@@ -19,13 +19,13 @@ import { ChannelPairingStepView } from './ChannelPairingStep';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
+import { CalendarConnectStepView } from './CalendarConnectStep';
 import { ClawSetupCompleteStep, ClawSetupErrorStep } from './ClawOnboardingFlow';
-import { PermissionStep } from './PermissionStep';
 import { ProvisioningStepView } from './ProvisioningStep';
 
 const FAKE_STEP_LABELS: Record<ClawOnboardingRenderStep, string> = {
   identity: 'Identity',
-  permissions: 'Permissions',
+  calendar: 'Calendar',
   channels: 'Channels',
   provisioning: 'Provisioning',
   pairing: 'Pairing',
@@ -52,6 +52,8 @@ const fakeStatus = {
   flyVolumeId: 'fake-volume',
   flyRegion: 'iad',
   machineSize: null,
+  instanceType: null,
+  volumeSizeGb: null,
   openclawVersion: 'fake',
   imageVariant: null,
   trackedImageTag: null,
@@ -62,17 +64,19 @@ const fakeStatus = {
   googleOAuthAccountEmail: null,
   googleOAuthCapabilities: [],
   gmailNotificationsEnabled: false,
-  execSecurity: 'allowlist',
-  execAsk: 'on-miss',
+  execSecurity: 'full',
+  execAsk: 'off',
   botName: 'KiloClaw',
   botNature: 'Operator',
   botVibe: 'Focused, capable, effective',
   botEmoji: '🤖',
   workerUrl: 'https://claw.kilo.ai',
+  controllerCapabilitiesVersion: null,
   name: 'Fake KiloClaw',
   instanceId: 'fake-instance',
   inboundEmailAddress: null,
   inboundEmailEnabled: false,
+  scheduledAction: null,
 } satisfies PopulatedClawStatus;
 
 export function ClawOnboardingFakeWalkthrough({
@@ -187,7 +191,7 @@ function getFakeStepProgress(
 function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
   switch (step) {
     case 'identity':
-    case 'permissions':
+    case 'calendar':
     case 'channels':
     case 'provisioning':
     case 'pairing':
@@ -209,14 +213,19 @@ function renderFakeStep({
 }: RenderFakeStepInput) {
   switch (step) {
     case 'identity': {
-      return <BotIdentityStep {...stepProgress} onContinue={() => setStep('permissions')} />;
+      return <BotIdentityStep {...stepProgress} onContinue={() => setStep('calendar')} />;
     }
-    case 'permissions': {
+    case 'calendar': {
       return (
-        <PermissionStep
+        <CalendarConnectStepView
           {...stepProgress}
-          instanceRunning={false}
-          onSelect={() => setStep('channels')}
+          connectUrl="#"
+          isConnected={false}
+          connectedAccountEmail={null}
+          readyToConnect={true}
+          onConnectClick={() => setStep('channels')}
+          onSkip={() => setStep('channels')}
+          onContinue={() => setStep('channels')}
         />
       );
     }
@@ -281,7 +290,7 @@ function renderFakeStep({
       );
     }
     case 'complete':
-      return <ClawSetupCompleteStep status={fakeStatus} gatewayReady basePath={basePath} />;
+      return <ClawSetupCompleteStep gatewayReady />;
     case 'error':
       return <ClawSetupErrorStep basePath={basePath} />;
   }

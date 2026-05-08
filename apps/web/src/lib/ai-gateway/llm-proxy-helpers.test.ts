@@ -2,6 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import {
   checkOrganizationModelRestrictions,
   extractEmbeddingPromptInfo,
+  makeErrorReadable,
   parseEmbeddingUsageFromResponse,
 } from './llm-proxy-helpers';
 
@@ -106,32 +107,31 @@ describe('checkOrganizationModelRestrictions', () => {
         settings: {
           model_deny_list: ['anthropic/claude-3-opus'],
         },
-        // No organizationPlan - individual user
       });
 
       expect(result.error).toBeNull();
     });
   });
 
-  describe('provider deny list - applies to enterprise plans', () => {
-    it('should return provider config with ignored providers for enterprise plan', () => {
+  describe('provider policy - allow list applies for enterprise plans', () => {
+    it('should return provider config with only providers for enterprise plan', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          provider_deny_list: ['openai'],
+          provider_allow_list: ['openai'],
         },
         organizationPlan: 'enterprise',
       });
 
       expect(result.error).toBeNull();
-      expect(result.providerConfig).toEqual({ ignore: ['openai'] });
+      expect(result.providerConfig).toEqual({ only: ['openai'] });
     });
 
-    it('should not return providerConfig for teams plan with provider_deny_list', () => {
+    it('should not return providerConfig for teams plan with provider_allow_list', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          provider_deny_list: ['openai'],
+          provider_allow_list: ['openai'],
         },
         organizationPlan: 'teams',
       });
@@ -140,17 +140,17 @@ describe('checkOrganizationModelRestrictions', () => {
       expect(result.providerConfig).toBeUndefined();
     });
 
-    it('should not return providerConfig when provider_deny_list is empty', () => {
+    it('should return providerConfig when provider_allow_list is empty', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          provider_deny_list: [],
+          provider_allow_list: [],
         },
         organizationPlan: 'enterprise',
       });
 
       expect(result.error).toBeNull();
-      expect(result.providerConfig).toBeUndefined();
+      expect(result.providerConfig).toEqual({ only: [] });
     });
   });
 
@@ -181,18 +181,18 @@ describe('checkOrganizationModelRestrictions', () => {
       expect(result.providerConfig).toEqual({ data_collection: 'deny' });
     });
 
-    it('should combine provider_deny_list and data_collection in provider config', () => {
+    it('should combine provider_allow_list and data_collection', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          provider_deny_list: ['openai'],
+          provider_allow_list: ['openai'],
           data_collection: 'deny',
         },
         organizationPlan: 'enterprise',
       });
 
       expect(result.error).toBeNull();
-      expect(result.providerConfig).toEqual({ ignore: ['openai'], data_collection: 'deny' });
+      expect(result.providerConfig).toEqual({ only: ['openai'], data_collection: 'deny' });
     });
   });
 
@@ -288,9 +288,8 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 100, total_tokens: 100, cost: 0.00005 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
-    // toMicrodollars(0.00005) = Math.round(0.00005 * 1_000_000) = 50
     expect(result.cost_mUsd).toBe(50);
   });
 
@@ -299,7 +298,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 1000, total_tokens: 1000 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.cost_mUsd).toBe(0);
   });
@@ -307,7 +306,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should extract id as messageId', () => {
     const response = makeResponse({ id: 'embd-abc' });
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.messageId).toBe('embd-abc');
   });
@@ -317,7 +316,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
     const parsed = JSON.parse(response);
     delete parsed.id;
 
-    const result = parseEmbeddingUsageFromResponse(JSON.stringify(parsed));
+    const result = parseEmbeddingUsageFromResponse(JSON.stringify(parsed), 200);
 
     expect(result.messageId).toBeNull();
   });
@@ -325,7 +324,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should set hasError to true when model is empty', () => {
     const response = makeResponse({ model: '' });
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.hasError).toBe(true);
   });
@@ -333,7 +332,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should set hasError to false when model is present', () => {
     const response = makeResponse({ model: 'text-embedding-3-small' });
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.hasError).toBe(false);
   });
@@ -341,7 +340,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should always set outputTokens to 0 and streamed/cancelled to false', () => {
     const response = makeResponse();
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.outputTokens).toBe(0);
     expect(result.streamed).toBe(false);
@@ -353,8 +352,21 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 42, total_tokens: 42 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.inputTokens).toBe(42);
+  });
+});
+
+describe('makeErrorReadable', () => {
+  it('returns undefined for non-error responses', async () => {
+    const response = new Response('{}', { status: 200 });
+    const result = await makeErrorReadable({
+      requestedModel: 'anything',
+      request: { kind: 'chat_completions', body: { model: 'test', messages: [] } },
+      response,
+      isUserByok: false,
+    });
+    expect(result).toBeUndefined();
   });
 });

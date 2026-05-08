@@ -1,7 +1,7 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import { createDrizzleClient, pg } from '@kilocode/db/client';
 import { computeDatabaseUrl } from '@kilocode/db';
-import { sql } from 'drizzle-orm';
+import { sql as drizzleSql } from 'drizzle-orm';
 import assert from 'node:assert';
 import { attachDatabasePool } from '@vercel/functions';
 export const { Client, Pool } = pg;
@@ -149,10 +149,10 @@ export const readDb = replica.db;
  * consider using `readDb` instead for better performance in US regions.
  */
 export const db = primaryDb;
-export { sql };
+export { sql } from 'drizzle-orm';
 
 // Helper for automatically updating the deleted_at column with database server time
-export const auto_deleted_at = { deleted_at: sql`now()` };
+export const auto_deleted_at = { deleted_at: drizzleSql`now()` };
 
 // Test cleanup functions
 // NOTE: With this simplified setup, the connection is created eagerly and not reset.
@@ -170,7 +170,7 @@ export type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]
 export async function cleanupDbForTest(): Promise<void> {
   // Use primary for test cleanup to ensure consistency
   const { rows: tables } = await primaryDb.execute<{ tablename: string }>(
-    sql`
+    drizzleSql`
       SELECT tablename
       FROM pg_tables
       WHERE schemaname = 'public'
@@ -190,5 +190,7 @@ export async function cleanupDbForTest(): Promise<void> {
   if (tables.length === 0) return;
 
   const truncateTargets = tables.map(({ tablename }) => `"${tablename}"`).join(', ');
-  await primaryDb.execute(sql.raw(`TRUNCATE TABLE ${truncateTargets} RESTART IDENTITY CASCADE;`));
+  await primaryDb.execute(
+    drizzleSql.raw(`TRUNCATE TABLE ${truncateTargets} RESTART IDENTITY CASCADE;`)
+  );
 }

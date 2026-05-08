@@ -177,6 +177,14 @@ export type PrimeContext = {
     branch: string | null;
     target_branch: string | null;
   } | null;
+  /** Present when the hooked bead is a PR conflict resolution (gt:pr-conflict label). */
+  pr_conflict_context: {
+    pr_url: string | null;
+    branch: string | null;
+    target_branch: string | null;
+    /** When true, the bead also has pending review feedback to address after resolving conflicts. */
+    has_feedback: boolean;
+  } | null;
 };
 
 // -- Agent done --
@@ -255,6 +263,10 @@ export const TownConfigSchema = z.object({
    * Town-level merge strategy. Rigs inherit this when they don't set their own.
    * - 'direct': Refinery pushes directly to main (no PR)
    * - 'pr': Refinery creates a GitHub PR / GitLab MR for human review
+   *
+   * NOTE: new towns are seeded with 'pr' by seedNewTownConfig(); the schema
+   * default below is preserved at 'direct' so existing persisted configs
+   * that never specified a merge_strategy keep their historical behavior.
    */
   merge_strategy: MergeStrategy.default('direct'),
 
@@ -275,6 +287,9 @@ export const TownConfigSchema = z.object({
       /** When enabled, a polecat is automatically dispatched to address
        *  unresolved review comments and failing CI checks on open PRs. */
       auto_resolve_pr_feedback: z.boolean().default(false),
+      /** When enabled, a polecat is automatically dispatched to rebase and
+       *  resolve merge conflicts on open PRs. */
+      auto_resolve_merge_conflicts: z.boolean().default(true).optional(),
       /** After all CI checks pass and all review threads are resolved,
        *  automatically merge the PR after this many minutes.
        *  0 = immediate, null = disabled (require manual merge). */
@@ -295,7 +310,9 @@ export const TownConfigSchema = z.object({
     })
     .optional(),
 
-  /** When true, all convoys are created as staged by default (agents not dispatched until started). */
+  /** When true, all convoys are created as staged by default (agents not dispatched until started).
+   *  New towns are seeded with `true` via seedNewTownConfig(); existing
+   *  persisted configs that never specified this key fall back to `false`. */
   staged_convoys_default: z.boolean().default(false),
 
   /** Default merge mode for new convoys.
@@ -347,6 +364,7 @@ export const RigOverrideConfigSchema = z.object({
   /** false = skip refinery entirely */
   code_review: z.boolean().optional(),
   auto_resolve_pr_feedback: z.boolean().optional(),
+  auto_resolve_merge_conflicts: z.boolean().optional(),
   auto_merge_delay_minutes: z.number().int().min(0).nullable().optional(),
 
   // Merge strategy
@@ -412,6 +430,7 @@ export const TownConfigUpdateSchema = z.object({
       code_review: z.boolean().optional(),
       review_mode: z.enum(['rework', 'comments']).optional(),
       auto_resolve_pr_feedback: z.boolean().optional(),
+      auto_resolve_merge_conflicts: z.boolean().optional(),
       auto_merge_delay_minutes: z.number().int().min(0).nullable().optional(),
     })
     .optional(),

@@ -59,8 +59,11 @@ for dir in $workspace_dirs; do
   has_test=$(node -e "const p=require('./$dir/package.json'); console.log(p.scripts?.test ? '1' : '')" 2>/dev/null)
   [ -n "$has_test" ] || continue
 
-  # Skip workspaces whose test script exists but has no test files
-  test_file_count=$(find "$dir" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' \) -not -path '*/node_modules/*' 2>/dev/null | head -1)
+  # Skip workspaces whose test script exists but has no test files.
+  # `-print -quit` stops find after the first match and prints it, avoiding
+  # a `find | head -1` pipeline — on Linux that produces SIGPIPE on find,
+  # which under `set -o pipefail` propagates as a non-zero pipeline exit.
+  test_file_count=$(find "$dir" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' \) -not -path '*/node_modules/*' -print -quit 2>/dev/null)
   [ -n "$test_file_count" ] || continue
 
   # Check for file changes (if we have a merge base)

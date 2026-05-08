@@ -15,7 +15,7 @@ These are non-negotiable. Do not reintroduce shared/fallback paths.
 - **`buildEnvVars` requires `sandboxId` and `gatewayTokenSecret`.** Returns `{ env, sensitive }` split. Sensitive values are AES-256-GCM encrypted and prefixed with `KILOCLAW_ENC_` before placement in machine config.env. Gateway token and `AUTO_APPROVE_DEVICES` are always set. No fallback to worker-level channel tokens.
 - **Env var name constraints.** User-provided `envVars` and `encryptedSecrets` keys must be valid shell identifiers (`/^[A-Za-z_][A-Za-z0-9_]*$/`) and must not use reserved prefixes `KILOCLAW_ENC_` or `KILOCLAW_ENV_`. Validated at schema level (ingest) and runtime (decrypt block).
 - **Token comparisons must be timing-safe.** Never compare auth/proxy tokens with `===`/`!==`. Use `timingSafeTokenEqual` from `controller/src/auth.ts` (or an equivalent `crypto.timingSafeEqual`-based helper) for bearer/proxy token validation.
-- **Next.js is the sole Postgres writer.** The worker only reads via Hyperdrive (pepper validation + DO restore). The DB stores registry data (`user_id`, `sandbox_id`, `created_at`, `destroyed_at`) plus config backup. Operational state (status, timestamps, Fly machine/volume IDs) lives in the DO only.
+- **`kiloclaw_instances` write split.** The Worker is the sole inserter of rows (`insertProvisionedInstanceRecord`, enforced by `.specs/kiloclaw-datamodel.md` rule 21) — infrastructure is provisioned first, the row reflects it. The Worker also owns updates to a small set of DO-mirrored columns: destroy finalization (`markDestroyedInPostgresHelper`) and denormalized operational metadata (`tracked_image_tag`, `instance_type`, `admin_size_override`) written via `syncTrackedImageTagToPostgresHelper` / `syncInstanceTypeToPostgresHelper` / `syncAdminSizeOverrideToPostgresHelper`. The DO is the source of truth for these columns; the Postgres copy is a denormalized read cache for SQL-filterable admin tooling. `tracked_image_tag` and `instance_type` are written by the alarm reconciler when DO state changes; `admin_size_override` is written only on explicit admin RPC paths (set/clear/auto-clear-on-tier-resize) — there is no observation path. Next.js owns updates to ownership, lifecycle, and billing columns (`organization_id`, `name`, `inbound_email_enabled`, soft-delete via `markActiveInstanceDestroyed`, etc. in `apps/web/src/lib/kiloclaw/instance-registry.ts` and `instance-lifecycle.ts`). Next.js never inserts `kiloclaw_instances` rows. New Worker writes beyond the DO-mirrored carve-out require explicit justification — prefer a Next.js tRPC procedure unless the data fundamentally lives in the DO and is being denormalized for query-shape reasons.
 - **DO restore from Postgres.** If DO SQLite is wiped, `start(userId)` reads the active instance row from Postgres and repopulates the DO state. This is the backup path for development mistakes that corrupt DO storage.
 - **Two-phase destroy.** Fly resource IDs (`pendingDestroyMachineId`, `pendingDestroyVolumeId`) are persisted before deletion attempts. DO state is only cleared when both are confirmed deleted. The alarm retries on failure.
 - **No machine recreation on transient errors.** `startExistingMachine()` only creates a new machine on 404 (confirmed gone). Transient Fly API errors (500, timeout) are re-thrown, not masked by duplicate creation.
@@ -128,14 +128,16 @@ The alarm runs for ALL statuses (not just `running`). `destroying` short-circuit
 
 ### Optional
 
-| Variable                     | Purpose                                                                                                                                                                 |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FLY_REGION`                 | Default region for new volumes/machines. Comma-separated priority list: `us,eu` tries US first, falls back to EU. (default: `us,eu`)                                    |
-| `KILOCODE_API_BASE_URL`      | Override KiloCode API URL                                                                                                                                               |
-| `AGENT_ENV_VARS_PRIVATE_KEY` | RSA private key for decrypting user secrets                                                                                                                             |
-| `TELEGRAM_DM_POLICY`         | Telegram DM policy (passed through to machine)                                                                                                                          |
-| `DISCORD_DM_POLICY`          | Discord DM policy (passed through to machine)                                                                                                                           |
-| `OPENCLAW_ALLOWED_ORIGINS`   | Comma-separated origins for Control UI WebSocket (e.g., `http://localhost:3000,http://localhost:8795`). Production: `https://claw.kilo.ai,https://claw.kilosessions.ai` |
+| Variable                        | Purpose                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `FLY_REGION`                    | Default region for new volumes/machines. Comma-separated priority list: `us,eu` tries US first, falls back to EU. (default: `us,eu`)                                                                                                                                                                                                 |
+| `KILOCODE_API_BASE_URL`         | Override KiloCode API URL                                                                                                                                                                                                                                                                                                            |
+| `AGENT_ENV_VARS_PRIVATE_KEY`    | RSA private key for decrypting user secrets                                                                                                                                                                                                                                                                                          |
+| `TELEGRAM_DM_POLICY`            | Telegram DM policy (passed through to machine)                                                                                                                                                                                                                                                                                       |
+| `DISCORD_DM_POLICY`             | Discord DM policy (passed through to machine)                                                                                                                                                                                                                                                                                        |
+| `OPENCLAW_ALLOWED_ORIGINS`      | Comma-separated origins for Control UI WebSocket (e.g., `http://localhost:3000,http://localhost:8795`). Production: `https://claw.kilo.ai,https://claw.kilosessions.ai`. Per-instance `<scheme>://<label><suffix>` origins are appended at machine build time from `KILOCLAW_INSTANCE_HOST_SUFFIX` + `KILOCLAW_INSTANCE_URL_SCHEME`. |
+| `KILOCLAW_INSTANCE_HOST_SUFFIX` | Host suffix for per-instance virtual hosting. Prod default in `wrangler.jsonc` is `.kiloclaw.ai`. No silent fallback — an unset value causes request-path code to throw (and `validateRequiredEnv` returns 503).                                                                                                                     |
+| `KILOCLAW_INSTANCE_URL_SCHEME`  | URL scheme paired with `KILOCLAW_INSTANCE_HOST_SUFFIX`. Prod default `https`. For dev-parity, set to `http` with a `:port`-bearing suffix like `.kiloclaw.localhost:8795`.                                                                                                                                                           |
 
 ### Fly.io Regions
 
@@ -215,7 +217,7 @@ KiloClaw is transitioning from one-instance-per-user to N-instances-per-owner (p
 - **Ownership checks are required on user-facing routes that accept `instanceId`.** The `/i/:instanceId/*` proxy route, `kiloclaw.ts` routes, and `api.ts` admin routes all verify `status.userId === authenticated userId` before allowing access. New routes must do the same.
 - **The Instance DO `provision()` method accepts `opts.instanceId` and `opts.orgId`.** When `instanceId` is provided, sandboxId is derived from it instead of userId. When `orgId` is provided, it's persisted in DO state and injected as an env var.
 - **Postgres `kiloclaw_instances.id` IS the instanceId.** There is no separate `instance_id` column. The existing UUID primary key is the routing identity.
-- **Next.js is still the sole Postgres writer.** The `ensureActiveInstance()` function returns the row's `id` which callers use as the instanceId for worker API calls.
+- **Row creation is Worker-driven.** Provision flows call the Worker's platform route, which inserts the `kiloclaw_instances` row and returns the `id`. `ensureActiveInstance()` in Next.js is now a read-through helper that returns the existing row; it does not create rows. See `.specs/kiloclaw-datamodel.md` rule 21.
 
 ### Upcoming PRs (do not implement yet)
 
@@ -259,31 +261,27 @@ User config is transported to the machine via environment variables set in the F
 
 **Encrypted (stored as `KILOCLAW_ENC_{name}`, decrypted to `{name}` at boot):**
 
-| Env var (after decrypt)      | Source                            | Purpose                        |
-| ---------------------------- | --------------------------------- | ------------------------------ |
-| `KILOCODE_API_KEY`           | User config (DO)                  | KiloCode API authentication    |
-| `OPENCLAW_GATEWAY_TOKEN`     | Derived from sandboxId            | Per-user gateway auth          |
-| `TELEGRAM_BOT_TOKEN`         | Decrypted channel token           | Telegram channel               |
-| `DISCORD_BOT_TOKEN`          | Decrypted channel token           | Discord channel                |
-| `SLACK_BOT_TOKEN`            | Decrypted channel token           | Slack channel                  |
-| `SLACK_APP_TOKEN`            | Decrypted channel token           | Slack channel                  |
-| `STREAM_CHAT_BOT_USER_TOKEN` | Auto-provisioned (Stream Chat DO) | Stream Chat bot authentication |
-| User encrypted secrets       | Decrypted from RSA envelopes      | User-provided credentials      |
+| Env var (after decrypt)  | Source                       | Purpose                     |
+| ------------------------ | ---------------------------- | --------------------------- |
+| `KILOCODE_API_KEY`       | User config (DO)             | KiloCode API authentication |
+| `OPENCLAW_GATEWAY_TOKEN` | Derived from sandboxId       | Per-user gateway auth       |
+| `TELEGRAM_BOT_TOKEN`     | Decrypted channel token      | Telegram channel            |
+| `DISCORD_BOT_TOKEN`      | Decrypted channel token      | Discord channel             |
+| `SLACK_BOT_TOKEN`        | Decrypted channel token      | Slack channel               |
+| `SLACK_APP_TOKEN`        | Decrypted channel token      | Slack channel               |
+| User encrypted secrets   | Decrypted from RSA envelopes | User-provided credentials   |
 
 **Plaintext (stored as-is in config.env):**
 
-| Env var                          | Source                            | Purpose                              |
-| -------------------------------- | --------------------------------- | ------------------------------------ |
-| `KILOCODE_DEFAULT_MODEL`         | User config (DO)                  | Default model for agents             |
-| `KILOCODE_MODELS_JSON`           | User config (DO), JSON-serialized | Available model list                 |
-| `KILOCODE_API_BASE_URL`          | Worker env                        | API base URL override                |
-| `AUTO_APPROVE_DEVICES`           | Hardcoded `true`                  | Skip device pairing                  |
-| `TELEGRAM_DM_POLICY`             | Worker env                        | Telegram DM policy                   |
-| `DISCORD_DM_POLICY`              | Worker env                        | Discord DM policy                    |
-| `OPENCLAW_ALLOWED_ORIGINS`       | Worker env                        | Control UI WebSocket allowed origins |
-| `STREAM_CHAT_API_KEY`            | Auto-provisioned (Stream Chat DO) | Stream Chat app key                  |
-| `STREAM_CHAT_BOT_USER_ID`        | Auto-provisioned (Stream Chat DO) | Per-user bot identifier              |
-| `STREAM_CHAT_DEFAULT_CHANNEL_ID` | Auto-provisioned (Stream Chat DO) | Default channel ID for the user      |
+| Env var                    | Source                            | Purpose                              |
+| -------------------------- | --------------------------------- | ------------------------------------ |
+| `KILOCODE_DEFAULT_MODEL`   | User config (DO)                  | Default model for agents             |
+| `KILOCODE_MODELS_JSON`     | User config (DO), JSON-serialized | Available model list                 |
+| `KILOCODE_API_BASE_URL`    | Worker env                        | API base URL override                |
+| `AUTO_APPROVE_DEVICES`     | Hardcoded `true`                  | Skip device pairing                  |
+| `TELEGRAM_DM_POLICY`       | Worker env                        | Telegram DM policy                   |
+| `DISCORD_DM_POLICY`        | Worker env                        | Discord DM policy                    |
+| `OPENCLAW_ALLOWED_ORIGINS` | Worker env                        | Control UI WebSocket allowed origins |
 
 ### AI Provider Selection
 
@@ -319,15 +317,17 @@ These files are COPYed by the Dockerfile and hashed by CI (`deploy-kiloclaw.yml`
 produce the content-hash image tag. If you add or remove a COPY in the Dockerfile,
 update the `find` command in the workflow's "Compute source content hash" step to match.
 
-| Path                              | Purpose                                                 |
-| --------------------------------- | ------------------------------------------------------- |
-| `Dockerfile`                      | Base image, apt packages, npm versions                  |
-| `controller/`                     | Compiled to `kiloclaw-controller.js` (entrypoint)       |
-| `container/`                      | Runtime assets (e.g. `TOOLS.md`) staged outside `/root` |
-| `plugins/kiloclaw-customizer/`    | KiloClaw customizer plugin package installed in image   |
-| `openclaw-pairing-list.js`        | Helper script used at runtime by controller             |
-| `openclaw-device-pairing-list.js` | Helper script used at runtime by controller             |
-| `skills/`                         | Custom skills copied to `/root/clawd/skills/`           |
+| Path                                 | Purpose                                                 |
+| ------------------------------------ | ------------------------------------------------------- |
+| `Dockerfile`                         | Base image, apt packages, npm versions                  |
+| `controller/`                        | Compiled to `kiloclaw-controller.js` (entrypoint)       |
+| `container/`                         | Runtime assets (e.g. `TOOLS.md`) staged outside `/root` |
+| `plugins/kiloclaw-customizer/`       | KiloClaw customizer plugin package installed in image   |
+| `plugins/kilo-chat/`                 | Kilo Chat channel plugin package installed in image     |
+| `plugins/kiloclaw-morning-briefing/` | Morning briefing plugin package installed in image      |
+| `openclaw-pairing-list.js`           | Helper script used at runtime by controller             |
+| `openclaw-device-pairing-list.js`    | Helper script used at runtime by controller             |
+| `skills/`                            | Custom skills copied to `/root/clawd/skills/`           |
 
 ## Fly Machine Lifecycle
 

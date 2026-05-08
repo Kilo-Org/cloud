@@ -4,15 +4,24 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import type { Owner } from '@/lib/integrations/core/types';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { exchangeSlackCode, upsertSlackInstallation } from '@/lib/integrations/slack-service';
-import { syncOldSlackInstallationToSdk } from '@/lib/bot/slack-installation-sync';
+import {
+  SlackWorkspaceAlreadyConnectedError,
+  upsertSlackInstallation,
+} from '@/lib/integrations/slack-service';
+import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
+import { bot } from '@/lib/bot';
+
+const SLACK_REDIRECT_URI = `${APP_URL}/api/integrations/slack/callback`;
 
 const buildSlackRedirectPath = (state: string | null, queryParam: string): string => {
-  if (state?.startsWith('org_')) {
-    return `/organizations/${state.replace('org_', '')}/integrations/slack?${queryParam}`;
+  const verified = state ? verifyOAuthState(state) : null;
+  const owner = verified?.owner;
+
+  if (owner?.startsWith('org_')) {
+    return `/organizations/${owner.replace('org_', '')}/integrations/slack?${queryParam}`;
   }
-  if (state?.startsWith('user_')) {
+  if (owner?.startsWith('user_')) {
     return `/integrations/slack?${queryParam}`;
   }
   return `/integrations?${queryParam}`;
@@ -63,18 +72,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 3. Parse owner from state
-    let owner: Owner;
-    let ownerId: string;
-
-    if (state?.startsWith('org_')) {
-      ownerId = state.replace('org_', '');
-      owner = { type: 'org', id: ownerId };
-    } else if (state?.startsWith('user_')) {
-      ownerId = state.replace('user_', '');
-      owner = { type: 'user', id: ownerId };
-    } else {
-      captureMessage('Slack callback missing or invalid owner in state', {
+    // 3. Verify signed state (CSRF protection)
+    const verified = verifyOAuthState(state);
+    if (!verified) {
+      captureMessage('Slack callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
         extra: { code: '***', state, allParams: Object.fromEntries(searchParams.entries()) },
@@ -82,7 +83,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
-    // 4. Verify user has access to the owner
+    // 4. Verify the user completing the flow is the same user who initiated it
+    if (verified.userId !== user.id) {
+      captureMessage('Slack callback user mismatch (possible CSRF)', {
+        level: 'warning',
+        tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
+        extra: { stateUserId: verified.userId, sessionUserId: user.id },
+      });
+      return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+    }
+
+    // 5. Parse owner from verified state payload
+    let owner: Owner;
+    const ownerStr = verified.owner;
+
+    if (ownerStr.startsWith('org_')) {
+      const ownerId = ownerStr.replace('org_', '');
+      owner = { type: 'org', id: ownerId };
+    } else if (ownerStr.startsWith('user_')) {
+      const ownerId = ownerStr.replace('user_', '');
+      owner = { type: 'user', id: ownerId };
+    } else {
+      captureMessage('Slack callback missing or invalid owner in state', {
+        level: 'warning',
+        tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
+        extra: { code: '***', owner: ownerStr },
+      });
+      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
+    }
+
+    // 6. Verify user has access to the owner
     if (owner.type === 'org') {
       await ensureOrganizationAccess({ user }, owner.id);
     } else {
@@ -92,27 +122,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 5. Exchange code for access token
-    const oauthData = await exchangeSlackCode(code);
+    // 7. Let the Chat SDK exchange the code and seed its installation state
+    await bot.initialize();
+    const slackAdapter = bot.getAdapter('slack');
+    const url = new URL(request.url);
+    url.searchParams.set('redirect_uri', SLACK_REDIRECT_URI);
+    const patchedRequest = new Request(url, request);
+    const { teamId, installation } = await slackAdapter.handleOAuthCallback(patchedRequest);
 
-    // 6. Store installation in database
-    await upsertSlackInstallation(owner, oauthData);
-
-    // 7. Best-effort seed Chat SDK state for future migration
+    // 8. Store installation in database
     try {
-      await syncOldSlackInstallationToSdk(oauthData);
-    } catch (syncError) {
-      captureException(syncError, {
-        tags: { endpoint: 'slack/callback', source: 'slack_sdk_sync' },
-        extra: {
-          teamId: oauthData.team?.id,
-          ownerType: owner.type,
-          ownerId: owner.id,
-        },
-      });
+      await upsertSlackInstallation({ owner, teamId, installation });
+    } catch (error) {
+      if (error instanceof SlackWorkspaceAlreadyConnectedError) {
+        return NextResponse.redirect(
+          new URL(buildSlackRedirectPath(state, 'error=workspace_already_connected'), APP_URL)
+        );
+      }
+
+      throw error;
     }
 
-    // 8. Redirect to success page
+    // 9. Redirect to success page
     const successPath =
       owner.type === 'org'
         ? `/organizations/${owner.id}/integrations/slack?success=installed`

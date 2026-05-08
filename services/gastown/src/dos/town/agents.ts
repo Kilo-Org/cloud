@@ -190,19 +190,42 @@ export function listAgents(sql: SqlStorage, filter?: AgentFilter): Agent[] {
 }
 
 export function updateAgentStatus(sql: SqlStorage, agentId: string, status: string): void {
+  // Set stalled_at when transitioning into `stalled`, clear it when transitioning
+  // out. The reconciler uses stalled_at (not last_activity_at) to measure how
+  // long an agent has been stalled, so the 2.5h recovery window is anchored to
+  // the stall event rather than the last heartbeat (which keeps arriving while
+  // the container is still running post-GUPP force-stop).
   query(
     sql,
     /* sql */ `
       UPDATE ${agent_metadata}
-      SET ${agent_metadata.columns.status} = ?
+      SET ${agent_metadata.columns.status} = ?,
+          ${agent_metadata.columns.stalled_at} = CASE
+            WHEN ? = 'stalled' THEN COALESCE(${agent_metadata.columns.stalled_at}, ?)
+            ELSE NULL
+          END
       WHERE ${agent_metadata.bead_id} = ?
     `,
-    [status, agentId]
+    [status, status, now(), agentId]
   );
 }
 
 export function deleteAgent(sql: SqlStorage, agentId: string): void {
-  // Unassign beads that reference this agent
+  // Clear assignee on terminal beads (closed/failed) without reopening them.
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${beads}
+      SET ${beads.columns.assignee_agent_bead_id} = NULL,
+          ${beads.columns.updated_at} = ?
+      WHERE ${beads.assignee_agent_bead_id} = ?
+        AND ${beads.columns.status} IN ('closed', 'failed')
+    `,
+    [now(), agentId]
+  );
+
+  // Reopen non-terminal beads assigned to this agent so the reconciler
+  // can re-dispatch them.
   query(
     sql,
     /* sql */ `
@@ -211,6 +234,7 @@ export function deleteAgent(sql: SqlStorage, agentId: string): void {
           ${beads.columns.status} = 'open',
           ${beads.columns.updated_at} = ?
       WHERE ${beads.assignee_agent_bead_id} = ?
+        AND ${beads.columns.status} NOT IN ('closed', 'failed')
     `,
     [now(), agentId]
   );
@@ -504,6 +528,33 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
     };
   }
 
+  // Build PR conflict context if the hooked bead is a PR conflict resolution request,
+  // or if it is a PR feedback bead that has also accumulated merge conflicts.
+  let pr_conflict_context: PrimeContext['pr_conflict_context'] = null;
+  if (hookedBead?.labels.includes('gt:pr-conflict') && hookedBead.metadata) {
+    const meta = hookedBead.metadata as Record<string, unknown>;
+    pr_conflict_context = {
+      pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
+      branch: typeof meta.branch === 'string' ? meta.branch : null,
+      target_branch: typeof meta.target_branch === 'string' ? meta.target_branch : null,
+      has_feedback: meta.has_feedback === true || meta.has_feedback === 1,
+    };
+  } else if (hookedBead?.labels.includes('gt:pr-feedback') && hookedBead.metadata) {
+    // A feedback bead can also have has_conflicts: true when a conflict was detected
+    // after the feedback bead was already created. Surface the conflict context so the
+    // agent resolves conflicts first, then addresses review feedback.
+    const meta = hookedBead.metadata as Record<string, unknown>;
+    if (meta.has_conflicts === true || meta.has_conflicts === 1) {
+      pr_conflict_context = {
+        pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
+        branch: typeof meta.branch === 'string' ? meta.branch : null,
+        target_branch:
+          typeof meta.conflict_target_branch === 'string' ? meta.conflict_target_branch : null,
+        has_feedback: true,
+      };
+    }
+  }
+
   return {
     agent,
     hooked_bead: hookedBead,
@@ -511,6 +562,7 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
     open_beads: openBeads,
     rework_context,
     pr_fixup_context,
+    pr_conflict_context,
   };
 }
 

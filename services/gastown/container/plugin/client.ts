@@ -26,6 +26,43 @@ function isApiResponse(
   return typeof obj.success === 'boolean';
 }
 
+/**
+ * One-shot refresh of `process.env.GASTOWN_CONTAINER_TOKEN` via the
+ * worker's `/refresh-container-token` endpoint. Returns the fresh
+ * token on success, or null on any failure (network error, non-2xx,
+ * missing env). Used by the plugin clients to recover from a 401
+ * caused by an expired container JWT.
+ *
+ * Duplicates the container/src/token-refresh.ts helper to keep the
+ * plugin independent of the control-server bundle.
+ */
+async function refreshContainerTokenFromWorker(baseUrl: string): Promise<string | null> {
+  const current = process.env.GASTOWN_CONTAINER_TOKEN;
+  const townId = process.env.GASTOWN_TOWN_ID;
+  if (!current || !townId) return null;
+  try {
+    const resp = await fetch(`${baseUrl}/api/towns/${townId}/refresh-container-token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${current}`,
+      },
+      body: '{}',
+    });
+    if (!resp.ok) return null;
+    const body: unknown = await resp.json();
+    const token =
+      body && typeof body === 'object' && 'data' in body
+        ? (body as { data?: { token?: unknown } }).data?.token
+        : undefined;
+    if (typeof token !== 'string' || token.length === 0) return null;
+    process.env.GASTOWN_CONTAINER_TOKEN = token;
+    return token;
+  } catch {
+    return null;
+  }
+}
+
 export class GastownClient {
   private baseUrl: string;
   private containerToken: string | undefined;
@@ -51,25 +88,39 @@ export class GastownClient {
   }
 
   private async request<T>(url: string, init?: RequestInit): Promise<T> {
-    // Normalize headers so callers can pass plain objects, Headers instances, or tuples
-    const headers = new Headers(init?.headers);
-    headers.set('Content-Type', 'application/json');
-    // Prefer the live container token from process.env (refreshed by the
-    // TownDO alarm via POST /refresh-token), then the token captured at
-    // init, then the legacy per-agent JWT.
-    const authToken = process.env.GASTOWN_CONTAINER_TOKEN ?? this.containerToken ?? this.token;
-    headers.set('Authorization', `Bearer ${authToken}`);
-    // When using a container-scoped JWT, send agent identity headers so
-    // the auth middleware can populate agentId/rigId on routes that don't
-    // have :agentId/:rigId params (e.g. /triage/resolve, /mail).
-    if (process.env.GASTOWN_CONTAINER_TOKEN || this.containerToken) {
-      headers.set('X-Gastown-Agent-Id', this.agentId);
-      headers.set('X-Gastown-Rig-Id', this.rigId);
-    }
+    const doFetch = async (): Promise<Response> => {
+      // Normalize headers so callers can pass plain objects, Headers instances, or tuples.
+      // Rebuilt on every attempt so a refreshed token is picked up on retry.
+      const headers = new Headers(init?.headers);
+      headers.set('Content-Type', 'application/json');
+      // Prefer the live container token from process.env (refreshed by the
+      // TownDO alarm via POST /refresh-token or by refreshContainerTokenFromWorker),
+      // then the token captured at init, then the legacy per-agent JWT.
+      const authToken = process.env.GASTOWN_CONTAINER_TOKEN ?? this.containerToken ?? this.token;
+      headers.set('Authorization', `Bearer ${authToken}`);
+      // When using a container-scoped JWT, send agent identity headers so
+      // the auth middleware can populate agentId/rigId on routes that don't
+      // have :agentId/:rigId params (e.g. /triage/resolve, /mail).
+      if (process.env.GASTOWN_CONTAINER_TOKEN || this.containerToken) {
+        headers.set('X-Gastown-Agent-Id', this.agentId);
+        headers.set('X-Gastown-Rig-Id', this.rigId);
+      }
+      return fetch(url, { ...init, headers });
+    };
 
     let response: Response;
     try {
-      response = await fetch(url, { ...init, headers });
+      response = await doFetch();
+      // One-shot token refresh on 401: the running kilo serve child was
+      // spawned with a snapshot of env and doesn't see live updates to
+      // process.env. When the parent receives a 401, mint a fresh token
+      // via the worker and retry once.
+      if (response.status === 401) {
+        const fresh = await refreshContainerTokenFromWorker(this.baseUrl);
+        if (fresh) {
+          response = await doFetch();
+        }
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new GastownApiError(`Network error: ${message}`, 0);
@@ -258,19 +309,29 @@ export class MayorGastownClient {
   }
 
   private async request<T>(url: string, init?: RequestInit): Promise<T> {
-    const headers = new Headers(init?.headers);
-    headers.set('Content-Type', 'application/json');
-    // Prefer live container token (refreshed via POST /refresh-token),
-    // then init-time token, then legacy per-agent JWT.
-    const authToken = process.env.GASTOWN_CONTAINER_TOKEN ?? this.containerToken ?? this.token;
-    headers.set('Authorization', `Bearer ${authToken}`);
-    if (process.env.GASTOWN_CONTAINER_TOKEN || this.containerToken) {
-      headers.set('X-Gastown-Agent-Id', this.agentId);
-    }
+    const doFetch = async (): Promise<Response> => {
+      const headers = new Headers(init?.headers);
+      headers.set('Content-Type', 'application/json');
+      // Prefer live container token (refreshed via POST /refresh-token
+      // or refreshContainerTokenFromWorker), then init-time token,
+      // then legacy per-agent JWT.
+      const authToken = process.env.GASTOWN_CONTAINER_TOKEN ?? this.containerToken ?? this.token;
+      headers.set('Authorization', `Bearer ${authToken}`);
+      if (process.env.GASTOWN_CONTAINER_TOKEN || this.containerToken) {
+        headers.set('X-Gastown-Agent-Id', this.agentId);
+      }
+      return fetch(url, { ...init, headers });
+    };
 
     let response: Response;
     try {
-      response = await fetch(url, { ...init, headers });
+      response = await doFetch();
+      if (response.status === 401) {
+        const fresh = await refreshContainerTokenFromWorker(this.baseUrl);
+        if (fresh) {
+          response = await doFetch();
+        }
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new GastownApiError(`Network error: ${message}`, 0);
@@ -409,12 +470,34 @@ export class MayorGastownClient {
       status?: 'open' | 'in_progress' | 'in_review' | 'closed' | 'failed';
       priority?: 'low' | 'medium' | 'high' | 'critical';
       labels?: string[];
+      depends_on?: string[];
     }
   ): Promise<Bead> {
     return this.request<Bead>(this.mayorPath(`/rigs/${rigId}/beads/${beadId}`), {
       method: 'PATCH',
       body: JSON.stringify(input),
     });
+  }
+
+  async convoyAddBead(
+    convoyId: string,
+    beadId: string,
+    dependsOn?: string[]
+  ): Promise<{ total_beads: number }> {
+    return this.request<{ total_beads: number }>(this.mayorPath(`/convoys/${convoyId}/add-bead`), {
+      method: 'POST',
+      body: JSON.stringify({ bead_id: beadId, depends_on: dependsOn }),
+    });
+  }
+
+  async convoyRemoveBead(convoyId: string, beadId: string): Promise<{ total_beads: number }> {
+    return this.request<{ total_beads: number }>(
+      this.mayorPath(`/convoys/${convoyId}/remove-bead`),
+      {
+        method: 'POST',
+        body: JSON.stringify({ bead_id: beadId }),
+      }
+    );
   }
 
   async reassignBead(rigId: string, beadId: string, agentId: string): Promise<Bead> {
@@ -428,6 +511,27 @@ export class MayorGastownClient {
     await this.request<void>(this.mayorPath(`/rigs/${rigId}/beads/${beadId}`), {
       method: 'DELETE',
     });
+  }
+
+  async deleteBeads(rigId: string, beadIds: string[]): Promise<{ deleted: number }> {
+    return this.request<{ deleted: number }>(this.mayorPath(`/rigs/${rigId}/beads/bulk-delete`), {
+      method: 'POST',
+      body: JSON.stringify({ bead_ids: beadIds }),
+    });
+  }
+
+  async deleteBeadsByStatus(
+    rigId: string,
+    status: 'open' | 'in_progress' | 'in_review' | 'closed' | 'failed',
+    type?: string
+  ): Promise<{ deleted: number }> {
+    return this.request<{ deleted: number }>(
+      this.mayorPath(`/rigs/${rigId}/beads/delete-by-status`),
+      {
+        method: 'POST',
+        body: JSON.stringify({ status, ...(type ? { type } : {}) }),
+      }
+    );
   }
 
   async resetAgent(rigId: string, agentId: string): Promise<void> {

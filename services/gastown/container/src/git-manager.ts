@@ -1,8 +1,25 @@
-import { mkdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { CloneOptions, WorktreeOptions } from './types';
 
 const WORKSPACE_ROOT = '/workspace/rigs';
+
+// Message fragments that indicate a git authentication failure. git CLI
+// doesn't surface HTTP status codes directly; we match on stderr.
+const AUTH_FAILURE_PATTERNS = [
+  /\b(401|403)\b/,
+  /Authentication failed/i,
+  /could not read Username/i,
+  /terminal prompts disabled/i,
+  /fatal: unable to access.*The requested URL returned error:\s*(401|403)/i,
+  /Invalid username or (password|token)/i,
+  /remote: (Invalid|Bad|Write access to repository not granted)/i,
+];
+
+function isAuthFailure(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return AUTH_FAILURE_PATTERNS.some(re => re.test(msg));
+}
 
 // ── Per-rig mutex ────────────────────────────────────────────────────────
 // Git operations (clone, fetch, worktree add/remove) on the same bare repo
@@ -180,6 +197,219 @@ async function assertInsideWorkspace(targetPath: string): Promise<void> {
   }
 }
 
+/**
+ * Call the worker's refresh-git-token endpoint to obtain a fresh GitHub
+ * App installation token. Updates process.env.GIT_TOKEN and rewrites
+ * per-repo credential-store files so subsequent git operations (including
+ * the agent's own `git push`) pick up the new token.
+ *
+ * Returns the new token on success, or null if the refresh failed (no
+ * integration configured, network error, auth rejected, etc.).
+ *
+ * Callers: retry-on-auth-failure wrapper in git-manager, periodic refresh
+ * timer in process-manager (if added).
+ */
+export async function refreshGitToken(rigId: string): Promise<string | null> {
+  const apiUrl = process.env.GASTOWN_API_URL;
+  const townId = process.env.GASTOWN_TOWN_ID;
+  const token = process.env.GASTOWN_CONTAINER_TOKEN;
+  if (!apiUrl || !townId || !token) {
+    console.warn(
+      `[refreshGitToken] missing env: apiUrl=${!!apiUrl} townId=${!!townId} containerToken=${!!token}`
+    );
+    return null;
+  }
+
+  try {
+    const resp = await fetch(`${apiUrl}/api/towns/${townId}/rigs/${rigId}/refresh-git-token`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '(unreadable)');
+      console.warn(
+        `[refreshGitToken] worker returned ${resp.status} for rig=${rigId}: ${body.slice(0, 200)}`
+      );
+      return null;
+    }
+    const raw: unknown = await resp.json();
+    if (
+      !raw ||
+      typeof raw !== 'object' ||
+      !('data' in raw) ||
+      !raw.data ||
+      typeof raw.data !== 'object' ||
+      !('token' in raw.data) ||
+      typeof (raw.data as { token: unknown }).token !== 'string'
+    ) {
+      console.warn(`[refreshGitToken] unexpected response shape for rig=${rigId}`);
+      return null;
+    }
+    const freshToken = (raw.data as { token: string }).token;
+
+    // Update process.env so subsequent exec() calls (which inherit
+    // process.env) see the new token via authenticateGitUrl.
+    process.env.GIT_TOKEN = freshToken;
+
+    // Rewrite the per-rig /tmp/.git-credentials* files that currently
+    // store a token. The credential helper reads these verbatim, so the
+    // agent's own `git push` (running in a subprocess outside this module)
+    // picks up the new token on the next invocation without restart.
+    //
+    // Scoped to the current rig only — both configureGitCredentials and
+    // configureRepoCredentials slugify a path containing the rigId into
+    // the credential filename, so we can select them by substring match.
+    // Rewriting every file would clobber other rigs' tokens (each rig can
+    // have a distinct platformIntegrationId, so tokens are not interchangeable).
+    await rewriteCredentialStoreFiles(rigId, freshToken);
+
+    console.log(`[refreshGitToken] refreshed token for rig=${rigId}`);
+    return freshToken;
+  } catch (err) {
+    console.warn(`[refreshGitToken] failed for rig=${rigId}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Walk /tmp for credential-store files previously written by
+ * configureRepoCredentials / configureGitCredentials for the given rig
+ * and rewrite them to use the new token. Files for other rigs are left
+ * alone so this refresh doesn't stomp their (possibly distinct) tokens.
+ *
+ * Files are identified by the slugified rigId appearing in the filename
+ * (both writers embed a path under `/workspace/rigs/<rigId>/...` in the
+ * credential file name, slugified via `replace(/[^a-zA-Z0-9]/g, '-')`).
+ * Only GitHub `x-access-token` lines are rewritten; GitLab `oauth2`
+ * lines are left alone (they use gitlab_token, not an installation token).
+ */
+async function rewriteCredentialStoreFiles(rigId: string, freshToken: string): Promise<void> {
+  let entries: string[];
+  try {
+    entries = await readdir('/tmp');
+  } catch {
+    return;
+  }
+
+  const rigSlug = rigId.replace(/[^a-zA-Z0-9]/g, '-');
+
+  for (const name of entries) {
+    if (!name.startsWith('.git-credentials')) continue;
+    if (!name.includes(rigSlug)) continue;
+    const path = `/tmp/${name}`;
+    let content: string;
+    try {
+      content = await readFile(path, 'utf8');
+    } catch {
+      continue;
+    }
+
+    // Credential line format: https://x-access-token:<token>@<host>\n
+    // Only rewrite lines using x-access-token (GitHub). Leave oauth2
+    // (GitLab) lines alone so we don't replace gitlab_token with a
+    // GitHub token.
+    const rewritten = content
+      .split('\n')
+      .map(line => {
+        if (!line.startsWith('https://x-access-token:')) return line;
+        const match = line.match(/^(https:\/\/x-access-token:)[^@]+(@.+)$/);
+        if (!match) return line;
+        return `${match[1]}${freshToken}${match[2]}`;
+      })
+      .join('\n');
+
+    if (rewritten !== content) {
+      try {
+        await writeFile(path, rewritten, { mode: 0o600 });
+      } catch (err) {
+        console.warn(`[refreshGitToken] failed to rewrite ${path}:`, err);
+      }
+    }
+  }
+}
+
+/**
+ * Run a git operation that uses GIT_TOKEN. On auth failure (401/403),
+ * refresh the token via the worker endpoint and retry once with the
+ * caller-rebuilt args (so authenticated URLs pick up the new token).
+ *
+ * `buildArgs` is called again on retry so callers that embed the token
+ * in a URL (e.g. `git clone https://<token>@...`) can regenerate it.
+ *
+ * For operations that talk to `origin` (fetch, pull, push without a URL
+ * arg), pass `gitUrl` so that after refresh we rewrite the `origin`
+ * remote URL with the new token. Git reads the embedded password from
+ * the remote URL before consulting the credential helper, so without
+ * this the retry would re-send the same expired token.
+ */
+async function execWithAuthRetry(
+  cmd: string,
+  buildArgs: () => string[] | Promise<string[]>,
+  opts: {
+    cwd?: string;
+    rigId: string;
+    envVars?: Record<string, string>;
+    /** Git URL to rebuild `origin` with after a token refresh. */
+    gitUrl?: string;
+  }
+): Promise<string> {
+  try {
+    const args = await buildArgs();
+    return await exec(cmd, args, opts.cwd);
+  } catch (err) {
+    if (!isAuthFailure(err)) throw err;
+
+    const rawMsg = err instanceof Error ? err.message.split('\n')[0] : String(err);
+    console.warn(
+      `[execWithAuthRetry] auth failure for rig=${opts.rigId}, refreshing token and retrying: ${redactGitTokens(rawMsg)}`
+    );
+
+    const fresh = await refreshGitToken(opts.rigId);
+    if (!fresh) {
+      throw err;
+    }
+
+    // Mutate the caller's envVars map in place so subsequent calls in
+    // the same workflow (e.g. mergeBranch → push after fetch) use the
+    // fresh token without another round-trip.
+    if (opts.envVars) {
+      opts.envVars.GIT_TOKEN = fresh;
+    }
+
+    // If the operation uses the `origin` remote, its stored URL still
+    // has the old token embedded. Rewrite it before retrying so the
+    // retry sends the fresh token.
+    if (opts.gitUrl && opts.cwd) {
+      try {
+        await exec(
+          'git',
+          ['remote', 'set-url', 'origin', authenticateGitUrl(opts.gitUrl, opts.envVars)],
+          opts.cwd
+        );
+      } catch (setUrlErr) {
+        const m = setUrlErr instanceof Error ? setUrlErr.message.split('\n')[0] : String(setUrlErr);
+        console.warn(
+          `[execWithAuthRetry] failed to rewrite origin URL for rig=${opts.rigId}: ${redactGitTokens(m)}`
+        );
+      }
+    }
+
+    const retryArgs = await buildArgs();
+    return await exec(cmd, retryArgs, opts.cwd);
+  }
+}
+
+/**
+ * Redact tokens from a string that may include authenticated git URLs
+ * (e.g. `https://x-access-token:<token>@github.com/...` or
+ * `https://oauth2:<token>@gitlab.com/...`). Used on every error string
+ * and log line that could contain a command line or git stderr, so an
+ * auth failure never leaks the token.
+ */
+function redactGitTokens(s: string): string {
+  return s.replace(/(https?:\/\/)([^:@/\s]+):([^@/\s]+)(@)/g, '$1$2:***REDACTED***$4');
+}
+
 async function exec(cmd: string, args: string[], cwd?: string): Promise<string> {
   const proc = Bun.spawn([cmd, ...args], {
     cwd,
@@ -204,7 +434,9 @@ async function exec(cmd: string, args: string[], cwd?: string): Promise<string> 
 
   if (exitCode !== 0) {
     const stderr = await new Response(proc.stderr).text();
-    throw new Error(`${cmd} ${args.join(' ')} failed: ${stderr || `exit code ${exitCode}`}`);
+    const cmdLine = redactGitTokens(`${cmd} ${args.join(' ')}`);
+    const detail = redactGitTokens(stderr || `exit code ${exitCode}`);
+    throw new Error(`${cmdLine} failed: ${detail}`);
   }
 
   return stdout.trim();
@@ -252,15 +484,24 @@ async function cloneRepoInner(
   validateGitUrl(options.gitUrl);
   validateBranchName(options.defaultBranch, 'defaultBranch');
   const dir = await repoDir(options.rigId);
-  const authUrl = authenticateGitUrl(options.gitUrl, options.envVars);
 
   if (await pathExists(join(dir, '.git'))) {
-    // Update the remote URL in case the token changed
-    await exec('git', ['remote', 'set-url', 'origin', authUrl], dir).catch(err => {
+    // Update the remote URL in case the token changed. Re-resolve authUrl
+    // inside the retry wrapper so a refreshed GIT_TOKEN is picked up.
+    await execWithAuthRetry(
+      'git',
+      () => ['remote', 'set-url', 'origin', authenticateGitUrl(options.gitUrl, options.envVars)],
+      { cwd: dir, rigId: options.rigId, envVars: options.envVars }
+    ).catch(err => {
       console.warn(`Failed to update remote URL for rig ${options.rigId}:`, err);
     });
     await configureRepoCredentials(dir, options.gitUrl, options.envVars);
-    await exec('git', ['fetch', '--all', '--prune'], dir);
+    await execWithAuthRetry('git', () => ['fetch', '--all', '--prune'], {
+      cwd: dir,
+      rigId: options.rigId,
+      envVars: options.envVars,
+      gitUrl: options.gitUrl,
+    });
     console.log(`Fetched latest for rig ${options.rigId}`);
     return dir;
   }
@@ -270,7 +511,7 @@ async function cloneRepoInner(
     await rm(dir, { recursive: true, force: true });
   }
 
-  const hasAuth = authUrl !== options.gitUrl;
+  const hasAuth = authenticateGitUrl(options.gitUrl, options.envVars) !== options.gitUrl;
   console.log(
     `Cloning repo for rig ${options.rigId}: hasAuth=${hasAuth} envKeys=[${Object.keys(options.envVars ?? {}).join(',')}]`
   );
@@ -279,7 +520,11 @@ async function cloneRepoInner(
   // exist yet, so `git clone --branch <branch>` would fail with
   // "Remote branch <branch> not found in upstream origin".
   await mkdir(dir, { recursive: true });
-  await exec('git', ['clone', '--no-checkout', authUrl, dir]);
+  await execWithAuthRetry(
+    'git',
+    () => ['clone', '--no-checkout', authenticateGitUrl(options.gitUrl, options.envVars), dir],
+    { rigId: options.rigId, envVars: options.envVars }
+  );
   await configureRepoCredentials(dir, options.gitUrl, options.envVars);
 
   // Detect empty repo: git rev-parse HEAD fails when there are no commits.
@@ -306,11 +551,21 @@ async function cloneRepoInner(
       ],
       dir
     );
-    await exec('git', ['push', 'origin', `HEAD:${options.defaultBranch}`], dir);
+    await execWithAuthRetry('git', () => ['push', 'origin', `HEAD:${options.defaultBranch}`], {
+      cwd: dir,
+      rigId: options.rigId,
+      envVars: options.envVars,
+      gitUrl: options.gitUrl,
+    });
     // Best-effort: set remote HEAD so future operations know the default branch
     await exec('git', ['remote', 'set-head', 'origin', options.defaultBranch], dir).catch(() => {});
     // Fetch so origin/<defaultBranch> ref is available locally
-    await exec('git', ['fetch', 'origin'], dir);
+    await execWithAuthRetry('git', () => ['fetch', 'origin'], {
+      cwd: dir,
+      rigId: options.rigId,
+      envVars: options.envVars,
+      gitUrl: options.gitUrl,
+    });
     console.log(`Created initial commit on empty repo for rig ${options.rigId}`);
   }
 
@@ -332,7 +587,12 @@ async function createWorktreeInner(options: WorktreeOptions): Promise<string> {
 
   if (await pathExists(dir)) {
     await exec('git', ['checkout', options.branch], dir);
-    await exec('git', ['pull', '--rebase', '--autostash'], dir).catch(() => {
+    await execWithAuthRetry('git', () => ['pull', '--rebase', '--autostash'], {
+      cwd: dir,
+      rigId: options.rigId,
+      envVars: options.envVars,
+      gitUrl: options.gitUrl,
+    }).catch(() => {
       // Pull may fail if remote branch doesn't exist yet; that's fine
     });
     console.log(`Reused existing worktree at ${dir}`);
@@ -436,7 +696,10 @@ async function setupBrowseWorktreeInner(rigId: string, defaultBranch: string): P
     // origin/<defaultBranch>. The worktree lives on the synthetic
     // browse-<rigId> branch, not on <defaultBranch> directly.
     try {
-      await exec('git', ['fetch', 'origin', defaultBranch], browseDir);
+      await execWithAuthRetry('git', () => ['fetch', 'origin', defaultBranch], {
+        cwd: browseDir,
+        rigId,
+      });
       await exec('git', ['reset', '--hard', `origin/${defaultBranch}`], browseDir);
       console.log(`Updated browse worktree for rig ${rigId} at ${browseDir}`);
     } catch (err) {
@@ -514,7 +777,6 @@ export async function mergeBranch(options: {
   validateGitUrl(options.gitUrl);
 
   const repo = await repoDir(options.rigId);
-  const authUrl = authenticateGitUrl(options.gitUrl, options.envVars);
 
   // Ensure repo exists and is up to date
   if (!(await pathExists(join(repo, '.git')))) {
@@ -525,9 +787,20 @@ export async function mergeBranch(options: {
       envVars: options.envVars,
     });
   } else {
-    // Update remote URL for fresh token
-    await exec('git', ['remote', 'set-url', 'origin', authUrl], repo).catch(() => {});
-    await exec('git', ['fetch', '--all', '--prune'], repo);
+    // Update remote URL for fresh token. Re-resolve inside the retry
+    // wrapper so a refreshed token replaces the expired one embedded
+    // in the remote URL.
+    await execWithAuthRetry(
+      'git',
+      () => ['remote', 'set-url', 'origin', authenticateGitUrl(options.gitUrl, options.envVars)],
+      { cwd: repo, rigId: options.rigId, envVars: options.envVars }
+    ).catch(() => {});
+    await execWithAuthRetry('git', () => ['fetch', '--all', '--prune'], {
+      cwd: repo,
+      rigId: options.rigId,
+      envVars: options.envVars,
+      gitUrl: options.gitUrl,
+    });
   }
 
   // Create a temporary worktree for the merge on the target branch
@@ -573,7 +846,11 @@ export async function mergeBranch(options: {
     const commitSha = await exec('git', ['rev-parse', 'HEAD'], mergeDir);
 
     // Push the merge commit to the target branch on the remote
-    await exec('git', ['push', 'origin', `${tmpBranch}:${options.targetBranch}`], mergeDir);
+    await execWithAuthRetry(
+      'git',
+      () => ['push', 'origin', `${tmpBranch}:${options.targetBranch}`],
+      { cwd: mergeDir, rigId: options.rigId, envVars: options.envVars, gitUrl: options.gitUrl }
+    );
 
     return { status: 'merged', message: 'Merge successful', commitSha };
   } finally {

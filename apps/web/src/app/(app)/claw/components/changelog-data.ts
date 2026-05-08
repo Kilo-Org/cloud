@@ -11,6 +11,40 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-05-07',
+    description:
+      "Stopped agents from hallucinating fixes that rely on systemd. The base container image ships systemd packages as transitive apt dependencies (so `which systemctl` finds the binary), but systemd is never PID 1 and the daemon is never running. `openclaw`, the gateway, and other background processes are managed by KiloClaw's own controller supervisor. TOOLS.md now documents this explicitly so the agent stops recommending `systemctl`, `journalctl`, or unit files. Existing instances pick up the new TOOLS.md section automatically on redeploy.",
+    category: 'bugfix',
+    deployHint: 'upgrade_required',
+  },
+  {
+    date: '2026-05-05',
+    description:
+      "Fixed a bug where many KiloClaw instances could not use Auto models (Auto Frontier, Auto Balanced, Auto Free). Agent requests failed with an 'Unknown model' error. Redeploy your instance to pick up image img-b9e5dac9115d.",
+    category: 'bugfix',
+    deployHint: 'redeploy_required',
+  },
+  {
+    date: '2026-05-01',
+    description: 'Updated OpenClaw to 2026.4.23.',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
+    date: '2026-04-28',
+    description:
+      'Added an Early Access opt-in under Settings → Manage Version. Turn it on to receive new KiloClaw versions while they are still rolling out, instead of waiting for full availability. Applies to all of your instances, personal and org. A version pin always wins per instance, so a pinned instance ignores Early Access until you unpin.',
+    category: 'feature',
+    deployHint: null,
+  },
+  {
+    date: '2026-04-23',
+    description:
+      'Added Morning Briefing for KiloClaw-hosted OpenClaw instances. The new bundled plugin can schedule daily briefings, run on demand, and save/read today and yesterday briefing Markdown files from persistent instance storage. Dashboard settings now include Morning Briefing status, source readiness, and controls.',
+    category: 'feature',
+    deployHint: 'redeploy_required',
+  },
+  {
     date: '2026-04-20',
     description:
       'Added support for Vector Search, Embedding Models, and Dreaming in Memory configuration. Vector Search lets your agent find relevant context across its memory files using semantic embeddings instead of plain keyword matches. Pick the Embedding Model that generates those vectors to trade off quality, speed, and cost. Dreaming runs in the background and promotes strong short-term signals into durable long-term memory, so the agent remembers what matters across sessions.',

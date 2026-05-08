@@ -1,9 +1,11 @@
 import { z } from 'zod';
+import { KiloclawDestroyReasonSchema, KiloclawStartReasonSchema } from '@kilocode/worker-utils';
 import {
   ALL_SECRET_FIELD_KEYS,
   isValidCustomSecretKey,
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
+import { InstanceTierKeySchema, InstanceTypeSchema } from '@kilocode/kiloclaw-instance-tiers';
 import { IMAGE_TAG_RE, IMAGE_TAG_MAX_LENGTH } from '../lib/image-tag-validation';
 
 export const EncryptedEnvelopeSchema = z.object({
@@ -87,12 +89,36 @@ export const DockerLocalProviderStateSchema = z.object({
   hostPort: z.number().int().nullable().default(null),
 });
 
+export const NorthflankProviderStateSchema = z.object({
+  provider: z.literal('northflank'),
+  projectId: z.string().nullable().default(null),
+  projectName: z.string().nullable().default(null),
+  serviceId: z.string().nullable().default(null),
+  serviceName: z.string().nullable().default(null),
+  volumeId: z.string().nullable().default(null),
+  volumeName: z.string().nullable().default(null),
+  secretId: z.string().nullable().default(null),
+  secretName: z.string().nullable().default(null),
+  /**
+   * SHA-256 hex digest of the canonical JSON of the restricted secret's
+   * variables. Used by `ensureSecret` to skip redundant PATCHes when
+   * `bootstrapEnv` is unchanged — Northflank propagates restricted-secret
+   * updates by re-rolling the deployed service, so writing the same values
+   * on every start would churn the pod unnecessarily.
+   */
+  secretContentHash: z.string().nullable().default(null),
+  ingressHost: z.string().nullable().default(null),
+  region: z.string().nullable().default(null),
+});
+
 export const ProviderStateSchema = z.discriminatedUnion('provider', [
   FlyProviderStateSchema,
   DockerLocalProviderStateSchema,
+  NorthflankProviderStateSchema,
 ]);
 export type FlyProviderState = z.infer<typeof FlyProviderStateSchema>;
 export type DockerLocalProviderState = z.infer<typeof DockerLocalProviderStateSchema>;
+export type NorthflankProviderState = z.infer<typeof NorthflankProviderStateSchema>;
 export type ProviderState = z.infer<typeof ProviderStateSchema>;
 
 export const KiloExaSearchModeSchema = z.enum(['kilo-proxy', 'disabled']);
@@ -147,6 +173,7 @@ export const InstanceConfigSchema = z.object({
   googleWorkspaceConfigSyncError: z.string().nullable().optional(),
   googleWorkspaceConfigSyncedAt: z.number().nullable().optional(),
   machineSize: MachineSizeSchema.optional(),
+  instanceType: InstanceTierKeySchema.optional(),
   // Region for Fly Volume/Machine. Comma-separated priority list of region codes or aliases.
   // Examples: "us,eu" (try US first, then Europe), "lhr" (London only).
   // If omitted, falls back to the FLY_REGION env var.
@@ -231,6 +258,7 @@ export const UserIdRequestSchema = z.object({
 
 export const DestroyRequestSchema = z.object({
   userId: z.string().min(1),
+  reason: KiloclawDestroyReasonSchema.optional(),
 });
 
 /**
@@ -288,6 +316,7 @@ export const PersistedStateSchema = z.object({
   restartingAt: z.number().nullable().default(null),
   recoveryStartedAt: z.number().nullable().default(null),
   restartUpdateSent: z.boolean().default(false),
+  pendingStartReason: KiloclawStartReasonSchema.nullable().default(null),
   lastStartedAt: z.number().nullable().default(null),
   lastStoppedAt: z.number().nullable().default(null),
   // Fly.io app/machine/volume identifiers
@@ -296,6 +325,26 @@ export const PersistedStateSchema = z.object({
   flyVolumeId: z.string().nullable().default(null),
   flyRegion: z.string().nullable().default(null),
   machineSize: MachineSizeSchema.nullable().default(null),
+  instanceType: InstanceTypeSchema.nullable().default(null),
+  volumeSizeGb: z.number().int().min(1).max(500).nullable().default(null),
+  /**
+   * Admin-only temporary CPU/RAM override. When non-null, wins over
+   * `machineSize` for runtime-spec construction (Fly guest, docker
+   * Memory/NanoCpus). Does NOT touch `instanceType` or `volumeSizeGb` —
+   * billing reality stays on the tier. Cleared by an explicit admin
+   * action or by a tier resize. See
+   * `~/fd-plans/kiloclaw/admin-machine-size-override.md`.
+   */
+  adminMachineSizeOverride: MachineSizeSchema.nullable().default(null),
+  adminMachineSizeOverrideMetadata: z
+    .object({
+      reason: z.string().min(1).max(500),
+      actorId: z.string().min(1),
+      actorEmail: z.string().email(),
+      setAt: z.number().int(),
+    })
+    .nullable()
+    .default(null),
   // Health check tracking
   healthCheckFailCount: z.number().default(0),
   // Two-phase destroy: IDs pending deletion on Fly. Cleared once Fly confirms.
@@ -334,6 +383,13 @@ export const PersistedStateSchema = z.object({
   // Each entry is a feature name (e.g. "npm-global-prefix") that gates runtime behavior.
   // New instances get the current feature set; legacy instances have an empty array.
   instanceFeatures: z.array(z.string()).default([]),
+  // Version of the controller config the running machine was last provisioned
+  // with. Written only when the DO observes or completes a transition to a
+  // running machine, so callers can treat it as a property of the running
+  // runtime rather than desired future config. Null means legacy (treat as
+  // version 1). See WORKER_CONTROLLER_CAPABILITIES_VERSION in config.ts for
+  // semantics.
+  controllerCapabilitiesVersion: z.number().int().nullable().default(null),
   gmailNotificationsEnabled: z.boolean().default(false),
   gmailLastHistoryId: z.string().nullable().default(null),
   gmailPushOidcEmail: z.string().nullable().default(null),
@@ -341,10 +397,20 @@ export const PersistedStateSchema = z.object({
   // null = use defaults (security: 'allowlist', ask: 'on-miss').
   execSecurity: z.string().nullable().default(null),
   execAsk: z.string().nullable().default(null),
+  // Set when updateExecPreset patched DO state but the gateway write was skipped
+  // or failed (e.g. status !== 'running'). Cleared when flushed on start or via
+  // alarm retry. See flushPendingConfigToGateway.
+  execPresetApplyPending: z.boolean().default(false),
   botName: z.string().nullable().default(null),
   botNature: z.string().nullable().default(null),
   botVibe: z.string().nullable().default(null),
   botEmoji: z.string().nullable().default(null),
+  // Set when updateBotIdentity patched DO state but the gateway write was
+  // skipped or failed. Cleared when flushed on start or via alarm retry.
+  botIdentityApplyPending: z.boolean().default(false),
+  // Set when additive channel updates were persisted but the running gateway
+  // config patch was skipped or failed. Removals intentionally do not set this.
+  channelsApplyPending: z.boolean().default(false),
   // Snapshot restore: tracks the volume before the most recent restore for admin revert path.
   previousVolumeId: z.string().nullable().default(null),
   // Snapshot restore: timestamp set at enqueue time. Used by alarm for stuck-restore detection
@@ -370,18 +436,17 @@ export const PersistedStateSchema = z.object({
   // Snapshot restore: volume ID created by the queue worker during restore.
   // Used for idempotency on retry — if set, the worker reuses this volume instead of creating another.
   pendingRestoreVolumeId: z.string().nullable().default(null),
-  // Tracks whether the "instance ready" email has been sent for this provision lifecycle.
-  // Set to true on first low-load checkin; reset on DO wipe (destroy + re-provision).
+  // Tracks whether the "instance ready" notifications (email + mobile push)
+  // have been dispatched for this provision lifecycle. Set to true on first
+  // low-load checkin; reset on DO wipe (destroy + re-provision).
   instanceReadyEmailSent: z.boolean().default(false),
+  // Tracks whether a "start failed" mobile push has been dispatched for the
+  // current starting attempt. Re-armed at the top of startAsync() so each
+  // retry can emit its own notification.
+  startFailurePushSentForAttempt: z.boolean().default(false),
   // Metadata for custom (non-catalog) secrets: env var name → { configPath? }.
   // configPath is a JSON dot-notation path for patching into openclaw.json at boot.
   customSecretMeta: z.record(z.string(), CustomSecretMetaSchema).nullable().default(null),
-  // Stream Chat default channel (auto-provisioned on first instance creation).
-  // Null on existing instances (pre-Stream Chat) and when STREAM_CHAT_API_KEY is not set.
-  streamChatApiKey: z.string().nullable().default(null),
-  streamChatBotUserId: z.string().nullable().default(null),
-  streamChatBotUserToken: z.string().nullable().default(null),
-  streamChatChannelId: z.string().nullable().default(null),
   // Vector memory: whether the builtin embedding-backed memory search is enabled.
   vectorMemoryEnabled: z.boolean().default(false),
   // Vector memory: embedding model ID (e.g. "mistralai/mistral-embed-2312").

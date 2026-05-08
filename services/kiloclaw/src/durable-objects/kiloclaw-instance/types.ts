@@ -9,6 +9,7 @@ import type {
 } from '../../schemas/instance-config';
 import type { FlyClientConfig } from '../../fly/client';
 import { userIdFromSandboxId } from '../../auth/sandbox-id';
+import type { KiloclawStartReason } from '@kilocode/worker-utils';
 import {
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
@@ -77,6 +78,7 @@ export type InstanceMutableState = {
   restartingAt: number | null;
   recoveryStartedAt: number | null;
   restartUpdateSent: boolean;
+  pendingStartReason: KiloclawStartReason | null;
   lastStartedAt: number | null;
   lastStoppedAt: number | null;
   // Legacy Fly compatibility mirrors. `providerState` is the canonical
@@ -87,6 +89,15 @@ export type InstanceMutableState = {
   flyVolumeId: string | null;
   flyRegion: string | null;
   machineSize: MachineSize | null;
+  instanceType: PersistedState['instanceType'];
+  volumeSizeGb: number | null;
+  /**
+   * Admin-only temporary CPU/RAM override. When non-null,
+   * `effectiveMachineSize(state)` returns this instead of `machineSize`.
+   * Does NOT change billable tier (`instanceType`/`volumeSizeGb`).
+   */
+  adminMachineSizeOverride: MachineSize | null;
+  adminMachineSizeOverrideMetadata: PersistedState['adminMachineSizeOverrideMetadata'];
   healthCheckFailCount: number;
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
@@ -111,27 +122,27 @@ export type InstanceMutableState = {
   lastRecoveryErrorAt: number | null;
   lastBoundMachineRecoveryAt: number | null;
   instanceFeatures: string[];
+  controllerCapabilitiesVersion: number | null;
   gmailNotificationsEnabled: boolean;
   gmailLastHistoryId: string | null;
   gmailPushOidcEmail: string | null;
   execSecurity: string | null;
   execAsk: string | null;
+  execPresetApplyPending: boolean;
   botName: string | null;
   botNature: string | null;
   botVibe: string | null;
   botEmoji: string | null;
+  botIdentityApplyPending: boolean;
+  channelsApplyPending: boolean;
   // Snapshot restore tracking
   previousVolumeId: string | null;
   restoreStartedAt: string | null;
   preRestoreStatus: InstanceStatus | null;
   pendingRestoreVolumeId: string | null;
   instanceReadyEmailSent: boolean;
+  startFailurePushSentForAttempt: boolean;
   customSecretMeta: PersistedState['customSecretMeta'];
-  // Stream Chat default channel (auto-provisioned)
-  streamChatApiKey: string | null;
-  streamChatBotUserId: string | null;
-  streamChatBotUserToken: string | null;
-  streamChatChannelId: string | null;
   vectorMemoryEnabled: boolean;
   vectorMemoryModel: string | null;
   dreamingEnabled: boolean;

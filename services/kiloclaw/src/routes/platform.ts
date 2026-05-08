@@ -15,19 +15,32 @@ import {
   ChannelsPatchSchema,
   GoogleCredentialsSchema,
   GoogleOAuthConnectionSchema,
+  MachineSizeSchema,
   SecretsPatchSchema,
   InstanceIdParam,
-  MachineSizeSchema,
 } from '../schemas/instance-config';
 import {
-  ImageVersionEntrySchema,
-  imageVersionKey,
-  imageVersionLatestKey,
-} from '../schemas/image-version';
+  DEFAULT_INSTANCE_TIER,
+  InstanceTierKeySchema,
+  isOfferedTier,
+} from '@kilocode/kiloclaw-instance-tiers';
+import { ImageVersionEntrySchema, imageVersionKey } from '../schemas/image-version';
 import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
+import {
+  selectImageVersionForInstance,
+  setRolloutPercent,
+  markImageAsLatest,
+  disableImageAndClearRollout,
+} from '../lib/version-rollout';
+import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
+import { runScheduledActionNoticesSweep } from '../scheduled/scheduled-action-notices';
 import { flattenError, z } from 'zod';
-import { withDORetry } from '@kilocode/worker-utils';
+import {
+  KiloclawStartReasonSchema,
+  KiloclawStopReasonSchema,
+  withDORetry,
+} from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
@@ -42,7 +55,6 @@ import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
-import { sendMessage } from '../stream-chat/client';
 import { assertAvailableProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
 import {
@@ -389,6 +401,7 @@ async function insertProvisionedInstanceRecord(params: {
   sandboxId: string;
   orgId: string | null;
   provider: ProviderId;
+  instanceType: string;
 }): Promise<ProvisionedInstanceRecord> {
   const connectionString = params.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
@@ -425,6 +438,7 @@ async function insertProvisionedInstanceRecord(params: {
           sandbox_id: params.sandboxId,
           provider: params.provider,
           organization_id: params.orgId,
+          instance_type: params.instanceType,
         })
         .onConflictDoNothing({ target: kiloclaw_instances.id })
         .returning({
@@ -885,13 +899,25 @@ platform.post('/provision', async c => {
     kilocodeDefaultModel,
     userTimezone,
     userLocation,
-    machineSize,
+    instanceType: requestedInstanceType,
     region,
     pinnedImageTag,
   } = result.data;
+  if (requestedInstanceType && !isOfferedTier(requestedInstanceType)) {
+    return c.json({ error: 'instanceType must be an offered tier' }, 400);
+  }
   const provisionedInstanceId = instanceId ?? crypto.randomUUID();
   const shouldInsertInstanceRecord = !instanceId;
   const shouldBootstrapSubscription = !instanceId || bootstrapSubscription === true;
+  // Only default to the catalog tier on FRESH inserts. On re-provision (config
+  // updates with an existing instanceId), pass `undefined` so the DO's
+  // `inferredInstanceType` path preserves existing tier / machineSize /
+  // volumeSizeGb. `provision()` is overloaded as the entrypoint for both
+  // fresh-create and config-update flows; defaulting unconditionally would
+  // silently overwrite custom (e.g. extend-volume) and legacy tiers on the
+  // next config change.
+  const instanceType =
+    requestedInstanceType ?? (shouldInsertInstanceRecord ? DEFAULT_INSTANCE_TIER : undefined);
   const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
   const provisionRoute = '/api/platform/provision';
   const provisionStartedAt = performance.now();
@@ -928,7 +954,7 @@ platform.post('/provision', async c => {
             kilocodeDefaultModel,
             userTimezone,
             userLocation,
-            machineSize,
+            instanceType,
             region,
             pinnedImageTag,
           },
@@ -968,6 +994,11 @@ platform.post('/provision', async c => {
         sandboxId: provision.sandboxId,
         orgId: orgId ?? null,
         provider: selectedProvider ?? 'fly',
+        // Inside this branch `shouldInsertInstanceRecord` is true, so the
+        // worker-side tier default has already been applied to `instanceType`
+        // — but TS can't narrow `string | undefined` from the broader scope.
+        // Re-derive locally so the helper signature stays `string`.
+        instanceType: requestedInstanceType ?? DEFAULT_INSTANCE_TIER,
       });
       writeEvent(c.env, {
         event: 'instance.record_inserted',
@@ -997,7 +1028,7 @@ platform.post('/provision', async c => {
         c.env,
         userId,
         provisionedInstanceId,
-        stub => stub.destroy(),
+        stub => stub.destroy({ reason: 'bootstrap_cleanup_failure' }),
         'destroy'
       ).catch(destroyErr => {
         console.error(
@@ -1928,6 +1959,276 @@ platform.patch('/openclaw-config', async c => {
   }
 });
 
+const MorningBriefingSetupSchema = z.object({
+  userId: z.string().min(1),
+  cron: z.string().min(1).optional(),
+  timezone: z.string().min(1).optional(),
+});
+
+type MorningBriefingWarmupRetryPolicy = {
+  includeTimeout: boolean;
+};
+
+function isMorningBriefingTimeoutError(err: unknown): boolean {
+  const raw = err instanceof Error ? err.message : String(err);
+  const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
+  return normalized.includes('operation was aborted due to timeout');
+}
+
+function isMorningBriefingWarmupError(
+  err: unknown,
+  policy: MorningBriefingWarmupRetryPolicy = { includeTimeout: true }
+): boolean {
+  const raw = err instanceof Error ? err.message : String(err);
+  const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
+  if (
+    normalized.includes('Gateway not running') ||
+    normalized.includes('Failed to reach gateway')
+  ) {
+    return true;
+  }
+  return policy.includeTimeout && isMorningBriefingTimeoutError(err);
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function withMorningBriefingWarmupRetry<T>(
+  operation: () => Promise<T>,
+  policy: MorningBriefingWarmupRetryPolicy = { includeTimeout: true }
+): Promise<T> {
+  const delaysMs = [0, 750, 1500];
+  let lastError: unknown = null;
+
+  for (const delayMs of delaysMs) {
+    if (delayMs > 0) {
+      await sleep(delayMs);
+    }
+
+    try {
+      return await operation();
+    } catch (err) {
+      lastError = err;
+      if (!isMorningBriefingWarmupError(err, policy)) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Gateway warming up');
+}
+
+// GET /api/platform/morning-briefing/status?userId=...
+platform.get('/morning-briefing/status', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const result = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.getMorningBriefingStatus(),
+      'getMorningBriefingStatus'
+    );
+    if (!result) {
+      // Controller predates this route. The dashboard polls status every 30s,
+      // so a 404 here would generate continuous user-facing errors. Return a
+      // typed "unavailable" payload at 200 instead — same shape pattern as
+      // the gateway_warming_up branch below.
+      return c.json(
+        {
+          ok: false,
+          enabled: false,
+          desiredEnabled: false,
+          observedEnabled: false,
+          reconcileState: 'idle',
+          code: 'controller_route_unavailable',
+          error: 'Morning Briefing unavailable (controller too old)',
+        },
+        200
+      );
+    }
+    return c.json(result, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return c.json(
+        {
+          ok: true,
+          reconcileState: 'in_progress',
+          error: 'Gateway warming up, retrying shortly.',
+          code: 'gateway_warming_up',
+          retryAfterSec: 2,
+        },
+        200
+      );
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/status');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/morning-briefing/enable
+platform.post('/morning-briefing/enable', async c => {
+  const result = await parseBody(c, MorningBriefingSetupSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, cron, timezone } = result.data;
+  try {
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
+        stub => stub.enableMorningBriefing({ cron, timezone }),
+        'enableMorningBriefing'
+      )
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/enable');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/morning-briefing/disable
+platform.post('/morning-briefing/disable', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        result.data.userId,
+        iidResult.instanceId,
+        stub => stub.disableMorningBriefing(),
+        'disableMorningBriefing'
+      )
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/disable');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/morning-briefing/run
+platform.post('/morning-briefing/run', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withMorningBriefingWarmupRetry(
+      () =>
+        withResolvedDORetry(
+          c.env,
+          result.data.userId,
+          iidResult.instanceId,
+          stub => stub.runMorningBriefing(),
+          'runMorningBriefing'
+        ),
+      { includeTimeout: false }
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err, { includeTimeout: false })) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    if (isMorningBriefingTimeoutError(err)) {
+      return jsonError(
+        'Morning Briefing run timed out while work may still be in progress. Check Last generated and Last delivery before retrying.',
+        504,
+        'morning_briefing_run_timeout'
+      );
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/run');
+    return jsonError(message, status, code);
+  }
+});
+
+// GET /api/platform/morning-briefing/read/{today|yesterday}?userId=...
+platform.get('/morning-briefing/read/:day', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const day = c.req.param('day');
+  if (day !== 'today' && day !== 'yesterday') {
+    return c.json({ error: 'day must be today or yesterday' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.readMorningBriefing(day),
+      'readMorningBriefing'
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      `morning-briefing/read/${day}`
+    );
+    return jsonError(message, status, code);
+  }
+});
+
 // GET /api/platform/files/tree?userId=...
 platform.get('/files/tree', async c => {
   const userId = setValidatedQueryUserId(c);
@@ -2258,6 +2559,7 @@ platform.post('/kilo-cli-run/cancel', async c => {
 // POST /api/platform/start
 const StartRequestSchema = UserIdRequestSchema.extend({
   skipCooldown: z.boolean().optional(),
+  reason: KiloclawStartReasonSchema.optional(),
 });
 
 async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
@@ -2271,39 +2573,55 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
 
   try {
     const route = mode === 'async' ? '/api/platform/start-async' : '/api/platform/start';
-    const eventBase =
-      mode === 'async' ? 'instance.async_start_requested' : 'instance.manual_start_succeeded';
-    const options = result.data.skipCooldown ? { skipCooldown: true } : undefined;
+    const startOptions =
+      result.data.skipCooldown || result.data.reason
+        ? {
+            ...(result.data.skipCooldown ? { skipCooldown: true } : {}),
+            ...(result.data.reason ? { reason: result.data.reason } : {}),
+          }
+        : undefined;
+    const asyncStartOptions = result.data.reason ? { reason: result.data.reason } : undefined;
 
     if (mode === 'async') {
       await withResolvedDORetry(
         c.env,
         result.data.userId,
         instanceId,
-        stub => stub.startAsync(result.data.userId),
+        stub => stub.startAsync(result.data.userId, asyncStartOptions),
         'startAsync'
       );
-    } else {
-      const { started } = await withResolvedDORetry(
-        c.env,
-        result.data.userId,
-        instanceId,
-        stub => stub.start(result.data.userId, options),
-        'start'
-      );
-      if (!started) {
-        return c.json({ ok: true });
-      }
+
+      writeEvent(c.env, {
+        event: 'instance.async_start_requested',
+        delivery: 'http',
+        route,
+        userId: result.data.userId,
+        label: result.data.reason,
+        durationMs: performance.now() - startedAt,
+      });
+      return c.json({ ok: true });
     }
 
-    writeEvent(c.env, {
-      event: eventBase,
-      delivery: 'http',
-      route,
-      userId: result.data.userId,
-      durationMs: performance.now() - startedAt,
-    });
-    return c.json({ ok: true });
+    const startResult = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      instanceId,
+      stub => stub.start(result.data.userId, startOptions),
+      'start'
+    );
+
+    if (startResult.currentStatus === 'running') {
+      writeEvent(c.env, {
+        event: 'instance.manual_start_succeeded',
+        delivery: 'http',
+        route,
+        userId: result.data.userId,
+        label: result.data.reason,
+        durationMs: performance.now() - startedAt,
+      });
+    }
+
+    return c.json({ ok: true, ...startResult });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'start');
     writeEvent(c.env, {
@@ -2312,6 +2630,7 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
       delivery: 'http',
       route: mode === 'async' ? '/api/platform/start-async' : '/api/platform/start',
       userId: result.data.userId,
+      label: result.data.reason,
       error: message,
       durationMs: performance.now() - startedAt,
     });
@@ -2390,9 +2709,13 @@ platform.post('/cleanup-recovery-previous-volume', async c => {
   }
 });
 
+const StopRequestSchema = UserIdRequestSchema.extend({
+  reason: KiloclawStopReasonSchema.optional(),
+});
+
 // POST /api/platform/stop
 platform.post('/stop', async c => {
-  const result = await parseBody(c, UserIdRequestSchema);
+  const result = await parseBody(c, StopRequestSchema);
   if ('error' in result) return result.error;
 
   const iidResult = parseInstanceIdQuery(c);
@@ -2400,8 +2723,15 @@ platform.post('/stop', async c => {
   const { instanceId } = iidResult;
 
   try {
-    await withResolvedDORetry(c.env, result.data.userId, instanceId, stub => stub.stop(), 'stop');
-    return c.json({ ok: true });
+    const stopOptions = result.data.reason ? { reason: result.data.reason } : undefined;
+    const stopResult = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      instanceId,
+      stub => stub.stop(stopOptions),
+      'stop'
+    );
+    return c.json({ ok: true, ...stopResult });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'stop');
     return jsonError(message, status);
@@ -2438,7 +2768,14 @@ platform.post('/destroy', async c => {
   }
 
   try {
-    await withResolvedDORetry(c.env, userId, instanceId, stub => stub.destroy(), 'destroy');
+    const destroyOptions = result.data.reason ? { reason: result.data.reason } : undefined;
+    await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.destroy(destroyOptions),
+      'destroy'
+    );
 
     // Remove the instance from the registry (best-effort).
     // When instanceId is provided, destroy by instanceId directly.
@@ -2510,31 +2847,6 @@ platform.get('/status', async c => {
     return c.json(status);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'status');
-    return jsonError(message, status);
-  }
-});
-
-// GET /api/platform/stream-chat-credentials?userId=...&instanceId=...
-platform.get('/stream-chat-credentials', async c => {
-  const userId = setValidatedQueryUserId(c);
-  if (!userId) {
-    return c.json({ error: 'userId query parameter is required' }, 400);
-  }
-  const iidResult = parseInstanceIdQuery(c);
-  if ('error' in iidResult) return iidResult.error;
-  const { instanceId } = iidResult;
-
-  try {
-    const creds = await withResolvedDORetry(
-      c.env,
-      userId,
-      instanceId,
-      stub => stub.getStreamChatCredentials(),
-      'getStreamChatCredentials'
-    );
-    return c.json(creds);
-  } catch (err) {
-    const { message, status } = sanitizeError(err, 'stream-chat-credentials');
     return jsonError(message, status);
   }
 });
@@ -2791,12 +3103,23 @@ platform.post('/inbound-email', async c => {
     }
 
     const error = await response.text().catch(() => '');
+    let controllerErrorMessage: string | undefined;
+    try {
+      const parsed: unknown = JSON.parse(error);
+      if (parsed && typeof parsed === 'object' && 'error' in parsed) {
+        const candidate = (parsed as { error: unknown }).error;
+        if (typeof candidate === 'string') controllerErrorMessage = candidate;
+      }
+    } catch {
+      // body wasn't JSON; the raw `error` field below preserves it
+    }
     const controllerFailure = {
       ...logContext,
       userId: instance.userId,
       doKey,
       status: response.status,
-      error: error.slice(0, 500),
+      error: error.slice(0, 2000),
+      controllerErrorMessage,
       durationMs: performance.now() - startedAt,
     };
     if (response.status >= 500) {
@@ -2815,74 +3138,6 @@ platform.post('/inbound-email', async c => {
     });
     const { message, status } = sanitizeError(err, 'inbound-email');
     return jsonError(message, status);
-  }
-});
-
-// POST /api/platform/send-chat-message
-// Send a message to a KiloClaw instance's Stream Chat channel as the human user.
-// The OpenClaw bot picks it up and responds as if the user typed it.
-const SendChatMessageSchema = z.object({
-  userId: z.string().min(1),
-  instanceId: z.string().uuid().optional(),
-  message: z.string().min(1).max(32_000),
-});
-
-platform.post('/send-chat-message', async c => {
-  const body: unknown = await c.req.json().catch(() => null);
-  const parsed = SendChatMessageSchema.safeParse(body);
-  if (!parsed.success) {
-    return jsonError('Invalid request body: userId and message are required', 400);
-  }
-
-  const { userId, instanceId, message } = parsed.data;
-  c.set('userId', userId);
-
-  const apiKey = c.env.STREAM_CHAT_API_KEY;
-  const apiSecret = c.env.STREAM_CHAT_API_SECRET;
-  if (!apiKey || !apiSecret) {
-    return jsonError('Stream Chat is not configured', 503);
-  }
-
-  try {
-    // Use instanceId as the DO key when available (matches how other endpoints resolve DOs).
-    // Falls back to userId for backward compatibility with triggers that predate instanceId.
-    const creds = await withResolvedDORetry(
-      c.env,
-      userId,
-      instanceId,
-      stub => stub.getStreamChatCredentials(),
-      'getStreamChatCredentials'
-    );
-
-    if (!creds) {
-      return jsonError('Stream Chat is not set up for this instance', 404);
-    }
-
-    await sendMessage(apiKey, apiSecret, creds.channelId, creds.userId, message);
-
-    writeEvent(c.env, {
-      event: 'instance.webhook_chat_message_sent',
-      delivery: 'http',
-      route: '/api/platform/send-chat-message',
-      userId,
-      instanceId: instanceId ?? undefined,
-      channelId: creds.channelId,
-    });
-
-    return c.json({ success: true, channelId: creds.channelId });
-  } catch (err) {
-    const { message: errMsg, status } = sanitizeError(err, 'send-chat-message');
-
-    writeEvent(c.env, {
-      event: 'instance.webhook_chat_message_failed',
-      delivery: 'http',
-      route: '/api/platform/send-chat-message',
-      userId,
-      instanceId: instanceId ?? undefined,
-      error: errMsg,
-    });
-
-    return jsonError(errMsg, status);
   }
 });
 
@@ -3107,7 +3362,7 @@ platform.post('/reassociate-volume', async c => {
 // Updates the machine size for an instance. Takes effect on next start/restart.
 const ResizeMachineSchema = z.object({
   userId: z.string().min(1),
-  machineSize: MachineSizeSchema,
+  instanceType: InstanceTierKeySchema,
 });
 
 platform.post('/resize-machine', async c => {
@@ -3122,12 +3377,87 @@ platform.post('/resize-machine', async c => {
       c.env,
       result.data.userId,
       iidResult.instanceId,
-      stub => stub.resizeMachine(result.data.machineSize),
+      stub => stub.resizeMachine(result.data.instanceType),
       'resizeMachine'
     );
     return c.json(response);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'resize-machine');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/admin-size-override/set
+// Admin-only: set a temporary CPU/RAM override that wins over the
+// tier-derived machineSize until cleared. Does NOT change instanceType
+// or volumeSizeGb (billing stays on the tier). Stopped-machine-only.
+const SetAdminSizeOverrideSchema = z.object({
+  userId: z.string().min(1),
+  size: MachineSizeSchema,
+  reason: z.string().min(10).max(500),
+  actorId: z.string().min(1),
+  actorEmail: z.string().email(),
+});
+
+platform.post('/admin-size-override/set', async c => {
+  const result = await parseBody(c, SetAdminSizeOverrideSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub =>
+        stub.setAdminMachineSizeOverride({
+          size: result.data.size,
+          reason: result.data.reason,
+          actorId: result.data.actorId,
+          actorEmail: result.data.actorEmail,
+        }),
+      'setAdminMachineSizeOverride'
+    );
+    return c.json(response);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'admin-size-override-set');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/admin-size-override/clear
+const ClearAdminSizeOverrideSchema = z.object({
+  userId: z.string().min(1),
+  reason: z.string().min(10).max(500),
+  actorId: z.string().min(1),
+  actorEmail: z.string().email(),
+});
+
+platform.post('/admin-size-override/clear', async c => {
+  const result = await parseBody(c, ClearAdminSizeOverrideSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub =>
+        stub.clearAdminMachineSizeOverride({
+          reason: result.data.reason,
+          actorId: result.data.actorId,
+          actorEmail: result.data.actorEmail,
+        }),
+      'clearAdminMachineSizeOverride'
+    );
+    return c.json(response);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'admin-size-override-clear');
     return jsonError(message, status);
   }
 });
@@ -3185,35 +3515,238 @@ platform.get('/versions', async c => {
 });
 
 // GET /api/platform/versions/latest
-// Returns the current :latest image version from KV.
+// Resolves the image version this caller should be on next.
+//
+// Query params (all optional):
+//   instanceId       — bucket subject for rollout candidate selection
+//   currentImageTag  — caller's current image; used to suppress self-upgrades
+//
+// Without instanceId, returns the current :latest pointer (back-compat for
+// anonymous callers — public version banner, CI, etc.). With instanceId, runs
+// the rollout-aware selector and returns the candidate when the instance falls
+// in cohort, the :latest baseline when not, or 404 when the caller is already
+// on the newest applicable image (banner: "no upgrade").
+//
+// The Early Access flag is looked up server-side from the instance's owning
+// user — callers cannot pass it as a query param. This keeps the service as
+// the single authoritative source: even an internal-key-holding caller can't
+// claim Early Access for an arbitrary instance.
 platform.get('/versions/latest', async c => {
   try {
-    const latest = await resolveLatestVersion(c.env.KV_CLAW_CACHE, 'default');
-    if (!latest) return c.json({ error: 'No latest version registered' }, 404);
-    return c.json(latest);
+    const instanceId = c.req.query('instanceId');
+    const currentImageTag = c.req.query('currentImageTag') ?? null;
+
+    if (!instanceId) {
+      const latest = await resolveLatestVersion(c.env.KV_CLAW_CACHE, 'default');
+      if (!latest) return c.json({ error: 'No latest version registered' }, 404);
+      return c.json(latest);
+    }
+
+    // Resolve Early Access from the instance's owner. This requires Hyperdrive;
+    // without it we degrade gracefully to autoEnroll=false (the bucket math
+    // still works correctly — only the staff/beta-tester override is missing).
+    let autoEnroll = false;
+    const connectionString = c.env.HYPERDRIVE?.connectionString;
+    if (connectionString) {
+      try {
+        autoEnroll = await lookupKiloclawEarlyAccessByInstanceId(connectionString, instanceId);
+      } catch (err) {
+        console.warn(
+          '[platform] Early Access lookup failed; treating as false:',
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+
+    const selected = await selectImageVersionForInstance({
+      kv: c.env.KV_CLAW_CACHE,
+      variant: 'default',
+      instanceId,
+      currentImageTag,
+      autoEnroll,
+    });
+    if (!selected) return c.json({ error: 'No upgrade available' }, 404);
+    return c.json(selected);
   } catch (err) {
     console.error('[platform] Failed to get latest version:', err);
     return c.json({ error: 'Failed to get latest version' }, 500);
   }
 });
 
+// POST /api/platform/versions/rollout
+// Set an image's rollout percent (0..100). Updates Postgres + KV pointers.
+const SetRolloutPercentBody = z.object({
+  imageTag: z.string().min(1),
+  percent: z.number().int().min(0).max(100),
+});
+
+// POST /api/platform/versions/disable-with-clear
+// Mark a tag as disabled AND set its rollout_percent to 0 atomically.
+// Used by the admin "Disable image" flow so a disabled tag never lingers as
+// a rollout candidate.
+const DisableWithClearBody = z.object({
+  imageTag: z.string().min(1),
+  updatedBy: z.string().min(1),
+});
+
+platform.post('/versions/disable-with-clear', async c => {
+  const result = await parseBody(c, DisableWithClearBody);
+  if ('error' in result) return result.error;
+
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return c.json({ error: 'Database not configured' }, 503);
+
+  try {
+    await disableImageAndClearRollout({
+      kv: c.env.KV_CLAW_CACHE,
+      hyperdriveConnectionString: connectionString,
+      imageTag: result.data.imageTag,
+      updatedBy: result.data.updatedBy,
+    });
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('[platform] Failed to disable + clear rollout:', err);
+    return c.json({ error: 'Failed to disable image' }, 500);
+  }
+});
+
+// POST /api/platform/users/:userId/kiloclaw-early-access
+// Toggle the per-user kiloclaw_early_access flag. Affects all of the user's
+// instances (personal + every org instance they own).
+const SetEarlyAccessBody = z.object({
+  value: z.boolean(),
+});
+
+platform.post('/users/:userId/kiloclaw-early-access', async c => {
+  const userId = c.req.param('userId');
+  if (!userId) return c.json({ error: 'Missing userId' }, 400);
+
+  const result = await parseBody(c, SetEarlyAccessBody);
+  if ('error' in result) return result.error;
+
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return c.json({ error: 'Database not configured' }, 503);
+
+  try {
+    const updated = await setKiloclawEarlyAccess(connectionString, userId, result.data.value);
+    if (!updated) return c.json({ error: 'User not found' }, 404);
+    return c.json({ ok: true, userId, earlyAccess: result.data.value });
+  } catch (err) {
+    console.error('[platform] Failed to set kiloclaw_early_access:', err);
+    return c.json({ error: 'Failed to set kiloclaw_early_access' }, 500);
+  }
+});
+
+platform.post('/versions/rollout', async c => {
+  const result = await parseBody(c, SetRolloutPercentBody);
+  if ('error' in result) return result.error;
+
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    return c.json({ error: 'Database not configured' }, 503);
+  }
+
+  try {
+    const updated = await setRolloutPercent({
+      kv: c.env.KV_CLAW_CACHE,
+      hyperdriveConnectionString: connectionString,
+      imageTag: result.data.imageTag,
+      percent: result.data.percent,
+    });
+    return c.json({ ok: true, ...updated });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    if (msg.startsWith('Image not found')) return c.json({ error: msg }, 404);
+    if (
+      msg.startsWith('Invalid rollout percent') ||
+      msg.startsWith('Image not available') ||
+      msg.startsWith('Cannot set rollout percent')
+    ) {
+      return c.json({ error: msg }, 400);
+    }
+    console.error('[platform] Failed to set rollout percent:', err);
+    return c.json({ error: 'Failed to set rollout percent' }, 500);
+  }
+});
+
+// POST /api/platform/versions/mark-latest
+// Mark an image as the production :latest for its variant. Atomically clears
+// is_latest from the previous :latest in the same variant. Independent of
+// rollout_percent.
+const MarkLatestBody = z.object({
+  imageTag: z.string().min(1),
+});
+
+// POST /api/platform/versions/apply-pin
+// Pushes a resolved admin pin (or pin clear) into the target instance's DO
+// state so the next redeploy/restart boots the pinned image. Does NOT
+// restart the machine — the caller triggers that separately if desired.
+const ApplyPinSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().min(1),
+  imageTag: z.string().min(1).nullable(),
+});
+
+platform.post('/versions/apply-pin', async c => {
+  const result = await parseBody(c, ApplyPinSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, instanceId, imageTag } = result.data;
+
+  try {
+    const applied = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.applyPinnedVersion(imageTag, instanceId),
+      'applyPinnedVersion'
+    );
+    return c.json({ ok: true, ...applied });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'apply-pin');
+    return jsonError(message, status);
+  }
+});
+
+platform.post('/versions/mark-latest', async c => {
+  const result = await parseBody(c, MarkLatestBody);
+  if ('error' in result) return result.error;
+
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return c.json({ error: 'Database not configured' }, 503);
+
+  try {
+    const updated = await markImageAsLatest({
+      kv: c.env.KV_CLAW_CACHE,
+      hyperdriveConnectionString: connectionString,
+      imageTag: result.data.imageTag,
+    });
+    return c.json({ ok: true, ...updated });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    if (msg.startsWith('Image not found')) return c.json({ error: msg }, 404);
+    if (msg.startsWith('Image is disabled')) return c.json({ error: msg }, 400);
+    console.error('[platform] Failed to mark image as latest:', err);
+    return c.json({ error: 'Failed to mark image as latest' }, 500);
+  }
+});
+
 // POST /api/platform/publish-image-version
-// Manual fallback for publishing/correcting version entries.
-// Primary registration path is worker self-registration on deploy.
+// Manual fallback for publishing/correcting version entries. Newly published
+// images land at rollout_percent=0 (not exposed). Ops slides the percent up
+// from the admin Versions page.
 const PublishImageVersionSchema = z.object({
   openclawVersion: z.string().min(1),
   variant: z.string().min(1).default('default'),
   imageTag: z.string().min(1),
   imageDigest: z.string().nullable().optional(),
-  // Set to false when backfilling older versions to avoid overwriting the latest pointer.
-  setLatest: z.boolean().optional().default(true),
 });
 
 platform.post('/publish-image-version', async c => {
   const result = await parseBody(c, PublishImageVersionSchema);
   if ('error' in result) return result.error;
 
-  const { openclawVersion, variant, imageTag, imageDigest, setLatest } = result.data;
+  const { openclawVersion, variant, imageTag, imageDigest } = result.data;
 
   if (openclawVersion === 'latest') {
     return c.json({ error: '"latest" is reserved and cannot be used as a version' }, 400);
@@ -3225,6 +3758,7 @@ platform.post('/publish-image-version', async c => {
     imageTag,
     imageDigest: imageDigest ?? null,
     publishedAt: new Date().toISOString(),
+    rolloutPercent: 0,
   };
 
   // Validate against schema
@@ -3233,15 +3767,13 @@ platform.post('/publish-image-version', async c => {
     return c.json({ error: 'Invalid version entry', details: parsed.error.flatten() }, 400);
   }
 
-  // Write the versioned key; optionally update the latest pointer
+  // Write the versioned key + tag lookup. Do NOT touch :latest — that
+  // pointer is owned by the rollout flow now.
   const serialized = JSON.stringify(parsed.data);
-  const writes: Promise<void>[] = [
+  await Promise.all([
     c.env.KV_CLAW_CACHE.put(imageVersionKey(openclawVersion, variant), serialized),
-  ];
-  if (setLatest) {
-    writes.push(c.env.KV_CLAW_CACHE.put(imageVersionLatestKey(variant), serialized));
-  }
-  await Promise.all(writes);
+    c.env.KV_CLAW_CACHE.put(`image-version-tag:${imageTag}`, serialized),
+  ]);
 
   // Maintain KV tag index
   await updateTagIndex(c.env.KV_CLAW_CACHE, imageTag);
@@ -3263,14 +3795,26 @@ platform.post('/publish-image-version', async c => {
   }
 
   console.log(
-    '[platform] Published image version:',
+    '[platform] Published image version (at 0% rollout):',
     openclawVersion,
     variant,
     '→',
-    imageTag,
-    setLatest ? '(latest)' : '(backfill)'
+    imageTag
   );
-  return c.json({ ok: true, setLatest, ...parsed.data }, 201);
+  return c.json(
+    {
+      ok: true,
+      ...parsed.data,
+      // Surfaced in CI logs / curl output so devs aren't surprised when their
+      // newly-pushed image isn't immediately picked up by instances.
+      promotionHint:
+        'Image registered at rollout_percent=0 and is_latest=false. It will not be served to ' +
+        'any instance until ops promotes it. Open /admin/kiloclaw?tab=versions and either ' +
+        'click "Make :latest" (full immediate rollout) or "Start rollout" with a percent ' +
+        '(staged rollout).',
+    },
+    201
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -3433,8 +3977,10 @@ platform.post('/destroy-fly-machine', async c => {
 });
 
 // POST /api/platform/extend-volume
-// Temporary workaround: extend a Fly volume to exactly 15 GB.
-const EXTEND_VOLUME_TARGET_SIZE_GB = 15;
+// Admin workaround for granting users temporary additional storage.
+// Fly volumes can grow but cannot shrink, so once extended an instance
+// is effectively pinned to the larger size — flips DO instanceType to
+// 'custom' to reflect that.
 const ExtendVolumeSchema = z.object({
   userId: z.string().min(1),
   appName: z
@@ -3446,6 +3992,7 @@ const ExtendVolumeSchema = z.object({
     .string()
     .min(1)
     .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+  targetSizeGb: z.number().int().min(1).max(500),
 });
 
 const FlyExtendVolumeResponseSchema = z.object({
@@ -3459,7 +4006,7 @@ platform.post('/extend-volume', async c => {
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
 
-  const { appName, volumeId } = result.data;
+  const { appName, volumeId, targetSizeGb, userId } = result.data;
   const apiToken = c.env.FLY_API_TOKEN;
   if (!apiToken) {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
@@ -3470,13 +4017,13 @@ platform.post('/extend-volume', async c => {
     const resp = await fetch(url, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ size_gb: EXTEND_VOLUME_TARGET_SIZE_GB }),
+      body: JSON.stringify({ size_gb: targetSizeGb }),
     });
 
     if (!resp.ok) {
       const body = await resp.text();
       console.error(
-        `[platform] extend-volume failed (${resp.status}) volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}:`,
+        `[platform] extend-volume failed (${resp.status}) volume=${volumeId} size=${targetSizeGb}:`,
         body
       );
       return jsonError(`Fly API error (${resp.status}): ${body}`, resp.status);
@@ -3492,12 +4039,102 @@ platform.post('/extend-volume', async c => {
     }
     // Default to true so the admin always sees the redeploy warning when Fly omits the flag
     const needsRestart = extendParsed.data.needs_restart ?? true;
+
+    // Catch the DO up to the new on-disk size so resize-policy comparisons stay honest.
+    try {
+      await withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
+        stub => stub.recordVolumeExtend(targetSizeGb),
+        'recordVolumeExtend'
+      );
+    } catch (err) {
+      // Don't fail the whole request — Fly is already extended; the request
+      // would have to be retried anyway and the Fly extend is idempotent
+      // (re-extending to the same size is a no-op on Fly).
+      //
+      // RECOVERY: there is no alarm-driven volume-size observation today
+      // (the alarm reconciles `machineSize` from `getMachine` but does not
+      // call `getVolume`), so this divergence does NOT auto-heal. The
+      // admin re-runs `/extend-volume` with the same target size — both
+      // calls are idempotent on retry. The "Has size override" / list
+      // tooling is not affected because volumeSizeGb is not surfaced in
+      // those filters.
+      //
+      // FOLLOW-UP: a later PR could add `getVolume`-driven volume-size
+      // reconciliation to `backfillMachineSizeFromFlyConfig` so this
+      // self-heals on the next alarm tick.
+      console.error(
+        `[platform] extend-volume: Fly extended succeeded but DO recordVolumeExtend failed for ` +
+          `volume=${volumeId} targetSizeGb=${targetSizeGb}. ` +
+          `DO state will lag until admin re-runs this route.`,
+        err
+      );
+    }
+
     console.log(
-      `[platform] extend-volume ok: volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}GB (target total) needsRestart=${needsRestart}`
+      `[platform] extend-volume ok: volume=${volumeId} size=${targetSizeGb}GB needsRestart=${needsRestart}`
     );
     return c.json({ ok: true as const, needsRestart });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'extend-volume');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/scheduled-action/wake
+//
+// Called by the web's scheduleAction tRPC right after persisting a new
+// scheduled-action row in Postgres. Resolves the target instance's DO
+// and calls notifyScheduledActionPending() — which just re-arms the
+// existing reconcile alarm so the next alarm tick picks up the new
+// row via the existing wedge in alarm().
+//
+// In production this is belt-and-suspenders (the platform proactively
+// fires past-due alarms anyway). In `wrangler dev`, stale alarm
+// timestamps don't auto-fire — this route is what prevents the dev
+// scheduler from sitting forever with a never-firing pre-existing
+// alarm.
+const ScheduledActionWakeSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().uuid(),
+});
+
+platform.post('/scheduled-action/wake', async c => {
+  const result = await parseBody(c, ScheduledActionWakeSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, instanceId } = result.data;
+
+  try {
+    const woken = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.notifyScheduledActionPending(),
+      'notifyScheduledActionPending'
+    );
+    return c.json(woken);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'scheduled-action-wake');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/scheduled-action/run-notice-sweep
+//
+// Synchronously runs the notice sweep that the cron normally drives.
+// Useful for local dev (where wrangler does not fire scheduled() on
+// the cron cadence) and for ad-hoc admin testing in production. The
+// sweep is idempotent and bounded (MAX_NOTIFICATIONS_PER_TICK), so
+// invoking it on demand is safe.
+platform.post('/scheduled-action/run-notice-sweep', async c => {
+  try {
+    const result = await runScheduledActionNoticesSweep(c.env);
+    return c.json(result);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'scheduled-action-run-notice-sweep');
     return jsonError(message, status);
   }
 });

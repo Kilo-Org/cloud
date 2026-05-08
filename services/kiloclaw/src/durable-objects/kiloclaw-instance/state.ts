@@ -4,7 +4,9 @@ import {
   type ProviderState,
   type FlyProviderState,
   type DockerLocalProviderState,
+  type NorthflankProviderState,
 } from '../../schemas/instance-config';
+import { LIFECYCLE_NOTIFICATION_RESET } from './lifecycle-push';
 import type { InstanceMutableState } from './types';
 
 /**
@@ -98,6 +100,28 @@ export function getDockerLocalProviderState(
   };
 }
 
+export function getNorthflankProviderState(
+  source: Pick<InstanceMutableState, 'providerState'>
+): NorthflankProviderState {
+  if (source.providerState?.provider === 'northflank') {
+    return source.providerState;
+  }
+  return {
+    provider: 'northflank',
+    projectId: null,
+    projectName: null,
+    serviceId: null,
+    serviceName: null,
+    volumeId: null,
+    volumeName: null,
+    secretId: null,
+    secretName: null,
+    secretContentHash: null,
+    ingressHost: null,
+    region: null,
+  };
+}
+
 export function getRuntimeId(
   source: Pick<InstanceMutableState, 'providerState' | 'flyMachineId'>
 ): string | null {
@@ -106,6 +130,9 @@ export function getRuntimeId(
   }
   if (source.providerState?.provider === 'docker-local') {
     return source.providerState.containerName;
+  }
+  if (source.providerState?.provider === 'northflank') {
+    return source.providerState.serviceId ?? source.providerState.serviceName;
   }
   return source.flyMachineId;
 }
@@ -119,6 +146,9 @@ export function getStorageId(
   if (source.providerState?.provider === 'docker-local') {
     return source.providerState.volumeName;
   }
+  if (source.providerState?.provider === 'northflank') {
+    return source.providerState.volumeId ?? source.providerState.volumeName;
+  }
   return source.flyVolumeId;
 }
 
@@ -130,6 +160,9 @@ export function getProviderRegion(
   }
   if (source.providerState?.provider === 'docker-local') {
     return null;
+  }
+  if (source.providerState?.provider === 'northflank') {
+    return source.providerState.region;
   }
   return source.flyRegion;
 }
@@ -240,6 +273,7 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.restartingAt = d.restartingAt;
     s.recoveryStartedAt = d.recoveryStartedAt;
     s.restartUpdateSent = d.restartUpdateSent;
+    s.pendingStartReason = d.pendingStartReason;
     s.lastStartedAt = d.lastStartedAt;
     s.lastStoppedAt = d.lastStoppedAt;
     s.flyAppName = d.flyAppName;
@@ -256,6 +290,10 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
       applyProviderState(s, s.providerState);
     }
     s.machineSize = d.machineSize;
+    s.instanceType = d.instanceType;
+    s.volumeSizeGb = d.volumeSizeGb;
+    s.adminMachineSizeOverride = d.adminMachineSizeOverride;
+    s.adminMachineSizeOverrideMetadata = d.adminMachineSizeOverrideMetadata;
     s.healthCheckFailCount = d.healthCheckFailCount;
     s.pendingDestroyMachineId = d.pendingDestroyMachineId;
     s.pendingDestroyVolumeId = d.pendingDestroyVolumeId;
@@ -280,27 +318,32 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.lastRecoveryErrorAt = d.lastRecoveryErrorAt;
     s.lastBoundMachineRecoveryAt = d.lastBoundMachineRecoveryAt;
     s.instanceFeatures = d.instanceFeatures;
+    s.controllerCapabilitiesVersion = d.controllerCapabilitiesVersion;
     s.gmailNotificationsEnabled = d.gmailNotificationsEnabled;
     s.gmailLastHistoryId = d.gmailLastHistoryId;
     s.gmailPushOidcEmail = d.gmailPushOidcEmail;
     s.execSecurity = d.execSecurity;
     s.execAsk = d.execAsk;
+    s.execPresetApplyPending = d.execPresetApplyPending;
     s.botName = d.botName;
     s.botNature = d.botNature;
     s.botVibe = d.botVibe;
     s.botEmoji = d.botEmoji;
+    s.botIdentityApplyPending = d.botIdentityApplyPending;
+    s.channelsApplyPending = d.channelsApplyPending;
     s.previousVolumeId = d.previousVolumeId;
     s.restoreStartedAt = d.restoreStartedAt;
     s.preRestoreStatus = d.preRestoreStatus;
     s.pendingRestoreVolumeId = d.pendingRestoreVolumeId;
     // Legacy instances pre-dating this field treat absence as already-sent
-    // to avoid spurious emails after deploy.
+    // to avoid spurious emails/pushes after deploy.
     s.instanceReadyEmailSent = 'instanceReadyEmailSent' in raw ? d.instanceReadyEmailSent : true;
+    // Legacy instances with an in-flight `starting` attempt at deploy time
+    // should not emit a retroactive `start_failed` push for that attempt.
+    // startAsync() re-arms this flag for every subsequent attempt.
+    s.startFailurePushSentForAttempt =
+      'startFailurePushSentForAttempt' in raw ? d.startFailurePushSentForAttempt : true;
     s.customSecretMeta = d.customSecretMeta;
-    s.streamChatApiKey = d.streamChatApiKey;
-    s.streamChatBotUserId = d.streamChatBotUserId;
-    s.streamChatBotUserToken = d.streamChatBotUserToken;
-    s.streamChatChannelId = d.streamChatChannelId;
     s.vectorMemoryEnabled = d.vectorMemoryEnabled;
     s.vectorMemoryModel = d.vectorMemoryModel;
     s.dreamingEnabled = d.dreamingEnabled;
@@ -347,6 +390,7 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.restartingAt = null;
   s.recoveryStartedAt = null;
   s.restartUpdateSent = false;
+  s.pendingStartReason = null;
   s.lastStartedAt = null;
   s.lastStoppedAt = null;
   s.flyAppName = null;
@@ -354,6 +398,10 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.flyVolumeId = null;
   s.flyRegion = null;
   s.machineSize = null;
+  s.instanceType = null;
+  s.volumeSizeGb = null;
+  s.adminMachineSizeOverride = null;
+  s.adminMachineSizeOverrideMetadata = null;
   s.healthCheckFailCount = 0;
   s.pendingDestroyMachineId = null;
   s.pendingDestroyVolumeId = null;
@@ -378,24 +426,24 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.lastRecoveryErrorAt = null;
   s.lastBoundMachineRecoveryAt = null;
   s.instanceFeatures = [];
+  s.controllerCapabilitiesVersion = null;
   s.gmailNotificationsEnabled = false;
   s.gmailLastHistoryId = null;
   s.gmailPushOidcEmail = null;
   s.execSecurity = null;
   s.execAsk = null;
+  s.execPresetApplyPending = false;
   s.botName = null;
   s.botNature = null;
   s.botVibe = null;
   s.botEmoji = null;
+  s.botIdentityApplyPending = false;
+  s.channelsApplyPending = false;
   s.previousVolumeId = null;
   s.restoreStartedAt = null;
   s.preRestoreStatus = null;
   s.pendingRestoreVolumeId = null;
-  s.instanceReadyEmailSent = false;
-  s.streamChatApiKey = null;
-  s.streamChatBotUserId = null;
-  s.streamChatBotUserToken = null;
-  s.streamChatChannelId = null;
+  Object.assign(s, LIFECYCLE_NOTIFICATION_RESET);
   s.vectorMemoryEnabled = false;
   s.vectorMemoryModel = null;
   s.dreamingEnabled = false;
@@ -436,6 +484,7 @@ export function createMutableState(): InstanceMutableState {
     restartingAt: null,
     recoveryStartedAt: null,
     restartUpdateSent: false,
+    pendingStartReason: null,
     lastStartedAt: null,
     lastStoppedAt: null,
     flyAppName: null,
@@ -443,6 +492,10 @@ export function createMutableState(): InstanceMutableState {
     flyVolumeId: null,
     flyRegion: null,
     machineSize: null,
+    instanceType: null,
+    volumeSizeGb: null,
+    adminMachineSizeOverride: null,
+    adminMachineSizeOverrideMetadata: null,
     healthCheckFailCount: 0,
     pendingDestroyMachineId: null,
     pendingDestroyVolumeId: null,
@@ -467,25 +520,25 @@ export function createMutableState(): InstanceMutableState {
     lastRecoveryErrorAt: null,
     lastBoundMachineRecoveryAt: null,
     instanceFeatures: [],
+    controllerCapabilitiesVersion: null,
     gmailNotificationsEnabled: false,
     gmailLastHistoryId: null,
     gmailPushOidcEmail: null,
     execSecurity: null,
     execAsk: null,
+    execPresetApplyPending: false,
     botName: null,
     botNature: null,
     botVibe: null,
     botEmoji: null,
+    botIdentityApplyPending: false,
+    channelsApplyPending: false,
     previousVolumeId: null,
     restoreStartedAt: null,
     preRestoreStatus: null,
     pendingRestoreVolumeId: null,
-    instanceReadyEmailSent: false,
+    ...LIFECYCLE_NOTIFICATION_RESET,
     customSecretMeta: null,
-    streamChatApiKey: null,
-    streamChatBotUserId: null,
-    streamChatBotUserToken: null,
-    streamChatChannelId: null,
     vectorMemoryEnabled: false,
     vectorMemoryModel: null,
     dreamingEnabled: false,

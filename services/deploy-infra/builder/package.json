@@ -27,7 +27,7 @@
   "devDependencies": {
     "@cloudflare/sandbox": "0.6.9",
     "@cloudflare/workers-types": "catalog:",
-    "@sentry/cli": "^2.58.5",
+    "@sentry/cli": "catalog:",
     "@types/jest": "^29.5.14",
     "@types/node": ">=24 <25",
     "@types/tar-stream": "^3.1.4",

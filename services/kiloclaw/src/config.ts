@@ -14,6 +14,24 @@ export const OPENCLAW_INTERNAL_PORT = 3001;
  *  Used as fallback when the user clears their model selection. */
 export const OPENCLAW_BUILTIN_DEFAULT_MODEL = 'kilocode/anthropic/claude-opus-4.6';
 
+/**
+ * Version marker for what the worker hands to a machine's controller at
+ * provision/start/restart time. Bumped when we change the set of env vars,
+ * controller config shape, or origin-check rules. Persisted per-instance as
+ * `controllerCapabilitiesVersion` so callers can tell which controller
+ * configuration contract a running machine was started with.
+ *
+ * Legacy instances (persisted as null) are treated as version 1.
+ *
+ * Version history:
+ *   1 — implicit; pre-capability-tracking.
+ *   2 — controller env contains a per-instance literal origin
+ *       `https://<label>.kiloclaw.ai` appended to OPENCLAW_ALLOWED_ORIGINS.
+ *       Origin checking remains exact string only; wildcard host patterns are
+ *       not supported.
+ */
+export const WORKER_CONTROLLER_CAPABILITIES_VERSION = 2;
+
 /** Maximum time to wait for the machine to reach 'started' state.
  *  Fly's /wait endpoint caps at 60s (spec.json:1538). */
 export const STARTUP_TIMEOUT_SECONDS = 60;
@@ -43,8 +61,7 @@ export const DEFAULT_MACHINE_GUEST = {
   cpu_kind: 'performance' as const,
 };
 
-/** Default Fly Volume size in GB */
-export const DEFAULT_VOLUME_SIZE_GB = 10;
+export { DEFAULT_VOLUME_SIZE_GB } from '@kilocode/kiloclaw-instance-tiers';
 
 /** Default Fly region priority list when FLY_REGION env var is not set. */
 export const DEFAULT_FLY_REGION = 'eu,us';

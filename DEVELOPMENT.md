@@ -74,7 +74,7 @@ brew install --cask docker
 
 **Important:** Open Docker Desktop at least once after installation — it configures the CLI tools needed for `docker compose`.
 
-### Vercel CLI
+### Vercel CLI (recommended if you have access)
 
 Used to pull environment variables from the Vercel project:
 
@@ -108,6 +108,8 @@ git lfs pull
 
 ### 3. Set up environment variables
 
+#### a. Set up using Vercel
+
 The project pulls environment variables from Vercel. Run these commands interactively (each will prompt for browser-based authentication):
 
 ```bash
@@ -124,6 +126,20 @@ The KiloClaw pages (`/claw/*`) render the Pylon support chat widget, which requi
 - `PYLON_IDENTITY_SECRET` — the identity verification secret used to HMAC-sign user emails
 
 Both are already present in Vercel and pulled by `vercel env pull`. If either is missing the widget is silently skipped, so local dev continues to work without Pylon configured.
+
+#### b. Set up manually
+
+If you do not have Vercel access (typical for non-Kilo-employees), you will need to set up the `.env.local` file manually.
+
+Copy `.env.local.example` to `.env.local`, then update the following variables in `.env.local`:
+
+- `NEXTAUTH_SECRET`: Generate a random secret with `openssl rand -base64 32`
+- `INTERNAL_API_SECRET`: Generate a random secret with `openssl rand -base64 32`
+- `STRIPE_SECRET_KEY` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`: These must be set to create a fake account. You can use an existing Stripe account or create a new one, and use the keys from Sandbox Mode (formerly Test Mode) here.
+
+Then copy `.env.development.local.example` to `.env.development.local`.
+
+These changes will allow you to do local testing with a fake account.
 
 ### 4. Start the database
 
@@ -146,6 +162,19 @@ pnpm drizzle migrate
 ```
 
 You need to re-run this every time you pull new migrations from the repository.
+
+If you want to fully reset the local dev database first, use:
+
+```bash
+pnpm dev:db:reset
+pnpm drizzle migrate
+```
+
+To smoke-test that migrations still bootstrap correctly from a fresh empty database, run:
+
+```bash
+pnpm drizzle:verify-bootstrap
+```
 
 ### 6. Start the development server
 
@@ -173,21 +202,23 @@ All tests should pass against the local PostgreSQL database.
 
 ## Common Development Commands
 
-| Command                    | Description                                                                                       |
-| -------------------------- | ------------------------------------------------------------------------------------------------- |
-| `pnpm dev:start`           | Start all local services in a tmux dashboard                                                      |
-| `pnpm dev:stop`            | Stop the tmux session and all services                                                            |
-| `pnpm dev:env`             | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
-| `pnpm test`                | Run the Jest test suite                                                                           |
-| `pnpm typecheck`           | Run the TypeScript type checker                                                                   |
-| `pnpm lint`                | Lint all source files                                                                             |
-| `pnpm format`              | Format all supported files with oxfmt                                                             |
-| `pnpm format:changed`      | Format only files changed since `main`                                                            |
-| `pnpm validate`            | Run typecheck, lint, and tests                                                                    |
-| `pnpm drizzle migrate`     | Apply pending database migrations                                                                 |
-| `pnpm drizzle generate`    | Generate a new migration after schema changes                                                     |
-| `pnpm --filter web stripe` | Start Stripe webhook forwarding to localhost                                                      |
-| `pnpm test:e2e`            | Run Playwright end-to-end tests                                                                   |
+| Command                         | Description                                                                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev:start`                | Start all local services in a tmux dashboard                                                                              |
+| `pnpm dev:stop`                 | Stop the tmux session and all services                                                                                    |
+| `pnpm dev:env`                  | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup))                         |
+| `pnpm test`                     | Run the Jest test suite                                                                                                   |
+| `pnpm typecheck`                | Run the TypeScript type checker                                                                                           |
+| `pnpm lint`                     | Lint all source files                                                                                                     |
+| `pnpm format`                   | Format all supported files with oxfmt                                                                                     |
+| `pnpm format:changed`           | Format only files changed since `main`                                                                                    |
+| `pnpm validate`                 | Run typecheck, lint, and tests                                                                                            |
+| `pnpm drizzle migrate`          | Apply pending database migrations                                                                                         |
+| `pnpm drizzle generate`         | Generate a new migration after schema changes                                                                             |
+| `pnpm drizzle:verify-bootstrap` | Create a temporary empty database and verify `pnpm drizzle migrate` bootstraps it cleanly                                 |
+| `pnpm dev:db:reset`             | Drop all app-owned schemas in the local dev database, recreate `public`, and leave the DB truly empty before re-migrating |
+| `pnpm --filter web stripe`      | Start Stripe webhook forwarding to localhost                                                                              |
+| `pnpm test:e2e`                 | Run Playwright end-to-end tests                                                                                           |
 
 ## Git Workflow
 
@@ -361,12 +392,31 @@ The `@url` annotation accepts multiple comma-separated services (e.g., `# @url s
 
 Run `pnpm dev:env` again after pulling changes that add new env vars to any `.dev.vars.example`.
 
+### Local Grafana (reads prod Analytics Engine)
+
+KiloClaw emits events to Cloudflare Analytics Engine (datasets `kiloclaw_events`, `kiloclaw_controller_telemetry`). A local-only Grafana is available for querying those datasets against the real production CF account — there is no local ClickHouse, and `wrangler dev` cannot simulate AE writes, but Grafana can always read what prod has already written.
+
+Grafana is part of the `observability` group in the dev runner, so `pnpm dev:start observability` (or `pnpm dev:start all`) boots it alongside the other observability workers. It shows up in the tmux sidebar under `OBSERVABILITY` on port 4000.
+
+One-time setup:
+
+1. Create a Cloudflare user API token with a single permission: **All accounts → Account Analytics: Read**. No zone, DNS, or write permissions required — this is strictly a read-only token.
+2. Add it to `.env.local` (the same file used by `pnpm dev:env`):
+   ```
+   CF_AE_TOKEN=<token>
+   ```
+3. `pnpm dev:start observability` — Grafana is available at http://localhost:4000 (default `admin`/`admin`).
+
+The dev runner passes `--env-file .env.local` to `docker compose` when starting infra, so the token reaches the Grafana container via env substitution without being loaded into the runner's `process.env`. Shell exports still override file values.
+
+If `CF_AE_TOKEN` is missing, Grafana will still boot — only dashboard queries fail. The runner prints an advisory warning at startup. See [dev/grafana/README.md](./dev/grafana/README.md) for full provisioning details and dashboard coverage.
+
 ### Limitations in local dev
 
 - **Service bindings** between workers don't function in local `wrangler dev`. This affects chains like session-ingest → o11y, webhook-agent → cloud-agent, and app-builder → db-proxy/git-token-service.
 - **Webhook → KiloClaw Chat** triggers require the KiloClaw worker running on port 8795. The webhook worker calls it via `KILOCLAW_API_URL` (HTTP, not a service binding) to deliver messages to Stream Chat. Stream Chat credentials (`STREAM_CHAT_API_KEY`, `STREAM_CHAT_API_SECRET`) must be in `kiloclaw/.dev.vars`.
 - **Cloudflare Containers** (used by cloud-agent, cloud-agent-next, app-builder) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
-- **Cloudflare-specific features** like Analytics Engine, Pipelines, and dispatch namespaces don't work locally.
+- **Analytics Engine writes** are no-ops in `wrangler dev` — there is no local AE simulator. Reads against the real prod datasets still work via the local Grafana above. **Pipelines** and **dispatch namespaces** don't work locally.
 
 ### What works without running any workers
 
@@ -385,6 +435,8 @@ export KILO_PORT_OFFSET=100
 ```
 
 With `auto`, the primary worktree gets offset 0 (default ports), and secondary worktrees get a deterministic offset based on the directory name. The offset is added to the Next.js port (3000), all worker dev ports, and the URLs generated by `pnpm dev:env`.
+
+Infrastructure containers (`postgres` on 5432, `redis` on 6379, `grafana` on 4000) always bind to their fixed host ports regardless of the offset — they are single shared services, not per-worktree. Only one worktree can run the infra stack at a time; secondary worktrees should either reuse the primary worktree's infra or run `pnpm dev:stop` before starting the infra in another worktree.
 
 ## Troubleshooting
 

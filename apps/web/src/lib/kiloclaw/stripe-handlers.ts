@@ -15,13 +15,17 @@ import {
   isIntroPriceId,
 } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { applyStripeFundedKiloClawPeriod } from '@/lib/kiloclaw/credit-billing';
-import { autoResumeIfSuspended } from '@/lib/kiloclaw/instance-lifecycle';
+import {
+  autoResumeIfSuspended,
+  clearTrialInactivityStopAfterTrialTransition,
+} from '@/lib/kiloclaw/instance-lifecycle';
 import { sentryLogger } from '@/lib/utils.server';
 import PostHogClient from '@/lib/posthog';
 import { after } from 'next/server';
 import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import { client as stripe } from '@/lib/stripe-client';
 import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
+import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
 import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 import {
   CurrentPersonalSubscriptionResolutionError,
@@ -122,6 +126,36 @@ async function insertStripeSubscriptionChangeLog(
       subscription_id: params.subscriptionId,
       action: params.action,
       reason: params.reason,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function clearTrialInactivityStopAfterStripeTrialTransition(params: {
+  userId: string;
+  before: KiloClawSubscription | null;
+  after: KiloClawSubscription | null;
+}) {
+  const before = params.before;
+  const after = params.after;
+
+  if (!before || before.plan !== 'trial' || before.status !== 'trialing' || !after?.instance_id) {
+    return;
+  }
+
+  if (after.plan === 'trial' && after.status === 'trialing') {
+    return;
+  }
+
+  try {
+    await clearTrialInactivityStopAfterTrialTransition({
+      kiloUserId: params.userId,
+      instanceId: after.instance_id,
+    });
+  } catch (error) {
+    logWarning('Failed to clear trial inactivity marker after Stripe trial transition', {
+      user_id: params.userId,
+      instance_id: after.instance_id,
       error: error instanceof Error ? error.message : String(error),
     });
   }
@@ -703,6 +737,8 @@ export async function handleKiloClawSubscriptionCreated(params: {
   let didProcess = false;
   let resolvedInstanceId: string | undefined;
   let convertedFromTrial = false;
+  let beforeSubscriptionForMarkerClear: KiloClawSubscription | null = null;
+  let afterSubscriptionForMarkerClear: KiloClawSubscription | null = null;
   const trialEndEventDate =
     typeof subscription.created === 'number' ? new Date(subscription.created * 1000) : new Date();
 
@@ -859,7 +895,15 @@ export async function handleKiloClawSubscriptionCreated(params: {
       after: afterSubscription ?? null,
     });
 
+    beforeSubscriptionForMarkerClear = beforeSubscription ?? null;
+    afterSubscriptionForMarkerClear = afterSubscription ?? null;
     didProcess = true;
+  });
+
+  await clearTrialInactivityStopAfterStripeTrialTransition({
+    userId: kiloUserId,
+    before: beforeSubscriptionForMarkerClear,
+    after: afterSubscriptionForMarkerClear,
   });
 
   if (wasSuspended) {
@@ -1060,6 +1104,12 @@ export async function handleKiloClawSubscriptionUpdated(params: {
       bestEffort: true,
     });
 
+    await clearTrialInactivityStopAfterStripeTrialTransition({
+      userId: preRead.user_id,
+      before: before ?? null,
+      after: after ?? null,
+    });
+
     if (wasSuspended) {
       await autoResumeIfSuspended(preRead.user_id, preRead.instance_id ?? undefined);
     }
@@ -1157,6 +1207,12 @@ export async function handleKiloClawSubscriptionDeleted(params: {
       bestEffort: true,
     });
 
+    await clearTrialInactivityStopAfterStripeTrialTransition({
+      userId: preRead.user_id,
+      before: before ?? null,
+      after: after ?? null,
+    });
+
     logInfo('KiloClaw subscription.deleted: converted to pure credit', {
       stripe_event_id: eventId,
       user_id: preRead.user_id,
@@ -1188,6 +1244,12 @@ export async function handleKiloClawSubscriptionDeleted(params: {
       before: before ?? null,
       after: after ?? null,
       bestEffort: true,
+    });
+
+    await clearTrialInactivityStopAfterStripeTrialTransition({
+      userId: preRead.user_id,
+      before: before ?? null,
+      after: after ?? null,
     });
 
     logInfo('KiloClaw subscription.deleted processed', {
@@ -1444,24 +1506,38 @@ export async function handleKiloClawInvoicePaid(params: {
         invoice.status_transitions?.paid_at != null
           ? new Date(invoice.status_transitions.paid_at * 1000)
           : new Date();
-      await enqueueAffiliateEventForUser({
+      const conversionDisposition = await processPersonalKiloClawPaidConversion({
         userId: metadata.kiloUserId,
-        provider: 'impact',
-        eventType: 'sale',
-        dedupeKey: buildAffiliateEventDedupeKey({
-          provider: 'impact',
-          eventType: 'sale',
-          entityId: invoice.id,
-        }),
+        sourcePaymentId: invoice.id,
         orderId: invoice.id,
         amount: invoice.amount_paid / 100,
         currencyCode: invoice.currency ?? 'usd',
-        eventDate,
+        convertedAt: eventDate,
         itemCategory: getImpactItemCategory(plan),
         itemName: getImpactItemName(plan),
         itemSku: matchingPriceId,
-        stripeChargeId: chargeId,
       });
+
+      if (conversionDisposition.shouldEnqueueAffiliateSale) {
+        await enqueueAffiliateEventForUser({
+          userId: metadata.kiloUserId,
+          provider: 'impact',
+          eventType: 'sale',
+          dedupeKey: buildAffiliateEventDedupeKey({
+            provider: 'impact',
+            eventType: 'sale',
+            entityId: invoice.id,
+          }),
+          orderId: invoice.id,
+          amount: invoice.amount_paid / 100,
+          currencyCode: invoice.currency ?? 'usd',
+          eventDate,
+          itemCategory: getImpactItemCategory(plan),
+          itemName: getImpactItemName(plan),
+          itemSku: matchingPriceId,
+          stripeChargeId: chargeId,
+        });
+      }
     } catch (error) {
       logWarning('Affiliate sale enqueue failed', {
         stripe_event_id: eventId,

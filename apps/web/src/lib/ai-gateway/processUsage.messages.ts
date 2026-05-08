@@ -15,7 +15,9 @@ import {
   computeOpenRouterCostFields,
   computeVercelCostMicrodollars,
   drainSseStream,
+  extractVercelIsByok,
 } from '@/lib/ai-gateway/processUsage.shared';
+import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
 import type Anthropic from '@anthropic-ai/sdk';
 
 type MaybeHasVercelProviderMetadata = {
@@ -61,7 +63,7 @@ export function processMessagesApiUsage(
       cacheHitTokens,
       cacheWriteTokens,
       cost_mUsd,
-      is_byok: null,
+      is_byok: extractVercelIsByok(vercelGateway),
     };
   }
 
@@ -169,7 +171,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
 
   const coreProps = {
     messageId,
-    hasError: reportedError || wasAborted,
+    hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
     model,
     responseContent,
     inference_provider,
@@ -180,6 +182,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
     generation_time: null,
     streamed: true,
     cancelled: null,
+    status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
   const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
@@ -203,19 +206,21 @@ export function parseMessagesMicrodollarUsageFromString(
     .map(c => c.text)
     .join('');
 
+  const finish_reason = responseJson?.stop_reason ?? null;
   const coreProps = {
     messageId: responseJson?.id ?? null,
-    hasError: !responseJson?.model || statusCode >= 400,
+    hasError: !responseJson?.model || statusCode >= 400 || isErrorFinishReason(finish_reason),
     model: responseJson?.model ?? null,
     responseContent,
     inference_provider,
     upstream_id: null,
-    finish_reason: responseJson?.stop_reason ?? null,
+    finish_reason,
     latency: null,
     moderation_latency: null,
     generation_time: null,
     streamed: false,
     cancelled: null,
+    status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
   const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);

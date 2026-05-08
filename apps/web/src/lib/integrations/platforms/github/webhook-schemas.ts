@@ -121,6 +121,7 @@ export const PullRequestPayloadSchema = z.object({
     body: z.string().nullable().optional(),
     state: z.string(),
     draft: z.boolean().optional(),
+    merged: z.boolean().nullable().optional(),
     html_url: z.string().optional(),
     user: z.object({
       id: z.number(),
@@ -133,6 +134,8 @@ export const PullRequestPayloadSchema = z.object({
       repo: z
         .object({
           full_name: z.string(),
+          clone_url: z.string().optional(),
+          html_url: z.string().optional(),
         })
         .nullable()
         .optional(),
@@ -238,6 +241,41 @@ export const PullRequestReviewCommentPayloadSchema = z.object({
   sender: GitHubSenderSchema.optional(),
 });
 
+// pull_request_review webhook payload
+export const PullRequestReviewPayloadSchema = z.object({
+  action: z.enum(['submitted', 'edited', 'dismissed']),
+  review: z.object({
+    id: z.number(),
+    state: z.enum(['approved', 'changes_requested', 'commented', 'dismissed']),
+    user: z.object({ login: z.string() }).nullish(),
+  }),
+  pull_request: z.object({
+    number: z.number(),
+    state: z.enum(['open', 'closed']),
+    merged: z.boolean().optional(),
+    html_url: z.string(),
+    title: z.string(),
+    head: z.object({
+      sha: z.string(),
+      ref: z.string(),
+      repo: z
+        .object({
+          full_name: z.string(),
+          clone_url: z.string(),
+          html_url: z.string(),
+        })
+        .nullable(),
+    }),
+  }),
+  repository: z.object({
+    id: z.number(),
+    name: z.string(),
+    full_name: z.string(),
+    owner: z.object({ login: z.string() }),
+  }),
+  installation: z.object({ id: z.number() }),
+});
+
 // Type exports for use in the webhook handler
 export type InstallationCreatedPayload = z.infer<typeof InstallationCreatedPayloadSchema>;
 export type InstallationDeletedPayload = z.infer<typeof InstallationDeletedPayloadSchema>;
@@ -248,4 +286,5 @@ export type PushEventPayload = z.infer<typeof PushEventPayloadSchema>;
 export type PullRequestPayload = z.infer<typeof PullRequestPayloadSchema>;
 export type IssuePayload = z.infer<typeof IssuePayloadSchema>;
 export type PullRequestReviewCommentPayload = z.infer<typeof PullRequestReviewCommentPayloadSchema>;
+export type PullRequestReviewPayload = z.infer<typeof PullRequestReviewPayloadSchema>;
 export type GitHubAuthorAssociation = z.infer<typeof GitHubAuthorAssociationSchema>;

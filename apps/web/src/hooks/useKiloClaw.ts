@@ -61,16 +61,6 @@ export function useRefreshDevicePairing() {
   };
 }
 
-export function useStreamChatCredentials(enabled: boolean) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
-      enabled,
-      staleTime: 5 * 60_000, // credentials don't change; avoid redundant refetches
-    })
-  );
-}
-
 export function useKiloClawGatewayStatus(enabled: boolean) {
   const trpc = useTRPC();
   return useQuery(
@@ -97,6 +87,16 @@ export function useControllerVersion(enabled: boolean) {
     trpc.kiloclaw.controllerVersion.queryOptions(undefined, {
       enabled,
       staleTime: 5 * 60_000, // version changes infrequently; acceptable staleness window
+    })
+  );
+}
+
+export function useMorningBriefingStatus(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.getMorningBriefingStatus.queryOptions(undefined, {
+      enabled,
+      refetchInterval: enabled ? 30_000 : false,
     })
   );
 }
@@ -150,6 +150,11 @@ export function useKiloClawMutations() {
     ]);
   };
 
+  const clearGatewayAndMorningBriefingCaches = () => {
+    queryClient.removeQueries({ queryKey: trpc.kiloclaw.gatewayReady.queryKey() });
+    queryClient.removeQueries({ queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey() });
+  };
+
   // Wipe all instance-scoped caches so no stale data (e.g. gatewayReady
   // from the old instance) bleeds into a subsequent re-provision flow.
   // removeQueries drops the cached payload entirely; invalidateQueries
@@ -173,13 +178,25 @@ export function useKiloClawMutations() {
   };
 
   return {
-    start: useMutation(trpc.kiloclaw.start.mutationOptions({ onSuccess: invalidateStatus })),
+    start: useMutation(
+      trpc.kiloclaw.start.mutationOptions({
+        onSuccess: async () => {
+          clearGatewayAndMorningBriefingCaches();
+          await invalidateStatus();
+        },
+      })
+    ),
     stop: useMutation(trpc.kiloclaw.stop.mutationOptions({ onSuccess: invalidateStatus })),
     destroy: useMutation(
       trpc.kiloclaw.destroy.mutationOptions({ onSuccess: resetAllInstanceState })
     ),
     provision: useMutation(
-      trpc.kiloclaw.provision.mutationOptions({ onSuccess: invalidateStatusAndBilling })
+      trpc.kiloclaw.provision.mutationOptions({
+        onSuccess: async () => {
+          clearGatewayAndMorningBriefingCaches();
+          await invalidateStatusAndBilling();
+        },
+      })
     ),
     cycleInboundEmailAddress: useMutation(
       trpc.kiloclaw.cycleInboundEmailAddress.mutationOptions({ onSuccess: invalidateStatus })
@@ -212,6 +229,7 @@ export function useKiloClawMutations() {
     restartMachine: useMutation(
       trpc.kiloclaw.restartMachine.mutationOptions({
         onSuccess: async () => {
+          clearGatewayAndMorningBriefingCaches();
           await invalidateStatus();
           await queryClient.invalidateQueries({
             queryKey: trpc.kiloclaw.gatewayStatus.queryKey(),
@@ -222,6 +240,7 @@ export function useKiloClawMutations() {
     restartOpenClaw: useMutation(
       trpc.kiloclaw.restartOpenClaw.mutationOptions({
         onSuccess: async () => {
+          clearGatewayAndMorningBriefingCaches();
           await invalidateStatus();
           await queryClient.invalidateQueries({
             queryKey: trpc.kiloclaw.gatewayStatus.queryKey(),
@@ -347,6 +366,36 @@ export function useKiloClawMutations() {
     setGmailNotifications: useMutation(
       trpc.kiloclaw.setGmailNotifications.mutationOptions({ onSuccess: invalidateStatus })
     ),
+    enableMorningBriefing: useMutation(
+      trpc.kiloclaw.enableMorningBriefing.mutationOptions({
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey(),
+          });
+        },
+      })
+    ),
+    disableMorningBriefing: useMutation(
+      trpc.kiloclaw.disableMorningBriefing.mutationOptions({
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey(),
+          });
+        },
+      })
+    ),
+    runMorningBriefing: useMutation(
+      trpc.kiloclaw.runMorningBriefing.mutationOptions({
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey(),
+          });
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.readMorningBriefing.queryKey({ day: 'today' }),
+          });
+        },
+      })
+    ),
     rename: useMutation(
       trpc.kiloclaw.renameInstance.mutationOptions({ onSuccess: invalidateStatus })
     ),
@@ -377,11 +426,13 @@ export function useKiloClawAvailableVersions(offset = 0, limit = 25) {
   );
 }
 
-export function useKiloClawMyPin() {
+export function useKiloClawMyPin(opts: { enabled?: boolean } = {}) {
+  const { enabled = true } = opts;
   const trpc = useTRPC();
   return useQuery(
     trpc.kiloclaw.getMyPin.queryOptions(undefined, {
       staleTime: 60_000, // pins don't change frequently
+      enabled,
     })
   );
 }

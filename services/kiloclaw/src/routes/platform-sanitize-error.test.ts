@@ -5,6 +5,7 @@ import {
   cancelKiloCliRun,
   startKiloCliRun,
 } from '../durable-objects/kiloclaw-instance/kilo-cli-run';
+import { runDoctorViaController } from '../durable-objects/kiloclaw-instance/doctor-run';
 import { platform } from './platform';
 
 vi.mock('cloudflare:workers', () => ({
@@ -350,8 +351,183 @@ describe('kilo-cli-run/cancel: conflict response handling', () => {
   });
 });
 
+describe('doctor-controller: response handling', () => {
+  function envWithDoctorRun(runDoctor: () => Promise<unknown>) {
+    return {
+      KILOCLAW_INSTANCE: {
+        idFromName: (id: string) => id,
+        get: () => ({ runDoctorViaController: runDoctor }),
+      },
+      KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      KV_CLAW_CACHE: {
+        get: vi.fn().mockResolvedValue(null),
+        put: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        list: vi.fn().mockResolvedValue({ keys: [], list_complete: true }),
+        getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+      },
+    } as never;
+  }
+
+  it('returns 200 when the controller doctor run succeeds', async () => {
+    const env = envWithDoctorRun(() =>
+      Promise.resolve({
+        ok: true,
+        status: 'completed',
+        fix: false,
+        output: 'doctor output',
+        exitCode: 0,
+        startedAt: '2026-05-08T00:00:00.000Z',
+        completedAt: '2026-05-08T00:00:01.000Z',
+        timedOut: false,
+      })
+    );
+
+    const resp = await platform.request(
+      '/doctor-controller?instanceId=11111111-1111-4111-8111-111111111111',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1', fix: false }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(200);
+    const body = await jsonBody(resp);
+    expect(body).toMatchObject({
+      ok: true,
+      status: 'completed',
+      fix: false,
+      output: 'doctor output',
+      exitCode: 0,
+      timedOut: false,
+    });
+  });
+
+  it('returns 404 when the controller route is unavailable', async () => {
+    const env = envWithDoctorRun(() => Promise.resolve(null));
+
+    const resp = await platform.request(
+      '/doctor-controller',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(404);
+    const body = await jsonBody(resp);
+    expect(body).toMatchObject({
+      code: 'controller_route_unavailable',
+      error: 'Doctor runner not available (controller too old)',
+    });
+  });
+
+  it('returns 409 when the DO helper converts not-running into a conflict', async () => {
+    const state = { ...runningFlyState(), status: 'stopped' };
+    const envForController = controllerEnv();
+    const env = envWithDoctorRun(() =>
+      runDoctorViaController(
+        state as InstanceMutableState,
+        envForController as KiloClawEnv,
+        true
+      ).then(response => response)
+    );
+
+    const resp = await platform.request(
+      '/doctor-controller',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(409);
+    const body = await jsonBody(resp);
+    expect(body).toMatchObject({
+      code: 'openclaw_doctor_instance_not_running',
+      error: 'Instance is not running',
+    });
+  });
+
+  it('returns 409 when the controller reports a doctor run is already active', async () => {
+    const state = runningFlyState();
+    const envForController = controllerEnv();
+    const env = envWithDoctorRun(() =>
+      runDoctorViaController(
+        state as InstanceMutableState,
+        envForController as KiloClawEnv,
+        true
+      ).then(response => response)
+    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'openclaw_doctor_already_active',
+          error: 'An openclaw doctor run is already in progress',
+        }),
+        {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    const resp = await platform.request(
+      '/doctor-controller',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(409);
+    const body = await jsonBody(resp);
+    expect(body).toMatchObject({
+      code: 'openclaw_doctor_already_active',
+      error: 'An openclaw doctor run is already in progress',
+    });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://app-1.fly.dev/_kilo/doctor/run',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ fix: true }),
+        signal: expect.any(AbortSignal),
+      })
+    );
+  });
+
+  it('returns 502 when the DO returns a malformed doctor conflict', async () => {
+    const env = envWithDoctorRun(() => Promise.resolve({ conflict: { error: 'Conflict' } }));
+
+    const resp = await platform.request(
+      '/doctor-controller',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(502);
+    const body = await jsonBody(resp);
+    expect(body).toMatchObject({
+      code: 'upstream_invalid_response',
+      error: 'Invalid doctor conflict response',
+    });
+  });
+});
+
 describe('sanitizeError: explicit provider support errors', () => {
-  it('returns 501 for unsupported providers on provision instead of a generic 500', async () => {
+  it('returns 503 for unconfigured Northflank on provision instead of a generic 500', async () => {
     const provision = vi.fn();
     const env = {
       KILOCLAW_INSTANCE: {
@@ -381,10 +557,13 @@ describe('sanitizeError: explicit provider support errors', () => {
       env
     );
 
-    expect(resp.status).toBe(501);
-    expect(await jsonBody(resp)).toEqual({
-      error: 'Provider northflank is not implemented yet',
-    });
+    expect(resp.status).toBe(503);
+    const body = await jsonBody(resp);
+    const errorMessage = body.error;
+    if (typeof errorMessage !== 'string') {
+      throw new Error('expected string error message in response body');
+    }
+    expect(errorMessage).toMatch(/^Provider northflank is not configured; missing /);
     expect(provision).not.toHaveBeenCalled();
   });
 

@@ -1,0 +1,1792 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "panels": [],
+      "title": "Overview",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "description": "Sample-corrected total event count across all event names.",
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT SUM(_sample_interval) AS total_events FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId)",
+          "rawSql": "SELECT SUM(_sample_interval) AS total_events FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId)",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Total Events",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "description": "Distinct sandbox IDs (blob8) seen in the window. Excludes empty sandbox IDs (early HTTP events without context).",
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT COUNT(DISTINCT blob8) AS sandboxes FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND blob8 != ''",
+          "rawSql": "SELECT COUNT(DISTINCT blob8) AS sandboxes FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND blob8 != ''",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Distinct Sandboxes",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 0.01
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "description": "Fraction of events with a non-empty error string (blob5). Sample-corrected via _sample_interval. Yellow at 1%, red at 5%.",
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT IF(SUM(_sample_interval) > 0, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval), 0) AS error_rate FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId)",
+          "rawSql": "SELECT IF(SUM(_sample_interval) > 0, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval), 0) AS error_rate FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId)",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Error Rate",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "description": "Sample-weighted P95 of double1 (operation duration in ms) across events that report a non-zero duration.",
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT quantileWeighted(0.95)(double1, _sample_interval) AS p95_duration_ms FROM kiloclaw_events WHERE $timeFilter AND double1 > 0\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId)",
+          "rawSql": "SELECT quantileWeighted(0.95)(double1, _sample_interval) AS p95_duration_ms FROM kiloclaw_events WHERE $timeFilter AND double1 > 0\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId)",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "P95 Duration",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 101,
+      "panels": [],
+      "title": "Traffic",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
+      "description": "Per-second event rate (sum of _sample_interval / bucket size) by event name.",
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) * 1000 / $__interval_ms AS rps FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) * 1000 / $__interval_ms AS rps FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) GROUP BY t, label ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Event Throughput",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
+      "description": "Event volume split by delivery layer (blob3): http, do, reconcile, queue.",
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob3 AS label, SUM(_sample_interval) AS events FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob3 AS label, SUM(_sample_interval) AS events FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) GROUP BY t, label ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Delivery Volume",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 102,
+      "panels": [],
+      "title": "Operations",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "description": "Reconcile actions emitted by the periodic reconciler (events matching reconcile.*). Spikes typically indicate a corrective sweep across many sandboxes.",
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS events FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND index1 LIKE 'reconcile.%' GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS events FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND index1 LIKE 'reconcile.%' GROUP BY t, label ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Reconcile Actions",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "description": "Snapshot restore lifecycle (instance.restore_*). Watch for restore_failed / restore_retry_scheduled growth.",
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS events FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND index1 LIKE 'instance.restore_%' GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob1 AS label, SUM(_sample_interval) AS events FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND index1 LIKE 'instance.restore_%' GROUP BY t, label ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Restore Activity",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 23
+      },
+      "description": "Top 20 event names by sample-corrected count.",
+      "id": 9,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT blob1 AS event, SUM(_sample_interval) AS count FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) GROUP BY event ORDER BY count DESC LIMIT 20",
+          "rawSql": "SELECT blob1 AS event, SUM(_sample_interval) AS count FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) GROUP BY event ORDER BY count DESC LIMIT 20",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Top Events",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 23
+      },
+      "description": "Top 20 event names that emitted with a non-empty error string.",
+      "id": 10,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT blob1 AS event, SUM(_sample_interval) AS errors FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND blob5 != '' GROUP BY event ORDER BY errors DESC LIMIT 20",
+          "rawSql": "SELECT blob1 AS event, SUM(_sample_interval) AS errors FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND blob5 != '' GROUP BY event ORDER BY errors DESC LIMIT 20",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Top Erroring Events",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 23
+      },
+      "description": "Recent region.capacity_eviction events. Spikes indicate Fly capacity pressure forcing evictions.",
+      "id": 11,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT timestamp, blob12 AS fly_region, blob13 AS action FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND index1 = 'region.capacity_eviction' ORDER BY timestamp DESC LIMIT 50",
+          "rawSql": "SELECT timestamp, blob12 AS fly_region, blob13 AS action FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND index1 = 'region.capacity_eviction' ORDER BY timestamp DESC LIMIT 50",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Capacity Evictions",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "description": "Top error messages from blob5, sample-corrected. Surfaces dominant error classes that the per-event 'Top Erroring Events' table hides by aggregating only on event name.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": 0 }]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "error" },
+            "properties": [{ "id": "custom.width", "value": 600 }]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "id": 15,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT blob5 AS error, SUM(_sample_interval) AS count, COUNT(DISTINCT blob1) AS distinct_events, COUNT(DISTINCT blob8) AS distinct_sandboxes FROM kiloclaw_events WHERE $timeFilter AND blob5 != ''\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) GROUP BY error ORDER BY count DESC LIMIT 25",
+          "rawSql": "SELECT blob5 AS error, SUM(_sample_interval) AS count, COUNT(DISTINCT blob1) AS distinct_events, COUNT(DISTINCT blob8) AS distinct_sandboxes FROM kiloclaw_events WHERE $timeFilter AND blob5 != ''\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) GROUP BY error ORDER BY count DESC LIMIT 25",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Top Error Messages",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 39
+      },
+      "id": 103,
+      "panels": [],
+      "title": "Recent Activity",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "description": "100 most recent events with a non-empty error string. Best entry point for triage.",
+      "id": 12,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT timestamp, blob1 AS event, blob5 AS error, blob8 AS sandbox_id, blob7 AS fly_machine_id, blob12 AS fly_region FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND blob5 != '' ORDER BY timestamp DESC LIMIT 100",
+          "rawSql": "SELECT timestamp, blob1 AS event, blob5 AS error, blob8 AS sandbox_id, blob7 AS fly_machine_id, blob12 AS fly_region FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND blob5 != '' ORDER BY timestamp DESC LIMIT 100",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Recent Failures",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "description": "100 most recent instance.* and reconcile.* events with status and label context.",
+      "id": 13,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT timestamp, blob1 AS event, blob9 AS status, blob6 AS fly_app_name, blob7 AS fly_machine_id, blob8 AS sandbox_id, blob13 AS label FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND (index1 LIKE 'instance.%' OR index1 LIKE 'reconcile.%') ORDER BY timestamp DESC LIMIT 100",
+          "rawSql": "SELECT timestamp, blob1 AS event, blob9 AS status, blob6 AS fly_app_name, blob7 AS fly_machine_id, blob8 AS sandbox_id, blob13 AS label FROM kiloclaw_events WHERE $timeFilter\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) AND (index1 LIKE 'instance.%' OR index1 LIKE 'reconcile.%') ORDER BY timestamp DESC LIMIT 100",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Recent Lifecycle Events",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": 0 }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 50
+      },
+      "description": "Count of instance.stopped DO events with label trial_inactivity over a fixed 7-day lookback.",
+      "id": 16,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT SUM(_sample_interval) AS stops FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity'",
+          "rawSql": "SELECT SUM(_sample_interval) AS stops FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity'",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Trial Inactivity Stops",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 35,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": 0 }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 54
+      },
+      "description": "Sample-corrected trial inactivity stops bucketed by Grafana's automatic interval in the selected dashboard time range.",
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "hidden",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, 'stops' AS label, SUM(_sample_interval) AS stops FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, 'stops' AS label, SUM(_sample_interval) AS stops FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' GROUP BY t ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Trial Stops by Interval",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": 0 }]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "instance_id" },
+            "properties": [{ "id": "custom.width", "value": 280 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "fly_machine_id" },
+            "properties": [{ "id": "custom.width", "value": 220 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "machine_uptime_ms" },
+            "properties": [{ "id": "unit", "value": "ms" }]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 18,
+        "x": 6,
+        "y": 50
+      },
+      "description": "Recent instance.stopped DO events with label trial_inactivity in the selected dashboard time range. double2 is machine uptime before stop. Limited to 100 rows.",
+      "id": 17,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT timestamp, blob2 AS user_id, blob15 AS instance_id, blob6 AS fly_app_name, blob7 AS fly_machine_id, blob8 AS sandbox_id, blob9 AS status, blob13 AS stop_reason, double2 AS machine_uptime_ms FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' ORDER BY timestamp DESC LIMIT 100",
+          "rawSql": "SELECT timestamp, blob2 AS user_id, blob15 AS instance_id, blob6 AS fly_app_name, blob7 AS fly_machine_id, blob8 AS sandbox_id, blob9 AS status, blob13 AS stop_reason, double2 AS machine_uptime_ms FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' ORDER BY timestamp DESC LIMIT 100",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Recent Trial Inactivity Stops",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 60
+      },
+      "id": 104,
+      "panels": [],
+      "title": "Latency",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "description": "Sample-weighted P50, P95, and P99 of double1 (operation duration) for events that report a non-zero duration.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": 0 }]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, quantileWeighted(0.5)(double1, _sample_interval) AS p50, quantileWeighted(0.95)(double1, _sample_interval) AS p95, quantileWeighted(0.99)(double1, _sample_interval) AS p99 FROM kiloclaw_events WHERE $timeFilter AND double1 > 0\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, quantileWeighted(0.5)(double1, _sample_interval) AS p50, quantileWeighted(0.95)(double1, _sample_interval) AS p95, quantileWeighted(0.99)(double1, _sample_interval) AS p99 FROM kiloclaw_events WHERE $timeFilter AND double1 > 0\n  $conditionalTest(AND blob8 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob2 = ${userId:sqlstring},, $userId)\n  $conditionalTest(AND blob3 IN ($delivery),, $delivery)\n  $conditionalTest(AND blob12 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND index1 IN ($event),, $event)\n  $conditionalTest(AND blob10 IN ($openclawVersion),, $openclawVersion)\n  $conditionalTest(AND blob11 IN ($imageTag),, $imageTag)\n  $conditionalTest(AND blob14 = ${orgId:sqlstring},, $orgId)\n  $conditionalTest(AND blob15 = ${instanceId:sqlstring},, $instanceId) GROUP BY t ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Duration Percentiles (P50 / P95 / P99)",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 42,
+  "tags": ["kiloclaw", "analytics-engine", "events"],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "Analytics Engine",
+          "value": "bffxugc31cnpcc"
+        },
+        "includeAll": false,
+        "name": "DS_KILOCLAW",
+        "options": [],
+        "query": "vertamedia-clickhouse-datasource",
+        "refresh": 1,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "Sandbox ID",
+        "name": "sandboxId",
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "User ID",
+        "name": "userId",
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "allValue": "",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "vertamedia-clickhouse-datasource",
+          "uid": "${DS_KILOCLAW}"
+        },
+        "definition": "SELECT blob3 FROM kiloclaw_events WHERE blob3 != '' GROUP BY blob3 ORDER BY blob3",
+        "includeAll": true,
+        "label": "Delivery",
+        "multi": true,
+        "name": "delivery",
+        "options": [],
+        "query": "SELECT blob3 FROM kiloclaw_events WHERE blob3 != '' GROUP BY blob3 ORDER BY blob3",
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": "",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "vertamedia-clickhouse-datasource",
+          "uid": "${DS_KILOCLAW}"
+        },
+        "definition": "SELECT blob12 FROM kiloclaw_events WHERE blob12 != '' GROUP BY blob12 ORDER BY blob12",
+        "includeAll": true,
+        "label": "Fly Region",
+        "multi": true,
+        "name": "flyRegion",
+        "options": [],
+        "query": "SELECT blob12 FROM kiloclaw_events WHERE blob12 != '' GROUP BY blob12 ORDER BY blob12",
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": "",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "vertamedia-clickhouse-datasource",
+          "uid": "${DS_KILOCLAW}"
+        },
+        "definition": "SELECT blob1 FROM kiloclaw_events GROUP BY blob1 ORDER BY blob1",
+        "includeAll": true,
+        "label": "Event",
+        "multi": true,
+        "name": "event",
+        "options": [],
+        "query": "SELECT blob1 FROM kiloclaw_events GROUP BY blob1 ORDER BY blob1",
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": "",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "vertamedia-clickhouse-datasource",
+          "uid": "${DS_KILOCLAW}"
+        },
+        "definition": "SELECT blob10 FROM kiloclaw_events WHERE blob10 != '' GROUP BY blob10 ORDER BY blob10",
+        "includeAll": true,
+        "label": "OpenClaw Version",
+        "multi": true,
+        "name": "openclawVersion",
+        "options": [],
+        "query": "SELECT blob10 FROM kiloclaw_events WHERE blob10 != '' GROUP BY blob10 ORDER BY blob10",
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": "",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "vertamedia-clickhouse-datasource",
+          "uid": "${DS_KILOCLAW}"
+        },
+        "definition": "SELECT blob11 FROM kiloclaw_events WHERE blob11 != '' GROUP BY blob11 ORDER BY blob11",
+        "includeAll": true,
+        "label": "Image Tag",
+        "multi": true,
+        "name": "imageTag",
+        "options": [],
+        "query": "SELECT blob11 FROM kiloclaw_events WHERE blob11 != '' GROUP BY blob11 ORDER BY blob11",
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "Org ID",
+        "name": "orgId",
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "Instance ID",
+        "name": "instanceId",
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "KiloClaw Events",
+  "uid": "kiloclaw-events",
+  "version": 1,
+  "weekStart": ""
+}

@@ -113,10 +113,14 @@ import {
   handleMayorConvoyClose,
   handleMayorConvoyUpdate,
   handleMayorBeadDelete,
+  handleMayorBulkDeleteBeads,
+  handleMayorDeleteBeadsByStatus,
   handleMayorEscalationAcknowledge,
   handleMayorConvoyStart,
   handleMayorUiAction,
   handleMayorGetPendingNudges,
+  handleMayorConvoyAddBead,
+  handleMayorConvoyRemoveBead,
 } from './handlers/mayor-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { townAuthMiddleware } from './middleware/town-auth.middleware';
@@ -142,6 +146,8 @@ import {
   handleContainerReady,
   handleDrainStatus,
 } from './handlers/town-eviction.handler';
+import { handleRefreshGitToken } from './handlers/refresh-git-token.handler';
+import { handleRefreshContainerToken } from './handlers/town-container-token.handler';
 
 export { GastownUserDO } from './dos/GastownUser.do';
 export { GastownOrgDO } from './dos/GastownOrg.do';
@@ -493,6 +499,16 @@ app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/nudge-delivered', c =>
 // Agent-to-agent nudge: any authenticated agent can nudge another agent in the rig
 app.post('/api/towns/:townId/rigs/:rigId/nudge', c => handleNudge(c, c.req.param()));
 
+// ── Refresh Git Token ──────────────────────────────────────────────────
+// Called by the container when a GIT_TOKEN (GitHub App installation token,
+// 1h TTL) expires mid-task. Returns a fresh token resolved via the
+// standard chain. Authenticated with the container-scoped JWT.
+app.post('/api/towns/:townId/rigs/:rigId/refresh-git-token', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/refresh-git-token', () =>
+    handleRefreshGitToken(c, c.req.param())
+  )
+);
+
 // ── Agent Events ─────────────────────────────────────────────────────────
 
 app.post('/api/towns/:townId/rigs/:rigId/agent-events', c =>
@@ -581,6 +597,12 @@ app.post('/api/towns/:townId/container-ready', c =>
   )
 );
 
+app.post('/api/towns/:townId/refresh-container-token', c =>
+  instrumented(c, 'POST /api/towns/:townId/refresh-container-token', () =>
+    handleRefreshContainerToken(c, c.req.param())
+  )
+);
+
 app.get('/api/towns/:townId/drain-status', c =>
   instrumented(c, 'GET /api/towns/:townId/drain-status', () => handleDrainStatus(c, c.req.param()))
 );
@@ -628,6 +650,12 @@ app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c =
   const { agentId } = c.req.param();
   const body = await c.req.arrayBuffer();
   await c.env.AGENT_DB_SNAPSHOTS_KV.put(agentId, body);
+  return c.json({ success: true });
+});
+
+app.delete('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
+  const { agentId } = c.req.param();
+  await c.env.AGENT_DB_SNAPSHOTS_KV.delete(agentId);
   return c.json({ success: true });
 });
 
@@ -978,6 +1006,16 @@ app.delete('/api/mayor/:townId/tools/rigs/:rigId/beads/:beadId', c =>
     handleMayorBeadDelete(c, c.req.param())
   )
 );
+app.post('/api/mayor/:townId/tools/rigs/:rigId/beads/bulk-delete', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/rigs/:rigId/beads/bulk-delete', () =>
+    handleMayorBulkDeleteBeads(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/rigs/:rigId/beads/delete-by-status', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/rigs/:rigId/beads/delete-by-status', () =>
+    handleMayorDeleteBeadsByStatus(c, c.req.param())
+  )
+);
 app.post('/api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/reset', c =>
   instrumented(c, 'POST /api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/reset', () =>
     handleMayorAgentReset(c, c.req.param())
@@ -1001,6 +1039,16 @@ app.post('/api/mayor/:townId/tools/escalations/:escalationId/acknowledge', c =>
 app.post('/api/mayor/:townId/tools/convoys/:convoyId/start', c =>
   handleMayorConvoyStart(c, c.req.param())
 );
+app.post('/api/mayor/:townId/tools/convoys/:convoyId/add-bead', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/convoys/:convoyId/add-bead', () =>
+    handleMayorConvoyAddBead(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/convoys/:convoyId/remove-bead', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/convoys/:convoyId/remove-bead', () =>
+    handleMayorConvoyRemoveBead(c, c.req.param())
+  )
+);
 // ── tRPC ────────────────────────────────────────────────────────────────
 // Serve the gastown tRPC router directly. The frontend tRPC client
 // connects here instead of going through the Next.js proxy layer.
@@ -1013,6 +1061,7 @@ app.use(
     endpoint: '/trpc',
     createContext: (_opts: unknown, c: Context<GastownEnv>) => ({
       env: c.env,
+      executionCtx: c.executionCtx,
       userId: c.get('kiloUserId') ?? '',
       isAdmin: c.get('kiloIsAdmin') ?? false,
       apiTokenPepper: c.get('kiloApiTokenPepper') ?? null,
@@ -1052,7 +1101,7 @@ export default withSentry(
   (env: Env) => ({
     dsn: env.SENTRY_DSN ?? '',
     release: env.SENTRY_RELEASE || env.CF_VERSION_METADATA?.id,
-    tracesSampleRate: 0.1,
+    tracesSampleRate: 0,
     enabled: !!env.SENTRY_DSN,
   }),
   {

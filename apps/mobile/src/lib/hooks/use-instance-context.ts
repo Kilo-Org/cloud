@@ -1,14 +1,23 @@
+import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { useTRPC } from '@/lib/trpc';
 
-export function useAllKiloClawInstances() {
+export type ClawInstance = inferRouterOutputs<RootRouter>['kiloclaw']['listAllInstances'][number];
+
+type ListPollDecider = (instances: ClawInstance[] | undefined) => number;
+
+export function useAllKiloClawInstances(refetchInterval: number | ListPollDecider = 30_000) {
   const trpc = useTRPC();
+  const intervalOption =
+    typeof refetchInterval === 'function'
+      ? (query: { state: { data?: ClawInstance[] } }) => refetchInterval(query.state.data)
+      : refetchInterval;
   return useQuery(
     trpc.kiloclaw.listAllInstances.queryOptions(undefined, {
       staleTime: 30_000,
-      refetchInterval: 30_000,
+      refetchInterval: intervalOption,
     })
   );
 }

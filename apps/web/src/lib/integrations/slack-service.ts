@@ -6,43 +6,63 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
-import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET } from '@/lib/config.server';
+import { SLACK_CLIENT_ID } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
 import { WebClient } from '@slack/web-api';
-import type { OAuthV2Response } from '@slack/oauth';
+import type { SlackInstallation } from '@chat-adapter/slack';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
-import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
+import {
+  createAllowPredicateFromRestrictions,
+  hasActiveModelRestrictions,
+} from '@/lib/model-allow.server';
+import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
 // Default model for Slack integrations - separate from the global platform default
 const SLACK_DEFAULT_MODEL = KILO_AUTO_FREE_MODEL.id;
 
+export class SlackWorkspaceAlreadyConnectedError extends Error {
+  constructor(teamName: string) {
+    super(
+      `${teamName} is already connected to another Kilo account or organization. Disconnect it there before connecting it here.`
+    );
+    this.name = 'SlackWorkspaceAlreadyConnectedError';
+  }
+}
+
 // Slack OAuth scopes for the integration
 // These should be kept in sync with the scopes requested in the Slack app configuration
 export const SLACK_SCOPES = [
   'app_mentions:read',
+  'assistant:write',
   'channels:history',
   'channels:read',
   'chat:write',
   'files:read',
-  'files:write',
   'groups:history',
   'groups:read',
   'im:history',
   'im:read',
-  'im:write',
   'mpim:history',
   'mpim:read',
   'reactions:read',
   'reactions:write',
   'team:read',
   'users:read',
-  'users:read.email',
 ];
 
+export function getMissingSlackScopes(installedScopes: string[] | null): string[] {
+  const installedScopeSet = new Set(installedScopes ?? []);
+  return SLACK_SCOPES.filter(scope => !installedScopeSet.has(scope));
+}
+
 const SLACK_REDIRECT_URI = `${APP_URL}/api/integrations/slack/callback`;
+
+type SlackUninstallOptions = {
+  deleteChatSdkInstallation?: (teamId: string) => Promise<void>;
+  deleteChatSdkIdentityCache?: (teamId: string) => Promise<void>;
+};
 
 function getOwnershipConditions(owner: Owner) {
   return owner.type === 'user'
@@ -72,36 +92,6 @@ export function getSlackOAuthUrl(state: string): string {
   });
 
   return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
-}
-
-/**
- * Exchange OAuth code for access token
- */
-export async function exchangeSlackCode(code: string): Promise<OAuthV2Response> {
-  if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
-    throw new Error('Slack OAuth credentials are not configured');
-  }
-
-  const response = await fetch('https://slack.com/api/oauth.v2.access', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      client_id: SLACK_CLIENT_ID,
-      client_secret: SLACK_CLIENT_SECRET,
-      code,
-      redirect_uri: SLACK_REDIRECT_URI,
-    }),
-  });
-
-  const data = (await response.json()) as OAuthV2Response;
-
-  if (!data.ok || !data.access_token) {
-    throw new Error(`Slack OAuth error: ${data.error || 'No access token received'}`);
-  }
-
-  return data;
 }
 
 /**
@@ -155,6 +145,47 @@ export async function getInstallationByTeamId(teamId: string): Promise<PlatformI
   return integration || null;
 }
 
+function isOwnedBy(integration: PlatformIntegration, owner: Owner): boolean {
+  return owner.type === 'user'
+    ? integration.owned_by_user_id === owner.id && integration.owned_by_organization_id === null
+    : integration.owned_by_organization_id === owner.id && integration.owned_by_user_id === null;
+}
+
+async function getConflictingSlackInstallation(
+  owner: Owner,
+  teamId: string
+): Promise<PlatformIntegration | null> {
+  const integrations = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.SLACK),
+        eq(platform_integrations.platform_installation_id, teamId)
+      )
+    )
+    .limit(2);
+
+  return integrations.find(integration => !isOwnedBy(integration, owner)) ?? null;
+}
+
+function isSlackWorkspaceUniqueViolation(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+
+  if (
+    'constraint' in error &&
+    error.constraint === 'UQ_platform_integrations_slack_platform_inst'
+  ) {
+    return true;
+  }
+
+  return (
+    'message' in error &&
+    typeof error.message === 'string' &&
+    error.message.includes('UQ_platform_integrations_slack_platform_inst')
+  );
+}
+
 /**
  * Get the owner information from a Slack installation
  */
@@ -169,19 +200,26 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 }
 
 /**
- * Create or update Slack installation from OAuth response
+ * Create or update Slack installation from the Chat SDK OAuth callback result.
  */
-export async function upsertSlackInstallation(
-  owner: Owner,
-  oauthResponse: OAuthV2Response
-): Promise<PlatformIntegration> {
+export async function upsertSlackInstallation({
+  owner,
+  teamId,
+  installation,
+}: {
+  owner: Owner;
+  teamId: string;
+  installation: SlackInstallation;
+}): Promise<PlatformIntegration> {
   const existing = await getInstallation(owner);
+  const teamName = installation.teamName || 'Unknown Team';
 
-  const teamId = oauthResponse.team?.id || '';
-  const teamName = oauthResponse.team?.name || 'Unknown Team';
-  const scopes = oauthResponse.scope?.split(',') || null;
+  const conflicting = await getConflictingSlackInstallation(owner, teamId);
+  if (conflicting) {
+    throw new SlackWorkspaceAlreadyConnectedError(teamName);
+  }
 
-  // For org integrations, get a model that respects the allow list
+  // For org integrations, get a model that respects org access policy.
   // For user integrations, use the Slack-specific default model
   const defaultModel =
     owner.type === 'org'
@@ -189,71 +227,89 @@ export async function upsertSlackInstallation(
       : SLACK_DEFAULT_MODEL;
 
   const metadata = {
-    access_token: oauthResponse.access_token,
-    bot_user_id: oauthResponse.bot_user_id,
-    app_id: oauthResponse.app_id,
-    authed_user_id: oauthResponse.authed_user?.id,
-    authed_user_scope: oauthResponse.authed_user?.scope,
-    authed_user_access_token: oauthResponse.authed_user?.access_token,
-    incoming_webhook: oauthResponse.incoming_webhook,
-    enterprise_id: oauthResponse.enterprise?.id,
-    enterprise_name: oauthResponse.enterprise?.name,
-    model_slug: defaultModel,
+    ...(existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
+    access_token: installation.botToken,
+    bot_user_id: installation.botUserId,
+    model_slug:
+      existing?.metadata &&
+      typeof existing.metadata === 'object' &&
+      'model_slug' in existing.metadata &&
+      typeof existing.metadata.model_slug === 'string'
+        ? existing.metadata.model_slug
+        : defaultModel,
   };
 
   if (existing) {
-    const [updated] = await db
-      .update(platform_integrations)
-      .set({
-        platform_account_id: teamId,
-        platform_account_login: teamName,
-        scopes,
-        integration_status: INTEGRATION_STATUS.ACTIVE,
-        metadata,
-        updated_at: new Date().toISOString(),
-      })
-      .where(eq(platform_integrations.id, existing.id))
-      .returning();
+    try {
+      const [updated] = await db
+        .update(platform_integrations)
+        .set({
+          platform_installation_id: teamId,
+          platform_account_id: teamId,
+          platform_account_login: teamName,
+          scopes: SLACK_SCOPES,
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata,
+          updated_at: new Date().toISOString(),
+        })
+        .where(eq(platform_integrations.id, existing.id))
+        .returning();
 
-    return updated;
+      return updated;
+    } catch (error) {
+      if (isSlackWorkspaceUniqueViolation(error)) {
+        throw new SlackWorkspaceAlreadyConnectedError(teamName);
+      }
+      throw error;
+    }
   }
 
-  const [created] = await db
-    .insert(platform_integrations)
-    .values({
-      owned_by_user_id: owner.type === 'user' ? owner.id : null,
-      owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-      platform: PLATFORM.SLACK,
-      integration_type: 'oauth',
-      platform_installation_id: teamId,
-      platform_account_id: teamId,
-      platform_account_login: teamName,
-      scopes,
-      integration_status: INTEGRATION_STATUS.ACTIVE,
-      metadata,
-      installed_at: new Date().toISOString(),
-    })
-    .returning();
+  try {
+    const [created] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: owner.type === 'user' ? owner.id : null,
+        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+        platform: PLATFORM.SLACK,
+        integration_type: 'oauth',
+        platform_installation_id: teamId,
+        platform_account_id: teamId,
+        platform_account_login: teamName,
+        scopes: SLACK_SCOPES,
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        metadata,
+        installed_at: new Date().toISOString(),
+      })
+      .returning();
 
-  return created;
+    return created;
+  } catch (error) {
+    if (isSlackWorkspaceUniqueViolation(error)) {
+      throw new SlackWorkspaceAlreadyConnectedError(teamName);
+    }
+    throw error;
+  }
 }
 
 /**
  * Uninstall Slack integration for an owner
  */
-export async function uninstallApp(owner: Owner) {
+export async function uninstallApp(owner: Owner, options: SlackUninstallOptions = {}) {
   const integration = await getInstallation(owner);
 
-  if (!integration || integration.integration_status !== INTEGRATION_STATUS.ACTIVE) {
+  if (!integration) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Slack installation not found',
     });
   }
 
+  const shouldDeleteSlackInstallation =
+    integration.integration_status === INTEGRATION_STATUS.ACTIVE;
+
   // Revoke the token if we have one
   const metadata = integration.metadata as { access_token?: string } | null;
-  if (metadata?.access_token) {
+  if (shouldDeleteSlackInstallation && metadata?.access_token) {
     try {
       await revokeSlackToken(metadata.access_token);
     } catch (error) {
@@ -261,9 +317,37 @@ export async function uninstallApp(owner: Owner) {
     }
   }
 
+  const teamId = integration.platform_installation_id ?? integration.platform_account_id;
+  if (
+    shouldDeleteSlackInstallation &&
+    (options.deleteChatSdkInstallation || options.deleteChatSdkIdentityCache)
+  ) {
+    if (!teamId) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Slack installation is missing a team ID',
+      });
+    }
+
+    await options.deleteChatSdkInstallation?.(teamId);
+    await options.deleteChatSdkIdentityCache?.(teamId);
+  }
+
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
 
   return { success: true };
+}
+
+export async function deleteInstallationByTeamId(teamId: string) {
+  const integration = await getInstallationByTeamId(teamId);
+
+  if (!integration) {
+    return { success: true, deleted: false };
+  }
+
+  await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
+
+  return { success: true, deleted: true };
 }
 
 /**
@@ -318,112 +402,6 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
 }
 
 /**
- * Send a test message to verify the Slack integration is working
- * Uses the incoming webhook channel if available, otherwise tries to find a general channel
- */
-export async function sendTestMessage(
-  owner: Owner
-): Promise<{ success: boolean; error?: string; channel?: string }> {
-  const integration = await getInstallation(owner);
-
-  if (!integration) {
-    return { success: false, error: 'No Slack installation found' };
-  }
-
-  const metadata = integration.metadata as {
-    access_token?: string;
-    model_slug?: string;
-    incoming_webhook?: { channel: string; channelId: string; url: string };
-  } | null;
-
-  if (!metadata?.access_token) {
-    return { success: false, error: 'No access token found' };
-  }
-
-  // Build the test message including the configured model
-  const modelInfo = metadata.model_slug
-    ? `\n📊 Configured model: \`${metadata.model_slug}\``
-    : '\n⚠️ No model configured yet';
-  const testMessage = `🎉 Test message from Kilo Code! Your Slack integration is working correctly.${modelInfo}`;
-
-  // If we have an incoming webhook URL, use it directly (doesn't require channel membership)
-  if (metadata.incoming_webhook?.url) {
-    try {
-      const response = await fetch(metadata.incoming_webhook.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: testMessage,
-        }),
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        return { success: false, error: `Webhook failed: ${text}` };
-      }
-
-      return { success: true, channel: metadata.incoming_webhook.channel };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: `Webhook error: ${errorMessage}` };
-    }
-  }
-
-  // Fall back to using the API (requires bot to be in channel)
-  try {
-    const client = new WebClient(metadata.access_token);
-
-    // Try to find a general or random channel to post to
-    const channelsResult = await client.conversations.list({
-      types: 'public_channel',
-      limit: 100,
-    });
-
-    const generalChannel = channelsResult.channels?.find(
-      c => c.name === 'general' || c.name === 'random'
-    );
-
-    let channel: string | undefined;
-    if (generalChannel?.id) {
-      channel = generalChannel.id;
-    } else if (channelsResult.channels?.[0]?.id) {
-      channel = channelsResult.channels[0].id;
-    }
-
-    if (!channel) {
-      return { success: false, error: 'No channel found to send test message' };
-    }
-
-    const result = await client.chat.postMessage({
-      channel,
-      text: testMessage,
-    });
-
-    if (!result.ok) {
-      return { success: false, error: result.error || 'Unknown error' };
-    }
-
-    return { success: true, channel: result.channel };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    // Provide more helpful error messages for common issues
-    if (errorMessage.includes('not_in_channel')) {
-      return {
-        success: false,
-        error: 'Bot is not in the channel. Please invite the Kilo Code bot to a channel first.',
-      };
-    }
-    if (errorMessage.includes('channel_not_found')) {
-      return {
-        success: false,
-        error: 'Channel not found. Please make sure the channel exists and is accessible.',
-      };
-    }
-    return { success: false, error: errorMessage };
-  }
-}
-
-/**
  * Send a message to a Slack channel using the stored integration
  */
 export async function sendMessage(
@@ -463,7 +441,7 @@ export async function sendMessage(
 
 /**
  * Update the model for a Slack integration.
- * For organization-owned integrations, validates the model against the allow list.
+ * For organization-owned integrations, validates the model against org access policy.
  */
 export async function updateModel(
   owner: Owner,
@@ -475,13 +453,13 @@ export async function updateModel(
     return { success: false, error: 'No Slack installation found' };
   }
 
-  // For org integrations, validate the model against the allow list
+  // For org integrations, validate the model against org access policy.
   if (owner.type === 'org') {
     const organization = await getOrganizationById(owner.id);
     if (organization) {
-      const { modelDenyList, providerDenyList } = getEffectiveModelRestrictions(organization);
-      if (modelDenyList.length > 0 || providerDenyList.length > 0) {
-        const isAllowed = createAllowPredicateFromDenyList(modelDenyList, providerDenyList);
+      const restrictions = getEffectiveModelRestrictions(organization);
+      if (hasActiveModelRestrictions(restrictions)) {
+        const isAllowed = createAllowPredicateFromRestrictions(restrictions);
         if (!(await isAllowed(modelSlug))) {
           return { success: false, error: 'Model is not allowed by organization policy' };
         }

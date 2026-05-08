@@ -10,7 +10,13 @@ export default function AutoSignOutPage() {
   }
 
   useEffect(() => {
-    void signOut({ callbackUrl: '/profile' });
+    void (async () => {
+      try {
+        await fetch('/api/auth/revoke-web-session', { method: 'POST' });
+      } finally {
+        await signOut({ callbackUrl: '/profile' });
+      }
+    })();
   }, []);
 
   return (

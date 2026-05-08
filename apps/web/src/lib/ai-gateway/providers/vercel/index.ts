@@ -12,37 +12,31 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import {
+  isReasoningExplicitlyDisabled,
+  isReasoningExplicitlyEnabled,
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { StoredModelSchema } from '@kilocode/db';
-import * as z from 'zod';
 import { redisGet } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
-import { GatewayPercentageSchema, DEFAULT_VERCEL_PERCENTAGE } from '@/lib/gateway-config';
-import { GATEWAY_METADATA_REDIS_KEYS, VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
-import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
+import {
+  GatewayPercentageSchema,
+  DEFAULT_VERCEL_PERCENTAGE,
+} from '@/lib/ai-gateway/gateway-config';
+import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
+import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
+import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
     const raw = await redisGet(VERCEL_ROUTING_REDIS_KEY);
-    return GatewayPercentageSchema.parse(JSON.parse(raw ?? 'null')).vercel_routing_percentage;
+    if (!raw) return DEFAULT_VERCEL_PERCENTAGE;
+    const { vercel_routing_percentage } = GatewayPercentageSchema.parse(JSON.parse(raw));
+    return vercel_routing_percentage ?? DEFAULT_VERCEL_PERCENTAGE;
   },
-  10_000,
+  600_000,
   DEFAULT_VERCEL_PERCENTAGE
-);
-
-const getVercelModels = createCachedFetch(
-  async function () {
-    const result = JSON.parse((await redisGet(GATEWAY_METADATA_REDIS_KEYS.vercelModels)) ?? 'null');
-    if (Object.keys(result).length === 0) {
-      console.debug('[getVercelModels] no Vercel models found in Redis');
-    }
-    return Object.values(z.record(z.string(), StoredModelSchema).parse(result))
-      .filter(model => model.type === 'language' && model.endpoints.length > 0)
-      .map(model => model.id);
-  },
-  60_000,
-  []
 );
 
 export async function shouldRouteToVercel(
@@ -65,17 +59,20 @@ export async function shouldRouteToVercel(
   }
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
+  const [routingPercentage, vercelModels] = await Promise.all([
+    getVercelRoutingPercentage(),
+    getVercelModels(),
+  ]);
+
   const passedRandomization =
-    getRandomNumberLessThan100('vercel_routing_' + randomSeed) <
-    (await getVercelRoutingPercentage());
+    getRandomNumber('vercel_routing_' + randomSeed, 100) < routingPercentage;
 
   if (!passedRandomization) {
     return false;
   }
 
-  const vercelModels = await getVercelModels();
   const vercelModelId = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(request));
-  if (!vercelModels.includes(vercelModelId)) {
+  if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
   }
@@ -101,6 +98,33 @@ function parseAwsCredentials(input: string) {
   } catch {
     throw new Error('Failed to parse AWS credentials');
   }
+}
+
+export function getAnthropicProviderOptionsForVercel(
+  requestedModel: string,
+  request: GatewayRequest
+): AnthropicProviderOptions | undefined {
+  const anthropicOptions: AnthropicProviderOptions = {};
+
+  // Workaround for Vercel not displaying thinking by default, unlike OpenRouter.
+  const isOpus47Thinking =
+    requestedModel.includes('opus-4.7') && isReasoningExplicitlyEnabled(request);
+  if (isOpus47Thinking) {
+    anthropicOptions.thinking = { type: 'adaptive', display: 'summarized' };
+  }
+
+  if (request.kind === 'chat_completions' && request.body.verbosity) {
+    anthropicOptions.effort = request.body.verbosity;
+  }
+  if (request.kind === 'responses' && request.body.text?.verbosity) {
+    anthropicOptions.effort = request.body.text.verbosity;
+  }
+
+  if (Object.keys(anthropicOptions).length === 0) {
+    return undefined;
+  }
+
+  return anthropicOptions;
 }
 
 export function getVercelInferenceProviderConfigForUserByok(
@@ -164,15 +188,9 @@ export function applyVercelSettings(
   }
 
   if (requestToMutate.body.providerOptions) {
-    if (requestToMutate.kind === 'chat_completions' && requestToMutate.body.verbosity) {
-      requestToMutate.body.providerOptions.anthropic = {
-        effort: requestToMutate.body.verbosity,
-      };
-    }
-    if (requestToMutate.kind === 'responses' && requestToMutate.body.text?.verbosity) {
-      requestToMutate.body.providerOptions.anthropic = {
-        effort: requestToMutate.body.text.verbosity,
-      };
+    const anthropicOptions = getAnthropicProviderOptionsForVercel(requestedModel, requestToMutate);
+    if (anthropicOptions) {
+      requestToMutate.body.providerOptions.anthropic = anthropicOptions;
     }
   }
 

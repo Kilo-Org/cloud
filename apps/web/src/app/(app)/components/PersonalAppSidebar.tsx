@@ -30,6 +30,7 @@ import {
   CreditCard,
   MessageSquare,
   Sparkles,
+  Gift,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -50,6 +51,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isGastownEnabled = useFeatureFlagEnabled('gastown-access');
+  const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Dashboard group
@@ -81,6 +83,8 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     title: string;
     icon: React.ElementType;
     url: string;
+    subtitle?: string;
+    badge?: string;
     className?: string;
   }> = [
     {
@@ -103,6 +107,13 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Sparkles,
       url: '/claw/changelog',
     },
+    {
+      title: 'Refer & Earn',
+      subtitle: 'Get 1 Month Free',
+      badge: 'NEW',
+      icon: Gift,
+      url: '/claw/refer',
+    },
   ];
 
   // Cloud group
@@ -112,11 +123,15 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     url: string;
     className?: string;
   }> = [
-    {
-      title: 'App Builder',
-      icon: Plus,
-      url: '/app-builder',
-    },
+    ...(isAppBuilderEnabled || isDevelopment
+      ? [
+          {
+            title: 'App Builder',
+            icon: Plus,
+            url: '/app-builder',
+          },
+        ]
+      : []),
     {
       title: 'Cloud Agent',
       icon: Cloud,
@@ -142,13 +157,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Shield,
       url: '/security-agent',
     },
-    {
-      title: 'Auto Triage',
-      icon: ListChecks,
-      url: '/auto-triage',
-    },
     ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [{ title: 'Auto Fix', icon: Wrench, url: '/auto-fix' }]
+      ? [
+          { title: 'Auto Triage', icon: ListChecks, url: '/auto-triage' },
+          { title: 'Auto Fix', icon: Wrench, url: '/auto-fix' },
+        ]
       : []),
     ...(ENABLE_DEPLOY_FEATURE
       ? [

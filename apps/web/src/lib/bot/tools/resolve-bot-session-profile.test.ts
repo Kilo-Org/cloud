@@ -11,7 +11,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { resolveBotSessionProfile } from './resolve-bot-session-profile';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
-import type { ProfileOwner } from '@/lib/agent/types';
+import type { ProfileOwner } from '@kilocode/cloud-agent-profile';
 
 const fakeEnvelope = JSON.stringify({
   encryptedData: 'dGVzdC1lbmNyeXB0ZWQtZGF0YQ==',
@@ -147,7 +147,7 @@ describe('resolveBotSessionProfile', () => {
     });
   });
 
-  test('org-owned integration: effective default falls back to ticket user personal default', async () => {
+  test('org-owned integration: ticket user personal default fills the effective default', async () => {
     const user = await insertTestUser();
     const org = await createTestOrganization('test-org', user.id, 0);
     const userOwner: ProfileOwner = { type: 'user', id: user.id };
@@ -169,7 +169,7 @@ describe('resolveBotSessionProfile', () => {
     expect(result.envVars).toEqual({ SOURCE: 'personal' });
   });
 
-  test('org-owned integration: org default takes precedence over user personal default', async () => {
+  test('org-owned integration: personal default takes precedence over org default', async () => {
     const user = await insertTestUser();
     const org = await createTestOrganization('test-org', user.id, 0);
     const userOwner: ProfileOwner = { type: 'user', id: user.id };
@@ -192,10 +192,33 @@ describe('resolveBotSessionProfile', () => {
       githubRepo: 'org/repo',
     });
 
+    expect(result.envVars).toEqual({ SOURCE: 'personal' });
+  });
+
+  test('org-owned integration: falls back to org default when ticket user has no personal default', async () => {
+    const user = await insertTestUser();
+    const org = await createTestOrganization('test-org', user.id, 0);
+    const orgOwner: ProfileOwner = { type: 'organization', id: org.id };
+
+    const orgProfileId = await createProfile(orgOwner, 'org-default', { isDefault: true });
+    await addVar(orgProfileId, 'SOURCE', 'org');
+
+    const integration = await insertPlatformIntegration({
+      organizationId: org.id,
+      platform: 'github',
+    });
+
+    const result = await resolveBotSessionProfile(ownerFromIntegration(integration), user.id, {
+      githubRepo: 'org/repo',
+    });
+
     expect(result.envVars).toEqual({ SOURCE: 'org' });
   });
 
-  test('layers repo-binding profile (base) under default profile (override)', async () => {
+  test('repo binding (base) layers under the effective default (top)', async () => {
+    // A repo binding claims the base slot; the effective default fills the
+    // top slot and layers over it. The bot flow never supplies a `profileId`,
+    // so there is no explicit override — the default is the top layer.
     const user = await insertTestUser();
     const owner: ProfileOwner = { type: 'user', id: user.id };
 
@@ -205,10 +228,10 @@ describe('resolveBotSessionProfile', () => {
     await addCommands(baseProfileId, ['base-cmd']);
     await bindRepo(owner, 'org/repo', 'github', baseProfileId);
 
-    const overrideProfileId = await createProfile(owner, 'override', { isDefault: true });
-    await addVar(overrideProfileId, 'SHARED', 'from-override');
-    await addVar(overrideProfileId, 'OVERRIDE_ONLY', 'override-val');
-    await addCommands(overrideProfileId, ['override-cmd']);
+    const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
+    await addVar(defaultProfileId, 'SHARED', 'from-default');
+    await addVar(defaultProfileId, 'DEFAULT_ONLY', 'default-val');
+    await addCommands(defaultProfileId, ['default-cmd']);
 
     const integration = await insertPlatformIntegration({ userId: user.id, platform: 'github' });
 
@@ -218,10 +241,10 @@ describe('resolveBotSessionProfile', () => {
 
     expect(result.envVars).toEqual({
       BASE_ONLY: 'base-val',
-      OVERRIDE_ONLY: 'override-val',
-      SHARED: 'from-override',
+      DEFAULT_ONLY: 'default-val',
+      SHARED: 'from-default',
     });
-    expect(result.setupCommands).toEqual(['base-cmd', 'override-cmd']);
+    expect(result.setupCommands).toEqual(['base-cmd', 'default-cmd']);
   });
 
   test('gitlabProject: uses platform=gitlab when resolving repo binding', async () => {

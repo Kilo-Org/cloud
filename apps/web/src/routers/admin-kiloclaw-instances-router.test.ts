@@ -6,9 +6,16 @@ import {
   kilocode_users,
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
+  kiloclaw_image_catalog,
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_instances,
+  kiloclaw_scheduled_actions,
+  kiloclaw_scheduled_action_notifications,
+  kiloclaw_scheduled_action_stages,
+  kiloclaw_scheduled_action_targets,
+  kiloclaw_subscriptions,
+  kiloclaw_version_pins,
 } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -20,6 +27,15 @@ const mockDestroyFlyMachine: jest.Mock<any, any> = jest.fn();
 const mockGetKiloCliRunStatus: jest.Mock<any, any> = jest.fn();
 const mockCancelKiloCliRun: jest.Mock<any, any> = jest.fn();
 const mockStartKiloCliRun: jest.Mock<any, any> = jest.fn();
+const mockStart: jest.Mock<any, any> = jest.fn();
+const mockUserClientRestartMachine: jest.Mock<any, any> = jest.fn();
+const startedResponse = {
+  ok: true,
+  started: true,
+  previousStatus: 'stopped',
+  currentStatus: 'running',
+  startedAt: 1_776_885_000_000,
+};
 
 function mockKiloClawInternalClient() {
   const { KiloClawInternalClient } = jest.requireMock('@/lib/kiloclaw/kiloclaw-internal-client');
@@ -29,6 +45,7 @@ function mockKiloClawInternalClient() {
     getKiloCliRunStatus: mockGetKiloCliRunStatus,
     cancelKiloCliRun: mockCancelKiloCliRun,
     startKiloCliRun: mockStartKiloCliRun,
+    start: mockStart,
   }));
 }
 
@@ -39,6 +56,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
     getKiloCliRunStatus: mockGetKiloCliRunStatus,
     cancelKiloCliRun: mockCancelKiloCliRun,
     startKiloCliRun: mockStartKiloCliRun,
+    start: mockStart,
   })),
   KiloClawApiError: class KiloClawApiError extends Error {
     statusCode: number;
@@ -49,6 +67,12 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
       this.responseBody = responseBody;
     }
   },
+}));
+
+jest.mock('@/lib/kiloclaw/kiloclaw-user-client', () => ({
+  KiloClawUserClient: jest.fn().mockImplementation(() => ({
+    restartMachine: mockUserClientRestartMachine,
+  })),
 }));
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -132,6 +156,10 @@ beforeEach(async () => {
   mockGetKiloCliRunStatus.mockReset();
   mockCancelKiloCliRun.mockReset();
   mockStartKiloCliRun.mockReset();
+  mockStart.mockReset();
+  mockStart.mockResolvedValue(startedResponse);
+  mockUserClientRestartMachine.mockReset();
+  mockUserClientRestartMachine.mockResolvedValue({ success: true, message: 'restarting' });
   mockKiloClawInternalClient();
 });
 
@@ -141,6 +169,7 @@ afterEach(async () => {
   await db
     .delete(kiloclaw_admin_audit_logs)
     .where(eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id));
+  await db.delete(kiloclaw_subscriptions).where(inArray(kiloclaw_subscriptions.user_id, userIds));
   // Delete cli_runs before instances (cli_runs.instance_id FK → instances)
   await db.delete(kiloclaw_cli_runs).where(inArray(kiloclaw_cli_runs.user_id, userIds));
   // Deleting instances cascades to inbound email aliases
@@ -209,6 +238,168 @@ describe('admin.kiloclawInstances.listKiloCliRuns', () => {
       await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, secondInstanceId));
       /* eslint-enable drizzle/enforce-delete-with-where */
     }
+  });
+});
+
+describe('admin.kiloclawInstances.list and stats', () => {
+  it('separates inactive trial stopped instances from active instances', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const baselineStats = await caller.admin.kiloclawInstances.stats({ days: 7 });
+
+    const [activeInstance, inactiveTrialStoppedInstance] = await db
+      .insert(kiloclaw_instances)
+      .values([
+        {
+          id: crypto.randomUUID(),
+          user_id: regularUser.id,
+          sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        },
+        {
+          id: crypto.randomUUID(),
+          user_id: regularUser.id,
+          sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+          inactive_trial_stopped_at: '2026-04-20T12:00:00.000Z',
+        },
+      ])
+      .returning({
+        id: kiloclaw_instances.id,
+        inactive: kiloclaw_instances.inactive_trial_stopped_at,
+      });
+
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        user_id: regularUser.id,
+        instance_id: activeInstance.id,
+        plan: 'trial',
+        status: 'trialing',
+      },
+      {
+        user_id: regularUser.id,
+        instance_id: inactiveTrialStoppedInstance.id,
+        plan: 'trial',
+        status: 'trialing',
+      },
+    ]);
+
+    const activeList = await caller.admin.kiloclawInstances.list({
+      offset: 0,
+      limit: 20,
+      sortBy: 'created_at',
+      sortOrder: 'desc',
+      status: 'active',
+    });
+    expect(activeList.instances.map(instance => instance.id)).toContain(activeInstance.id);
+    expect(activeList.instances.map(instance => instance.id)).not.toContain(
+      inactiveTrialStoppedInstance.id
+    );
+
+    const inactiveList = await caller.admin.kiloclawInstances.list({
+      offset: 0,
+      limit: 20,
+      sortBy: 'created_at',
+      sortOrder: 'desc',
+      status: 'inactive_trial_stopped',
+    });
+    expect(inactiveList.instances).toHaveLength(1);
+    expect(inactiveList.instances[0]).toMatchObject({
+      id: inactiveTrialStoppedInstance.id,
+      lifecycle_state: 'inactive_trial_stopped',
+    });
+    expect(
+      new Date(String(inactiveList.instances[0].inactive_trial_stopped_at)).toISOString()
+    ).toBe('2026-04-20T12:00:00.000Z');
+
+    const stats = await caller.admin.kiloclawInstances.stats({ days: 7 });
+    expect(stats.overview.activeInstances).toBe(baselineStats.overview.activeInstances + 1);
+    expect(stats.overview.inactiveTrialStoppedInstances).toBe(
+      baselineStats.overview.inactiveTrialStoppedInstances + 1
+    );
+  });
+});
+
+describe('admin.kiloclawInstances.machineStart', () => {
+  it('clears the inactivity marker after an admin start on a personal trial instance', async () => {
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        inactive_trial_stopped_at: '2026-04-20T12:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: regularUser.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.machineStart({
+      userId: regularUser.id,
+      instanceId: instance.id,
+    });
+
+    expect(result).toEqual(startedResponse);
+    expect(mockStart).toHaveBeenCalledWith(regularUser.id, instance.id, {
+      skipCooldown: true,
+      reason: 'admin_request',
+    });
+
+    const updatedInstance = await db.query.kiloclaw_instances.findFirst({
+      where: eq(kiloclaw_instances.id, instance.id),
+    });
+    expect(updatedInstance?.inactive_trial_stopped_at).toBeNull();
+  });
+
+  it('does not clear the inactivity marker when admin start is a no-op', async () => {
+    mockStart.mockResolvedValueOnce({
+      ok: true,
+      started: false,
+      previousStatus: 'stopped',
+      currentStatus: 'stopped',
+      startedAt: null,
+    });
+
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        inactive_trial_stopped_at: '2026-04-20T12:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: regularUser.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.machineStart({
+      userId: regularUser.id,
+      instanceId: instance.id,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      started: false,
+      previousStatus: 'stopped',
+      currentStatus: 'stopped',
+      startedAt: null,
+    });
+
+    const updatedInstance = await db.query.kiloclaw_instances.findFirst({
+      where: eq(kiloclaw_instances.id, instance.id),
+    });
+    expect(new Date(String(updatedInstance?.inactive_trial_stopped_at)).toISOString()).toBe(
+      '2026-04-20T12:00:00.000Z'
+    );
   });
 });
 
@@ -365,6 +556,52 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
     ).rejects.toThrow('Invalid Fly machine ID');
 
     expect(mockGetDebugStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('admin.kiloclawInstances.extendVolume', () => {
+  it('rejects when instanceId belongs to a different user than the supplied userId', async () => {
+    // Regression: resolveInstance(userId, instanceId) looks up by id only —
+    // without the ownership assert, an admin passing userId=A + instanceId=B
+    // (B owned by user C) would extend C's volume while the audit log
+    // attributed it to A. Fly volumes can't shrink, so the consequence is
+    // permanent + misattributed. Mirrors the same guard on resizeMachine /
+    // set/clear admin size override.
+    const targetUser = await insertTestUser({
+      google_user_email: `extend-volume-target-${Math.random()}@example.com`,
+      is_admin: false,
+    });
+    const otherUser = await insertTestUser({
+      google_user_email: `extend-volume-other-${Math.random()}@example.com`,
+      is_admin: false,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: targetUser.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+    });
+
+    try {
+      const caller = await createCallerForUser(adminUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.extendVolume({
+          userId: otherUser.id,
+          instanceId,
+          appName: testAppName,
+          volumeId: 'vol_test123',
+          targetSizeGb: 20,
+        })
+      ).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+        message: 'Instance not found',
+      });
+
+      // The Fly extend should never have been attempted — guard runs first.
+      expect(mockGetDebugStatus).not.toHaveBeenCalled();
+    } finally {
+      await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, instanceId));
+    }
   });
 });
 
@@ -1086,5 +1323,1227 @@ describe('admin.kiloclawInstances.cancelKiloCliRun', () => {
       await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, destroyedInstance.id));
       /* eslint-enable drizzle/enforce-delete-with-where */
     }
+  });
+});
+
+describe('admin.kiloclawInstances.restartMachine pin override gate', () => {
+  // The pin row has an FK to kiloclaw_image_catalog.image_tag, so we
+  // need real catalog rows for the pin inserts in these tests. The
+  // restartMachine input regex (^[a-zA-Z0-9][a-zA-Z0-9._-]*$) rejects
+  // slashes and colons, so we use docker-tag-style identifiers here even
+  // though production catalog rows use full registry URLs.
+  const newerTag = 'admin-pin-gate-newer';
+  const olderTag = 'admin-pin-gate-older';
+  let testInstanceId: string;
+
+  beforeEach(async () => {
+    await db.insert(kiloclaw_image_catalog).values([
+      {
+        openclaw_version: '2026.4.10',
+        variant: 'default',
+        image_tag: newerTag,
+        image_digest: 'sha256:newer',
+        status: 'available',
+        published_at: new Date().toISOString(),
+      },
+      {
+        openclaw_version: '2026.3.1',
+        variant: 'default',
+        image_tag: olderTag,
+        image_digest: 'sha256:older',
+        status: 'available',
+        published_at: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+      },
+    ]);
+
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    testInstanceId = instance.id;
+  });
+
+  afterEach(async () => {
+    /* eslint-disable drizzle/enforce-delete-with-where */
+    await db
+      .delete(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, testInstanceId));
+    await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, testInstanceId));
+    await db
+      .delete(kiloclaw_image_catalog)
+      .where(inArray(kiloclaw_image_catalog.image_tag, [newerTag, olderTag]));
+    /* eslint-enable drizzle/enforce-delete-with-where */
+  });
+
+  it('throws FORBIDDEN for non-admin callers', async () => {
+    const caller = await createCallerForUser(regularUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.restartMachine({
+        instanceId: testInstanceId,
+        imageTag: newerTag,
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
+  });
+
+  it('plain restart with no imageTag ignores pin state and never triggers the gate', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: testInstanceId,
+      image_tag: newerTag,
+      pinned_by: regularUser.id,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.restartMachine({
+      instanceId: testInstanceId,
+    });
+
+    expect(result).toEqual({ success: true, message: 'restarting' });
+    expect(mockUserClientRestartMachine).toHaveBeenCalledWith(undefined, expect.any(Object));
+
+    // Pin must remain untouched on plain restart.
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, testInstanceId));
+    expect(pins.length).toBe(1);
+  });
+
+  it('version change with no pin succeeds without acknowledgeOverride', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.restartMachine({
+      instanceId: testInstanceId,
+      imageTag: newerTag,
+    });
+
+    expect(result).toEqual({ success: true, message: 'restarting' });
+    expect(mockUserClientRestartMachine).toHaveBeenCalledWith(
+      { imageTag: newerTag },
+      expect.any(Object)
+    );
+  });
+
+  it('version change with user-set pin and no override throws PRECONDITION_FAILED', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: testInstanceId,
+      image_tag: olderTag,
+      pinned_by: regularUser.id,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.restartMachine({
+        instanceId: testInstanceId,
+        imageTag: newerTag,
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'PIN_EXISTS',
+    });
+
+    expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
+
+    // Pin remains in place after a blocked attempt.
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, testInstanceId));
+    expect(pins.length).toBe(1);
+    expect(pins[0].pinned_by).toBe(regularUser.id);
+  });
+
+  it('version change with admin-set pin and no override throws PRECONDITION_FAILED', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: testInstanceId,
+      image_tag: olderTag,
+      pinned_by: adminUser.id,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.restartMachine({
+        instanceId: testInstanceId,
+        imageTag: newerTag,
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'PIN_EXISTS',
+    });
+
+    expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
+  });
+
+  it('version change with acknowledgeOverride deletes a user-set pin and proceeds', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: testInstanceId,
+      image_tag: olderTag,
+      pinned_by: regularUser.id,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.restartMachine({
+      instanceId: testInstanceId,
+      imageTag: newerTag,
+      acknowledgeOverride: true,
+    });
+
+    expect(result).toEqual({ success: true, message: 'restarting' });
+    expect(mockUserClientRestartMachine).toHaveBeenCalledWith(
+      { imageTag: newerTag },
+      expect.any(Object)
+    );
+
+    // Pin row removed; no replacement admin pin written.
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, testInstanceId));
+    expect(pins.length).toBe(0);
+  });
+
+  it('version change with acknowledgeOverride deletes an admin-set pin and proceeds', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: testInstanceId,
+      image_tag: olderTag,
+      pinned_by: adminUser.id,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.restartMachine({
+      instanceId: testInstanceId,
+      imageTag: newerTag,
+      acknowledgeOverride: true,
+    });
+
+    expect(result).toEqual({ success: true, message: 'restarting' });
+
+    // Pin row removed; the override path strips any pin regardless of pinned_by.
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, testInstanceId));
+    expect(pins.length).toBe(0);
+  });
+
+  it('is direction-agnostic — older imageTag works the same as newer', async () => {
+    // No pin: admin can switch to an older tag without override.
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.restartMachine({
+      instanceId: testInstanceId,
+      imageTag: olderTag,
+    });
+
+    expect(result).toEqual({ success: true, message: 'restarting' });
+    expect(mockUserClientRestartMachine).toHaveBeenCalledWith(
+      { imageTag: olderTag },
+      expect.any(Object)
+    );
+  });
+
+  it('NOT_FOUND when instance does not exist', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.restartMachine({
+        instanceId: crypto.randomUUID(),
+        imageTag: newerTag,
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+
+    expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
+  });
+});
+
+describe('admin.kiloclawInstances.bulkChangeVersion', () => {
+  const newerTag = 'admin-bulk-change-newer';
+  const olderTag = 'admin-bulk-change-older';
+  const disabledTag = 'admin-bulk-change-disabled';
+  let secondAdmin: User;
+
+  // Five fixture instances exercising every partition class. Names mirror
+  // the partition reasons surfaced in the result.
+  let unpinnedId: string;
+  let userPinnedId: string;
+  let adminPinnedId: string;
+  let destroyedId: string;
+  let alreadyOnTargetId: string;
+
+  beforeEach(async () => {
+    secondAdmin = await insertTestUser({
+      google_user_email: `admin-bulk-secondary-${Math.random()}@admin.example.com`,
+      is_admin: true,
+    });
+
+    await db.insert(kiloclaw_image_catalog).values([
+      {
+        openclaw_version: '2026.4.10',
+        variant: 'default',
+        image_tag: newerTag,
+        image_digest: 'sha256:newer',
+        status: 'available',
+        published_at: new Date().toISOString(),
+      },
+      {
+        openclaw_version: '2026.3.1',
+        variant: 'default',
+        image_tag: olderTag,
+        image_digest: 'sha256:older',
+        status: 'available',
+        published_at: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+      },
+      {
+        openclaw_version: '2026.2.1',
+        variant: 'default',
+        image_tag: disabledTag,
+        image_digest: 'sha256:disabled',
+        status: 'disabled',
+        published_at: new Date(Date.now() - 60 * 86_400_000).toISOString(),
+      },
+    ]);
+
+    const insertInstance = async (
+      ownerId: string,
+      overrides: Partial<{ destroyed_at: string; tracked_image_tag: string | null }> = {}
+    ): Promise<string> => {
+      const id = crypto.randomUUID();
+      await db.insert(kiloclaw_instances).values({
+        id,
+        user_id: ownerId,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        ...overrides,
+      });
+      return id;
+    };
+
+    unpinnedId = await insertInstance(regularUser.id, { tracked_image_tag: olderTag });
+    userPinnedId = await insertInstance(regularUser.id, { tracked_image_tag: olderTag });
+    adminPinnedId = await insertInstance(regularUser.id, { tracked_image_tag: olderTag });
+    destroyedId = await insertInstance(regularUser.id, {
+      tracked_image_tag: olderTag,
+      destroyed_at: new Date().toISOString(),
+    });
+    alreadyOnTargetId = await insertInstance(regularUser.id, { tracked_image_tag: newerTag });
+
+    await db.insert(kiloclaw_version_pins).values([
+      { instance_id: userPinnedId, image_tag: olderTag, pinned_by: regularUser.id },
+      { instance_id: adminPinnedId, image_tag: olderTag, pinned_by: secondAdmin.id },
+    ]);
+  });
+
+  afterEach(async () => {
+    /* eslint-disable drizzle/enforce-delete-with-where */
+    const ids = [unpinnedId, userPinnedId, adminPinnedId, destroyedId, alreadyOnTargetId];
+    await db.delete(kiloclaw_version_pins).where(inArray(kiloclaw_version_pins.instance_id, ids));
+    await db.delete(kiloclaw_instances).where(inArray(kiloclaw_instances.id, ids));
+    await db
+      .delete(kiloclaw_image_catalog)
+      .where(inArray(kiloclaw_image_catalog.image_tag, [newerTag, olderTag, disabledTag]));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, secondAdmin.id));
+    /* eslint-enable drizzle/enforce-delete-with-where */
+  });
+
+  it('throws FORBIDDEN for non-admin callers', async () => {
+    const caller = await createCallerForUser(regularUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.bulkChangeVersion({
+        instanceIds: [unpinnedId],
+        imageTag: newerTag,
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
+  });
+
+  it('Zod rejects empty instanceIds', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.bulkChangeVersion({
+        instanceIds: [],
+        imageTag: newerTag,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
+  });
+
+  it('Zod rejects more than 500 instanceIds', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const tooMany = Array.from({ length: 501 }, () => crypto.randomUUID());
+    await expect(
+      caller.admin.kiloclawInstances.bulkChangeVersion({
+        instanceIds: tooMany,
+        imageTag: newerTag,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('Zod rejects malformed imageTag', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.bulkChangeVersion({
+        instanceIds: [unpinnedId],
+        imageTag: 'invalid/tag:with:colons',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
+  });
+
+  it('BAD_REQUEST when target tag is not in catalog', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.bulkChangeVersion({
+        instanceIds: [unpinnedId],
+        imageTag: 'never-published-tag',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
+  });
+
+  it('BAD_REQUEST when target tag is disabled', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.bulkChangeVersion({
+        instanceIds: [unpinnedId],
+        imageTag: disabledTag,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
+  });
+
+  it('partitions a mixed batch correctly with overridePins=false', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.bulkChangeVersion({
+      instanceIds: [unpinnedId, userPinnedId, adminPinnedId, destroyedId, alreadyOnTargetId],
+      imageTag: newerTag,
+    });
+
+    expect(result.applied).toEqual([unpinnedId]);
+    expect(result.failed).toEqual([]);
+    expect(result.skipped).toHaveLength(4);
+    expect(result.skipped).toEqual(
+      expect.arrayContaining([
+        { instanceId: userPinnedId, reason: 'pinned_by_user' },
+        { instanceId: adminPinnedId, reason: 'pinned_by_admin' },
+        { instanceId: destroyedId, reason: 'destroyed' },
+        { instanceId: alreadyOnTargetId, reason: 'already_on_target' },
+      ])
+    );
+
+    expect(mockUserClientRestartMachine).toHaveBeenCalledTimes(1);
+    expect(mockUserClientRestartMachine).toHaveBeenCalledWith(
+      { imageTag: newerTag },
+      expect.any(Object)
+    );
+
+    // Pins on user-pinned and admin-pinned instances must remain in place
+    // when override is off.
+    const remainingPins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(inArray(kiloclaw_version_pins.instance_id, [userPinnedId, adminPinnedId]));
+    expect(remainingPins.length).toBe(2);
+  });
+
+  it('overridePins=true shifts user-pinned and admin-pinned into applied', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.bulkChangeVersion({
+      instanceIds: [unpinnedId, userPinnedId, adminPinnedId, destroyedId, alreadyOnTargetId],
+      imageTag: newerTag,
+      overridePins: true,
+    });
+
+    expect(result.applied).toEqual(
+      expect.arrayContaining([unpinnedId, userPinnedId, adminPinnedId])
+    );
+    expect(result.applied).toHaveLength(3);
+    expect(result.failed).toEqual([]);
+    expect(result.skipped).toEqual(
+      expect.arrayContaining([
+        { instanceId: destroyedId, reason: 'destroyed' },
+        { instanceId: alreadyOnTargetId, reason: 'already_on_target' },
+      ])
+    );
+    expect(result.skipped).toHaveLength(2);
+
+    // Pins on user-pinned and admin-pinned instances are deleted; no
+    // replacement admin pin written.
+    const remainingPins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(inArray(kiloclaw_version_pins.instance_id, [userPinnedId, adminPinnedId]));
+    expect(remainingPins.length).toBe(0);
+
+    expect(mockUserClientRestartMachine).toHaveBeenCalledTimes(3);
+  });
+
+  it('per-instance worker failure does not abort siblings', async () => {
+    mockUserClientRestartMachine
+      .mockReset()
+      .mockResolvedValueOnce({ success: true, message: 'restarting' })
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValue({ success: true, message: 'restarting' });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.bulkChangeVersion({
+      instanceIds: [unpinnedId, userPinnedId, adminPinnedId],
+      imageTag: newerTag,
+      overridePins: true,
+    });
+
+    // One of the three fails, the other two succeed. Order is not
+    // guaranteed because the for-loop chunks 10 at a time and
+    // Promise.allSettled doesn't preserve mock-call order across the batch.
+    // Assert on counts and shapes rather than specific id-to-result mapping.
+    expect(result.applied).toHaveLength(2);
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0].error).toContain('boom');
+    expect(result.skipped).toEqual([]);
+  });
+
+  it('returns failed:not_found for instanceIds that do not exist', async () => {
+    const ghostId = crypto.randomUUID();
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.bulkChangeVersion({
+      instanceIds: [unpinnedId, ghostId],
+      imageTag: newerTag,
+    });
+
+    expect(result.applied).toEqual([unpinnedId]);
+    expect(result.skipped).toEqual([]);
+    expect(result.failed).toEqual([{ instanceId: ghostId, error: 'not_found' }]);
+  });
+
+  it('plain happy path with a single unpinned instance', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.bulkChangeVersion({
+      instanceIds: [unpinnedId],
+      imageTag: newerTag,
+    });
+
+    expect(result).toEqual({
+      applied: [unpinnedId],
+      skipped: [],
+      failed: [],
+    });
+  });
+
+  it('writes an admin audit log capturing the bulk action', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    await caller.admin.kiloclawInstances.bulkChangeVersion({
+      instanceIds: [unpinnedId, userPinnedId],
+      imageTag: newerTag,
+      overridePins: false,
+    });
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_admin_audit_logs)
+      .where(
+        and(
+          eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+          eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.instances.bulk_change_version')
+        )
+      );
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].actor_email).toBe(adminUser.google_user_email);
+    expect(logs[0].target_user_id).toBe(adminUser.id); // multi-user action sentinels actor
+    expect(logs[0].message).toContain(`tag=${newerTag}`);
+    expect(logs[0].message).toContain('overridePins=false');
+    expect(logs[0].metadata).toMatchObject({
+      imageTag: newerTag,
+      overridePins: false,
+      appliedInstanceIds: [unpinnedId],
+    });
+    expect(logs[0].metadata).toHaveProperty('skipped');
+    expect(logs[0].metadata).toHaveProperty('failed');
+  });
+});
+
+describe('admin.kiloclawInstances scheduled actions', () => {
+  let testInstanceId: string;
+
+  beforeEach(async () => {
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    testInstanceId = instance.id;
+  });
+
+  afterEach(async () => {
+    /* eslint-disable drizzle/enforce-delete-with-where */
+    await db
+      .delete(kiloclaw_scheduled_action_targets)
+      .where(eq(kiloclaw_scheduled_action_targets.instance_id, testInstanceId));
+    // We deleted target rows above (by instance_id). Stages and parents
+    // don't auto-delete from that — the FK from target.stage_id is ON
+    // DELETE SET NULL, which nullifies the column on the target row, not
+    // the other way around. Tear down stages and parents explicitly by
+    // id so the test instance leaves no orphans.
+    const parents = await db
+      .select({ id: kiloclaw_scheduled_actions.id })
+      .from(kiloclaw_scheduled_actions)
+      .where(eq(kiloclaw_scheduled_actions.created_by, adminUser.id));
+    if (parents.length > 0) {
+      const ids = parents.map(p => p.id);
+      await db
+        .delete(kiloclaw_scheduled_action_stages)
+        .where(inArray(kiloclaw_scheduled_action_stages.scheduled_action_id, ids));
+      await db
+        .delete(kiloclaw_scheduled_actions)
+        .where(inArray(kiloclaw_scheduled_actions.id, ids));
+    }
+    await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, testInstanceId));
+    /* eslint-enable drizzle/enforce-delete-with-where */
+  });
+
+  describe('scheduleAction', () => {
+    it('throws FORBIDDEN for non-admin callers', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'scheduled_restart',
+          instanceIds: [testInstanceId],
+          scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('rejects scheduledAt within 1 minute of now', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'scheduled_restart',
+          instanceIds: [testInstanceId],
+          // 30 seconds in the future — under the 1-minute floor.
+          scheduledAt: new Date(Date.now() + 30_000).toISOString(),
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('1 minute'),
+      });
+    });
+
+    it('rejects unknown instanceId with NOT_FOUND', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'scheduled_restart',
+          instanceIds: [crypto.randomUUID()],
+          scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
+    it('rejects scheduling on a destroyed instance', async () => {
+      // Mark the test instance destroyed.
+      await db
+        .update(kiloclaw_instances)
+        .set({ destroyed_at: new Date().toISOString() })
+        .where(eq(kiloclaw_instances.id, testInstanceId));
+
+      const caller = await createCallerForUser(adminUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'scheduled_restart',
+          instanceIds: [testInstanceId],
+          scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('happy path creates parent + stage + target rows and writes audit log', async () => {
+      const scheduledAt = new Date(Date.now() + 60 * 60_000).toISOString();
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId],
+        scheduledAt,
+        reason: 'e2e test',
+      });
+
+      expect(result.id).toBeDefined();
+      expect(result.stageId).toBeDefined();
+
+      const [parent] = await db
+        .select()
+        .from(kiloclaw_scheduled_actions)
+        .where(eq(kiloclaw_scheduled_actions.id, result.id));
+      expect(parent.action_type).toBe('scheduled_restart');
+      expect(parent.status).toBe('scheduled');
+      expect(parent.created_by).toBe(adminUser.id);
+      expect(parent.total_count).toBe(1);
+      expect(parent.reason).toBe('e2e test');
+
+      const stages = await db
+        .select()
+        .from(kiloclaw_scheduled_action_stages)
+        .where(eq(kiloclaw_scheduled_action_stages.scheduled_action_id, result.id));
+      expect(stages).toHaveLength(1);
+      expect(stages[0].stage_index).toBe(0);
+      expect(stages[0].status).toBe('pending');
+
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, result.id));
+      expect(targets).toHaveLength(1);
+      expect(targets[0].instance_id).toBe(testInstanceId);
+      expect(targets[0].status).toBe('pending');
+      expect(targets[0].user_id).toBe(regularUser.id);
+
+      const logs = await db
+        .select()
+        .from(kiloclaw_admin_audit_logs)
+        .where(
+          and(
+            eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+            eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.scheduled_action.created')
+          )
+        );
+      expect(logs).toHaveLength(1);
+      expect(logs[0].metadata).toMatchObject({
+        scheduledActionId: result.id,
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId],
+      });
+    });
+
+    it('multi-instance happy path creates one parent + one stage + N targets', async () => {
+      // Build a second instance owned by a different user.
+      const secondUser = await insertTestUser();
+      const [secondInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: secondUser.id,
+          sandbox_id: `test-multi-schedule-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId, secondInstance.id],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      const [parent] = await db
+        .select()
+        .from(kiloclaw_scheduled_actions)
+        .where(eq(kiloclaw_scheduled_actions.id, result.id));
+      expect(parent.total_count).toBe(2);
+
+      const stages = await db
+        .select()
+        .from(kiloclaw_scheduled_action_stages)
+        .where(eq(kiloclaw_scheduled_action_stages.scheduled_action_id, result.id));
+      expect(stages).toHaveLength(1);
+
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, result.id));
+      expect(targets).toHaveLength(2);
+      const targetInstanceIds = new Set(targets.map(t => t.instance_id));
+      expect(targetInstanceIds).toEqual(new Set([testInstanceId, secondInstance.id]));
+      // Each target is stamped with the right user_id.
+      const userIdByInstance = new Map(targets.map(t => [t.instance_id, t.user_id]));
+      expect(userIdByInstance.get(testInstanceId)).toBe(regularUser.id);
+      expect(userIdByInstance.get(secondInstance.id)).toBe(secondUser.id);
+    });
+
+    it('silently filters destroyed instances from a bulk schedule', async () => {
+      const [destroyedInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: regularUser.id,
+          sandbox_id: `test-bulk-dead-${Date.now()}`,
+          destroyed_at: new Date().toISOString(),
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId, destroyedInstance.id],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      // Only the live instance becomes a target; total_count reflects
+      // the post-filter size.
+      const [parent] = await db
+        .select()
+        .from(kiloclaw_scheduled_actions)
+        .where(eq(kiloclaw_scheduled_actions.id, result.id));
+      expect(parent.total_count).toBe(1);
+
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, result.id));
+      expect(targets).toHaveLength(1);
+      expect(targets[0].instance_id).toBe(testInstanceId);
+
+      // Audit metadata captures what was filtered so the trail is
+      // self-explanatory.
+      const logs = await db
+        .select()
+        .from(kiloclaw_admin_audit_logs)
+        .where(
+          and(
+            eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+            eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.scheduled_action.created')
+          )
+        );
+      expect(logs).toHaveLength(1);
+      expect(logs[0].metadata).toMatchObject({
+        instanceIds: [testInstanceId],
+        filteredDestroyedInstanceIds: [destroyedInstance.id],
+      });
+    });
+
+    it('rejects when every instance is destroyed (nothing to schedule)', async () => {
+      const [destroyedInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: regularUser.id,
+          sandbox_id: `test-all-dead-${Date.now()}`,
+          destroyed_at: new Date().toISOString(),
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      const caller = await createCallerForUser(adminUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'scheduled_restart',
+          instanceIds: [destroyedInstance.id],
+          scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('destroyed'),
+      });
+    });
+
+    it('rejects with CONFLICT when an instance already has a pending scheduled action', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      // First schedule succeeds.
+      await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+      // Second schedule on the same instance is rejected — we don't
+      // support 1+N concurrent schedules per instance.
+      await expect(
+        caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'scheduled_restart',
+          instanceIds: [testInstanceId],
+          scheduledAt: new Date(Date.now() + 120 * 60_000).toISOString(),
+        })
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: expect.stringMatching(/pending(?:.*in-flight)? scheduled action/),
+      });
+    });
+
+    it('dedupes duplicate instanceIds in the input', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId, testInstanceId, testInstanceId],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, result.id));
+      expect(targets).toHaveLength(1);
+    });
+
+    describe('version_change variant', () => {
+      // Per-test tags so cross-test runs can't collide on the unique
+      // image_tag constraint when an earlier test's catalog cleanup is
+      // delayed by FK ordering.
+      let availableTag: string;
+      let disabledTag: string;
+
+      beforeEach(async () => {
+        availableTag = `vc-test-available-${crypto.randomUUID()}`;
+        disabledTag = `vc-test-disabled-${crypto.randomUUID()}`;
+        await db.insert(kiloclaw_image_catalog).values([
+          {
+            openclaw_version: '2026.1.1',
+            variant: 'default',
+            image_tag: availableTag,
+            image_digest: 'sha256:vc-available',
+            status: 'available',
+            published_at: new Date().toISOString(),
+          },
+          {
+            openclaw_version: '2026.0.1',
+            variant: 'default',
+            image_tag: disabledTag,
+            image_digest: 'sha256:vc-disabled',
+            status: 'disabled',
+            published_at: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+          },
+        ]);
+      });
+
+      afterEach(async () => {
+        /* eslint-disable drizzle/enforce-delete-with-where */
+        // FK from kiloclaw_scheduled_actions.target_image_tag → catalog
+        // is ON DELETE RESTRICT. Outer afterEach deletes parents but
+        // runs after this inner one, so clear our parents first.
+        const parents = await db
+          .select({ id: kiloclaw_scheduled_actions.id })
+          .from(kiloclaw_scheduled_actions)
+          .where(inArray(kiloclaw_scheduled_actions.target_image_tag, [availableTag, disabledTag]));
+        if (parents.length > 0) {
+          const parentIds = parents.map(p => p.id);
+          await db
+            .delete(kiloclaw_scheduled_action_targets)
+            .where(inArray(kiloclaw_scheduled_action_targets.scheduled_action_id, parentIds));
+          await db
+            .delete(kiloclaw_scheduled_action_stages)
+            .where(inArray(kiloclaw_scheduled_action_stages.scheduled_action_id, parentIds));
+          await db
+            .delete(kiloclaw_scheduled_actions)
+            .where(inArray(kiloclaw_scheduled_actions.id, parentIds));
+        }
+        await db
+          .delete(kiloclaw_image_catalog)
+          .where(inArray(kiloclaw_image_catalog.image_tag, [availableTag, disabledTag]));
+        /* eslint-enable drizzle/enforce-delete-with-where */
+      });
+
+      it('happy path stamps target_image_tag + override_pins on parent and target', async () => {
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'version_change',
+          instanceIds: [testInstanceId],
+          imageTag: availableTag,
+          overridePins: true,
+          scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        });
+
+        const [parent] = await db
+          .select()
+          .from(kiloclaw_scheduled_actions)
+          .where(eq(kiloclaw_scheduled_actions.id, result.id));
+        expect(parent.action_type).toBe('version_change');
+        expect(parent.target_image_tag).toBe(availableTag);
+        expect(parent.override_pins).toBe(true);
+
+        const [target] = await db
+          .select()
+          .from(kiloclaw_scheduled_action_targets)
+          .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, result.id));
+        // target_image_tag mirrored from the parent — DO apply path
+        // reads the per-target column directly without re-joining.
+        expect(target.target_image_tag).toBe(availableTag);
+        expect(target.instance_id).toBe(testInstanceId);
+
+        const logs = await db
+          .select()
+          .from(kiloclaw_admin_audit_logs)
+          .where(
+            and(
+              eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+              eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.scheduled_action.created')
+            )
+          );
+        expect(logs).toHaveLength(1);
+        expect(logs[0].metadata).toMatchObject({
+          actionType: 'version_change',
+          imageTag: availableTag,
+          overridePins: true,
+        });
+      });
+
+      it('rejects unknown imageTag with BAD_REQUEST', async () => {
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.admin.kiloclawInstances.scheduleAction({
+            actionType: 'version_change',
+            instanceIds: [testInstanceId],
+            imageTag: 'totally-not-in-catalog',
+            scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+          })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('not found'),
+        });
+      });
+
+      it('rejects disabled imageTag with BAD_REQUEST', async () => {
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.admin.kiloclawInstances.scheduleAction({
+            actionType: 'version_change',
+            instanceIds: [testInstanceId],
+            imageTag: disabledTag,
+            scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+          })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('disabled'),
+        });
+      });
+
+      it('Zod rejects malformed imageTag (regex)', async () => {
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.admin.kiloclawInstances.scheduleAction({
+            actionType: 'version_change',
+            instanceIds: [testInstanceId],
+            // Starts with a non-alphanumeric — fails the
+            // /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/ guard.
+            imageTag: '-bad-tag',
+            scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      });
+    });
+  });
+
+  describe('listScheduledActions / getScheduledAction', () => {
+    it('throws FORBIDDEN for non-admin callers (listScheduledActions)', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(caller.admin.kiloclawInstances.listScheduledActions({})).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+    });
+
+    it('throws FORBIDDEN for non-admin callers (getScheduledAction)', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.getScheduledAction({ id: crypto.randomUUID() })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('lists scheduled actions and getScheduledAction returns parent + stages + targets', async () => {
+      const adminCaller = await createCallerForUser(adminUser.id);
+      const created = await adminCaller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      const list = await adminCaller.admin.kiloclawInstances.listScheduledActions({});
+      expect(list.items.some(a => a.id === created.id)).toBe(true);
+      expect(list.pagination.total).toBeGreaterThanOrEqual(1);
+
+      const detail = await adminCaller.admin.kiloclawInstances.getScheduledAction({
+        id: created.id,
+      });
+      expect(detail.action.id).toBe(created.id);
+      expect(detail.stages).toHaveLength(1);
+      expect(detail.targets).toHaveLength(1);
+      expect(detail.targets[0].instance_id).toBe(testInstanceId);
+    });
+  });
+
+  describe('cancelScheduledAction', () => {
+    it('throws FORBIDDEN for non-admin callers', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.cancelScheduledAction({ id: crypto.randomUUID() })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('throws NOT_FOUND for an unknown id', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.cancelScheduledAction({ id: crypto.randomUUID() })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
+    it('cancels a scheduled action and marks pending stages + targets cancelled', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const created = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      const result = await caller.admin.kiloclawInstances.cancelScheduledAction({
+        id: created.id,
+      });
+      expect(result).toEqual({ cancelled: true, status: 'cancelled' });
+
+      const [parent] = await db
+        .select()
+        .from(kiloclaw_scheduled_actions)
+        .where(eq(kiloclaw_scheduled_actions.id, created.id));
+      expect(parent.status).toBe('cancelled');
+      expect(parent.cancelled_at).not.toBeNull();
+
+      const stages = await db
+        .select()
+        .from(kiloclaw_scheduled_action_stages)
+        .where(eq(kiloclaw_scheduled_action_stages.scheduled_action_id, created.id));
+      expect(stages.every(s => s.status === 'cancelled')).toBe(true);
+
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+      expect(targets.every(t => t.status === 'skipped' && t.skip_reason === 'cancelled')).toBe(
+        true
+      );
+
+      const logs = await db
+        .select()
+        .from(kiloclaw_admin_audit_logs)
+        .where(
+          and(
+            eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+            eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.scheduled_action.cancelled')
+          )
+        );
+      expect(logs).toHaveLength(1);
+    });
+
+    it('returns no-op when called twice (idempotent)', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const created = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      const first = await caller.admin.kiloclawInstances.cancelScheduledAction({
+        id: created.id,
+      });
+      expect(first).toEqual({ cancelled: true, status: 'cancelled' });
+
+      const second = await caller.admin.kiloclawInstances.cancelScheduledAction({
+        id: created.id,
+      });
+      expect(second.cancelled).toBe(false);
+      expect(second.status).toBe('cancelled');
+    });
+
+    it('voids pending notice rows so the sweep does not deliver after cancel', async () => {
+      // scheduleAction with default notify=true queues 3 pending notice
+      // rows (email, webapp, mobile_push) per target. After cancel,
+      // those rows must transition to 'failed' so selectDueNotifications
+      // never picks them up again.
+      const caller = await createCallerForUser(adminUser.id);
+      const created = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      const beforeCancel = await db
+        .select()
+        .from(kiloclaw_scheduled_action_notifications)
+        .innerJoin(
+          kiloclaw_scheduled_action_targets,
+          eq(
+            kiloclaw_scheduled_action_targets.id,
+            kiloclaw_scheduled_action_notifications.target_id
+          )
+        )
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+      expect(beforeCancel.length).toBeGreaterThan(0);
+      expect(
+        beforeCancel.every(
+          row =>
+            row.kiloclaw_scheduled_action_notifications.kind === 'notice' &&
+            row.kiloclaw_scheduled_action_notifications.status === 'pending'
+        )
+      ).toBe(true);
+
+      await caller.admin.kiloclawInstances.cancelScheduledAction({ id: created.id });
+
+      const afterCancel = await db
+        .select()
+        .from(kiloclaw_scheduled_action_notifications)
+        .innerJoin(
+          kiloclaw_scheduled_action_targets,
+          eq(
+            kiloclaw_scheduled_action_targets.id,
+            kiloclaw_scheduled_action_notifications.target_id
+          )
+        )
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+      const noticeRows = afterCancel
+        .map(row => row.kiloclaw_scheduled_action_notifications)
+        .filter(n => n.kind === 'notice');
+      expect(noticeRows.length).toBe(beforeCancel.length);
+      expect(noticeRows.every(n => n.status === 'failed')).toBe(true);
+      expect(
+        noticeRows.every(n => n.error_message === 'action cancelled before notice was dispatched')
+      ).toBe(true);
+    });
+  });
+
+  describe('cancelScheduledActionTarget', () => {
+    it('voids pending notice rows for only the cancelled target', async () => {
+      // Two targets in one action; cancel one. Pending notice rows for
+      // the cancelled target should transition to 'failed'; the other
+      // target's notice rows should stay 'pending'.
+      const secondUser = await insertTestUser();
+      const [secondInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: secondUser.id,
+          sandbox_id: `test-cancel-target-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      const caller = await createCallerForUser(adminUser.id);
+      const created = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId, secondInstance.id],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      await caller.admin.kiloclawInstances.cancelScheduledActionTarget({
+        scheduledActionId: created.id,
+        instanceId: testInstanceId,
+      });
+
+      const allNotices = await db
+        .select({
+          status: kiloclaw_scheduled_action_notifications.status,
+          error_message: kiloclaw_scheduled_action_notifications.error_message,
+          instance_id: kiloclaw_scheduled_action_targets.instance_id,
+        })
+        .from(kiloclaw_scheduled_action_notifications)
+        .innerJoin(
+          kiloclaw_scheduled_action_targets,
+          eq(
+            kiloclaw_scheduled_action_targets.id,
+            kiloclaw_scheduled_action_notifications.target_id
+          )
+        )
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+
+      const cancelledTargetRows = allNotices.filter(n => n.instance_id === testInstanceId);
+      const otherTargetRows = allNotices.filter(n => n.instance_id === secondInstance.id);
+
+      expect(cancelledTargetRows.length).toBeGreaterThan(0);
+      expect(cancelledTargetRows.every(n => n.status === 'failed')).toBe(true);
+
+      expect(otherTargetRows.length).toBeGreaterThan(0);
+      expect(otherTargetRows.every(n => n.status === 'pending')).toBe(true);
+    });
   });
 });

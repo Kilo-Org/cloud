@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import { atomicWrite } from './atomic-write';
 
 const execFileAsync = promisify(execFile);
 
@@ -18,8 +19,10 @@ export type DevicePairingRequest = {
   requestId: string;
   deviceId: string;
   role?: string;
+  roles?: string[];
   platform?: string;
   clientId?: string;
+  clientMode?: string;
   ts?: number;
 };
 
@@ -45,6 +48,8 @@ export type PairingCache = {
 };
 
 type ExecImpl = (command: string, args: string[]) => Promise<{ stdout: string; stderr: string }>;
+type ReadTextFileImpl = (filePath: string) => Promise<string>;
+type WriteTextFileAtomicImpl = (filePath: string, data: string) => Promise<void>;
 
 export type ReadChannelPairingImpl = (channel: string) => Promise<unknown>;
 export type ReadDevicePairingImpl = () => Promise<unknown>;
@@ -55,7 +60,11 @@ type PairingCacheOptions = {
   nowImpl?: () => string;
   readChannelPairingImpl?: ReadChannelPairingImpl;
   readDevicePairingImpl?: ReadDevicePairingImpl;
+  readTextFileImpl?: ReadTextFileImpl;
+  writeTextFileAtomicImpl?: WriteTextFileAtomicImpl;
   nowMsImpl?: () => number;
+  /** Auto-approve pending device pairings from the gateway's own exec client. */
+  autoApproveGatewayClient?: boolean;
 };
 
 export const PERIODIC_INTERVAL_MS = 120_000;
@@ -63,7 +72,10 @@ export const DEBOUNCE_DELAY_MS = 2_000;
 
 export const FAILURE_RETRY_BASE_MS = 30_000;
 export const FAILURE_RETRY_MAX_MS = 300_000;
-export const APPROVE_TIMEOUT_MS = 45_000;
+// TEMPORARY: bumped from 45_000 to 180_000 because OpenClaw CLI startup can
+// exceed 60s on shared-cpu instances. Revert to 45_000 once upstream startup
+// is consistently below the old timeout on full KiloClaw images.
+export const APPROVE_TIMEOUT_MS = 180_000;
 export const CONFIG_PATH = '/root/.openclaw/openclaw.json';
 
 // TTL constants — exact matches to openclaw source
@@ -91,6 +103,15 @@ function approveFail(message: string, statusHint: 400 | 500): ApproveResult {
 }
 
 export const OPENCLAW_BIN = '/usr/local/bin/openclaw';
+export const GATEWAY_CLIENT_ID = 'gateway-client';
+export const OPERATOR_ROLE = 'operator';
+export const GATEWAY_CLIENT_OPERATOR_SCOPES = [
+  'operator.read',
+  'operator.admin',
+  'operator.approvals',
+  'operator.pairing',
+  'operator.write',
+];
 
 // Mirrors resolveStateDir() / resolveOAuthDir() in openclaw/src/config/paths.ts
 // Note: openclaw's full resolveStateDir() also does filesystem-existence checks for
@@ -125,6 +146,15 @@ function defaultReadConfigImpl(): unknown {
   return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 }
 
+async function defaultWriteTextFileAtomicImpl(filePath: string, data: string): Promise<void> {
+  atomicWrite(filePath, data, {
+    writeFileSync: (p, content) => fs.writeFileSync(p, content),
+    renameSync: (oldPath, newPath) => fs.renameSync(oldPath, newPath),
+    unlinkSync: p => fs.unlinkSync(p),
+    chmodSync: (p, mode) => fs.chmodSync(p, mode),
+  });
+}
+
 // Zod schemas for IO boundary parsing — .passthrough() keeps forward compatibility
 // when openclaw adds fields without breaking the controller.
 const channelPairingRequestSchema = z
@@ -150,8 +180,10 @@ const devicePendingEntrySchema = z.object({
   requestId: z.string(),
   deviceId: z.string(),
   role: z.string().optional(),
+  roles: z.array(z.string()).optional(),
   platform: z.string().optional(),
   clientId: z.string().optional(),
+  clientMode: z.string().optional(),
   ts: z.number().optional(),
 });
 
@@ -184,6 +216,77 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function stringArraySetEquals(left: unknown, right: readonly string[]): boolean {
+  if (!Array.isArray(left) || left.length !== right.length) return false;
+  const rightSet = new Set(right);
+  return left.every(value => typeof value === 'string' && rightSet.has(value));
+}
+
+function normalizeRoleList(req: Pick<DevicePairingRequest, 'role' | 'roles'>): string[] {
+  const roles = new Set<string>();
+  if (Array.isArray(req.roles)) {
+    for (const role of req.roles) {
+      const trimmed = role.trim();
+      if (trimmed) roles.add(trimmed);
+    }
+  }
+  const role = req.role?.trim();
+  if (role) roles.add(role);
+  return [...roles];
+}
+
+export function isGatewayClientOperatorRequest(req: DevicePairingRequest): boolean {
+  if (req.clientId !== GATEWAY_CLIENT_ID) return false;
+  const roles = normalizeRoleList(req);
+  return roles.includes(OPERATOR_ROLE);
+}
+
+function widenGatewayClientPendingRequestScopesInFile(
+  parsed: unknown,
+  requestId: string
+): {
+  changed: boolean;
+  missing: boolean;
+  value: unknown;
+} {
+  if (!isRecord(parsed)) {
+    return { changed: false, missing: true, value: parsed };
+  }
+
+  const entry = parsed[requestId];
+  if (!isRecord(entry)) {
+    return { changed: false, missing: true, value: parsed };
+  }
+
+  const candidate = devicePendingEntrySchema.safeParse(entry);
+  if (!candidate.success || !isGatewayClientOperatorRequest(candidate.data)) {
+    return { changed: false, missing: false, value: parsed };
+  }
+
+  if (stringArraySetEquals(entry.scopes, GATEWAY_CLIENT_OPERATOR_SCOPES)) {
+    return { changed: false, missing: false, value: parsed };
+  }
+
+  entry.scopes = [...GATEWAY_CLIENT_OPERATOR_SCOPES];
+  return { changed: true, missing: false, value: parsed };
+}
+
+export async function widenGatewayClientPendingRequestScopes(params: {
+  requestId: string;
+  readTextFile: ReadTextFileImpl;
+  writeTextFileAtomic: WriteTextFileAtomicImpl;
+  pendingPath?: string;
+}): Promise<{ changed: boolean; missing: boolean }> {
+  const pendingPath = params.pendingPath ?? resolveDevicePendingPath();
+  const raw = await params.readTextFile(pendingPath);
+  const parsed = JSON.parse(raw) as unknown;
+  const result = widenGatewayClientPendingRequestScopesInFile(parsed, params.requestId);
+  if (result.changed) {
+    await params.writeTextFileAtomic(pendingPath, JSON.stringify(result.value, null, 2) + '\n');
+  }
+  return { changed: result.changed, missing: result.missing };
+}
+
 export function detectChannels(config: unknown): string[] {
   if (!isRecord(config)) return [];
   const ch = isRecord(config.channels) ? config.channels : {};
@@ -212,7 +315,10 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
       const filePath = resolveDevicePendingPath();
       return JSON.parse(await fs.promises.readFile(filePath, 'utf8')) as unknown;
     },
+    readTextFileImpl = async (filePath: string) => await fs.promises.readFile(filePath, 'utf8'),
+    writeTextFileAtomicImpl = defaultWriteTextFileAtomicImpl,
     nowMsImpl = () => Date.now(),
+    autoApproveGatewayClient = false,
   } = options ?? {};
 
   let channelCache: CacheEntry<ChannelPairingRequest> = { requests: [], lastUpdated: '' };
@@ -348,6 +454,39 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
         deviceCache = { requests, lastUpdated: nowImpl() };
       }
       console.log(`[pairing-cache] devices: read ok, ${requests.length} pending`);
+
+      if (autoApproveGatewayClient) {
+        const gatewayRequests = requests.filter(isGatewayClientOperatorRequest);
+        for (const req of gatewayRequests) {
+          console.log(`[pairing-cache] auto-approving gateway-client device ${req.requestId}`);
+          try {
+            const widened = await widenGatewayClientPendingRequestScopes({
+              requestId: req.requestId,
+              readTextFile: readTextFileImpl,
+              writeTextFileAtomic: writeTextFileAtomicImpl,
+            });
+            if (widened.missing) {
+              console.log(
+                `[pairing-cache] gateway-client pending request ${req.requestId} disappeared before approval`
+              );
+              continue;
+            }
+            if (widened.changed) {
+              console.log(
+                `[pairing-cache] widened gateway-client device ${req.requestId} approval scopes`
+              );
+            }
+            await execImpl(OPENCLAW_BIN, ['devices', 'approve', req.requestId]);
+          } catch (err) {
+            console.error(`[pairing-cache] auto-approve failed for ${req.requestId}:`, err);
+          }
+        }
+        if (gatewayRequests.length > 0) {
+          // Re-read after approvals so the cache reflects the updated state.
+          await refreshDevicePairingInternal();
+        }
+      }
+
       return true;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {

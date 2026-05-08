@@ -19,12 +19,7 @@ export {
 
 import type { OrganizationRole, OrganizationPlan } from './organization-base-types';
 import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
-import {
-  ModelSettingsSchema,
-  OpenClawModelSettingsSchema,
-  OpenCodeSettingsSchema,
-  VersionedSettingsSchema,
-} from '@kilocode/db/schema-types';
+import { OpenClawModelSettingsSchema, OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
 
 // API-facing billing cycle values: 'monthly' | 'annual'
 // The DB stores 'yearly' instead of 'annual'; Stripe uses 'year'/'month'.
@@ -204,8 +199,6 @@ const OpenRouterModelSchema = z.object({
   // kilocode additions:
   preferredIndex: z.number().optional(),
   isFree: z.boolean().optional(),
-  settings: ModelSettingsSchema.optional(),
-  versioned_settings: VersionedSettingsSchema.optional(),
   opencode: OpenCodeSettingsSchema.optional(),
   openclaw: OpenClawModelSettingsSchema.optional(),
 

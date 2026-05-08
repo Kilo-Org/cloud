@@ -128,6 +128,8 @@ describe('legacy platform DO routing', () => {
       userId: currentUserId,
       orgId: null,
       inboundEmailEnabled: true,
+      provider: 'fly',
+      instanceType: null,
     });
 
     await expect(
@@ -211,6 +213,8 @@ describe('resolveInstanceDoKey with instanceId', () => {
       userId: currentUserId,
       orgId: null,
       inboundEmailEnabled: false,
+      provider: 'fly',
+      instanceType: null,
     });
 
     await expect(resolveInstanceDoKey(env, currentUserId, instanceId)).resolves.toBe(legacyDoKey);
@@ -223,6 +227,8 @@ describe('resolveInstanceDoKey with instanceId', () => {
       userId: currentUserId,
       orgId: null,
       inboundEmailEnabled: false,
+      provider: 'fly',
+      instanceType: null,
     });
 
     await expect(resolveInstanceDoKey(env, currentUserId, instanceId)).resolves.toBe(instanceId);

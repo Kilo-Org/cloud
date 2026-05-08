@@ -175,7 +175,7 @@ const ArtificialAnalysisModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
-  release_date: z.string().optional(),
+  release_date: z.string().nullable().optional(),
   model_creator: z
     .object({
       id: z.string(),

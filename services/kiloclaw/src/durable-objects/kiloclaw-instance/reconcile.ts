@@ -10,8 +10,10 @@ import {
   RESTARTING_TIMEOUT_MS,
   RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
+  WORKER_CONTROLLER_CAPABILITIES_VERSION,
   getProactiveRefreshThresholdMs,
 } from '../../config';
+import { resolveInstanceTypeLabel } from '@kilocode/kiloclaw-instance-tiers';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../../utils/env-encryption';
 import {
   METADATA_RECOVERY_COOLDOWN_MS,
@@ -20,7 +22,11 @@ import {
   selectRecoveryCandidate,
   volumeIdFromMachine,
 } from '../machine-recovery';
-import { METADATA_KEY_USER_ID, METADATA_KEY_SANDBOX_ID } from '../machine-config';
+import {
+  METADATA_KEY_USER_ID,
+  METADATA_KEY_SANDBOX_ID,
+  parseMachineSizeFromFlyGuest,
+} from '../machine-config';
 import type { InstanceMutableState, DestroyResult } from './types';
 import { getAppKey } from './types';
 import {
@@ -33,9 +39,11 @@ import {
 import { doError, doWarn, toLoggable, createReconcileContext } from './log';
 import type { ReconcileContext } from './log';
 import { ensureVolume, staleProvisionAgeMs } from './fly-machines';
+import { syncInstanceTypeToPostgresHelper } from './postgres';
 import { mintFreshApiKey } from './config';
 import * as gateway from './gateway';
 import { writeEvent, eventContextFromState } from '../../utils/analytics';
+import { maybeDispatchStartFailurePush } from './lifecycle-push';
 
 export type ReconcileWithFlyResult = {
   beginUnexpectedStopRecovery?: {
@@ -53,20 +61,27 @@ export type ReconcileWithFlyResult = {
   };
 };
 
-function emitStartFailedEvent(
-  env: { KILOCLAW_AE?: AnalyticsEngineDataset },
+/**
+ * Record a start-attempt failure: write the analytics event and dispatch the
+ * one-shot mobile push for this attempt. Single entry point so callers can't
+ * accidentally emit one without the other.
+ */
+async function recordStartFailure(
+  env: KiloClawEnv,
   state: InstanceMutableState,
+  ctx: DurableObjectState,
   label: string,
-  error?: string
-): void {
+  error?: string | null
+): Promise<void> {
   writeEvent(env, {
     event: 'instance.provisioning_failed',
     delivery: 'do',
     status: 'stopped',
     label,
-    error,
+    error: error ?? undefined,
     ...eventContextFromState(state),
   });
+  await maybeDispatchStartFailurePush(env, state, ctx, label, error);
 }
 
 /**
@@ -108,6 +123,7 @@ export async function reconcileWithFly(
   const { reconciled: machineReconciled, result } = await reconcileMachine(
     flyConfig,
     ctx,
+    env,
     state,
     rctx
   );
@@ -338,12 +354,7 @@ async function reconcileStarting(
           healthCheckFailCount: 0,
         })
       );
-      emitStartFailedEvent(
-        env,
-        state,
-        'starting_timeout',
-        state.lastStartErrorMessage ?? undefined
-      );
+      await recordStartFailure(env, state, ctx, 'starting_timeout', state.lastStartErrorMessage);
       return;
     }
     // start() hasn't persisted a machine ID yet — still in progress, wait.
@@ -387,11 +398,12 @@ async function reconcileStarting(
           healthCheckFailCount: 0,
         })
       );
-      emitStartFailedEvent(
+      await recordStartFailure(
         env,
         state,
+        ctx,
         'starting_timeout_with_machine',
-        state.lastStartErrorMessage ?? undefined
+        state.lastStartErrorMessage
       );
     }
   } catch (err) {
@@ -418,7 +430,13 @@ async function reconcileStarting(
           })
         )
       );
-      emitStartFailedEvent(env, state, 'starting_machine_gone', 'machine gone during start');
+      await recordStartFailure(
+        env,
+        state,
+        ctx,
+        'starting_machine_gone',
+        'machine gone during start'
+      );
     } else if (isTimedOut) {
       // Transient Fly API error but we've exceeded the starting timeout.
       // Fall back to 'stopped' so the user can retry instead of staying
@@ -442,9 +460,10 @@ async function reconcileStarting(
           healthCheckFailCount: 0,
         })
       );
-      emitStartFailedEvent(
+      await recordStartFailure(
         env,
         state,
+        ctx,
         'starting_timeout_transient_error',
         err instanceof Error ? err.message : String(err)
       );
@@ -731,6 +750,7 @@ async function reconcileVolume(
 async function reconcileMachine(
   flyConfig: FlyClientConfig,
   ctx: DurableObjectState,
+  env: KiloClawEnv,
   state: InstanceMutableState,
   rctx: ReconcileContext
 ): Promise<{ reconciled: boolean; result: ReconcileWithFlyResult }> {
@@ -740,6 +760,7 @@ async function reconcileMachine(
 
   try {
     const machine = await fly.getMachine(flyConfig, state.flyMachineId);
+    await backfillMachineSizeFromFlyConfig(ctx, env, state, machine, 'reconcile-alarm');
     const result = await syncStatusWithFly(ctx, state, machine.state, rctx);
     await reconcileMachineMount(flyConfig, ctx, state, machine, rctx);
     return { reconciled: true, result };
@@ -749,6 +770,53 @@ async function reconcileMachine(
       return { reconciled: true, result: {} };
     }
     return { reconciled: false, result: {} };
+  }
+}
+
+/**
+ * Backfill machineSize and instanceType from live Fly machine config.
+ *
+ * No-op when machineSize is already set or the Fly machine has no guest config.
+ * Called from any path that already has a fresh `getMachine` response: alarm
+ * reconcile, the user-facing live-check, future restart paths. Keeps the
+ * "we observed live hardware → write it back" logic in one place so callers
+ * don't drift.
+ *
+ * When the backfill actually writes new state, fires a fire-and-forget
+ * Postgres sync via `ctx.waitUntil` so the denormalized
+ * `kiloclaw_instances.instance_type` column catches up immediately. The
+ * alarm path no longer syncs Postgres unconditionally — sync happens only
+ * when DO state actually changes.
+ */
+async function backfillMachineSizeFromFlyConfig(
+  ctx: DurableObjectState,
+  env: KiloClawEnv,
+  state: InstanceMutableState,
+  machine: { config?: { guest?: { cpus: number; memory_mb: number; cpu_kind?: string } } },
+  source: string
+): Promise<void> {
+  if (state.machineSize !== null) return;
+  // Skip backfill when an admin override is active. The live Fly guest
+  // reflects the override, not the billable tier hardware, so writing it
+  // back to `machineSize` would silently re-label the instance.
+  if (state.adminMachineSizeOverride !== null) return;
+  const guest = machine.config?.guest;
+  if (!guest) return;
+  const parsedSize = parseMachineSizeFromFlyGuest(guest);
+  if (!parsedSize) {
+    doWarn(state, 'Skipping machineSize backfill: live Fly guest failed schema validation', {
+      source,
+      guest,
+    });
+    return;
+  }
+  state.machineSize = parsedSize;
+  state.instanceType = resolveInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
+  await ctx.storage.put(
+    storageUpdate({ machineSize: state.machineSize, instanceType: state.instanceType })
+  );
+  if (state.sandboxId && state.userId) {
+    ctx.waitUntil(syncInstanceTypeToPostgresHelper(env, state, state.userId, state.sandboxId));
   }
 }
 
@@ -877,12 +945,17 @@ export async function syncStatusWithFly(
     if (state.lastStartedAt === null) {
       state.lastStartedAt = Date.now();
     }
+    // Reconcile may be the first path to observe that a machine reached its
+    // running state, so keep the capability marker coupled to the observed
+    // running transition here as well.
+    state.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
     await ctx.storage.put(
       storageUpdate({
         status: 'running',
         startingAt: null,
         healthCheckFailCount: 0,
         lastStartedAt: state.lastStartedAt,
+        controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
       })
     );
     return {};
@@ -944,7 +1017,13 @@ export async function syncStatusWithFly(
       })
     );
     if (wasStarting) {
-      emitStartFailedEvent(rctx.env, state, 'fly_failed_state', 'fly machine entered failed state');
+      await recordStartFailure(
+        rctx.env,
+        state,
+        ctx,
+        'fly_failed_state',
+        'fly machine entered failed state'
+      );
     }
     return {};
   }
@@ -1086,6 +1165,7 @@ export async function markRestartSuccessful(
   state.healthCheckFailCount = 0;
   state.lastRestartErrorMessage = null;
   state.lastRestartErrorAt = null;
+  state.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
   await ctx.storage.put(
     storageUpdate({
       status: 'running',
@@ -1096,6 +1176,7 @@ export async function markRestartSuccessful(
       healthCheckFailCount: 0,
       lastRestartErrorMessage: null,
       lastRestartErrorAt: null,
+      controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
     })
   );
 }
@@ -1132,13 +1213,7 @@ export async function syncStatusFromLiveCheck(
     const flyConfig = { apiToken: env.FLY_API_TOKEN, appName };
 
     const machine = await fly.getMachine(flyConfig, state.flyMachineId);
-
-    // Backfill machineSize from live Fly machine config for legacy instances
-    if (state.machineSize === null && machine.config?.guest) {
-      const { cpus, memory_mb, cpu_kind } = machine.config.guest;
-      state.machineSize = { cpus, memory_mb, cpu_kind };
-      await ctx.storage.put(storageUpdate({ machineSize: state.machineSize }));
-    }
+    await backfillMachineSizeFromFlyConfig(ctx, env, state, machine, 'live-check');
 
     if (machine.state === 'started') {
       state.healthCheckFailCount = 0;

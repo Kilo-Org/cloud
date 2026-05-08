@@ -62,7 +62,8 @@ export async function runDoctorViaController(
       '/_kilo/doctor/run',
       'POST',
       OpenclawDoctorRunResponseSchema,
-      { fix }
+      { fix },
+      { timeoutMs: 130_000 }
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;

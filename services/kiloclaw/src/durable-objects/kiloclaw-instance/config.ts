@@ -38,6 +38,13 @@ export function resolveRuntimeImageRef(state: InstanceMutableState, env: KiloCla
   if (state.provider === 'docker-local') {
     return env.DOCKER_LOCAL_IMAGE ?? 'kiloclaw:local';
   }
+  if (state.provider === 'northflank') {
+    const template = env.NF_IMAGE_PATH_TEMPLATE;
+    if (!template) {
+      throw new Error('NF_IMAGE_PATH_TEMPLATE is not configured');
+    }
+    return template.replaceAll('{tag}', resolveImageTag(state, env));
+  }
   return resolveImageRef(state, env);
 }
 
@@ -206,17 +213,6 @@ export async function buildUserEnvVars(
   // Inject latest Gmail historyId for controller to patch gog state on startup.
   if (state.gmailLastHistoryId) {
     plainEnv.KILOCLAW_GMAIL_LAST_HISTORY_ID = state.gmailLastHistoryId;
-  }
-
-  // Stream Chat default channel (auto-provisioned at first provision).
-  // API key and bot user ID are plaintext; bot user token is sensitive.
-  if (state.streamChatApiKey && state.streamChatBotUserId && state.streamChatBotUserToken) {
-    plainEnv.STREAM_CHAT_API_KEY = state.streamChatApiKey;
-    plainEnv.STREAM_CHAT_BOT_USER_ID = state.streamChatBotUserId;
-    sensitive.STREAM_CHAT_BOT_USER_TOKEN = state.streamChatBotUserToken;
-    if (state.streamChatChannelId) {
-      plainEnv.STREAM_CHAT_DEFAULT_CHANNEL_ID = state.streamChatChannelId;
-    }
   }
 
   // Get the env encryption key from the App DO, creating it if needed.

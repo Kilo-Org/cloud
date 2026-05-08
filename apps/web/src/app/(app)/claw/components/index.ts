@@ -7,7 +7,6 @@ export {
   ClawConfigServiceBannerWithStatus,
 } from './ClawConfigServiceBanner';
 export { ClawHeader } from './ClawHeader';
-export { ClawChatPage } from './ClawChatPage';
 export { ClawSettingsPage } from './ClawSettingsPage';
 export { DetailTile } from './DetailTile';
 export { InstanceTab } from './InstanceTab';

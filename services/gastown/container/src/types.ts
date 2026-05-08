@@ -164,6 +164,11 @@ export type HealthResponse = {
   servers: number;
   uptime: number;
   draining?: boolean;
+  startedAt?: string;
+  /** ISO 8601 timestamp of the first mayor agent reaching 'running' status
+   *  in this container's lifetime. Used by the worker to measure container
+   *  cold-start → mayor-session-ready latency. */
+  mayorReadyAt?: string;
 };
 
 // ── Kilo serve instance ─────────────────────────────────────────────────
@@ -303,6 +308,16 @@ export type WorktreeOptions = {
   startPoint?: string;
   /** Default branch name, used as fallback start point (e.g. 'main'). */
   defaultBranch?: string;
+  /**
+   * Env vars with the current GIT_TOKEN. If passed, execWithAuthRetry
+   * mutates this in place on a 401 so subsequent operations use the fresh token.
+   */
+  envVars?: Record<string, string>;
+  /**
+   * Authenticated git URL used to rewrite the `origin` remote if the
+   * embedded token expires during a reused-worktree pull.
+   */
+  gitUrl?: string;
 };
 
 // ── Repo setup (proactive clone + browse worktree) ──────────────────────

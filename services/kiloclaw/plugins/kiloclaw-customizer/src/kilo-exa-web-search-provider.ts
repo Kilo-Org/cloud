@@ -531,7 +531,10 @@ async function runKiloExaSearch(params: {
   }
 
   const organizationId = resolveKiloOrganizationId();
-  const extraHeaders = organizationId ? { 'X-KiloCode-OrganizationId': organizationId } : undefined;
+  const extraHeaders: Record<string, string> = { 'x-kilocode-feature': 'kiloclaw' };
+  if (organizationId) {
+    extraHeaders['X-KiloCode-OrganizationId'] = organizationId;
+  }
 
   return postTrustedWebToolsJson(
     {
@@ -540,7 +543,7 @@ async function runKiloExaSearch(params: {
       apiKey: params.kiloCodeApiKey,
       body,
       errorLabel: 'Kilo Exa proxy',
-      ...(extraHeaders ? { extraHeaders } : {}),
+      extraHeaders,
     },
     async response => {
       try {

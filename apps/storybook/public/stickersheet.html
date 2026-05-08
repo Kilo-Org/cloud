@@ -1,0 +1,1677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Kilo Cloud — Stickersheet</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="icon" href="/favicon/favicon.svg" />
+<style id="kilo-tokens">
+/* ==========================================================================
+   Kilo Cloud — Colors & Type
+   Dark-first, technical design system for the Kilo Code / Kilo Cloud product.
+   Source of truth: web/src/app/globals.css (Tailwind v4 @theme) +
+   web/src/components/Button.tsx / ui/button.tsx / badge.tsx.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   FONTS — Inter (UI) + Roboto Mono (code / terminal / readouts).
+   Both loaded from Google Fonts. Matches next/font in layout.tsx:
+   Inter  → --font-sans
+   Roboto → --font-mono
+   -------------------------------------------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;600;700&display=swap');
+
+/* Typography defaults — enable the Inter character variants we've chosen
+   (cv11 = alt single-story a, ss01 = alt curly-tailed characters) and force
+   tabular numerics on mono so dollars, latencies, and timestamps align. */
+
+:root {
+  /* ---- Brand ----------------------------------------------------------- */
+  /* The single Kilo brand accent — a bright yellow-green. Used sparingly:
+     logo tile, focus rings, selection, status lights, special highlights. */
+  --brand-primary:        oklch(95% 0.15 108);     /* #edff00-ish */
+  --brand-primary-dim:    oklch(75% 0.14 108);     /* lowered state */
+  --brand-primary-glow:   oklch(95% 0.15 108 / 0.35);
+
+  /* ---- Greyscale (the product's real palette) ------------------------- */
+  /* Straight from globals.css — Tailwind v4 @theme CSS vars. Keep the
+     oklch() syntax so downstream consumers get wide-gamut output. */
+  --bg:                 oklch(0.145 0 0);   /* #121212 app background      */
+  --card:               oklch(0.205 0 0);   /* charcoal card / popover     */
+  --card-2:             oklch(0.235 0 0);   /* one step lighter card       */
+  --muted:              oklch(0.269 0 0);   /* inactive tab / secondary bg */
+  --accent:             oklch(0.269 0 0);   /* hover accent                */
+  --kilo-gray:          oklch(0.24 0.007 1);               /* warm grey   */
+  --kilo-gray-lighter:  oklch(calc(0.24 + 0.1) 0.007 1);   /* warm grey+  */
+
+  /* Foreground text */
+  --fg:             oklch(0.985 0 0);        /* primary text  */
+  --fg-muted:       oklch(0.708 0 0);        /* secondary text */
+  --fg-subtle:      oklch(0.556 0 0);        /* disabled / tertiary */
+
+  /* Borders & inputs — white @ low alpha (classic dark-UI trick) */
+  --border:         oklch(1 0 0 / 10%);
+  --border-strong:  oklch(1 0 0 / 18%);
+  --input:          oklch(1 0 0 / 15%);
+  --input-bg:       oklch(1 0 0 / 4%);
+  --ring:           oklch(0.556 0 0);
+
+  /* ---- Action hierarchy ----------------------------------------------
+     Primary  = brand yellow (high-signal, earned, CTA).
+     Secondary = dark gray (quiet, high-contrast against cards).
+     Tertiary = legacy blue (kept as a link / inline accent only). */
+  --action:          var(--brand-primary);          /* brand yellow */
+  --action-hover:    oklch(from var(--brand-primary) calc(l - 0.05) c h);
+  --action-ring:     var(--brand-primary-glow);
+  --action-fg:       oklch(0.14 0 0);               /* near-black on yellow */
+
+  --action-2:        oklch(0.24 0 0);               /* dark-gray secondary */
+  --action-2-hover:  oklch(0.30 0 0);
+  --action-2-fg:     var(--fg);
+
+  --link:            var(--fg);                      /* white, underline-on-use */
+  --link-hover:      var(--fg);
+
+  /* ---- Semantic status (translucent, glass-leaning) -------------------
+     Pattern observed in SessionsList badges: bg-<c>-500/20, text-<c>-400,
+     ring-<c>-500/20. These are the canonical values. */
+  --blue-500:    oklch(0.62 0.18 255);
+  --blue-400:    oklch(0.72 0.15 253);
+  --blue-bg:     oklch(0.62 0.18 255 / 0.20);
+  --blue-ring:   oklch(0.62 0.18 255 / 0.20);
+
+  --green-500:   oklch(0.66 0.17 148);
+  --green-400:   oklch(0.76 0.17 149);
+  --green-bg:    oklch(0.66 0.17 148 / 0.20);
+  --green-ring:  oklch(0.66 0.17 148 / 0.20);
+
+  --yellow-500:  oklch(0.82 0.16 95);
+  --yellow-400:  oklch(0.88 0.15 95);
+  --yellow-bg:   oklch(0.82 0.16 95 / 0.20);
+
+  --red-500:     oklch(0.64 0.22 25);
+  --red-400:     oklch(0.73 0.20 25);
+  --red-bg:      oklch(0.64 0.22 25 / 0.20);
+
+  --purple-500:  oklch(0.63 0.21 295);
+  --purple-400:  oklch(0.73 0.18 295);
+  --purple-bg:   oklch(0.63 0.21 295 / 0.20);
+
+  --orange-500:  oklch(0.72 0.19 45);
+  --orange-400:  oklch(0.80 0.17 50);
+  --orange-bg:   oklch(0.72 0.19 45 / 0.20);
+
+  --zinc-500:    oklch(0.56 0 0);
+  --zinc-400:    oklch(0.70 0 0);
+  --zinc-bg:     oklch(0.56 0 0 / 0.20);
+
+  --emerald-500: oklch(0.69 0.17 162);
+  --emerald-400: oklch(0.79 0.15 162);
+  --emerald-bg:  oklch(0.69 0.17 162 / 0.20);
+
+  --destructive:         oklch(0.704 0.191 22.216);
+  --destructive-surface: oklch(0.35 0.10 25);
+
+  /* Chart palette — from globals.css */
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+
+  /* --------------------------------------------------------------------
+     TYPE SYSTEM
+     Fonts:  --font-sans (Inter) for UI, --font-mono (Roboto Mono) for
+     all code, terminals, readouts, and agent surfaces. One mono face.
+     -------------------------------------------------------------------- */
+  --font-sans:    'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono:    'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-jetbrains: var(--font-mono); /* legacy alias — points at Roboto Mono now */
+
+  /* Tailwind-aligned size scale (compact, UI-first). */
+  --text-xs:    0.75rem;   /* 12 — timestamps, badges */
+  --text-sm:    0.875rem;  /* 14 — body UI text, buttons */
+  --text-base:  1rem;      /* 16 — page body */
+  --text-lg:    1.125rem;  /* 18 — sub-section heads */
+  --text-xl:    1.25rem;   /* 20 — card titles */
+  --text-2xl:   1.5rem;    /* 24 */
+  --text-3xl:   1.875rem;  /* 30 — page headers, large logo text */
+  --text-4xl:   2.25rem;   /* 36 */
+  --text-5xl:   3rem;      /* 48 */
+
+  /* Line heights — tighter for display, looser for reading copy. */
+  --lh-display: 1.05;        /* 40px+ hero / display */
+  --lh-tight:  1.15;         /* h1 */
+  --lh-snug:   1.25;         /* h2 / h3 */
+  --lh-normal: 1.5;          /* body */
+  --lh-loose:  1.65;         /* long reading passages */
+
+  /* Weights (Inter is loaded 400–800) */
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-semibold: 600;
+  --fw-bold:    700;
+  --fw-extrabold: 800;
+
+  /* Letter spacing — optical tracking scales with size. Large type wants
+     negative tracking; small caps / eyebrows want positive. */
+  --tracking-display: -0.028em;   /* 36px+ */
+  --tracking-tight:   -0.015em;   /* 20–30px */
+  --tracking-snug:    -0.01em;    /* 16–18px */
+  --tracking-normal:  0;
+  --tracking-caps:    0.08em;     /* eyebrows, small caps, labels */
+  --tracking-wide:    0.12em;     /* micro-mono labels */
+
+  /* --------------------------------------------------------------------
+     SPACING / RADII / SHADOWS / ELEVATION
+     --radius pulled from globals.css (0.625rem). shadcn derives the others.
+     -------------------------------------------------------------------- */
+  --radius:     0.625rem;                       /* 10px, "rounded-lg"  */
+  --radius-sm:  calc(var(--radius) - 4px);      /*  6px, "rounded-md"  */
+  --radius-md:  calc(var(--radius) - 2px);      /*  8px                */
+  --radius-lg:  var(--radius);                  /* 10px                */
+  --radius-xl:  calc(var(--radius) + 4px);      /* 14px                */
+  --radius-full: 9999px;
+
+  /* Spacing — Tailwind's 4px scale, a floor-to-ceiling ladder. */
+  --space-0-5: 0.125rem;   /* 2  */
+  --space-1:   0.25rem;    /* 4  */
+  --space-1-5: 0.375rem;   /* 6  */
+  --space-2:   0.5rem;     /* 8  */
+  --space-3:   0.75rem;    /* 12 */
+  --space-4:   1rem;       /* 16 */
+  --space-5:   1.25rem;    /* 20 */
+  --space-6:   1.5rem;     /* 24 */
+  --space-8:   2rem;       /* 32 */
+  --space-10:  2.5rem;     /* 40 */
+  --space-12:  3rem;       /* 48 */
+
+  /* Shadows — shadcn "shadow-xs / shadow / shadow-md". Dark UIs lean on
+     borders + subtle inner highlights more than big drop-shadows. */
+  --shadow-xs:  0 1px 0 0 rgb(0 0 0 / 0.2);
+  --shadow-sm:  0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow:     0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.35);
+  --shadow-md:  0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg:  0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --shadow-inset-top: inset 0 1px 0 0 rgb(255 255 255 / 0.05);
+
+  /* Agent/frontier surfaces: atmospheric brand glow */
+  --glow-brand: 0 0 24px oklch(95% 0.15 108 / 0.35);
+
+  /* Sidebar — mirrors globals.css tokens */
+  --sidebar:            oklch(0.205 0 0);
+  --sidebar-fg:         oklch(0.985 0 0);
+  --sidebar-accent:     oklch(0.269 0 0);
+  --sidebar-accent-fg:  oklch(0.985 0 0);
+  --sidebar-border:     oklch(1 0 0 / 10%);
+}
+
+/* --------------------------------------------------------------------------
+   Semantic tokens — map the raw vars above onto role-named aliases so
+   downstream files don't have to know the palette.
+   -------------------------------------------------------------------------- */
+:root {
+  --color-background:       var(--bg);
+  --color-foreground:       var(--fg);
+  --color-card:             var(--card);
+  --color-card-foreground:  var(--fg);
+  --color-popover:          var(--card);
+  --color-muted:            var(--muted);
+  --color-muted-foreground: var(--fg-muted);
+  --color-accent:           var(--accent);
+  --color-primary:          var(--action);
+  --color-primary-foreground: var(--action-fg);
+  --color-border:           var(--border);
+  --color-input:            var(--input);
+  --color-ring:             var(--ring);
+}
+
+/* --------------------------------------------------------------------------
+   Base body + element styles. Apply once to get the Kilo look.
+   -------------------------------------------------------------------------- */
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--lh-normal);
+  font-feature-settings: "cv11", "ss01";
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
+}
+
+/* Semantic typography — mirrors the shadcn/tailwind patterns in the app. */
+.h1, h1 { font-size: var(--text-3xl); font-weight: var(--fw-bold);     letter-spacing: var(--tracking-tight); line-height: var(--lh-tight); }
+.h2, h2 { font-size: var(--text-2xl); font-weight: var(--fw-semibold); letter-spacing: var(--tracking-tight); line-height: var(--lh-snug); }
+.h3, h3 { font-size: var(--text-xl);  font-weight: var(--fw-semibold); letter-spacing: var(--tracking-snug);  line-height: var(--lh-snug); }
+.h4, h4 { font-size: var(--text-lg);  font-weight: var(--fw-semibold); letter-spacing: var(--tracking-snug);  line-height: var(--lh-snug); }
+.eyebrow { font-size: 0.6875rem; font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--fg-muted); }
+.p       { font-size: var(--text-sm); line-height: var(--lh-normal); color: var(--fg); }
+.dim     { color: var(--fg-muted); }
+.code, code, pre, .mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;                      /* 13px — ~93% of 14px body */
+  font-feature-settings: "calt", "ss01";
+  font-variant-numeric: tabular-nums;
+}
+.terminal, .agent-mono {
+  font-family: var(--font-jetbrains);
+  font-feature-settings: "calt", "ss01";
+  font-variant-numeric: tabular-nums;
+}
+
+/* Inline mono inside prose — drop a touch so 13px mono doesn't tower over 14px Inter. */
+p code, .sub code, .section-sub code { font-size: 0.92em; }
+
+/* Focus ring — the Kilo yellow-green, but only on keyboard focus. */
+:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Selection — brand accent at low alpha. */
+::selection {
+  background: oklch(95% 0.15 108 / 0.35);
+  color: var(--fg);
+}
+
+</style>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Page chrome                                                         */
+  /* ------------------------------------------------------------------ */
+  .page {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .masthead {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+    gap: 32px;
+  }
+  .masthead-left { display: flex; gap: 16px; align-items: center; }
+  .brand-tile {
+    width: 56px;
+    height: 56px;
+    background: var(--brand-primary);
+    border-radius: var(--radius-md);
+    display: grid;
+    place-items: center;
+    color: #121212;
+    font-family: var(--font-sans);
+    font-weight: var(--fw-extrabold);
+    font-size: 28px;
+    letter-spacing: -0.04em;
+    box-shadow: 0 0 0 1px oklch(1 0 0 / 0.08);
+  }
+  .masthead h1 {
+    font-size: 28px;                       /* matches DriftAudit reference h1 */
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--tracking-tight); /* -0.015em */
+    line-height: 1.2;
+    margin: 8px 0 0;
+    text-wrap: balance;
+  }
+  .masthead .sub {
+    color: var(--fg-muted);
+    margin-top: 12px;
+    font-size: var(--text-sm);            /* 14px — matches DriftAudit intro */
+    line-height: 1.55;
+    max-width: 72ch;
+    text-wrap: pretty;
+  }
+  .masthead-right {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+    color: var(--fg-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);            /* 12px */
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+  }
+  .masthead-right .v { color: var(--brand-primary); }
+
+  /* ------------------------------------------------------------------ */
+  /* Section primitives                                                  */
+  /* ------------------------------------------------------------------ */
+  .section { margin-bottom: 72px; }
+  .section-head {
+    display: flex; align-items: baseline; gap: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed var(--border);
+  }
+  .section-num {
+    font-family: var(--font-mono);
+    font-size: var(--text-xl);             /* 20px — reads as a numeric marker, not a footnote */
+    font-weight: var(--fw-semibold);
+    color: var(--brand-primary);
+    letter-spacing: 0;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .section-title {
+    font-size: var(--text-2xl);             /* 24px — matches h2 in token block */
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--tracking-tight);
+    line-height: var(--lh-snug);
+    margin: 0;
+  }
+  .section-sub {
+    color: var(--fg-muted);
+    font-size: var(--text-sm);              /* 14px — matches body */
+    line-height: var(--lh-normal);
+    margin-left: auto;
+    max-width: 56ch;
+    text-align: right;
+    text-wrap: pretty;
+  }
+  /* Reference eyebrow — same shape as DriftAudit's Storybook eyebrow. */
+  .masthead .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--tracking-caps);  /* 0.08em */
+    text-transform: uppercase;
+    color: var(--fg-muted);
+    font-weight: var(--fw-semibold);
+  }
+
+  /* Sticker — reference block, no decorative chrome. */
+  .sticker {
+    padding: 0;
+    position: relative;
+  }
+  .sticker-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 16px;
+  }
+  .sticker-title {
+    font-size: var(--text-sm);              /* 14px — consistent with .demo-card-title */
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--tracking-snug);
+  }
+  .sticker-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+  .sticker-grid { display: grid; gap: 16px; }
+
+  /* ------------------------------------------------------------------ */
+  /* 1. Foundations: greyscale ladder + borders                          */
+  /* ------------------------------------------------------------------ */
+  .foundation-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .swatch {
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    min-height: 130px;
+  }
+  .swatch .fill {
+    flex: 1;
+    border-bottom: 1px solid var(--border);
+  }
+  .swatch .meta {
+    padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .swatch .name { font-size: var(--text-xs); font-weight: var(--fw-semibold); letter-spacing: var(--tracking-snug); }
+  .swatch .hex  { font-family: var(--font-mono); font-size: 11px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+
+  .border-demo {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  }
+  .border-card {
+    padding: 16px;
+    border-radius: var(--radius-md);
+    background: var(--bg);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-muted);
+  }
+  .border-card.b1 { border: 1px solid var(--border); }
+  .border-card.b2 { border: 1px solid var(--border-strong); }
+
+  /* ------------------------------------------------------------------ */
+  /* 2. Action hierarchy + Brand                                         */
+  /* ------------------------------------------------------------------ */
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+  .action-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .action-card .label {
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    color: var(--fg-muted);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-caps);
+  }
+  .action-card .name {
+    font-size: var(--text-base);
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--tracking-snug);
+  }
+  .action-card .swatches {
+    display: flex; gap: 6px;
+  }
+  .action-card .chip {
+    width: 32px; height: 32px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+  }
+  .btn {
+    height: 36px;
+    padding: 0 16px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    letter-spacing: var(--tracking-snug);
+    border: 1px solid transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 200ms, color 200ms, border-color 200ms;
+  }
+  .btn-primary { background: var(--brand-primary); color: #1F1F1F; font-weight: var(--fw-semibold); }
+  .btn-primary:hover { background: oklch(0.88 0.16 108); }
+  .btn-secondary { background: #3D3D3D; color: var(--fg); border-color: var(--border); }
+  .btn-secondary:hover { background: #4D4D4D; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--fg);
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 255, 255, 0.35);
+    text-underline-offset: 3px;
+    padding: 0 4px;
+    font-weight: var(--fw-medium);
+  }
+  .btn-ghost:hover { text-decoration-color: #fff; }
+  .btn-destructive { background: oklch(0.64 0.22 25); color: #fff; font-weight: var(--fw-semibold); }
+  .btn-link {
+    background: transparent;
+    color: #60A5FA;
+    padding: 0 4px;
+    font-weight: var(--fw-medium);
+  }
+  .btn-sm { height: 28px; padding: 0 10px; font-size: var(--text-xs); }
+  .btn[disabled] { opacity: 0.5; pointer-events: none; cursor: not-allowed; }
+
+  .icon {
+    display: inline-block;
+    flex: none;
+    width: 1em;
+    height: 1em;
+    color: currentColor;
+    vertical-align: -0.125em;
+  }
+
+  .icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 3. Status palette                                                   */
+  /* ------------------------------------------------------------------ */
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .status-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .status-card .role { font-size: 11px; color: var(--fg-subtle); font-family: var(--font-mono); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 12px; font-weight: 500;
+    line-height: 1.4;
+    width: fit-content;
+  }
+  .badge .icon { width: 12px; height: 12px; }
+  .badge.cloud    { background: var(--blue-bg);    color: var(--blue-400);    box-shadow: inset 0 0 0 1px var(--blue-ring); }
+  .badge.ext      { background: var(--purple-bg);  color: var(--purple-400);  box-shadow: inset 0 0 0 1px oklch(0.63 0.21 295 / 0.20); }
+  .badge.cli      { background: var(--zinc-bg);    color: var(--zinc-400);    box-shadow: inset 0 0 0 1px oklch(0.56 0 0 / 0.20); }
+  .badge.slack    { background: var(--emerald-bg); color: var(--emerald-400); box-shadow: inset 0 0 0 1px oklch(0.69 0.17 162 / 0.20); }
+  .badge.agent    { background: var(--orange-bg);  color: var(--orange-400);  box-shadow: inset 0 0 0 1px oklch(0.72 0.19 45 / 0.20); }
+  .badge.success  { background: var(--green-bg);   color: var(--green-400);   box-shadow: inset 0 0 0 1px var(--green-ring); }
+  .badge.warn     { background: var(--yellow-bg);  color: var(--yellow-400);  box-shadow: inset 0 0 0 1px oklch(0.82 0.16 95 / 0.20); }
+  .badge.danger   { background: var(--red-bg);     color: var(--red-400);     box-shadow: inset 0 0 0 1px oklch(0.64 0.22 25 / 0.20); }
+  .status-card code { font-family: var(--font-mono); font-size: 10px; color: var(--fg-subtle); }
+
+  /* ------------------------------------------------------------------ */
+  /* 4. Typography                                                       */
+  /* ------------------------------------------------------------------ */
+  .type-stack { display: flex; flex-direction: column; }
+  .type-row {
+    display: grid;
+    grid-template-columns: 200px 1fr 200px;
+    gap: 24px;
+    padding: 16px 0;
+    border-bottom: 1px dashed var(--border);
+    align-items: baseline;
+  }
+  .type-row:last-child { border-bottom: 0; }
+  .type-row .meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-subtle);
+    line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+  }
+  .type-row .meta b {
+    color: var(--fg);
+    font-weight: var(--fw-regular);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-caps);
+    font-size: 10px;
+  }
+  .type-row .specimen { color: var(--fg); }
+  .type-row .specimen.dim { color: var(--fg-muted); }
+  .type-row .right {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-subtle);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .display { font-size: 48px; font-weight: var(--fw-bold); letter-spacing: var(--tracking-display); line-height: var(--lh-display); }
+  .h1-spec { font-size: 30px; font-weight: var(--fw-bold);     letter-spacing: var(--tracking-tight); line-height: var(--lh-tight); }
+  .h2-spec { font-size: 24px; font-weight: var(--fw-semibold); letter-spacing: var(--tracking-tight); line-height: var(--lh-snug); }
+  .h3-spec { font-size: 20px; font-weight: var(--fw-semibold); letter-spacing: var(--tracking-snug);  line-height: var(--lh-snug); }
+  .body-spec        { font-size: var(--text-sm); line-height: var(--lh-normal); max-width: 64ch; text-wrap: pretty; }
+  .body-strong-spec { font-size: var(--text-sm); font-weight: var(--fw-medium); line-height: var(--lh-normal); }
+  .label-spec       { font-size: var(--text-xs); font-weight: var(--fw-medium); letter-spacing: 0; }
+  .eyebrow-spec     { font-size: 11px; font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--fg-muted); }
+  .code-spec { font-family: var(--font-mono); font-size: 13px; color: var(--fg-muted); font-variant-numeric: tabular-nums; font-feature-settings: "calt", "ss01"; }
+  .code-spec .k { color: #fff; }
+  .code-spec .b { color: #60A5FA; }
+  .code-spec .s { color: #4ADE80; }
+
+  /* ------------------------------------------------------------------ */
+  /* 5. Spacing + radii                                                  */
+  /* ------------------------------------------------------------------ */
+  .spacing-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+  }
+  .space-cell {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .space-cell .bar {
+    background: var(--brand-primary);
+    height: 4px;
+    border-radius: 2px;
+  }
+  .space-cell .name { font-family: var(--font-mono); font-size: 11px; color: var(--fg); }
+  .space-cell .px { font-family: var(--font-mono); font-size: 10px; color: var(--fg-subtle); }
+
+  .radii-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .radius-cell {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 14px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .radius-shape {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--card-2), var(--card));
+    border: 1px solid var(--border-strong);
+    flex: none;
+  }
+  .radius-meta { display: flex; flex-direction: column; }
+  .radius-meta .n { font-family: var(--font-mono); font-size: 11px; color: var(--fg); }
+  .radius-meta .v { font-family: var(--font-mono); font-size: 10px; color: var(--fg-subtle); }
+
+  /* ------------------------------------------------------------------ */
+  /* 6. Components                                                       */
+  /* ------------------------------------------------------------------ */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+  .grid-asym { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; }
+
+  /* Button playground */
+  .btn-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+  /* Input demo */
+  .input {
+    height: 36px;
+    padding: 0 12px;
+    background: oklch(1 0 0 / 0.04);
+    border: 1px solid var(--input);
+    border-radius: var(--radius-sm);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    width: 100%;
+  }
+  .input:focus { outline: 2px solid var(--brand-primary); outline-offset: 1px; }
+  .input::placeholder { color: var(--fg-subtle); }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field-label {
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    color: var(--fg);
+    letter-spacing: var(--tracking-snug);
+  }
+  .field-help { font-size: 11px; color: var(--fg-muted); line-height: var(--lh-normal); }
+  .field-error { font-size: 11px; color: var(--red-400); line-height: var(--lh-normal); }
+  .input.error { border-color: oklch(0.64 0.22 25); }
+
+  /* Card demo */
+  .demo-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 20px;
+  }
+  .demo-card-head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding-bottom: 8px;
+  }
+  .demo-card-title {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--tracking-snug);
+  }
+  .demo-card-sub {
+    font-size: var(--text-xs);
+    color: var(--fg-muted);
+  }
+  .demo-card-body {
+    font-size: var(--text-sm);
+    line-height: var(--lh-normal);
+    color: var(--fg-muted);
+    margin-top: 8px;
+    text-wrap: pretty;
+  }
+  .meta-row {
+    display: flex;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-muted);
+    margin-top: 12px;
+    align-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .meta-row b { color: var(--fg); font-weight: var(--fw-medium); }
+
+  /* Sidebar demo */
+  .sidebar-demo {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 12px 8px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .sb-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 6px;
+  }
+  .sb-tile {
+    width: 28px;
+    height: 28px;
+    background: var(--brand-primary);
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+    color: #121212;
+    font-weight: var(--fw-extrabold);
+    font-size: var(--text-sm);
+    letter-spacing: -0.02em;
+  }
+  .sb-name {
+    font-size: 13px;
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--tracking-snug);
+  }
+  .sb-section {
+    padding: 12px 10px 4px;
+    font-size: 10px;
+    font-weight: var(--fw-semibold);
+    color: var(--fg-subtle);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-caps);
+  }
+  .sb-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    color: var(--fg-muted);
+    font-size: 13px;
+    letter-spacing: var(--tracking-snug);
+  }
+  .sb-row.active { background: var(--accent); color: var(--fg); }
+  .sb-row:hover { background: var(--accent); color: var(--fg); }
+  .sb-row .icon { width: 16px; height: 16px; }
+  .sb-row .count {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--fg-subtle);
+  }
+
+  /* Topbar */
+  .topbar-demo {
+    height: 56px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    display: flex; align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+  }
+  .crumbs {
+    display: flex; gap: 8px; align-items: center;
+    font-size: 13px; color: var(--fg-muted);
+  }
+  .crumbs .sep { color: var(--fg-subtle); }
+  .crumbs .here { color: var(--fg); }
+  .topbar-spacer { flex: 1; }
+  .icon-btn {
+    width: 32px; height: 32px;
+    display: grid; place-items: center;
+    border-radius: 6px;
+    color: var(--fg-muted);
+    cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--muted); color: var(--fg); }
+  .avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, var(--brand-primary), oklch(0.7 0.14 108));
+    display: grid;
+    place-items: center;
+    color: #121212;
+    font-weight: var(--fw-bold);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-snug);
+  }
+
+  /* Terminal / agent */
+  .terminal-demo {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.55;
+    box-shadow: inset 0 0 0 1px oklch(95% 0.15 108 / 0.1), 0 0 24px oklch(95% 0.15 108 / 0.08);
+  }
+  .terminal-demo .line { display: block; }
+  .terminal-demo .prompt { color: var(--brand-primary); }
+  .terminal-demo .agent { color: var(--blue-400); }
+  .terminal-demo .ok    { color: var(--green-400); }
+  .terminal-demo .dim   { color: var(--fg-subtle); }
+  .terminal-demo .cursor {
+    display: inline-block;
+    width: 8px; height: 14px;
+    background: var(--fg);
+    margin-left: 2px;
+    vertical-align: -2px;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { background: transparent; } }
+
+  /* Tool card (inside agent chat) */
+  .tool-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .tool-head { display: flex; align-items: center; gap: 8px; }
+  .tool-head .name {
+    font-size: 11px;
+    font-weight: var(--fw-semibold);
+    color: var(--fg-subtle);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-caps);
+  }
+  .tool-head .name .tname { color: var(--fg); margin-left: 6px; }
+  .tool-summary {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .tool-summary .path { color: var(--fg); }
+
+  /* Dialog */
+  .dialog-stage {
+    position: relative;
+    background: oklch(0 0 0 / 0.7);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 36px;
+    min-height: 280px;
+    display: grid; place-items: center;
+  }
+  .dialog {
+    width: 360px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    box-shadow: 0 18px 40px -12px rgba(0,0,0,0.7);
+  }
+  .dialog h4 {
+    margin: 0 0 6px;
+    font-size: var(--text-base);
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--tracking-tight);
+    line-height: var(--lh-snug);
+    text-wrap: balance;
+  }
+  .dialog p {
+    margin: 0;
+    color: var(--fg-muted);
+    font-size: 13px;
+    line-height: var(--lh-normal);
+    text-wrap: pretty;
+  }
+  .dialog-foot {
+    display: flex; justify-content: flex-end; gap: 8px;
+    margin-top: 20px;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 7. Iconography + brand marks                                        */
+  /* ------------------------------------------------------------------ */
+  .icon-grid {
+    display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px;
+  }
+  .icon-tile {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    aspect-ratio: 1 / 1;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--fg);
+  }
+  .icon-tile .icon,
+  .icon-tile svg {
+    width: 22px;
+    height: 22px;
+    stroke-width: 1.75;
+    display: block;
+    flex-shrink: 0;
+  }
+  .icon-tile .n {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--fg-subtle);
+    text-align: center;
+    line-height: 1;
+  }
+
+  .brand-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  }
+  .brand-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 18px;
+    aspect-ratio: 1 / 1;
+    display: flex; flex-direction: column; justify-content: space-between;
+    align-items: flex-start; gap: 14px;
+  }
+  .brand-card .mark {
+    flex: 1; width: 100%;
+    display: grid; place-items: center;
+  }
+  .brand-card .label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-subtle);
+  }
+  .brand-card.tile-yellow .mark {
+    background: var(--brand-primary);
+    border-radius: var(--radius-md);
+    aspect-ratio: 1 / 1;
+    width: 64px;
+    color: #121212;
+    font-weight: 800;
+    font-size: 36px;
+    letter-spacing: -0.05em;
+  }
+  .brand-card.tile-dark .mark {
+    background: #121212;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    aspect-ratio: 1 / 1;
+    width: 64px;
+    color: var(--brand-primary);
+    font-weight: 800;
+    font-size: 36px;
+    letter-spacing: -0.05em;
+  }
+  .brand-card.lockup .mark {
+    flex-direction: row; gap: 10px; justify-content: flex-start;
+  }
+  .brand-card .lockup-tile {
+    width: 28px; height: 28px;
+    background: var(--brand-primary);
+    border-radius: 6px;
+    display: grid; place-items: center;
+    color: #121212;
+    font-weight: 800;
+  }
+  .brand-card .word { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+
+  /* ------------------------------------------------------------------ */
+  /* 8. Do's & Don'ts                                                    */
+  /* ------------------------------------------------------------------ */
+  .do-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .do-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 10px;
+    position: relative;
+  }
+  .do-card .tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    width: fit-content;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .do-card.do .tag { color: var(--green-400); background: var(--green-bg); }
+  .do-card.dont .tag { color: var(--red-400); background: var(--red-bg); }
+  .do-card .text { font-size: 13px; color: var(--fg); line-height: 1.5; }
+  .do-card .demo { padding: 10px; border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--border); font-size: 12px; color: var(--fg-muted); }
+
+  /* ------------------------------------------------------------------ */
+  /* Section dividers                                                    */
+  /* ------------------------------------------------------------------ */
+  .rule {
+    height: 1px; background: var(--border);
+    margin: 32px 0;
+  }
+
+  .footer {
+    margin-top: 80px; padding-top: 24px;
+    border-top: 1px dashed var(--border);
+    display: flex; justify-content: space-between;
+    color: var(--fg-subtle);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- =============================================================== -->
+  <!-- Draft notice                                                      -->
+  <!-- =============================================================== -->
+  <div style="background: oklch(0.82 0.16 95 / 0.14); border: 1px solid oklch(0.82 0.16 95 / 0.3); color: oklch(0.88 0.15 95); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 32px; display: flex; gap: 12px; align-items: flex-start; font-size: 13px; line-height: 1.5;">
+    <i data-lucide="alert-triangle" style="width: 18px; height: 18px; flex: none; margin-top: 2px;"></i>
+    <div>
+      <strong style="display: block; font-weight: 600; margin-bottom: 4px;">Proposed visual reference — not canonical yet.</strong>
+      <span style="color: var(--fg-muted);">
+        This stickersheet was generated as a draft proposal of the Kilo Cloud design system. It drifts from the current app in several material ways (primary action color, font stack, button variants, status/feedback patterns). Treat it as an aspirational reference for discussion. See
+        <em style="color: var(--fg);">Design Proposal / Drift Audit</em>
+        in Storybook for the current reality vs. proposal.
+      </span>
+    </div>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- Masthead                                                          -->
+  <!-- =============================================================== -->
+  <header class="masthead">
+    <div class="masthead-left">
+      <div>
+        <div class="eyebrow" style="margin-bottom: 8px;">Design Proposal</div>
+        <h1>Kilo Cloud — visual reference</h1>
+        <p class="sub">A printable overview of every token, surface, and component declared in <code style="font-family: var(--font-mono); color: var(--fg);">DESIGN.md</code>. Dark-first, near-black, utilitarian. Borders carry the elevation. Yellow acts — it's the brand and the CTA at once. Greys do everything else.</p>
+      </div>
+    </div>
+    <div class="masthead-right">
+      <span>name <span class="v">"Kilo Cloud"</span></span>
+      <span>version <span class="v">alpha</span></span>
+      <span>theme <span class="v">dark</span></span>
+    </div>
+  </header>
+
+  <!-- =============================================================== -->
+  <!-- 1. Foundations                                                    -->
+  <!-- =============================================================== -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">01</span>
+      <h2 class="section-title">Foundations</h2>
+      <span class="section-sub">A four-step near-black ladder with translucent white borders. Lift comes from value steps + 10%-white border, never from drop shadows.</span>
+    </div>
+
+    <div class="grid-2">
+      <div class="sticker">
+        <div class="sticker-head">
+          <span class="sticker-title">Surface ladder</span>
+          <span class="sticker-tag">colors.background → muted</span>
+        </div>
+        <div class="foundation-row">
+          <div class="swatch"><div class="fill" style="background:#121212"></div><div class="meta"><span class="name">background</span><span class="hex">#121212</span></div></div>
+          <div class="swatch"><div class="fill" style="background:#2B2B2B"></div><div class="meta"><span class="name">surface</span><span class="hex">#2B2B2B</span></div></div>
+          <div class="swatch"><div class="fill" style="background:#333333"></div><div class="meta"><span class="name">surface-raised</span><span class="hex">#333333</span></div></div>
+          <div class="swatch"><div class="fill" style="background:#3D3D3D"></div><div class="meta"><span class="name">muted</span><span class="hex">#3D3D3D</span></div></div>
+        </div>
+      </div>
+
+      <div class="sticker">
+        <div class="sticker-head">
+          <span class="sticker-title">Foreground ladder</span>
+          <span class="sticker-tag">colors.foreground → -subtle</span>
+        </div>
+        <div class="foundation-row">
+          <div class="swatch"><div class="fill" style="background:#FAFAFA"></div><div class="meta"><span class="name">foreground</span><span class="hex">#FAFAFA</span></div></div>
+          <div class="swatch"><div class="fill" style="background:#A3A3A3"></div><div class="meta"><span class="name">fg-muted</span><span class="hex">#A3A3A3</span></div></div>
+          <div class="swatch"><div class="fill" style="background:#7A7A7A"></div><div class="meta"><span class="name">fg-subtle</span><span class="hex">#7A7A7A</span></div></div>
+          <div class="swatch"><div class="fill" style="background:#525252"></div><div class="meta"><span class="name">disabled</span><span class="hex">#525252</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rule"></div>
+
+    <div class="grid-asym">
+      <div class="sticker">
+        <div class="sticker-head">
+          <span class="sticker-title">Translucent borders — the system's signature</span>
+          <span class="sticker-tag">white @ 10% / 18%</span>
+        </div>
+        <div class="border-demo">
+          <div class="border-card b1">border<br/><span style="color:var(--fg)">#FFFFFF1A · 10% alpha</span></div>
+          <div class="border-card b2">border-strong<br/><span style="color:var(--fg)">#FFFFFF2E · 18% alpha</span></div>
+        </div>
+        <p style="font-size: 12px; color: var(--fg-muted); margin: 14px 0 0;">Because borders are translucent, they read correctly on every surface step without per-context overrides. Solid grey borders are wrong.</p>
+      </div>
+
+      <div class="sticker">
+        <div class="sticker-head">
+          <span class="sticker-title">Brand accent</span>
+          <span class="sticker-tag">colors.brand</span>
+        </div>
+        <div style="display:flex; gap:14px; align-items:center;">
+          <div style="width:64px; height:64px; background: var(--brand-primary); border-radius: var(--radius-md); display:grid; place-items:center; color:#121212; font-weight:800; font-size:32px; letter-spacing:-0.04em;">K</div>
+          <div>
+            <div style="font-weight:600; font-size: 14px;">Kilo yellow-green</div>
+            <div style="font-family: var(--font-mono); font-size: 12px; color: var(--fg-muted);">#EDFF00</div>
+            <div style="font-size: 12px; color: var(--fg-muted); margin-top: 6px; max-width: 220px; line-height: 1.5;">Earned. Logo, focus, selection, agent glow. Never a fill, divider, or hover.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================================== -->
+  <!-- 2. Action hierarchy                                               -->
+  <!-- =============================================================== -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">02</span>
+      <h2 class="section-title">Action hierarchy</h2>
+      <span class="section-sub">Brand yellow (#EDFF00) is the primary action — brand and CTA in one swatch. Exactly one per surface. Secondary is dark gray. Ghost is underlined white text. Blue is a legacy link role only.</span>
+    </div>
+
+    <div class="action-row">
+      <div class="action-card">
+        <div>
+          <span class="label">Primary · brand &amp; CTA</span>
+          <div class="name">Kilo yellow</div>
+        </div>
+        <div class="swatches">
+          <div class="chip" style="background: var(--brand-primary)"></div>
+          <div class="chip" style="background: oklch(0.88 0.16 108)"></div>
+          <div class="chip" style="background: oklch(95% 0.15 108 / 0.35)"></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary">Create session</button>
+          <button class="btn btn-primary btn-sm"><i data-lucide="plus"></i>New</button>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 11px; color: var(--fg-subtle);">#EDFF00 · #D6E600 · ring 35%</div>
+      </div>
+
+      <div class="action-card">
+        <div>
+          <span class="label">Secondary</span>
+          <div class="name">Charcoal</div>
+        </div>
+        <div class="swatches">
+          <div class="chip" style="background:#3D3D3D"></div>
+          <div class="chip" style="background:#4D4D4D"></div>
+          <div class="chip" style="background:transparent; border-color: var(--border);"></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-secondary">Cancel</button>
+          <button class="btn btn-ghost">View docs →</button>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 11px; color: var(--fg-subtle);">#3D3D3D · #4D4D4D · border 10%</div>
+      </div>
+
+      <div class="action-card">
+        <div>
+          <span class="label">Destructive &amp; link</span>
+          <div class="name">Red &amp; legacy blue</div>
+        </div>
+        <div class="swatches">
+          <div class="chip" style="background: oklch(0.64 0.22 25)"></div>
+          <div class="chip" style="background: #3B82F6"></div>
+          <div class="chip" style="background: transparent;"></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-destructive">Delete</button>
+          <a class="btn btn-link">docs.kilo.dev</a>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 11px; color: var(--fg-subtle);">red-500 · link-blue (inline only)</div>
+      </div>
+    </div>
+
+    <div class="rule"></div>
+
+    <div class="sticker">
+      <div class="sticker-head">
+        <span class="sticker-title">Primary button states</span>
+        <span class="sticker-tag">components.button-primary</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary">Default</button>
+        <button class="btn btn-primary" style="background: oklch(0.88 0.16 108)">Hover</button>
+        <button class="btn btn-primary" style="outline: 3px solid oklch(95% 0.15 108 / 0.35); outline-offset: 2px;">Focused</button>
+        <button class="btn btn-primary" disabled>Disabled</button>
+        <span style="width: 24px"></span>
+        <button class="btn btn-secondary">Secondary</button>
+        <button class="btn btn-ghost">Ghost link</button>
+        <button class="btn btn-destructive">Destructive</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================================== -->
+  <!-- 3. Typography                                                     -->
+  <!-- =============================================================== -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">03</span>
+      <h2 class="section-title">Typography</h2>
+      <span class="section-sub">Inter for UI. Roboto Mono for code, terminals, and dense numerics. Default body is 14&nbsp;px / 1.5. Title sizes use tracking-tight (&minus;0.015em).</span>
+    </div>
+
+    <div class="sticker">
+      <div class="type-stack">
+        <div class="type-row">
+          <div class="meta"><b>display</b><br/>Inter / 700<br/>48px / 1.1 / -0.015em</div>
+          <div class="specimen display">Run agents in the cloud.</div>
+          <div class="right">empty-state hero</div>
+        </div>
+        <div class="type-row">
+          <div class="meta"><b>h1</b><br/>Inter / 700<br/>30px / 1.15 / -0.015em</div>
+          <div class="specimen h1-spec">Organization details</div>
+          <div class="right">page header</div>
+        </div>
+        <div class="type-row">
+          <div class="meta"><b>h2</b><br/>Inter / 600<br/>24px / 1.3 / -0.015em</div>
+          <div class="specimen h2-spec">Providers and models</div>
+          <div class="right">section header</div>
+        </div>
+        <div class="type-row">
+          <div class="meta"><b>h3</b><br/>Inter / 600<br/>20px / 1.3</div>
+          <div class="specimen h3-spec">Active sessions</div>
+          <div class="right">card title</div>
+        </div>
+        <div class="type-row">
+          <div class="meta"><b>body</b><br/>Inter / 400<br/>14px / 1.5</div>
+          <div class="specimen body-spec">Kilo Code is an open-source AI coding agent that runs in your editor or headlessly in the cloud. You bring the API key. We host the agent and stream its output back to you.</div>
+          <div class="right">default copy</div>
+        </div>
+        <div class="type-row">
+          <div class="meta"><b>body-strong</b><br/>Inter / 500<br/>14px / 1.5</div>
+          <div class="specimen body-strong-spec">Sentence-case button labels are the rule. Title Case is wrong.</div>
+          <div class="right">button labels, emphasis</div>
+        </div>
+        <div class="type-row">
+          <div class="meta"><b>label</b><br/>Inter / 500<br/>12px / 1.3</div>
+          <div class="specimen label-spec">API key · Last used 2 hours ago</div>
+          <div class="right">form labels, metadata</div>
+        </div>
+        <div class="type-row">
+          <div class="meta"><b>eyebrow</b><br/>Inter / 600 caps<br/>11px / 0.06em / muted</div>
+          <div class="specimen eyebrow-spec">Cloud agent · session sk-9f12</div>
+          <div class="right">section eyebrows</div>
+        </div>
+        <div class="type-row">
+          <div class="meta"><b>code</b><br/>Roboto Mono / 400<br/>13px / 1.5</div>
+          <div class="specimen code-spec"><span class="k">const</span> agent = <span class="k">await</span> kilo.<span class="b">spawn</span>({ repo: <span class="s">"acme/web"</span> });</div>
+          <div class="right">inline code</div>
+        </div>
+        <div class="type-row">
+          <div class="meta"><b>terminal</b><br/>Roboto Mono / 400<br/>13px / 1.55</div>
+          <div class="specimen code-spec"><span style="color:var(--brand-primary)">$</span> kilo run --headless --branch main <span style="color:var(--green-400)">✓</span></div>
+          <div class="right">agent surface</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================================== -->
+  <!-- 4. Spacing & shape                                                -->
+  <!-- =============================================================== -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">04</span>
+      <h2 class="section-title">Spacing &amp; shape</h2>
+      <span class="section-sub">A 4px ladder. 2/3/4/6 covers ~90% of layout. Three radii by role: sm controls, md popovers, lg/xl cards.</span>
+    </div>
+
+    <div class="sticker" style="margin-bottom: 16px;">
+      <div class="sticker-head">
+        <span class="sticker-title">Spacing scale</span>
+        <span class="sticker-tag">spacing.*</span>
+      </div>
+      <div class="spacing-row">
+        <div class="space-cell"><div class="bar" style="width:4px"></div><span class="name">1</span><span class="px">4px</span></div>
+        <div class="space-cell"><div class="bar" style="width:8px"></div><span class="name">2</span><span class="px">8px</span></div>
+        <div class="space-cell"><div class="bar" style="width:12px"></div><span class="name">3</span><span class="px">12px</span></div>
+        <div class="space-cell"><div class="bar" style="width:16px"></div><span class="name">4</span><span class="px">16px</span></div>
+        <div class="space-cell"><div class="bar" style="width:24px"></div><span class="name">6</span><span class="px">24px</span></div>
+        <div class="space-cell"><div class="bar" style="width:32px"></div><span class="name">8</span><span class="px">32px</span></div>
+        <div class="space-cell"><div class="bar" style="width:48px"></div><span class="name">12</span><span class="px">48px</span></div>
+      </div>
+    </div>
+
+    <div class="sticker">
+      <div class="sticker-head">
+        <span class="sticker-title">Radii by role</span>
+        <span class="sticker-tag">rounded.*</span>
+      </div>
+      <div class="radii-row">
+        <div class="radius-cell"><div class="radius-shape" style="border-radius:0"></div><div class="radius-meta"><span class="n">none</span><span class="v">0 · dividers</span></div></div>
+        <div class="radius-cell"><div class="radius-shape" style="border-radius:6px"></div><div class="radius-meta"><span class="n">sm</span><span class="v">6px · controls</span></div></div>
+        <div class="radius-cell"><div class="radius-shape" style="border-radius:8px"></div><div class="radius-meta"><span class="n">md</span><span class="v">8px · popovers</span></div></div>
+        <div class="radius-cell"><div class="radius-shape" style="border-radius:14px"></div><div class="radius-meta"><span class="n">xl</span><span class="v">14px · cards</span></div></div>
+        <div class="radius-cell"><div class="radius-shape" style="border-radius:9999px; width:36px;"></div><div class="radius-meta"><span class="n">full</span><span class="v">∞ · avatars</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================================== -->
+  <!-- 5. Components                                                     -->
+  <!-- =============================================================== -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">05</span>
+      <h2 class="section-title">Components</h2>
+      <span class="section-sub">Buttons, cards, inputs, sidebar, topbar, dialog, terminal. Every surface is surface + 10%-white border + rounded.xl + 24px padding.</span>
+    </div>
+
+    <div class="grid-2">
+      <!-- Card -->
+      <div class="sticker">
+        <div class="sticker-head">
+          <span class="sticker-title">Card</span>
+          <span class="sticker-tag">components.card</span>
+        </div>
+        <div class="demo-card">
+          <div class="demo-card-head">
+            <div>
+              <div class="demo-card-title">acme/web · feat/refactor-auth</div>
+              <div class="demo-card-sub">Started 12 minutes ago by you</div>
+            </div>
+            <span class="badge success"><i data-lucide="check"></i>Active</span>
+          </div>
+          <div class="demo-card-body">Streaming output from the agent. Refactored 14 files, opened a draft PR with 3 review comments.</div>
+          <div class="meta-row">
+            <span><i data-lucide="git-branch" style="width:12px;height:12px;display:inline-block;vertical-align:-2px"></i> <b>main</b></span>
+            <span>$<b>0.34</b></span>
+            <span><b>14</b> files</span>
+            <span><b>2.1k</b> tokens</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inputs -->
+      <div class="sticker">
+        <div class="sticker-head">
+          <span class="sticker-title">Input + form</span>
+          <span class="sticker-tag">components.input</span>
+        </div>
+        <div style="display:grid; gap:14px;">
+          <div class="field">
+            <label class="field-label">Organization domain</label>
+            <input class="input" placeholder="acme.com" />
+            <span class="field-help">Used for SSO matching and member auto-join.</span>
+          </div>
+          <div class="field">
+            <label class="field-label">Webhook URL</label>
+            <input class="input error" value="not-a-url" />
+            <span class="field-error">Please enter a valid URL (e.g. https://acme.com/webhooks/kilo)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rule"></div>
+
+    <div class="grid-asym">
+      <!-- Sidebar -->
+      <div class="sticker">
+        <div class="sticker-head">
+          <span class="sticker-title">Sidebar</span>
+          <span class="sticker-tag">components.sidebar — 256px</span>
+        </div>
+        <div class="sidebar-demo">
+          <div class="sb-head">
+            <div class="sb-tile">K</div>
+            <div>
+              <div class="sb-name">Acme Inc</div>
+              <div style="font-size:11px;color:var(--fg-subtle);">Free plan · $12.40 used</div>
+            </div>
+          </div>
+          <div class="sb-section">Workspace</div>
+          <a class="sb-row active"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+          <a class="sb-row"><i data-lucide="cloud"></i> Cloud sessions <span class="count">8</span></a>
+          <a class="sb-row"><i data-lucide="bot"></i> Agent manager</a>
+          <a class="sb-row"><i data-lucide="puzzle"></i> Integrations</a>
+          <div class="sb-section">Organization</div>
+          <a class="sb-row"><i data-lucide="users"></i> Members <span class="count">14</span></a>
+          <a class="sb-row"><i data-lucide="key-round"></i> API keys</a>
+          <a class="sb-row"><i data-lucide="piggy-bank"></i> Billing</a>
+          <a class="sb-row"><i data-lucide="scroll-text"></i> Audit log</a>
+        </div>
+      </div>
+
+      <!-- Dialog -->
+      <div class="sticker" style="padding: 0; overflow: hidden;">
+        <div style="padding: 20px; border-bottom: 1px solid var(--border);">
+          <div class="sticker-head" style="margin-bottom:0">
+            <span class="sticker-title">Dialog</span>
+            <span class="sticker-tag">components.dialog — bg-black/80 overlay</span>
+          </div>
+        </div>
+        <div class="dialog-stage">
+          <div class="dialog">
+            <h4>Delete API key?</h4>
+            <p>This key was last used 2 hours ago. Anything still using it will start failing immediately.</p>
+            <div class="dialog-foot">
+              <button class="btn btn-ghost">Cancel</button>
+              <button class="btn btn-destructive">Delete key</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rule"></div>
+
+    <!-- Agent / terminal -->
+    <div class="grid-asym">
+      <div class="sticker">
+        <div class="sticker-head">
+          <span class="sticker-title">Agent surface — terminal</span>
+          <span class="sticker-tag">components.terminal — atmospheric</span>
+        </div>
+        <div class="terminal-demo">
+          <span class="line"><span class="prompt">kilo</span> <span class="dim">~/acme/web (main)</span></span>
+          <span class="line"><span class="prompt">$</span> kilo run --branch feat/refactor-auth</span>
+          <span class="line dim">→ spawning agent · model: sonnet-4.5 · mode: edit</span>
+          <span class="line"><span class="agent">[agent]</span> Reading <span class="dim">src/auth/session.ts</span></span>
+          <span class="line"><span class="agent">[agent]</span> Editing <span class="dim">14 files in 3 directories</span></span>
+          <span class="line"><span class="ok">✓</span> Tests passed · <span class="dim">142 / 142</span></span>
+          <span class="line"><span class="ok">✓</span> PR opened · <span class="dim">#284 — refactor: extract auth/session</span></span>
+          <span class="line"><span class="prompt">$</span><span class="cursor"></span></span>
+        </div>
+      </div>
+
+      <div class="sticker">
+        <div class="sticker-head">
+          <span class="sticker-title">Tool cards (agent chat)</span>
+          <span class="sticker-tag">inside cloud-agent</span>
+        </div>
+        <div style="display:grid; gap: 10px;">
+          <div class="tool-card">
+            <div class="tool-head">
+              <i data-lucide="file-text" style="width:14px;height:14px; color: var(--brand-primary);"></i>
+              <span class="name">Tool · <span class="tname">Read</span></span>
+            </div>
+            <div class="tool-summary"><span class="path">src/auth/session.ts</span> · 482 lines</div>
+          </div>
+          <div class="tool-card">
+            <div class="tool-head">
+              <i data-lucide="terminal" style="width:14px;height:14px; color: var(--zinc-400);"></i>
+              <span class="name">Tool · <span class="tname">Bash</span></span>
+            </div>
+            <div class="tool-summary">pnpm test · <span style="color:var(--green-400)">142 passed</span></div>
+          </div>
+          <div class="tool-card">
+            <div class="tool-head">
+              <i data-lucide="check-square" style="width:14px;height:14px; color: var(--green-400);"></i>
+              <span class="name">Tool · <span class="tname">Todo</span></span>
+            </div>
+            <div class="tool-summary">3 of 5 tasks complete</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================================== -->
+  <!-- 6. Iconography                                                    -->
+  <!-- =============================================================== -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">06</span>
+      <h2 class="section-title">Iconography</h2>
+      <span class="section-sub">Lucide for everything, 1.5–2px stroke. No emoji in product chrome.</span>
+    </div>
+
+    <div class="sticker">
+      <div class="sticker-head">
+        <span class="sticker-title">Lucide vocabulary</span>
+        <span class="sticker-tag">lucide-react · stroke 1.75</span>
+      </div>
+      <div class="icon-grid">
+        <div class="icon-tile"><i data-lucide="cloud"></i><span class="n">cloud</span></div>
+        <div class="icon-tile"><i data-lucide="terminal"></i><span class="n">terminal</span></div>
+        <div class="icon-tile"><i data-lucide="puzzle"></i><span class="n">puzzle</span></div>
+        <div class="icon-tile"><i data-lucide="bot"></i><span class="n">bot</span></div>
+        <div class="icon-tile"><i data-lucide="building-2"></i><span class="n">org</span></div>
+        <div class="icon-tile"><i data-lucide="piggy-bank"></i><span class="n">billing</span></div>
+        <div class="icon-tile"><i data-lucide="key-round"></i><span class="n">key</span></div>
+        <div class="icon-tile"><i data-lucide="git-branch"></i><span class="n">branch</span></div>
+        <div class="icon-tile"><i data-lucide="send"></i><span class="n">send</span></div>
+        <div class="icon-tile"><i data-lucide="paperclip"></i><span class="n">attach</span></div>
+        <div class="icon-tile"><i data-lucide="square-pen"></i><span class="n">edit</span></div>
+        <div class="icon-tile"><i data-lucide="sparkles"></i><span class="n">sparkles</span></div>
+        <div class="icon-tile"><i data-lucide="bell"></i><span class="n">bell</span></div>
+        <div class="icon-tile"><i data-lucide="rocket"></i><span class="n">launch</span></div>
+        <div class="icon-tile"><i data-lucide="clock"></i><span class="n">clock</span></div>
+        <div class="icon-tile"><i data-lucide="info"></i><span class="n">info</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================================== -->
+  <!-- 7. Do's and Don'ts                                                -->
+  <!-- =============================================================== -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">07</span>
+      <h2 class="section-title">Do's &amp; Don'ts</h2>
+      <span class="section-sub">The rules that keep Kilo Cloud feeling like Kilo Cloud and not a generic dark dashboard.</span>
+    </div>
+
+    <div class="do-grid">
+      <div class="do-card do">
+        <span class="tag"><i data-lucide="check" style="width:12px;height:12px"></i>Do</span>
+        <div class="text">Use brand yellow for the primary action — once per surface. Brand and CTA are the same swatch.</div>
+        <div class="demo" style="display:flex; gap:8px;"><button class="btn btn-primary btn-sm">Save</button><button class="btn btn-ghost btn-sm">Cancel</button></div>
+      </div>
+      <div class="do-card dont">
+        <span class="tag"><i data-lucide="x" style="width:12px;height:12px"></i>Don't</span>
+        <div class="text">Don't put two yellows on a screen. The second action is always a secondary.</div>
+        <div class="demo" style="display:flex; gap:8px;"><button class="btn btn-primary btn-sm">Save</button><button class="btn btn-primary btn-sm">Submit</button></div>
+      </div>
+
+      <div class="do-card do">
+        <span class="tag"><i data-lucide="check" style="width:12px;height:12px"></i>Do</span>
+        <div class="text">Borders are white at 10%. Lift comes from value step + translucent border.</div>
+        <div class="demo" style="background:#2B2B2B; border-color:#FFFFFF1A">surface · 10% white border</div>
+      </div>
+      <div class="do-card dont">
+        <span class="tag"><i data-lucide="x" style="width:12px;height:12px"></i>Don't</span>
+        <div class="text">Don't use solid grey borders. They read flat against every surface step.</div>
+        <div class="demo" style="background:#2B2B2B; border-color:#525252">solid #525252 — wrong</div>
+      </div>
+
+      <div class="do-card do">
+        <span class="tag"><i data-lucide="check" style="width:12px;height:12px"></i>Do</span>
+        <div class="text">Pair primary yellow with secondary charcoal or ghost-link cancels.</div>
+        <div class="demo" style="display:flex; gap:8px;"><button class="btn btn-secondary btn-sm">Cancel</button><button class="btn btn-primary btn-sm">Create session</button></div>
+      </div>
+      <div class="do-card dont">
+        <span class="tag"><i data-lucide="x" style="width:12px;height:12px"></i>Don't</span>
+        <div class="text">Don't use blue as a button background. Blue is a legacy inline-link role only.</div>
+        <div class="demo" style="display:flex; gap:8px;"><button class="btn btn-sm" style="background:#2B6AD2;color:#fff">Save</button><button class="btn btn-sm" style="background:#2B6AD2;color:#fff">Submit</button></div>
+      </div>
+
+      <div class="do-card do">
+        <span class="tag"><i data-lucide="check" style="width:12px;height:12px"></i>Do</span>
+        <div class="text">Sentence case for every user-visible label. Buttons, nav, titles.</div>
+        <div class="demo">"Create session" · "Buy credits" · "Invite member"</div>
+      </div>
+      <div class="do-card dont">
+        <span class="tag"><i data-lucide="x" style="width:12px;height:12px"></i>Don't</span>
+        <div class="text">Don't Title Case. Don't Use Exclamation Points!</div>
+        <div class="demo">"Create Session" · "Buy Credits!" — wrong</div>
+      </div>
+
+      <div class="do-card do">
+        <span class="tag"><i data-lucide="check" style="width:12px;height:12px"></i>Do</span>
+        <div class="text">Dollars, latencies, timestamps in Roboto Mono. They align across rows.</div>
+        <div class="demo" style="font-family: var(--font-mono);">$12.40 · 142ms · 2026-04-28 14:33</div>
+      </div>
+      <div class="do-card dont">
+        <span class="tag"><i data-lucide="x" style="width:12px;height:12px"></i>Don't</span>
+        <div class="text">Don't use Inter for table numerics. Variable widths jitter the column.</div>
+        <div class="demo">$12.40 · 142ms · 2026-04-28 14:33</div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <span>Kilo Cloud · DESIGN.md · alpha</span>
+    <span>Stickersheet rev. 2026-04-28</span>
+  </footer>
+
+</div>
+
+<script>
+  const iconPaths = {
+    'alert-triangle': ['M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z', 'M12 9v4', 'M12 17h.01'],
+    bell: ['M10 20a2 2 0 0 0 4 0', 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9'],
+    bot: ['M12 8V4H8', 'M2 14h2', 'M20 14h2', 'M7 13h.01', 'M17 13h.01', 'M8 18h8', 'M5 8h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z'],
+    'building-2': ['M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18', 'M6 12H4a2 2 0 0 0-2 2v8h20v-8a2 2 0 0 0-2-2h-2', 'M10 6h4', 'M10 10h4', 'M10 14h4', 'M10 18h4'],
+    check: ['M20 6 9 17l-5-5'],
+    'check-square': ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
+    clock: ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z', 'M12 6v6l4 2'],
+    cloud: ['M17.5 19H7a5 5 0 1 1 1.3-9.8A7 7 0 0 1 21 13a4 4 0 0 1-3.5 6Z'],
+    'file-text': ['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z', 'M14 2v6h6', 'M8 13h8', 'M8 17h8', 'M8 9h2'],
+    'git-branch': ['M6 3v12', 'M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M18 9a9 9 0 0 1-9 9'],
+    info: ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z', 'M12 16v-4', 'M12 8h.01'],
+    'key-round': ['M2 18a6 6 0 1 0 10.8-3.6L22 5.2V2h-3.2l-7.3 7.3A6 6 0 0 0 2 18Z', 'M7 17h.01'],
+    'layout-dashboard': ['M3 3h7v9H3Z', 'M14 3h7v5h-7Z', 'M14 12h7v9h-7Z', 'M3 16h7v5H3Z'],
+    paperclip: ['M21.4 11.6 12 21a6 6 0 0 1-8.5-8.5l10-10a4 4 0 0 1 5.7 5.7l-10 10a2 2 0 0 1-2.8-2.8l9.2-9.2'],
+    piggy-bank: ['M19 5c-1.5 0-2.8.8-3.5 2H9a6 6 0 0 0-6 6v1H1v4h3a6 6 0 0 0 5 3v-2h6v2a6 6 0 0 0 5-5h2v-4h-2a6 6 0 0 0-1-3V5Z', 'M8 11h.01', 'M12 7v2'],
+    plus: ['M12 5v14', 'M5 12h14'],
+    puzzle: ['M19 13v5a2 2 0 0 1-2 2h-5v-3a2 2 0 1 0-4 0v3H5a2 2 0 0 1-2-2v-5h3a2 2 0 1 0 0-4H3V6a2 2 0 0 1 2-2h5v3a2 2 0 1 0 4 0V4h3a2 2 0 0 1 2 2v3h-3a2 2 0 1 0 0 4Z'],
+    rocket: ['M4.5 16.5c-1.5 1.3-2 4-2 4s2.7-.5 4-2', 'M9 15 5 19', 'M14 4c3.5-1.2 6 0 6 0s1.2 2.5 0 6c-1.2 3.7-4.4 7-8 8l-6-6c1-3.6 4.3-6.8 8-8Z', 'M15 9h.01'],
+    'scroll-text': ['M8 21h8a4 4 0 0 0 4-4V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a4 4 0 0 0 4 4Z', 'M8 7h8', 'M8 11h8', 'M8 15h5'],
+    send: ['M22 2 11 13', 'M22 2 15 22l-4-9-9-4Z'],
+    'square-pen': ['M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7', 'M18.4 2.6a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z'],
+    sparkles: ['M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7Z', 'M5 3v4', 'M3 5h4', 'M19 17v4', 'M17 19h4'],
+    terminal: ['M4 17l6-6-6-6', 'M12 19h8'],
+    users: ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', 'M22 21v-2a4 4 0 0 0-3-3.9', 'M16 3.1a4 4 0 0 1 0 7.8'],
+    x: ['M18 6 6 18', 'M6 6l12 12'],
+  };
+
+  for (const element of document.querySelectorAll('[data-lucide]')) {
+    const name = element.getAttribute('data-lucide');
+    const paths = iconPaths[name] ?? iconPaths.info;
+    element.classList.add('icon');
+    element.removeAttribute('data-lucide');
+    element.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${paths
+      .map(path => `<path d="${path}"></path>`)
+      .join('')}</svg>`;
+  }
+</script>
+</body>
+</html>

@@ -2,6 +2,8 @@
  * Mock implementation of GitHub adapter for testing
  */
 
+export type GitHubAppType = 'standard' | 'lite';
+
 export function verifyGitHubWebhookSignature(_payload: string, _signature: string): boolean {
   return true;
 }
@@ -15,6 +17,13 @@ export async function deleteGitHubInstallation(_installationId: string): Promise
   return;
 }
 
+export async function exchangeGitHubOAuthCode(
+  _code: string,
+  _appType: GitHubAppType = 'standard'
+): Promise<{ id: string; login: string }> {
+  return { id: '12345', login: 'octocat' };
+}
+
 export async function getCollaboratorPermissionLevel(
   _installationId: string,
   _owner: string,
@@ -22,4 +31,87 @@ export async function getCollaboratorPermissionLevel(
   _username: string
 ): Promise<'admin' | 'write' | 'read' | 'none' | null> {
   return 'write';
+}
+
+export async function isMergeCommit(
+  _installationId: string,
+  _owner: string,
+  _repo: string,
+  _commitSha: string,
+  _appType: GitHubAppType = 'standard'
+): Promise<boolean> {
+  return false;
+}
+
+export async function addReactionToPR(
+  _installationId: string,
+  _owner: string,
+  _repo: string,
+  _issueNumber: number,
+  _reaction: string,
+  _appType: GitHubAppType = 'standard'
+): Promise<void> {
+  return;
+}
+
+export async function createCheckRun(
+  _installationId: string,
+  _owner: string,
+  _repo: string,
+  _headSha: string,
+  _options: unknown,
+  _appType: GitHubAppType = 'standard'
+): Promise<number> {
+  return 0;
+}
+
+export async function updateCheckRun(
+  _installationId: string,
+  _owner: string,
+  _repo: string,
+  _checkRunId: number,
+  _updates: unknown,
+  _appType: GitHubAppType = 'standard'
+): Promise<void> {
+  return;
+}
+
+export type AssociatedPullRequest = {
+  number: number;
+  htmlUrl: string;
+  state: 'open' | 'closed' | 'merged';
+  title: string;
+  headSha: string;
+  updatedAt: string;
+};
+
+export class GitHubRateLimitError extends Error {
+  public readonly resetAt: Date;
+  constructor(resetAt: Date) {
+    super(`GitHub rate limited until ${resetAt.toISOString()}`);
+    this.name = 'GitHubRateLimitError';
+    this.resetAt = resetAt;
+  }
+}
+
+export async function fetchPullRequestForBranch(_params: {
+  installationId: number;
+  owner: string;
+  repo: string;
+  branch: string;
+  appType: GitHubAppType;
+}): Promise<AssociatedPullRequest | null> {
+  return null;
+}
+
+export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required';
+
+export async function fetchPullRequestReviewDecision(_args: {
+  installationId: string;
+  owner: string;
+  repo: string;
+  number: number;
+  appType?: GitHubAppType;
+}): Promise<ReviewDecision | null> {
+  return null;
 }

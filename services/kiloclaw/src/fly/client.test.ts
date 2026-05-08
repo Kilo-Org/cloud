@@ -5,6 +5,7 @@ import {
   isFlyInsufficientResources,
   createMachine,
   updateMachine,
+  extendVolume,
   createVolumeWithFallback,
   listVolumeSnapshots,
 } from './client';
@@ -258,6 +259,52 @@ describe('createMachine', () => {
         timeout: '5s',
       },
     });
+    fetchSpy.mockRestore();
+  });
+});
+
+describe('extendVolume', () => {
+  it('PUTs the target size to the Fly volume extend endpoint', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: 'vol-1',
+          name: 'root',
+          state: 'detached',
+          size_gb: 20,
+          region: 'iad',
+          attached_machine_id: null,
+          created_at: '2026-02-21T00:00:00.000Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    await extendVolume(fakeConfig, 'vol-1', 20);
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.machines.dev/v1/apps/test-app/volumes/vol-1/extend'
+    );
+    expect(fetchSpy.mock.calls[0][1]).toMatchObject({ method: 'PUT' });
+    expect(JSON.parse(fetchSpy.mock.calls[0][1]?.body as string)).toEqual({ size_gb: 20 });
+    fetchSpy.mockRestore();
+  });
+
+  it('rethrows Fly 400 errors', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(400, { error: 'invalid extend' }));
+
+    await expect(extendVolume(fakeConfig, 'vol-1', 20)).rejects.toThrow('invalid extend');
+    fetchSpy.mockRestore();
+  });
+
+  it('surfaces 404 as Fly not found', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockFetchResponse(404, { error: 'not found' }));
+
+    await expect(extendVolume(fakeConfig, 'vol-1', 20)).rejects.toSatisfy(isFlyNotFound);
     fetchSpy.mockRestore();
   });
 });

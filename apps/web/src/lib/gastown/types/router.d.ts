@@ -138,6 +138,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
               review_mode?: 'rework' | 'comments' | undefined;
               code_review?: boolean | undefined;
               auto_resolve_pr_feedback?: boolean | undefined;
+              auto_resolve_merge_conflicts?: boolean | undefined;
               auto_merge_delay_minutes?: number | null | undefined;
               merge_strategy?: 'direct' | 'pr' | undefined;
               convoy_merge_mode?: 'review-then-land' | 'review-and-merge' | undefined;
@@ -209,6 +210,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           review_mode?: 'rework' | 'comments' | undefined;
           code_review?: boolean | undefined;
           auto_resolve_pr_feedback?: boolean | undefined;
+          auto_resolve_merge_conflicts?: boolean | undefined;
           auto_merge_delay_minutes?: number | null | undefined;
           merge_strategy?: 'direct' | 'pr' | undefined;
           convoy_merge_mode?: 'review-then-land' | 'review-and-merge' | undefined;
@@ -555,6 +557,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
               code_review: boolean;
               review_mode: 'comments' | 'rework';
               auto_resolve_pr_feedback: boolean;
+              auto_resolve_merge_conflicts: boolean;
               auto_merge_delay_minutes: number | null;
             }
           | undefined;
@@ -619,6 +622,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
                 code_review?: boolean | undefined;
                 review_mode?: 'comments' | 'rework' | undefined;
                 auto_resolve_pr_feedback?: boolean | undefined;
+                auto_resolve_merge_conflicts?: boolean | undefined;
                 auto_merge_delay_minutes?: number | null | undefined;
               }
             | undefined;
@@ -677,6 +681,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
               code_review: boolean;
               review_mode: 'comments' | 'rework';
               auto_resolve_pr_feedback: boolean;
+              auto_resolve_merge_conflicts: boolean;
               auto_merge_delay_minutes: number | null;
             }
           | undefined;
@@ -1381,6 +1386,84 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       output: never;
       meta: object;
     }>;
+    createBead: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        rigId: string;
+        title: string;
+        body?: string | undefined;
+        labels?: string[] | undefined;
+        startImmediately?: boolean | undefined;
+        townId?: string | undefined;
+      };
+      output: {
+        bead_id: string;
+        type:
+          | 'agent'
+          | 'convoy'
+          | 'escalation'
+          | 'issue'
+          | 'merge_request'
+          | 'message'
+          | 'molecule';
+        status: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open';
+        title: string;
+        body: string | null;
+        rig_id: string | null;
+        parent_bead_id: string | null;
+        assignee_agent_bead_id: string | null;
+        priority: 'critical' | 'high' | 'low' | 'medium';
+        labels: string[];
+        metadata: Record<string, unknown>;
+        created_by: string | null;
+        created_at: string;
+        updated_at: string;
+        closed_at: string | null;
+      };
+      meta: object;
+    }>;
+    startBead: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        rigId: string;
+        beadId: string;
+        townId?: string | undefined;
+      };
+      output: {
+        bead_id: string;
+        type:
+          | 'agent'
+          | 'convoy'
+          | 'escalation'
+          | 'issue'
+          | 'merge_request'
+          | 'message'
+          | 'molecule';
+        status: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open';
+        title: string;
+        body: string | null;
+        rig_id: string | null;
+        parent_bead_id: string | null;
+        assignee_agent_bead_id: string | null;
+        priority: 'critical' | 'high' | 'low' | 'medium';
+        labels: string[];
+        metadata: Record<string, unknown>;
+        created_by: string | null;
+        created_at: string;
+        updated_at: string;
+        closed_at: string | null;
+      };
+      meta: object;
+    }>;
+    enrichBead: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        body: string;
+        townId: string;
+      };
+      output: {
+        title: string;
+        labels: string[];
+      } | null;
+      meta: object;
+    }>;
   }>
 >;
 export type GastownRouter = typeof gastownRouter;
@@ -1537,6 +1620,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                   review_mode?: 'rework' | 'comments' | undefined;
                   code_review?: boolean | undefined;
                   auto_resolve_pr_feedback?: boolean | undefined;
+                  auto_resolve_merge_conflicts?: boolean | undefined;
                   auto_merge_delay_minutes?: number | null | undefined;
                   merge_strategy?: 'direct' | 'pr' | undefined;
                   convoy_merge_mode?: 'review-then-land' | 'review-and-merge' | undefined;
@@ -1608,6 +1692,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               review_mode?: 'rework' | 'comments' | undefined;
               code_review?: boolean | undefined;
               auto_resolve_pr_feedback?: boolean | undefined;
+              auto_resolve_merge_conflicts?: boolean | undefined;
               auto_merge_delay_minutes?: number | null | undefined;
               merge_strategy?: 'direct' | 'pr' | undefined;
               convoy_merge_mode?: 'review-then-land' | 'review-and-merge' | undefined;
@@ -1954,6 +2039,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                   code_review: boolean;
                   review_mode: 'comments' | 'rework';
                   auto_resolve_pr_feedback: boolean;
+                  auto_resolve_merge_conflicts: boolean;
                   auto_merge_delay_minutes: number | null;
                 }
               | undefined;
@@ -2018,6 +2104,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                     code_review?: boolean | undefined;
                     review_mode?: 'comments' | 'rework' | undefined;
                     auto_resolve_pr_feedback?: boolean | undefined;
+                    auto_resolve_merge_conflicts?: boolean | undefined;
                     auto_merge_delay_minutes?: number | null | undefined;
                   }
                 | undefined;
@@ -2076,6 +2163,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                   code_review: boolean;
                   review_mode: 'comments' | 'rework';
                   auto_resolve_pr_feedback: boolean;
+                  auto_resolve_merge_conflicts: boolean;
                   auto_merge_delay_minutes: number | null;
                 }
               | undefined;
@@ -2778,6 +2866,84 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             townId: string;
           };
           output: never;
+          meta: object;
+        }>;
+        createBead: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            rigId: string;
+            title: string;
+            body?: string | undefined;
+            labels?: string[] | undefined;
+            startImmediately?: boolean | undefined;
+            townId?: string | undefined;
+          };
+          output: {
+            bead_id: string;
+            type:
+              | 'agent'
+              | 'convoy'
+              | 'escalation'
+              | 'issue'
+              | 'merge_request'
+              | 'message'
+              | 'molecule';
+            status: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open';
+            title: string;
+            body: string | null;
+            rig_id: string | null;
+            parent_bead_id: string | null;
+            assignee_agent_bead_id: string | null;
+            priority: 'critical' | 'high' | 'low' | 'medium';
+            labels: string[];
+            metadata: Record<string, unknown>;
+            created_by: string | null;
+            created_at: string;
+            updated_at: string;
+            closed_at: string | null;
+          };
+          meta: object;
+        }>;
+        startBead: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            rigId: string;
+            beadId: string;
+            townId?: string | undefined;
+          };
+          output: {
+            bead_id: string;
+            type:
+              | 'agent'
+              | 'convoy'
+              | 'escalation'
+              | 'issue'
+              | 'merge_request'
+              | 'message'
+              | 'molecule';
+            status: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open';
+            title: string;
+            body: string | null;
+            rig_id: string | null;
+            parent_bead_id: string | null;
+            assignee_agent_bead_id: string | null;
+            priority: 'critical' | 'high' | 'low' | 'medium';
+            labels: string[];
+            metadata: Record<string, unknown>;
+            created_by: string | null;
+            created_at: string;
+            updated_at: string;
+            closed_at: string | null;
+          };
+          meta: object;
+        }>;
+        enrichBead: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            body: string;
+            townId: string;
+          };
+          output: {
+            title: string;
+            labels: string[];
+          } | null;
           meta: object;
         }>;
       }>

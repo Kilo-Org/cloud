@@ -126,27 +126,31 @@ export async function dispatchAgent(
 
     const rigRecord = rigs.getRig(ctx.sql, rigId);
 
-    const started = await dispatch.startAgentInContainer(ctx.env, ctx.storage, {
-      townId: ctx.townId,
-      rigId,
-      userId: rigConfig.userId,
-      agentId: agent.id,
-      agentName: agent.name,
-      role: agent.role,
-      identity: agent.identity,
-      beadId: bead.bead_id,
-      beadTitle: bead.title,
-      beadBody: bead.body ?? '',
-      checkpoint: agent.checkpoint,
-      gitUrl: rigConfig.gitUrl,
-      defaultBranch: rigConfig.defaultBranch,
-      kilocodeToken,
-      townConfig,
-      rigOverride: rigRecord?.config ?? null,
-      platformIntegrationId: rigConfig.platformIntegrationId,
-      convoyFeatureBranch: convoyFeatureBranch ?? undefined,
-      systemPromptOverride: options?.systemPromptOverride,
-    });
+    const { started, containerFetchMs } = await dispatch.startAgentInContainer(
+      ctx.env,
+      ctx.storage,
+      {
+        townId: ctx.townId,
+        rigId,
+        userId: rigConfig.userId,
+        agentId: agent.id,
+        agentName: agent.name,
+        role: agent.role,
+        identity: agent.identity,
+        beadId: bead.bead_id,
+        beadTitle: bead.title,
+        beadBody: bead.body ?? '',
+        checkpoint: agent.checkpoint,
+        gitUrl: rigConfig.gitUrl,
+        defaultBranch: rigConfig.defaultBranch,
+        kilocodeToken,
+        townConfig,
+        rigOverride: rigRecord?.config ?? null,
+        platformIntegrationId: rigConfig.platformIntegrationId,
+        convoyFeatureBranch: convoyFeatureBranch ?? undefined,
+        systemPromptOverride: options?.systemPromptOverride,
+      }
+    );
 
     if (started) {
       // Reset dispatch_attempts on successful start — but NOT for refineries.
@@ -172,6 +176,7 @@ export async function dispatchAgent(
         agentId: agent.id,
         beadId: bead.bead_id,
         role: agent.role,
+        durationMs: containerFetchMs,
       });
     } else {
       // Container start returned false — but the container may have
@@ -261,10 +266,18 @@ export function dispatchUnblockedBeads(ctx: SchedulingContext, closedBeadId: str
  * interval. Used to decide between active and idle alarm cadence.
  */
 export function hasActiveWork(sql: SqlStorage): boolean {
+  // Stalled agents older than 30min no longer count as active work: they
+  // typically represent stuck rows (container crashed hard, /status keeps
+  // returning running/unknown). Keeping them in the active set would pin
+  // the alarm at its 5s fast cadence indefinitely. The stalled->idle
+  // auto-transition in reconcileAgents cleans them up after 2h 30min.
   const activeAgentRows = [
     ...query(
       sql,
-      /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata} WHERE ${agent_metadata.status} IN ('working', 'stalled')`,
+      /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata}
+        WHERE ${agent_metadata.status} = 'working'
+           OR (${agent_metadata.status} = 'stalled'
+               AND ${agent_metadata.last_activity_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes'))`,
       []
     ),
   ];

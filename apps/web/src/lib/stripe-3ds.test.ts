@@ -21,6 +21,7 @@ jest.mock('@/lib/organizations/organization-seats', () => ({
 
 import { handleUpdateSeatCount, KNOWN_SEAT_PRICE_IDS } from './stripe';
 import { client } from '@/lib/stripe-client';
+import { STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID } from '@/lib/config.server';
 
 // Get references to the mocked functions after import
 const mockSubscriptionsRetrieve = client.subscriptions.retrieve as jest.Mock;
@@ -193,6 +194,51 @@ describe('handleUpdateSeatCount with 3DS', () => {
       expect.objectContaining({
         proration_behavior: 'always_invoice',
         payment_behavior: 'allow_incomplete',
+      }),
+      expect.any(Object)
+    );
+  });
+
+  it('ignores non-seat add-ons when preserving free seat items', async () => {
+    const mockSubscription = {
+      id: mockSubscriptionId,
+      items: {
+        data: [
+          {
+            id: mockItemId,
+            quantity: 5,
+            price: { id: 'price_test_seat', product: STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID },
+          },
+          {
+            id: 'si_free_seats',
+            quantity: 2,
+            price: {
+              id: 'price_free_seats',
+              product: STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
+            },
+          },
+          {
+            id: 'si_kilo_pass',
+            quantity: 27,
+            price: { id: 'price_kilo_pass', product: 'prod_kilo_pass_not_seats' },
+          },
+        ],
+      },
+      latest_invoice: 'inv_test_789',
+    };
+
+    mockSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
+    mockSubscriptionsUpdate.mockResolvedValue({
+      ...mockSubscription,
+      items: { data: [{ id: mockItemId, quantity: 6, price: { id: 'price_test_seat' } }] },
+    });
+
+    await handleUpdateSeatCount(mockSubscriptionId, 8, 7);
+
+    expect(mockSubscriptionsUpdate).toHaveBeenCalledWith(
+      mockSubscriptionId,
+      expect.objectContaining({
+        items: [{ id: mockItemId, quantity: 6 }],
       }),
       expect.any(Object)
     );

@@ -4,7 +4,7 @@ import { validateAuthorizationHeader, JWT_TOKEN_VERSION } from './tokens';
 import { NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 
-import type { CreateOrUpdateUserArgs } from './user';
+import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from './user';
 import { findUserById, createOrUpdateUser, findAndSyncExistingUser } from './user';
 import { db, readDb } from '@/lib/drizzle';
 import type {
@@ -30,6 +30,12 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { redirect } from 'next/navigation';
 import { IMPACT_CLICK_ID_COOKIE } from '@/lib/impact-affiliate-utils';
+import { logImpactReferralDebug } from '@/lib/impact-debug';
+import { countryCodeFromHeaders, localeFromHeaders } from '@/lib/impact-referral';
+import {
+  parseImpactAffiliateTouchFromUrl,
+  parseImpactReferralTouchFromUrl,
+} from '@/lib/impact-referral-utils';
 import { isOrganizationHardLocked } from '@/lib/organizations/trial-utils';
 import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
 import { secondsInDay } from 'date-fns/constants';
@@ -50,7 +56,8 @@ import { linkAccountToExistingUser } from '@/lib/user';
 import type { FailureResult } from '@/lib/maybe-result';
 import { failureResult, whenOk } from '@/lib/maybe-result';
 import type { AuthErrorType } from '@/lib/auth/constants';
-import { hosted_domain_specials, SSO_SIGNIN_PATH } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@/lib/auth/constants';
+import { authFailureRedirectUrl, ssoSignInRedirectUrl } from '@/lib/auth/redirect-urls';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import {
   GITHUB_CLIENT_ID,
@@ -80,6 +87,7 @@ import { processSSOUserLogin } from '@/lib/sso-user';
 import { getLowerDomainFromEmail } from '@/lib/utils';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
+import { isWebSessionCurrent } from '@/lib/web-session-revocation';
 
 export type TurnstileJwtPayload = {
   /**
@@ -401,28 +409,81 @@ async function getSignInRedirectContext(): Promise<SignInRedirectContext> {
   return parseSignInRedirectContext(raw);
 }
 
-async function getAffiliateTrackingIdFromAuthFlow(): Promise<string | null> {
+async function getImpactTrackingContextFromAuthFlow(requestHeaders?: Headers): Promise<{
+  affiliateTrackingId: string | null;
+  trackingContext: CreateOrUpdateUserTrackingContext;
+}> {
   const cookieStore = await cookies();
 
-  // Prefer im_ref from the callback URL (explicitly passed through the auth flow)
   const callbackUrlCookie =
     cookieStore.get('__Secure-next-auth.callback-url')?.value ??
     cookieStore.get('next-auth.callback-url')?.value;
+  const cookieTrackingId = cookieStore.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null;
 
   if (callbackUrlCookie) {
     try {
       const callbackUrl = new URL(callbackUrlCookie, 'http://localhost');
-      const imRef = callbackUrl.searchParams.get('im_ref')?.trim();
-      if (imRef) return imRef;
+      const referralTouch = parseImpactReferralTouchFromUrl(callbackUrl);
+      const urlImRefParam = callbackUrl.searchParams.get('im_ref')?.trim() || null;
+      const ignoreUrlImRefForReferralTouch = Boolean(
+        referralTouch?.opaqueTrackingValue && urlImRefParam
+      );
+      const fallbackUrl = new URL('http://localhost/users/after-sign-in');
+      const affiliateTouch = ignoreUrlImRefForReferralTouch
+        ? cookieTrackingId && cookieTrackingId !== urlImRefParam
+          ? parseImpactAffiliateTouchFromUrl(fallbackUrl, cookieTrackingId)
+          : null
+        : (parseImpactAffiliateTouchFromUrl(callbackUrl) ??
+          (cookieTrackingId
+            ? parseImpactAffiliateTouchFromUrl(fallbackUrl, cookieTrackingId)
+            : null));
+
+      logImpactReferralDebug('Auth flow parsed Impact tracking context from callback URL cookie', {
+        affiliateTouchPresent: Boolean(affiliateTouch),
+        referralTouchPresent: Boolean(referralTouch),
+        referralCookieValuePresent: Boolean(referralTouch?.opaqueTrackingValue),
+        affiliateTrackingIdPresent: Boolean(affiliateTouch?.trackingId?.trim()),
+        urlImRefParamPresent: Boolean(urlImRefParam),
+        ignoredUrlImRefForReferralTouch: ignoreUrlImRefForReferralTouch,
+        affiliateCookieFallbackPresent: Boolean(cookieTrackingId?.trim()),
+        callbackPath: callbackUrl.pathname,
+      });
+
+      return {
+        affiliateTrackingId: affiliateTouch?.trackingId ?? null,
+        trackingContext: {
+          affiliateTouch,
+          referralTouch,
+          locale: localeFromHeaders(requestHeaders),
+          countryCode: countryCodeFromHeaders(requestHeaders),
+        },
+      };
     } catch {
       // fall through to cookie fallback
     }
   }
 
-  // Fall back to the shared parent-domain cookie written by kilo.ai. This is
-  // our bridge cookie for auth redirects, not the native IR_<campaignId> UTT
-  // cookie set by Impact itself.
-  return cookieStore.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null;
+  const fallbackUrl = new URL('http://localhost/users/after-sign-in');
+  const affiliateTouch = cookieTrackingId
+    ? parseImpactAffiliateTouchFromUrl(fallbackUrl, cookieTrackingId)
+    : null;
+
+  logImpactReferralDebug('Auth flow parsed Impact tracking context from cookie fallback', {
+    affiliateTouchPresent: Boolean(affiliateTouch),
+    referralTouchPresent: false,
+    affiliateTrackingIdPresent: Boolean(cookieTrackingId?.trim()),
+    cookieTrackingIdLength: cookieTrackingId?.length ?? 0,
+  });
+
+  return {
+    affiliateTrackingId: cookieTrackingId,
+    trackingContext: {
+      affiliateTouch,
+      referralTouch: null,
+      locale: localeFromHeaders(requestHeaders),
+      countryCode: countryCodeFromHeaders(requestHeaders),
+    },
+  };
 }
 
 type ExtendedProfile = Profile & {
@@ -521,24 +582,23 @@ const authOptions: NextAuthOptions = {
       id: 'email',
       name: 'Email',
       credentials: {
-        email: { label: 'Email', type: 'email' },
         token: { label: 'Token', type: 'text' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.token) {
+        if (!credentials?.token) {
           return null;
         }
 
         const tokenData = await verifyAndConsumeMagicLinkToken(credentials.token);
 
-        if (!tokenData || tokenData.email !== credentials.email) {
+        if (!tokenData) {
           return null;
         }
 
         return {
-          id: `email-${credentials.email}`,
-          email: credentials.email,
-          name: credentials.email.split('@')[0],
+          id: `email-${tokenData.email}`,
+          email: tokenData.email,
+          name: tokenData.email.split('@')[0],
           image: '',
         };
       },
@@ -579,24 +639,20 @@ const authOptions: NextAuthOptions = {
       let isAccountLinking: boolean | null = null;
       let linkingSession: AccountLinkingSession | null = null;
       const redirectContext = await getSignInRedirectContext();
-      const redirectUrlForCode = (error: AuthErrorType, email?: string): string => {
-        const params = new URLSearchParams({ error });
-        if (email) {
-          params.set('email', email);
+      const redirectUrlForCode = (error: AuthErrorType): string => {
+        const redirectUrl = new URL(
+          authFailureRedirectUrl(error, Boolean(isAccountLinking)),
+          'http://localhost'
+        );
+        if (!isAccountLinking) {
+          if (redirectContext.callbackPath) {
+            redirectUrl.searchParams.set('callbackPath', redirectContext.callbackPath);
+          }
+          if (redirectContext.signup) {
+            redirectUrl.searchParams.set('signup', 'true');
+          }
         }
-        if (isAccountLinking) {
-          return `/connected-accounts?${params.toString()}`;
-        }
-        // Preserve the original sign-in context so an error bounce (e.g. BLOCKED,
-        // USER-NOT-FOUND, DIFFERENT-OAUTH) doesn't strand a mobile device-auth
-        // flow on a plain sign-in page without the code or signup mode.
-        if (redirectContext.callbackPath) {
-          params.set('callbackPath', redirectContext.callbackPath);
-        }
-        if (redirectContext.signup) {
-          params.set('signup', 'true');
-        }
-        return `/users/sign_in?${params.toString()}`;
+        return `${redirectUrl.pathname}?${redirectUrl.searchParams.toString()}`;
       };
       try {
         if (!account) return `TRAP: No account found`;
@@ -621,7 +677,7 @@ const authOptions: NextAuthOptions = {
         const domain = getLowerDomainFromEmail(accountInfo.google_user_email);
 
         if (!domain) {
-          return redirectUrlForCode('USER-NOT-FOUND', accountInfo.google_user_email);
+          return redirectUrlForCode('USER-NOT-FOUND');
         }
 
         if (await isEmailBlacklistedByDomainAsync(accountInfo.google_user_email)) {
@@ -630,7 +686,7 @@ const authOptions: NextAuthOptions = {
             accountInfo
           );
 
-          return redirectUrlForCode(`BLOCKED`, accountInfo.google_user_email);
+          return redirectUrlForCode(`BLOCKED`);
         }
 
         let domainToCheck = domain;
@@ -640,7 +696,7 @@ const authOptions: NextAuthOptions = {
 
         // Block new signups from blocked TLDs (existing users can still sign in)
         if (!existingUser && isBlockedTLD(accountInfo.google_user_email)) {
-          return redirectUrlForCode(`BLOCKED`, accountInfo.google_user_email);
+          return redirectUrlForCode(`BLOCKED`);
         }
 
         if (existingUser) {
@@ -661,11 +717,7 @@ const authOptions: NextAuthOptions = {
             (await doesOrgWithSSODomainExist(domainToCheck));
 
           if (redir) {
-            // Include email in redirect so it can be auto-filled on SSO sign-in page
-            const emailParam = accountInfo.google_user_email
-              ? `&email=${encodeURIComponent(accountInfo.google_user_email)}`
-              : '';
-            return SSO_SIGNIN_PATH + `?domain=${encodeURIComponent(domainToCheck)}${emailParam}`; // redirect to SSO sign-in page
+            return ssoSignInRedirectUrl(domainToCheck);
           }
         }
 
@@ -716,8 +768,24 @@ const authOptions: NextAuthOptions = {
         // For email (magic link) auth, we auto-link to existing users since magic link
         // is verified by email ownership
         const autoLinkToExistingUser = isEmailAuth || isFakeLogin;
-        const affiliateTrackingId =
-          !isAccountLinking && !isFakeLogin ? await getAffiliateTrackingIdFromAuthFlow() : null;
+        if (isAccountLinking) {
+          logImpactReferralDebug('Auth flow skipped Impact tracking context extraction', {
+            provider: accountInfo.provider,
+            isAccountLinking: Boolean(isAccountLinking),
+            isFakeLogin,
+          });
+        }
+
+        const { affiliateTrackingId, trackingContext } = !isAccountLinking
+          ? await getImpactTrackingContextFromAuthFlow(requestHeaders)
+          : { affiliateTrackingId: null, trackingContext: {} };
+
+        logImpactReferralDebug('Auth flow forwarding Impact tracking context to user upsert', {
+          provider: accountInfo.provider,
+          affiliateTrackingIdPresent: Boolean(affiliateTrackingId?.trim()),
+          affiliateTouchPresent: Boolean(trackingContext.affiliateTouch),
+          referralTouchPresent: Boolean(trackingContext.referralTouch),
+        });
         const result =
           isAccountLinking && linkingSession
             ? whenOk(
@@ -729,7 +797,8 @@ const authOptions: NextAuthOptions = {
                 verifiedToken?.guid,
                 autoLinkToExistingUser,
                 requestHeaders,
-                affiliateTrackingId
+                affiliateTrackingId,
+                trackingContext
               );
 
         if (result.success === false) {
@@ -753,7 +822,7 @@ const authOptions: NextAuthOptions = {
               }
             );
           }
-          return redirectUrlForCode(result.error, accountInfo.google_user_email);
+          return redirectUrlForCode(result.error);
         }
 
         if (result.user.blocked_reason) {
@@ -815,7 +884,7 @@ const authOptions: NextAuthOptions = {
         token.exp = Math.floor(Date.now() / 1000) + secondsInDay * 30;
         token.iat = Math.floor(Date.now() / 1000);
         token.isNewUser = (profile as ExtendedProfile)?.isNewUser || false;
-        token.pepper = existingUser.api_token_pepper;
+        token.webSessionPepper = existingUser.web_session_pepper;
         token.isAdmin = existingUser.is_admin;
       } catch (error) {
         captureException(error, {
@@ -836,7 +905,7 @@ const authOptions: NextAuthOptions = {
       session.user.id = castToken.sub;
       session.isAdmin = castToken.isAdmin || false; // Ensure isAdmin is always defined
       session.kiloUserId = castToken.kiloUserId;
-      session.pepper = castToken.pepper;
+      session.webSessionPepper = castToken.webSessionPepper ?? castToken.pepper ?? null;
       session.isNewUser = castToken.isNewUser || false; // Pass isNewUser to the session
       return session;
     },
@@ -922,7 +991,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   const user = await findUserById(maybeKiloUserId, readDb);
   if (!user) return authError(401, 'Unauthorized (D)', maybeKiloUserId);
 
-  if (user.api_token_pepper != session.pepper)
+  if (!isWebSessionCurrent(session.webSessionPepper, user))
     return authError(401, 'Reauthentication required', maybeKiloUserId);
 
   // NOTE: we currently do not thread organization id through here as its only used for extension-originated requests

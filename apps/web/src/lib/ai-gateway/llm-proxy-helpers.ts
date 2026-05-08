@@ -35,8 +35,8 @@ import type {
   MicrodollarUsageStats,
   PromptInfo,
 } from '@/lib/ai-gateway/processUsage.types';
-import { getMaxTokens } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
+import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
+import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
 export { proxyErrorTypeSchema, ProxyErrorType } from '@/lib/proxy-error-types';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
@@ -62,6 +62,18 @@ export function invalidRequestResponse() {
       error: 'Invalid request',
       error_type: ProxyErrorType.invalid_request,
       message: 'Could not parse request body. Please ensure it is valid JSON.',
+    },
+    { status: 400 }
+  );
+}
+
+export function malformedJsonResponse(parseError: unknown) {
+  const detail = parseError instanceof Error ? parseError.message : String(parseError);
+  return NextResponse.json(
+    {
+      error: 'Malformed JSON',
+      error_type: ProxyErrorType.invalid_request,
+      message: `Request body is not valid JSON: ${detail}`,
     },
     { status: 400 }
   );
@@ -161,10 +173,6 @@ function byokErrorMessage(status: number): string | undefined {
   return byokErrorMessages[status];
 }
 
-function estimateTokenCount(request: GatewayRequest) {
-  return Math.round(JSON.stringify(request).length / 4 + (getMaxTokens(request) ?? 0));
-}
-
 export async function makeErrorReadable({
   requestedModel,
   request,
@@ -195,20 +203,8 @@ export async function makeErrorReadable({
     }
   }
 
-  // Sometimes we get generic or nonsensical errors when the context length is exceeded
-  // (such as "Internal Server Error" or "No allowed providers are available for the selected model")
-  const model = kiloExclusiveModels.find(m => m.public_id === requestedModel);
-  if (model) {
-    const estimatedTokenCount = estimateTokenCount(request);
-    if (estimatedTokenCount >= model.context_length) {
-      const error = `The maximum context length is ${model.context_length} tokens. However, about ${estimatedTokenCount} tokens were requested.`;
-      warnExceptInTest(`Responding with ${response.status} ${error}`);
-      return NextResponse.json(
-        { error, error_type: ProxyErrorType.context_length_exceeded, message: error },
-        { status: response.status }
-      );
-    }
-  }
+  const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
+  if (overflowResponse) return overflowResponse;
 
   if (isKiloStealthModel(requestedModel)) {
     return await stealthModelError(response);
@@ -251,6 +247,14 @@ export function modelDoesNotExistResponse() {
       message: 'The requested model could not be found.',
     },
     { status: 404 }
+  );
+}
+
+export function noFreeModelsAvailableResponse() {
+  const error = `No free models are currently available for ${KILO_AUTO_FREE_MODEL.id}. Please try again later, or switch to ${KILO_AUTO_BALANCED_MODEL.id} for affordable paid inference.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.no_free_models_available, message: error },
+    { status: 503 }
   );
 }
 
@@ -355,8 +359,8 @@ export type OrganizationRestrictionResult = {
 /**
  * Checks organization-level restrictions for model and provider access.
  *
- * Model allow list restrictions only apply to Enterprise plans.
- * Provider allow list and data collection settings apply to all plans.
+ * Provider allow list and model deny list restrictions only apply to Enterprise plans.
+ * Data collection settings apply to all organization plans.
  *
  * @param params.modelId - The model ID being requested
  * @param params.settings - Organization settings (may be undefined for non-org users)
@@ -372,25 +376,23 @@ export function checkOrganizationModelRestrictions(params: {
 
   const normalizedModelId = normalizeModelId(params.modelId);
 
-  // Model deny list restrictions only apply to Enterprise plans
-  // Teams plans should allow all models by default
+  // Model/provider access restrictions only apply to Enterprise plans.
   if (params.organizationPlan === 'enterprise') {
     const modelDenyList = params.settings.model_deny_list;
-    if (
-      modelDenyList &&
-      modelDenyList.some(entry => normalizeModelId(entry) === normalizedModelId)
-    ) {
+    if (modelDenyList?.some(entry => normalizeModelId(entry) === normalizedModelId)) {
       return { error: modelNotAllowedResponse() };
     }
   }
 
-  const providerDenyList = params.settings.provider_deny_list;
+  const providerAllowList = params.settings.provider_allow_list;
   const dataCollection = params.settings.data_collection;
 
   const providerConfig: OpenRouterProviderConfig = {};
 
-  if (params.organizationPlan === 'enterprise' && providerDenyList && providerDenyList.length > 0) {
-    providerConfig.ignore = providerDenyList;
+  if (params.organizationPlan === 'enterprise') {
+    if (providerAllowList !== undefined) {
+      providerConfig.only = providerAllowList;
+    }
   }
 
   // Setting this only if it's set as an override on the organization settings
@@ -513,6 +515,7 @@ function parseMistralFimUsageFromString(
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: statusCode,
   };
 }
 
@@ -612,6 +615,7 @@ async function parseMistralFimUsageFromStream(
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: statusCode,
   };
 }
 
@@ -679,7 +683,10 @@ type EmbeddingResponse = {
   usage: EmbeddingUsage;
 };
 
-export function parseEmbeddingUsageFromResponse(responseText: string): MicrodollarUsageStats {
+export function parseEmbeddingUsageFromResponse(
+  responseText: string,
+  statusCode: number
+): MicrodollarUsageStats {
   const json: EmbeddingResponse = JSON.parse(responseText);
 
   // Upstream providers (OpenRouter, Vercel) include cost in USD → convert to microdollars.
@@ -689,7 +696,7 @@ export function parseEmbeddingUsageFromResponse(responseText: string): Microdoll
     messageId: json.id ?? null,
     model: json.model,
     responseContent: '',
-    hasError: !json.model,
+    hasError: !json.model || statusCode >= 400,
     inference_provider: null,
     inputTokens: json.usage.prompt_tokens,
     outputTokens: 0,
@@ -704,6 +711,7 @@ export function parseEmbeddingUsageFromResponse(responseText: string): Microdoll
     generation_time: null,
     streamed: false,
     cancelled: false,
+    status_code: statusCode,
   };
 }
 
@@ -730,11 +738,12 @@ export function countAndStoreEmbeddingUsage(
 ) {
   debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
 
+  const statusCode = usageContext.status_code ?? 0;
   const usageStatsPromise = !clonedResponse.body
     ? Promise.resolve(null)
     : clonedResponse
         .text()
-        .then(text => parseEmbeddingUsageFromResponse(text))
+        .then(text => parseEmbeddingUsageFromResponse(text, statusCode))
         .catch(() => null);
 
   after(

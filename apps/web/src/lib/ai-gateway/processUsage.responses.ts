@@ -16,7 +16,9 @@ import {
   computeOpenRouterCostFields,
   computeVercelCostMicrodollars,
   drainSseStream,
+  extractVercelIsByok,
 } from '@/lib/ai-gateway/processUsage.shared';
+import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
 
 // OpenRouter adds cost fields to the standard Responses API usage object.
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
@@ -72,7 +74,7 @@ export function processResponsesApiUsage(
       cacheHitTokens,
       cacheWriteTokens: 0,
       cost_mUsd,
-      is_byok: null,
+      is_byok: extractVercelIsByok(vercelGateway),
     };
   }
 
@@ -203,7 +205,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
 
   const coreProps = {
     messageId,
-    hasError: reportedError || wasAborted,
+    hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
     model,
     responseContent,
     inference_provider,
@@ -214,6 +216,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
     generation_time: null,
     streamed: true,
     cancelled: null,
+    status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
   const costs = processResponsesApiUsage(usage, providerMetadata, coreProps);
@@ -244,6 +247,7 @@ export function parseResponsesMicrodollarUsageFromString(
     generation_time: null,
     streamed: false,
     cancelled: null,
+    status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
   const costs = processResponsesApiUsage(usage, providerMetadata, coreProps);

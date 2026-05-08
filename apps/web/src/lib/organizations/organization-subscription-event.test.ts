@@ -97,7 +97,7 @@ function createMockSubscription(overrides: Partial<Stripe.Subscription> = {}): S
             metadata: {},
             meter: null,
             nickname: null,
-            product: 'prod_test',
+            product: STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
             tiers_mode: null,
             transform_usage: null,
             trial_period_days: null,
@@ -115,7 +115,7 @@ function createMockSubscription(overrides: Partial<Stripe.Subscription> = {}): S
             lookup_key: null,
             metadata: {},
             nickname: null,
-            product: 'prod_test',
+            product: STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
             recurring: {
               interval: 'month',
               interval_count: 1,
@@ -359,7 +359,7 @@ describe('handleSubscriptionEvent', () => {
     });
 
     await expect(handleSubscriptionEvent(subscription, 'test-no-items')).rejects.toThrow(
-      'No period end found in invoice line items'
+      'No seat line items with period end found'
     );
   });
 
@@ -385,7 +385,7 @@ describe('handleSubscriptionEvent', () => {
     });
 
     await expect(handleSubscriptionEvent(subscription, 'test-no-period-end')).rejects.toThrow(
-      'No period end found in invoice line items'
+      'No seat line items with period end found'
     );
   });
 
@@ -1287,6 +1287,219 @@ describe('Organization seat count tracking', () => {
   });
 });
 
+describe('Non-seat product filtering', () => {
+  let testUser: User;
+  let testOrganization: Organization;
+
+  beforeEach(async () => {
+    testUser = await insertTestUser();
+    testOrganization = await createOrganization('Test Organization', testUser.id);
+  });
+
+  test('should only count seat product line items, ignoring non-seat products', async () => {
+    const base = createMockSubscription();
+    const baseItem = base.items.data[0];
+
+    const subscription = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '5',
+      },
+      items: {
+        object: 'list',
+        data: [
+          {
+            ...baseItem,
+            id: 'si_seat_item',
+            quantity: 5,
+            current_period_start: Math.floor(Date.now() / 1000),
+            current_period_end: Math.floor(Date.now() / 1000) + 2592000,
+            price: {
+              ...baseItem.price,
+              product: STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
+              unit_amount: 1000, // $10/seat
+            },
+          },
+          {
+            ...baseItem,
+            id: 'si_non_seat_item',
+            quantity: 1,
+            current_period_start: Math.floor(Date.now() / 1000),
+            current_period_end: Math.floor(Date.now() / 1000) + 2592000,
+            price: {
+              ...baseItem.price,
+              id: 'price_kilopass',
+              product: 'prod_kilopass_not_seats',
+              unit_amount: 4900, // $49/month non-seat product
+            },
+          },
+        ],
+        has_more: false,
+        url: '/v1/subscription_items',
+      },
+    });
+
+    await handleSubscriptionEvent(subscription, 'test-non-seat-filter');
+
+    const purchases = await db
+      .select()
+      .from(organization_seats_purchases)
+      .where(eq(organization_seats_purchases.idempotency_key, 'test-non-seat-filter'));
+
+    expect(purchases).toHaveLength(1);
+    // Should only count the 5 seats from the seat product, not the 1 from KiloPass
+    expect(purchases[0].seat_count).toBe(5);
+    // Amount should only include seat product: 5 * $10 = $50, not $50 + $49
+    expect(purchases[0].amount_usd).toBe(50);
+
+    // Verify organization seat_count is correct
+    const org = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, testOrganization.id))
+      .then(rows => rows[0]);
+    expect(org.seat_count).toBe(5);
+  });
+
+  test('should derive billing period from seat line item when non-seat product appears first', async () => {
+    const base = createMockSubscription();
+    const baseItem = base.items.data[0];
+    const nonSeatStart = 1_800_000_000;
+    const nonSeatEnd = nonSeatStart + 2_592_000;
+    const seatStart = 1_700_000_000;
+    const seatEnd = seatStart + 2_592_000;
+
+    const subscription = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '5',
+      },
+      items: {
+        object: 'list',
+        data: [
+          {
+            ...baseItem,
+            id: 'si_non_seat_first',
+            quantity: 27,
+            current_period_start: nonSeatStart,
+            current_period_end: nonSeatEnd,
+            price: {
+              ...baseItem.price,
+              id: 'price_kilopass_first',
+              product: 'prod_kilopass_not_seats',
+              unit_amount: 1900,
+            },
+          },
+          {
+            ...baseItem,
+            id: 'si_seat_second',
+            quantity: 5,
+            current_period_start: seatStart,
+            current_period_end: seatEnd,
+            price: {
+              ...baseItem.price,
+              product: STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
+              unit_amount: 1000,
+            },
+          },
+        ],
+        has_more: false,
+        url: '/v1/subscription_items',
+      },
+    });
+
+    await handleSubscriptionEvent(subscription, 'test-seat-period-from-filtered-item');
+
+    const purchases = await db
+      .select()
+      .from(organization_seats_purchases)
+      .where(
+        eq(organization_seats_purchases.idempotency_key, 'test-seat-period-from-filtered-item')
+      );
+
+    expect(purchases).toHaveLength(1);
+    expect(new Date(purchases[0].starts_at).getTime()).toBe(seatStart * 1000);
+    expect(new Date(purchases[0].expires_at).getTime()).toBe(seatEnd * 1000);
+  });
+
+  test('should sum quantities across multiple seat product line items at different prices', async () => {
+    const base = createMockSubscription();
+    const baseItem = base.items.data[0];
+
+    const subscription = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '8',
+      },
+      items: {
+        object: 'list',
+        data: [
+          {
+            ...baseItem,
+            id: 'si_paid_seats',
+            quantity: 5,
+            current_period_start: Math.floor(Date.now() / 1000),
+            current_period_end: Math.floor(Date.now() / 1000) + 2592000,
+            price: {
+              ...baseItem.price,
+              id: 'price_paid_seats',
+              product: STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
+              unit_amount: 1000, // $10/seat
+            },
+          },
+          {
+            ...baseItem,
+            id: 'si_free_seats',
+            quantity: 3,
+            current_period_start: Math.floor(Date.now() / 1000),
+            current_period_end: Math.floor(Date.now() / 1000) + 2592000,
+            price: {
+              ...baseItem.price,
+              id: 'price_free_seats',
+              product: STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
+              unit_amount: 0, // free seats
+            },
+          },
+          {
+            ...baseItem,
+            id: 'si_addon_product',
+            quantity: 2,
+            current_period_start: Math.floor(Date.now() / 1000),
+            current_period_end: Math.floor(Date.now() / 1000) + 2592000,
+            price: {
+              ...baseItem.price,
+              id: 'price_addon',
+              product: 'prod_addon_not_seats',
+              unit_amount: 2000, // $20/unit non-seat add-on
+            },
+          },
+        ],
+        has_more: false,
+        url: '/v1/subscription_items',
+      },
+    });
+
+    await handleSubscriptionEvent(subscription, 'test-multi-price-seats');
+
+    const purchases = await db
+      .select()
+      .from(organization_seats_purchases)
+      .where(eq(organization_seats_purchases.idempotency_key, 'test-multi-price-seats'));
+
+    expect(purchases).toHaveLength(1);
+    // Should sum 5 + 3 = 8 seats (both seat products), excluding the 2 add-on units
+    expect(purchases[0].seat_count).toBe(8);
+    // Amount: (5 * $10) + (3 * $0) = $50, not including (2 * $20) = $40 from add-on
+    expect(purchases[0].amount_usd).toBe(50);
+  });
+});
+
 describe('billing cycle tracking', () => {
   let testUser: User;
   let testOrganization: Organization;
@@ -1476,7 +1689,7 @@ describe('Organization plan type updates from subscription', () => {
   });
 });
 
-describe('L3: Enterprise-to-Teams plan transition preserves deny lists', () => {
+describe('L3: Enterprise-to-Teams plan transition preserves access lists', () => {
   let testUser: User;
   let testOrganization: Organization;
 
@@ -1485,17 +1698,17 @@ describe('L3: Enterprise-to-Teams plan transition preserves deny lists', () => {
     testOrganization = await createOrganization('Test Organization', testUser.id);
   });
 
-  test('should preserve model deny lists when transitioning enterprise → teams → enterprise', async () => {
+  test('should preserve provider allow and model deny lists when transitioning enterprise → teams → enterprise', async () => {
     const baseTime = Math.floor(Date.now() / 1000);
 
-    // Set org to enterprise plan with model/provider deny lists
+    // Set org to enterprise plan with provider allow and model deny lists
     await db
       .update(organizations)
       .set({
         plan: 'enterprise',
         settings: {
           model_deny_list: ['gpt-4', 'claude-3-opus'],
-          provider_deny_list: ['openai'],
+          provider_allow_list: ['openai'],
         },
       })
       .where(eq(organizations.id, testOrganization.id));
@@ -1535,7 +1748,7 @@ describe('L3: Enterprise-to-Teams plan transition preserves deny lists', () => {
 
     await handleSubscriptionEvent(teamsSubscription, 'test-l3-to-teams');
 
-    // Verify plan is teams AND deny lists are preserved
+    // Verify plan is teams AND access lists are preserved
     let updatedOrg = await db
       .select()
       .from(organizations)
@@ -1544,7 +1757,7 @@ describe('L3: Enterprise-to-Teams plan transition preserves deny lists', () => {
 
     expect(updatedOrg.plan).toBe('teams');
     expect(updatedOrg.settings.model_deny_list).toEqual(['gpt-4', 'claude-3-opus']);
-    expect(updatedOrg.settings.provider_deny_list).toEqual(['openai']);
+    expect(updatedOrg.settings.provider_allow_list).toEqual(['openai']);
 
     // Process a subscription event that transitions back to 'enterprise'
     const enterpriseSubscription = createMockSubscription({
@@ -1570,7 +1783,7 @@ describe('L3: Enterprise-to-Teams plan transition preserves deny lists', () => {
 
     await handleSubscriptionEvent(enterpriseSubscription, 'test-l3-back-to-enterprise');
 
-    // Verify plan is enterprise AND deny lists are still preserved
+    // Verify plan is enterprise AND access lists are still preserved
     updatedOrg = await db
       .select()
       .from(organizations)
@@ -1579,7 +1792,7 @@ describe('L3: Enterprise-to-Teams plan transition preserves deny lists', () => {
 
     expect(updatedOrg.plan).toBe('enterprise');
     expect(updatedOrg.settings.model_deny_list).toEqual(['gpt-4', 'claude-3-opus']);
-    expect(updatedOrg.settings.provider_deny_list).toEqual(['openai']);
+    expect(updatedOrg.settings.provider_allow_list).toEqual(['openai']);
   });
 });
 

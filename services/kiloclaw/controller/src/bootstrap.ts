@@ -13,12 +13,23 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync as nodeExecFileSync } from 'node:child_process';
-import { generateBaseConfig, writeBaseConfig, writeMcporterConfig } from './config-writer';
+import {
+  generateBaseConfig,
+  ensureInboundEmailHookFlags,
+  sanitizeLegacyStreamChatConfig,
+  writeBaseConfig,
+  writeMcporterConfig,
+} from './config-writer';
 import type { ConfigWriterDeps } from './config-writer';
 import { atomicWrite } from './atomic-write';
+import { migrateKilocodeAuthProfilesToKeyRef } from './auth-profiles-migration';
+import type { AuthProfilesMigrationDeps } from './auth-profiles-migration';
 
 const CONFIG_DIR = '/root/.openclaw';
 const CONFIG_PATH = '/root/.openclaw/openclaw.json';
+const EXEC_APPROVALS_PATH = '/root/.openclaw/exec-approvals.json';
+const DEVICE_PAIRED_PATH = '/root/.openclaw/devices/paired.json';
+const DEVICE_PENDING_PATH = '/root/.openclaw/devices/pending.json';
 const WORKSPACE_DIR = '/root/clawd';
 const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
@@ -32,10 +43,26 @@ const LEGACY_BOT_IDENTITY_DESTS = ['/root/.openclaw/workspace/BOOTSTRAP.md'];
 const ENC_PREFIX = 'KILOCLAW_ENC_';
 const VALUE_PREFIX = 'enc:v1:';
 const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const GATEWAY_CLIENT_ID = 'gateway-client';
+const OPERATOR_TOKEN_ROLE = 'operator';
+const GATEWAY_CLIENT_OPERATOR_SCOPES = [
+  'operator.read',
+  'operator.admin',
+  'operator.approvals',
+  'operator.pairing',
+  'operator.write',
+];
 
 // ---- Types ----
 
 type EnvLike = Record<string, string | undefined>;
+
+type JsonRecord = Record<string, unknown>;
+
+type GatewayClientScopeRepairRequest = {
+  deviceId: string;
+  scopes: string[];
+};
 
 type ExecOpts = {
   env?: NodeJS.ProcessEnv;
@@ -54,6 +81,7 @@ export type BootstrapDeps = {
   renameSync: (oldPath: string, newPath: string) => void;
   unlinkSync: (path: string) => void;
   readdirSync: (dir: string) => string[];
+  statSync: (p: string) => { isDirectory: () => boolean };
   execFileSync: (cmd: string, args: string[], opts?: ExecOpts) => string;
 };
 
@@ -68,6 +96,7 @@ const defaultDeps: BootstrapDeps = {
   renameSync: (oldPath, newPath) => fs.renameSync(oldPath, newPath),
   unlinkSync: p => fs.unlinkSync(p),
   readdirSync: dir => fs.readdirSync(dir),
+  statSync: p => fs.statSync(p),
   execFileSync: (cmd, args, opts) =>
     nodeExecFileSync(cmd, args, {
       encoding: 'utf8',
@@ -86,6 +115,56 @@ export type ControllerState =
   | { state: 'degraded'; error: string };
 
 export type ControllerStateRef = { current: ControllerState };
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stringArraySetEquals(left: unknown, right: readonly string[]): boolean {
+  if (!Array.isArray(left)) return false;
+  const rightSet = new Set(right);
+  const leftSet = new Set<string>();
+  for (const value of left) {
+    if (typeof value !== 'string') return false;
+    leftSet.add(value);
+  }
+  if (leftSet.size !== rightSet.size) return false;
+  return [...rightSet].every(value => leftSet.has(value));
+}
+
+function mergeStringLists(...lists: unknown[]): string[] {
+  const values = new Set<string>();
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const value of list) {
+      if (typeof value !== 'string') continue;
+      const trimmed = value.trim();
+      if (trimmed) values.add(trimmed);
+    }
+  }
+  return [...values];
+}
+
+function setScopeList(
+  record: JsonRecord,
+  key: 'scopes' | 'approvedScopes',
+  scopes: readonly string[]
+): boolean {
+  if (stringArraySetEquals(record[key], scopes)) return false;
+  record[key] = [...scopes];
+  return true;
+}
+
+function roleList(record: JsonRecord): string[] {
+  return mergeStringLists(
+    record.roles,
+    typeof record.role === 'string' ? [record.role] : undefined
+  );
+}
+
+function hasOperatorRole(record: JsonRecord): boolean {
+  return roleList(record).includes(OPERATOR_TOKEN_ROLE);
+}
 
 // ---- Step 1: Env decryption ----
 
@@ -284,11 +363,18 @@ export function writeBotIdentityFile(
   > = defaultDeps
 ): void {
   deps.mkdirSync(path.dirname(IDENTITY_MD_DEST), { recursive: true });
-  atomicWrite(IDENTITY_MD_DEST, formatBotIdentityMarkdown(env), {
-    writeFileSync: deps.writeFileSync,
-    renameSync: deps.renameSync,
-    unlinkSync: deps.unlinkSync,
-  });
+
+  // Only seed IDENTITY.md on the initial boot. After that it's agent/user-owned
+  // content — we must not clobber edits on subsequent reboots. Bot-identity env
+  // var changes (KILOCLAW_BOT_NAME etc.) therefore only take effect on a fresh
+  // instance; existing instances keep whatever IDENTITY.md currently contains.
+  if (!deps.existsSync(IDENTITY_MD_DEST)) {
+    atomicWrite(IDENTITY_MD_DEST, formatBotIdentityMarkdown(env), {
+      writeFileSync: deps.writeFileSync,
+      renameSync: deps.renameSync,
+      unlinkSync: deps.unlinkSync,
+    });
+  }
 
   for (const legacyPath of LEGACY_BOT_IDENTITY_DESTS) {
     if (!deps.existsSync(legacyPath)) continue;
@@ -601,6 +687,7 @@ function toConfigWriterDeps(deps: BootstrapDeps): ConfigWriterDeps {
     renameSync: deps.renameSync,
     chmodSync: deps.chmodSync,
     copyFileSync: deps.copyFileSync,
+    mkdirSync: (p, opts) => deps.mkdirSync(p, { recursive: opts?.recursive ?? false }),
     readdirSync: deps.readdirSync,
     unlinkSync: deps.unlinkSync,
     existsSync: deps.existsSync,
@@ -608,6 +695,66 @@ function toConfigWriterDeps(deps: BootstrapDeps): ConfigWriterDeps {
       deps.execFileSync(cmd, [...args], opts);
     },
   };
+}
+
+/** Adapt BootstrapDeps to AuthProfilesMigrationDeps. */
+function toAuthProfilesMigrationDeps(deps: BootstrapDeps): AuthProfilesMigrationDeps {
+  return {
+    existsSync: deps.existsSync,
+    readdirSync: deps.readdirSync,
+    statSync: deps.statSync,
+    readFileSync: deps.readFileSync,
+    writeFileSync: deps.writeFileSync,
+    renameSync: deps.renameSync,
+    unlinkSync: deps.unlinkSync,
+    chmodSync: deps.chmodSync,
+  };
+}
+
+function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(deps.readFileSync(CONFIG_PATH, 'utf8'));
+  } catch (error) {
+    console.warn(
+      `[controller] Skipping pre-doctor config sanitization: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return;
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return;
+  }
+
+  const initial = JSON.stringify(parsed);
+  const applied: string[] = [];
+
+  sanitizeLegacyStreamChatConfig(parsed);
+  let snapshot = JSON.stringify(parsed);
+  if (snapshot !== initial) applied.push('streamChat');
+
+  ensureInboundEmailHookFlags(parsed);
+  const final = JSON.stringify(parsed);
+  if (final !== snapshot) applied.push('inboundEmailFlags');
+
+  if (applied.length === 0) {
+    return;
+  }
+
+  atomicWrite(
+    CONFIG_PATH,
+    JSON.stringify(parsed, null, 2),
+    {
+      writeFileSync: deps.writeFileSync,
+      renameSync: deps.renameSync,
+      unlinkSync: deps.unlinkSync,
+      chmodSync: deps.chmodSync,
+    },
+    { mode: 0o600 }
+  );
+  console.log(`Sanitized existing config before doctor: [${applied.join(', ')}]`);
 }
 
 export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
@@ -629,6 +776,7 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     }
   } else {
     console.log('Using existing config, running doctor...');
+    sanitizeExistingConfigBeforeDoctor(deps);
     deps.execFileSync('openclaw', ['doctor', '--fix', '--non-interactive'], {
       stdio: 'inherit',
     });
@@ -652,9 +800,220 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     env.KILOCLAW_FRESH_INSTALL = 'false';
   }
 
+  // Seed exec-approvals.json defaults to match the config's exec policy.
+  // The gateway resolves effective exec policy as maxAsk(config, approvals).
+  // If exec-approvals.json has empty defaults, the host layer inherits the
+  // config fallback — but some openclaw versions require explicit defaults
+  // in exec-approvals.json to fully suppress interactive approval prompts.
+  seedExecApprovalsDefaults(env, deps);
+
+  // Migrate any legacy plaintext kilocode keys in auth-profiles.json to
+  // env-backed keyRefs. No-op on fresh installs (onboard writes keyRefs
+  // directly thanks to --secret-input-mode ref) and on instances already
+  // migrated. Running unconditionally also covers the case where an older
+  // auth-profiles.json somehow reappears (e.g., legacy auth.json migration
+  // on first load).
+  const migrationReport = migrateKilocodeAuthProfilesToKeyRef(
+    CONFIG_DIR,
+    toAuthProfilesMigrationDeps(deps)
+  );
+  if (migrationReport.profilesMigrated > 0) {
+    console.log(
+      `[controller] auth-profiles migration: ${migrationReport.profilesMigrated} profile(s) across ${migrationReport.filesModified} file(s)`
+    );
+  }
+
   writeBotIdentityFile(env, deps);
   writeUserProfileFile(env, deps);
   ensureWeatherSkillInstalled(env, deps);
+}
+
+// ---- exec-approvals.json seeder ----
+
+export function seedExecApprovalsDefaults(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
+  const security = env.KILOCLAW_EXEC_SECURITY || 'allowlist';
+  const ask = env.KILOCLAW_EXEC_ASK || 'on-miss';
+
+  try {
+    let file: Record<string, unknown>;
+    if (deps.existsSync(EXEC_APPROVALS_PATH)) {
+      file = JSON.parse(deps.readFileSync(EXEC_APPROVALS_PATH, 'utf8')) as Record<string, unknown>;
+    } else {
+      file = { version: 1 };
+    }
+
+    const defaults = (file.defaults ?? {}) as Record<string, unknown>;
+    defaults.security = security;
+    defaults.ask = ask;
+    defaults.askFallback = 'full';
+    file.defaults = defaults;
+
+    atomicWrite(
+      EXEC_APPROVALS_PATH,
+      JSON.stringify(file, null, 2) + '\n',
+      {
+        writeFileSync: deps.writeFileSync,
+        renameSync: deps.renameSync,
+        unlinkSync: deps.unlinkSync,
+        chmodSync: deps.chmodSync,
+      },
+      { mode: 0o600 }
+    );
+  } catch (err) {
+    console.warn('[controller] Failed to seed exec-approvals.json defaults:', err);
+  }
+}
+
+// ---- gateway-client paired device remediation ----
+
+export type GatewayClientDeviceScopeRemediationResult = {
+  checked: number;
+  updated: number;
+};
+
+function hasOperatorToken(record: JsonRecord): boolean {
+  const tokens = record.tokens;
+  return isJsonRecord(tokens) && isJsonRecord(tokens[OPERATOR_TOKEN_ROLE]);
+}
+
+function readGatewayClientRepairRequests(
+  deps: Pick<BootstrapDeps, 'existsSync' | 'readFileSync'>
+): GatewayClientScopeRepairRequest[] {
+  if (!deps.existsSync(DEVICE_PENDING_PATH)) return [];
+
+  let pendingFile: unknown;
+  try {
+    pendingFile = JSON.parse(deps.readFileSync(DEVICE_PENDING_PATH, 'utf8')) as unknown;
+  } catch (err) {
+    console.warn('[controller] Device pending state is unreadable, skipping repair lookup:', err);
+    return [];
+  }
+  if (!isJsonRecord(pendingFile)) {
+    console.warn('[controller] Device pending state is not an object, skipping repair lookup');
+    return [];
+  }
+
+  const repairs: GatewayClientScopeRepairRequest[] = [];
+  for (const value of Object.values(pendingFile)) {
+    if (!isJsonRecord(value)) continue;
+    if (value.clientId !== GATEWAY_CLIENT_ID) continue;
+    if (value.isRepair !== true) continue;
+    if (!hasOperatorRole(value)) continue;
+    if (typeof value.deviceId !== 'string' || value.deviceId.trim().length === 0) continue;
+
+    // Trust boundary: pending.json is local OpenClaw state, not external API input.
+    // Revisit this guard if any non-OpenClaw writer starts staging device requests.
+    const operatorScopes = mergeStringLists(value.scopes).filter(scope =>
+      scope.startsWith('operator.')
+    );
+    if (operatorScopes.length === 0) continue;
+
+    repairs.push({ deviceId: value.deviceId, scopes: operatorScopes });
+  }
+  return repairs;
+}
+
+function buildGatewayClientRepairScopesByDeviceId(
+  deps: Pick<BootstrapDeps, 'existsSync' | 'readFileSync'>
+): Map<string, string[]> {
+  const scopesByDeviceId = new Map<string, string[]>();
+  for (const repair of readGatewayClientRepairRequests(deps)) {
+    const existing = scopesByDeviceId.get(repair.deviceId);
+    scopesByDeviceId.set(repair.deviceId, mergeStringLists(existing, repair.scopes));
+  }
+  return scopesByDeviceId;
+}
+
+export function remediateGatewayClientDeviceScopes(
+  deps: Pick<
+    BootstrapDeps,
+    'existsSync' | 'readFileSync' | 'writeFileSync' | 'renameSync' | 'unlinkSync' | 'chmodSync'
+  > = defaultDeps
+): GatewayClientDeviceScopeRemediationResult {
+  if (!deps.existsSync(DEVICE_PAIRED_PATH)) {
+    return { checked: 0, updated: 0 };
+  }
+
+  const pairedFile = JSON.parse(deps.readFileSync(DEVICE_PAIRED_PATH, 'utf8')) as unknown;
+  if (!isJsonRecord(pairedFile)) {
+    console.warn('[controller] Device paired state is not an object, skipping remediation');
+    return { checked: 0, updated: 0 };
+  }
+
+  let checked = 0;
+  let updated = 0;
+  const repairScopesByDeviceId = buildGatewayClientRepairScopesByDeviceId(deps);
+
+  for (const value of Object.values(pairedFile)) {
+    if (!isJsonRecord(value)) continue;
+    const deviceId = typeof value.deviceId === 'string' ? value.deviceId : undefined;
+    const repairScopes = deviceId ? repairScopesByDeviceId.get(deviceId) : undefined;
+    const isGatewayClientPairing = value.clientId === GATEWAY_CLIENT_ID;
+    const shouldRepairByDeviceId =
+      Array.isArray(repairScopes) && repairScopes.length > 0 && hasOperatorToken(value);
+    if (!isGatewayClientPairing && !shouldRepairByDeviceId) continue;
+    checked += 1;
+
+    const tokens = value.tokens;
+    const operatorToken = isJsonRecord(tokens) ? tokens[OPERATOR_TOKEN_ROLE] : undefined;
+    // Intentionally monotonic: converge OpenClaw's persisted approval layers to the
+    // broadest locally observed gateway-client operator repair scope set.
+    const mergedScopes = mergeStringLists(
+      value.scopes,
+      value.approvedScopes,
+      isJsonRecord(operatorToken) ? operatorToken.scopes : undefined,
+      GATEWAY_CLIENT_OPERATOR_SCOPES,
+      repairScopes
+    );
+
+    let changed = false;
+    changed = setScopeList(value, 'scopes', mergedScopes) || changed;
+    changed = setScopeList(value, 'approvedScopes', mergedScopes) || changed;
+
+    if (isJsonRecord(operatorToken)) {
+      changed = setScopeList(operatorToken, 'scopes', mergedScopes) || changed;
+    }
+
+    if (changed) updated += 1;
+  }
+
+  if (updated === 0) {
+    return { checked, updated };
+  }
+
+  atomicWrite(
+    DEVICE_PAIRED_PATH,
+    JSON.stringify(pairedFile, null, 2) + '\n',
+    {
+      writeFileSync: deps.writeFileSync,
+      renameSync: deps.renameSync,
+      unlinkSync: deps.unlinkSync,
+      chmodSync: deps.chmodSync,
+    },
+    { mode: 0o600 }
+  );
+
+  return { checked, updated };
+}
+
+export function runGatewayClientDeviceScopeRemediation(
+  deps: Pick<
+    BootstrapDeps,
+    'existsSync' | 'readFileSync' | 'writeFileSync' | 'renameSync' | 'unlinkSync' | 'chmodSync'
+  > = defaultDeps
+): GatewayClientDeviceScopeRemediationResult {
+  try {
+    const remediation = remediateGatewayClientDeviceScopes(deps);
+    if (remediation.updated > 0) {
+      console.log(
+        `[controller] gateway-client device scopes remediated: ${remediation.updated}/${remediation.checked} paired device(s)`
+      );
+    }
+    return remediation;
+  } catch (err) {
+    console.warn('[controller] Failed to remediate gateway-client device scopes:', err);
+    return { checked: 0, updated: 0 };
+  }
 }
 
 // ---- TOOLS.md bounded-section helper ----
@@ -790,7 +1149,7 @@ You can interact with the \`Linear\` MCP server using your \`mcporter\` skill.
 
 // Additional KiloClaw-mitigated OpenClaw audit findings beyond the
 // gateway.control_ui.insecure_auth one already documented in the base
-// TOOLS.md. Mirrors the list in apps/web/src/lib/security-advisor/
+// TOOLS.md. Mirrors the list in apps/web/src/lib/shell-security/
 // kiloclaw-mitigations.ts — the server-side /security-checkup path
 // suppresses these before grading, but when a user runs `openclaw doctor`
 // directly the findings still show and the agent needs the same context
@@ -816,7 +1175,7 @@ When running \`openclaw doctor\` or \`openclaw security audit\`, the following f
 
 1. Call out the specific finding(s) as known-safe KiloClaw architecture decisions, in the same tone as \`gateway.control_ui.insecure_auth\` above.
 2. Explain WHY each is safe using the per-finding rationale above.
-3. Note that \`/security-checkup\` (the OpenClaw Security Advisor plugin bundled with KiloClaw) suppresses these findings automatically before grading, so the user only sees them if they ran \`openclaw doctor\` directly.
+3. Note that \`/security-checkup\` (the ShellSecurity plugin bundled with KiloClaw) suppresses these findings automatically before grading, so the user only sees them if they ran \`openclaw doctor\` directly.
 <!-- END:kiloclaw-mitigations -->`,
 };
 
@@ -828,6 +1187,28 @@ When running \`openclaw doctor\` or \`openclaw security audit\`, the following f
 // OpenClaw versions, users editing openclaw.json). This section is a
 // belt-and-suspenders reminder for the agent flow, not the load-bearing
 // fix.
+// Pin the process model so agents stop hallucinating systemd-based
+// remediation. systemd packages ship in the image as apt transitive deps,
+// so `which systemctl` finds the binary, but the daemon is never running
+// and there are no unit files. Always-on, idempotent — appended to
+// existing instances on redeploy.
+export const PROCESS_MODEL_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: 'Process Model',
+  beginMarker: '<!-- BEGIN:process-model -->',
+  endMarker: '<!-- END:process-model -->',
+  section: `
+<!-- BEGIN:process-model -->
+
+## Process Model
+
+KiloClaw does NOT use systemd. Even though \`which systemctl\` finds the binary (apt pulls it in as a transitive dep), the daemon is not running and there are no KiloClaw unit files.
+
+- Do not suggest \`systemctl\`, \`journalctl\`, \`service ...\`, unit files, or any init-based remediation — none of it will work.
+- \`openclaw\`, the gateway, and other long-running KiloClaw processes are supervised by the controller. To inspect or restart them, use the controller's APIs and logs, not init.
+
+<!-- END:process-model -->`,
+};
+
 export const PLUGIN_INSTALL_SECTION_CONFIG: ToolsMdSectionConfig = {
   name: 'Plugin Install',
   beginMarker: '<!-- BEGIN:plugin-install -->',
@@ -908,6 +1289,10 @@ export async function bootstrapNonCritical(
   const steps: BootstrapStep[] = [
     { phase: 'github', run: () => configureGitHub(env, deps) },
     { phase: 'linear', run: () => configureLinear(env) },
+    {
+      phase: 'gateway-client-device-scopes',
+      run: () => runGatewayClientDeviceScopeRemediation(deps),
+    },
     { phase: configPhase, run: () => runOnboardOrDoctor(env, deps) },
     {
       phase: 'tools-md',
@@ -922,6 +1307,7 @@ export async function bootstrapNonCritical(
         // and how to keep plugins.allow in sync on plugin installs.
         updateToolsMdSection(true, KILOCLAW_MITIGATIONS_SECTION_CONFIG, deps);
         updateToolsMdSection(true, PLUGIN_INSTALL_SECTION_CONFIG, deps);
+        updateToolsMdSection(true, PROCESS_MODEL_SECTION_CONFIG, deps);
       },
     },
     {

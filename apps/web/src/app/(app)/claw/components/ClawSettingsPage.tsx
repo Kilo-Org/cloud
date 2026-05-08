@@ -4,13 +4,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { TRPCClientError } from '@trpc/client';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
-import { useKiloClawStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
-import { useOrgKiloClawStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
+import { useKiloClawStatus, useKiloClawMutations, useKiloClawMyPin } from '@/hooks/useKiloClaw';
+import {
+  useOrgKiloClawStatus,
+  useOrgKiloClawMutations,
+  useOrgKiloClawMyPin,
+} from '@/hooks/useOrgKiloClaw';
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawInstanceOverview } from './ClawInstanceOverview';
 import { SettingsTab } from './SettingsTab';
+import { UpgradeKiloClawDialog } from './UpgradeKiloClawDialog';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,7 +38,18 @@ function ClawSettingsInner({
   const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
   const mutations = organizationId ? orgMutations : personalMutations;
 
+  // Pin state for the upgrade-confirmation dialog. Only the active
+  // context queries (org vs personal); the inactive hook stays disabled
+  // so we don't fire an org getMyPin with an empty organizationId.
+  const personalPin = useKiloClawMyPin({ enabled: !organizationId });
+  const orgPin = useOrgKiloClawMyPin(organizationId ?? '', {
+    enabled: !!organizationId,
+  });
+  const pin = organizationId ? orgPin.data : personalPin.data;
+  const pinnedImageTag = pin?.image_tag ?? null;
+
   const [dirtySecrets, setDirtySecrets] = useState<Set<string>>(new Set());
+  const [confirmUpgrade, setConfirmUpgrade] = useState(false);
   const onSecretsChanged = useCallback((entryId: string) => {
     setDirtySecrets(prev => new Set([...prev, entryId]));
   }, []);
@@ -53,36 +70,80 @@ function ClawSettingsInner({
     });
   }, [mutations.restartMachine, onRedeploySuccess]);
 
-  const onUpgrade = useCallback(() => {
+  const onRequestUpgrade = useCallback(() => {
+    setConfirmUpgrade(true);
+  }, []);
+
+  const onConfirmUpgrade = useCallback(() => {
+    // Only ack what was actually rendered to the user. If pinnedImageTag
+    // is null (no warning shown), send false; the backend gate will
+    // catch any pin that appeared between render and click and surface
+    // PIN_EXISTS so the user can retry with fresh data.
     mutations.restartMachine.mutate(
-      { imageTag: 'latest' },
+      { imageTag: 'latest', acknowledgePinRemoval: !!pinnedImageTag },
       {
         onSuccess: () => {
-          toast.success('Upgrading to latest image');
+          toast.success('Upgrading KiloClaw');
+          setConfirmUpgrade(false);
           onRedeploySuccess();
         },
         onError: err => {
+          if (
+            err instanceof TRPCClientError &&
+            err.data?.code === 'PRECONDITION_FAILED' &&
+            err.message === 'PIN_EXISTS'
+          ) {
+            // Pin appeared between render and click. Refetch the active
+            // context's pin query so the dialog re-renders with a warning
+            // on the next click.
+            if (organizationId) void orgPin.refetch();
+            else void personalPin.refetch();
+            toast.error(
+              'A version pin was set on this instance. Review the warning and try again.',
+              { duration: 10000 }
+            );
+            return;
+          }
           toast.error(err.message, { duration: 10000 });
         },
       }
     );
-  }, [mutations.restartMachine, onRedeploySuccess]);
-
-  const onRequestUpgrade = useCallback(() => {
-    onUpgrade();
-  }, [onUpgrade]);
+  }, [
+    mutations.restartMachine,
+    onRedeploySuccess,
+    pinnedImageTag,
+    organizationId,
+    orgPin,
+    personalPin,
+  ]);
 
   return (
-    <SettingsTab
-      status={status}
-      mutations={mutations}
-      onSecretsChanged={onSecretsChanged}
-      dirtySecrets={dirtySecrets}
-      onRedeploy={onRedeploy}
-      onUpgrade={onUpgrade}
-      onRequestUpgrade={onRequestUpgrade}
-      organizationName={organizationName}
-    />
+    <>
+      <ClawInstanceOverview
+        status={status}
+        onRedeploySuccess={onRedeploySuccess}
+        onRequestUpgrade={onRequestUpgrade}
+      />
+      <SettingsTab
+        status={status}
+        mutations={mutations}
+        onSecretsChanged={onSecretsChanged}
+        dirtySecrets={dirtySecrets}
+        onRedeploy={onRedeploy}
+        onRequestUpgrade={onRequestUpgrade}
+        organizationName={organizationName}
+      />
+      <UpgradeKiloClawDialog
+        open={confirmUpgrade}
+        onOpenChange={open => {
+          if (mutations.restartMachine.isPending) return;
+          setConfirmUpgrade(open);
+        }}
+        isPending={mutations.restartMachine.isPending}
+        onConfirm={onConfirmUpgrade}
+        pinnedImageTag={pinnedImageTag}
+      />
+    </>
   );
 }
 
@@ -139,7 +200,6 @@ function ClawSettingsWithStatus({
   const settingsContent = (
     <div className="flex flex-col gap-6">
       <ClawConfigServiceBanner status={status} />
-      <ClawInstanceOverview status={status} />
       <ClawSettingsInner status={status} organizationName={organizationName} />
     </div>
   );

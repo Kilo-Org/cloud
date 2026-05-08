@@ -25,7 +25,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { OpenInEditorButton } from '@/app/share/[shareId]/open-in-editor-button';
-import { OpenInCliButton } from '@/app/share/[shareId]/open-in-cli-button';
 import { CopyableCommand } from '@/components/CopyableCommand';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -53,7 +52,7 @@ export function SessionsPageContent() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [platformFilter, setPlatformFilter] = useState<PlatformFilterValue>('all');
   const [includeSubSessions, setIncludeSubSessions] = useState(false);
-  type SessionWithSource = SessionsListItem & { source: 'v1' | 'v2' };
+  type SessionWithSource = SessionsListItem & { source: 'v2' };
   const [selectedSession, setSelectedSession] = useState<SessionWithSource | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -76,7 +75,7 @@ export function SessionsPageContent() {
   // Query for listing sessions (when not searching)
   // Order by updated_at and filter by organization and platform
   const { data: listData, isLoading: isListLoading } = useQuery(
-    trpc.unifiedSessions.list.queryOptions({
+    trpc.cliSessionsV2.list.queryOptions({
       limit: 50,
       orderBy: 'updated_at',
       organizationId: organizationId ?? null,
@@ -86,13 +85,13 @@ export function SessionsPageContent() {
           : platformFilter === 'cloud-agent'
             ? ['cloud-agent', 'cloud-agent-web']
             : platformFilter,
-      includeSubSessions,
+      includeChildren: includeSubSessions,
     })
   );
 
   // Query for searching sessions (uses debounced value)
   const { data: searchData, isLoading: isSearchLoading } = useQuery({
-    ...trpc.unifiedSessions.search.queryOptions({
+    ...trpc.cliSessionsV2.search.queryOptions({
       search_string: debouncedSearchQuery.trim(),
       limit: 50,
       offset: 0,
@@ -103,7 +102,7 @@ export function SessionsPageContent() {
           : platformFilter === 'cloud-agent'
             ? ['cloud-agent', 'cloud-agent-web']
             : platformFilter,
-      includeSubSessions,
+      includeChildren: includeSubSessions,
     }),
     enabled: isSearching,
   });
@@ -111,13 +110,12 @@ export function SessionsPageContent() {
   // Convert API session to StoredSession format
   const convertToStoredSession = (session: {
     session_id: string;
-    title: string;
+    title: string | null;
     git_url: string | null;
     created_at: string;
     updated_at: string;
     created_on_platform: string;
     cloud_agent_session_id: string | null;
-    source: 'v1' | 'v2';
   }): SessionWithSource => {
     const repository = extractRepoFromGitUrl(session.git_url) ?? null;
     const prompt = session.title || 'Untitled';
@@ -129,7 +127,7 @@ export function SessionsPageContent() {
       repository,
       sessionId: session.session_id,
       mode: '',
-      source: session.source,
+      source: 'v2' as const,
     };
   };
 
@@ -261,53 +259,24 @@ export function SessionsPageContent() {
                   Fork this session to continue working on it in your editor or CLI
                 </p>
 
-                {selectedSession.source === 'v1' && (
-                  <>
-                    {/* Open in Editor (v1 only) */}
-                    <div className="flex justify-center">
-                      <OpenInEditorButton sessionId={selectedSession.sessionId} />
-                    </div>
+                {/* Open in Editor */}
+                <div className="flex justify-center">
+                  <OpenInEditorButton
+                    sessionId={selectedSession.sessionId}
+                    pathOverride={`/s/${selectedSession.sessionId}`}
+                  />
+                </div>
 
-                    {/* Open in CLI (v1 only) */}
-                    <div className="flex justify-center">
-                      <OpenInCliButton command={`kilocode --fork ${selectedSession.sessionId}`} />
-                    </div>
-
-                    {/* Manual fork command (v1) */}
-                    <div className="space-y-2">
-                      <p className="text-muted-foreground text-xs">
-                        Or use the fork command manually:
-                      </p>
-                      <CopyableCommand
-                        command={`/session fork ${selectedSession.sessionId}`}
-                        className="bg-muted rounded-md px-3 py-2 text-sm"
-                      />
-                    </div>
-                  </>
-                )}
-
-                {selectedSession.source === 'v2' && (
-                  <>
-                    {/* Open in Editor (v2) */}
-                    <div className="flex justify-center">
-                      <OpenInEditorButton
-                        sessionId={selectedSession.sessionId}
-                        pathOverride={`/s/${selectedSession.sessionId}`}
-                      />
-                    </div>
-
-                    {/* Fork in CLI (v2) */}
-                    <div className="space-y-2">
-                      <p className="text-muted-foreground text-xs">
-                        Or use the CLI to fork this session:
-                      </p>
-                      <CopyableCommand
-                        command={`kilo --session ${selectedSession.sessionId} --cloud-fork`}
-                        className="bg-muted rounded-md px-3 py-2 text-sm"
-                      />
-                    </div>
-                  </>
-                )}
+                {/* Fork in CLI */}
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs">
+                    Or use the CLI to fork this session:
+                  </p>
+                  <CopyableCommand
+                    command={`kilo --session ${selectedSession.sessionId} --cloud-fork`}
+                    className="bg-muted rounded-md px-3 py-2 text-sm"
+                  />
+                </div>
               </div>
             </div>
           )}

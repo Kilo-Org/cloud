@@ -1,4 +1,9 @@
 import { z, type ZodType } from 'zod';
+import {
+  DELIVERY_CHANNELS,
+  DELIVERY_REASONS,
+  DELIVERY_STATUSES,
+} from '../../plugins/kiloclaw-morning-briefing/src/delivery-constants';
 
 export type GatewayProcessStatus = {
   state: 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed' | 'shutting_down';
@@ -97,6 +102,71 @@ export const OpenclawWorkspaceImportResponseSchema = z.object({
   failedCount: z.number().int().min(0),
   totalUtf8Bytes: z.number().int().min(0),
   failures: z.array(OpenclawWorkspaceImportFailureSchema),
+});
+
+const MorningBriefingSourceReadinessSchema = z.object({
+  configured: z.boolean(),
+  summary: z.string(),
+});
+
+const MorningBriefingDeliverySchema = z.object({
+  channel: z.enum(DELIVERY_CHANNELS),
+  status: z.enum(DELIVERY_STATUSES),
+  target: z.string().optional(),
+  accountId: z.string().optional(),
+  reason: z.enum(DELIVERY_REASONS).optional(),
+  error: z.string().optional(),
+});
+
+export const MorningBriefingStatusResponseSchema = z.object({
+  ok: z.boolean(),
+  enabled: z.boolean().optional(),
+  cron: z.string().optional(),
+  timezone: z.string().optional(),
+  cronJobId: z.string().nullable().optional(),
+  lastGeneratedDate: z.string().nullable().optional(),
+  lastGeneratedAt: z.string().nullable().optional(),
+  reconcileState: z.enum(['idle', 'in_progress', 'succeeded', 'failed']).optional(),
+  lastReconcileAction: z.enum(['enable', 'disable']).nullable().optional(),
+  desiredEnabled: z.boolean().optional(),
+  observedEnabled: z.boolean().nullable().optional(),
+  lastReconcileAt: z.string().nullable().optional(),
+  lastReconcileError: z.string().nullable().optional(),
+  sourceReadiness: z
+    .object({
+      github: MorningBriefingSourceReadinessSchema,
+      linear: MorningBriefingSourceReadinessSchema,
+      web: MorningBriefingSourceReadinessSchema,
+    })
+    .optional(),
+  lastDelivery: z.array(MorningBriefingDeliverySchema).optional(),
+  code: z.string().optional(),
+  retryAfterSec: z.number().int().positive().optional(),
+  error: z.string().optional(),
+});
+
+export const MorningBriefingActionResponseSchema = z.object({
+  ok: z.boolean(),
+  enabled: z.boolean().optional(),
+  cron: z.string().optional(),
+  timezone: z.string().optional(),
+  cronJobId: z.string().nullable().optional(),
+  date: z.string().optional(),
+  filePath: z.string().optional(),
+  failures: z.array(z.string()).optional(),
+  delivery: z.array(MorningBriefingDeliverySchema).optional(),
+  code: z.string().optional(),
+  retryAfterSec: z.number().int().positive().optional(),
+  error: z.string().optional(),
+});
+
+export const MorningBriefingReadResponseSchema = z.object({
+  ok: z.boolean(),
+  dateKey: z.string().optional(),
+  filePath: z.string().optional(),
+  exists: z.boolean().optional(),
+  markdown: z.string().nullable().optional(),
+  error: z.string().optional(),
 });
 
 export class GatewayControllerError extends Error {

@@ -11,7 +11,7 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
-import { eq, and, desc, count, ne, inArray, sql, sum, gte } from 'drizzle-orm';
+import { eq, and, desc, count, ne, inArray, sql, sum, gte, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
@@ -40,6 +40,7 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
         head_sha: params.headSha,
         platform: params.platform ?? 'github',
         platform_project_id: params.platformProjectId ?? null,
+        agent_version: 'v2',
         status: 'pending',
       })
       .returning({ id: cloud_agent_code_reviews.id });
@@ -157,6 +158,101 @@ export async function updateCodeReviewStatus(
     captureException(error, {
       tags: { operation: 'updateCodeReviewStatus' },
       extra: { reviewId, status, updates },
+    });
+    throw error;
+  }
+}
+
+export async function updateCodeReviewStatusIfNonTerminal(
+  reviewId: string,
+  status: CodeReviewStatus,
+  updates: {
+    sessionId?: string;
+    cliSessionId?: string;
+    errorMessage?: string;
+    terminalReason?: CodeReviewTerminalReason;
+    startedAt?: Date;
+    completedAt?: Date;
+    agentVersion?: string;
+    model?: string;
+    totalTokensIn?: number;
+    totalTokensOut?: number;
+    totalCostMusd?: number;
+  } = {}
+): Promise<boolean> {
+  try {
+    const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (updates.sessionId !== undefined) updateData.session_id = updates.sessionId;
+    if (updates.cliSessionId !== undefined) updateData.cli_session_id = updates.cliSessionId;
+    if (updates.errorMessage !== undefined) updateData.error_message = updates.errorMessage;
+    if (updates.terminalReason !== undefined) updateData.terminal_reason = updates.terminalReason;
+    if (updates.startedAt !== undefined) updateData.started_at = updates.startedAt.toISOString();
+    if (updates.completedAt !== undefined) {
+      updateData.completed_at = updates.completedAt.toISOString();
+    }
+    if (updates.agentVersion !== undefined) updateData.agent_version = updates.agentVersion;
+    if (updates.model !== undefined) updateData.model = updates.model;
+    if (updates.totalTokensIn !== undefined) updateData.total_tokens_in = updates.totalTokensIn;
+    if (updates.totalTokensOut !== undefined) updateData.total_tokens_out = updates.totalTokensOut;
+    if (updates.totalCostMusd !== undefined) updateData.total_cost_musd = updates.totalCostMusd;
+
+    if (status === 'running' && !updates.startedAt) {
+      updateData.started_at = new Date().toISOString();
+    }
+    if (
+      (status === 'completed' || status === 'failed' || status === 'cancelled') &&
+      !updates.completedAt
+    ) {
+      updateData.completed_at = new Date().toISOString();
+    }
+
+    const updated = await db
+      .update(cloud_agent_code_reviews)
+      .set(updateData)
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.id, reviewId),
+          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
+        )
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    return updated.length > 0;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'updateCodeReviewStatusIfNonTerminal' },
+      extra: { reviewId, status, updates },
+    });
+    throw error;
+  }
+}
+
+export async function releaseQueuedReviewClaim(reviewId: string): Promise<boolean> {
+  try {
+    const released = await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        status: 'pending',
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.id, reviewId),
+          eq(cloud_agent_code_reviews.status, 'queued'),
+          isNull(cloud_agent_code_reviews.session_id)
+        )
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    return released.length > 0;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'releaseQueuedReviewClaim' },
+      extra: { reviewId },
     });
     throw error;
   }
@@ -488,6 +584,39 @@ export async function updateCheckRunId(reviewId: string, checkRunId: number): Pr
     captureException(error, {
       tags: { operation: 'updateCheckRunId' },
       extra: { reviewId, checkRunId },
+    });
+    throw error;
+  }
+}
+
+/**
+ * Repoints an in-flight review at a new head SHA (and optionally a new check
+ * run). Used when a merge commit arrives for a PR with a preserved review:
+ * the review keeps running on the prior feature-branch content, but its
+ * eventual completion needs to update the gate on the new HEAD (which is
+ * what branch-protection evaluates) rather than the abandoned prior SHA.
+ *
+ * Pass `checkRunId = null` for GitLab, whose commit statuses are keyed by
+ * (sha, name) rather than by an opaque ID.
+ */
+export async function updateReviewHeadShaAndCheckRun(
+  reviewId: string,
+  headSha: string,
+  checkRunId: number | null
+): Promise<void> {
+  try {
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        head_sha: headSha,
+        check_run_id: checkRunId,
+        updated_at: new Date().toISOString(),
+      })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'updateReviewHeadShaAndCheckRun' },
+      extra: { reviewId, headSha, checkRunId },
     });
     throw error;
   }

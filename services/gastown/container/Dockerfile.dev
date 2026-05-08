@@ -4,7 +4,7 @@ FROM --platform=linux/arm64 oven/bun:1-slim
 # Package categories:
 #   version control: git, git-lfs
 #   network/download: curl, wget, ca-certificates, gnupg, unzip
-#   build toolchain: build-essential, autoconf
+#   build toolchain: build-essential, autoconf, cmake, pkg-config
 #   search tools: ripgrep, jq
 #   compression: bzip2, zstd
 #   SSL/crypto: libssl-dev, libffi-dev
@@ -16,6 +16,7 @@ FROM --platform=linux/arm64 oven/bun:1-slim
 #   C++ stdlib: libc++1
 #   math: libgmp-dev
 #   timezone data: tzdata
+#   Java: default-jdk
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       git \
@@ -27,6 +28,8 @@ RUN apt-get update && \
       unzip \
       build-essential \
       autoconf \
+      cmake \
+      pkg-config \
       ripgrep \
       jq \
       bzip2 \
@@ -47,6 +50,7 @@ RUN apt-get update && \
       libc++1 \
       libgmp-dev \
       tzdata \
+      default-jdk \
     && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -67,7 +71,7 @@ RUN git lfs install --system
 # pick either depending on the detected libc. bun:1-slim is Debian (glibc)
 # but the resolver sometimes misdetects; installing both is safe.
 # Also install pnpm — many projects use it as their package manager.
-RUN npm install -g @kilocode/cli @kilocode/cli-linux-arm64 @kilocode/cli-linux-arm64-musl pnpm && \
+RUN npm install -g @kilocode/cli@7.2.14 @kilocode/cli-linux-arm64@7.2.14 @kilocode/cli-linux-arm64-musl@7.2.14 @kilocode/plugin@7.2.14 pnpm && \
     ln -s "$(which kilo)" /usr/local/bin/opencode
 
 # Create non-root user for defense-in-depth

@@ -17,8 +17,6 @@ const LOG = '[patrol]';
 
 // ── Thresholds ──────────────────────────────────────────────────────
 
-/** First GUPP warning (existing behavior) */
-export const GUPP_WARN_MS = 30 * 60_000; // 30 min
 /** Escalate to mayor after second threshold */
 export const GUPP_ESCALATE_MS = 60 * 60_000; // 1h
 /** Force-stop agent after third threshold */
@@ -60,6 +58,12 @@ export const TRIAGE_BATCH_LABEL = 'gt:triage';
 
 /** SQL LIKE pattern for querying triage request beads by label. */
 export const TRIAGE_LABEL_LIKE = `%"${TRIAGE_REQUEST_LABEL}"%`;
+
+/** Label used to mark beads that should not yet be dispatched by the reconciler. */
+export const HELD_LABEL = 'gt:held';
+
+/** SQL LIKE pattern for querying held beads by label. */
+export const HELD_LABEL_LIKE = `%"${HELD_LABEL}"%`;
 
 /** Create a triage request bead for the LLM triage agent to resolve. */
 export function createTriageRequest(

@@ -93,6 +93,65 @@ export function useClawControllerVersion(enabled: boolean) {
   return organizationId ? org : personal;
 }
 
+export function useClawMorningBriefingStatus(enabled: boolean) {
+  const trpc = useTRPC();
+  const { organizationId } = useClawContext();
+
+  const getRefetchInterval = (data: unknown): number => {
+    const maybeCode =
+      typeof data === 'object' && data !== null && 'code' in data
+        ? (data as { code?: unknown }).code
+        : undefined;
+    return maybeCode === 'gateway_warming_up' ? 10_000 : 30_000;
+  };
+
+  const personal = useQuery({
+    ...trpc.kiloclaw.getMorningBriefingStatus.queryOptions(undefined, {
+      refetchInterval: query => (enabled ? getRefetchInterval(query.state.data) : false),
+      retry: false,
+    }),
+    enabled: enabled && !organizationId,
+  });
+
+  const org = useQuery({
+    ...trpc.organizations.kiloclaw.getMorningBriefingStatus.queryOptions(
+      { organizationId: organizationId ?? '' },
+      {
+        refetchInterval: query => (enabled ? getRefetchInterval(query.state.data) : false),
+        retry: false,
+      }
+    ),
+    enabled: enabled && !!organizationId,
+  });
+
+  return organizationId ? org : personal;
+}
+
+export function useClawReadMorningBriefing(day: 'today' | 'yesterday' | null, enabled: boolean) {
+  const trpc = useTRPC();
+  const { organizationId } = useClawContext();
+
+  const personal = useQuery({
+    ...trpc.kiloclaw.readMorningBriefing.queryOptions(
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by enabled
+      { day: day! },
+      { refetchOnWindowFocus: false }
+    ),
+    enabled: enabled && day !== null && !organizationId,
+  });
+
+  const org = useQuery({
+    ...trpc.organizations.kiloclaw.readMorningBriefing.queryOptions(
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by enabled
+      { organizationId: organizationId ?? '', day: day! },
+      { refetchOnWindowFocus: false }
+    ),
+    enabled: enabled && day !== null && !!organizationId,
+  });
+
+  return organizationId ? org : personal;
+}
+
 // Pairing
 
 export function useClawPairing(enabled = true) {
@@ -213,18 +272,24 @@ export function useClawMyPin() {
   return organizationId ? org : personal;
 }
 
-export function useClawLatestVersion() {
+export function useClawLatestVersion(currentImageTag?: string | null) {
   const trpc = useTRPC();
   const { organizationId } = useClawContext();
 
+  // Pass currentImageTag to the resolver so it can suppress false upgrade
+  // offers when the instance is already on the candidate (or otherwise on
+  // the resolver's chosen image). Without this the banner can surface a
+  // downgrade after a slider rollback.
+  const input = currentImageTag ? { currentImageTag } : undefined;
+
   const personal = useQuery({
-    ...trpc.kiloclaw.latestVersion.queryOptions(undefined, { staleTime: 60_000 }),
+    ...trpc.kiloclaw.latestVersion.queryOptions(input, { staleTime: 60_000 }),
     enabled: !organizationId,
   });
 
   const org = useQuery({
     ...trpc.organizations.kiloclaw.latestVersion.queryOptions(
-      { organizationId: organizationId ?? '' },
+      { organizationId: organizationId ?? '', currentImageTag: currentImageTag ?? undefined },
       { staleTime: 60_000 }
     ),
     enabled: !!organizationId,
@@ -346,30 +411,6 @@ export function useClawGoogleSetupCommand(enabled: boolean) {
     ...trpc.organizations.kiloclaw.getGoogleSetupCommand.queryOptions(
       { organizationId: organizationId ?? '' },
       { refetchInterval: 50 * 60 * 1000, refetchOnWindowFocus: false }
-    ),
-    enabled: enabled && !!organizationId,
-  });
-
-  return organizationId ? org : personal;
-}
-
-// Stream Chat
-
-export function useClawStreamChatCredentials(enabled: boolean) {
-  const trpc = useTRPC();
-  const { organizationId } = useClawContext();
-
-  const personal = useQuery({
-    ...trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
-      staleTime: 5 * 60_000,
-    }),
-    enabled: enabled && !organizationId,
-  });
-
-  const org = useQuery({
-    ...trpc.organizations.kiloclaw.getStreamChatCredentials.queryOptions(
-      { organizationId: organizationId ?? '' },
-      { staleTime: 5 * 60_000 }
     ),
     enabled: enabled && !!organizationId,
   });

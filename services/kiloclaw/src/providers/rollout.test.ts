@@ -48,7 +48,7 @@ describe('provider rollout config', () => {
     });
   });
 
-  it('selects fly while Northflank rollout is unavailable', async () => {
+  it('selects Northflank when rollout is enabled at 100 percent', async () => {
     const kv = createKv(
       JSON.stringify({
         northflank: {
@@ -59,14 +59,14 @@ describe('provider rollout config', () => {
       })
     );
 
-    await expect(selectProviderForProvision({ kv, userId: 'user-1' })).resolves.toBe('fly');
+    await expect(selectProviderForProvision({ kv, userId: 'user-1' })).resolves.toBe('northflank');
     await expect(
       selectProviderForProvision({
         kv,
         userId: 'user-1',
         orgId: '550e8400-e29b-41d4-a716-446655440001',
       })
-    ).resolves.toBe('fly');
+    ).resolves.toBe('northflank');
   });
 
   it('selects the configured default provider in development', async () => {

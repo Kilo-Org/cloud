@@ -17,6 +17,35 @@ type PersonalSubscriptionRow = {
   };
 };
 
+type TransferUpdate = {
+  before: KiloClawSubscription;
+  transferredToSubscriptionId: string | null;
+};
+
+type TransferPlan = {
+  headRow: PersonalSubscriptionRow;
+  updates: TransferUpdate[];
+};
+
+type ChangeLogFailurePolicy = 'fail' | 'log';
+
+type ChangeLogFailureContext = {
+  error: unknown;
+  reason: string;
+  subscriptionId: string;
+  userId: string;
+};
+
+type CollapseOptions = {
+  changeLogFailurePolicy?: ChangeLogFailurePolicy;
+  onChangeLogFailure?: (context: ChangeLogFailureContext) => Promise<void> | void;
+};
+
+type BuildTransferUpdatesOverride = (params: {
+  rows: PersonalSubscriptionRow[];
+  now: Date;
+}) => TransferUpdate[];
+
 export type DestroyedInstanceRow = {
   id: string;
   userId: string;
@@ -42,11 +71,41 @@ export class PersonalSubscriptionDestroyConflictError extends Error {
   }
 }
 
-function byCreatedAtAndId(left: PersonalSubscriptionRow, right: PersonalSubscriptionRow): number {
+export class FundedRowDemotionRefusedError extends Error {
+  readonly userId: string;
+  readonly destroyedInstanceId: string;
+  readonly demotionCandidateSubscriptionId: string;
+
+  constructor(params: {
+    userId: string;
+    destroyedInstanceId: string;
+    demotionCandidateSubscriptionId: string;
+  }) {
+    super(
+      `Refusing to demote funded or access-granting personal subscription ${params.demotionCandidateSubscriptionId} for user ${params.userId} while destroying instance ${params.destroyedInstanceId}`
+    );
+    this.name = 'FundedRowDemotionRefusedError';
+    this.userId = params.userId;
+    this.destroyedInstanceId = params.destroyedInstanceId;
+    this.demotionCandidateSubscriptionId = params.demotionCandidateSubscriptionId;
+  }
+}
+
+function compareRowsByCreatedAtAndIdAscending(
+  left: PersonalSubscriptionRow,
+  right: PersonalSubscriptionRow
+): number {
   if (left.subscription.created_at === right.subscription.created_at) {
     return left.subscription.id.localeCompare(right.subscription.id);
   }
   return left.subscription.created_at.localeCompare(right.subscription.created_at);
+}
+
+function compareRowsByCreatedAtAndIdDescending(
+  left: PersonalSubscriptionRow,
+  right: PersonalSubscriptionRow
+): number {
+  return compareRowsByCreatedAtAndIdAscending(right, left);
 }
 
 async function listPersonalSubscriptionRows(
@@ -94,46 +153,70 @@ function isAccessGrantingSubscription(
   return false;
 }
 
-function shouldCancelSingleDestroyedCurrentAccessRow(row: KiloClawSubscription): boolean {
+function getHeadSelectionPriority(
+  row: Pick<
+    KiloClawSubscription,
+    'plan' | 'status' | 'stripe_subscription_id' | 'suspended_at' | 'trial_ends_at'
+  >,
+  now: Date
+): number {
   if (row.stripe_subscription_id !== null) {
-    return false;
+    return 4;
   }
-  if (row.plan === 'trial' && row.status === 'trialing' && row.payment_source === null) {
-    return true;
+  if (row.plan === 'commit' && row.status === 'active') {
+    return 3;
   }
-  return (
-    (row.plan === 'standard' || row.plan === 'commit') &&
-    row.status === 'active' &&
-    row.payment_source === 'credits'
-  );
+  if (row.plan === 'standard' && row.status === 'active') {
+    return 2;
+  }
+  if (
+    (row.status === 'trialing' && row.suspended_at === null && row.trial_ends_at === null) ||
+    (row.status !== 'active' && isAccessGrantingSubscription(row, now))
+  ) {
+    return 1;
+  }
+  return 0;
 }
 
-type TransferUpdate = {
-  before: KiloClawSubscription;
-  transferredToSubscriptionId: string | null;
-};
+function compareRowsByHeadSelectionPriority(
+  left: PersonalSubscriptionRow,
+  right: PersonalSubscriptionRow,
+  now: Date
+): number {
+  const priorityDifference =
+    getHeadSelectionPriority(right.subscription, now) -
+    getHeadSelectionPriority(left.subscription, now);
+  if (priorityDifference !== 0) {
+    return priorityDifference;
+  }
+  return compareRowsByCreatedAtAndIdDescending(left, right);
+}
 
-type ChangeLogFailurePolicy = 'fail' | 'log';
+function selectTransferHeadRow(
+  rows: PersonalSubscriptionRow[],
+  now: Date
+): PersonalSubscriptionRow {
+  const [headRow] = [...rows].sort((left, right) =>
+    compareRowsByHeadSelectionPriority(left, right, now)
+  );
+  if (!headRow) {
+    throw new Error('Cannot select a personal subscription collapse head from an empty row set');
+  }
+  return headRow;
+}
 
-type ChangeLogFailureContext = {
-  error: unknown;
-  reason: string;
-  subscriptionId: string;
-  userId: string;
-};
+function buildDesiredTransferUpdates(rows: PersonalSubscriptionRow[], now: Date): TransferPlan {
+  const headRow = selectTransferHeadRow(rows, now);
+  const nonHeadRowsDescending = rows
+    .filter(row => row.subscription.id !== headRow.subscription.id)
+    .sort(compareRowsByCreatedAtAndIdDescending);
+  const desiredChainTailToHead = [...nonHeadRowsDescending].reverse();
+  desiredChainTailToHead.push(headRow);
 
-type CollapseOptions = {
-  changeLogFailurePolicy?: ChangeLogFailurePolicy;
-  cancelSingleCurrentAccessRow?: boolean;
-  onChangeLogFailure?: (context: ChangeLogFailureContext) => Promise<void> | void;
-};
-
-function buildTransferUpdates(rows: PersonalSubscriptionRow[]): TransferUpdate[] {
-  const orderedRows = [...rows].sort(byCreatedAtAndId);
   const updates: TransferUpdate[] = [];
 
-  for (const [index, row] of orderedRows.entries()) {
-    const nextRow = orderedRows[index + 1];
+  for (const [index, row] of desiredChainTailToHead.entries()) {
+    const nextRow = desiredChainTailToHead[index + 1];
     const desiredTransferredTo = nextRow?.subscription.id ?? null;
     if (row.subscription.transferred_to_subscription_id === desiredTransferredTo) {
       continue;
@@ -144,54 +227,86 @@ function buildTransferUpdates(rows: PersonalSubscriptionRow[]): TransferUpdate[]
     });
   }
 
-  return updates;
+  return { headRow, updates };
 }
 
-async function cancelSingleDestroyedCurrentAccessRow(params: {
-  actor: KiloClawSubscriptionChangeActor;
-  executor: PersonalSubscriptionCollapseWriter;
-  reason: string;
-  row: KiloClawSubscription;
-}): Promise<string | null> {
-  if (!isAccessGrantingSubscription(params.row, new Date())) {
-    return null;
-  }
-  if (!shouldCancelSingleDestroyedCurrentAccessRow(params.row)) {
-    return null;
+function orderTransferUpdatesForUniqueIndex(
+  rows: PersonalSubscriptionRow[],
+  updates: TransferUpdate[]
+): TransferUpdate[] {
+  if (updates.length <= 1) {
+    return updates;
   }
 
-  const [after] = await params.executor
-    .update(kiloclaw_subscriptions)
-    .set({
-      status: 'canceled',
-      suspended_at: null,
-      destruction_deadline: null,
-      auto_resume_requested_at: null,
-      auto_resume_retry_after: null,
-      auto_resume_attempt_count: 0,
-      auto_top_up_triggered_for_period: null,
-      cancel_at_period_end: false,
-      pending_conversion: false,
-      scheduled_plan: null,
-      scheduled_by: null,
-    })
-    .where(eq(kiloclaw_subscriptions.id, params.row.id))
-    .returning();
+  const remainingUpdates = new Map(updates.map(update => [update.before.id, update]));
+  const currentOccupantByTarget = new Map<string, string>();
 
-  if (!after) {
-    throw new Error(`Failed to cancel destroyed current subscription ${params.row.id}`);
+  for (const row of rows) {
+    if (row.subscription.transferred_to_subscription_id !== null) {
+      currentOccupantByTarget.set(
+        row.subscription.transferred_to_subscription_id,
+        row.subscription.id
+      );
+    }
   }
 
-  await insertKiloClawSubscriptionChangeLog(params.executor, {
-    subscriptionId: after.id,
-    actor: params.actor,
-    action: 'canceled',
-    reason: params.reason,
-    before: params.row,
-    after,
-  });
+  const orderedUpdates: TransferUpdate[] = [];
 
-  return after.id;
+  while (remainingUpdates.size > 0) {
+    let appliedAtLeastOneUpdate = false;
+
+    for (const update of updates) {
+      if (!remainingUpdates.has(update.before.id)) {
+        continue;
+      }
+
+      const targetId = update.transferredToSubscriptionId;
+      const targetOccupantId = targetId ? currentOccupantByTarget.get(targetId) : undefined;
+      const targetIsBlockedByPendingUpdate =
+        targetId !== null &&
+        targetOccupantId !== undefined &&
+        targetOccupantId !== update.before.id &&
+        remainingUpdates.has(targetOccupantId);
+
+      if (targetIsBlockedByPendingUpdate) {
+        continue;
+      }
+
+      orderedUpdates.push(update);
+      remainingUpdates.delete(update.before.id);
+      appliedAtLeastOneUpdate = true;
+
+      if (
+        update.before.transferred_to_subscription_id !== null &&
+        currentOccupantByTarget.get(update.before.transferred_to_subscription_id) ===
+          update.before.id
+      ) {
+        currentOccupantByTarget.delete(update.before.transferred_to_subscription_id);
+      }
+
+      if (targetId !== null) {
+        currentOccupantByTarget.set(targetId, update.before.id);
+      }
+    }
+
+    if (appliedAtLeastOneUpdate) {
+      continue;
+    }
+
+    throw new Error(
+      'Unable to order personal subscription collapse updates without violating UQ_kiloclaw_subscriptions_transferred_to'
+    );
+  }
+
+  return orderedUpdates;
+}
+
+function buildTransferPlan(rows: PersonalSubscriptionRow[], now: Date): TransferPlan {
+  const desiredPlan = buildDesiredTransferUpdates(rows, now);
+  return {
+    headRow: desiredPlan.headRow,
+    updates: orderTransferUpdatesForUniqueIndex(rows, desiredPlan.updates),
+  };
 }
 
 async function applyTransferUpdates(
@@ -251,13 +366,21 @@ async function applyTransferUpdates(
   return updatedSubscriptionIds;
 }
 
+/**
+ * Repairs historical multi-row personal subscription drift after a personal
+ * instance is destroyed. Destroying a user's only current personal instance is
+ * not a billing cancellation: if its current subscription still grants access,
+ * the row remains current and keeps its entitlement. A later reprovision creates
+ * a successor row via the provision-bootstrap transfer path, preserving the
+ * remaining trial or paid billing period without a second charge.
+ */
 export async function collapseOrphanPersonalSubscriptionsOnDestroy(params: {
   actor: KiloClawSubscriptionChangeActor;
+  buildTransferUpdatesOverride?: BuildTransferUpdatesOverride;
   changeLogFailurePolicy?: ChangeLogFailurePolicy;
   destroyedInstanceId: string;
   executor: PersonalSubscriptionCollapseWriter;
   onChangeLogFailure?: (context: ChangeLogFailureContext) => Promise<void> | void;
-  cancelSingleCurrentAccessRow?: boolean;
   reason: string;
   userId: string;
 }): Promise<{ updatedSubscriptionIds: string[] }> {
@@ -281,46 +404,70 @@ export async function collapseOrphanPersonalSubscriptionsOnDestroy(params: {
     return { updatedSubscriptionIds: [] };
   }
 
-  if (currentRows.length === 1) {
-    if (!params.cancelSingleCurrentAccessRow) {
-      return { updatedSubscriptionIds: [] };
-    }
-
-    const [currentRow] = currentRows;
-    if (currentRow?.instance.id !== params.destroyedInstanceId) {
-      return { updatedSubscriptionIds: [] };
-    }
-
-    const canceledSubscriptionId = await cancelSingleDestroyedCurrentAccessRow({
-      actor: params.actor,
-      executor: params.executor,
-      reason: 'destroy_path_cancel_single_current_access_row',
-      row: currentRow.subscription,
-    });
-    return { updatedSubscriptionIds: canceledSubscriptionId ? [canceledSubscriptionId] : [] };
+  if (currentRows.length <= 1) {
+    return { updatedSubscriptionIds: [] };
   }
 
-  const updates = buildTransferUpdates(personalRows);
+  const now = new Date();
+  const transferPlan = buildTransferPlan(personalRows, now);
+  const updates =
+    params.buildTransferUpdatesOverride?.({ rows: personalRows, now }) ?? transferPlan.updates;
+
+  const demotionCandidate = updates.find(
+    update =>
+      update.transferredToSubscriptionId !== null &&
+      getHeadSelectionPriority(update.before, now) > 0
+  );
+
+  if (demotionCandidate) {
+    throw new FundedRowDemotionRefusedError({
+      userId: params.userId,
+      destroyedInstanceId: params.destroyedInstanceId,
+      demotionCandidateSubscriptionId: demotionCandidate.before.id,
+    });
+  }
+
   if (updates.length === 0) {
     return { updatedSubscriptionIds: [] };
   }
 
+  const updatedSubscriptionIds = await applyTransferUpdates(
+    params.executor,
+    updates,
+    params.actor,
+    params.reason,
+    {
+      changeLogFailurePolicy: params.changeLogFailurePolicy,
+      onChangeLogFailure: params.onChangeLogFailure,
+    }
+  );
+
+  console.log('personal_subscription_destroy_collapse_applied', {
+    userId: params.userId,
+    destroyedInstanceId: params.destroyedInstanceId,
+    rowCountTotal: personalRows.length,
+    rowCountAlive: personalRows.filter(row => row.instance.destroyedAt === null).length,
+    headSubscriptionId: transferPlan.headRow.subscription.id,
+    headPlan: transferPlan.headRow.subscription.plan,
+    headStatus: transferPlan.headRow.subscription.status,
+    headStripeSubscriptionId: transferPlan.headRow.subscription.stripe_subscription_id,
+    updateCount: updatedSubscriptionIds.length,
+  });
+
   return {
-    updatedSubscriptionIds: await applyTransferUpdates(
-      params.executor,
-      updates,
-      params.actor,
-      params.reason,
-      {
-        changeLogFailurePolicy: params.changeLogFailurePolicy,
-        onChangeLogFailure: params.onChangeLogFailure,
-      }
-    ),
+    updatedSubscriptionIds,
   };
 }
 
+/**
+ * Marks a personal instance destroyed without revoking any still-valid personal
+ * subscription attached to it. Access-granting trial/active/past-due rows remain
+ * current so the user can immediately reprovision and transfer the remaining
+ * entitlement to the new instance.
+ */
 export async function markInstanceDestroyedWithPersonalSubscriptionCollapse(params: {
   actor: KiloClawSubscriptionChangeActor;
+  buildTransferUpdatesOverride?: BuildTransferUpdatesOverride;
   changeLogFailurePolicy?: ChangeLogFailurePolicy;
   destroyedAt?: string;
   executor: PersonalSubscriptionCollapseWriter;
@@ -391,10 +538,10 @@ export async function markInstanceDestroyedWithPersonalSubscriptionCollapse(para
   if (destroyedInstance.organizationId === null) {
     await collapseOrphanPersonalSubscriptionsOnDestroy({
       actor: params.actor,
+      buildTransferUpdatesOverride: params.buildTransferUpdatesOverride,
       changeLogFailurePolicy: params.changeLogFailurePolicy,
       destroyedInstanceId: destroyedInstance.id,
       executor: params.executor,
-      cancelSingleCurrentAccessRow: true,
       onChangeLogFailure: params.onChangeLogFailure,
       reason: params.reason,
       userId: params.userId,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TownConfigSchema } from '../../types';
-import { resolveModel } from './config';
+import { getTownConfig, resolveModel } from './config';
 
 const HARDCODED_FALLBACK = 'anthropic/claude-sonnet-4.6';
 
@@ -137,5 +137,49 @@ describe('resolveModel backward compatibility', () => {
     });
     // refinery: no role override, no default → hardcoded
     expect(resolveModel(configNoDefault, null, 'refinery')).toBe(HARDCODED_FALLBACK);
+  });
+});
+
+// Minimal in-memory stand-in for DurableObjectStorage. config.ts only calls
+// .get(key) and .put(key, value), so we implement just those two and widen
+// to DurableObjectStorage for the test's call sites. The double-cast is
+// intentional and isolated to this test fake — production code doesn't cast.
+function makeFakeStorage(initial: Map<string, unknown> = new Map()): DurableObjectStorage {
+  const store = initial;
+  const fake = {
+    get: async (key: string) => store.get(key),
+    put: async (key: string, value: unknown) => {
+      store.set(key, value);
+    },
+  };
+  return fake as unknown as DurableObjectStorage;
+}
+
+describe('getTownConfig seeding behavior', () => {
+  it('seeds new-style defaults for a fresh town (no persisted config)', async () => {
+    const storage = makeFakeStorage();
+    const config = await getTownConfig(storage);
+    expect(config.merge_strategy).toBe('pr');
+    expect(config.staged_convoys_default).toBe(true);
+    expect(config.refinery?.review_mode).toBe('comments');
+    expect(config.refinery?.auto_resolve_pr_feedback).toBe(true);
+    expect(config.refinery?.auto_merge_delay_minutes).toBe(5);
+    // And the seeded value is persisted so subsequent reads return the same shape
+    const reloaded = await getTownConfig(storage);
+    expect(reloaded.merge_strategy).toBe('pr');
+  });
+
+  it('does NOT retroactively apply new defaults to an existing persisted config', async () => {
+    // Legacy town stored before #2725: no merge_strategy, no refinery, no
+    // staged_convoys_default. This mirrors real storage rows from production.
+    const legacyRaw = {
+      env_vars: {},
+      default_model: 'openai/gpt-4o',
+    };
+    const storage = makeFakeStorage(new Map([['town:config', legacyRaw]]));
+    const config = await getTownConfig(storage);
+    expect(config.merge_strategy).toBe('direct');
+    expect(config.staged_convoys_default).toBe(false);
+    expect(config.refinery).toBeUndefined();
   });
 });

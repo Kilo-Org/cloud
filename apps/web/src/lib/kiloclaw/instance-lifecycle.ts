@@ -12,6 +12,7 @@ import {
 import { sentryLogger } from '@/lib/utils.server';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
+import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
 
 const logInfo = sentryLogger('kiloclaw-instance-lifecycle', 'info');
 const logError = sentryLogger('kiloclaw-instance-lifecycle', 'error');
@@ -265,7 +266,9 @@ export async function autoResumeIfSuspended(
 
   try {
     const client = new KiloClawInternalClient();
-    await client.startAsync(kiloUserId, workerInstanceId(targetInstance));
+    await client.startAsync(kiloUserId, workerInstanceId(targetInstance), {
+      reason: 'interrupted_auto_resume',
+    });
   } catch (startError) {
     if (recordRetryState) {
       await db
@@ -375,4 +378,69 @@ export async function completeAutoResumeIfReady(
     changeLogReason: 'auto_resume_completed',
   });
   return { instanceId: targetInstance.id, resumeCompleted: true };
+}
+
+async function clearInactiveTrialStopMarkerForPersonalInstance(params: {
+  kiloUserId: string;
+  instanceId: string;
+  logMessage: string;
+}): Promise<boolean> {
+  const [updatedInstance] = await db
+    .update(kiloclaw_instances)
+    .set({ inactive_trial_stopped_at: null })
+    .where(
+      and(
+        eq(kiloclaw_instances.id, params.instanceId),
+        eq(kiloclaw_instances.user_id, params.kiloUserId),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .returning({ id: kiloclaw_instances.id });
+
+  if (!updatedInstance) {
+    return false;
+  }
+
+  logInfo(params.logMessage, {
+    user_id: params.kiloUserId,
+    instance_id: params.instanceId,
+  });
+  return true;
+}
+
+export async function clearTrialInactivityStopAfterStart(params: {
+  kiloUserId: string;
+  instanceId: string;
+}): Promise<boolean> {
+  const currentSubscriptionRow = await resolveCurrentPersonalSubscriptionRow({
+    userId: params.kiloUserId,
+    instanceId: params.instanceId,
+  });
+
+  if (!currentSubscriptionRow?.instance || currentSubscriptionRow.instance.destroyedAt !== null) {
+    return false;
+  }
+
+  if (
+    currentSubscriptionRow.subscription.plan !== 'trial' ||
+    currentSubscriptionRow.subscription.status !== 'trialing'
+  ) {
+    return false;
+  }
+
+  return await clearInactiveTrialStopMarkerForPersonalInstance({
+    ...params,
+    logMessage: 'Cleared trial inactivity stop marker after explicit start',
+  });
+}
+
+export async function clearTrialInactivityStopAfterTrialTransition(params: {
+  kiloUserId: string;
+  instanceId: string;
+}): Promise<boolean> {
+  return await clearInactiveTrialStopMarkerForPersonalInstance({
+    ...params,
+    logMessage: 'Cleared trial inactivity stop marker after trial transition',
+  });
 }

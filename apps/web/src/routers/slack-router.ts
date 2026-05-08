@@ -2,6 +2,7 @@ import 'server-only';
 import { z } from 'zod';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import * as slackService from '@/lib/integrations/slack-service';
+import { createOAuthState } from '@/lib/integrations/oauth-state';
 import { TRPCError } from '@trpc/server';
 import {
   resolveOwner,
@@ -11,6 +12,23 @@ import {
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
+
+async function getInitializedBot() {
+  const { bot } = await import('@/lib/bot');
+  await bot.initialize();
+  return bot;
+}
+
+async function deleteChatSdkSlackInstallation(teamId: string): Promise<void> {
+  const bot = await getInitializedBot();
+  await bot.getAdapter('slack').deleteInstallation(teamId);
+}
+
+async function deleteChatSdkSlackIdentityCache(teamId: string): Promise<void> {
+  const bot = await getInitializedBot();
+  await unlinkTeamKiloUsers(bot.getState(), 'slack', teamId);
+}
 
 export const slackRouter = createTRPCRouter({
   // Get Slack installation status
@@ -36,7 +54,11 @@ export const slackRouter = createTRPCRouter({
       installation: {
         teamId: integration.platform_account_id,
         teamName: integration.platform_account_login,
+        status: integration.integration_status,
+        suspendedAt: integration.suspended_at,
+        suspendedBy: integration.suspended_by,
         scopes: integration.scopes,
+        missingScopes: slackService.getMissingSlackScopes(integration.scopes),
         installedAt: integration.installed_at,
         modelSlug: metadata?.model_slug || null,
       },
@@ -48,7 +70,10 @@ export const slackRouter = createTRPCRouter({
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
     }
-    const state = input?.organizationId ? `org_${input.organizationId}` : `user_${ctx.user.id}`;
+    const statePrefix = input?.organizationId
+      ? `org_${input.organizationId}`
+      : `user_${ctx.user.id}`;
+    const state = createOAuthState(statePrefix, ctx.user.id);
     return {
       url: slackService.getSlackOAuthUrl(state),
     };
@@ -61,7 +86,10 @@ export const slackRouter = createTRPCRouter({
       await requireActiveSubscriptionOrTrial(input.organizationId);
     }
     const owner = await resolveAuthorizedOwner(ctx, input?.organizationId);
-    const result = await slackService.uninstallApp(owner);
+    const result = await slackService.uninstallApp(owner, {
+      deleteChatSdkInstallation: deleteChatSdkSlackInstallation,
+      deleteChatSdkIdentityCache: deleteChatSdkSlackIdentityCache,
+    });
 
     if (input?.organizationId) {
       await createAuditLog({
@@ -85,16 +113,6 @@ export const slackRouter = createTRPCRouter({
     }
     const owner = resolveOwner(ctx, input?.organizationId);
     return slackService.testConnection(owner);
-  }),
-
-  // Send a test message to Slack
-  sendTestMessage: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
-    if (input?.organizationId) {
-      await ensureOrganizationAccess(ctx, input.organizationId);
-      await requireActiveSubscriptionOrTrial(input.organizationId);
-    }
-    const owner = resolveOwner(ctx, input?.organizationId);
-    return slackService.sendTestMessage(owner);
   }),
 
   // Update the model for Slack integration

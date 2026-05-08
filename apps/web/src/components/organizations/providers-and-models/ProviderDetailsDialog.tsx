@@ -113,7 +113,7 @@ export function ProviderDetailsDialog({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Allowed</TableHead>
+                <TableHead>Model allowed</TableHead>
                 <TableHead>Model</TableHead>
                 <TableHead>In</TableHead>
                 <TableHead>Out</TableHead>

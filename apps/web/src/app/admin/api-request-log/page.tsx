@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { format, subDays } from 'date-fns';
+import { format, formatDistanceToNow, subDays } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
@@ -19,6 +21,9 @@ export default function ApiRequestLogPage() {
   const [endDate, setEndDate] = useState(today);
   const [model, setModel] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const trpc = useTRPC();
+  const oldestEntryQuery = useQuery(trpc.admin.apiRequestLog.getOldestEntry.queryOptions());
 
   function handleDownload() {
     if (!userId.trim()) {
@@ -49,7 +54,18 @@ export default function ApiRequestLogPage() {
     <AdminPage
       breadcrumbs={<BreadcrumbItem className="hidden md:block">API Request Log</BreadcrumbItem>}
     >
-      <div className="w-full max-w-xl">
+      <div className="w-full max-w-xl space-y-4">
+        {oldestEntryQuery.data && (
+          <p className="text-muted-foreground text-sm">
+            Oldest entry is{' '}
+            <span title={new Date(oldestEntryQuery.data.created_at).toLocaleString()}>
+              {formatDistanceToNow(new Date(oldestEntryQuery.data.created_at), {
+                addSuffix: true,
+              })}
+            </span>
+            .
+          </p>
+        )}
         <Card>
           <CardHeader>
             <CardTitle>Download API Request Log</CardTitle>

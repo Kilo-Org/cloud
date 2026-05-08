@@ -106,6 +106,16 @@ export function useOrgControllerVersion(organizationId: string, enabled: boolean
   );
 }
 
+export function useOrgMorningBriefingStatus(organizationId: string, enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.kiloclaw.getMorningBriefingStatus.queryOptions(
+      { organizationId },
+      { enabled, refetchInterval: enabled ? 30_000 : false }
+    )
+  );
+}
+
 export function useOrgKiloClawServiceDegraded(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(
@@ -136,10 +146,14 @@ export function useOrgKiloClawAvailableVersions(organizationId: string, offset =
   );
 }
 
-export function useOrgKiloClawMyPin(organizationId: string) {
+export function useOrgKiloClawMyPin(organizationId: string, opts: { enabled?: boolean } = {}) {
+  const { enabled = true } = opts;
   const trpc = useTRPC();
   return useQuery(
-    trpc.organizations.kiloclaw.getMyPin.queryOptions({ organizationId }, { staleTime: 60_000 })
+    trpc.organizations.kiloclaw.getMyPin.queryOptions(
+      { organizationId },
+      { staleTime: 60_000, enabled }
+    )
   );
 }
 
@@ -205,6 +219,15 @@ export function useOrgKiloClawMutations(
     });
   };
 
+  const clearGatewayAndMorningBriefingCaches = () => {
+    queryClient.removeQueries({
+      queryKey: trpc.organizations.kiloclaw.gatewayReady.queryKey({ organizationId }),
+    });
+    queryClient.removeQueries({
+      queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({ organizationId }),
+    });
+  };
+
   // Helper: wrap a raw org mutation so mutate/mutateAsync inject organizationId.
   // The `any` types are unavoidable here — we're wrapping tRPC mutations generically
   // to pre-bind organizationId. The final return uses `satisfies` to catch missing keys.
@@ -227,7 +250,12 @@ export function useOrgKiloClawMutations(
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   const rawStart = useMutation(
-    trpc.organizations.kiloclaw.start.mutationOptions({ onSuccess: invalidateStatus })
+    trpc.organizations.kiloclaw.start.mutationOptions({
+      onSuccess: async () => {
+        clearGatewayAndMorningBriefingCaches();
+        await invalidateStatus();
+      },
+    })
   );
   const rawStop = useMutation(
     trpc.organizations.kiloclaw.stop.mutationOptions({ onSuccess: invalidateStatus })
@@ -236,7 +264,12 @@ export function useOrgKiloClawMutations(
     trpc.organizations.kiloclaw.destroy.mutationOptions({ onSuccess: resetAllInstanceState })
   );
   const rawProvision = useMutation(
-    trpc.organizations.kiloclaw.provision.mutationOptions({ onSuccess: invalidateStatus })
+    trpc.organizations.kiloclaw.provision.mutationOptions({
+      onSuccess: async () => {
+        clearGatewayAndMorningBriefingCaches();
+        await invalidateStatus();
+      },
+    })
   );
   const rawCycleInboundEmailAddress = useMutation(
     trpc.organizations.kiloclaw.cycleInboundEmailAddress.mutationOptions({
@@ -277,6 +310,7 @@ export function useOrgKiloClawMutations(
   const rawRestartMachine = useMutation(
     trpc.organizations.kiloclaw.restartMachine.mutationOptions({
       onSuccess: async () => {
+        clearGatewayAndMorningBriefingCaches();
         await invalidateStatus();
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.gatewayStatus.queryKey({ organizationId }),
@@ -287,6 +321,7 @@ export function useOrgKiloClawMutations(
   const rawRestartOpenClaw = useMutation(
     trpc.organizations.kiloclaw.restartOpenClaw.mutationOptions({
       onSuccess: async () => {
+        clearGatewayAndMorningBriefingCaches();
         await invalidateStatus();
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.gatewayStatus.queryKey({ organizationId }),
@@ -423,6 +458,45 @@ export function useOrgKiloClawMutations(
   const rawCancelKiloCliRun = useMutation(
     trpc.organizations.kiloclaw.cancelKiloCliRun.mutationOptions({ onSuccess: invalidateStatus })
   );
+  const rawEnableMorningBriefing = useMutation(
+    trpc.organizations.kiloclaw.enableMorningBriefing.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({
+            organizationId,
+          }),
+        });
+      },
+    })
+  );
+  const rawDisableMorningBriefing = useMutation(
+    trpc.organizations.kiloclaw.disableMorningBriefing.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({
+            organizationId,
+          }),
+        });
+      },
+    })
+  );
+  const rawRunMorningBriefing = useMutation(
+    trpc.organizations.kiloclaw.runMorningBriefing.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({
+            organizationId,
+          }),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.readMorningBriefing.queryKey({
+            organizationId,
+            day: 'today',
+          }),
+        });
+      },
+    })
+  );
 
   const mutations = {
     start: bindVoid(rawStart),
@@ -451,6 +525,9 @@ export function useOrgKiloClawMutations(
     patchOpenclawConfig: bind(rawPatchOpenclawConfig),
     disconnectGoogle: bindVoid(rawDisconnectGoogle),
     setGmailNotifications: bind(rawSetGmailNotifications),
+    enableMorningBriefing: bind(rawEnableMorningBriefing),
+    disableMorningBriefing: bindVoid(rawDisableMorningBriefing),
+    runMorningBriefing: bindVoid(rawRunMorningBriefing),
     startKiloCliRun: bind(rawStartKiloCliRun),
     cancelKiloCliRun: bind(rawCancelKiloCliRun),
     rename: bind(rawRename),

@@ -225,6 +225,101 @@ export const AffiliateEventDeliveryState = {
 export type AffiliateEventDeliveryState =
   (typeof AffiliateEventDeliveryState)[keyof typeof AffiliateEventDeliveryState];
 
+export const KiloClawAttributionTouchType = {
+  Affiliate: 'affiliate',
+  Referral: 'referral',
+} as const;
+
+export type KiloClawAttributionTouchType =
+  (typeof KiloClawAttributionTouchType)[keyof typeof KiloClawAttributionTouchType];
+
+export const KiloClawAttributionTouchProvider = {
+  ImpactPerformance: 'impact_performance',
+  ImpactAdvocate: 'impact_advocate',
+} as const;
+
+export type KiloClawAttributionTouchProvider =
+  (typeof KiloClawAttributionTouchProvider)[keyof typeof KiloClawAttributionTouchProvider];
+
+export const ImpactAdvocateRegistrationState = {
+  Pending: 'pending',
+  Retrying: 'retrying',
+  Registered: 'registered',
+  Failed: 'failed',
+} as const;
+
+export type ImpactAdvocateRegistrationState =
+  (typeof ImpactAdvocateRegistrationState)[keyof typeof ImpactAdvocateRegistrationState];
+
+export const ImpactAdvocateAttemptDeliveryState = {
+  Queued: 'queued',
+  Sending: 'sending',
+  Succeeded: 'succeeded',
+  Failed: 'failed',
+} as const;
+
+export type ImpactAdvocateAttemptDeliveryState =
+  (typeof ImpactAdvocateAttemptDeliveryState)[keyof typeof ImpactAdvocateAttemptDeliveryState];
+
+export const KiloClawReferralBeneficiaryRole = {
+  Referrer: 'referrer',
+  Referee: 'referee',
+} as const;
+
+export type KiloClawReferralBeneficiaryRole =
+  (typeof KiloClawReferralBeneficiaryRole)[keyof typeof KiloClawReferralBeneficiaryRole];
+
+export const KiloClawReferralWinningTouchType = {
+  Referral: 'referral',
+  Affiliate: 'affiliate',
+  None: 'none',
+} as const;
+
+export type KiloClawReferralWinningTouchType =
+  (typeof KiloClawReferralWinningTouchType)[keyof typeof KiloClawReferralWinningTouchType];
+
+export const KiloClawReferralDecisionOutcome = {
+  Granted: 'granted',
+  CapLimited: 'cap_limited',
+  Disqualified: 'disqualified',
+} as const;
+
+export type KiloClawReferralDecisionOutcome =
+  (typeof KiloClawReferralDecisionOutcome)[keyof typeof KiloClawReferralDecisionOutcome];
+
+export const KiloClawReferralRewardStatus = {
+  Pending: 'pending',
+  Earned: 'earned',
+  Applied: 'applied',
+  Reversed: 'reversed',
+  Expired: 'expired',
+  Canceled: 'canceled',
+  ReviewRequired: 'review_required',
+} as const;
+
+export type KiloClawReferralRewardStatus =
+  (typeof KiloClawReferralRewardStatus)[keyof typeof KiloClawReferralRewardStatus];
+
+export const ImpactConversionReportState = {
+  Queued: 'queued',
+  Retrying: 'retrying',
+  Delivered: 'delivered',
+  Failed: 'failed',
+} as const;
+
+export type ImpactConversionReportState =
+  (typeof ImpactConversionReportState)[keyof typeof ImpactConversionReportState];
+
+export const ImpactAdvocateRewardRedemptionState = {
+  Queued: 'queued',
+  Retrying: 'retrying',
+  Redeemed: 'redeemed',
+  Failed: 'failed',
+} as const;
+
+export type ImpactAdvocateRewardRedemptionState =
+  (typeof ImpactAdvocateRewardRedemptionState)[keyof typeof ImpactAdvocateRewardRedemptionState];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.extend',
@@ -245,14 +340,97 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.inbound_email.update_enabled',
   'kiloclaw.machine.destroy_fly',
   'kiloclaw.machine.resize',
+  'kiloclaw.admin_size_override.set',
+  'kiloclaw.admin_size_override.clear',
   'kiloclaw.subscription.bulk_trial_grant',
   'kiloclaw.subscription.admin_cancel',
   'kiloclaw.cli_run.start',
   'kiloclaw.cli_run.cancel',
   'kiloclaw.orphan.destroy',
+  'kiloclaw.instances.bulk_change_version',
+  'kiloclaw.scheduled_action.created',
+  'kiloclaw.scheduled_action.cancelled',
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
+
+// --- KiloClaw scheduled action status enums ---
+
+// Parent action status. Lifecycle:
+//   scheduled → running → completed (or failed if every target failed)
+//   scheduled or running → cancelled (by admin)
+export const KiloClawScheduledActionStatus = z.enum([
+  'scheduled',
+  'running',
+  'completed',
+  'cancelled',
+  'failed',
+]);
+export type KiloClawScheduledActionStatus = z.infer<typeof KiloClawScheduledActionStatus>;
+
+// Stage status. Same lifecycle as the parent action.
+export const KiloClawScheduledActionStageStatus = z.enum([
+  'pending',
+  'running',
+  'completed',
+  'cancelled',
+  'failed',
+]);
+export type KiloClawScheduledActionStageStatus = z.infer<typeof KiloClawScheduledActionStageStatus>;
+
+// Target status. 'running' is a transient claim state set by the DO
+// apply path immediately before it dispatches the side effect; final
+// states are 'applied', 'skipped', or 'failed'.
+export const KiloClawScheduledActionTargetStatus = z.enum([
+  'pending',
+  'running',
+  'applied',
+  'skipped',
+  'failed',
+]);
+export type KiloClawScheduledActionTargetStatus = z.infer<
+  typeof KiloClawScheduledActionTargetStatus
+>;
+
+// Notification dispatch lifecycle. 'pending' until the sweep claims
+// it via the CAS pending → sending; 'sending' is a transient state
+// while the sweep is mid-dispatch (set when claimed, cleared by markSent
+// or markFailed); 'sent' on successful dispatch; 'failed' if the channel
+// returned an error. Recovery: stuck 'sending' rows whose claimed_at is
+// older than the recovery threshold get reset to 'pending' at the top
+// of each tick.
+export const KiloClawScheduledActionNotificationStatus = z.enum([
+  'pending',
+  'sending',
+  'sent',
+  'failed',
+]);
+export type KiloClawScheduledActionNotificationStatus = z.infer<
+  typeof KiloClawScheduledActionNotificationStatus
+>;
+
+// Notification dispatch channel. 'agent' is reserved for a future PR
+// that adds a kilo-chat sendSystemNotice RPC; the v1 dispatcher returns
+// 501 for that channel so the schema enum can stabilize without the
+// dispatcher implementation.
+export const KiloClawScheduledActionNotificationChannel = z.enum([
+  'email',
+  'webapp',
+  'mobile_push',
+  'agent',
+]);
+export type KiloClawScheduledActionNotificationChannel = z.infer<
+  typeof KiloClawScheduledActionNotificationChannel
+>;
+
+// Why this notification exists. 'notice' is the upcoming-action heads-up
+// dispatched ahead of the scheduled time. 'cancelled' is the follow-up
+// when an admin cancels an action whose notice has already been sent
+// for the same (target, channel) pair.
+export const KiloClawScheduledActionNotificationKind = z.enum(['notice', 'cancelled']);
+export type KiloClawScheduledActionNotificationKind = z.infer<
+  typeof KiloClawScheduledActionNotificationKind
+>;
 
 // --- ContributorChampion enums ---
 
@@ -278,13 +456,9 @@ export const OrganizationPlanSchema = z.enum(['teams', 'enterprise']);
 export type OrganizationPlan = z.infer<typeof OrganizationPlanSchema>;
 
 const OrganizationSettingsSchema = z.object({
-  /** @deprecated use model_deny_list instead. delete if this is still here May 2026 */
-  model_allow_list: z.array(z.string()).optional(),
-  /** @deprecated use provider_deny_list instead. delete if this is still here May 2026 */
   provider_allow_list: z.array(z.string()).optional(),
 
   model_deny_list: z.array(z.string()).optional(),
-  provider_deny_list: z.array(z.string()).optional(),
 
   default_model: z.string().optional(),
   data_collection: z.enum(['allow', 'deny']).nullable().optional(),
@@ -336,6 +510,106 @@ export const OrganizationModeConfigSchema = z.object({
 export type OrganizationModeConfig = z.infer<typeof OrganizationModeConfigSchema>;
 export type EditGroupConfig = z.infer<typeof EditGroupConfigSchema>;
 
+// ============================================================================
+// Agent (modern replacement for legacy `customModes`)
+// ============================================================================
+//
+// Mirrors the kilocode CLI's `AgentConfig` shape — see
+// `packages/opencode/src/config/agent.ts` and
+// `packages/opencode/src/config/permission.ts` in the kilocode repo. The
+// stored config is passed through to `KILO_CONFIG_CONTENT.agent.<slug>`
+// almost verbatim; no runtime migration is needed.
+
+/** Permission action — `null` is the CLI's "delete" sentinel. */
+const PermissionActionSchema = z.enum(['allow', 'ask', 'deny']);
+const PermissionActionOrNullSchema = z.union([PermissionActionSchema, z.null()]);
+
+/**
+ * Permission rule: either a single action, or a per-pattern map of glob →
+ * action. Used for tools like `read`, `edit`, `bash` that accept per-path
+ * restrictions.
+ */
+const PermissionRuleSchema = z.union([
+  PermissionActionOrNullSchema,
+  z.record(z.string(), PermissionActionOrNullSchema),
+]);
+
+/**
+ * Permission config. Either a bare action (shorthand for "all tools at this
+ * level") or a per-tool map. Accepts unknown tool keys so new CLI tools
+ * don't immediately fail validation.
+ */
+export const PermissionConfigSchema = z.union([
+  PermissionActionSchema,
+  z
+    .object({
+      read: PermissionRuleSchema.optional(),
+      edit: PermissionRuleSchema.optional(),
+      glob: PermissionRuleSchema.optional(),
+      grep: PermissionRuleSchema.optional(),
+      list: PermissionRuleSchema.optional(),
+      bash: PermissionRuleSchema.optional(),
+      task: PermissionRuleSchema.optional(),
+      external_directory: PermissionRuleSchema.optional(),
+      // Action-only (no per-pattern sub-targets) — matches CLI shape.
+      todowrite: PermissionActionOrNullSchema.optional(),
+      question: PermissionActionOrNullSchema.optional(),
+      webfetch: PermissionActionOrNullSchema.optional(),
+      websearch: PermissionActionOrNullSchema.optional(),
+      codesearch: PermissionActionOrNullSchema.optional(),
+      doom_loop: PermissionActionOrNullSchema.optional(),
+      lsp: PermissionRuleSchema.optional(),
+      skill: PermissionRuleSchema.optional(),
+      agent_manager: PermissionRuleSchema.optional(),
+    })
+    .catchall(PermissionRuleSchema),
+]);
+
+export type PermissionAction = z.infer<typeof PermissionActionSchema>;
+export type PermissionRule = z.infer<typeof PermissionRuleSchema>;
+export type PermissionConfig = z.infer<typeof PermissionConfigSchema>;
+
+const AgentVisibilitySchema = z.enum(['subagent', 'primary', 'all']);
+
+/** Hex `#RRGGBB` or one of the CLI's theme literals. */
+const AgentColorSchema = z.union([
+  z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  z.enum(['primary', 'secondary', 'accent', 'success', 'warning', 'error', 'info']),
+]);
+
+/**
+ * Authoritative validator for a profile-scoped Agent's `config` jsonb column.
+ * All fields optional — the CLI pulls defaults from the model and profile
+ * layers. An empty `{}` is a valid agent.
+ */
+export const AgentConfigSchema = z
+  .object({
+    prompt: z.string().max(50_000).optional(),
+    description: z.string().max(2_000).optional(),
+    mode: AgentVisibilitySchema.optional(),
+    model: z.string().max(200).nullable().optional(),
+    variant: z.string().max(50).optional(),
+    temperature: z.number().optional(),
+    top_p: z.number().optional(),
+    steps: z.number().int().positive().optional(),
+    hidden: z.boolean().optional(),
+    disable: z.boolean().optional(),
+    color: AgentColorSchema.optional(),
+    permission: PermissionConfigSchema.optional(),
+    /** Freeform bag — CLI rolls unknown top-level keys into here. */
+    options: z.record(z.string(), z.unknown()).optional(),
+  })
+  // Variant keys are model-specific (each model defines its own
+  // `opencode.variants` map), so a `variant` without a `model` has no
+  // anchor — reject it instead of silently dropping it at runtime.
+  .refine(c => !c.variant || (typeof c.model === 'string' && c.model.length > 0), {
+    message: 'variant requires a model — variants are model-specific',
+    path: ['variant'],
+  });
+
+export type AgentVisibility = z.infer<typeof AgentVisibilitySchema>;
+export type AgentConfig = z.infer<typeof AgentConfigSchema>;
+
 export { OrganizationSettingsSchema };
 
 // --- AuditLogAction ---
@@ -351,6 +625,7 @@ export const AuditLogAction = z.enum([
   'organization.user.send_invite', // ✅
   'organization.user.revoke_invite', // ✅
   'organization.settings.change', // ✅
+  'organization.settings.auto_change', // ✅ (system-initiated; null actor)
   'organization.purchase_credits', // ✅
   'organization.promo_credit_granted', // ✅
   'organization.member.remove', // ✅
@@ -681,34 +956,6 @@ export const NormalizedOpenRouterResponse = z.object({
   generated_at: z.string(),
 });
 
-// --- Model settings ---
-
-export const ToolSchema = z.enum([
-  'apply_diff',
-  'apply_patch',
-  'delete_file',
-  'edit_file',
-  'search_replace',
-  'search_and_replace',
-  'write_file',
-  'write_to_file',
-]);
-
-export type Tool = z.infer<typeof ToolSchema>;
-
-export const ToolArraySchema = z.array(ToolSchema);
-
-export const ModelSettingsSchema = z.object({
-  included_tools: ToolArraySchema,
-  excluded_tools: ToolArraySchema,
-});
-
-export type ModelSettings = z.infer<typeof ModelSettingsSchema>;
-
-export const VersionedSettingsSchema = z.record(z.string(), ModelSettingsSchema);
-
-export type VersionedSettings = z.infer<typeof VersionedSettingsSchema>;
-
 export const OpenCodePromptSchema = z.enum([
   'codex',
   'gemini',
@@ -716,6 +963,7 @@ export const OpenCodePromptSchema = z.enum([
   'anthropic',
   'trinity',
   'anthropic_without_todo',
+  'gpt55',
 ]);
 
 export type OpenCodePrompt = z.infer<typeof OpenCodePromptSchema>;
@@ -737,6 +985,7 @@ export const CustomLlmProviderSchema = z.enum([
   'openai', // uses Responses API
   'openai-compatible', // uses Chat Completions API with reasoning_content
   'openrouter', // uses Chat Completions API with reasoning_details
+  'alibaba', // identical to openai-compatible, but reports cache write tokens that alibaba bills separately
 ]);
 
 export type CustomLlmProvider = z.infer<typeof CustomLlmProviderSchema>;
@@ -831,7 +1080,6 @@ export const ModelSchema = z.object({
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 
 export const EndpointSchema = z.object({
-  provider_name: z.string(),
   tag: z.string(),
   context_length: z.number(),
 });

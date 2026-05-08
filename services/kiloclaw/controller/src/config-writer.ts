@@ -39,7 +39,23 @@ function pruneOldConfigBackups(dir: string, base: string, deps: ConfigWriterDeps
   }
 }
 
-/** Flags passed to `openclaw onboard` for non-interactive first-boot setup. */
+/**
+ * Flags passed to `openclaw onboard` for non-interactive first-boot setup.
+ *
+ * `--secret-input-mode ref` stores the kilocode credential in
+ * `agents/<id>/agent/auth-profiles.json` as an env-backed SecretRef
+ * (`keyRef: { source: "env", provider: "default", id: "KILOCODE_API_KEY" }`)
+ * instead of embedding the literal key. No plaintext on disk means the
+ * auth resolver can't shadow env-based rotation with a stale file value;
+ * rotation itself is driven by `supervisor.restart()` in
+ * `routes/env.ts` so the respawned gateway inherits the controller's
+ * current env.
+ *
+ * Works because the gateway process env has `KILOCODE_API_KEY` set before
+ * we spawn onboard (via `decryptEnvVars`), and `resolveNonInteractiveApiKey`
+ * in openclaw accepts `--kilocode-api-key` together with `--secret-input-mode
+ * ref` as long as the env var is present.
+ */
 const ONBOARD_FLAGS = [
   'onboard',
   '--non-interactive',
@@ -53,10 +69,20 @@ const ONBOARD_FLAGS = [
   '--skip-channels',
   '--skip-skills',
   '--skip-health',
+  '--secret-input-mode',
+  'ref',
 ] as const;
 
 const KILOCLAW_CUSTOMIZER_PLUGIN_ID = 'kiloclaw-customizer';
 const KILOCLAW_CUSTOMIZER_PLUGIN_PATH = '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer';
+const KILOCLAW_MORNING_BRIEFING_PLUGIN_ID = 'kiloclaw-morning-briefing';
+const KILOCLAW_MORNING_BRIEFING_PLUGIN_PATH =
+  '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-morning-briefing';
+const LEGACY_STREAM_CHAT_PLUGIN_ID = 'openclaw-channel-streamchat';
+const LEGACY_STREAM_CHAT_PLUGIN_PATH =
+  '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
+const KILO_CHAT_PLUGIN_ID = 'kilo-chat';
+const KILO_CHAT_PLUGIN_PATH = '/usr/local/lib/node_modules/@kiloclaw/kilo-chat';
 const KILO_EXA_PROVIDER_ID = 'kilo-exa';
 
 type KiloExaSearchMode = 'kilo-proxy' | 'disabled';
@@ -83,7 +109,60 @@ type ConfigObject = Record<string, any>;
 
 type EnvLike = Record<string, string | undefined>;
 
+// OpenClaw refuses hook mappings that derive `sessionKey` from a request
+// payload unless this flag is set. The inbound-email mapping uses
+// `{{payload.sessionKey}}` so the platform worker can pre-compute a stable
+// key like `inbound-email:YYYY-MM-DD-<slug>` that coalesces emails on the
+// same thread into one agent session.
+//
+// Force-overrides any prior value (including `false`) on purpose: the
+// inbound-email mapping is canonical config — generateBaseConfig
+// unconditionally installs/overwrites it on every run — so the flag it
+// requires must converge to true alongside the mapping. If an admin needs
+// to disable inbound email handling, the right lever is the
+// kiloclaw_instances.inbound_email_enabled column, not flipping this flag.
+export function ensureInboundEmailHookFlags(config: ConfigObject): void {
+  if (config.hooks && typeof config.hooks === 'object' && !Array.isArray(config.hooks)) {
+    config.hooks.allowRequestSessionKey = true;
+  }
+}
+
+export function sanitizeLegacyStreamChatConfig(config: ConfigObject): void {
+  if (config.channels && typeof config.channels === 'object' && !Array.isArray(config.channels)) {
+    delete config.channels.streamchat;
+  }
+
+  if (config.plugins && typeof config.plugins === 'object' && !Array.isArray(config.plugins)) {
+    if (
+      config.plugins.load &&
+      typeof config.plugins.load === 'object' &&
+      !Array.isArray(config.plugins.load) &&
+      Array.isArray(config.plugins.load.paths)
+    ) {
+      config.plugins.load.paths = config.plugins.load.paths.filter(
+        (pluginPath: unknown) => pluginPath !== LEGACY_STREAM_CHAT_PLUGIN_PATH
+      );
+    }
+
+    if (
+      config.plugins.entries &&
+      typeof config.plugins.entries === 'object' &&
+      !Array.isArray(config.plugins.entries)
+    ) {
+      delete config.plugins.entries[LEGACY_STREAM_CHAT_PLUGIN_ID];
+    }
+
+    if (Array.isArray(config.plugins.allow)) {
+      config.plugins.allow = config.plugins.allow.filter(
+        (pluginId: unknown) => pluginId !== LEGACY_STREAM_CHAT_PLUGIN_ID
+      );
+    }
+  }
+}
+
 const INBOUND_EMAIL_HOOK_ID = 'cloudflare-email-inbound';
+const DEFAULT_HOOK_SESSION_KEY_PREFIX = 'hook:';
+const INBOUND_EMAIL_SESSION_KEY_PREFIX = 'inbound-email:';
 
 function migrateHookMapping(mapping: ConfigObject): ConfigObject {
   if (mapping.id === INBOUND_EMAIL_HOOK_ID) {
@@ -123,6 +202,7 @@ export type ConfigWriterDeps = {
   renameSync: (oldPath: string, newPath: string) => void;
   chmodSync: (path: string, mode: number) => void;
   copyFileSync: (src: string, dest: string) => void;
+  mkdirSync: (path: string, opts?: { recursive?: boolean }) => void;
   readdirSync: (dir: string) => string[];
   unlinkSync: (path: string) => void;
   existsSync: (path: string) => boolean;
@@ -135,6 +215,7 @@ const defaultDeps: ConfigWriterDeps = {
   renameSync: (oldPath, newPath) => fs.renameSync(oldPath, newPath),
   chmodSync: (p, mode) => fs.chmodSync(p, mode),
   copyFileSync: (src, dest) => fs.copyFileSync(src, dest),
+  mkdirSync: (p, opts) => fs.mkdirSync(p, opts),
   readdirSync: dir => fs.readdirSync(dir),
   unlinkSync: p => fs.unlinkSync(p),
   existsSync: p => fs.existsSync(p),
@@ -176,6 +257,8 @@ export function generateBaseConfig(
     console.log('No existing config file, starting with empty config');
   }
 
+  sanitizeLegacyStreamChatConfig(config);
+
   config.gateway = config.gateway ?? {};
   config.channels = config.channels ?? {};
 
@@ -201,42 +284,48 @@ export function generateBaseConfig(
     );
   }
 
-  // Migration: remove stale manually-managed kilocode provider config.
-  // OpenClaw 2026.2.24+ has a built-in kilocode provider that activates when
-  // KILOCODE_API_KEY is in the environment. Stale config entries with the old
-  // /api/openrouter/ URL or the production /api/gateway/ URL conflict with it.
-  // For the production /api/gateway/ URL, skip removal when KILOCODE_ORGANIZATION_ID
-  // is set: org-scoped instances need an explicit provider entry (with the production
-  // baseUrl) to carry the org header. The /api/openrouter/ cleanup always runs since
-  // that URL is unconditionally broken.
-  if (config.models?.providers?.kilocode) {
-    const staleBaseUrl: string = config.models.providers.kilocode.baseUrl || '';
-    const isOpenrouterUrl = staleBaseUrl.includes('/api/openrouter/');
-    const isGatewayUrl = staleBaseUrl === 'https://api.kilo.ai/api/gateway/';
-    if (isOpenrouterUrl || (isGatewayUrl && !env.KILOCODE_ORGANIZATION_ID)) {
-      delete config.models.providers.kilocode;
-      console.log(`Removed stale kilocode provider config (baseUrl: ${staleBaseUrl})`);
-      if (Object.keys(config.models.providers).length === 0) {
-        delete config.models.providers;
-      }
-      if (Object.keys(config.models).length === 0) {
-        delete config.models;
-      }
-    }
+  // KiloCode provider entry. The bundled openclaw kilocode plugin only loads
+  // when an explicit `models.providers.kilocode` entry exists in the config —
+  // without it, the plugin's catalog hook never runs and live gateway model
+  // discovery never populates `kilo-auto/*` and the rest of the dynamic
+  // catalog. So we always include this entry (production baseUrl, empty
+  // `models` so live discovery owns the catalog).
+  //
+  // Cleanup: the old `/api/openrouter/` URL is unconditionally broken; if a
+  // stale entry pointing at it survives from a previous boot, drop it before
+  // we rebuild.
+  const existingProviders = config.models?.providers;
+  const existingBaseUrl: string = existingProviders?.kilocode?.baseUrl ?? '';
+  if (existingProviders && existingBaseUrl.includes('/api/openrouter/')) {
+    delete existingProviders.kilocode;
+    console.log(`Removed stale kilocode provider config (baseUrl: ${existingBaseUrl})`);
   }
+
+  config.models = config.models ?? {};
+  config.models.providers = config.models.providers ?? {};
+  config.models.providers.kilocode = config.models.providers.kilocode ?? {};
+  config.models.providers.kilocode.baseUrl =
+    config.models.providers.kilocode.baseUrl ?? 'https://api.kilo.ai/api/gateway/';
+  config.models.providers.kilocode.api =
+    config.models.providers.kilocode.api ?? 'openai-completions';
+  // Empty array keeps the provider schema-valid while letting live gateway
+  // discovery populate the catalog. Stale model entries written by an older
+  // `openclaw onboard` are intentionally cleared here.
+  config.models.providers.kilocode.models = [];
+  // Auth must come from `KILOCODE_API_KEY` env (env-backed SecretRef in
+  // `auth-profiles.json` for new installs). A literal `apiKey` in
+  // `openclaw.json` is never the source of truth on kiloclaw, but the
+  // previous deletion-based migration was incidentally scrubbing the field.
+  // Preserve that scrub explicitly so any pre-existing plaintext key from a
+  // legacy onboard run does not linger on disk.
+  delete config.models.providers.kilocode.apiKey;
 
   // KiloCode provider base URL override (local dev only).
   // OpenClaw's native kilocode provider hardcodes https://api.kilo.ai/api/gateway/.
   // In local dev, Fly machines need to route through a Cloudflare tunnel, so we
   // override the base URL when KILOCODE_API_BASE_URL is set.
   if (env.KILOCODE_API_BASE_URL) {
-    config.models = config.models ?? {};
-    config.models.providers = config.models.providers ?? {};
-    config.models.providers.kilocode = config.models.providers.kilocode ?? {};
     config.models.providers.kilocode.baseUrl = env.KILOCODE_API_BASE_URL;
-    // Provider entries require a models array per OpenClaw's strict zod schema.
-    // Empty array is valid — the built-in kilocode provider fills in its catalog.
-    config.models.providers.kilocode.models = config.models.providers.kilocode.models ?? [];
     console.log(`Overriding kilocode base URL: ${env.KILOCODE_API_BASE_URL}`);
   }
 
@@ -244,23 +333,14 @@ export function generateBaseConfig(
   // This is used by OpenClaw provider requests (not Kilo CLI).
   // Header name matches ORGANIZATION_ID_HEADER in src/lib/constants.ts.
   if (env.KILOCODE_ORGANIZATION_ID) {
-    config.models = config.models ?? {};
-    config.models.providers = config.models.providers ?? {};
-    config.models.providers.kilocode = config.models.providers.kilocode ?? {};
-    // Explicit provider entries require a baseUrl per OpenClaw's strict schema.
-    // When KILOCODE_API_BASE_URL already set the URL above, preserve it;
-    // otherwise default to the production gateway URL.
-    config.models.providers.kilocode.baseUrl =
-      config.models.providers.kilocode.baseUrl ?? 'https://api.kilo.ai/api/gateway/';
     config.models.providers.kilocode.headers = config.models.providers.kilocode.headers ?? {};
     config.models.providers.kilocode.headers['X-KiloCode-OrganizationId'] =
       env.KILOCODE_ORGANIZATION_ID;
-    config.models.providers.kilocode.models = config.models.providers.kilocode.models ?? [];
     console.log('Configured KiloCode organization header from KILOCODE_ORGANIZATION_ID');
   } else {
     // Remove stale org header from previous boots (e.g., instance was transferred
     // from org to personal, or org was deleted).
-    delete config.models?.providers?.kilocode?.headers?.['X-KiloCode-OrganizationId'];
+    delete config.models.providers.kilocode.headers?.['X-KiloCode-OrganizationId'];
   }
 
   // User-selected default model override.
@@ -343,10 +423,14 @@ export function generateBaseConfig(
   const searchProvider = config.tools?.web?.search?.provider;
   const hasExplicitSearchProvider =
     typeof searchProvider === 'string' && searchProvider.trim().length > 0;
+  const hasExplicitSearchDisabled = config.tools?.web?.search?.enabled === false;
+  const braveConfigured = Boolean(env.BRAVE_API_KEY?.trim());
+  const hasExplicitSearchPreference =
+    hasExplicitSearchProvider || hasExplicitSearchDisabled || braveConfigured;
 
   const kiloExaSearchMode = resolveKiloExaSearchMode(env.KILO_EXA_SEARCH_MODE);
   const shouldForceExa = kiloExaSearchMode === 'kilo-proxy';
-  const shouldAutoAssignExa = kiloExaSearchMode === 'unset' && !hasExplicitSearchProvider;
+  const shouldAutoAssignExa = kiloExaSearchMode === 'unset' && !hasExplicitSearchPreference;
   if (shouldForceExa || shouldAutoAssignExa) {
     customizerWebSearchConfig.enabled = true;
     config.tools = config.tools ?? {};
@@ -360,7 +444,6 @@ export function generateBaseConfig(
   } else if (kiloExaSearchMode === 'disabled') {
     customizerWebSearchConfig.enabled = false;
 
-    const braveConfigured = Boolean(env.BRAVE_API_KEY?.trim());
     if (
       braveConfigured &&
       (!hasExplicitSearchProvider || config.tools?.web?.search?.provider === KILO_EXA_PROVIDER_ID)
@@ -380,6 +463,19 @@ export function generateBaseConfig(
 
   customizerPluginConfig.webSearch = customizerWebSearchConfig;
   config.plugins.entries[KILOCLAW_CUSTOMIZER_PLUGIN_ID].config = customizerPluginConfig;
+
+  if (!(config.plugins.load.paths as string[]).includes(KILOCLAW_MORNING_BRIEFING_PLUGIN_PATH)) {
+    (config.plugins.load.paths as string[]).push(KILOCLAW_MORNING_BRIEFING_PLUGIN_PATH);
+  }
+  if (
+    Array.isArray(config.plugins.allow) &&
+    !config.plugins.allow.includes(KILOCLAW_MORNING_BRIEFING_PLUGIN_ID)
+  ) {
+    config.plugins.allow.push(KILOCLAW_MORNING_BRIEFING_PLUGIN_ID);
+  }
+  config.plugins.entries[KILOCLAW_MORNING_BRIEFING_PLUGIN_ID] =
+    config.plugins.entries[KILOCLAW_MORNING_BRIEFING_PLUGIN_ID] ?? {};
+  config.plugins.entries[KILOCLAW_MORNING_BRIEFING_PLUGIN_ID].enabled = true;
 
   // Telegram
   if (env.TELEGRAM_BOT_TOKEN) {
@@ -434,33 +530,36 @@ export function generateBaseConfig(
     config.plugins.entries.slack.enabled = true;
   }
 
-  // Stream Chat default channel (auto-provisioned at provision time)
-  if (env.STREAM_CHAT_API_KEY && env.STREAM_CHAT_BOT_USER_ID && env.STREAM_CHAT_BOT_USER_TOKEN) {
-    config.channels.streamchat = config.channels.streamchat ?? {};
-    config.channels.streamchat.apiKey = env.STREAM_CHAT_API_KEY;
-    config.channels.streamchat.botUserId = env.STREAM_CHAT_BOT_USER_ID;
-    config.channels.streamchat.botUserToken = env.STREAM_CHAT_BOT_USER_TOKEN;
-    config.channels.streamchat.botUserName = 'KiloClaw';
-    config.channels.streamchat.enabled = true;
+  // Session — default DM scope to per-channel-peer so each channel+peer
+  // combination gets its own session. OpenClaw's onboard sets this for new
+  // instances, but legacy instances may not have it.
+  config.session = config.session ?? {};
+  config.session.dmScope = config.session.dmScope ?? 'per-channel-peer';
 
-    config.plugins = config.plugins ?? {};
-    config.plugins.load = config.plugins.load ?? {};
-    config.plugins.load.paths = Array.isArray(config.plugins.load.paths)
-      ? config.plugins.load.paths
-      : [];
-    const pluginPath = '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
-    if (!(config.plugins.load.paths as string[]).includes(pluginPath)) {
-      (config.plugins.load.paths as string[]).push(pluginPath);
-    }
+  // Kilo Chat — always enabled. The plugin's outbound path reaches
+  // kilo-chat via controller proxy → kilo-chat Worker directly.
+  config.channels['kilo-chat'] = config.channels['kilo-chat'] ?? {};
+  config.channels['kilo-chat'].enabled = true;
+  // Load-bearing: _configured is the marker key for OpenClaw's
+  // hasMeaningfulChannelConfig gate — without a non-`enabled` key the
+  // plugin loads in setup-runtime mode instead of full.
+  config.channels['kilo-chat']._configured = true;
 
-    config.plugins.entries = config.plugins.entries ?? {};
-    // Entry key must match the plugin's manifest id (openclaw.plugin.json).
-    // The fork's manifest declares id "openclaw-channel-streamchat" to align
-    // with the idHint that OpenClaw derives from the package name.
-    const scEntry = 'openclaw-channel-streamchat';
-    config.plugins.entries[scEntry] = config.plugins.entries[scEntry] ?? {};
-    config.plugins.entries[scEntry].enabled = true;
+  config.plugins = config.plugins ?? {};
+  config.plugins.load = config.plugins.load ?? {};
+  config.plugins.load.paths = Array.isArray(config.plugins.load.paths)
+    ? config.plugins.load.paths
+    : [];
+  if (!(config.plugins.load.paths as string[]).includes(KILO_CHAT_PLUGIN_PATH)) {
+    (config.plugins.load.paths as string[]).push(KILO_CHAT_PLUGIN_PATH);
   }
+  if (Array.isArray(config.plugins.allow) && !config.plugins.allow.includes(KILO_CHAT_PLUGIN_ID)) {
+    config.plugins.allow.push(KILO_CHAT_PLUGIN_ID);
+  }
+
+  config.plugins.entries = config.plugins.entries ?? {};
+  config.plugins.entries[KILO_CHAT_PLUGIN_ID] = config.plugins.entries[KILO_CHAT_PLUGIN_ID] ?? {};
+  config.plugins.entries[KILO_CHAT_PLUGIN_ID].enabled = true;
 
   // Webhook hooks configuration for controller-mediated inbound events.
   // hooks.token stays local to the machine; external Workers authenticate to
@@ -470,6 +569,24 @@ export function generateBaseConfig(
     config.hooks.enabled = true;
     config.hooks.token = env.KILOCLAW_HOOKS_TOKEN;
     config.hooks.path = '/hooks';
+    ensureInboundEmailHookFlags(config);
+    config.hooks.allowedSessionKeyPrefixes = Array.isArray(config.hooks.allowedSessionKeyPrefixes)
+      ? config.hooks.allowedSessionKeyPrefixes
+      : [];
+    if (
+      !(config.hooks.allowedSessionKeyPrefixes as string[]).includes(
+        DEFAULT_HOOK_SESSION_KEY_PREFIX
+      )
+    ) {
+      (config.hooks.allowedSessionKeyPrefixes as string[]).push(DEFAULT_HOOK_SESSION_KEY_PREFIX);
+    }
+    if (
+      !(config.hooks.allowedSessionKeyPrefixes as string[]).includes(
+        INBOUND_EMAIL_SESSION_KEY_PREFIX
+      )
+    ) {
+      (config.hooks.allowedSessionKeyPrefixes as string[]).push(INBOUND_EMAIL_SESSION_KEY_PREFIX);
+    }
 
     config.hooks.mappings = Array.isArray(config.hooks.mappings)
       ? config.hooks.mappings.map((mapping: ConfigObject) => migrateHookMapping(mapping))
@@ -683,7 +800,7 @@ export function writeMcporterConfig(
 
   const dir = path.dirname(configPath);
   if (!deps.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+    deps.mkdirSync(dir, { recursive: true });
   }
 
   deps.writeFileSync(configPath, JSON.stringify(existing, null, 2));

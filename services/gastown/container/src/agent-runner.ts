@@ -4,6 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import { cloneRepo, createWorktree, setupRigBrowseWorktree } from './git-manager';
 import { startAgent } from './process-manager';
 import { getCurrentTownConfig } from './control-server';
+import { log } from './logger';
 import type { ManagedAgent, StartAgentRequest } from './types';
 
 /**
@@ -471,6 +472,7 @@ export async function writeMayorSystemPromptToAgentsMd(
 export async function runAgent(originalRequest: StartAgentRequest): Promise<ManagedAgent> {
   let request = originalRequest;
   let workdir: string;
+  const t0 = Date.now();
 
   if (request.role === 'triage' || request.lightweight) {
     // Triage/lightweight agents are pure reasoning — no code changes, no git needed.
@@ -563,6 +565,8 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
       branch: request.branch,
       startPoint: request.startPoint,
       defaultBranch: request.defaultBranch,
+      envVars,
+      gitUrl: request.gitUrl,
     });
 
     // Set up git credentials so the agent can push
@@ -570,6 +574,12 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
 
     // Pre-flight: verify git credentials can authenticate against the remote.
     await verifyGitCredentials(workdir, request.gitUrl, envVars);
+
+    log.info('agent.startup_phase', {
+      agentId: request.agentId,
+      phase: 'git_done',
+      elapsedMs: Date.now() - t0,
+    });
   }
 
   const env = buildAgentEnv(request);

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
+import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { BillingBanner } from './BillingBanner';
 import { AccessLockedDialog } from './AccessLockedDialog';
 import { PlanSelectionDialog } from './PlanSelectionDialog';
@@ -19,8 +20,8 @@ function EarlybirdActiveCard({
   onSubscribeClick: () => void;
 }) {
   return (
-    <div className="border-brand-primary/30 bg-brand-primary/5 flex items-center gap-3 rounded-xl border p-4">
-      <span className="text-xl">🦀</span>
+    <div className="border-brand-primary/30 bg-brand-primary/5 flex shrink-0 items-center gap-3 rounded-xl border p-4">
+      <KiloCrabIcon className="text-brand-primary size-5 shrink-0" />
       <div className="flex-1">
         <span className="text-brand-primary text-sm font-semibold">
           Thanks for being an early KiloClaw subscriber.

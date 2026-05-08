@@ -32,6 +32,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import type Stripe from 'stripe';
 import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { differenceInCalendarMonths } from 'date-fns';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
@@ -307,12 +308,32 @@ async function insertPersonalSubscriptionFixture(params: PersonalSubscriptionFix
 
 async function seedDeliveredImpactSignupEvent(userId: string, email: string) {
   const { recordAffiliateAttributionAndQueueParentEvent } = await import('@/lib/affiliate-events');
+  const { recordImpactAffiliateTouch } = await import('@/lib/impact-referral');
+  const eventDate = new Date('2026-04-09T10:00:00.000Z');
+
   const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
     userId,
     provider: 'impact',
     trackingId: 'impact-click-123',
     customerEmail: email,
-    eventDate: new Date('2026-04-09T10:00:00.000Z'),
+    eventDate,
+  });
+
+  await recordImpactAffiliateTouch({
+    userId,
+    touch: {
+      trackingId: 'impact-click-123',
+      trackingValueLength: 'impact-click-123'.length,
+      isTrackingValueAccepted: true,
+      landingPath: '/pricing?im_ref=impact-click-123',
+      utmSource: null,
+      utmMedium: null,
+      utmCampaign: null,
+      utmTerm: null,
+      utmContent: null,
+      touchedAt: eventDate,
+      expiresAt: new Date('2026-05-09T10:00:00.000Z'),
+    },
   });
 
   expect(parentEvent).not.toBeNull();
@@ -2276,6 +2297,10 @@ describe('handleKiloClawSubscriptionCreated', () => {
 
   it('upgrades a trial row to a paid subscription', async () => {
     const instance = await createWebhookAnchor();
+    await db
+      .update(kiloclaw_instances)
+      .set({ inactive_trial_stopped_at: '2026-04-20T12:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, instance.id));
 
     const subscription = makeStripeSubscription({
       id: 'sub_paid',
@@ -2303,6 +2328,14 @@ describe('handleKiloClawSubscriptionCreated', () => {
     expect(row.stripe_subscription_id).toBe('sub_paid');
     expect(row.plan).toBe('standard');
     expect(row.status).toBe('active');
+
+    const [updatedInstance] = await db
+      .select({ inactive: kiloclaw_instances.inactive_trial_stopped_at })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, instance.id))
+      .limit(1);
+
+    expect(updatedInstance?.inactive).toBeNull();
   });
 
   it('attaches pre-deploy subscription.created without instanceId metadata to current personal row', async () => {
@@ -5050,11 +5083,9 @@ describe('enrollWithCredits', () => {
     expect(sub.payment_source).toBe('credits');
     expect(sub.commit_ends_at).not.toBeNull();
 
-    // commit_ends_at should be ~6 months from now
+    // commit_ends_at should be 6 calendar months from now.
     const commitEnd = new Date(sub.commit_ends_at!);
-    const diffDays = (commitEnd.getTime() - Date.now()) / 86_400_000;
-    expect(diffDays).toBeGreaterThanOrEqual(178);
-    expect(diffDays).toBeLessThanOrEqual(184);
+    expect(differenceInCalendarMonths(commitEnd, new Date())).toBe(6);
   });
 
   it('rejects enrollment when balance is insufficient', async () => {
@@ -5082,6 +5113,43 @@ describe('enrollWithCredits', () => {
       credit_renewal_at: new Date(Date.now() + 30 * 86_400_000).toISOString(),
       cancel_at_period_end: false,
     });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.enrollWithCredits({ plan: 'standard' })).rejects.toThrow(
+      'active subscription already exists'
+    );
+  });
+
+  it('enrollWithCredits with no instanceId after destroy does NOT produce duplicate_enrollment', async () => {
+    const instance = await createInstance(user.id);
+    await giveUserCredits(user.id, 50_000_000);
+    const now = new Date();
+    const periodKey = now.toISOString().slice(0, 7);
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      payment_source: 'credits',
+      plan: 'standard',
+      status: 'active',
+      current_period_start: now.toISOString(),
+      current_period_end: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
+      credit_renewal_at: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
+      cancel_at_period_end: false,
+    });
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: -4_000_000,
+      is_free: false,
+      description: 'KiloClaw standard enrollment',
+      credit_category: `kiloclaw-subscription:${instance.id}:${periodKey}`,
+      check_category_uniqueness: true,
+      original_baseline_microdollars_used: 0,
+    });
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: new Date(now.getTime() + 60_000).toISOString() })
+      .where(eq(kiloclaw_instances.id, instance.id));
 
     const caller = await createCallerForUser(user.id);
     await expect(caller.kiloclaw.enrollWithCredits({ plan: 'standard' })).rejects.toThrow(
@@ -5140,6 +5208,10 @@ describe('enrollWithCredits', () => {
   it('allows enrollment when subscription is trialing', async () => {
     const instance = await createInstance(user.id);
     await giveUserCredits(user.id, 50_000_000);
+    await db
+      .update(kiloclaw_instances)
+      .set({ inactive_trial_stopped_at: '2026-04-20T12:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, instance.id));
 
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
@@ -5166,6 +5238,14 @@ describe('enrollWithCredits', () => {
     // Trial dates are preserved for historical visibility
     expect(sub.trial_started_at).not.toBeNull();
     expect(sub.trial_ends_at).not.toBeNull();
+
+    const [updatedInstance] = await db
+      .select({ inactive: kiloclaw_instances.inactive_trial_stopped_at })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, instance.id))
+      .limit(1);
+
+    expect(updatedInstance?.inactive).toBeNull();
   });
 
   it('enqueues trial_end and sale affiliate events for attributed trial-to-credit conversion', async () => {

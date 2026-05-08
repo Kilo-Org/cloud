@@ -1,3 +1,5 @@
+export { getCachedSecret, clearSecretCacheForTest } from './cached-secret.js';
+
 export { withDORetry, DEFAULT_DO_RETRY_CONFIG } from './do-retry.js';
 export type { DORetryConfig } from './do-retry.js';
 
@@ -35,6 +37,11 @@ export type {
   CloudAgentUpdateSessionInput,
   CloudAgentSendMessageInput,
   CloudAgentSendMessageOutput,
+  CloudAgentSessionHealthInput,
+  CloudAgentSessionHealthOutput,
+  CloudAgentSandboxStatus,
+  CloudAgentSessionExecutionHealth,
+  CloudAgentActiveExecutionStatus,
   CloudAgentInterruptInput,
   CloudAgentInterruptOutput,
 } from './cloud-agent-next-client.js';
@@ -55,6 +62,8 @@ export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
 
 export { redactSensitiveHeaders } from './redact-headers.js';
 
+export { normalizeGitUrl } from './normalize-git-url.js';
+
 export {
   BILLING_FLOW,
   BILLING_HEADER_NAMES,
@@ -63,3 +72,20 @@ export {
   readBillingCorrelationHeaders,
 } from './kiloclaw-billing-observability.js';
 export type { BillingCorrelationContext } from './kiloclaw-billing-observability.js';
+
+export {
+  KILOCLAW_START_REASONS,
+  KILOCLAW_STOP_REASONS,
+  KILOCLAW_DESTROY_REASONS,
+  KiloclawStartReasonSchema,
+  KiloclawStopReasonSchema,
+  KiloclawDestroyReasonSchema,
+} from './kiloclaw-lifecycle-reasons.js';
+export type {
+  KiloclawStartReason,
+  KiloclawStopReason,
+  KiloclawDestroyReason,
+} from './kiloclaw-lifecycle-reasons.js';
+
+export { isValidGitUrl, sanitizeGitUrl, parseGitUrl, repoFullNameFromGitUrl } from './git-url.js';
+export type { RepoCoordinates } from './git-url.js';

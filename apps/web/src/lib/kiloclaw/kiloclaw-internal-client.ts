@@ -1,5 +1,10 @@
 import 'server-only';
 
+import type {
+  KiloclawDestroyReason,
+  KiloclawStartReason,
+  KiloclawStopReason,
+} from '@kilocode/worker-utils';
 import { KILOCLAW_API_URL, KILOCLAW_INTERNAL_API_SECRET } from '@/lib/config.server';
 import type {
   ImageVersionEntry,
@@ -33,6 +38,9 @@ import type {
   GatewayReadyResponse,
   ControllerVersionResponse,
   OpenclawConfigResponse,
+  MorningBriefingStatusResponse,
+  MorningBriefingActionResponse,
+  MorningBriefingReadResponse,
   GoogleCredentialsInput,
   GoogleCredentialsResponse,
   GoogleOAuthConnectionInput,
@@ -41,6 +49,8 @@ import type {
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
   ResizeMachineResponse,
+  SetAdminMachineSizeOverrideResponse,
+  ClearAdminMachineSizeOverrideResponse,
   RestoreVolumeSnapshotResponse,
   CleanupRecoveryPreviousVolumeResponse,
   RegionsResponse,
@@ -49,6 +59,7 @@ import type {
   UpdateProviderRolloutResponse,
   ProviderRolloutConfig,
 } from './types';
+import type { InstanceTierKey } from '@kilocode/kiloclaw-instance-tiers';
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
 export interface FileNode {
@@ -123,17 +134,137 @@ export class KiloClawInternalClient {
     return this.request('/api/platform/versions');
   }
 
-  async getLatestVersion(): Promise<ImageVersionEntry | null> {
+  async getLatestVersion(opts?: {
+    instanceId?: string;
+    currentImageTag?: string | null;
+  }): Promise<ImageVersionEntry | null> {
+    // Note: Early Access is resolved server-side from the instance's owning
+    // user — callers do NOT pass it as a param. Trying to set it here would
+    // be ignored.
+    let path = '/api/platform/versions/latest';
+    if (opts?.instanceId) {
+      const params = new URLSearchParams({ instanceId: opts.instanceId });
+      if (opts.currentImageTag) params.set('currentImageTag', opts.currentImageTag);
+      path += `?${params.toString()}`;
+    }
     try {
-      return await this.request('/api/platform/versions/latest');
+      return await this.request(path);
     } catch (err) {
-      // Only return null for 404 (no latest version set)
-      // Re-throw other errors (network, auth, server errors) so callers can handle them
+      // 404 means "no latest version set" or "no upgrade available for this instance".
+      // Both collapse to null for callers (no banner, fall back to existing image).
       if (err instanceof KiloClawApiError && err.statusCode === 404) {
         return null;
       }
       throw err;
     }
+  }
+
+  async setRolloutPercent(
+    imageTag: string,
+    percent: number
+  ): Promise<{
+    ok: boolean;
+    imageTag: string;
+    variant: string;
+    rolloutPercent: number;
+    isLatest: boolean;
+  }> {
+    return this.request('/api/platform/versions/rollout', {
+      method: 'POST',
+      body: JSON.stringify({ imageTag, percent }),
+    });
+  }
+
+  async markImageAsLatest(
+    imageTag: string
+  ): Promise<{ ok: boolean; imageTag: string; variant: string }> {
+    return this.request('/api/platform/versions/mark-latest', {
+      method: 'POST',
+      body: JSON.stringify({ imageTag }),
+    });
+  }
+
+  async disableImageAndClearRollout(imageTag: string, updatedBy: string): Promise<{ ok: boolean }> {
+    return this.request('/api/platform/versions/disable-with-clear', {
+      method: 'POST',
+      body: JSON.stringify({ imageTag, updatedBy }),
+    });
+  }
+
+  /**
+   * Push a resolved admin pin (or clear) into the instance's DO state.
+   * Pass `imageTag = null` to clear the pin and reset to the current
+   * rollout target. Does not restart the machine.
+   */
+  async applyPinnedVersion(
+    userId: string,
+    instanceId: string,
+    imageTag: string | null
+  ): Promise<{
+    ok: boolean;
+    openclawVersion: string | null;
+    imageTag: string | null;
+    imageDigest: string | null;
+    variant: string | null;
+  }> {
+    return this.request(
+      '/api/platform/versions/apply-pin',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, instanceId, imageTag }),
+      },
+      { userId }
+    );
+  }
+
+  /**
+   * Wake the target instance's DO so it re-arms its alarm after a new
+   * scheduled action has been persisted. Best-effort — failures are
+   * acceptable (the wedge in alarm() will eventually pick up the action
+   * the next time the DO ticks for any other reason). See
+   * services/kiloclaw/src/routes/platform.ts for the route comment
+   * explaining why this is required in dev and merely defensive in
+   * production.
+   */
+  async wakeScheduledAction(userId: string, instanceId: string): Promise<{ ok: true }> {
+    return this.request(
+      '/api/platform/scheduled-action/wake',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, instanceId }),
+      },
+      { userId }
+    );
+  }
+
+  /**
+   * Synchronously runs the notification notice sweep that the cron
+   * normally drives. Used by the admin Scheduler tab "Run notice sweep
+   * now" button so admins can verify notice copy locally (where wrangler
+   * does not fire scheduled() on cadence) and on demand in production.
+   * No userId routing — sweep is fleet-wide.
+   */
+  async runScheduledActionNoticeSweep(): Promise<{
+    processed: number;
+    sent: number;
+    failed: number;
+    recovered: number;
+    voidedStale: number;
+  }> {
+    return this.request('/api/platform/scheduled-action/run-notice-sweep', {
+      method: 'POST',
+      body: '{}',
+    });
+  }
+
+  async setUserKiloclawEarlyAccess(
+    userId: string,
+    value: boolean
+  ): Promise<{ ok: boolean; userId: string; earlyAccess: boolean }> {
+    return this.request(`/api/platform/users/${encodeURIComponent(userId)}/kiloclaw-early-access`, {
+      method: 'POST',
+      body: JSON.stringify({ value }),
+    });
   }
 
   async provision(
@@ -154,50 +285,78 @@ export class KiloClawInternalClient {
   async start(
     userId: string,
     instanceId?: string,
-    options?: { skipCooldown?: boolean }
-  ): Promise<{ ok: true }> {
+    options?: { skipCooldown?: boolean; reason?: KiloclawStartReason }
+  ): Promise<{
+    ok: true;
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/start${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, ...options }),
+        body: JSON.stringify({
+          userId,
+          ...(options?.skipCooldown ? { skipCooldown: true } : {}),
+          ...(options?.reason ? { reason: options.reason } : {}),
+        }),
       },
       { userId }
     );
   }
 
-  async startAsync(userId: string, instanceId?: string): Promise<{ ok: true }> {
+  async startAsync(
+    userId: string,
+    instanceId?: string,
+    options?: { reason?: KiloclawStartReason }
+  ): Promise<{ ok: true }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/start-async${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
       },
       { userId }
     );
   }
 
-  async stop(userId: string, instanceId?: string): Promise<{ ok: true }> {
+  async stop(
+    userId: string,
+    instanceId?: string,
+    options?: { reason?: KiloclawStopReason }
+  ): Promise<{
+    ok: true;
+    stopped: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    stoppedAt: number | null;
+  }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/stop${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
       },
       { userId }
     );
   }
 
-  async destroy(userId: string, instanceId?: string): Promise<{ ok: true }> {
+  async destroy(
+    userId: string,
+    instanceId?: string,
+    options?: { reason?: KiloclawDestroyReason }
+  ): Promise<{ ok: true }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/destroy${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
       },
       { userId }
     );
@@ -211,33 +370,73 @@ export class KiloClawInternalClient {
     });
   }
 
-  async getStreamChatCredentials(
+  async getMorningBriefingStatus(
     userId: string,
     instanceId?: string
-  ): Promise<{
-    apiKey: string;
-    userId: string;
-    userToken: string;
-    channelId: string;
-  } | null> {
+  ): Promise<MorningBriefingStatusResponse> {
     const params = new URLSearchParams({ userId });
     if (instanceId) params.set('instanceId', instanceId);
-    return this.request(`/api/platform/stream-chat-credentials?${params.toString()}`, undefined, {
+    return this.request(`/api/platform/morning-briefing/status?${params.toString()}`, undefined, {
       userId,
     });
   }
 
-  async sendChatMessage(
+  async enableMorningBriefing(
     userId: string,
-    message: string,
+    input?: { cron?: string; timezone?: string },
     instanceId?: string
-  ): Promise<{ success: boolean; channelId: string }> {
+  ): Promise<MorningBriefingActionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/send-chat-message',
+      `/api/platform/morning-briefing/enable${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, message, instanceId }),
+        body: JSON.stringify({ userId, ...input }),
       },
+      { userId }
+    );
+  }
+
+  async disableMorningBriefing(
+    userId: string,
+    instanceId?: string
+  ): Promise<MorningBriefingActionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/disable${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async runMorningBriefing(
+    userId: string,
+    instanceId?: string
+  ): Promise<MorningBriefingActionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/run${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async readMorningBriefing(
+    userId: string,
+    day: 'today' | 'yesterday',
+    instanceId?: string
+  ): Promise<MorningBriefingReadResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(
+      `/api/platform/morning-briefing/read/${day}?${params.toString()}`,
+      undefined,
       { userId }
     );
   }
@@ -795,7 +994,7 @@ export class KiloClawInternalClient {
 
   async resizeMachine(
     userId: string,
-    machineSize: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' },
+    instanceType: InstanceTierKey,
     instanceId?: string
   ): Promise<ResizeMachineResponse> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
@@ -803,7 +1002,44 @@ export class KiloClawInternalClient {
       `/api/platform/resize-machine${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, machineSize }),
+        body: JSON.stringify({ userId, instanceType }),
+      },
+      { userId }
+    );
+  }
+
+  async setAdminMachineSizeOverride(
+    userId: string,
+    payload: {
+      size: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' };
+      reason: string;
+      actorId: string;
+      actorEmail: string;
+    },
+    instanceId?: string
+  ): Promise<SetAdminMachineSizeOverrideResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/admin-size-override/set${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, ...payload }),
+      },
+      { userId }
+    );
+  }
+
+  async clearAdminMachineSizeOverride(
+    userId: string,
+    payload: { reason: string; actorId: string; actorEmail: string },
+    instanceId?: string
+  ): Promise<ClearAdminMachineSizeOverrideResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/admin-size-override/clear${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, ...payload }),
       },
       { userId }
     );
@@ -846,6 +1082,7 @@ export class KiloClawInternalClient {
     userId: string,
     appName: string,
     volumeId: string,
+    targetSizeGb: number,
     instanceId?: string
   ): Promise<{ ok: true; needsRestart: boolean }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
@@ -853,7 +1090,7 @@ export class KiloClawInternalClient {
       `/api/platform/extend-volume${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, appName, volumeId }),
+        body: JSON.stringify({ userId, appName, volumeId, targetSizeGb }),
       },
       { userId }
     );

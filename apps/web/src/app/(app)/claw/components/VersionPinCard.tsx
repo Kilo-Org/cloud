@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Pin, PinOff, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastPinMutationResult } from '@/lib/kiloclaw/pin-sync-toast';
 import { useClawAvailableVersions, useClawMyPin } from '../hooks/useClawHooks';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { Button } from '@/components/ui/button';
@@ -48,11 +49,12 @@ export function VersionPinCard({
     }
 
     try {
-      await mutations.setMyPin.mutateAsync({
+      const result = await mutations.setMyPin.mutateAsync({
         imageTag: selectedImageTag,
         reason: reason.trim() || undefined,
       });
-      toast.success(
+      toastPinMutationResult(
+        result,
         'Version pinned successfully. Use the "Redeploy or Upgrade" button to apply this version.'
       );
       setSelectedImageTag('');
@@ -65,8 +67,9 @@ export function VersionPinCard({
 
   const handleUnpin = async () => {
     try {
-      await mutations.removeMyPin.mutateAsync();
-      toast.success(
+      const result = await mutations.removeMyPin.mutateAsync();
+      toastPinMutationResult(
+        result,
         'Version pin removed. Use the "Redeploy or Upgrade" button to return to the latest version.'
       );
     } catch (error) {
@@ -96,29 +99,20 @@ export function VersionPinCard({
     <div>
       <h3 className="text-foreground mb-1 flex items-center gap-2 text-sm font-medium">
         <Pin className="size-4" />
-        Version Pinning
+        Pin a version
       </h3>
       <div className="grid grid-cols-1 items-start gap-6 sm:grid-cols-2">
-        {/* Left: Description + Pinning Controls */}
+        {/* Left: description + controls (or pinned status) */}
         <div className="space-y-3">
-          <div className="space-y-2">
-            <p className="text-muted-foreground text-sm">
-              Pin your instance to a specific OpenClaw version or follow the latest
-            </p>
-            <div className="text-muted-foreground flex items-start gap-1 text-xs">
-              <Info className="mt-0.5 h-3 w-3 shrink-0" />
-              <span>
-                Pinning locks your instance to a specific version. You won&apos;t receive automatic
-                updates until you unpin.
-              </span>
-            </div>
-          </div>
+          <p className="text-muted-foreground text-sm">
+            Lock your instance to a specific OpenClaw version. No automatic updates until you unpin.
+          </p>
 
           {!isPinned ? (
             <div className="space-y-3">
               <div className="space-y-2">
                 <Label htmlFor="version-select" className="text-sm">
-                  Select Version
+                  Select version
                 </Label>
                 <div className="flex items-center gap-2">
                   <Select value={selectedImageTag} onValueChange={setSelectedImageTag}>
@@ -167,24 +161,12 @@ export function VersionPinCard({
                 />
               </div>
             </div>
-          ) : null}
-        </div>
-
-        {/* Right: Current Status */}
-        <div>
-          <h3 className="text-muted-foreground mb-2 text-sm font-medium">Current Status</h3>
-          {isPinned ? (
+          ) : (
             <div className="space-y-1.5 text-sm">
               <div>
                 <span className="text-muted-foreground">Pinned to: </span>
                 <code className="bg-muted rounded px-1.5 py-0.5 text-xs">
                   {myPin.openclaw_version ?? 'Unknown'} / {myPin.variant ?? 'Unknown'}
-                </code>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Image tag: </span>
-                <code className="bg-muted rounded px-1.5 py-0.5 text-xs" title={myPin.image_tag}>
-                  {truncateTag(myPin.image_tag)}
                 </code>
               </div>
               {myPin.reason && (
@@ -197,7 +179,7 @@ export function VersionPinCard({
                 <span className="text-muted-foreground">Pinned by: </span>
                 <span>{pinnedByLabel}</span>
               </div>
-              <div className="space-y-1.5 pt-2">
+              <div className="pt-2">
                 {pinnedBySelf ? (
                   <>
                     <Button
@@ -209,7 +191,7 @@ export function VersionPinCard({
                       <PinOff className="mr-2 size-4" />
                       {isUnpinning ? 'Unpinning...' : 'Unpin'}
                     </Button>
-                    <p className="text-muted-foreground flex items-start gap-1 text-xs">
+                    <p className="text-muted-foreground mt-1.5 flex items-start gap-1 text-xs">
                       <Info className="mt-0.5 h-3 w-3 shrink-0" />
                       <span>
                         Unpinning returns to following latest. Use the Upgrade button to upgrade
@@ -227,50 +209,59 @@ export function VersionPinCard({
                 )}
               </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-green-100 px-3 py-0.5 text-center text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-100">
-                  Following latest
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  Automatically uses newest version
-                </span>
-              </div>
-              {(trackedImageTag || latestImageTag) && (
-                <table className="text-sm">
-                  <tbody>
-                    {trackedImageTag && (
-                      <tr>
-                        <td className="text-muted-foreground pr-3 align-top">Current image</td>
-                        <td>
-                          <code
-                            className="bg-muted rounded px-1.5 py-0.5 text-xs"
-                            title={trackedImageTag}
-                          >
-                            {truncateTag(trackedImageTag)}
-                          </code>
-                        </td>
-                      </tr>
-                    )}
-                    {latestImageTag && (
-                      <tr>
-                        <td className="text-muted-foreground pr-3 pt-1 align-top">Latest image</td>
-                        <td className="pt-1">
-                          <code
-                            className="bg-muted rounded px-1.5 py-0.5 text-xs"
-                            title={latestImageTag}
-                          >
-                            {truncateTag(latestImageTag)}
-                          </code>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              )}
-            </div>
           )}
+        </div>
+
+        {/* Right: compact image hash list. No redundant heading and no
+            "Following latest" pill — those live in the OpenClaw Instance row
+            above. */}
+        <div className="text-sm">
+          <table>
+            <tbody>
+              {isPinned ? (
+                <tr>
+                  <td className="text-muted-foreground pr-3 align-top">Pinned image</td>
+                  <td>
+                    <code
+                      className="bg-muted rounded px-1.5 py-0.5 text-xs"
+                      title={myPin.image_tag}
+                    >
+                      {truncateTag(myPin.image_tag)}
+                    </code>
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  {trackedImageTag && (
+                    <tr>
+                      <td className="text-muted-foreground pr-3 align-top">Current image</td>
+                      <td>
+                        <code
+                          className="bg-muted rounded px-1.5 py-0.5 text-xs"
+                          title={trackedImageTag}
+                        >
+                          {truncateTag(trackedImageTag)}
+                        </code>
+                      </td>
+                    </tr>
+                  )}
+                  {latestImageTag && (
+                    <tr>
+                      <td className="text-muted-foreground pr-3 pt-1 align-top">Latest image</td>
+                      <td className="pt-1">
+                        <code
+                          className="bg-muted rounded px-1.5 py-0.5 text-xs"
+                          title={latestImageTag}
+                        >
+                          {truncateTag(latestImageTag)}
+                        </code>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

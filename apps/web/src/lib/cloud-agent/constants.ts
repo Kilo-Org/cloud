@@ -23,3 +23,13 @@ export const CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 export const CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX = 1536;
 
 export const CLOUD_AGENT_IMAGE_PRESIGNED_URL_EXPIRY_SECONDS = 900; // 15 min
+
+/**
+ * Maximum prompt length (in characters) accepted by the cloud agent.
+ *
+ * Mirrors the server-side cap in `services/cloud-agent-next/src/schema.ts`
+ * (`Limits.MAX_PROMPT_LENGTH`). Prompts exceeding this would be rejected by
+ * the worker, so we enforce the same limit client-side to give users
+ * immediate feedback.
+ */
+export const CLOUD_AGENT_PROMPT_MAX_LENGTH = 100_000;

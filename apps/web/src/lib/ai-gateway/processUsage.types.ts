@@ -19,8 +19,26 @@ export type OpenRouterUsage = {
   total_tokens: number;
 }; //ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
 
+export type VercelProviderAttempt = {
+  provider?: string;
+  credentialType?: string;
+  success?: boolean;
+};
+
+export type VercelModelAttempt = {
+  success?: boolean;
+  providerAttempts?: VercelProviderAttempt[];
+};
+
 export type VercelProviderMetaData = {
-  gateway?: { routing?: { finalProvider?: string }; cost?: string; marketCost?: string };
+  gateway?: {
+    routing?: {
+      finalProvider?: string;
+      modelAttempts?: VercelModelAttempt[];
+    };
+    cost?: string;
+    marketCost?: string;
+  };
 };
 
 export type MaybeHasVercelProviderMetaData = {
@@ -65,6 +83,10 @@ export type NotYetCostedUsageStats = {
   generation_time: number | null;
   streamed: boolean | null;
   cancelled: boolean | null;
+  /** Effective HTTP status code for this usage record. Starts from the upstream
+   *  response status and is overwritten by a numeric `error.code` encountered
+   *  in-stream (e.g. a 200 response that ends up carrying a 502 error event). */
+  status_code: number;
 };
 
 export type JustTheCostsUsageStats = {
@@ -120,6 +142,8 @@ export type MicrodollarUsageContext = {
   mode: string | null;
   /** The auto model ID when one was requested (e.g. 'kilo-auto/free'). */
   auto_model: string | null;
+  /** Time to first byte from the upstream provider, in milliseconds. Set after the upstream request returns. */
+  ttfb_ms: number | null;
 };
 
 export type CoreUsageWithMetaData = {
@@ -169,7 +193,7 @@ export type UsageMetaData = {
 
 export type OpenRouterError = {
   message: string;
-  code: string;
+  code: number | string;
   metadata?: Record<string, unknown>;
   provider_name?: string;
 };

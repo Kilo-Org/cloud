@@ -1,4 +1,5 @@
 import { listAgents } from './process-manager';
+import { fetchFreshContainerToken } from './token-refresh';
 import type { HeartbeatPayload } from './types';
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
@@ -118,19 +119,30 @@ async function sendHeartbeats(): Promise<void> {
       containerInstanceId: CONTAINER_INSTANCE_ID,
     };
 
+    const url = `${gastownApiUrl}/api/towns/${agent.townId}/rigs/${agent.rigId}/agents/${agent.agentId}/heartbeat`;
+    const doPost = (token: string) =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${currentToken}`,
-      };
-      const response = await fetch(
-        `${gastownApiUrl}/api/towns/${agent.townId}/rigs/${agent.rigId}/agents/${agent.agentId}/heartbeat`,
-        {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(payload),
+      let response = await doPost(currentToken);
+      // On 401, mint a fresh token via the worker's refresh endpoint
+      // (it tolerates expired tokens) and retry once.
+      if (response.status === 401) {
+        console.warn(
+          `Heartbeat 401 for agent ${agent.agentId} — attempting one-shot token refresh`
+        );
+        const fresh = await fetchFreshContainerToken();
+        if (fresh) {
+          response = await doPost(fresh);
         }
-      );
+      }
 
       if (!response.ok) {
         console.warn(

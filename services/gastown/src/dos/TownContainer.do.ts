@@ -20,7 +20,7 @@ const TC_LOG = '[TownContainer.do]';
  */
 export class TownContainerDO extends Container<Env> {
   defaultPort = 8080;
-  sleepAfter = '30m';
+  sleepAfter = '10m';
 
   // Container env vars. Includes infra URLs and any tokens stored via setEnvVar().
   // The Container base class reads this when booting the container.
@@ -81,6 +81,27 @@ export class TownContainerDO extends Container<Env> {
 
   override onStart(): void {
     console.log(`${TC_LOG} container started for DO id=${this.ctx.id.toString()}`);
+  }
+
+  /**
+   * Ensure the container is running and its default port is ready to accept
+   * traffic. Returns how long the underlying Container class took to satisfy
+   * that (i.e. `startAndWaitForPorts`), along with whether this call actually
+   * triggered a cold start.
+   *
+   * Intended to be called from the Town DO alarm in place of a manual
+   * /health ping — gives an accurate cold-start measurement without being
+   * capped by an arbitrary client-side timeout.
+   */
+  async warmUp(): Promise<{ coldStart: boolean; durationMs: number }> {
+    const state = await this.getState();
+    const alreadyHealthy = this.ctx.container?.running === true && state.status === 'healthy';
+    if (alreadyHealthy) {
+      return { coldStart: false, durationMs: 0 };
+    }
+    const t0 = Date.now();
+    await this.startAndWaitForPorts();
+    return { coldStart: true, durationMs: Date.now() - t0 };
   }
 
   override onStop({ exitCode, reason }: { exitCode: number; reason: string }): void {

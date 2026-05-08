@@ -24,7 +24,6 @@ import {
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { logExceptInTest } from '@/lib/utils.server';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -149,14 +148,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
       const platform = input?.platform ?? 'github';
-      const [config, isCloudAgentNextFlagEnabled, isPrGateFlagEnabled] = await Promise.all([
-        getAgentConfigForOwner(owner, 'code_review', platform),
-        isFeatureFlagEnabled('code-review-cloud-agent-next', ctx.user.id),
-        isFeatureFlagEnabled('code-review-pr-gate', ctx.user.id),
-      ]);
-      const isCloudAgentNextEnabled =
-        isCloudAgentNextFlagEnabled || process.env.NODE_ENV === 'development';
-      const isPrGateEnabled = isPrGateFlagEnabled || process.env.NODE_ENV === 'development';
+      const config = await getAgentConfigForOwner(owner, 'code_review', platform);
 
       if (!config) {
         // Return default configuration
@@ -172,8 +164,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
           repositorySelectionMode: 'all' as const,
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
-          isCloudAgentNextEnabled,
-          isPrGateEnabled,
         };
       }
 
@@ -190,8 +180,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
         repositorySelectionMode: cfg.repository_selection_mode || 'all',
         selectedRepositoryIds: cfg.selected_repository_ids || [],
         manuallyAddedRepositories: cfg.manually_added_repositories || [],
-        isCloudAgentNextEnabled,
-        isPrGateEnabled,
       };
     }),
 

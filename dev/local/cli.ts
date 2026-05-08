@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -37,6 +37,7 @@ import {
   findRepoRoot,
   startServiceInTmux,
   startInfra,
+  buildInfraDownArgs,
   readEnvValue,
   readEnvMtime,
   waitForEnvValueChange,
@@ -95,7 +96,8 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     process.exit(1);
   }
 
-  const envLocalExists = fs.existsSync(path.join(repoRoot, '.env.local'));
+  const envLocalPath = path.join(repoRoot, '.env.local');
+  const envLocalExists = fs.existsSync(envLocalPath);
   if (!envLocalExists) {
     console.warn('⚠ .env.local not found — worker secrets will use defaults.');
     console.warn('  To sync from Vercel: vercel env pull .env.local');
@@ -144,6 +146,21 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     }
   }
 
+  // --- Warn if grafana is enabled but CF_AE_TOKEN is not set ---
+  // Grafana boots fine without the token; only dashboard queries fail. Treat
+  // this as advisory so devs poking around the repo don't get blocked. Check
+  // .env.local in addition to the shell so the warning doesn't fire when the
+  // token is set in the file (docker compose picks it up via --env-file).
+  if (serviceNames.includes('grafana')) {
+    const tokenFromShell = process.env.CF_AE_TOKEN;
+    const tokenFromFile = envLocalExists ? readEnvValue(envLocalPath, 'CF_AE_TOKEN') : undefined;
+    if (!tokenFromShell && !tokenFromFile) {
+      console.warn('⚠ CF_AE_TOKEN not set — Grafana will boot but AE queries will fail.');
+      console.warn('  Create a CF user API token with "All accounts → Account Analytics: Read",');
+      console.warn('  then add CF_AE_TOKEN=<token> to .env.local. See dev/grafana/README.md.');
+    }
+  }
+
   // --- Start Docker infra ---
   const hasInfra = serviceNames.some(name => getService(name).type === 'infra');
   if (hasInfra) {
@@ -160,7 +177,11 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   }
 
   // --- Create tmux session ---
-  createSession(sessionName);
+  // Pass KILO_PORT_OFFSET into the session environment so panes see it even
+  // when an existing tmux server (from a sibling worktree) is running with a
+  // different offset. Without this, new windows inherit the server env, not
+  // ours, and services bind to base ports — causing conflicts.
+  createSession(sessionName, { KILO_PORT_OFFSET: String(portOffset) });
 
   // --- Start each service in its own tmux window ---
   const SIDEBAR_WIDTH = 40;
@@ -179,8 +200,10 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
       const tunnelEnvPath = path.join(repoRoot, 'services/kiloclaw/.dev.vars');
       oldValues.set('tunnel', readEnvValue(tunnelEnvPath, 'KILOCODE_API_BASE_URL'));
       oldValues.set('checkin', readEnvValue(tunnelEnvPath, 'KILOCLAW_CHECKIN_URL'));
+      oldValues.set('kilochat', readEnvValue(tunnelEnvPath, 'KILOCHAT_BASE_URL'));
       oldMtimes.set('tunnel', readEnvMtime(tunnelEnvPath));
       oldMtimes.set('checkin', readEnvMtime(tunnelEnvPath));
+      oldMtimes.set('kilochat', readEnvMtime(tunnelEnvPath));
     }
     if (captureServices.includes('kiloclaw-stripe')) {
       const stripeEnvPath = path.join(repoRoot, 'apps/web/.env.development.local');
@@ -219,8 +242,15 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
             CAPTURE_TIMEOUT_MS,
             oldMtimes.get('checkin')
           ),
-        ]).then(([gatewayReady, checkinReady]) => {
-          kiloclawTunnelCaptured = gatewayReady && checkinReady;
+          waitForEnvValueChange(
+            path.join(repoRoot, 'services/kiloclaw/.dev.vars'),
+            'KILOCHAT_BASE_URL',
+            oldValues.get('kilochat'),
+            CAPTURE_TIMEOUT_MS,
+            oldMtimes.get('kilochat')
+          ),
+        ]).then(([gatewayReady, checkinReady, kiloChatReady]) => {
+          kiloclawTunnelCaptured = gatewayReady && checkinReady && kiloChatReady;
           if (kiloclawTunnelCaptured) {
             console.log('  KiloClaw tunnel URLs captured');
             return;
@@ -234,6 +264,11 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
           if (!checkinReady) {
             console.warn(
               '  KILOCLAW_CHECKIN_URL not captured after 30s - kiloclaw startup will wait for a retry'
+            );
+          }
+          if (!kiloChatReady) {
+            console.warn(
+              '  KILOCHAT_BASE_URL not captured after 30s - kiloclaw startup will wait for a retry'
             );
           }
         })
@@ -297,7 +332,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
 
   if (skippedServices.length > 0) {
     console.warn(
-      `Skipped startup for ${skippedServices.join(', ')} until KILOCODE_API_BASE_URL and KILOCLAW_CHECKIN_URL are captured.`
+      `Skipped startup for ${skippedServices.join(', ')} until KILOCODE_API_BASE_URL, KILOCLAW_CHECKIN_URL, and KILOCHAT_BASE_URL are captured.`
     );
     console.warn('Start or restart these services after the tunnel URL is ready.');
   }
@@ -468,7 +503,7 @@ async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> 
   console.log(`Restarted ${serviceName}`);
 }
 
-async function cmdStop(repoRoot: string): Promise<void> {
+async function cmdStop(repoRoot: string, force: boolean): Promise<void> {
   const sessionName = getSessionName();
 
   if (sessionExists(sessionName)) {
@@ -476,11 +511,24 @@ async function cmdStop(repoRoot: string): Promise<void> {
     console.log(`Killed tmux session ${sessionName}`);
   }
 
-  console.log('Stopping Docker infrastructure…');
-  try {
-    execSync('docker compose -f dev/docker-compose.yml down', { cwd: repoRoot, stdio: 'inherit' });
-  } catch {
-    // docker compose down may fail if nothing is running
+  // Docker Compose uses project name "dev" for every worktree, so containers
+  // (postgres, redis, grafana) are shared singletons. Tearing them down here
+  // would break any other worktree's running session — skip when siblings
+  // are active unless --force is passed.
+  const otherSessions = findOtherKiloDevSessions();
+  if (otherSessions.length > 0 && !force) {
+    console.log(
+      `Leaving Docker infrastructure running (other sessions active: ${otherSessions.join(', ')})`
+    );
+    console.log('  Pass --force to tear down shared containers anyway.');
+  } else {
+    console.log('Stopping Docker infrastructure…');
+    try {
+      const [cmd, args] = buildInfraDownArgs();
+      execFileSync(cmd, args, { cwd: repoRoot, stdio: 'inherit' });
+    } catch {
+      // docker compose down may fail if nothing is running
+    }
   }
 
   console.log(`${GREEN}All services stopped.${RESET}`);
@@ -511,14 +559,15 @@ function printUsage(): void {
   console.log(`
 Usage:
   dev:start [targets...]  Start services (default: core)
-  dev:stop                Stop all services
+  dev:stop [--force]      Stop all services (skips shared Docker infra if
+                          other kilo-dev sessions are running; --force overrides)
   dev:status [--json]     Show running services and their ports
   dev:restart <service>   Restart a running service
   dev:env [targets...]    Sync env vars (.dev.vars + .env.development.local)
   dev:env --check         Validate env vars (CI mode)
   dev:env -y              Sync without confirmation
 
-Targets: app, app-builder, agents, all, or any service/group name
+Targets: app, app-builder, agents, mobile, all, or any service/group name
 Multiple targets can be specified: dev:start kiloclaw agents`);
 }
 
@@ -536,7 +585,7 @@ async function main() {
       await cmdUp(args.slice(1), repoRoot);
       break;
     case 'stop':
-      await cmdStop(repoRoot);
+      await cmdStop(repoRoot, args.includes('--force') || args.includes('-f'));
       break;
     case 'status':
       await cmdStatus(repoRoot, args.includes('--json'));

@@ -117,6 +117,7 @@ const defaultFetchedSession = {
   isPreparingAsync: false,
   prompt: null,
   initialMessageId: null,
+  associatedPr: null,
 } satisfies FetchedSessionData;
 
 function createMockConfig(overrides: Partial<SessionManagerConfig> = {}): SessionManagerConfig {
@@ -995,6 +996,40 @@ describe('createSessionManager', () => {
       const sc = atomValue<{ variant?: string | null }>(config.store, mgr.atoms.sessionConfig);
       expect(sc?.variant).toBe(null);
     });
+
+    it('updates sessionConfig.mode from assistant agent slug, not visibility mode', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = mockedCreate.mock.calls[0][0];
+
+      // Custom agents always carry `mode: 'primary' | 'subagent' | 'all'` as
+      // visibility; the slug lives on `agent`. The picker must track the slug.
+      sessionConfig.onEvent?.({
+        type: 'message.updated',
+        info: {
+          id: 'msg-1',
+          sessionID: 'ses-1',
+          role: 'assistant',
+          modelID: 'claude-3-5-sonnet',
+          providerID: 'test',
+          mode: 'primary',
+          time: { created: 1 },
+          agent: 'e-code',
+          cost: 0,
+          parentID: '',
+          path: { cwd: '', root: '' },
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+      });
+
+      const sc = atomValue<{ mode?: string }>(config.store, mgr.atoms.sessionConfig);
+      expect(sc?.mode).toBe('e-code');
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1474,6 +1509,48 @@ describe('formatError', () => {
     expect(formatError({ data: { code: 'SOME_UNKNOWN_CODE' } })).toBe(
       'Something went wrong. Please retry in a moment.'
     );
+  });
+
+  it('handles SERVICE_UNAVAILABLE code', () => {
+    expect(formatError({ data: { code: 'SERVICE_UNAVAILABLE' } })).toBe(
+      'Service is temporarily unavailable. Please retry in a moment.'
+    );
+  });
+
+  it('handles 503 httpStatus', () => {
+    expect(formatError({ data: { httpStatus: 503 } })).toBe(
+      'Service is temporarily unavailable. Please retry in a moment.'
+    );
+  });
+
+  it('handles TRPCClientError-shaped Error instance with CONFLICT code', () => {
+    const err = Object.assign(new Error('Execution exc_123 is in progress'), {
+      data: { code: 'CONFLICT', httpStatus: 409 },
+    });
+    expect(formatError(err)).toBe('Previous task is still finishing up. Please wait a moment.');
+  });
+
+  it('handles TRPCClientError-shaped Error instance with 402 httpStatus', () => {
+    const err = Object.assign(new Error('Payment required'), {
+      data: { httpStatus: 402 },
+    });
+    expect(formatError(err)).toBe(
+      'Insufficient credits. Please add at least $1 to continue using Cloud Agent.'
+    );
+  });
+
+  it('handles TRPCClientError-shaped Error instance with SERVICE_UNAVAILABLE', () => {
+    const err = Object.assign(new Error('upstream handshake failed'), {
+      data: { code: 'SERVICE_UNAVAILABLE', httpStatus: 503 },
+    });
+    expect(formatError(err)).toBe('Service is temporarily unavailable. Please retry in a moment.');
+  });
+
+  it('handles TRPCClientError-shaped Error instance with unmapped code', () => {
+    const err = Object.assign(new Error('boom'), {
+      data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 },
+    });
+    expect(formatError(err)).toBe('Something went wrong. Please retry in a moment.');
   });
 
   it('handles unknown errors', () => {

@@ -3,7 +3,7 @@
  *
  * Manages the lifecycle of a single triage ticket:
  * - Duplicate detection
- * - Issue classification
+ * - Issue classification (via cloud-agent-next prepare + initiate + callback)
  * - Applying AI-selected labels
  * - Status updates back to Next.js
  */
@@ -15,16 +15,27 @@ import type {
   TriageRequest,
   DuplicateResult,
   ClassificationResult,
+  ClassificationCallbackPayload,
 } from './types';
 import { parseClassification } from './parsers/classification-parser';
-import { SSEStreamProcessor } from './services/sse-stream-processor';
-import { CloudAgentClient } from './services/cloud-agent-client';
+import { createCloudAgentNextFetchClient } from '@kilocode/worker-utils';
 import { buildClassificationPrompt } from './services/prompt-builder';
 import { fetchRepoLabels, DEFAULT_LABELS } from './services/github-labels-service';
 
+/**
+ * Constant-time comparison for auth secrets. Not exposed on Workers runtime
+ * globals (no `crypto.timingSafeEqual`), so we implement it locally. Strings
+ * of unequal length short-circuit — the lengths themselves are not secret.
+ */
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 export class TriageOrchestrator extends DurableObject<Env> {
   private state!: TriageTicket;
-  private sseProcessor = new SSEStreamProcessor();
 
   /** Default classification timeout (5 minutes) - used if not configured */
   private static readonly DEFAULT_CLASSIFICATION_TIMEOUT_MS = 5 * 60 * 1000;
@@ -72,9 +83,9 @@ export class TriageOrchestrator extends DurableObject<Env> {
 
     await this.updateStatus('analyzing');
 
-    // Set alarm as safety net for stuck tickets. Budget covers the full runTriage
-    // lifecycle: duplicate check + classification + label/comment API calls, plus a
-    // 2-minute buffer on top of the classification timeout for that overhead.
+    // Set alarm as safety net for stuck tickets. Budget covers classification
+    // end-to-end (cloud-agent-next queue + agent runtime + callback delivery)
+    // plus post-classification label/comment API calls, with a 2-minute buffer.
     const alarmTimeout = this.getClassificationTimeout() + 120_000;
     await this.ctx.storage.setAlarm(Date.now() + alarmTimeout);
 
@@ -87,67 +98,87 @@ export class TriageOrchestrator extends DurableObject<Env> {
         return;
       }
 
-      // Step 2: Classify the issue
-      const classification = await this.classifyIssue();
-
-      // Step 3: Take action based on classification
-      if (classification.classification === 'question') {
-        await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
-        await this.answerQuestion(classification);
-      } else if (classification.classification === 'unclear') {
-        await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
-        await this.requestClarification(classification);
-      } else if (classification.confidence >= this.state.sessionInput.autoFixThreshold) {
-        const labelsApplied = await this.buildAndApplyLabels(
-          ['kilo-triaged', 'kilo-auto-fix'],
-          classification.selectedLabels
-        );
-        if (!labelsApplied) {
-          console.error('[TriageOrchestrator] kilo-auto-fix label may not have been applied', {
-            ticketId: this.state.ticketId,
-          });
-        }
-        await this.updateStatus('actioned', {
-          classification: classification.classification,
-          confidence: classification.confidence,
-          intentSummary: classification.intentSummary,
-          relatedFiles: classification.relatedFiles,
-          actionMetadata: labelsApplied ? undefined : { labelWarning: 'Failed to apply labels' },
-        });
-      } else {
-        await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
-        await this.requestClarification(classification);
-      }
+      // Step 2: Prepare + initiate classification session. Terminal result
+      // arrives via POST /tickets/:ticketId/classification-callback, which
+      // invokes completeClassification() to continue the flow.
+      await this.classifyIssue();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const isTimeout = error instanceof Error && error.message.includes('timed out');
-      const isClassificationTimeout =
-        error instanceof Error && error.message.includes('Classification timed out');
-      const isPRTimeout = error instanceof Error && error.message.includes('PR creation timed out');
+      await this.handleTriageError(error);
+    }
+  }
 
-      console.error('[TriageOrchestrator] Error:', {
+  /**
+   * RPC: continue triage after cloud-agent-next has delivered a terminal
+   * classification callback. Invoked from the classification-callback HTTP
+   * route on this worker.
+   *
+   * Verifies the per-ticket callback secret in constant time, checks that
+   * the session id matches what we prepared, is idempotent against repeat
+   * deliveries, and applies the classification result using the same logic
+   * previously inline in runTriage().
+   */
+  async completeClassification(
+    providedSecret: string,
+    payload: ClassificationCallbackPayload
+  ): Promise<void> {
+    await this.loadState();
+
+    const expectedSecret = this.state.callbackSecret;
+    if (!expectedSecret || !constantTimeEqual(providedSecret, expectedSecret)) {
+      console.warn('[TriageOrchestrator] Callback secret mismatch', {
         ticketId: this.state.ticketId,
-        error: errorMessage,
-        isTimeout,
-        isClassificationTimeout,
-        isPRTimeout,
       });
+      throw new Error('Unauthorized');
+    }
 
-      try {
-        await this.updateStatus('failed', {
-          errorMessage: errorMessage,
-        });
-      } catch (statusError) {
-        console.error('[TriageOrchestrator] Failed to update status to failed via API:', {
-          ticketId: this.state.ticketId,
-          statusError: statusError instanceof Error ? statusError.message : String(statusError),
-        });
-        this.state.status = 'failed';
-        this.state.errorMessage = errorMessage;
-        this.state.completedAt = new Date().toISOString();
-        this.state.updatedAt = new Date().toISOString();
-        await this.ctx.storage.put('state', this.state);
+    if (
+      !this.state.cloudAgentSessionId ||
+      payload.cloudAgentSessionId !== this.state.cloudAgentSessionId
+    ) {
+      console.warn('[TriageOrchestrator] Callback cloudAgentSessionId mismatch', {
+        ticketId: this.state.ticketId,
+        expected: this.state.cloudAgentSessionId,
+        received: payload.cloudAgentSessionId,
+      });
+      throw new Error('Session id mismatch');
+    }
+
+    if (
+      this.state.status === 'actioned' ||
+      this.state.status === 'failed' ||
+      this.state.status === 'skipped'
+    ) {
+      console.log('[TriageOrchestrator] Callback ignored — already terminal', {
+        ticketId: this.state.ticketId,
+        status: this.state.status,
+      });
+      return;
+    }
+
+    if (payload.status !== 'completed') {
+      const errorMessage =
+        payload.errorMessage ??
+        `Classification session ended with status '${payload.status}' without an error message.`;
+      await this.updateStatus('failed', { errorMessage });
+      return;
+    }
+
+    try {
+      const text = payload.lastAssistantMessageText ?? '';
+      if (text.length === 0) {
+        throw new Error(
+          'Classification failed — the agent session produced no output. Please retry.'
+        );
       }
+
+      const classification = this.parseClassificationFromText(
+        text,
+        text,
+        this.state.availableLabels ?? []
+      );
+      await this.applyClassificationResult(classification);
+    } catch (error) {
+      await this.handleTriageError(error);
     }
   }
 
@@ -225,10 +256,12 @@ export class TriageOrchestrator extends DurableObject<Env> {
   }
 
   /**
-   * Classify the issue
-   * Now handles Cloud Agent session directly (like PR creation)
+   * Prepare and initiate a classification session in cloud-agent-next.
+   *
+   * The terminal classification result arrives asynchronously via the
+   * callback queue and is handled by completeClassification().
    */
-  private async classifyIssue(): Promise<ClassificationResult> {
+  private async classifyIssue(): Promise<void> {
     console.log('[TriageOrchestrator] Classifying issue', {
       ticketId: this.state.ticketId,
     });
@@ -299,41 +332,138 @@ export class TriageOrchestrator extends DurableObject<Env> {
       availableLabels
     );
 
-    // Build session input
-    const sessionInput = {
+    // Mint a per-ticket callback secret and persist before prepareSession so
+    // a callback that races the prepareSession response still has something
+    // to compare against. We only need the secret on this write; the other
+    // fields the callback path reads (availableLabels, classifyConfig,
+    // cloudAgentSessionId) all come together after prepare returns, so they
+    // get a single post-prepare write below.
+    const callbackSecret = crypto.randomUUID();
+    this.state.callbackSecret = callbackSecret;
+    this.state.updatedAt = new Date().toISOString();
+    await this.ctx.storage.put('state', this.state);
+
+    const callbackUrl = `${this.env.SELF_URL}/tickets/${encodeURIComponent(
+      this.state.ticketId
+    )}/classification-callback`;
+
+    const cloudAgent = createCloudAgentNextFetchClient(this.env.CLOUD_AGENT_URL);
+    const cloudAgentHeaders = {
+      Authorization: `Bearer ${this.state.authToken}`,
+      'x-internal-api-key': this.env.INTERNAL_API_SECRET,
+    };
+
+    const prepareInput = {
       githubRepo: this.state.sessionInput.repoFullName,
       kilocodeOrganizationId: this.state.owner.type === 'org' ? this.state.owner.id : undefined,
       prompt,
-      mode: 'ask' as const, // Classification is a Q&A task
+      mode: 'ask',
       model: config.model_slug,
       githubToken,
       createdOnPlatform: 'auto-triage',
+      callbackTarget: {
+        url: callbackUrl,
+        headers: {
+          'X-Callback-Secret': callbackSecret,
+        },
+      },
     };
 
-    // Use CloudAgentClient to initiate session
-    const cloudAgentClient = new CloudAgentClient(this.env.CLOUD_AGENT_URL, this.state.authToken);
-    const response = await cloudAgentClient.initiateSession(sessionInput, this.state.ticketId);
-
-    // Add timeout protection for classification
-    const timeoutMs = this.getClassificationTimeout();
-    const timeoutMinutes = Math.floor(timeoutMs / 60000);
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(
-        () =>
-          reject(new Error(`Classification timed out - exceeded ${timeoutMinutes} minute limit`)),
-        timeoutMs
-      );
+    console.log('[TriageOrchestrator] Preparing classification session in cloud-agent-next', {
+      ticketId: this.state.ticketId,
+      callbackUrl,
     });
 
-    // Process SSE stream with timeout, ensuring the timer is always cleaned up
+    const prepareResult = await cloudAgent.prepareSession(cloudAgentHeaders, prepareInput);
+
+    // Single write with everything the callback path will need.
+    this.state.cloudAgentSessionId = prepareResult.cloudAgentSessionId;
+    this.state.availableLabels = availableLabels;
+    this.state.classifyConfig = config;
+    this.state.updatedAt = new Date().toISOString();
+    await this.ctx.storage.put('state', this.state);
+
+    const initiateResult = await cloudAgent.initiateFromPreparedSession(cloudAgentHeaders, {
+      cloudAgentSessionId: prepareResult.cloudAgentSessionId,
+    });
+
+    console.log('[TriageOrchestrator] Classification session initiated', {
+      ticketId: this.state.ticketId,
+      cloudAgentSessionId: prepareResult.cloudAgentSessionId,
+      kiloSessionId: prepareResult.kiloSessionId,
+      executionId: initiateResult.executionId,
+    });
+
+    // Terminal result is delivered via callback queue to
+    // POST /tickets/:ticketId/classification-callback.
+  }
+
+  /**
+   * Apply labels and post-classification actions based on the classification
+   * result. Shared between the legacy inline path (now removed) and the
+   * callback-driven completion path.
+   */
+  private async applyClassificationResult(classification: ClassificationResult): Promise<void> {
+    if (classification.classification === 'question') {
+      await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
+      await this.answerQuestion(classification);
+    } else if (classification.classification === 'unclear') {
+      await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
+      await this.requestClarification(classification);
+    } else if (classification.confidence >= this.state.sessionInput.autoFixThreshold) {
+      const labelsApplied = await this.buildAndApplyLabels(
+        ['kilo-triaged', 'kilo-auto-fix'],
+        classification.selectedLabels
+      );
+      if (!labelsApplied) {
+        console.error('[TriageOrchestrator] kilo-auto-fix label may not have been applied', {
+          ticketId: this.state.ticketId,
+        });
+      }
+      await this.updateStatus('actioned', {
+        classification: classification.classification,
+        confidence: classification.confidence,
+        intentSummary: classification.intentSummary,
+        relatedFiles: classification.relatedFiles,
+        actionMetadata: labelsApplied ? undefined : { labelWarning: 'Failed to apply labels' },
+      });
+    } else {
+      await this.buildAndApplyLabels(['kilo-triaged'], classification.selectedLabels);
+      await this.requestClarification(classification);
+    }
+  }
+
+  /**
+   * Shared error path: log the failure and best-effort persist 'failed'
+   * status. Used from both runTriage() and completeClassification().
+   */
+  private async handleTriageError(error: unknown): Promise<void> {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isTimeout = error instanceof Error && error.message.includes('timed out');
+    const isClassificationTimeout =
+      error instanceof Error && error.message.includes('Classification timed out');
+
+    console.error('[TriageOrchestrator] Error:', {
+      ticketId: this.state.ticketId,
+      error: errorMessage,
+      isTimeout,
+      isClassificationTimeout,
+    });
+
     try {
-      return await Promise.race([
-        this.processClassificationStream(response, availableLabels),
-        timeoutPromise,
-      ]);
-    } finally {
-      if (timeoutId !== null) clearTimeout(timeoutId);
+      await this.updateStatus('failed', {
+        errorMessage: errorMessage,
+      });
+    } catch (statusError) {
+      console.error('[TriageOrchestrator] Failed to update status to failed via API:', {
+        ticketId: this.state.ticketId,
+        statusError: statusError instanceof Error ? statusError.message : String(statusError),
+      });
+      this.state.status = 'failed';
+      this.state.errorMessage = errorMessage;
+      this.state.completedAt = new Date().toISOString();
+      this.state.updatedAt = new Date().toISOString();
+      await this.ctx.storage.put('state', this.state);
     }
   }
 
@@ -546,78 +676,13 @@ export class TriageOrchestrator extends DurableObject<Env> {
   }
 
   /**
-   * Process Cloud Agent classification stream.
-   *
-   * Collects two text buffers:
-   * - sayText: only LLM "say" events (text + completion_result) — the actual model output.
-   * - fullText: all text content from the stream (superset of sayText, includes tool output etc.).
-   *
-   * Parsing tries sayText first (cleaner, less noise), falling back to fullText.
-   */
-  private async processClassificationStream(
-    response: Response,
-    availableLabels: string[]
-  ): Promise<ClassificationResult> {
-    let fullText = '';
-    let sayText = '';
-
-    await this.sseProcessor.processStream(response, {
-      onTextContent: (text: string) => {
-        fullText += text;
-      },
-      onKilocodeEvent: payload => {
-        // Capture LLM text responses: both streaming 'text' and final 'completion_result'
-        if (
-          payload.type === 'say' &&
-          (payload.say === 'text' || payload.say === 'completion_result')
-        ) {
-          const text =
-            typeof payload.content === 'string'
-              ? payload.content
-              : typeof payload.text === 'string'
-                ? payload.text
-                : '';
-          if (text) {
-            sayText += text;
-          }
-        }
-      },
-      onComplete: () => {
-        console.log('[TriageOrchestrator] Classification stream completed', {
-          ticketId: this.state.ticketId,
-          sayTextLength: sayText.length,
-          fullTextLength: fullText.length,
-        });
-      },
-      onError: (error: Error) => {
-        // Error events are informational warnings, not fatal errors
-        // The stream continues processing after these events
-        console.warn('[TriageOrchestrator] Classification warning event', {
-          ticketId: this.state.ticketId,
-          error: error.message,
-        });
-      },
-    });
-
-    console.log('[TriageOrchestrator] Classification stream ended', {
-      ticketId: this.state.ticketId,
-      sayTextLength: sayText.length,
-      fullTextLength: fullText.length,
-    });
-
-    if (sayText.length === 0 && fullText.length === 0) {
-      throw new Error(
-        'Classification failed — the agent session produced no output. Please retry.'
-      );
-    }
-
-    // Parse classification from accumulated text
-    return this.parseClassificationFromText(sayText, fullText, availableLabels);
-  }
-
-  /**
    * Parse classification result from text.
-   * Tries sayText (LLM "say" events only) first, falls back to fullText (all events).
+   *
+   * Called with the same string twice (sayText / fullText) because
+   * cloud-agent-next delivers a single pre-assembled assistant message
+   * string. The two-arg signature is preserved to keep the parsing
+   * fallback logic intact, and in case we ever split the text into
+   * cleaner/noisier halves again.
    */
   private parseClassificationFromText(
     sayText: string,

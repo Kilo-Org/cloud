@@ -37,12 +37,7 @@ import type {
 } from '../prompts/generate-prompt';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { getCodeReviewById, findPreviousCompletedReview } from '../db/code-reviews';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
-import {
-  DEFAULT_CODE_REVIEW_MODEL,
-  DEFAULT_CODE_REVIEW_MODE,
-  FEATURE_FLAG_INCREMENTAL_REVIEW,
-} from '../core/constants';
+import { DEFAULT_CODE_REVIEW_MODEL, DEFAULT_CODE_REVIEW_MODE } from '../core/constants';
 import type { Owner } from '../core';
 import { generateReviewPrompt } from '../prompts/generate-prompt';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
@@ -149,67 +144,62 @@ export async function prepareReviewPayload(
       const integration = await getIntegrationById(review.platform_integration_id);
 
       if (platform === 'github' && integration?.platform_installation_id) {
+        // Use the stored app type (defaults to 'standard' for existing integrations)
+        const appType: GitHubAppType = integration.github_app_type || 'standard';
+        // GitHub: Use installation token. Auth failures here (e.g. IP allow list
+        // blocking, suspended/uninstalled app) are hard failures: without a token
+        // we cannot clone private repos or post review comments. Let the error
+        // propagate so the user sees a meaningful failure on the review.
+        const tokenData = await generateGitHubInstallationToken(
+          integration.platform_installation_id,
+          appType
+        );
+        githubToken = tokenData.token;
+
+        // Build complete review state for intelligent update/create decisions
         try {
-          // Use the stored app type (defaults to 'standard' for existing integrations)
-          const appType: GitHubAppType = integration.github_app_type || 'standard';
-          // GitHub: Use installation token
-          const tokenData = await generateGitHubInstallationToken(
-            integration.platform_installation_id,
-            appType
-          );
-          githubToken = tokenData.token;
+          const [repoOwner, repoName] = review.repo_full_name.split('/');
 
-          // Build complete review state for intelligent update/create decisions
-          try {
-            const [repoOwner, repoName] = review.repo_full_name.split('/');
+          // Fetch all state in parallel for efficiency
+          const [summaryComment, inlineComments, headCommitSha] = await Promise.all([
+            findKiloReviewComment(
+              integration.platform_installation_id,
+              repoOwner,
+              repoName,
+              review.pr_number,
+              appType
+            ),
+            fetchPRInlineComments(
+              integration.platform_installation_id,
+              repoOwner,
+              repoName,
+              review.pr_number,
+              appType
+            ),
+            getPRHeadCommit(
+              integration.platform_installation_id,
+              repoOwner,
+              repoName,
+              review.pr_number,
+              appType
+            ),
+          ]);
 
-            // Fetch all state in parallel for efficiency
-            const [summaryComment, inlineComments, headCommitSha] = await Promise.all([
-              findKiloReviewComment(
-                integration.platform_installation_id,
-                repoOwner,
-                repoName,
-                review.pr_number,
-                appType
-              ),
-              fetchPRInlineComments(
-                integration.platform_installation_id,
-                repoOwner,
-                repoName,
-                review.pr_number,
-                appType
-              ),
-              getPRHeadCommit(
-                integration.platform_installation_id,
-                repoOwner,
-                repoName,
-                review.pr_number,
-                appType
-              ),
-            ]);
+          existingReviewState = buildReviewState(summaryComment, inlineComments, headCommitSha);
 
-            existingReviewState = buildReviewState(summaryComment, inlineComments, headCommitSha);
-
-            logExceptInTest('[prepareReviewPayload] Built GitHub review state', {
-              reviewId,
-              hasSummary: !!summaryComment,
-              inlineCount: inlineComments.length,
-              previousStatus: existingReviewState.previousStatus,
-              headCommitSha: headCommitSha.substring(0, 8),
-            });
-          } catch (stateLookupError) {
-            // Non-critical - continue without state info
-            logExceptInTest('[prepareReviewPayload] Failed to build GitHub review state:', {
-              reviewId,
-              error: stateLookupError,
-            });
-          }
-        } catch (authError) {
-          captureException(authError, {
-            tags: { operation: 'prepareReviewPayload', step: 'get-github-token' },
-            extra: { reviewId, platformIntegrationId: review.platform_integration_id },
+          logExceptInTest('[prepareReviewPayload] Built GitHub review state', {
+            reviewId,
+            hasSummary: !!summaryComment,
+            inlineCount: inlineComments.length,
+            previousStatus: existingReviewState.previousStatus,
+            headCommitSha: headCommitSha.substring(0, 8),
           });
-          // Continue without token - cloud agent may still work with public repos
+        } catch (stateLookupError) {
+          // Non-critical - continue without state info
+          logExceptInTest('[prepareReviewPayload] Failed to build GitHub review state:', {
+            reviewId,
+            error: stateLookupError,
+          });
         }
       } else if (platform === PLATFORM.GITLAB && integration) {
         // GitLab: Use Project Access Token (PrAT) for all operations
@@ -319,54 +309,41 @@ export async function prepareReviewPayload(
     // continuation) are derived from the same review row to avoid mismatches.
     let previousHeadSha: string | null = null;
     let previousCloudAgentSessionId: string | undefined;
-    const incrementalEnabled = await isFeatureFlagEnabled(
-      FEATURE_FLAG_INCREMENTAL_REVIEW,
-      owner.userId
-    );
+    try {
+      const previousReview = await findPreviousCompletedReview(
+        review.repo_full_name,
+        review.pr_number,
+        existingReviewState?.headCommitSha ?? review.head_sha,
+        platform
+      );
+      previousHeadSha = previousReview?.head_sha ?? null;
+      previousCloudAgentSessionId = previousReview?.session_id ?? undefined;
 
-    logExceptInTest('[prepareReviewPayload] Incremental review flag evaluated', {
-      reviewId,
-      incrementalEnabled,
-      ownerId: owner.userId,
-    });
-
-    if (incrementalEnabled) {
-      try {
-        const previousReview = await findPreviousCompletedReview(
-          review.repo_full_name,
-          review.pr_number,
-          existingReviewState?.headCommitSha ?? review.head_sha,
-          platform
-        );
-        previousHeadSha = previousReview?.head_sha ?? null;
-        previousCloudAgentSessionId = previousReview?.session_id ?? undefined;
-
-        if (previousHeadSha) {
-          logExceptInTest(
-            '[prepareReviewPayload] Found previous completed review for incremental mode',
-            {
-              reviewId,
-              previousHeadSha: previousHeadSha.substring(0, 8),
-              currentHeadSha: review.head_sha.substring(0, 8),
-              previousCloudAgentSessionId,
-            }
-          );
-        } else {
-          logExceptInTest(
-            '[prepareReviewPayload] No previous completed review found, using full review',
-            { reviewId }
-          );
-        }
-      } catch (error) {
-        // Non-critical - fall back to full review
+      if (previousHeadSha) {
         logExceptInTest(
-          '[prepareReviewPayload] Failed to fetch previous review, falling back to full review:',
+          '[prepareReviewPayload] Found previous completed review for incremental mode',
           {
             reviewId,
-            error,
+            previousHeadSha: previousHeadSha.substring(0, 8),
+            currentHeadSha: review.head_sha.substring(0, 8),
+            previousCloudAgentSessionId,
           }
         );
+      } else {
+        logExceptInTest(
+          '[prepareReviewPayload] No previous completed review found, using full review',
+          { reviewId }
+        );
       }
+    } catch (error) {
+      // Non-critical - fall back to full review
+      logExceptInTest(
+        '[prepareReviewPayload] Failed to fetch previous review, falling back to full review:',
+        {
+          reviewId,
+          error,
+        }
+      );
     }
 
     // 5. Generate auth token for cloud agent with bot identifier
@@ -402,12 +379,7 @@ export async function prepareReviewPayload(
     // GitHub: uses githubRepo (owner/repo format) + githubToken
     // GitLab: uses gitUrl (full HTTPS URL) + gitToken
     const variant = config.thinking_effort ?? undefined;
-    // Defense-in-depth: only send gateThreshold to the agent when the PR gate flag is enabled.
-    // This prevents a stale non-'off' config from activating gating after the flag is turned off.
-    const isPrGateEnabled =
-      process.env.NODE_ENV === 'development' ||
-      (await isFeatureFlagEnabled('code-review-pr-gate', owner.userId));
-    const gateThreshold = isPrGateEnabled ? (config.gate_threshold ?? 'off') : 'off';
+    const gateThreshold = config.gate_threshold ?? 'off';
     const sessionInput: SessionInput =
       platform === PLATFORM.GITLAB
         ? {

@@ -23,6 +23,7 @@ import {
   KeyRound,
   Copy,
   Megaphone,
+  Coins,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -104,6 +105,11 @@ const financialItems: MenuItem[] = [
     icon: () => <Upload />,
   },
   {
+    title: () => 'Kilo Pass Bulk Cancel',
+    url: '/admin/kilo-pass/bulk-cancel',
+    icon: () => <Coins />,
+  },
+  {
     title: () => 'Revenue KPI',
     url: '/admin/revenue',
     icon: () => <DollarSign />,
@@ -114,6 +120,11 @@ const productEngineeringItems: MenuItem[] = [
   {
     title: () => 'KiloClaw',
     url: '/admin/kiloclaw',
+    icon: () => <KiloCrabIcon className="size-4" />,
+  },
+  {
+    title: () => 'KiloClaw referrals',
+    url: '/admin/kiloclaw-referrals',
     icon: () => <KiloCrabIcon className="size-4" />,
   },
   {

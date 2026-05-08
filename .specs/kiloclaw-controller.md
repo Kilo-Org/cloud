@@ -136,15 +136,16 @@ endpoint.
 
 The `phase` field during `bootstrapping` progresses through:
 
-| Phase           | What is happening                                 |
-| --------------- | ------------------------------------------------- |
-| `init`          | HTTP server started, bootstrap not yet begun      |
-| `decrypting`    | Decrypting `KILOCLAW_ENC_*` env vars              |
-| `directories`   | Creating config/workspace dirs, setting env vars  |
-| `feature-flags` | Applying instance feature flags                   |
-| `github`        | Configuring GitHub access (best-effort)           |
-| `onboard`       | Running `openclaw onboard` (first boot)           |
-| `doctor`        | Running `openclaw doctor --fix` (subsequent boot) |
+| Phase                          | What is happening                                 |
+| ------------------------------ | ------------------------------------------------- |
+| `init`                         | HTTP server started, bootstrap not yet begun      |
+| `decrypting`                   | Decrypting `KILOCLAW_ENC_*` env vars              |
+| `directories`                  | Creating config/workspace dirs, setting env vars  |
+| `feature-flags`                | Applying instance feature flags                   |
+| `github`                       | Configuring GitHub access (best-effort)           |
+| `gateway-client-device-scopes` | Remediating gateway-client device approval scopes |
+| `onboard`                      | Running `openclaw onboard` (first boot)           |
+| `doctor`                       | Running `openclaw doctor --fix` (subsequent boot) |
 
 ### Endpoint Availability by Phase
 
@@ -334,23 +335,35 @@ patches to `openclaw.json`. The patches MUST include:
 2. Gateway auth token from `OPENCLAW_GATEWAY_TOKEN`.
 3. `allowInsecureAuth` when `AUTO_APPROVE_DEVICES=true`.
 4. Allowed origins from `OPENCLAW_ALLOWED_ORIGINS`.
-5. Stale kilocode provider migration (remove entries with old base
-   URLs).
-6. KiloCode API base URL override from `KILOCODE_API_BASE_URL`.
-7. Default model from `KILOCODE_DEFAULT_MODEL`.
-8. Agent default user timezone from `KILOCLAW_USER_TIMEZONE`.
-9. Remove `agents.defaults.models` allowlist (KiloClaw users see all
-   models).
-10. `tools.profile`: MUST be set to `full` on fresh install or config
+5. KiloCode provider entry MUST always be present at
+   `models.providers.kilocode` with `baseUrl`
+   `https://api.kilo.ai/api/gateway/`, `api` `openai-completions`, and
+   `models` set to `[]`. The bundled openclaw kilocode plugin only loads
+   when this entry is present; without it, live model discovery never
+   runs and `kilo-auto/*` is unreachable. Stale entries written with
+   the old `/api/openrouter/` base URL MUST be dropped before the entry
+   is rebuilt.
+6. KiloCode API base URL override from `KILOCODE_API_BASE_URL` (local
+   dev tunnel).
+7. Org-scoped KiloCode provider configuration from
+   `KILOCODE_ORGANIZATION_ID`: MUST set the
+   `X-KiloCode-OrganizationId` header on the kilocode provider entry.
+   When `KILOCODE_ORGANIZATION_ID` is unset, the controller MUST
+   remove any stale `X-KiloCode-OrganizationId` header from the entry.
+8. Default model from `KILOCODE_DEFAULT_MODEL`.
+9. Agent default user timezone from `KILOCLAW_USER_TIMEZONE`.
+10. Remove `agents.defaults.models` allowlist (KiloClaw users see all
+    models).
+11. `tools.profile`: MUST be set to `full` on fresh install or config
     restore. MUST be preserved on subsequent boots.
-11. Exec policy: host `gateway`, security `allowlist`, ask `on-miss`.
-12. Browser: enabled, headless, noSandbox.
-13. KiloClaw customizer plugin: load path and entry MUST be present;
+12. Exec policy: host `gateway`, security `allowlist`, ask `on-miss`.
+13. Browser: enabled, headless, noSandbox.
+14. KiloClaw customizer plugin: load path and entry MUST be present;
     when `plugins.allow` exists, it MUST include `kiloclaw-customizer`.
-14. Channel configuration from `TELEGRAM_BOT_TOKEN`,
+15. Channel configuration from `TELEGRAM_BOT_TOKEN`,
     `DISCORD_BOT_TOKEN`, `SLACK_BOT_TOKEN`/`SLACK_APP_TOKEN`, with
     corresponding plugin enablement.
-15. Hooks configuration from `KILOCLAW_HOOKS_TOKEN`: enabled,
+16. Hooks configuration from `KILOCLAW_HOOKS_TOKEN`: enabled,
     token, inbound email mapping. When Gmail credentials are present, the
     gmail preset MUST also be enabled.
 

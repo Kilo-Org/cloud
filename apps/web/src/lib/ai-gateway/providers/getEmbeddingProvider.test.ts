@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { getEmbeddingProvider } from '@/lib/ai-gateway/providers';
+import { getEmbeddingProvider } from '@/lib/ai-gateway/providers/get-provider';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { createAnonymousContext } from '@/lib/anonymous';
 import {

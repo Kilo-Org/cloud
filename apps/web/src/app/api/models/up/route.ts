@@ -56,6 +56,7 @@ const HEALTH_CHECK_EXCLUSIONS = new Set([
   // We don't control when this model may be retracted by OpenRouter.
   'openrouter/elephant-alpha',
   'openai/gpt-5.4',
+  'openai/gpt-5.5',
 ]);
 
 function emptyMetrics(): Omit<ModelHealthMetrics, 'monitored'> {
@@ -204,6 +205,23 @@ export async function GET(
     // Only monitored models affect the top-level health status
     const hasSignificantDrop = Object.values(models).some(m => m.monitored && !m.healthy);
     const status = hasSignificantDrop ? 503 : 200;
+
+    if (hasSignificantDrop) {
+      const unhealthy = Object.entries(models)
+        .filter(([, m]) => m.monitored && !m.healthy)
+        .map(([model, m]) => ({
+          model,
+          currentRequests: m.currentRequests,
+          previousRequests: m.previousRequests,
+          baselineRequests: m.baselineRequests,
+          percentChange: m.percentChange,
+          uniqueUsersBaseline: m.uniqueUsersBaseline,
+        }));
+      console.error('[models/up] returning 503: unhealthy monitored models', {
+        anchorTime: (anchorTime ?? new Date()).toISOString(),
+        unhealthy,
+      });
+    }
 
     return NextResponse.json(
       {

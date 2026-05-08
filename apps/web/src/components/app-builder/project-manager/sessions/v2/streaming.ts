@@ -25,10 +25,9 @@ import type { StoredMessage } from '@/components/cloud-agent-next/types';
 import type { V2SessionStore } from './store';
 import type { AppTRPCClient } from '../../types';
 import type { Images } from '@/lib/images-schema';
-import type { WorkerVersion } from '@/lib/app-builder/types';
 import { createLogger } from '../../logging';
 
-type SendMessageResponse = { sessionId: string; workerVersion: WorkerVersion };
+type SendMessageResponse = { sessionId: string; workerVersion: 'v2' };
 
 export type SessionChangedUserMessage = { text: string; images?: Images };
 
@@ -40,11 +39,7 @@ export type V2StreamingConfig = {
   cloudAgentSessionId: string | null;
   onStreamComplete?: () => void;
   /** Called when the backend creates a new session (upgrade or GitHub migration) */
-  onSessionChanged?: (
-    newSessionId: string,
-    workerVersion: WorkerVersion,
-    userMessage: SessionChangedUserMessage
-  ) => void;
+  onSessionChanged?: (newSessionId: string, userMessage: SessionChangedUserMessage) => void;
 };
 
 export type V2StreamingCoordinator = {
@@ -409,7 +404,7 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
         // V2 has no optimistic message — pass the user message to the new session.
         if (sessionId !== config.cloudAgentSessionId && onSessionChanged) {
           store.setState({ isStreaming: false });
-          onSessionChanged(sessionId, workerVersion, { text: message, images });
+          onSessionChanged(sessionId, { text: message, images });
           return;
         }
 

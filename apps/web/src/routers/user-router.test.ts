@@ -335,7 +335,6 @@ describe('user router - skipCustomerSource', () => {
 
   it('allows a real answer to overwrite a previous skip', async () => {
     const caller = await createCallerForUser(skipTestUser.id);
-
     await caller.user.skipCustomerSource();
     await caller.user.submitCustomerSource({ source: 'Changed my mind — Reddit' });
 
@@ -343,5 +342,77 @@ describe('user router - skipCustomerSource', () => {
       where: eq(kilocode_users.id, skipTestUser.id),
     });
     expect(updated?.customer_source).toBe('Changed my mind — Reddit');
+  });
+});
+
+describe('session and API token reset mutations', () => {
+  async function findRequiredUser(userId: string): Promise<User> {
+    const user = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, userId),
+    });
+    if (!user) throw new Error(`Expected test user to exist: ${userId}`);
+    return user;
+  }
+
+  it('resets the current user API key without signing out browser sessions', async () => {
+    const user = await insertTestUser({
+      api_token_pepper: 'api-pepper-before',
+      web_session_pepper: 'web-session-pepper-before',
+    });
+    const caller = await createCallerForUser(user.id);
+
+    await caller.user.resetAPIKey();
+
+    const updated = await findRequiredUser(user.id);
+    expect(updated.api_token_pepper).toEqual(expect.any(String));
+    expect(updated.api_token_pepper).not.toBe('api-pepper-before');
+    expect(updated.web_session_pepper).toBe('web-session-pepper-before');
+  });
+
+  it('signs out current user browser sessions without resetting the API key', async () => {
+    const user = await insertTestUser({
+      api_token_pepper: 'api-pepper-before',
+      web_session_pepper: 'web-session-pepper-before',
+    });
+    const caller = await createCallerForUser(user.id);
+
+    await caller.user.signOutBrowserSessions();
+
+    const updated = await findRequiredUser(user.id);
+    expect(updated.web_session_pepper).toEqual(expect.any(String));
+    expect(updated.web_session_pepper).not.toBe('web-session-pepper-before');
+    expect(updated.api_token_pepper).toBe('api-pepper-before');
+  });
+
+  it('lets admins reset a user API key without signing out browser sessions', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const target = await insertTestUser({
+      api_token_pepper: 'api-pepper-before',
+      web_session_pepper: 'web-session-pepper-before',
+    });
+    const caller = await createCallerForUser(admin.id);
+
+    await caller.admin.users.resetAPIKey({ userId: target.id });
+
+    const updated = await findRequiredUser(target.id);
+    expect(updated.api_token_pepper).toEqual(expect.any(String));
+    expect(updated.api_token_pepper).not.toBe('api-pepper-before');
+    expect(updated.web_session_pepper).toBe('web-session-pepper-before');
+  });
+
+  it('lets admins sign out user browser sessions without resetting the API key', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const target = await insertTestUser({
+      api_token_pepper: 'api-pepper-before',
+      web_session_pepper: 'web-session-pepper-before',
+    });
+    const caller = await createCallerForUser(admin.id);
+
+    await caller.admin.users.signOutBrowserSessions({ userId: target.id });
+
+    const updated = await findRequiredUser(target.id);
+    expect(updated.web_session_pepper).toEqual(expect.any(String));
+    expect(updated.web_session_pepper).not.toBe('web-session-pepper-before');
+    expect(updated.api_token_pepper).toBe('api-pepper-before');
   });
 });

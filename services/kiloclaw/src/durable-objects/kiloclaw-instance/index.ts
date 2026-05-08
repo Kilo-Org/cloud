@@ -30,18 +30,27 @@ import {
 import type { FlyVolume, FlyVolumeSnapshot } from '../../fly/types';
 import * as fly from '../../fly/client';
 import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '../../auth/sandbox-id';
+import type {
+  KiloclawDestroyReason,
+  KiloclawStartReason,
+  KiloclawStopReason,
+} from '@kilocode/worker-utils';
 import {
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
 } from '@kilocode/worker-utils/instance-id';
-import { resolveLatestVersion, resolveVersionByTag } from '../../lib/image-version';
+import { resolveVersionByTag } from '../../lib/image-version';
 import { lookupCatalogVersion } from '../../lib/catalog-registration';
+import { selectImageVersionForInstance } from '../../lib/version-rollout';
+import { lookupKiloclawEarlyAccess } from '../../lib/user-flags';
 import { ImageVariantSchema } from '../../schemas/image-version';
+import type { ImageVariant } from '../../schemas/image-version';
 import {
   LIVE_CHECK_THROTTLE_MS,
   OPENCLAW_BUILTIN_DEFAULT_MODEL,
   RESTARTING_TIMEOUT_MS,
   STARTING_TIMEOUT_MS,
+  WORKER_CONTROLLER_CAPABILITIES_VERSION,
 } from '../../config';
 import {
   SECRET_CATALOG,
@@ -51,8 +60,22 @@ import {
   MAX_CUSTOM_SECRETS,
   type SecretFieldKey,
 } from '@kilocode/kiloclaw-secret-catalog';
+import {
+  canUpgradeTo,
+  DEFAULT_INSTANCE_TIER,
+  getTier,
+  resolveInstanceTypeLabel,
+  tryInstanceTypeLabel,
+  DEFAULT_VOLUME_SIZE_GB,
+  type InstanceTierKey,
+  type InstanceType,
+} from '@kilocode/kiloclaw-instance-tiers';
 import * as regionHelpers from '../regions';
-import { buildRuntimeSpec } from '../machine-config';
+import {
+  buildRuntimeSpec,
+  effectiveMachineSize,
+  parseMachineSizeFromFlyGuest,
+} from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
 
 // Domain modules
@@ -73,6 +96,7 @@ import { nextAlarmTime, doLog, doError, doWarn, toLoggable, createReconcileConte
 import { attemptMetadataRecovery } from './reconcile';
 import { buildUserEnvVars, resolveImageTag, resolveRuntimeImageRef } from './config';
 import * as gateway from './gateway';
+import { buildChannelConfigPatch } from './channel-config';
 import * as pairing from './pairing';
 import * as kiloCliRun from './kilo-cli-run';
 import * as doctorRun from './doctor-run';
@@ -85,7 +109,19 @@ import {
   reconcileMachineMount,
   markRestartSuccessful,
 } from './reconcile';
-import { restoreFromPostgres, markDestroyedInPostgresHelper } from './postgres';
+import {
+  restoreFromPostgres,
+  markDestroyedInPostgresHelper,
+  syncAdminSizeOverrideToPostgresHelper,
+  syncInstanceTypeToPostgresHelper,
+  syncTrackedImageTagToPostgresHelper,
+} from './postgres';
+import {
+  dispatchReadyPush,
+  LIFECYCLE_NOTIFICATION_RESET,
+  maybeDispatchStartFailurePush,
+} from './lifecycle-push';
+import { runScheduledActionApply } from './scheduled-action-apply';
 import { legacyDoKeysForIdentity } from '../../lib/instance-routing';
 import {
   beginUnexpectedStopRecovery,
@@ -97,11 +133,6 @@ import {
   runUnexpectedStopRecoveryInBackground,
   type RecoveryRuntime,
 } from './recovery';
-import {
-  setupDefaultStreamChatChannel,
-  createShortLivedUserToken,
-  deactivateStreamChatUsers,
-} from '../../stream-chat/client';
 import { writeEvent, safeInstanceIdFromSandboxId } from '../../utils/analytics';
 import type { KiloClawEventData, KiloClawEventName } from '../../utils/analytics';
 import { getProviderAdapter, resolveDefaultProvider } from '../../providers';
@@ -129,6 +160,28 @@ const CHANNEL_ENV_VARS = new Set(
 );
 const BRAVE_SEARCH_FIELD_KEY = 'braveSearchApiKey';
 
+/**
+ * Resolve a coherent instanceType for the given DO state.
+ *
+ * Self-heals two pathological persisted shapes:
+ * - `instanceType === 'custom'` with `machineSize === null`: incoherent — we
+ *   can't actually tell whether it's custom without hardware to compare. Drop
+ *   the stale label and re-run inference.
+ * - `instanceType` is a known catalog key but `machineSize === null`: trust
+ *   the persisted label (catalog tier is its own evidence).
+ *
+ * For null persisted state, falls back to live inference from machineSize +
+ * volumeSizeGb, which returns null when there's nothing to infer from.
+ */
+function resolveInstanceTypeFromState(
+  state: Pick<InstanceMutableState, 'instanceType' | 'machineSize' | 'volumeSizeGb'>
+): InstanceType | null {
+  if (state.instanceType === 'custom' && state.machineSize === null) {
+    return tryInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
+  }
+  return state.instanceType ?? tryInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
+}
+
 export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private s: InstanceMutableState = createMutableState();
   private startInProgress = false;
@@ -140,6 +193,150 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   private async persist(patch: Partial<PersistedState>): Promise<void> {
     await this.ctx.storage.put(storageUpdate(syncProviderStateForStorage(this.s, patch)));
+  }
+
+  /**
+   * Dispatch a fire-and-forget live check against Fly when status is running
+   * and we're past the throttle window. Used by both `getStatus` (user-facing)
+   * and `getDebugState` (admin-facing) so admins see live data — including
+   * tier backfill for legacy instances — without waiting for the next alarm.
+   */
+  private maybeDispatchLiveCheck(): void {
+    if (
+      this.s.status === 'running' &&
+      this.s.provider === 'fly' &&
+      this.s.flyMachineId &&
+      (this.s.lastLiveCheckAt === null ||
+        Date.now() - this.s.lastLiveCheckAt >= LIVE_CHECK_THROTTLE_MS)
+    ) {
+      this.s.lastLiveCheckAt = Date.now();
+      this.ctx.waitUntil(syncStatusFromLiveCheck(this.ctx, this.s, this.env));
+    }
+  }
+
+  /**
+   * Resolve the image version for a pin/rollout decision and write the four
+   * image fields (openclawVersion, imageVariant, trackedImageTag,
+   * trackedImageDigest) on `this.s`. Does NOT persist — callers are
+   * responsible for writing these fields to storage via `persist` or their
+   * own storage.put.
+   *
+   * When `pinnedImageTag` is a tag: resolves against KV, then the Postgres
+   * catalog, then falls back to storing the tag verbatim with null metadata.
+   *
+   * When `pinnedImageTag` is null: runs the rollout selector (honours
+   * per-user kiloclaw_early_access). If the selector returns nothing and
+   * `isNew` is true, clears the fields; otherwise preserves the existing
+   * tracked image so a restart keeps running what it's running.
+   */
+  private async resolveImageStateForPin(
+    pinnedImageTag: string | null,
+    userId: string,
+    instanceId: string,
+    opts: { isNew: boolean; ignoreCurrentImageTag?: boolean }
+  ): Promise<void> {
+    if (pinnedImageTag) {
+      let pinned = await resolveVersionByTag(this.env.KV_CLAW_CACHE, pinnedImageTag);
+
+      if (!pinned && !this.env.HYPERDRIVE?.connectionString) {
+        doError(this.s, 'HYPERDRIVE not configured — cannot look up pinned tag in Postgres', {
+          pinnedImageTag,
+        });
+      }
+      if (!pinned && this.env.HYPERDRIVE?.connectionString) {
+        try {
+          const catalogEntry = await lookupCatalogVersion(
+            this.env.HYPERDRIVE.connectionString,
+            pinnedImageTag
+          );
+          if (catalogEntry) {
+            const variantParse = ImageVariantSchema.safeParse(catalogEntry.variant);
+            if (!variantParse.success) {
+              doError(this.s, 'Invalid variant from Postgres catalog, skipping', {
+                variant: catalogEntry.variant,
+                pinnedImageTag,
+                validationErrors: variantParse.error.flatten(),
+              });
+            } else {
+              pinned = {
+                openclawVersion: catalogEntry.openclawVersion,
+                variant: variantParse.data,
+                imageTag: catalogEntry.imageTag,
+                imageDigest: catalogEntry.imageDigest,
+                publishedAt: catalogEntry.publishedAt,
+                // Pinned instances bypass rollout gating entirely; defaults
+                // are placeholders. The :latest / candidate state of the
+                // pinned tag is irrelevant to selection.
+                rolloutPercent: 0,
+                isLatest: false,
+              };
+            }
+          }
+        } catch (err) {
+          doWarn(this.s, 'Failed to look up pinned tag in Postgres', {
+            error: toLoggable(err),
+          });
+        }
+      }
+
+      if (pinned) {
+        this.s.openclawVersion = pinned.openclawVersion;
+        this.s.imageVariant = pinned.variant;
+        this.s.trackedImageTag = pinned.imageTag;
+        this.s.trackedImageDigest = pinned.imageDigest;
+      } else {
+        doWarn(this.s, 'Pinned tag not found in KV or Postgres, using tag directly', {
+          pinnedImageTag,
+        });
+        this.s.openclawVersion = null;
+        this.s.imageVariant = null;
+        this.s.trackedImageTag = pinnedImageTag;
+        this.s.trackedImageDigest = null;
+      }
+      return;
+    }
+
+    const variant: ImageVariant = 'default';
+    // Per-user early-access opt-in: when set, the user is offered the
+    // current candidate (if any) for every instance they own — personal or
+    // org. The flag lives on kilocode_users, not on the instance.
+    let autoEnroll = false;
+    if (this.env.HYPERDRIVE?.connectionString) {
+      try {
+        autoEnroll = await lookupKiloclawEarlyAccess(this.env.HYPERDRIVE.connectionString, userId);
+      } catch (err) {
+        doWarn(this.s, 'Failed to look up kiloclaw_early_access; treating as false', {
+          error: toLoggable(err),
+        });
+      }
+    }
+    // When clearing an explicit pin (`ignoreCurrentImageTag`), we must not
+    // pass the current tracked tag to the selector. The selector's sticky-
+    // on-candidate behavior (see lib/version-rollout.ts) would otherwise
+    // preserve the previously-pinned tag for a user who isn't in the
+    // candidate's rollout cohort, defeating the point of removing the pin.
+    const selectorCurrentImageTag = opts.ignoreCurrentImageTag ? null : this.s.trackedImageTag;
+    const selected = await selectImageVersionForInstance({
+      kv: this.env.KV_CLAW_CACHE,
+      variant,
+      instanceId,
+      currentImageTag: selectorCurrentImageTag,
+      autoEnroll,
+    });
+    if (selected) {
+      this.s.openclawVersion = selected.openclawVersion;
+      this.s.imageVariant = selected.variant;
+      this.s.trackedImageTag = selected.imageTag;
+      this.s.trackedImageDigest = selected.imageDigest;
+    } else if (opts.isNew) {
+      this.s.openclawVersion = null;
+      this.s.imageVariant = null;
+      this.s.trackedImageTag = null;
+      this.s.trackedImageDigest = null;
+    }
+    // Existing-instance redeploys with no eligible upgrade keep their
+    // current trackedImageTag — already true in this branch since we only
+    // overwrite when `selected` is non-null.
   }
 
   private async scheduleAlarm(): Promise<void> {
@@ -175,6 +372,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     applyProviderState(this.s, result.providerState);
     if (result.corePatch?.machineSize !== undefined) {
       this.s.machineSize = result.corePatch.machineSize;
+    }
+    if (result.corePatch?.instanceType !== undefined) {
+      this.s.instanceType = result.corePatch.instanceType;
     }
     if (result.corePatch?.restartUpdateSent !== undefined) {
       this.s.restartUpdateSent = result.corePatch.restartUpdateSent;
@@ -247,20 +447,38 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
   }
 
+  private async clearPendingStartReason(): Promise<void> {
+    if (this.s.pendingStartReason === null) {
+      return;
+    }
+
+    this.s.pendingStartReason = null;
+    await this.persist({ pendingStartReason: null });
+  }
+
   private async markStartFailedFromProvider(message: string): Promise<void> {
     const now = Date.now();
     this.s.status = 'stopped';
     this.s.startingAt = null;
+    this.s.pendingStartReason = null;
     this.s.lastStoppedAt = now;
     this.s.lastStartErrorMessage = message;
     this.s.lastStartErrorAt = now;
     await this.persist({
       status: 'stopped',
       startingAt: null,
+      pendingStartReason: null,
       lastStoppedAt: now,
       lastStartErrorMessage: message,
       lastStartErrorAt: now,
     });
+    await maybeDispatchStartFailurePush(
+      this.env,
+      this.s,
+      this.ctx,
+      'provider_start_failed',
+      message
+    );
   }
 
   private async markRestartFailedFromProvider(message: string): Promise<void> {
@@ -285,10 +503,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   private async markNonFlyRunningFromProvider(reason: 'start' | 'runtime'): Promise<void> {
     const startingAt = this.s.startingAt;
+    const startReason = reason === 'start' ? this.s.pendingStartReason : null;
     this.s.status = 'running';
     this.s.startingAt = null;
     this.s.restartingAt = null;
     this.s.restartUpdateSent = false;
+    this.s.pendingStartReason = reason === 'start' ? null : this.s.pendingStartReason;
     if (this.s.lastStartedAt === null) {
       this.s.lastStartedAt = Date.now();
     }
@@ -302,6 +522,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       startingAt: null,
       restartingAt: null,
       restartUpdateSent: false,
+      ...(reason === 'start' ? { pendingStartReason: null } : {}),
       lastStartedAt: this.s.lastStartedAt,
       healthCheckFailCount: 0,
       lastStartErrorMessage: null,
@@ -314,6 +535,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.emitEvent({
         event: 'instance.started',
         status: 'running',
+        label: startReason ?? undefined,
         durationMs: startingAt ? Date.now() - startingAt : undefined,
       });
     }
@@ -547,6 +769,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const providerId =
       opts?.provider ?? (isNew ? resolveDefaultProvider(this.env) : this.s.provider);
     const orgId = opts?.orgId ?? null;
+    const inferredInstanceType = resolveInstanceTypeFromState(this.s);
+    const instanceType =
+      config.instanceType ?? inferredInstanceType ?? (isNew ? DEFAULT_INSTANCE_TIER : null);
+    const tier = instanceType && instanceType !== 'custom' ? getTier(instanceType) : null;
+    const nextMachineSize = tier?.machineSize ?? this.s.machineSize ?? null;
+    const nextVolumeSizeGb = tier?.volumeSizeGb ?? this.s.volumeSizeGb ?? null;
     const provider = getProviderAdapter(this.env, { provider: providerId });
     const provisioningState = {
       ...this.s,
@@ -554,13 +782,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       sandboxId,
       provider: providerId,
       orgId,
+      instanceType,
+      machineSize: nextMachineSize,
+      volumeSizeGb: nextVolumeSizeGb,
     } satisfies InstanceMutableState;
 
     const provisioning = await provider.ensureProvisioningResources({
       env: this.env,
       state: provisioningState,
       orgId,
-      machineSize: config.machineSize ?? null,
+      machineSize: nextMachineSize,
       region: config.region,
     });
     this.s.userId = userId;
@@ -571,79 +802,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     // Resolve the image version for this provision.
     console.debug('[DO] provision: pinnedImageTag from config:', config.pinnedImageTag ?? 'none');
-    if (config.pinnedImageTag) {
-      let pinned = await resolveVersionByTag(this.env.KV_CLAW_CACHE, config.pinnedImageTag);
-
-      if (!pinned && !this.env.HYPERDRIVE?.connectionString) {
-        doError(this.s, 'HYPERDRIVE not configured — cannot look up pinned tag in Postgres', {
-          pinnedImageTag: config.pinnedImageTag,
-        });
-      }
-      if (!pinned && this.env.HYPERDRIVE?.connectionString) {
-        try {
-          const catalogEntry = await lookupCatalogVersion(
-            this.env.HYPERDRIVE.connectionString,
-            config.pinnedImageTag
-          );
-          if (catalogEntry) {
-            const variantParse = ImageVariantSchema.safeParse(catalogEntry.variant);
-            if (!variantParse.success) {
-              doError(this.s, 'Invalid variant from Postgres catalog, skipping', {
-                variant: catalogEntry.variant,
-                pinnedImageTag: config.pinnedImageTag,
-                validationErrors: variantParse.error.flatten(),
-              });
-            } else {
-              pinned = {
-                openclawVersion: catalogEntry.openclawVersion,
-                variant: variantParse.data,
-                imageTag: catalogEntry.imageTag,
-                imageDigest: catalogEntry.imageDigest,
-                publishedAt: catalogEntry.publishedAt,
-              };
-              console.debug(
-                '[DO] Resolved pinned tag from Postgres catalog:',
-                config.pinnedImageTag
-              );
-            }
-          }
-        } catch (err) {
-          doWarn(this.s, 'Failed to look up pinned tag in Postgres', {
-            error: toLoggable(err),
-          });
-        }
-      }
-
-      if (pinned) {
-        this.s.openclawVersion = pinned.openclawVersion;
-        this.s.imageVariant = pinned.variant;
-        this.s.trackedImageTag = pinned.imageTag;
-        this.s.trackedImageDigest = pinned.imageDigest;
-        console.debug('[DO] Using pinned version:', pinned.openclawVersion, '→', pinned.imageTag);
-      } else {
-        doWarn(this.s, 'Pinned tag not found in KV or Postgres, using tag directly', {
-          pinnedImageTag: config.pinnedImageTag,
-        });
-        this.s.openclawVersion = null;
-        this.s.imageVariant = null;
-        this.s.trackedImageTag = config.pinnedImageTag;
-        this.s.trackedImageDigest = null;
-      }
-    } else {
-      const variant = 'default';
-      const latest = await resolveLatestVersion(this.env.KV_CLAW_CACHE, variant);
-      if (latest) {
-        this.s.openclawVersion = latest.openclawVersion;
-        this.s.imageVariant = latest.variant;
-        this.s.trackedImageTag = latest.imageTag;
-        this.s.trackedImageDigest = latest.imageDigest;
-      } else if (isNew) {
-        this.s.openclawVersion = null;
-        this.s.imageVariant = null;
-        this.s.trackedImageTag = null;
-        this.s.trackedImageDigest = null;
-      }
-    }
+    await this.resolveImageStateForPin(
+      config.pinnedImageTag ?? null,
+      userId,
+      opts?.instanceId ?? userId,
+      { isNew }
+    );
 
     const previousUserTimezone = this.s.userTimezone ?? null;
     const previousUserLocation = this.s.userLocation ?? null;
@@ -671,7 +835,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       userLocation,
       kiloExaSearchMode: config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null,
       channels: config.channels ?? null,
-      machineSize: config.machineSize ?? this.s.machineSize ?? null,
+      machineSize: nextMachineSize,
+      instanceType,
+      volumeSizeGb: nextVolumeSizeGb,
     } satisfies Partial<PersistedState>;
 
     const versionFields = {
@@ -704,7 +870,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             pendingDestroyMachineId: null,
             pendingDestroyVolumeId: null,
             pendingPostgresMarkOnFinalize: false,
-            instanceReadyEmailSent: false,
+            ...LIFECYCLE_NOTIFICATION_RESET,
           })
         )
       : syncProviderStateForStorage(
@@ -731,7 +897,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.userLocation = userLocation;
     this.s.kiloExaSearchMode = config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null;
     this.s.channels = config.channels ?? null;
-    this.s.machineSize = config.machineSize ?? this.s.machineSize ?? null;
+    this.s.machineSize = nextMachineSize;
+    this.s.instanceType = instanceType;
+    this.s.volumeSizeGb = nextVolumeSizeGb;
     if (isNew) {
       this.s.provisionedAt = Date.now();
       this.s.lastStartedAt = null;
@@ -740,7 +908,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.pendingDestroyMachineId = null;
       this.s.pendingDestroyVolumeId = null;
       this.s.pendingPostgresMarkOnFinalize = false;
-      this.s.instanceReadyEmailSent = false;
+      Object.assign(this.s, LIFECYCLE_NOTIFICATION_RESET);
     }
     this.s.loaded = true;
 
@@ -751,53 +919,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       });
     }
 
-    // Set up the default Stream Chat channel on first provision (best-effort).
-    // The bot and channel are created server-side here so the API secret never
-    // reaches the Fly Machine. Failure is non-fatal: the instance will start
-    // without the Stream Chat channel rather than blocking provisioning.
-    // Set up or backfill the default Stream Chat channel (best-effort).
-    // On first provision (isNew) this creates the channel from scratch.
-    // On re-provision (!isNew) this backfills instances created before the
-    // feature was added. setupDefaultStreamChatChannel is idempotent
-    // (upsert users, getOrCreate channel). Failure is non-fatal.
-    if (
-      !this.s.streamChatApiKey &&
-      this.env.STREAM_CHAT_API_KEY &&
-      this.env.STREAM_CHAT_API_SECRET
-    ) {
-      try {
-        const streamChat = await setupDefaultStreamChatChannel(
-          this.env.STREAM_CHAT_API_KEY,
-          this.env.STREAM_CHAT_API_SECRET,
-          sandboxId
-        );
-        this.s.streamChatApiKey = streamChat.apiKey;
-        this.s.streamChatBotUserId = streamChat.botUserId;
-        this.s.streamChatBotUserToken = streamChat.botUserToken;
-        this.s.streamChatChannelId = streamChat.channelId;
-        await this.persist({
-          streamChatApiKey: streamChat.apiKey,
-          streamChatBotUserId: streamChat.botUserId,
-          streamChatBotUserToken: streamChat.botUserToken,
-          streamChatChannelId: streamChat.channelId,
-        });
-        console.log(
-          `[DO] Stream Chat channel ${isNew ? 'provisioned' : 'backfilled'}:`,
-          streamChat.channelId
-        );
-      } catch (err) {
-        doWarn(this.s, 'Stream Chat channel setup failed (non-fatal)', {
-          error: toLoggable(err),
-        });
-      }
-    }
-
     if (isNew) {
       await this.scheduleAlarm();
     }
 
     if (isNew) {
-      await this.startAsync(userId);
+      await this.startAsync(userId, { reason: 'initial_provision' });
     }
 
     this.emitEvent({
@@ -994,6 +1121,87 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
   }
 
+  /**
+   * Flush DO-side config that was patched while the gateway wasn't reachable
+   * (status !== 'running') to the live gateway now.
+   *
+   * Called:
+   * - From _startInner after status transitions to 'running' (covers the
+   *   common onboarding path where a client patches during 'starting').
+   * - From the alarm retry block when flags stayed set because the inline
+   *   gateway call failed, or because the starting→running transition was
+   *   driven by reconcileStarting instead of _startInner.
+   *
+   * No-op when nothing is pending. On per-field failure the flag stays true
+   * so the next alarm retries.
+   */
+  private async flushPendingConfigToGateway(reason: string): Promise<void> {
+    if (this.s.status !== 'running' || !getRuntimeId(this.s)) return;
+
+    const pending: Partial<PersistedState> = {};
+
+    if (this.s.botIdentityApplyPending) {
+      try {
+        await gateway.writeBotIdentity(this.s, this.env, {
+          botName: this.s.botName,
+          botNature: this.s.botNature,
+          botVibe: this.s.botVibe,
+          botEmoji: this.s.botEmoji,
+        });
+        this.s.botIdentityApplyPending = false;
+        pending.botIdentityApplyPending = false;
+        doLog(this.s, 'flushPendingConfigToGateway: bot identity applied', { reason });
+      } catch (err) {
+        doWarn(this.s, 'flushPendingConfigToGateway: bot identity failed; will retry', {
+          reason,
+          error: toLoggable(err),
+        });
+      }
+    }
+
+    if (this.s.execPresetApplyPending) {
+      try {
+        await gateway.patchOpenclawConfig(this.s, this.env, {
+          tools: {
+            exec: {
+              security: this.s.execSecurity,
+              ask: this.s.execAsk,
+            },
+          },
+        });
+        this.s.execPresetApplyPending = false;
+        pending.execPresetApplyPending = false;
+        doLog(this.s, 'flushPendingConfigToGateway: exec preset applied', { reason });
+      } catch (err) {
+        doWarn(this.s, 'flushPendingConfigToGateway: exec preset failed; will retry', {
+          reason,
+          error: toLoggable(err),
+        });
+      }
+    }
+
+    if (this.s.channelsApplyPending) {
+      try {
+        const patch = buildChannelConfigPatch(this.env, this.s.channels);
+        if (patch) {
+          await gateway.patchOpenclawConfig(this.s, this.env, patch);
+        }
+        this.s.channelsApplyPending = false;
+        pending.channelsApplyPending = false;
+        doLog(this.s, 'flushPendingConfigToGateway: channels applied', { reason });
+      } catch (err) {
+        doWarn(this.s, 'flushPendingConfigToGateway: channels failed; will retry', {
+          reason,
+          error: toLoggable(err),
+        });
+      }
+    }
+
+    if (Object.keys(pending).length > 0) {
+      await this.ctx.storage.put(pending);
+    }
+  }
+
   async updateExecPreset(patch: {
     security?: string;
     ask?: string;
@@ -1011,8 +1219,34 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       pending.execAsk = patch.ask;
     }
 
-    if (Object.keys(pending).length > 0) {
-      await this.ctx.storage.put(pending);
+    if (Object.keys(pending).length === 0) {
+      return {
+        execSecurity: this.s.execSecurity,
+        execAsk: this.s.execAsk,
+      };
+    }
+
+    this.s.execPresetApplyPending = true;
+    pending.execPresetApplyPending = true;
+    await this.ctx.storage.put(storageUpdate(pending));
+
+    if (this.s.status === 'running') {
+      try {
+        await gateway.patchOpenclawConfig(this.s, this.env, {
+          tools: {
+            exec: {
+              security: this.s.execSecurity,
+              ask: this.s.execAsk,
+            },
+          },
+        });
+        this.s.execPresetApplyPending = false;
+        await this.ctx.storage.put(storageUpdate({ execPresetApplyPending: false }));
+      } catch (err) {
+        doWarn(this.s, 'updateExecPreset: gateway patch failed; deferring to alarm', {
+          error: toLoggable(err),
+        });
+      }
     }
 
     return {
@@ -1074,17 +1308,36 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       pending.botEmoji = patch.botEmoji;
     }
 
-    if (Object.keys(pending).length > 0) {
-      await this.ctx.storage.put(pending);
-    }
-
-    if (this.s.status === 'running' && Object.keys(pending).length > 0) {
-      await gateway.writeBotIdentity(this.s, this.env, {
+    if (Object.keys(pending).length === 0) {
+      return {
         botName: this.s.botName,
         botNature: this.s.botNature,
         botVibe: this.s.botVibe,
         botEmoji: this.s.botEmoji,
-      });
+      };
+    }
+
+    this.s.botIdentityApplyPending = true;
+    pending.botIdentityApplyPending = true;
+    await this.ctx.storage.put(storageUpdate(pending));
+
+    if (this.s.status === 'running') {
+      try {
+        await gateway.writeBotIdentity(this.s, this.env, {
+          botName: this.s.botName,
+          botNature: this.s.botNature,
+          botVibe: this.s.botVibe,
+          botEmoji: this.s.botEmoji,
+        });
+        this.s.botIdentityApplyPending = false;
+        await this.ctx.storage.put(storageUpdate({ botIdentityApplyPending: false }));
+      } catch (err) {
+        // Gateway reachable only after flyMachineId + controller up; on
+        // transient failure, keep the alarm retry path queued.
+        doWarn(this.s, 'updateBotIdentity: gateway write failed; deferring to alarm', {
+          error: toLoggable(err),
+        });
+      }
     }
 
     return {
@@ -1107,13 +1360,52 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     slackApp: boolean;
   }> {
     const secretsPatch: Record<string, EncryptedEnvelope | null> = {};
+    let includesRemoval = false;
+    let includesAddition = false;
     for (const [key, value] of Object.entries(patch)) {
       if (value !== undefined) {
         secretsPatch[key] = value;
+        if (value === null) {
+          includesRemoval = true;
+        } else {
+          includesAddition = true;
+        }
       }
     }
 
     const { configured } = await this.updateSecrets(secretsPatch);
+
+    const pending: Partial<PersistedState> = {};
+    if (Object.keys(secretsPatch).length > 0) {
+      if (includesAddition && this.s.status === 'running' && getRuntimeId(this.s)) {
+        try {
+          const configPatch = buildChannelConfigPatch(this.env, this.s.channels);
+          if (configPatch) {
+            await gateway.patchOpenclawConfig(this.s, this.env, configPatch);
+          }
+          this.s.channelsApplyPending = false;
+          pending.channelsApplyPending = false;
+        } catch (err) {
+          doWarn(this.s, 'updateChannels: gateway patch failed; deferring to alarm', {
+            error: toLoggable(err),
+          });
+          this.s.channelsApplyPending = true;
+          pending.channelsApplyPending = true;
+        }
+      } else if (includesAddition) {
+        this.s.channelsApplyPending = true;
+        pending.channelsApplyPending = true;
+      } else if (includesRemoval && (!this.s.channelsApplyPending || !this.s.channels)) {
+        // Removals are not live-applied, but do not erase a pending additive replay
+        // while other channel config remains queued for the gateway.
+        this.s.channelsApplyPending = false;
+        pending.channelsApplyPending = false;
+      }
+    }
+
+    if (Object.keys(pending).length > 0) {
+      await this.ctx.storage.put(pending);
+    }
 
     return {
       telegram: configured.includes('telegramBotToken'),
@@ -1511,16 +1803,93 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return { ok: true };
   }
 
+  /**
+   * Apply or clear an admin version pin by writing the resolved image
+   * fields into DO state. Does not restart the machine — the next
+   * provision/restart/redeploy picks up the new trackedImageTag via
+   * resolveImageTag(state, env).
+   *
+   * Pass `imageTag` = tag string to pin, or null to clear the pin (resets
+   * to the current rollout target via selectImageVersionForInstance).
+   *
+   * Returns the resolved image metadata so the caller can surface what
+   * was actually applied.
+   */
+  async applyPinnedVersion(
+    imageTag: string | null,
+    instanceId?: string
+  ): Promise<{
+    openclawVersion: string | null;
+    imageTag: string | null;
+    imageDigest: string | null;
+    variant: string | null;
+  }> {
+    await this.loadState();
+
+    if (!this.s.status) {
+      throw Object.assign(new Error('Cannot apply pin: instance has no status'), { status: 404 });
+    }
+    if (this.s.status === 'destroying') {
+      throw Object.assign(new Error('Cannot apply pin: instance is being destroyed'), {
+        status: 409,
+      });
+    }
+    if (!this.s.userId) {
+      throw Object.assign(new Error('Cannot apply pin: instance has no userId'), { status: 404 });
+    }
+
+    const resolvedInstanceId = instanceId ?? this.s.userId;
+    await this.resolveImageStateForPin(imageTag, this.s.userId, resolvedInstanceId, {
+      isNew: false,
+      // When clearing a pin (imageTag === null), force a fresh rollout
+      // decision instead of preserving the currently-tracked tag. Without
+      // this, an instance that was pinned to the current candidate would
+      // stay on that candidate even when the user isn't in the rollout
+      // cohort — effectively leaving the pin in place.
+      ignoreCurrentImageTag: imageTag === null,
+    });
+
+    await this.persist({
+      openclawVersion: this.s.openclawVersion,
+      imageVariant: this.s.imageVariant,
+      trackedImageTag: this.s.trackedImageTag,
+      trackedImageDigest: this.s.trackedImageDigest,
+    });
+
+    doLog(this.s, 'applyPinnedVersion: DO state updated', {
+      requestedImageTag: imageTag,
+      resolvedImageTag: this.s.trackedImageTag,
+      openclawVersion: this.s.openclawVersion,
+    });
+
+    return {
+      openclawVersion: this.s.openclawVersion,
+      imageTag: this.s.trackedImageTag,
+      imageDigest: this.s.trackedImageDigest,
+      variant: this.s.imageVariant,
+    };
+  }
+
   async start(
     userId?: string,
-    options?: { skipCooldown?: boolean }
-  ): Promise<{ started: boolean }> {
+    options?: { skipCooldown?: boolean; reason?: KiloclawStartReason }
+  ): Promise<{
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }> {
     // Guard against concurrent start() calls — two overlapping invocations
     // (e.g. startAsync via waitUntil + a direct RPC start) can both see
     // flyMachineId as null and each create a Fly machine, orphaning one.
     if (this.startInProgress) {
       doWarn(this.s, 'start: already in progress, skipping duplicate call');
-      return { started: false };
+      return {
+        started: false,
+        previousStatus: this.s.status,
+        currentStatus: this.s.status,
+        startedAt: this.s.lastStartedAt,
+      };
     }
     this.startInProgress = true;
 
@@ -1533,9 +1902,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   private async _startInner(
     userId?: string,
-    options?: { skipCooldown?: boolean }
-  ): Promise<{ started: boolean }> {
+    options?: { skipCooldown?: boolean; reason?: KiloclawStartReason }
+  ): Promise<{
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }> {
     await this.loadState();
+    const previousStatus = this.s.status;
+    const startReason = options?.reason ?? this.s.pendingStartReason;
 
     if (this.s.status === 'destroying') {
       throw new Error('Cannot start: instance is being destroyed');
@@ -1656,8 +2032,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
               createReconcileContext(this.s, this.env, 'start')
             );
             console.log('[DO] Machine already running, mount verified');
+            await this.clearPendingStartReason();
             await this.scheduleAlarm();
-            return { started: false };
+            return {
+              started: false,
+              previousStatus,
+              currentStatus: this.s.status,
+              startedAt: this.s.lastStartedAt,
+            };
           }
           console.log(
             '[DO] Status is running but machine state is:',
@@ -1704,7 +2086,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       resolveRuntimeImageRef(this.s, this.env),
       envVars,
       bootstrapEnv,
-      this.s.machineSize,
+      effectiveMachineSize(this.s),
       identity,
       this.s.provider
     );
@@ -1749,36 +2131,57 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const currentStatus = await this.ctx.storage.get('status');
     if (!currentStatus || currentStatus === 'destroying') {
       doWarn(this.s, 'start: instance was destroyed while starting, aborting');
-      return { started: false };
+      if (currentStatus === 'destroying') {
+        await this.clearPendingStartReason();
+      } else {
+        this.s.pendingStartReason = null;
+      }
+      return {
+        started: false,
+        previousStatus,
+        currentStatus: typeof currentStatus === 'string' ? currentStatus : this.s.status,
+        startedAt: this.s.lastStartedAt,
+      };
     }
 
     const startingAt = this.s.startingAt;
     this.s.status = 'running';
     this.s.startingAt = null;
+    this.s.pendingStartReason = null;
     this.s.lastStartedAt = Date.now();
     this.s.healthCheckFailCount = 0;
     this.s.lastStartErrorMessage = null;
     this.s.lastStartErrorAt = null;
+    this.s.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
     await this.persist({
       status: 'running',
       startingAt: null,
+      pendingStartReason: null,
       lastStartedAt: this.s.lastStartedAt,
       healthCheckFailCount: 0,
       flyMachineId: this.s.flyMachineId,
       lastStartErrorMessage: null,
       lastStartErrorAt: null,
+      controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
     });
 
     await this.syncGoogleWorkspaceConfig('instance_started');
+    await this.flushPendingConfigToGateway('instance_started');
 
     this.emitEvent({
       event: 'instance.started',
       status: 'running',
+      label: startReason ?? undefined,
       durationMs: startingAt ? Date.now() - startingAt : undefined,
     });
 
     await this.scheduleAlarm();
-    return { started: true };
+    return {
+      started: true,
+      previousStatus,
+      currentStatus: this.s.status,
+      startedAt: this.s.lastStartedAt,
+    };
   }
 
   /**
@@ -1787,7 +2190,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Used by provision() so the RPC call returns quickly instead of waiting for
    * the full runtime startup sequence.
    */
-  async startAsync(userId?: string): Promise<void> {
+  async startAsync(userId?: string, options?: { reason?: KiloclawStartReason }): Promise<void> {
     await this.loadState();
 
     if (this.s.status === 'destroying') {
@@ -1800,17 +2203,46 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error('Cannot start: instance is restarting');
     }
 
+    // Duplicate-provision guard: if another recent startAsync call is still
+    // in flight we must not schedule a second background start(). The
+    // startInProgress flag in start() only protects against *concurrent*
+    // re-entry — two startAsyncs that fire their waitUntils back-to-back
+    // can still run start() sequentially after the first finishes,
+    // producing a redundant provider.startRuntime (e.g. a second Northflank
+    // deployment PATCH). reconcileStarting takes over when startingAt goes
+    // stale past STARTING_TIMEOUT_MS, so a stale starting state falls
+    // through to a fresh attempt.
+    if (this.s.status === 'starting' && this.s.startingAt !== null) {
+      const startAge = Date.now() - this.s.startingAt;
+      if (startAge < STARTING_TIMEOUT_MS) {
+        doWarn(this.s, 'startAsync: already starting within fresh window, skipping duplicate', {
+          startingAt: this.s.startingAt,
+          ageMs: startAge,
+        });
+        return;
+      }
+    }
+
     // Mark as starting so the UI can show a polling state immediately.
     // Record startingAt so reconcileStarting() can time out after STARTING_TIMEOUT_MS.
     this.s.status = 'starting';
     this.s.startingAt = Date.now();
-    await this.persist({ status: 'starting', startingAt: this.s.startingAt });
+    this.s.pendingStartReason = options?.reason ?? null;
+    // Re-arm the failure push flag so this start attempt can trigger its own
+    // notification even if a previous attempt already sent one.
+    this.s.startFailurePushSentForAttempt = false;
+    await this.persist({
+      status: 'starting',
+      startingAt: this.s.startingAt,
+      pendingStartReason: this.s.pendingStartReason,
+      startFailurePushSentForAttempt: false,
+    });
     await this.scheduleAlarm();
 
     // Run the actual start in the background; the reconcile alarm will
     // pick up the result and transition to 'running' (or fall back on error).
     this.ctx.waitUntil(
-      this.start(userId).catch(async err => {
+      this.start(userId, { reason: options?.reason }).catch(async err => {
         doError(this.s, 'startAsync: background start failed', {
           error: toLoggable(err),
         });
@@ -1880,12 +2312,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     );
   }
 
-  async stop(): Promise<void> {
+  async stop(options?: { reason?: KiloclawStopReason }): Promise<{
+    stopped: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    stoppedAt: number | null;
+  }> {
     await this.loadState();
 
     if (!this.s.userId || !this.s.sandboxId) {
       throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
     }
+    const previousStatus = this.s.status;
     if (
       this.s.status === 'stopped' ||
       this.s.status === 'provisioned' ||
@@ -1896,7 +2334,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.status === 'restoring'
     ) {
       console.log('[DO] Instance not running (status:', this.s.status, '), no-op');
-      return;
+      return {
+        stopped: false,
+        previousStatus,
+        currentStatus: this.s.status,
+        stoppedAt: this.s.lastStoppedAt,
+      };
     }
 
     const machineUptimeMs = this.s.lastStartedAt ? Date.now() - this.s.lastStartedAt : 0;
@@ -1929,13 +2372,21 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.emitEvent({
       event: 'instance.stopped',
       status: 'stopped',
+      label: options?.reason,
       value: machineUptimeMs,
     });
 
     await this.scheduleAlarm();
+
+    return {
+      stopped: true,
+      previousStatus,
+      currentStatus: this.s.status,
+      stoppedAt: this.s.lastStoppedAt,
+    };
   }
 
-  async destroy(): Promise<DestroyResult> {
+  async destroy(options?: { reason?: KiloclawDestroyReason }): Promise<DestroyResult> {
     await this.loadState();
 
     if (!this.s.userId || !this.s.sandboxId) {
@@ -1965,20 +2416,22 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.emitEvent({
       event: 'instance.destroy_started',
       status: 'destroying',
+      label: options?.reason,
       value: machineUptimeMs,
     });
 
-    // Best-effort: deactivate Stream Chat users so any captured tokens become useless.
-    // Failure is non-fatal — worst case is the same as pre-deactivation behavior.
-    if (this.env.STREAM_CHAT_API_KEY && this.env.STREAM_CHAT_API_SECRET && this.s.sandboxId) {
+    // Best-effort: clean up kilo-chat data (conversations, messages, memberships)
+    // for this sandbox. Failure is non-fatal — orphaned data is unreachable.
+    if (this.env.KILO_CHAT && this.s.sandboxId) {
       try {
-        await deactivateStreamChatUsers(
-          this.env.STREAM_CHAT_API_KEY,
-          this.env.STREAM_CHAT_API_SECRET,
-          [this.s.sandboxId, `bot-${this.s.sandboxId}`]
-        );
+        const result = await this.env.KILO_CHAT.destroySandboxData(this.s.sandboxId);
+        if (!result.ok) {
+          doWarn(this.s, 'kilo-chat sandbox cleanup partially failed (non-fatal)', {
+            failedConversations: result.failedConversations,
+          });
+        }
       } catch (err) {
-        doWarn(this.s, 'Stream Chat user deactivation failed (non-fatal)', {
+        doWarn(this.s, 'kilo-chat sandbox cleanup failed (non-fatal)', {
           error: toLoggable(err),
         });
       }
@@ -2092,6 +2545,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     flyVolumeId: string | null;
     flyRegion: string | null;
     machineSize: MachineSize | null;
+    instanceType: InstanceType | null;
+    volumeSizeGb: number | null;
     openclawVersion: string | null;
     imageVariant: string | null;
     trackedImageTag: string | null;
@@ -2113,19 +2568,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     botNature: string | null;
     botVibe: string | null;
     botEmoji: string | null;
+    controllerCapabilitiesVersion: number | null;
   }> {
     await this.loadState();
-
-    if (
-      this.s.status === 'running' &&
-      this.s.provider === 'fly' &&
-      this.s.flyMachineId &&
-      (this.s.lastLiveCheckAt === null ||
-        Date.now() - this.s.lastLiveCheckAt >= LIVE_CHECK_THROTTLE_MS)
-    ) {
-      this.s.lastLiveCheckAt = Date.now();
-      this.ctx.waitUntil(syncStatusFromLiveCheck(this.ctx, this.s, this.env));
-    }
+    this.maybeDispatchLiveCheck();
 
     return {
       userId: this.s.userId,
@@ -2149,6 +2595,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyVolumeId: this.s.flyVolumeId,
       flyRegion: this.s.flyRegion,
       machineSize: this.s.machineSize,
+      instanceType: resolveInstanceTypeFromState(this.s),
+      volumeSizeGb: this.s.volumeSizeGb,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
       trackedImageTag: this.s.trackedImageTag,
@@ -2170,38 +2618,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       botNature: this.s.botNature,
       botVibe: this.s.botVibe,
       botEmoji: this.s.botEmoji,
-    };
-  }
-
-  async getStreamChatCredentials(): Promise<{
-    apiKey: string;
-    userId: string;
-    userToken: string;
-    channelId: string;
-  } | null> {
-    await this.loadState();
-
-    if (
-      !this.s.streamChatApiKey ||
-      !this.env.STREAM_CHAT_API_SECRET ||
-      !this.s.streamChatChannelId ||
-      !this.s.sandboxId
-    ) {
-      return null;
-    }
-
-    // Mint a short-lived token on every request so that revoked users lose
-    // access when the token expires, without requiring an app-secret rotation.
-    const userToken = await createShortLivedUserToken(
-      this.env.STREAM_CHAT_API_SECRET,
-      this.s.sandboxId
-    );
-
-    return {
-      apiKey: this.s.streamChatApiKey,
-      userId: this.s.sandboxId,
-      userToken,
-      channelId: this.s.streamChatChannelId,
+      controllerCapabilitiesVersion: this.s.controllerCapabilitiesVersion,
     };
   }
 
@@ -2225,10 +2642,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     flyVolumeId: string | null;
     flyRegion: string | null;
     machineSize: MachineSize | null;
+    instanceType: InstanceType | null;
+    volumeSizeGb: number | null;
     openclawVersion: string | null;
     imageVariant: string | null;
     trackedImageTag: string | null;
     trackedImageDigest: string | null;
+    adminMachineSizeOverride: MachineSize | null;
+    adminMachineSizeOverrideMetadata: InstanceMutableState['adminMachineSizeOverrideMetadata'];
     googleConnected: boolean;
     googleOAuthConnected: boolean;
     googleOAuthStatus: GoogleOAuthConnection['status'];
@@ -2264,12 +2685,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     restoreStartedAt: string | null;
     pendingRestoreVolumeId: string | null;
     instanceReadyEmailSent: boolean;
+    startFailurePushSentForAttempt: boolean;
     // --- env key diagnostics ---
     envKeyAppDOKey: string | null;
     envKeyAppDOFlyAppName: string | null;
     envKeyAppDOKeySet: boolean | null;
   }> {
     await this.loadState();
+    this.maybeDispatchLiveCheck();
     const alarmScheduledAt = await this.ctx.storage.getAlarm();
 
     // Fetch env key diagnostics from the App DO (best-effort, don't fail the whole response).
@@ -2310,6 +2733,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyVolumeId: this.s.flyVolumeId,
       flyRegion: this.s.flyRegion,
       machineSize: this.s.machineSize,
+      instanceType: resolveInstanceTypeFromState(this.s),
+      volumeSizeGb: this.s.volumeSizeGb,
+      adminMachineSizeOverride: this.s.adminMachineSizeOverride,
+      adminMachineSizeOverrideMetadata: this.s.adminMachineSizeOverrideMetadata,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
       trackedImageTag: this.s.trackedImageTag,
@@ -2349,6 +2776,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       restoreStartedAt: this.s.restoreStartedAt,
       pendingRestoreVolumeId: this.s.pendingRestoreVolumeId,
       instanceReadyEmailSent: this.s.instanceReadyEmailSent,
+      startFailurePushSentForAttempt: this.s.startFailurePushSentForAttempt,
       envKeyAppDOKey,
       envKeyAppDOFlyAppName: envKeyDiag?.flyAppName ?? null,
       envKeyAppDOKeySet: envKeyDiag?.envKeySet ?? null,
@@ -2377,6 +2805,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         : undefined,
       channels: this.s.channels ?? undefined,
       machineSize: this.s.machineSize ?? undefined,
+      instanceType:
+        this.s.instanceType === 'custom' ? undefined : (this.s.instanceType ?? undefined),
       customSecretMeta: this.s.customSecretMeta ?? undefined,
       vectorMemoryEnabled: this.s.vectorMemoryEnabled,
       vectorMemoryModel: this.s.vectorMemoryModel,
@@ -2387,7 +2817,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   /**
    * Atomically check-and-set the instance ready flag. Returns shouldNotify: true
    * on the first call per provision lifecycle, false on all subsequent calls.
-   * Used by the controller checkin handler to trigger a one-time "instance ready" email.
+   * Used by the controller checkin handler to trigger the one-time "instance
+   * ready" email and mobile push.
    */
   async tryMarkInstanceReady(): Promise<{ shouldNotify: boolean; userId: string | null }> {
     await this.loadState();
@@ -2398,10 +2829,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.instanceReadyEmailSent = true;
     await this.persist({ instanceReadyEmailSent: true });
 
-    // If the instance was provisioned more than 6 hours ago, don't send the email
+    // If the instance was provisioned more than 6 hours ago, don't notify.
     if (this.s.provisionedAt && this.s.provisionedAt < Date.now() - 1000 * 60 * 60 * 6) {
       return { shouldNotify: false, userId: this.s.userId };
     }
+
+    // Mobile push fires fire-and-forget so the checkin response isn't blocked
+    // on the notifications RPC. Email dispatch happens via the controller route.
+    this.ctx.waitUntil(dispatchReadyPush(this.env, this.s));
 
     return { shouldNotify: true, userId: this.s.userId };
   }
@@ -2517,36 +2952,392 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   // ── Machine resize (admin) ─────────────────────────────────────────
 
-  async resizeMachine(newSize: MachineSize): Promise<{
-    previousSize: MachineSize | null;
-    newSize: MachineSize;
+  async resizeMachine(targetTierKey: InstanceTierKey): Promise<{
+    previousTier: InstanceType | null;
+    newTier: InstanceTierKey;
+    previousVolumeSizeGb: number | null;
+    newVolumeSizeGb: number;
+    machineSize: MachineSize;
+    clearedOverride: {
+      size: MachineSize;
+      metadata: NonNullable<InstanceMutableState['adminMachineSizeOverrideMetadata']>;
+    } | null;
   }> {
     await this.loadState();
+    this.assertAdminSizeChangeAllowed({
+      cannotPrefix: 'resize',
+      beforePhrase: 'resizing machine tier',
+      notSupportedSubject: 'Instance tier resize',
+      // Fly tier resize calls fly.extendVolume on storage growth, which
+      // requires the machine to be stopped. Northflank uses deployment
+      // rollout semantics and does not require a stopped instance.
+      requireStopped: this.s.provider !== 'northflank',
+      allowNorthflank: true,
+    });
 
+    const targetTier = getTier(targetTierKey);
+    if (targetTier.status !== 'offered') {
+      throw new Error(`Instance tier ${targetTierKey} is not an offerable resize target`);
+    }
+
+    const previousTier = resolveInstanceTypeFromState(this.s);
+    const previousVolumeSizeGb = this.s.volumeSizeGb;
+
+    if (
+      !canUpgradeTo({
+        currentType: previousTier,
+        currentSize: this.s.machineSize,
+        currentVolumeSizeGb: previousVolumeSizeGb,
+        targetTier: targetTier.key,
+      })
+    ) {
+      throw new Error(
+        `Cannot resize from ${previousTier ?? 'custom'} to ${targetTierKey}: downgrades and sidegrades are not allowed`
+      );
+    }
+
+    if (
+      this.s.provider === 'fly' &&
+      targetTier.volumeSizeGb > (previousVolumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB)
+    ) {
+      if (!this.s.flyVolumeId) {
+        throw new Error('Cannot resize: no Fly volume is associated with this instance');
+      }
+      await fly.extendVolume(
+        getFlyConfig(this.env, this.s),
+        this.s.flyVolumeId,
+        targetTier.volumeSizeGb
+      );
+      this.s.volumeSizeGb = targetTier.volumeSizeGb;
+      await this.persist({ volumeSizeGb: targetTier.volumeSizeGb });
+    }
+
+    if (this.s.provider === 'northflank') {
+      const result = await this.provider().resizeRuntime?.({
+        env: this.env,
+        state: this.s,
+        targetTier: targetTier.key,
+      });
+      if (!result) {
+        throw new Error('Provider northflank does not support tier resize');
+      }
+      await this.persistProviderResult(result);
+    }
+
+    // Capture and clear any active admin override before applying the tier
+    // change. The customer is now paying for the new tier; carrying a
+    // pre-existing override would either silently downgrade them (override
+    // smaller than new tier) or upgrade them for free (override larger).
+    const clearedOverrideSize = this.s.adminMachineSizeOverride;
+    const clearedOverrideMetadata = this.s.adminMachineSizeOverrideMetadata;
+    const clearedOverride =
+      clearedOverrideSize !== null && clearedOverrideMetadata !== null
+        ? { size: clearedOverrideSize, metadata: clearedOverrideMetadata }
+        : null;
+
+    this.s.instanceType = targetTier.key;
+    this.s.machineSize = targetTier.machineSize;
+    this.s.volumeSizeGb = targetTier.volumeSizeGb;
+    this.s.adminMachineSizeOverride = null;
+    this.s.adminMachineSizeOverrideMetadata = null;
+    await this.persist({
+      instanceType: targetTier.key,
+      machineSize: targetTier.machineSize,
+      volumeSizeGb: targetTier.volumeSizeGb,
+      adminMachineSizeOverride: null,
+      adminMachineSizeOverrideMetadata: null,
+    });
+
+    if (this.s.userId && this.s.sandboxId) {
+      const userId = this.s.userId;
+      const sandboxId = this.s.sandboxId;
+      this.ctx.waitUntil(syncInstanceTypeToPostgresHelper(this.env, this.s, userId, sandboxId));
+      // Sync override clear to Postgres if EITHER field was populated, not just
+      // when both are. A skewed legacy state (one column populated, one null)
+      // would otherwise leave Postgres stale because we just nulled DO state.
+      // The sync helper is idempotent via `IS DISTINCT FROM`.
+      if (clearedOverrideSize !== null || clearedOverrideMetadata !== null) {
+        this.ctx.waitUntil(
+          syncAdminSizeOverrideToPostgresHelper(this.env, this.s, userId, sandboxId)
+        );
+      }
+    }
+
+    console.log(
+      `[admin-machine-resize] userId=${this.s.userId} ` +
+        `previousTier=${previousTier ?? 'unknown'} newTier=${targetTier.key} ` +
+        `previousVolume=${previousVolumeSizeGb ?? 'unknown'} newVolume=${targetTier.volumeSizeGb}` +
+        (clearedOverride
+          ? ` clearedOverride=${clearedOverride.size.cpus}/${clearedOverride.size.memory_mb}MB`
+          : '')
+    );
+
+    return {
+      previousTier,
+      newTier: targetTier.key,
+      previousVolumeSizeGb,
+      newVolumeSizeGb: targetTier.volumeSizeGb,
+      machineSize: targetTier.machineSize,
+      clearedOverride,
+    };
+  }
+
+  /**
+   * Shared guard for admin operations that mutate hardware-related state
+   * (`resizeMachine`, `setAdminMachineSizeOverride`, `clearAdminMachineSizeOverride`).
+   *
+   * Always rejects: not-provisioned, destroying / restoring / recovering /
+   * starting / restarting transitional states, and Northflank instances
+   * (none of these paths are wired up for Northflank's async pod-rollout
+   * model yet).
+   *
+   * Optionally rejects when the instance is running (`requireStopped: true`).
+   * Tier resize requires stopped because it extends the Fly volume in place,
+   * which Fly's API only allows on stopped machines. Override set/clear are
+   * pure DO state writes — the Fly `updateMachine(guest=...)` call doesn't
+   * happen until the machine's next stop/start cycle, where Fly's own state
+   * machine enforces the constraint. So override paths pass
+   * `requireStopped: false` and let the customer or admin decide when to
+   * trigger the cycle that picks up the new override.
+   *
+   * Takes message fragments so each call site reads naturally:
+   * - `cannotPrefix` slots into "Cannot {prefix}: ..."
+   * - `beforePhrase` slots into "Instance must be stopped before {phrase}"
+   *   (only used when `requireStopped: true`)
+   * - `notSupportedSubject` slots into "{subject} is not yet supported on Northflank instances"
+   */
+  private assertAdminSizeChangeAllowed(args: {
+    cannotPrefix: string;
+    beforePhrase?: string;
+    notSupportedSubject: string;
+    requireStopped: boolean;
+    allowNorthflank?: boolean;
+  }): void {
     if (!this.s.userId) {
       throw new Error('Instance is not provisioned');
     }
     if (this.s.status === 'destroying') {
-      throw new Error('Cannot resize: instance is being destroyed');
+      throw new Error(`Cannot ${args.cannotPrefix}: instance is being destroyed`);
     }
     if (this.s.status === 'restoring') {
-      throw new Error('Cannot resize: instance is restoring from snapshot');
+      throw new Error(`Cannot ${args.cannotPrefix}: instance is restoring from snapshot`);
     }
     if (this.s.status === 'recovering') {
-      throw new Error('Cannot resize: instance is recovering from an unexpected stop');
+      throw new Error(
+        `Cannot ${args.cannotPrefix}: instance is recovering from an unexpected stop`
+      );
+    }
+    if (this.s.status === 'starting' || this.s.status === 'restarting') {
+      throw new Error(`Cannot ${args.cannotPrefix}: instance is busy (${this.s.status})`);
+    }
+    if (args.requireStopped && this.s.status !== 'stopped' && getRuntimeId(this.s)) {
+      throw Object.assign(
+        new Error(`Instance must be stopped before ${args.beforePhrase ?? args.cannotPrefix}`),
+        { status: 409 }
+      );
+    }
+    if (this.s.provider === 'northflank' && args.allowNorthflank !== true) {
+      throw new Error(`${args.notSupportedSubject} is not yet supported on Northflank instances`);
+    }
+  }
+
+  // ── Admin temporary CPU/RAM override ──────────────────────────────
+
+  /**
+   * Set a temporary admin override for the machine's CPU/RAM. Wins over
+   * the tier-derived `machineSize` for runtime spec construction without
+   * touching `instanceType` or `volumeSizeGb` (so billing stays on the
+   * customer's tier). Fly + docker-local only.
+   *
+   * Can be set on a running instance — the override is a pure DO state
+   * write and takes effect on the next stop/start cycle (manual restart,
+   * customer-initiated stop/start, or any other path that flows through
+   * `startExistingMachine`). The current container keeps running on the
+   * tier hardware until that cycle.
+   *
+   * Override is sticky until cleared explicitly or until a tier resize
+   * auto-clears it. See `~/fd-plans/kiloclaw/admin-machine-size-override.md`.
+   */
+  async setAdminMachineSizeOverride(input: {
+    size: MachineSize;
+    reason: string;
+    actorId: string;
+    actorEmail: string;
+  }): Promise<{
+    previousOverride: MachineSize | null;
+    newOverride: MachineSize;
+  }> {
+    await this.loadState();
+    this.assertAdminSizeChangeAllowed({
+      cannotPrefix: 'set admin size override',
+      notSupportedSubject: 'Admin size override',
+      // Override is a pure DO state write; it takes effect on the next
+      // stop/start cycle when `startExistingMachine` calls
+      // `fly.updateMachine(guest=...)`. Setting on a running machine is
+      // safe — current container keeps running, override applies on next
+      // restart.
+      requireStopped: false,
+    });
+    if (this.s.machineSize === null) {
+      throw new Error(
+        'Cannot set admin size override: machineSize has not been observed yet ' +
+          '(legacy instance — wait for backfill or run a tier resize first)'
+      );
     }
 
-    const previousSize = this.s.machineSize;
+    const previousOverride = this.s.adminMachineSizeOverride;
+    const metadata = {
+      reason: input.reason,
+      actorId: input.actorId,
+      actorEmail: input.actorEmail,
+      setAt: Date.now(),
+    };
 
-    this.s.machineSize = newSize;
-    await this.persist({ machineSize: newSize });
+    this.s.adminMachineSizeOverride = input.size;
+    this.s.adminMachineSizeOverrideMetadata = metadata;
+    await this.persist({
+      adminMachineSizeOverride: input.size,
+      adminMachineSizeOverrideMetadata: metadata,
+    });
+
+    if (this.s.userId && this.s.sandboxId) {
+      const userId = this.s.userId;
+      const sandboxId = this.s.sandboxId;
+      this.ctx.waitUntil(
+        syncAdminSizeOverrideToPostgresHelper(this.env, this.s, userId, sandboxId)
+      );
+    }
 
     console.log(
-      `[admin-machine-resize] userId=${this.s.userId} ` +
-        `previous=${JSON.stringify(previousSize)} new=${JSON.stringify(newSize)}`
+      `[admin-size-override] set userId=${this.s.userId} actor=${input.actorEmail} ` +
+        `previous=${
+          previousOverride ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB` : 'none'
+        } ` +
+        `new=${input.size.cpus}/${input.size.memory_mb}MB cpu_kind=${input.size.cpu_kind ?? 'shared'} ` +
+        `reason="${input.reason.replace(/"/g, '\\"')}"`
     );
 
-    return { previousSize, newSize };
+    return { previousOverride, newOverride: input.size };
+  }
+
+  async clearAdminMachineSizeOverride(input: {
+    reason: string;
+    actorId: string;
+    actorEmail: string;
+  }): Promise<{ previousOverride: MachineSize | null }> {
+    await this.loadState();
+
+    // Short-circuit BEFORE the guard. Clearing nothing is a true no-op from
+    // the DO's perspective, and admins triaging incidents shouldn't get an
+    // error for it when the instance happens to be in a transitional state
+    // (destroying / starting / recovering / Northflank). The set path still
+    // runs the guard — it mutates hardware-shaping state and needs the
+    // protection.
+    //
+    // Even when the DO has no override, still fire the Postgres sync. The
+    // `admin_size_override` column is a denormalized read cache for the
+    // admin "Has size override" filter and badge; if a prior clear's
+    // best-effort sync failed or the DO was restored without an override
+    // while Postgres still holds a stale payload, the list page would show
+    // a phantom override forever. An admin firing "Clear Size Override"
+    // expects that affordance to repair the cache. The sync is idempotent
+    // via `IS DISTINCT FROM` — when Postgres already matches DO state
+    // (both null), this is a SQL no-op.
+    const previousOverride = this.s.adminMachineSizeOverride;
+    if (previousOverride === null && this.s.adminMachineSizeOverrideMetadata === null) {
+      if (this.s.userId && this.s.sandboxId) {
+        const userId = this.s.userId;
+        const sandboxId = this.s.sandboxId;
+        this.ctx.waitUntil(
+          syncAdminSizeOverrideToPostgresHelper(this.env, this.s, userId, sandboxId)
+        );
+      }
+      console.log(
+        `[admin-size-override] clear (no-op) userId=${this.s.userId} actor=${input.actorEmail} ` +
+          `reason="${input.reason.replace(/"/g, '\\"')}"`
+      );
+      return { previousOverride: null };
+    }
+
+    this.assertAdminSizeChangeAllowed({
+      cannotPrefix: 'clear admin size override',
+      notSupportedSubject: 'Admin size override',
+      // Same as set: clear is a DO state write; revert to tier hardware
+      // happens on next restart when `startExistingMachine` calls Fly.
+      requireStopped: false,
+    });
+
+    this.s.adminMachineSizeOverride = null;
+    this.s.adminMachineSizeOverrideMetadata = null;
+    await this.persist({
+      adminMachineSizeOverride: null,
+      adminMachineSizeOverrideMetadata: null,
+    });
+
+    if (this.s.userId && this.s.sandboxId) {
+      const userId = this.s.userId;
+      const sandboxId = this.s.sandboxId;
+      this.ctx.waitUntil(
+        syncAdminSizeOverrideToPostgresHelper(this.env, this.s, userId, sandboxId)
+      );
+    }
+
+    const previousLabel = previousOverride
+      ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB`
+      : 'metadata-only (skewed state)';
+    console.log(
+      `[admin-size-override] clear userId=${this.s.userId} actor=${input.actorEmail} ` +
+        `previous=${previousLabel} reason="${input.reason.replace(/"/g, '\\"')}"`
+    );
+
+    return { previousOverride };
+  }
+
+  /**
+   * Record a Fly volume extend that's already happened on the Fly side.
+   *
+   * Used by the admin `/extend-volume` route, which performs the Fly API
+   * call directly (not through the DO) and then needs the DO to catch up
+   * its persisted `volumeSizeGb` so the resize-policy check stays honest.
+   *
+   * Sets `instanceType = 'custom'` because an arbitrary extend is by
+   * definition off the catalog ladder — even if the new shape happens to
+   * match a tier's volume size, the catalog match would be coincidental.
+   * A subsequent admin resize to a named tier replaces 'custom' via the
+   * normal path.
+   *
+   * Caller is responsible for ensuring the Fly volume actually got extended
+   * to `newSizeGb` before calling this. The DO does not double-check Fly.
+   */
+  async recordVolumeExtend(newSizeGb: number): Promise<{
+    previousVolumeSizeGb: number | null;
+    newVolumeSizeGb: number;
+    instanceType: InstanceType | null;
+  }> {
+    await this.loadState();
+    if (!this.s.userId) {
+      throw new Error('Instance is not provisioned');
+    }
+    if (!Number.isInteger(newSizeGb) || newSizeGb < 1 || newSizeGb > 500) {
+      throw new Error(`Invalid volume size: ${newSizeGb}`);
+    }
+    const previousVolumeSizeGb = this.s.volumeSizeGb;
+    this.s.volumeSizeGb = newSizeGb;
+    this.s.instanceType = 'custom';
+    await this.persist({ volumeSizeGb: newSizeGb, instanceType: 'custom' });
+    if (this.s.sandboxId) {
+      this.ctx.waitUntil(
+        syncInstanceTypeToPostgresHelper(this.env, this.s, this.s.userId, this.s.sandboxId)
+      );
+    }
+    console.log(
+      `[admin-volume-extend] userId=${this.s.userId} previousSize=${previousVolumeSizeGb ?? 'unknown'} newSize=${newSizeGb}`
+    );
+    return {
+      previousVolumeSizeGb,
+      newVolumeSizeGb: newSizeGb,
+      instanceType: this.s.instanceType,
+    };
   }
 
   // ── Snapshot restore (admin) ───────────────────────────────────────
@@ -2832,6 +3623,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.importOpenclawWorkspace(this.s, this.env, files);
   }
 
+  async getMorningBriefingStatus() {
+    await this.loadState();
+    return gateway.getMorningBriefingStatus(this.s, this.env);
+  }
+
+  async enableMorningBriefing(input: { cron?: string; timezone?: string }) {
+    await this.loadState();
+    return gateway.enableMorningBriefing(this.s, this.env, input);
+  }
+
+  async disableMorningBriefing() {
+    await this.loadState();
+    return gateway.disableMorningBriefing(this.s, this.env);
+  }
+
+  async runMorningBriefing() {
+    await this.loadState();
+    return gateway.runMorningBriefing(this.s, this.env);
+  }
+
+  async readMorningBriefing(day: 'today' | 'yesterday') {
+    await this.loadState();
+    return gateway.readMorningBriefing(this.s, this.env, day);
+  }
+
   // ── Restart machine (user-facing) ──────────────────────────────────
 
   async restartMachine(options?: {
@@ -2867,7 +3683,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
 
     try {
-      if (this.s.provider !== 'fly' && options?.imageTag) {
+      // Image tag overrides are only meaningful for providers that pull from
+      // a registry. docker-local always runs the locally built image
+      // (resolveRuntimeImageRef hardcodes to env.DOCKER_LOCAL_IMAGE), but we
+      // still allow the trackedImageTag state update so the banner clears and
+      // local-dev exercises the full upgrade UX. The actual local container
+      // is unchanged.
+      if (this.s.provider !== 'fly' && this.s.provider !== 'docker-local' && options?.imageTag) {
         return {
           success: false,
           error: `Provider ${this.s.provider} does not support image tag overrides`,
@@ -2876,8 +3698,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
       if (options?.imageTag) {
         if (options.imageTag === 'latest') {
-          const variant = 'default';
-          const latest = await resolveLatestVersion(this.env.KV_CLAW_CACHE, variant);
+          const variant: ImageVariant = 'default';
+          const instanceIdForBucket =
+            this.s.sandboxId && isInstanceKeyedSandboxId(this.s.sandboxId)
+              ? instanceIdFromSandboxId(this.s.sandboxId)
+              : (this.s.userId ?? '');
+          let autoEnroll = false;
+          if (this.s.userId && this.env.HYPERDRIVE?.connectionString) {
+            try {
+              autoEnroll = await lookupKiloclawEarlyAccess(
+                this.env.HYPERDRIVE.connectionString,
+                this.s.userId
+              );
+            } catch (err) {
+              doWarn(this.s, 'Failed to look up kiloclaw_early_access on upgrade', {
+                error: toLoggable(err),
+              });
+            }
+          }
+          const latest = await selectImageVersionForInstance({
+            kv: this.env.KV_CLAW_CACHE,
+            variant,
+            instanceId: instanceIdForBucket,
+            currentImageTag: this.s.trackedImageTag,
+            autoEnroll,
+          });
           if (latest) {
             this.s.openclawVersion = latest.openclawVersion;
             this.s.imageVariant = latest.variant;
@@ -2898,14 +3743,35 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         });
       }
 
-      // Backfill machineSize from live machine for legacy instances
-      if (this.s.provider === 'fly' && this.s.machineSize === null && this.s.flyMachineId) {
+      // Backfill machineSize from live machine for legacy instances. Skipped
+      // when an admin override is active (override-shape isn't tier hardware).
+      if (
+        this.s.provider === 'fly' &&
+        this.s.machineSize === null &&
+        this.s.adminMachineSizeOverride === null &&
+        this.s.flyMachineId
+      ) {
         const flyConfig = getFlyConfig(this.env, this.s);
         const machine = await fly.getMachine(flyConfig, this.s.flyMachineId);
         if (machine.config?.guest) {
-          const { cpus, memory_mb, cpu_kind } = machine.config.guest;
-          this.s.machineSize = { cpus, memory_mb, cpu_kind };
-          await this.persist({ machineSize: this.s.machineSize });
+          const parsedSize = parseMachineSizeFromFlyGuest(machine.config.guest);
+          if (parsedSize) {
+            this.s.machineSize = parsedSize;
+            this.s.instanceType = resolveInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb);
+            await this.persist({
+              machineSize: this.s.machineSize,
+              instanceType: this.s.instanceType,
+            });
+          } else {
+            doWarn(
+              this.s,
+              'Skipping machineSize backfill: live Fly guest failed schema validation',
+              {
+                source: 'restart-backfill',
+                guest: machine.config.guest,
+              }
+            );
+          }
         }
       }
 
@@ -2939,6 +3805,26 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
   }
 
+  /**
+   * Wake the DO and re-arm its alarm so a freshly-scheduled action will
+   * fire on the next reconcile tick. Called by the web's scheduleAction
+   * tRPC right after it persists the parent + stage + target rows.
+   *
+   * Why this is needed: the wedge in `alarm()` queries Postgres for due
+   * targets, but it can only run when `alarm()` actually fires. In
+   * production Cloudflare, alarms with past timestamps fire immediately
+   * (so this method is belt-and-suspenders). In `wrangler dev`, stale
+   * alarm timestamps don't auto-fire — the DO needs a fresh setAlarm
+   * call to get back on the cadence. Calling scheduleAlarm() here sets
+   * a fresh near-future alarm time and unblocks the wedge.
+   */
+  async notifyScheduledActionPending(): Promise<{ ok: true }> {
+    await this.loadState();
+    if (!this.s.status) return { ok: true };
+    await this.scheduleAlarm();
+    return { ok: true };
+  }
+
   private async restartMachineInBackground(): Promise<void> {
     try {
       await this.loadState();
@@ -2959,40 +3845,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
       if (!getRuntimeId(this.s)) {
         throw new Error('No machine exists');
-      }
-
-      // Backfill Stream Chat for instances created before the feature was added.
-      // setupDefaultStreamChatChannel is idempotent (upsert users, getOrCreate channel).
-      if (
-        !this.s.streamChatApiKey &&
-        this.env.STREAM_CHAT_API_KEY &&
-        this.env.STREAM_CHAT_API_SECRET &&
-        this.s.sandboxId
-      ) {
-        try {
-          const streamChat = await setupDefaultStreamChatChannel(
-            this.env.STREAM_CHAT_API_KEY,
-            this.env.STREAM_CHAT_API_SECRET,
-            this.s.sandboxId
-          );
-          this.s.streamChatApiKey = streamChat.apiKey;
-          this.s.streamChatBotUserId = streamChat.botUserId;
-          this.s.streamChatBotUserToken = streamChat.botUserToken;
-          this.s.streamChatChannelId = streamChat.channelId;
-          await this.persist({
-            streamChatApiKey: streamChat.apiKey,
-            streamChatBotUserId: streamChat.botUserId,
-            streamChatBotUserToken: streamChat.botUserToken,
-            streamChatChannelId: streamChat.channelId,
-          });
-          doLog(this.s, 'Stream Chat backfilled on restart', {
-            channelId: streamChat.channelId,
-          });
-        } catch (err) {
-          doWarn(this.s, 'Stream Chat backfill failed on restart (non-fatal)', {
-            error: toLoggable(err),
-          });
-        }
       }
 
       const { envVars, bootstrapEnv, minSecretsVersion } = await buildUserEnvVars(
@@ -3017,7 +3869,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         resolveRuntimeImageRef(this.s, this.env),
         envVars,
         bootstrapEnv,
-        this.s.machineSize,
+        effectiveMachineSize(this.s),
         identity,
         this.s.provider
       );
@@ -3102,6 +3954,55 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     if (!this.s.userId || !this.s.status) return;
 
+    // Best-effort denormalize trackedImageTag → kiloclaw_instances.tracked_image_tag so
+    // admin tooling can filter populations by current running version via SQL. Fire-and-
+    // forget; Postgres failures must never break alarm reconciliation. Skipped when the
+    // sandbox isn't set yet (pre-provision).
+    if (this.s.sandboxId) {
+      this.ctx.waitUntil(
+        syncTrackedImageTagToPostgresHelper(this.env, this.s, this.s.userId, this.s.sandboxId)
+      );
+    }
+
+    // Best-effort scheduled-action apply pass. Queries Postgres for any
+    // pending targets for this instance whose stage time has passed and
+    // whose parent action is still actionable, dispatches per
+    // action_type, and records outcomes. Wrapped in waitUntil so a slow
+    // apply doesn't block reconcile; wrapped in try/catch inside the
+    // helper so Postgres failures never break this alarm.
+    if (this.s.sandboxId) {
+      this.ctx.waitUntil(
+        runScheduledActionApply({
+          env: this.env,
+          state: this.s,
+          restartCurrentInstance: async (imageTag?: string) => {
+            // Call the public restartMachine entry point (not the
+            // internal *InBackground variant). The entry point sets
+            // status='restarting' and triggers the background restart
+            // via waitUntil. Calling the internal variant directly
+            // bypasses the status flip, which causes its own initial
+            // guard ("status is not 'restarting' → abort") to bail
+            // silently and the actual restart never happens.
+            //
+            // imageTag is optional: omit for `scheduled_restart`
+            // (redeploys current tag); pass for `version_change`
+            // (redeploys on the chosen target tag).
+            const result = await this.restartMachine(imageTag ? { imageTag } : undefined);
+            if (!result.success) {
+              throw new Error(result.error ?? 'restartMachine returned failure');
+            }
+          },
+        }).then(
+          () => undefined,
+          err => {
+            doWarn(this.s, 'scheduled-action-apply pass threw', {
+              error: toLoggable(err),
+            });
+          }
+        )
+      );
+    }
+
     // Skip reconciliation during restore — the queue worker owns the lifecycle.
     // Detect stuck restores: if restoreStartedAt is set and older than 30 min,
     // the queue worker likely failed permanently. Reset to stopped.
@@ -3125,6 +4026,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     if (this.s.googleWorkspaceConfigSyncPending && this.s.status === 'running') {
       await this.syncGoogleWorkspaceConfig('alarm_retry');
+    }
+
+    // Flushes patches that landed in DO state while status was not 'running'
+    // (Window B of the onboarding timing analysis). Covers both the rare path
+    // where reconcileStarting — not _startInner — flipped status to 'running'
+    // in a prior alarm tick, and the case where an inline gateway call failed.
+    if (
+      (this.s.botIdentityApplyPending ||
+        this.s.execPresetApplyPending ||
+        this.s.channelsApplyPending) &&
+      this.s.status === 'running'
+    ) {
+      await this.flushPendingConfigToGateway('alarm_retry');
     }
 
     if (this.s.status !== 'recovering') {
@@ -3165,7 +4079,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         this.s,
         this.env,
         'alarm',
-        () => this.destroy().then(() => undefined),
+        () => this.destroy({ reason: 'stale_provision_cleanup' }).then(() => undefined),
         (userId, sandboxId) =>
           markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
       );

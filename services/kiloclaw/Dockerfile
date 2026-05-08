@@ -2,10 +2,10 @@
 ARG CONTROLLER_COMMIT=unknown
 ARG CONTROLLER_CACHE_BUST=1
 
-FROM debian:bookworm-slim AS runtime
+FROM debian:trixie-slim AS runtime
 
 # Install Node.js 24 (required by OpenClaw)
-ENV NODE_VERSION=24.14.1
+ENV NODE_VERSION=24.15.0
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        ca-certificates curl gnupg git xz-utils unzip jq ripgrep rsync zstd \
@@ -41,6 +41,12 @@ RUN apt-get update \
     && node --version \
     && npm --version
 
+# Route npm's git-backed deps (GitHub refs, ssh:// transitive deps like
+# baileys → libsignal-node) through https during the build so we don't need
+# an ssh client in the image. The final stage removes /etc/gitconfig so this
+# build-only config does not ship in the runtime image.
+RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.com/"
+
 # Install pnpm globally
 RUN npm install -g pnpm
 
@@ -49,7 +55,7 @@ RUN npm install -g pnpm
 # Patch: bump model discovery timeout from 5s to 60s — shared-cpu machines
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Remove this sed patch once openclaw exposes a configurable timeout.
-RUN npm install -g openclaw@2026.4.9 \
+RUN npm install -g openclaw@2026.4.23 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && FOUND_FILES=$(find "$OC_DIST" -name 'provider-models-*.js' | wc -l | tr -d ' ') \
     && if [ "$FOUND_FILES" -eq 0 ]; then echo "ERROR: provider-models-*.js not found in openclaw dist" >&2; exit 1; fi \
@@ -61,7 +67,29 @@ RUN npm install -g openclaw@2026.4.9 \
     && if [ "$AFTER" -ne 1 ]; then echo "ERROR: sed patch failed - expected 1 occurrence of 60e3, found $AFTER" >&2; exit 1; fi \
     && if grep -q 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null; then echo "ERROR: old 5e3 value still present after patch" >&2; exit 1; fi \
     && echo "OK: patched DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $(basename "$PM_FILE")" \
+    && CT_FILE=$(find "$OC_DIST" -name 'channel-target-*.js' | head -1) \
+    && if [ -z "$CT_FILE" ]; then echo "ERROR: channel-target-*.js not found in openclaw dist" >&2; exit 1; fi \
+    && sed -i 's/MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"/\(MESSAGE_ACTION_TARGET_MODE[action] ?? "none"\) !== "none"/' "$CT_FILE" \
+    && if grep -q 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$CT_FILE"; then echo "ERROR: actionRequiresTarget patch failed" >&2; exit 1; fi \
+    && echo "OK: patched actionRequiresTarget in $(basename "$CT_FILE")" \
     && openclaw --version
+
+# Bake bundled plugin runtime deps into the image so first boot is pure
+# startup — no npm install from `openclaw doctor` on shared-cpu Fly machines.
+# Each step writes to a temp file and is chained with && so failures break
+# the build (Debian's /bin/sh is dash, no pipefail). jq does the workspace:
+# filter so no pipe is needed between jq and sort.
+RUN cd /usr/local/lib/node_modules/openclaw \
+    && jq -r '((.dependencies // {}) + (.optionalDependencies // {})) | to_entries[] | select(.value | startswith("workspace:") | not) | "\(.key)@\(.value)"' \
+         dist/extensions/*/package.json > /tmp/bundled-plugin-specs.raw \
+    && sort -u /tmp/bundled-plugin-specs.raw > /tmp/bundled-plugin-specs.txt \
+    && test -s /tmp/bundled-plugin-specs.txt \
+    && xargs -a /tmp/bundled-plugin-specs.txt npm install \
+           --omit=dev --no-save --package-lock=false \
+           --ignore-scripts --legacy-peer-deps \
+           --no-fund --no-audit \
+    && rm -f /tmp/bundled-plugin-specs.raw /tmp/bundled-plugin-specs.txt \
+    && rm -rf /root/.npm
 
 # Install ClawHub CLI
 RUN npm install -g clawhub
@@ -69,18 +97,14 @@ RUN npm install -g clawhub
 # Install mcporter (MCP server tooling)
 RUN npm install -g mcporter@0.7.3
 
-# Install Stream Chat channel plugin for OpenClaw (installed from GitHub, not npm)
-ARG STREAM_CHAT_CACHE_BUSTER=1
-RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#fix/plugin-name-resolution
-
 # Install summarize (web page summarization CLI)
 RUN npm install -g @steipete/summarize@0.12.0
 
 # Install Kilo CLI (agentic coding assistant for the terminal)
-RUN npm install -g @kilocode/cli@7.1.13
+RUN npm install -g @kilocode/cli@7.2.31
 
 # Install Go (available at runtime for users to `go install` additional tools)
-ENV GO_VERSION=1.26.0
+ENV GO_VERSION=1.26.2
 RUN ARCH="$(dpkg --print-architecture)" \
     && curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz -o /tmp/go.tar.gz \
     && EXPECTED_SHA256="$(curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz.sha256)" \
@@ -94,11 +118,13 @@ RUN ARCH="$(dpkg --print-architecture)" \
 #   so user-installed tools persist across restarts and are included in snapshots.
 # - npm/Node (installed to /usr/local) and apt packages (/usr/bin) are unaffected.
 ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
-RUN GOBIN=/usr/local/bin go install github.com/steipete/gogcli/cmd/gog@v0.12.0 \
+RUN ARCH="$(dpkg --print-architecture)" \
+    && curl -fsSL "https://github.com/steipete/gogcli/releases/download/v0.14.0/gogcli_0.14.0_linux_${ARCH}.tar.gz" \
+       | tar xz -C /usr/local/bin gog \
     && mv /usr/local/bin/gog /usr/local/bin/gog.real \
     && GOBIN=/usr/local/bin go install github.com/steipete/goplaces/cmd/goplaces@v0.3.0 \
     && GOBIN=/usr/local/bin go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@v0.0.2 \
-    && GOBIN=/usr/local/bin go install github.com/xdevplatform/xurl@v1.0.3 \
+    && GOBIN=/usr/local/bin go install github.com/xdevplatform/xurl@v1.1.0 \
     && GOBIN=/usr/local/bin go install github.com/steipete/gifgrep/cmd/gifgrep@v0.2.3 \
     && go clean -cache -modcache
 
@@ -107,7 +133,7 @@ RUN GOBIN=/usr/local/bin go install github.com/steipete/gogcli/cmd/gog@v0.12.0 \
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh \
     && uv --version
 
-# ── Builder stage: package customizer plugin ───────────────────────────
+# ── Builder stage: package custom plugins ───────────────────────────
 # Build the vendored plugin tarball in an isolated stage so dev-time
 # dependencies do not inflate the runtime image layers.
 FROM runtime AS customizer-builder
@@ -120,16 +146,39 @@ RUN cd /tmp/kiloclaw-customizer \
     && cd / \
     && rm -rf /tmp/kiloclaw-customizer /root/.npm
 
+# ── Builder stage: package kilo-chat plugin ────────────────────────────
+# Build the vendored plugin tarball in an isolated stage so dev-time
+# dependencies do not inflate the runtime image layers.
+FROM runtime AS kilo-chat-builder
+
+COPY plugins/kilo-chat/ /tmp/kilo-chat/
+RUN cd /tmp/kilo-chat \
+    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && mv "${PKG_TGZ}" /tmp/kilo-chat.tgz \
+    && cd / \
+    && rm -rf /tmp/kilo-chat /root/.npm
+
+FROM runtime AS morning-briefing-builder
+
+COPY plugins/kiloclaw-morning-briefing/ /tmp/kiloclaw-morning-briefing/
+RUN cd /tmp/kiloclaw-morning-briefing \
+    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && mv "${PKG_TGZ}" /tmp/kiloclaw-morning-briefing.tgz \
+    && cd / \
+    && rm -rf /tmp/kiloclaw-morning-briefing /root/.npm
+
 # ── Builder stage: compile the controller with Bun ────────────────────
 # Bun is only needed to bundle the controller TypeScript into a single JS
 # file. By building in a separate stage, Bun (~100MB) stays out of the
 # final image. Bun installed to /root/.bun/ which gets shadowed by the
 # Fly Volume mount at /root, so it was unreachable at runtime anyway.
-FROM debian:bookworm-slim AS controller-builder
+FROM debian:trixie-slim AS controller-builder
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl unzip \
-    && curl -fsSL https://bun.sh/install | bash -s "bun-v1.2.4" \
+    && curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.13" \
     && rm -rf /var/lib/apt/lists/*
 ENV PATH="/root/.bun/bin:$PATH"
 
@@ -139,7 +188,7 @@ ARG CONTROLLER_CACHE_BUST
 COPY controller/ /tmp/controller-build/
 RUN cd /tmp/controller-build \
     && bun install --frozen-lockfile \
-    && CONTROLLER_VERSION="$(date -u +'%Y.%-m.%-d')" \
+    && CONTROLLER_VERSION="$(date -u +'%Y.%-m.%-d.%H%M')" \
     && bun build src/index.ts --outfile=/usr/local/bin/kiloclaw-controller.js --target=node --minify \
        --define "KILOCLAW_CONTROLLER_VERSION=\"${CONTROLLER_VERSION}\"" \
        --define "KILOCLAW_CONTROLLER_COMMIT=\"${CONTROLLER_COMMIT}\"" \
@@ -149,9 +198,20 @@ RUN cd /tmp/controller-build \
 FROM runtime AS final
 
 # Install prebuilt customizer plugin package from builder stage.
+# Also drop /etc/gitconfig (set earlier for the build's ssh→https rewrite) so
+# it doesn't persist in the runtime image.
 COPY --from=customizer-builder /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-customizer.tgz
-RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz \
+COPY --from=morning-briefing-builder /tmp/kiloclaw-morning-briefing.tgz /tmp/kiloclaw-morning-briefing.tgz
+RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-morning-briefing.tgz \
     && rm -f /tmp/kiloclaw-customizer.tgz \
+    && rm -f /tmp/kiloclaw-morning-briefing.tgz \
+    && rm -f /etc/gitconfig \
+    && rm -rf /root/.npm
+
+# Install prebuilt kilo-chat plugin package from builder stage.
+COPY --from=kilo-chat-builder /tmp/kilo-chat.tgz /tmp/kilo-chat.tgz
+RUN npm install -g --legacy-peer-deps /tmp/kilo-chat.tgz \
+    && rm -f /tmp/kilo-chat.tgz \
     && rm -rf /root/.npm
 
 # Copy the compiled controller from the builder stage
@@ -164,8 +224,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-03-17-v65-remove-startup-script
-RUN echo "11"
+# Build cache bust: 2026-05-01-v67-openclaw-2026.4.23
+RUN echo "13"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

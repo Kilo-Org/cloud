@@ -1,6 +1,6 @@
 import { WorkersLogger } from 'workers-tagged-logger';
 
-import type { BillingSweepKind } from './types.js';
+import type { BillingMessageSweep } from './types.js';
 import type { BillingCorrelationContext } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 
 export type BillingLogFieldValue =
@@ -18,11 +18,11 @@ export type BillingLogFields = {
 };
 
 export type BillingLogTags = BillingCorrelationContext & {
-  billingComponent?: 'worker' | 'side_effects' | 'kiloclaw_platform';
-  billingSweep?: BillingSweepKind;
+  billingComponent?: 'worker' | 'side_effects' | 'kiloclaw_platform' | 'snowflake_sql_api';
+  billingSweep?: BillingMessageSweep;
   source?: string;
   event?: string;
-  outcome?: 'started' | 'completed' | 'failed' | 'retry' | 'discarded';
+  outcome?: 'started' | 'completed' | 'failed' | 'retry' | 'discarded' | 'skipped';
   userId?: string;
   instanceId?: string;
   stripeSubscriptionId?: string;

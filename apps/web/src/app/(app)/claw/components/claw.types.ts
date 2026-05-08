@@ -5,6 +5,8 @@ export type ClawState = KiloClawDashboardStatus['status'];
 
 export type ExecPreset = 'always-ask' | 'never-ask';
 
+export const DEFAULT_ONBOARDING_EXEC_PRESET = 'never-ask' satisfies ExecPreset;
+
 export type BotIdentity = {
   botName: string;
   botNature: string;

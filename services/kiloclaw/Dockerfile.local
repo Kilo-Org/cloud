@@ -1,7 +1,7 @@
-FROM debian:bookworm-slim AS runtime
+FROM debian:trixie-slim AS runtime
 
 # Install Node.js 24 (required by OpenClaw)
-ENV NODE_VERSION=24.14.1
+ENV NODE_VERSION=24.15.0
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        ca-certificates curl gnupg git xz-utils unzip jq ripgrep rsync zstd \
@@ -30,7 +30,7 @@ RUN apt-get update \
     && curl -fsSL https://downloads.1password.com/linux/keys/1password.asc \
        | gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg \
     && apt-get update \
-    && apt-get install -y --no-install-recommends gh 1password-cli=2.33.0-1 \
+    && apt-get install -y --no-install-recommends gh 1password-cli \
     && apt-get purge -y xz-utils \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* \
@@ -52,17 +52,14 @@ RUN npm install -g clawhub
 # Install mcporter (MCP server tooling)
 RUN npm install -g mcporter@0.7.3
 
-# Install Stream Chat channel plugin for OpenClaw (installed from GitHub, not npm)
-RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#fix/plugin-name-resolution
-
 # Install summarize (web page summarization CLI)
 RUN npm install -g @steipete/summarize@0.12.0
 
 # Install Kilo CLI (agentic coding assistant for the terminal)
-RUN npm install -g @kilocode/cli@7.1.13
+RUN npm install -g @kilocode/cli@7.2.31
 
 # Install Go (available at runtime for users to `go install` additional tools)
-ENV GO_VERSION=1.26.0
+ENV GO_VERSION=1.26.2
 RUN ARCH="$(dpkg --print-architecture)" \
     && curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz -o /tmp/go.tar.gz \
     && EXPECTED_SHA256="$(curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz.sha256)" \
@@ -76,11 +73,13 @@ RUN ARCH="$(dpkg --print-architecture)" \
 #   so user-installed tools persist across restarts and are included in snapshots.
 # - npm/Node (installed to /usr/local) and apt packages (/usr/bin) are unaffected.
 ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
-RUN GOBIN=/usr/local/bin go install github.com/steipete/gogcli/cmd/gog@v0.12.0 \
+RUN ARCH="$(dpkg --print-architecture)" \
+    && curl -fsSL "https://github.com/steipete/gogcli/releases/download/v0.14.0/gogcli_0.14.0_linux_${ARCH}.tar.gz" \
+       | tar xz -C /usr/local/bin gog \
     && mv /usr/local/bin/gog /usr/local/bin/gog.real \
     && GOBIN=/usr/local/bin go install github.com/steipete/goplaces/cmd/goplaces@v0.3.0 \
     && GOBIN=/usr/local/bin go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@v0.0.2 \
-    && GOBIN=/usr/local/bin go install github.com/xdevplatform/xurl@v1.0.3 \
+    && GOBIN=/usr/local/bin go install github.com/xdevplatform/xurl@v1.1.0 \
     && GOBIN=/usr/local/bin go install github.com/steipete/gifgrep/cmd/gifgrep@v0.2.3 \
     && go clean -cache -modcache
 
@@ -90,7 +89,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/b
     && uv --version
 
 # Install pinned Bun (build-time only) and compile the controller bundle.
-ARG BUN_VERSION=1.2.4
+ARG BUN_VERSION=1.3.13
 RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
 ENV PATH="/root/.bun/bin:$PATH"
 
@@ -101,7 +100,7 @@ ARG CONTROLLER_CACHE_BUST=1
 COPY controller/ /tmp/controller-build/
 RUN cd /tmp/controller-build \
     && bun install --frozen-lockfile \
-    && CONTROLLER_VERSION="$(date -u +'%Y.%-m.%-d')" \
+    && CONTROLLER_VERSION="$(date -u +'%Y.%-m.%-d.%H%M')" \
     && bun build src/index.ts --outfile=/usr/local/bin/kiloclaw-controller.js --target=node --minify \
        --define "KILOCLAW_CONTROLLER_VERSION=\"${CONTROLLER_VERSION}\"" \
        --define "KILOCLAW_CONTROLLER_COMMIT=\"${CONTROLLER_COMMIT}\"" \
@@ -134,7 +133,7 @@ EXPOSE 18789
 # feature flags) lives in the controller's bootstrap module — no shell wrapper needed.
 CMD ["node", "/usr/local/bin/kiloclaw-controller.js"]
 
-# Build customizer plugin tarball in isolated stage so dev dependencies
+# Build custom plugins tarballs in isolated stages so dev dependencies
 # are not persisted in the runtime image.
 FROM runtime AS customizer-builder
 
@@ -146,9 +145,39 @@ RUN cd /tmp/kiloclaw-customizer \
     && cd / \
     && rm -rf /tmp/kiloclaw-customizer /root/.npm
 
+# Build kilo-chat plugin tarball in isolated stage so dev dependencies
+# are not persisted in the runtime image.
+FROM runtime AS kilo-chat-builder
+
+COPY plugins/kilo-chat/ /tmp/kilo-chat/
+RUN cd /tmp/kilo-chat \
+    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && mv "${PKG_TGZ}" /tmp/kilo-chat.tgz \
+    && cd / \
+    && rm -rf /tmp/kilo-chat /root/.npm
+
+FROM runtime AS morning-briefing-builder
+
+COPY plugins/kiloclaw-morning-briefing/ /tmp/kiloclaw-morning-briefing/
+RUN cd /tmp/kiloclaw-morning-briefing \
+    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && mv "${PKG_TGZ}" /tmp/kiloclaw-morning-briefing.tgz \
+    && cd / \
+    && rm -rf /tmp/kiloclaw-morning-briefing /root/.npm
+
 FROM runtime AS final
 
 COPY --from=customizer-builder /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-customizer.tgz
-RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz \
+COPY --from=morning-briefing-builder /tmp/kiloclaw-morning-briefing.tgz /tmp/kiloclaw-morning-briefing.tgz
+RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-morning-briefing.tgz \
     && rm -f /tmp/kiloclaw-customizer.tgz \
+    && rm -f /tmp/kiloclaw-morning-briefing.tgz \
+    && rm -rf /root/.npm
+
+# Install prebuilt kilo-chat plugin package from builder stage.
+COPY --from=kilo-chat-builder /tmp/kilo-chat.tgz /tmp/kilo-chat.tgz
+RUN npm install -g --legacy-peer-deps /tmp/kilo-chat.tgz \
+    && rm -f /tmp/kilo-chat.tgz \
     && rm -rf /root/.npm

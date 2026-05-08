@@ -1,10 +1,57 @@
-import { updateBotRequest } from '@/lib/bot/request-logging';
+import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
+import { extractAndUploadImages } from '@/lib/bot/images';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
-import { emoji } from 'chat';
+import { captureException } from '@sentry/nextjs';
 
-export async function processMessage({
+export async function processLinkedMessage({
+  thread,
+  message,
+  platformIntegration,
+  user,
+}: {
+  thread: Thread;
+  message: Message;
+  platformIntegration: PlatformIntegration;
+  user: User;
+}) {
+  await thread.startTyping('Thinking...');
+
+  let botRequestId: string;
+  try {
+    botRequestId = await createBotRequest({
+      createdBy: user.id,
+      organizationId: platformIntegration.owned_by_organization_id ?? null,
+      platformIntegrationId: platformIntegration.id,
+      platform: thread.adapter.name,
+      platformThreadId: thread.id,
+      platformMessageId: message.id,
+      userMessage: message.text,
+      modelUsed: undefined,
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'create-bot-request' },
+      extra: {
+        platform: thread.adapter.name,
+        platformIntegrationId: platformIntegration.id,
+        userId: user.id,
+        threadId: thread.id,
+        messageId: message.id,
+      },
+    });
+    await thread.post({
+      markdown:
+        'Sorry, I could not start processing your message because of an internal error. Please try again in a moment.',
+    });
+    return;
+  }
+
+  await processMessage({ thread, message, platformIntegration, user, botRequestId });
+}
+
+async function processMessage({
   thread,
   message,
   platformIntegration,
@@ -15,9 +62,22 @@ export async function processMessage({
   message: Message;
   platformIntegration: PlatformIntegration;
   user: User;
-  botRequestId: string | undefined;
+  botRequestId: string;
 }) {
   const startedAt = Date.now();
+
+  // Extract and upload any image attachments from the chat message to R2.
+  // This runs before the agent loop so the images are ready when a Cloud Agent
+  // session is spawned. Failures are non-fatal — we log and continue without images.
+  let images: Awaited<ReturnType<typeof extractAndUploadImages>>;
+  try {
+    images = await extractAndUploadImages(message, user.id);
+  } catch (error) {
+    console.error('[KiloBot] Failed to extract/upload images, continuing without them:', error);
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'extract-upload-images' },
+    });
+  }
 
   try {
     const result = await runBotAgent({
@@ -28,37 +88,30 @@ export async function processMessage({
       user,
       botRequestId,
       prompt: message.text,
+      images,
     });
 
-    if (botRequestId) {
-      updateBotRequest(botRequestId, {
-        ...(result.startedCloudAgentSession ? {} : { status: 'completed' }),
-        steps: [...result.collectedSteps],
-        responseTimeMs: result.responseTimeMs,
-      });
-    }
+    updateBotRequest(botRequestId, {
+      ...(result.startedCloudAgentSession ? {} : { status: 'completed' }),
+      steps: [...result.collectedSteps],
+      responseTimeMs: result.responseTimeMs,
+    });
 
     if (!result.startedCloudAgentSession) {
-      const received = thread.createSentMessageFromMessage(message);
       await thread.post({ markdown: result.finalText });
-      await Promise.all([received.removeReaction(emoji.eyes), received.addReaction(emoji.check)]);
     }
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
 
-    if (botRequestId) {
-      updateBotRequest(botRequestId, {
-        status: 'error',
-        errorMessage: errMsg.slice(0, 2000),
-        responseTimeMs: Date.now() - startedAt,
-      });
-    }
+    updateBotRequest(botRequestId, {
+      status: 'error',
+      errorMessage: errMsg.slice(0, 2000),
+      responseTimeMs: Date.now() - startedAt,
+    });
 
     console.error(`[KiloBot] Error during bot run:`, errMsg, error);
 
-    const received = thread.createSentMessageFromMessage(message);
     await Promise.all([
-      received.removeReaction(emoji.eyes).catch(() => {}),
       thread.post(`Sorry, there was an error calling the AI service: ${errMsg.slice(0, 200)}`),
     ]);
   }

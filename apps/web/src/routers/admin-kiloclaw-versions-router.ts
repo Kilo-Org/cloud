@@ -558,6 +558,50 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       return { latest, candidate };
     }),
 
+  /**
+   * Returns a breakdown of active (non-destroyed) instances grouped by their
+   * last-reported `tracked_image_tag`. Joined with the catalog so callers can
+   * classify each bucket as :latest, candidate, old-available, disabled, or
+   * "no tag yet" (null — DO hasn't reconciled yet).
+   *
+   * `pinned_count` tells how many instances in that bucket have an admin pin —
+   * useful when assessing rollout coverage since pinned instances are immune to
+   * the rollout selector.
+   *
+   * Note: `tracked_image_tag` is a denormalized column updated by the DO alarm
+   * reconciler; it may lag up to ~30 min for idle instances.
+   */
+  getVersionDistribution: adminProcedure.query(async () => {
+    const rows = await db
+      .select({
+        tracked_image_tag: kiloclaw_instances.tracked_image_tag,
+        count: sql<number>`COUNT(*)::int`,
+        pinned_count: sql<number>`COUNT(${kiloclaw_version_pins.id})::int`,
+        openclaw_version: kiloclaw_image_catalog.openclaw_version,
+        is_latest: kiloclaw_image_catalog.is_latest,
+        rollout_percent: kiloclaw_image_catalog.rollout_percent,
+        status: kiloclaw_image_catalog.status,
+      })
+      .from(kiloclaw_instances)
+      .leftJoin(
+        kiloclaw_image_catalog,
+        eq(kiloclaw_instances.tracked_image_tag, kiloclaw_image_catalog.image_tag)
+      )
+      .leftJoin(kiloclaw_version_pins, eq(kiloclaw_instances.id, kiloclaw_version_pins.instance_id))
+      .where(isNull(kiloclaw_instances.destroyed_at))
+      .groupBy(
+        kiloclaw_instances.tracked_image_tag,
+        kiloclaw_image_catalog.openclaw_version,
+        kiloclaw_image_catalog.is_latest,
+        kiloclaw_image_catalog.rollout_percent,
+        kiloclaw_image_catalog.status
+      )
+      .orderBy(sql`count(*) desc`);
+
+    const total = rows.reduce((sum, r) => sum + r.count, 0);
+    return { rows, total };
+  }),
+
   syncCatalog: adminProcedure.mutation(async () => {
     const client = new KiloClawInternalClient();
     let kvVersions;

@@ -68,6 +68,8 @@ import {
   Minus,
   Ban,
   Info,
+  BarChart2,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { toastPinMutationResult } from '@/lib/kiloclaw/pin-sync-toast';
@@ -374,6 +376,178 @@ function StartRolloutButton({
   );
 }
 
+/**
+ * Shows how the live fleet is distributed across image tags.
+ * Data comes from the denormalized `tracked_image_tag` column on kiloclaw_instances,
+ * which is written by the DO alarm reconciler and may lag ~30 min for idle instances.
+ */
+function InstanceDistributionPanel() {
+  const trpc = useTRPC();
+  const { data, isLoading, refetch, isFetching, dataUpdatedAt } = useQuery(
+    trpc.admin.kiloclawVersions.getVersionDistribution.queryOptions()
+  );
+
+  const total = data?.total ?? 0;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-base">
+          <div className="flex items-center gap-2">
+            <BarChart2 className="h-4 w-4" />
+            Instance Distribution
+          </div>
+          <div className="flex items-center gap-2">
+            {dataUpdatedAt > 0 && (
+              <span className="text-muted-foreground text-xs">
+                updated {formatDistanceToNow(new Date(dataUpdatedAt), { addSuffix: true })}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+              aria-label="Refresh distribution"
+            >
+              <RefreshCw className={`h-3 w-3 ${isFetching ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex justify-center py-4">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </div>
+        ) : !data || data.rows.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No active instances.</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <p className="text-muted-foreground text-xs">
+              {total} active instance{total === 1 ? '' : 's'} · tag data from DO reconciler, may lag
+              ~30 min for idle instances
+            </p>
+            <div className="overflow-hidden rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Image Tag</TableHead>
+                    <TableHead>OpenClaw</TableHead>
+                    <TableHead>State</TableHead>
+                    <TableHead>Count</TableHead>
+                    <TableHead className="w-[60px]">Fleet %</TableHead>
+                    <TableHead className="w-[70px]">Pinned</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.rows.map((row, i) => {
+                    const isLatest = row.is_latest === true;
+                    const isCandidate = !isLatest && (row.rollout_percent ?? 0) > 0;
+                    const isDisabled = row.status === 'disabled';
+                    const isUnknown = row.tracked_image_tag == null;
+
+                    const pct = total > 0 ? Math.round((row.count / total) * 100) : 0;
+
+                    const accent = isLatest
+                      ? 'border-l-4 border-l-blue-600'
+                      : isCandidate
+                        ? 'border-l-4 border-l-purple-600'
+                        : isDisabled
+                          ? 'border-l-4 border-l-red-800'
+                          : isUnknown
+                            ? 'border-l-4 border-l-border'
+                            : 'border-l-4 border-l-amber-600';
+
+                    const barColor = isLatest
+                      ? 'bg-blue-600'
+                      : isCandidate
+                        ? 'bg-purple-600'
+                        : isDisabled
+                          ? 'bg-red-800/60'
+                          : isUnknown
+                            ? 'bg-muted-foreground/30'
+                            : 'bg-amber-600/60';
+
+                    return (
+                      <TableRow key={row.tracked_image_tag ?? `__unknown__${i}`} className={accent}>
+                        <TableCell>
+                          {isUnknown ? (
+                            <span className="text-muted-foreground text-xs italic">no tag yet</span>
+                          ) : (
+                            <code className="text-xs" title={row.tracked_image_tag ?? undefined}>
+                              {(row.tracked_image_tag ?? '').length > 28
+                                ? `${row.tracked_image_tag!.slice(0, 28)}…`
+                                : row.tracked_image_tag}
+                            </code>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {row.openclaw_version ?? <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell>
+                          {isLatest ? (
+                            <Badge className="bg-blue-600 text-xs text-white">
+                              <Anchor className="mr-1 h-3 w-3" />
+                              :latest
+                            </Badge>
+                          ) : isCandidate ? (
+                            <Badge className="bg-purple-600 text-xs text-white">
+                              <Rocket className="mr-1 h-3 w-3" />
+                              {row.rollout_percent}%
+                            </Badge>
+                          ) : isDisabled ? (
+                            <Badge variant="destructive" className="text-xs">
+                              disabled
+                            </Badge>
+                          ) : isUnknown ? (
+                            <Badge variant="outline" className="text-muted-foreground text-xs">
+                              unknown
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground text-xs">
+                              old
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                              <div
+                                className={`h-full rounded-full ${barColor}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium tabular-nums">{row.count}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm tabular-nums">
+                          {pct}%
+                        </TableCell>
+                        <TableCell>
+                          {row.pinned_count > 0 ? (
+                            <Badge variant="secondary" className="text-xs">
+                              <Anchor className="mr-1 h-3 w-3" />
+                              {row.pinned_count}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 type SortColumn = 'openclaw_version' | 'image_tag' | 'status' | 'published_at';
 type SortDir = 'asc' | 'desc';
 
@@ -439,14 +613,18 @@ export function VersionsTab() {
   const allEligibleSelected =
     eligibleRows.length > 0 && eligibleRows.every(v => selectedTags.has(v.image_tag));
 
-  // After any mutation that changes catalog state, invalidate both the
-  // paginated list (table view) AND the active rollout query (hero panel).
+  // After any mutation that changes catalog state, invalidate the paginated
+  // list (table view), the active rollout query (hero panel), and the instance
+  // distribution panel so counts stay in sync after promotions/rollout changes.
   const invalidateRolloutState = () => {
     void queryClient.invalidateQueries({
       queryKey: trpc.admin.kiloclawVersions.listVersions.queryKey(),
     });
     void queryClient.invalidateQueries({
       queryKey: trpc.admin.kiloclawVersions.getActiveRollout.queryKey(),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.admin.kiloclawVersions.getVersionDistribution.queryKey(),
     });
   };
 
@@ -587,6 +765,9 @@ export function VersionsTab() {
           await markLatest({ imageTag });
         }}
       />
+
+      {/* Fleet distribution: how many instances are on each image tag */}
+      <InstanceDistributionPanel />
 
       {/* Reminder when newly-published images are sitting dormant. */}
       {unpromotedImages.length > 0 && (

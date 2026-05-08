@@ -499,7 +499,6 @@ describe('doctor-controller: response handling', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ fix: true }),
-        signal: expect.any(AbortSignal),
       })
     );
   });

@@ -275,6 +275,9 @@ export async function checkPRFeedback(
   };
 
   let hasUnresolvedComments = false;
+  let reviewDecision: ReviewDecision = null;
+  let mergeStateStatus: MergeStateStatus = null;
+  let isDraft = false;
   try {
     const graphqlRes = await fetch('https://api.github.com/graphql', {
       method: 'POST',
@@ -361,9 +364,9 @@ export async function checkPRFeedback(
       const pullRequest = gql.success
         ? gql.data.data?.repository?.pullRequest
         : undefined;
-      const reviewDecision = (pullRequest?.reviewDecision ?? null) as ReviewDecision;
-      const mergeStateStatus = (pullRequest?.mergeStateStatus ?? null) as MergeStateStatus;
-      const isDraft = pullRequest?.isDraft ?? false;
+      reviewDecision = (pullRequest?.reviewDecision ?? null) as ReviewDecision;
+      mergeStateStatus = (pullRequest?.mergeStateStatus ?? null) as MergeStateStatus;
+      isDraft = pullRequest?.isDraft ?? false;
       const reviewThreads = pullRequest?.reviewThreads;
       const threads = reviewThreads?.nodes ?? [];
       const hasMorePages = reviewThreads?.pageInfo?.hasNextPage === true;

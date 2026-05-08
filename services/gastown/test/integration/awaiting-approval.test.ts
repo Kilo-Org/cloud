@@ -64,15 +64,19 @@ describe('Awaiting approval — convoy landing MR respawn suppression', () => {
     const { mrBeadId } = await setupConvoyWithLandingMr();
 
     const mrBead = await town.getBeadAsync(mrBeadId);
-    await town.updateBead(mrBeadId, {
-      metadata: {
-        ...(mrBead?.metadata ?? {}),
-        awaiting_approval: 1,
-        review_decision: 'REVIEW_REQUIRED',
-        merge_state_status: 'BLOCKED',
-        last_poll_at: new Date(Date.now() - 45 * 60_000).toISOString(),
+    await town.updateBead(
+      mrBeadId,
+      {
+        metadata: {
+          ...(mrBead?.metadata ?? {}),
+          awaiting_approval: 1,
+          review_decision: 'REVIEW_REQUIRED',
+          merge_state_status: 'BLOCKED',
+          last_poll_at: new Date(Date.now() - 45 * 60_000).toISOString(),
+        },
       },
-    }, 'system');
+      'system'
+    );
 
     await town.updateBeadStatus(mrBeadId, 'in_progress', 'system');
 
@@ -87,14 +91,18 @@ describe('Awaiting approval — convoy landing MR respawn suppression', () => {
     const { mrBeadId } = await setupConvoyWithLandingMr();
 
     const mrBead = await town.getBeadAsync(mrBeadId);
-    await town.updateBead(mrBeadId, {
-      metadata: {
-        ...(mrBead?.metadata ?? {}),
-        awaiting_approval: 1,
-        review_decision: 'REVIEW_REQUIRED',
-        merge_state_status: 'BLOCKED',
+    await town.updateBead(
+      mrBeadId,
+      {
+        metadata: {
+          ...(mrBead?.metadata ?? {}),
+          awaiting_approval: 1,
+          review_decision: 'REVIEW_REQUIRED',
+          merge_state_status: 'BLOCKED',
+        },
       },
-    }, 'system');
+      'system'
+    );
     await town.updateBeadStatus(mrBeadId, 'in_progress', 'system');
 
     const refineries = await town.listAgents({ role: 'refinery' });
@@ -116,14 +124,18 @@ describe('Awaiting approval — convoy landing MR respawn suppression', () => {
     await runDurableObjectAlarm(town);
 
     const mrBead = await town.getBeadAsync(mrBeadId);
-    await town.updateBead(mrBeadId, {
-      metadata: {
-        ...(mrBead?.metadata ?? {}),
-        awaiting_approval: 1,
-        review_decision: 'REVIEW_REQUIRED',
-        merge_state_status: 'BLOCKED',
+    await town.updateBead(
+      mrBeadId,
+      {
+        metadata: {
+          ...(mrBead?.metadata ?? {}),
+          awaiting_approval: 1,
+          review_decision: 'REVIEW_REQUIRED',
+          merge_state_status: 'BLOCKED',
+        },
       },
-    }, 'system');
+      'system'
+    );
     await town.updateBeadStatus(mrBeadId, 'failed', 'system');
 
     await runDurableObjectAlarm(town);
@@ -142,13 +154,17 @@ describe('Awaiting approval — convoy landing MR respawn suppression', () => {
     const { mrBeadId } = await setupConvoyWithLandingMr();
 
     const mrBead = await town.getBeadAsync(mrBeadId);
-    await town.updateBead(mrBeadId, {
-      metadata: {
-        ...(mrBead?.metadata ?? {}),
-        awaiting_approval: 1,
-        review_decision: 'REVIEW_REQUIRED',
+    await town.updateBead(
+      mrBeadId,
+      {
+        metadata: {
+          ...(mrBead?.metadata ?? {}),
+          awaiting_approval: 1,
+          review_decision: 'REVIEW_REQUIRED',
+        },
       },
-    }, 'system');
+      'system'
+    );
     await town.updateBeadStatus(mrBeadId, 'in_progress', 'system');
 
     await runDurableObjectAlarm(town);
@@ -157,14 +173,18 @@ describe('Awaiting approval — convoy landing MR respawn suppression', () => {
     expect(during?.status).toBe('in_progress');
 
     const withApproval = await town.getBeadAsync(mrBeadId);
-    await town.updateBead(mrBeadId, {
-      metadata: {
-        ...(withApproval?.metadata ?? {}),
-        awaiting_approval: 0,
-        review_decision: 'APPROVED',
-        merge_state_status: 'CLEAN',
+    await town.updateBead(
+      mrBeadId,
+      {
+        metadata: {
+          ...(withApproval?.metadata ?? {}),
+          awaiting_approval: 0,
+          review_decision: 'APPROVED',
+          merge_state_status: 'CLEAN',
+        },
       },
-    }, 'system');
+      'system'
+    );
 
     await runDurableObjectAlarm(town);
 
@@ -214,25 +234,29 @@ describe('PR feedback vs awaiting approval — CHANGES_REQUESTED creates feedbac
     expect(mrBead).toBeTruthy();
 
     const mrWithApproval = await town.getBeadAsync(mrBead!.bead_id);
-    await town.updateBead(mrBead!.bead_id, {
-      metadata: {
-        ...(mrWithApproval?.metadata ?? {}),
-        awaiting_approval: 1,
-        review_decision: 'REVIEW_REQUIRED',
-        merge_state_status: 'BLOCKED',
+    await town.updateBead(
+      mrBead!.bead_id,
+      {
+        metadata: {
+          ...(mrWithApproval?.metadata ?? {}),
+          awaiting_approval: 1,
+          review_decision: 'REVIEW_REQUIRED',
+          merge_state_status: 'BLOCKED',
+        },
       },
-    }, 'system');
+      'system'
+    );
 
     const feedbackBeadsBefore = await town.listBeads({});
-    const prFeedbackBeadsBefore = feedbackBeadsBefore.filter(
-      b => b.labels?.includes('gt:pr-feedback')
+    const prFeedbackBeadsBefore = feedbackBeadsBefore.filter(b =>
+      b.labels?.includes('gt:pr-feedback')
     );
 
     await runDurableObjectAlarm(town);
 
     const feedbackBeadsAfter = await town.listBeads({});
-    const prFeedbackBeadsAfter = feedbackBeadsAfter.filter(
-      b => b.labels?.includes('gt:pr-feedback')
+    const prFeedbackBeadsAfter = feedbackBeadsAfter.filter(b =>
+      b.labels?.includes('gt:pr-feedback')
     );
 
     expect(prFeedbackBeadsAfter.length).toBe(prFeedbackBeadsBefore.length);
@@ -262,14 +286,18 @@ describe('PR feedback vs awaiting approval — CHANGES_REQUESTED creates feedbac
     expect(mrBead).toBeTruthy();
 
     const mrWithChanges = await town.getBeadAsync(mrBead!.bead_id);
-    await town.updateBead(mrBead!.bead_id, {
-      metadata: {
-        ...(mrWithChanges?.metadata ?? {}),
-        awaiting_approval: 1,
-        review_decision: 'CHANGES_REQUESTED',
-        merge_state_status: 'BLOCKED',
+    await town.updateBead(
+      mrBead!.bead_id,
+      {
+        metadata: {
+          ...(mrWithChanges?.metadata ?? {}),
+          awaiting_approval: 1,
+          review_decision: 'CHANGES_REQUESTED',
+          merge_state_status: 'BLOCKED',
+        },
       },
-    }, 'system');
+      'system'
+    );
 
     await town.debugInsertTownEvent({
       event_type: 'pr_feedback_detected',
@@ -289,9 +317,7 @@ describe('PR feedback vs awaiting approval — CHANGES_REQUESTED creates feedbac
     await runDurableObjectAlarm(town);
 
     const feedbackBeads = await town.listBeads({});
-    const prFeedbackBeads = feedbackBeads.filter(
-      b => b.labels?.includes('gt:pr-feedback')
-    );
+    const prFeedbackBeads = feedbackBeads.filter(b => b.labels?.includes('gt:pr-feedback'));
     expect(prFeedbackBeads.length).toBeGreaterThan(0);
   });
 });

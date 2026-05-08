@@ -2591,10 +2591,7 @@ export async function stopAll(): Promise<void> {
   sdkInstances.clear();
 }
 
-function postEventToWorker(
-  event: string,
-  data: Record<string, unknown>
-): void {
+function postEventToWorker(event: string, data: Record<string, unknown>): void {
   const apiUrl = process.env.GASTOWN_API_URL;
   const townId = process.env.GASTOWN_TOWN_ID;
   const token = process.env.GASTOWN_CONTAINER_TOKEN;
@@ -2677,11 +2674,7 @@ function buildPrewarmEnv(mayorAgentId: string): Record<string, string> {
   return env;
 }
 
-async function prewarmMayorSDK(
-  townId: string,
-  apiUrl: string,
-  token: string
-): Promise<void> {
+async function prewarmMayorSDK(townId: string, apiUrl: string, token: string): Promise<void> {
   const t0 = Date.now();
 
   const mayorAgentId = await fetchMayorAgentId(townId, apiUrl, token);

@@ -58,7 +58,7 @@ function makeDeps(overrides: Partial<IdleStopDeps> = {}): TestDeps {
       })),
     writeEventFn:
       overrides.writeEventFn ??
-      ((data) => {
+      (data => {
         events.push(data);
       }),
     now: overrides.now ?? (() => Date.now()),
@@ -102,7 +102,9 @@ describe('stopContainerIfIdle', () => {
   });
 
   it('stops container when mayor idle beyond threshold and container is running', async () => {
-    const oldActivity = new Date(Date.now() - CONTAINER_IDLE_STOP_THRESHOLD_MS - 60_000).toISOString();
+    const oldActivity = new Date(
+      Date.now() - CONTAINER_IDLE_STOP_THRESHOLD_MS - 60_000
+    ).toISOString();
     const deps = makeDeps({ getMayor: () => makeMayor({ last_activity_at: oldActivity }) });
     await stopContainerIfIdle(deps);
     expect(deps._stopFn).toHaveBeenCalledTimes(1);

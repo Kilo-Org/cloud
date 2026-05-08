@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useGastownTRPC } from '@/lib/gastown/trpc';
+import { useGastownTRPC, type GastownOutputs } from '@/lib/gastown/trpc';
 import { useSidebar } from '@/components/ui/sidebar';
 import { ChevronDown, ChevronUp, Terminal as TerminalIcon } from 'lucide-react';
 import { useXtermPty } from './useXtermPty';
@@ -23,10 +23,10 @@ export function MayorChat({ townId }: MayorChatProps) {
   const ensureMayor = useMutation(
     trpc.gastown.ensureMayor.mutationOptions({
       onSuccess: data => {
-        queryClient.setQueryData(
+        queryClient.setQueryData<GastownOutputs['gastown']['getMayorStatus']>(
           trpc.gastown.getMayorStatus.queryKey({ townId }),
-          (old: { configured?: boolean; townId?: string; session?: { agentId?: string; sessionId?: string; status?: string; lastActivityAt?: string } } | undefined) => ({
-            ...(old ?? {}),
+          (old): GastownOutputs['gastown']['getMayorStatus'] => ({
+            ...(old ?? { configured: true, townId: null, session: null }),
             configured: true,
             townId,
             session: {

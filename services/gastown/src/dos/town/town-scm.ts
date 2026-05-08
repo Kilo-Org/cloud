@@ -318,14 +318,7 @@ export async function checkPRFeedback(
                         .nullable()
                         .optional(),
                       mergeStateStatus: z
-                        .enum([
-                          'CLEAN',
-                          'BLOCKED',
-                          'BEHIND',
-                          'DIRTY',
-                          'HAS_HOOKS',
-                          'UNKNOWN',
-                        ])
+                        .enum(['CLEAN', 'BLOCKED', 'BEHIND', 'DIRTY', 'HAS_HOOKS', 'UNKNOWN'])
                         .nullable()
                         .optional(),
                       isDraft: z.boolean().optional(),
@@ -357,9 +350,7 @@ export async function checkPRFeedback(
             .optional(),
         })
         .safeParse(gqlRaw);
-      const pullRequest = gql.success
-        ? gql.data.data?.repository?.pullRequest
-        : undefined;
+      const pullRequest = gql.success ? gql.data.data?.repository?.pullRequest : undefined;
       reviewDecision = (pullRequest?.reviewDecision ?? null) as ReviewDecision;
       mergeStateStatus = (pullRequest?.mergeStateStatus ?? null) as MergeStateStatus;
       isDraft = pullRequest?.isDraft ?? false;
@@ -462,8 +453,7 @@ export async function checkPRFeedback(
     console.warn(`${TOWN_LOG} checkPRFeedback: check-runs failed for ${prUrl}`, err);
   }
 
-  const awaitingApproval =
-    reviewDecision === 'REVIEW_REQUIRED' || mergeStateStatus === 'BLOCKED';
+  const awaitingApproval = reviewDecision === 'REVIEW_REQUIRED' || mergeStateStatus === 'BLOCKED';
   const changesRequested = reviewDecision === 'CHANGES_REQUESTED';
 
   return {

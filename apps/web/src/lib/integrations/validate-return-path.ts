@@ -1,4 +1,4 @@
-const RETURN_PATH_RE = /^\/(?![\/\\])[^\r\n]*$/;
+const RETURN_PATH_RE = /^\/(?![/\\])[^\r\n]*$/;
 
 export function validateReturnPath(candidate: string): string | null {
   if (!RETURN_PATH_RE.test(candidate) || candidate.startsWith('//')) {

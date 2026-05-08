@@ -20,7 +20,10 @@ export type IdleStopDeps = {
   getTownId: () => string | null;
   getLastIdleStopAt: () => Promise<number | undefined>;
   setLastIdleStopAt: (value: number) => Promise<void>;
-  getContainerStub: (townId: string) => { getState: () => Promise<{ status: string }>; stop: () => Promise<void> };
+  getContainerStub: (townId: string) => {
+    getState: () => Promise<{ status: string }>;
+    stop: () => Promise<void>;
+  };
   writeEventFn: (data: { event: string; townId: string; reason: string; error?: string }) => void;
   now: () => number;
 };
@@ -58,9 +61,10 @@ export async function stopContainerIfIdle(deps: IdleStopDeps): Promise<void> {
 
   if (state.status !== 'running' && state.status !== 'healthy') return;
 
-  const idleMinutes = mayor?.last_activity_at != null
-    ? Math.round((deps.now() - new Date(mayor.last_activity_at).getTime()) / 60_000)
-    : 0;
+  const idleMinutes =
+    mayor?.last_activity_at != null
+      ? Math.round((deps.now() - new Date(mayor.last_activity_at).getTime()) / 60_000)
+      : 0;
   const reason = mayor ? `mayor_idle_${idleMinutes}m` : 'no_active_work';
 
   try {

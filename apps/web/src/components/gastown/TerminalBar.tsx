@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useGastownTRPC, gastownWsUrl } from '@/lib/gastown/trpc';
+import { useGastownTRPC, gastownWsUrl, type GastownOutputs } from '@/lib/gastown/trpc';
 
 import { useSidebar } from '@/components/ui/sidebar';
 import {
@@ -1320,10 +1320,10 @@ function MayorTerminalPane({ townId, collapsed }: { townId: string; collapsed: b
   const ensureMayor = useMutation(
     trpc.gastown.ensureMayor.mutationOptions({
       onSuccess: data => {
-        queryClient.setQueryData(
+        queryClient.setQueryData<GastownOutputs['gastown']['getMayorStatus']>(
           trpc.gastown.getMayorStatus.queryKey({ townId }),
-          (old: { configured?: boolean; townId?: string; session?: { agentId?: string; sessionId?: string; status?: string; lastActivityAt?: string } } | undefined) => ({
-            ...(old ?? {}),
+          (old): GastownOutputs['gastown']['getMayorStatus'] => ({
+            ...(old ?? { configured: true, townId: null, session: null }),
             configured: true,
             townId,
             session: {

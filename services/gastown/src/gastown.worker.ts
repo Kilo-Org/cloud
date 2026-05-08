@@ -722,7 +722,12 @@ app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
 // Skip for container-registry and db-snapshot routes which use authMiddleware with container JWT support.
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
   const path = c.req.path;
-  if (path.includes('/container-registry') || path.includes('/db-snapshot') || path.includes('/mayor-id') || path.includes('/container-events')) {
+  if (
+    path.includes('/container-registry') ||
+    path.includes('/db-snapshot') ||
+    path.includes('/mayor-id') ||
+    path.includes('/container-events')
+  ) {
     return next();
   }
   await kiloAuthMiddleware(c, async () => {

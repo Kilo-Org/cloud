@@ -77,7 +77,7 @@ export function OnboardingStepRepo() {
 
   useEffect(() => {
     if (githubInstallParam === 'success') {
-      refetchGithubRepos();
+      void refetchGithubRepos();
       toast.success('GitHub app installed. Select a repo to continue.');
     }
   }, [githubInstallParam, refetchGithubRepos]);

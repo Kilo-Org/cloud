@@ -2694,7 +2694,8 @@ export class TownDO extends DurableObject<Env> {
     // fresh dispatch instead of returning early.
     const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
-    const sdkAlive = isAlive && (containerStatus.serverPort ?? 0) > 0 && Boolean(containerStatus.sessionId);
+    const sdkAlive =
+      isAlive && (containerStatus.serverPort ?? 0) > 0 && Boolean(containerStatus.sessionId);
 
     if (sdkAlive) {
       const isActive =
@@ -4229,9 +4230,9 @@ export class TownDO extends DurableObject<Env> {
       getMayor: () => agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null,
       getTownId: () => this.townId,
       getLastIdleStopAt: () => this.ctx.storage.get<number>('container:lastIdleStopAt'),
-      setLastIdleStopAt: (value) => this.ctx.storage.put('container:lastIdleStopAt', value),
-      getContainerStub: (townId) => getTownContainerStub(this.env, townId),
-      writeEventFn: (data) => writeEvent(this.env, data),
+      setLastIdleStopAt: value => this.ctx.storage.put('container:lastIdleStopAt', value),
+      getContainerStub: townId => getTownContainerStub(this.env, townId),
+      writeEventFn: data => writeEvent(this.env, data),
       now: () => Date.now(),
     });
   }

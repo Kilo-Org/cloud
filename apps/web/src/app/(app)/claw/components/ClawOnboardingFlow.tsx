@@ -115,11 +115,20 @@ function ClawOnboardingFlowInner({
   const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
   const mutations = organizationId ? orgMutations : personalMutations;
 
-  const { data: currentUser } = useUser();
+  const { data: currentUser, isPending: isUserPending } = useUser();
   // Calendar OAuth is admin-only — both `/api/integrations/google/connect` and
   // `/disconnect` require `adminOnly: true`. Hide the calendar step from
   // non-admins so the wizard advances identity → channels directly.
-  const hasCalendarStep = currentUser?.is_admin === true;
+  //
+  // While `useUser` is loading we default to `true` (admin assumption). This
+  // matters most for admins returning from the OAuth round-trip on a full
+  // page reload: defaulting to `false` would briefly flip the wizard into
+  // the 3-step non-admin layout and — if they race-clicked Continue before
+  // the query resolved — silently skip the calendar step entirely. The
+  // theoretical inverse (a non-admin race-clicking Continue and seeing one
+  // frame of the calendar UI before the state machine redirects to
+  // channels) is harmless: the connect endpoint enforces admin too.
+  const hasCalendarStep = isUserPending ? true : currentUser?.is_admin === true;
 
   const gatewayUrl = useGatewayUrl(status);
 
@@ -299,6 +308,13 @@ function ClawOnboardingFlowInner({
     if (hasResumedFromQuery.current) return;
     const stepParam = searchParams?.get('step');
     if (stepParam !== 'calendar') return;
+    // The OAuth round-trip is a full-page reload, so `useUser` starts fresh
+    // and `currentUser` is undefined for the first render(s). Wait until the
+    // query resolves before deciding what to do — otherwise an admin
+    // returning from a successful OAuth would be treated as a non-admin,
+    // have `?step=calendar` stripped immediately, and never see the success
+    // toast or the calendar step again.
+    if (currentUser === undefined) return;
     // Calendar is admin-only; a non-admin landing here (e.g. via a stale
     // shared URL) shouldn't trigger calendar-specific toasts or set
     // onboardingStep to 'calendar'. Just strip the params and move on.
@@ -329,7 +345,7 @@ function ClawOnboardingFlowInner({
       toast.error('Could not connect calendar — please try again or skip for now.');
     }
     cleanupResumeQueryParams();
-  }, [searchParams, botIdentity, posthog, cleanupResumeQueryParams, hasCalendarStep]);
+  }, [searchParams, botIdentity, posthog, cleanupResumeQueryParams, hasCalendarStep, currentUser]);
 
   // Watchdog: if `?step=calendar` is in the URL but botIdentity hydration
   // never completes (e.g. patchBotIdentity hadn't propagated to the DB

@@ -116,7 +116,7 @@ export function isClawOnboardingErrorStatus(status: PopulatedClawStatus['status'
   return false;
 }
 
-function getActiveWizardSteps(hasCalendarStep: boolean, hasPairingStep: boolean): OnboardingStep[] {
+function getActiveWizardSteps(hasPairingStep: boolean, hasCalendarStep: boolean): OnboardingStep[] {
   const steps: OnboardingStep[] = ['identity'];
   if (hasCalendarStep) steps.push('calendar');
   steps.push('channels', 'provisioning');
@@ -129,7 +129,7 @@ export function getClawOnboardingStepProgress(
   hasPairingStep: boolean,
   hasCalendarStep: boolean = true
 ): { currentStep: number; totalSteps: number } {
-  const wizardSteps = getActiveWizardSteps(hasCalendarStep, hasPairingStep);
+  const wizardSteps = getActiveWizardSteps(hasPairingStep, hasCalendarStep);
   const totalSteps = wizardSteps.length;
 
   if (step === 'done') {

@@ -334,14 +334,16 @@ describe('ClawOnboardingFlow state machine', () => {
 
   describe('when calendar step is hidden (non-admin user)', () => {
     test('drops calendar from total step count', () => {
-      const noPairing = getClawOnboardingFlowState(createInput({ hasCalendarStep: false }));
-      expect(noPairing.totalSteps).toBe(3);
-      expect(noPairing.hasCalendarStep).toBe(false);
+      const noCalendarNoPairing = getClawOnboardingFlowState(
+        createInput({ hasCalendarStep: false })
+      );
+      expect(noCalendarNoPairing.totalSteps).toBe(3);
+      expect(noCalendarNoPairing.hasCalendarStep).toBe(false);
 
-      const withPairing = getClawOnboardingFlowState(
+      const noCalendarWithPairing = getClawOnboardingFlowState(
         createInput({ hasCalendarStep: false, selectedChannelId: 'telegram' })
       );
-      expect(withPairing.totalSteps).toBe(4);
+      expect(noCalendarWithPairing.totalSteps).toBe(4);
     });
 
     test('redirects calendar render step to channels in create-first mode', () => {

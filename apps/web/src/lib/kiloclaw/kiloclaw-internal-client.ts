@@ -28,7 +28,9 @@ import type {
   DevicePairingApproveResponse,
   VolumeSnapshotsResponse,
   DoctorResponse,
-  DoctorControllerResponse,
+  DoctorControllerStartResponse,
+  DoctorControllerStatusResponse,
+  DoctorControllerCancelResponse,
   OpenclawWorkspaceImportResponse,
   KiloCliRunStartResponse,
   KiloCliRunStatusResponse,
@@ -626,17 +628,43 @@ export class KiloClawInternalClient {
     );
   }
 
-  async runDoctorViaController(
+  async startDoctorViaController(
     userId: string,
     fix: boolean,
     instanceId?: string
-  ): Promise<DoctorControllerResponse> {
+  ): Promise<DoctorControllerStartResponse> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      `/api/platform/doctor-controller${params}`,
+      `/api/platform/doctor-controller/start${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId, fix }),
+      },
+      { userId }
+    );
+  }
+
+  async getDoctorViaControllerStatus(
+    userId: string,
+    instanceId?: string
+  ): Promise<DoctorControllerStatusResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/doctor-controller/status?${params.toString()}`, undefined, {
+      userId,
+    });
+  }
+
+  async cancelDoctorViaController(
+    userId: string,
+    instanceId?: string
+  ): Promise<DoctorControllerCancelResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/doctor-controller/cancel${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
       },
       { userId }
     );

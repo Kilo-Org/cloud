@@ -349,16 +349,33 @@ export type DoctorResponse = {
   output: string;
 };
 
-/** Response from POST /api/platform/doctor-controller */
-export type DoctorControllerResponse = {
+export type DoctorControllerStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'timed_out';
+
+/** Response from POST /api/platform/doctor-controller/start */
+export type DoctorControllerStartResponse = {
   ok: boolean;
-  status: 'completed' | 'failed' | 'cancelled' | 'timed_out';
-  fix: boolean;
-  output: string;
-  exitCode: number | null;
+  runId: string;
   startedAt: string;
-  completedAt: string;
+};
+
+/** Response from GET /api/platform/doctor-controller/status */
+export type DoctorControllerStatusResponse = {
+  hasRun: boolean;
+  runId: string | null;
+  status: DoctorControllerStatus | null;
+  fix: boolean | null;
+  output: string | null;
+  outputBytes: number;
+  outputTruncated: boolean;
+  exitCode: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
   timedOut: boolean;
+};
+
+/** Response from POST /api/platform/doctor-controller/cancel */
+export type DoctorControllerCancelResponse = {
+  ok: boolean;
 };
 
 export type OpenclawWorkspaceImportFailure = {

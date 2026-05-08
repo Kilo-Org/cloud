@@ -1,44 +1,76 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import { timingSafeTokenEqual } from '../auth';
+import { atomicWrite } from '../atomic-write';
 import { getBearerToken } from './gateway';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
 type DoctorRunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'timed_out';
 
-type DoctorRunState = {
-  process: ChildProcess;
-  output: string;
+type DoctorRunMetadata = {
+  hasRun: true;
+  runId: string;
   status: DoctorRunStatus;
-  exitCode: number | null;
   fix: boolean;
+  exitCode: number | null;
   startedAt: string;
   completedAt: string | null;
   timedOut: boolean;
-  /** Set when the child emits `close` or `error`; the SIGKILL timer is a no-op after this. */
-  terminated: boolean;
-  completed: Promise<void>;
-  resolveCompleted: () => void;
+  outputBytes: number;
+  outputTruncated: boolean;
+};
+
+type DoctorRunStatusResponse = {
+  hasRun: boolean;
+  runId: string | null;
+  status: DoctorRunStatus | null;
+  fix: boolean | null;
+  output: string | null;
+  outputBytes: number;
+  outputTruncated: boolean;
+  exitCode: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  timedOut: boolean;
+};
+
+type ActiveRun = {
+  process: ChildProcess;
+  runId: string;
+  outputBytes: number;
+  outputTruncated: boolean;
   timeoutTimer: ReturnType<typeof setTimeout> | null;
   killTimer: ReturnType<typeof setTimeout> | null;
+  metadataFlushTimer: ReturnType<typeof setTimeout> | null;
+  terminated: boolean;
 };
 
 // ── Constants ─────────────────────────────────────────────────────────
 
-/** Cap output buffer at ~1MB to prevent OOM from verbose doctor runs. */
+let DOCTOR_RUN_DIR = '/root/.openclaw/.kiloclaw/doctor-runs';
+let METADATA_PATH = path.join(DOCTOR_RUN_DIR, 'current.json');
+let LOG_PATH = path.join(DOCTOR_RUN_DIR, 'current.log');
+
+/** Cap output at ~1MB to prevent unbounded persistent logs. */
 const MAX_OUTPUT_BYTES = 1_048_576;
 
 /** Hard cap on a single doctor invocation. */
 const DOCTOR_TIMEOUT_MS = 120_000;
 
-/** Time between SIGTERM and SIGKILL on timeout or client disconnect. */
+/** Time between SIGTERM and SIGKILL on timeout or explicit cancel. */
 const SIGTERM_GRACE_MS = 5_000;
+
+const OUTPUT_TRUNCATED_MARKER = '… [output truncated] …\n';
+const METADATA_FLUSH_INTERVAL_MS = 1_000;
 
 // ── Module-level state (one run at a time per machine) ────────────────
 
-let activeRun: DoctorRunState | null = null;
+let activeRun: ActiveRun | null = null;
 let startQueue: Promise<void> = Promise.resolve();
 
 // ── Request schemas ───────────────────────────────────────────────────
@@ -47,31 +79,173 @@ const DoctorRunBodySchema = z.object({
   fix: z.boolean().optional(),
 });
 
+const DoctorRunMetadataSchema = z.object({
+  hasRun: z.literal(true),
+  runId: z.string().min(1),
+  status: z.enum(['running', 'completed', 'failed', 'cancelled', 'timed_out']),
+  fix: z.boolean(),
+  exitCode: z.number().int().nullable(),
+  startedAt: z.string(),
+  completedAt: z.string().nullable(),
+  timedOut: z.boolean(),
+  outputBytes: z.number().int().min(0),
+  outputTruncated: z.boolean(),
+});
+
 // ── Helpers ───────────────────────────────────────────────────────────
 
-function appendOutput(run: DoctorRunState, chunk: string): void {
-  run.output += chunk;
-  if (run.output.length > MAX_OUTPUT_BYTES) {
-    const truncateAt = run.output.length - MAX_OUTPUT_BYTES;
-    run.output = '… [output truncated] …\n' + run.output.slice(truncateAt);
+function configureDoctorRunPaths(runDir: string): void {
+  DOCTOR_RUN_DIR = runDir;
+  METADATA_PATH = path.join(DOCTOR_RUN_DIR, 'current.json');
+  LOG_PATH = path.join(DOCTOR_RUN_DIR, 'current.log');
+}
+
+function ensureRunDir(): void {
+  fs.mkdirSync(DOCTOR_RUN_DIR, { recursive: true });
+}
+
+function noRunStatus(): DoctorRunStatusResponse {
+  return {
+    hasRun: false,
+    runId: null,
+    status: null,
+    fix: null,
+    output: null,
+    outputBytes: 0,
+    outputTruncated: false,
+    exitCode: null,
+    startedAt: null,
+    completedAt: null,
+    timedOut: false,
+  };
+}
+
+function writeMetadata(metadata: DoctorRunMetadata): void {
+  ensureRunDir();
+  atomicWrite(METADATA_PATH, JSON.stringify(metadata, null, 2) + '\n');
+}
+
+function readMetadata(): DoctorRunMetadata | null {
+  try {
+    const raw = fs.readFileSync(METADATA_PATH, 'utf8');
+    const parsed = DoctorRunMetadataSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success) return null;
+    return parsed.data;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null;
+    console.warn(
+      '[doctor] Failed to read metadata:',
+      error instanceof Error ? error.message : error
+    );
+    return null;
   }
 }
 
-function finalizeRun(run: DoctorRunState, exitCode: number | null, status: DoctorRunStatus): void {
-  if (run.status !== 'running') return;
-  run.exitCode = exitCode;
-  run.status = status;
-  run.completedAt = new Date().toISOString();
+function readLog(): string {
+  try {
+    return fs.readFileSync(LOG_PATH, 'utf8');
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return '';
+    console.warn('[doctor] Failed to read log:', error instanceof Error ? error.message : error);
+    return '';
+  }
+}
+
+function logSizeBytes(): number {
+  try {
+    return fs.statSync(LOG_PATH).size;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return 0;
+    console.warn('[doctor] Failed to stat log:', error instanceof Error ? error.message : error);
+    return 0;
+  }
+}
+
+function rewriteLogTailWithMarker(): { outputBytes: number; outputTruncated: true } {
+  const markerBytes = Buffer.byteLength(OUTPUT_TRUNCATED_MARKER, 'utf8');
+  const keepBytes = Math.max(0, MAX_OUTPUT_BYTES - markerBytes);
+  const current = fs.readFileSync(LOG_PATH);
+  const next = Buffer.concat([
+    Buffer.from(OUTPUT_TRUNCATED_MARKER, 'utf8'),
+    current.subarray(Math.max(0, current.length - keepBytes)),
+  ]);
+  atomicWrite(LOG_PATH, next.toString('utf8'));
+  return { outputBytes: next.length, outputTruncated: true };
+}
+
+function computeOutputFields(
+  metadata: DoctorRunMetadata
+): Pick<DoctorRunMetadata, 'outputBytes' | 'outputTruncated'> {
+  const outputBytes = logSizeBytes();
+  const outputTruncated = metadata.outputTruncated || readLog().startsWith(OUTPUT_TRUNCATED_MARKER);
+  return { outputBytes, outputTruncated };
+}
+
+function syncMetadataOutputFields(metadata: DoctorRunMetadata): DoctorRunMetadata {
+  const fields = computeOutputFields(metadata);
+  if (
+    metadata.outputBytes === fields.outputBytes &&
+    metadata.outputTruncated === fields.outputTruncated
+  ) {
+    return metadata;
+  }
+  const next = { ...metadata, ...fields };
+  writeMetadata(next);
+  return next;
+}
+
+function persistActiveRunOutput(run: ActiveRun): void {
+  const metadata = readMetadata();
+  if (!metadata || metadata.runId !== run.runId) return;
+  writeMetadata({
+    ...metadata,
+    outputBytes: run.outputBytes,
+    outputTruncated: run.outputTruncated,
+  });
+}
+
+function scheduleMetadataFlush(run: ActiveRun): void {
+  if (run.metadataFlushTimer) return;
+  run.metadataFlushTimer = setTimeout(() => {
+    run.metadataFlushTimer = null;
+    persistActiveRunOutput(run);
+  }, METADATA_FLUSH_INTERVAL_MS);
+  run.metadataFlushTimer.unref?.();
+}
+
+function appendOutput(run: ActiveRun, text: string): void {
+  ensureRunDir();
+  const chunk = Buffer.from(text, 'utf8');
+  fs.appendFileSync(LOG_PATH, chunk);
+  run.outputBytes += chunk.length;
+
+  if (run.outputBytes > MAX_OUTPUT_BYTES) {
+    const truncated = rewriteLogTailWithMarker();
+    run.outputBytes = truncated.outputBytes;
+    run.outputTruncated = truncated.outputTruncated;
+    persistActiveRunOutput(run);
+    return;
+  }
+
+  scheduleMetadataFlush(run);
+}
+
+function clearTimers(run: ActiveRun): void {
   if (run.timeoutTimer) {
     clearTimeout(run.timeoutTimer);
     run.timeoutTimer = null;
   }
-  // Intentionally do NOT clear killTimer here — after SIGTERM we still need
-  // the SIGKILL grace timer to fire if the child ignores the signal.
-  run.resolveCompleted();
+  if (run.killTimer) {
+    clearTimeout(run.killTimer);
+    run.killTimer = null;
+  }
+  if (run.metadataFlushTimer) {
+    clearTimeout(run.metadataFlushTimer);
+    run.metadataFlushTimer = null;
+  }
 }
 
-function scheduleSigkill(run: DoctorRunState): void {
+function scheduleSigkill(run: ActiveRun): void {
   if (run.killTimer) return;
   run.killTimer = setTimeout(() => {
     if (!run.terminated) {
@@ -82,14 +256,76 @@ function scheduleSigkill(run: DoctorRunState): void {
       }
     }
   }, SIGTERM_GRACE_MS);
+  run.killTimer.unref?.();
+}
+
+function finalizeRun(run: ActiveRun, exitCode: number | null, status: DoctorRunStatus): void {
+  const metadata = readMetadata();
+  if (!metadata || metadata.runId !== run.runId || metadata.status !== 'running') return;
+
+  writeMetadata({
+    ...metadata,
+    outputBytes: run.outputBytes,
+    outputTruncated: run.outputTruncated,
+    exitCode,
+    status,
+    completedAt: new Date().toISOString(),
+    timedOut: status === 'timed_out' || metadata.timedOut,
+  });
+  if (run.timeoutTimer) {
+    clearTimeout(run.timeoutTimer);
+    run.timeoutTimer = null;
+  }
+  if (run.metadataFlushTimer) {
+    clearTimeout(run.metadataFlushTimer);
+    run.metadataFlushTimer = null;
+  }
+  activeRun = null;
+}
+
+function markInterruptedRunIfNeeded(): DoctorRunMetadata | null {
+  const metadata = readMetadata();
+  if (!metadata) return null;
+  if (metadata.status !== 'running' || activeRun?.runId === metadata.runId) {
+    return syncMetadataOutputFields(metadata);
+  }
+
+  fs.appendFileSync(LOG_PATH, '\n[doctor run interrupted by controller restart]\n');
+  const fields = computeOutputFields(metadata);
+  const interrupted = {
+    ...metadata,
+    ...fields,
+    status: 'failed' as const,
+    exitCode: null,
+    completedAt: new Date().toISOString(),
+  };
+  writeMetadata(interrupted);
+  return interrupted;
+}
+
+function statusResponse(): DoctorRunStatusResponse {
+  const metadata = markInterruptedRunIfNeeded();
+  if (!metadata) return noRunStatus();
+
+  const synced = syncMetadataOutputFields(metadata);
+  return {
+    hasRun: true,
+    runId: synced.runId,
+    status: synced.status,
+    fix: synced.fix,
+    output: readLog(),
+    outputBytes: synced.outputBytes,
+    outputTruncated: synced.outputTruncated,
+    exitCode: synced.exitCode,
+    startedAt: synced.startedAt,
+    completedAt: synced.completedAt,
+    timedOut: synced.timedOut,
+  };
 }
 
 /**
  * Chain each start attempt behind the previous one so two concurrent POSTs
  * can never both observe `activeRun === null` and race into a double-spawn.
- *
- * Copied from routes/kilo-cli-run.ts — `then(fn, fn)` ensures the next attempt
- * runs regardless of whether the previous one resolved or rejected.
  */
 function runStartExclusive<T>(fn: () => Promise<T>): Promise<T> {
   const next = startQueue.then(fn, fn);
@@ -111,14 +347,11 @@ export function registerDoctorRoutes(app: Hono, expectedToken: string): void {
     await next();
   });
 
-  // POST /_kilo/doctor/run — synchronous buffered `openclaw doctor` invocation.
-  // Blocks until the child exits (or the 120s cap trips, or the client aborts).
-  app.post('/_kilo/doctor/run', async c => {
+  app.post('/_kilo/doctor/start', async c => {
     let body: unknown;
     try {
       body = await c.req.json();
     } catch {
-      // An empty body is valid (fix defaults to true; see coalesce below).
       body = {};
     }
 
@@ -127,166 +360,141 @@ export function registerDoctorRoutes(app: Hono, expectedToken: string): void {
       return c.json({ error: 'Invalid request body', details: z.treeifyError(parsed.error) }, 400);
     }
 
-    // Default is `true` to match the Fly-exec flow (which always passed --fix)
-    // and the admin UI checkbox default. Explicit `false` opts into read-only
-    // diagnostics.
     const fix = parsed.data.fix ?? true;
 
-    const run = await runStartExclusive(async () => {
-      if (activeRun?.status === 'running') {
-        return null;
+    return runStartExclusive(async () => {
+      markInterruptedRunIfNeeded();
+      if (activeRun) {
+        return c.json(
+          {
+            code: 'openclaw_doctor_already_active',
+            error: 'An openclaw doctor run is already in progress',
+          },
+          409
+        );
       }
 
-      const args = ['doctor', ...(fix ? ['--fix'] : []), '--non-interactive'];
+      ensureRunDir();
+      fs.writeFileSync(LOG_PATH, '');
 
-      // Use the same env as the supervisor spawns `openclaw gateway` with
-      // (supervisor.ts:186-188). Bootstrap has already decrypted KILOCLAW_ENC_*
-      // vars into plaintext env, so doctor sees identical KILOCODE_API_KEY,
-      // OPENCLAW_GATEWAY_TOKEN, channel tokens, etc. as the live gateway.
+      const runId = crypto.randomUUID();
+      const startedAt = new Date().toISOString();
+      writeMetadata({
+        hasRun: true,
+        runId,
+        status: 'running',
+        fix,
+        outputBytes: 0,
+        outputTruncated: false,
+        exitCode: null,
+        startedAt,
+        completedAt: null,
+        timedOut: false,
+      });
+
+      const args = ['doctor', ...(fix ? ['--fix'] : []), '--non-interactive'];
       const child = spawn('openclaw', args, {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: process.env,
       });
 
-      let resolveCompleted!: () => void;
-      const completed = new Promise<void>(resolve => {
-        resolveCompleted = resolve;
-      });
-
-      const newRun: DoctorRunState = {
+      const run: ActiveRun = {
         process: child,
-        output: '',
-        status: 'running',
-        exitCode: null,
-        fix,
-        startedAt: new Date().toISOString(),
-        completedAt: null,
-        timedOut: false,
-        terminated: false,
-        completed,
-        resolveCompleted,
+        runId,
+        outputBytes: 0,
+        outputTruncated: false,
         timeoutTimer: null,
         killTimer: null,
+        metadataFlushTimer: null,
+        terminated: false,
       };
-
-      activeRun = newRun;
+      activeRun = run;
 
       child.stdout?.on('data', (chunk: Buffer | string) => {
-        appendOutput(newRun, typeof chunk === 'string' ? chunk : chunk.toString());
+        appendOutput(run, typeof chunk === 'string' ? chunk : chunk.toString());
       });
       child.stderr?.on('data', (chunk: Buffer | string) => {
-        appendOutput(newRun, typeof chunk === 'string' ? chunk : chunk.toString());
+        appendOutput(run, typeof chunk === 'string' ? chunk : chunk.toString());
       });
 
       child.once('error', err => {
         console.error('[doctor] Process error:', err.message);
-        newRun.terminated = true;
-        if (newRun.status === 'running') {
-          appendOutput(newRun, `\n[process error: ${err.message}]\n`);
-          finalizeRun(newRun, null, 'failed');
-        }
+        run.terminated = true;
+        appendOutput(run, `\n[process error: ${err.message}]\n`);
+        finalizeRun(run, null, 'failed');
       });
 
       child.once('close', (code, signal) => {
-        newRun.terminated = true;
-        if (newRun.status !== 'running') return; // already handled
+        run.terminated = true;
+        const metadata = readMetadata();
+        if (!metadata || metadata.runId !== run.runId || metadata.status !== 'running') return;
         console.log(`[doctor] Process exited: code=${code} signal=${signal}`);
-        const nextStatus: DoctorRunStatus = code === 0 ? 'completed' : 'failed';
-        finalizeRun(newRun, code, nextStatus);
+        finalizeRun(run, code, code === 0 ? 'completed' : 'failed');
       });
 
-      newRun.timeoutTimer = setTimeout(() => {
-        if (newRun.status !== 'running') return;
+      run.timeoutTimer = setTimeout(() => {
+        const metadata = readMetadata();
+        if (!metadata || metadata.runId !== run.runId || metadata.status !== 'running') return;
         console.warn('[doctor] Run timed out after 120s, sending SIGTERM');
-        appendOutput(newRun, '\n[doctor timed out after 120s]\n');
-        newRun.timedOut = true;
+        appendOutput(run, '\n[doctor timed out after 120s]\n');
         try {
           child.kill('SIGTERM');
         } catch {
           // Ignore: child may already be gone.
         }
-        scheduleSigkill(newRun);
-        // Finalize immediately so the awaiting request unblocks; the SIGKILL
-        // timer will still fire if needed to reap the process.
-        finalizeRun(newRun, null, 'timed_out');
+        scheduleSigkill(run);
+        finalizeRun(run, null, 'timed_out');
       }, DOCTOR_TIMEOUT_MS);
 
-      console.log(`[doctor] Started: pid=${child.pid}, fix=${fix}`);
-      return newRun;
+      console.log(`[doctor] Started: pid=${child.pid}, fix=${fix}, runId=${runId}`);
+      return c.json({ ok: true, runId, startedAt });
     });
+  });
 
-    if (run === null) {
+  app.get('/_kilo/doctor/status', c => c.json(statusResponse()));
+
+  app.post('/_kilo/doctor/cancel', c => {
+    const run = activeRun;
+    if (!run) {
       return c.json(
         {
-          code: 'openclaw_doctor_already_active',
-          error: 'An openclaw doctor run is already in progress',
+          code: 'openclaw_doctor_no_active_run',
+          error: 'No active doctor run to cancel',
         },
         409
       );
     }
 
-    // Client-disconnect abort: SIGTERM the child if the caller drops.
-    // c.req.raw.signal is the AbortSignal plumbed through handleHttpRequest
-    // from the underlying node req's 'close' event.
-    const onAbort = () => {
-      if (run.status !== 'running') return;
-      console.warn('[doctor] Client disconnected, cancelling run');
-      appendOutput(run, '\n[cancelled by client disconnect]\n');
-      try {
-        run.process.kill('SIGTERM');
-      } catch {
-        // Ignore: child may already be gone.
-      }
-      scheduleSigkill(run);
-      finalizeRun(run, null, 'cancelled');
-    };
-
-    const signal = c.req.raw.signal;
-    if (signal.aborted) {
-      onAbort();
-    } else {
-      signal.addEventListener('abort', onAbort, { once: true });
-    }
+    appendOutput(run, '\n[cancelled by operator]\n');
     try {
-      await run.completed;
-    } finally {
-      signal.removeEventListener('abort', onAbort);
+      run.process.kill('SIGTERM');
+    } catch {
+      // Ignore: child may already be gone.
     }
+    scheduleSigkill(run);
+    finalizeRun(run, null, 'cancelled');
 
-    const completedAt = run.completedAt;
-    if (completedAt === null) {
-      // finalizeRun is invoked on every path that resolves `run.completed`, so
-      // this branch is unreachable — the explicit check narrows the type.
-      throw new Error('doctor: completedAt not set after run completion');
-    }
-
-    return c.json(
-      {
-        ok: run.status === 'completed',
-        status: run.status,
-        fix: run.fix,
-        output: run.output,
-        exitCode: run.exitCode,
-        startedAt: run.startedAt,
-        completedAt,
-        timedOut: run.timedOut,
-      },
-      200
-    );
+    return c.json({ ok: true });
   });
 }
 
 /** Exported for testing. */
-export function _getActiveRun(): DoctorRunState | null {
+export function _getActiveRun(): ActiveRun | null {
   return activeRun;
 }
 
 /** Exported for testing. */
 export function _resetActiveRun(): void {
+  if (activeRun) clearTimers(activeRun);
   activeRun = null;
 }
 
 /** Exported for testing. */
 export function _resetStartQueue(): void {
   startQueue = Promise.resolve();
+}
+
+/** Exported for testing. */
+export function _setDoctorRunDirForTest(runDir: string): void {
+  configureDoctorRunPaths(runDir);
 }

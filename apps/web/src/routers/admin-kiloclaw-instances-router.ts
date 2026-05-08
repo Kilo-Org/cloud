@@ -889,7 +889,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }
   }),
 
-  runDoctorViaController: adminProcedure
+  startDoctorViaController: adminProcedure
     .input(
       z.object({
         userId: z.string().min(1),
@@ -898,18 +898,46 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      const fallbackMessage = 'Failed to run doctor (controller)';
+      const fallbackMessage = 'Failed to start doctor (controller)';
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
         assertInstanceBelongsToUser(instance, input.userId);
         const client = new KiloClawInternalClient();
-        return await client.runDoctorViaController(
+        return await client.startDoctorViaController(
           input.userId,
           input.fix ?? true,
           workerInstanceId(instance)
         );
       } catch (err) {
-        console.error('Failed to run doctor (controller) for user:', input.userId, err);
+        console.error('Failed to start doctor (controller) for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
+
+  doctorViaControllerStatus: adminProcedure.input(GatewayProcessSchema).query(async ({ input }) => {
+    const fallbackMessage = 'Failed to fetch doctor status (controller)';
+    try {
+      const instance = await resolveInstance(input.userId, input.instanceId);
+      assertInstanceBelongsToUser(instance, input.userId);
+      const client = new KiloClawInternalClient();
+      return await client.getDoctorViaControllerStatus(input.userId, workerInstanceId(instance));
+    } catch (err) {
+      console.error('Failed to fetch doctor status (controller) for user:', input.userId, err);
+      throwKiloclawAdminError(err, fallbackMessage);
+    }
+  }),
+
+  cancelDoctorViaController: adminProcedure
+    .input(GatewayProcessSchema)
+    .mutation(async ({ input }) => {
+      const fallbackMessage = 'Failed to cancel doctor (controller)';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        assertInstanceBelongsToUser(instance, input.userId);
+        const client = new KiloClawInternalClient();
+        return await client.cancelDoctorViaController(input.userId, workerInstanceId(instance));
+      } catch (err) {
+        console.error('Failed to cancel doctor (controller) for user:', input.userId, err);
         throwKiloclawAdminError(err, fallbackMessage);
       }
     }),

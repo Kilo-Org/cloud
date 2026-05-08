@@ -1753,9 +1753,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return pairing.runDoctor(this.s, this.env);
   }
 
-  async runDoctorViaController(fix: boolean) {
+  async startDoctorViaController(fix: boolean) {
     await this.loadState();
-    return doctorRun.runDoctorViaController(this.s, this.env, fix);
+    return doctorRun.startDoctorViaController(this.s, this.env, fix);
+  }
+
+  async getDoctorViaControllerStatus() {
+    await this.loadState();
+    return doctorRun.getDoctorViaControllerStatus(this.s, this.env);
+  }
+
+  async cancelDoctorViaController() {
+    await this.loadState();
+    return doctorRun.cancelDoctorViaController(this.s, this.env);
   }
 
   // ── Kilo CLI Run ────────────────────────────────────────────────────

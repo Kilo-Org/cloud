@@ -118,7 +118,11 @@ const KiloCliRunConflictSchema = z.object({
 
 const DoctorRunConflictSchema = z.object({
   conflict: z.object({
-    code: z.enum(['openclaw_doctor_instance_not_running', 'openclaw_doctor_already_active']),
+    code: z.enum([
+      'openclaw_doctor_instance_not_running',
+      'openclaw_doctor_already_active',
+      'openclaw_doctor_no_active_run',
+    ]),
     error: z.string().min(1),
   }),
 });
@@ -2418,18 +2422,18 @@ platform.post('/doctor', async c => {
   }
 });
 
-// POST /api/platform/doctor-controller
+// POST /api/platform/doctor-controller/start
 //
-// Runs `openclaw doctor` via the machine's controller HTTP API (NOT the Fly
-// Machines exec API). Synchronous buffered: blocks until the child exits or
-// the controller's 120s cap trips. Intended to replace /api/platform/doctor
-// once validated; both paths are live in parallel during the migration.
+// Starts `openclaw doctor` via the machine's controller HTTP API (NOT the Fly
+// Machines exec API). The run is async and status/output is polled separately.
+// Intended to replace /api/platform/doctor once validated; both paths are live
+// in parallel during the migration.
 const DoctorControllerRunSchema = z.object({
   userId: z.string().min(1),
   fix: z.boolean().optional(),
 });
 
-platform.post('/doctor-controller', async c => {
+platform.post('/doctor-controller/start', async c => {
   const result = await parseBody(c, DoctorControllerRunSchema);
   if ('error' in result) return result.error;
 
@@ -2447,8 +2451,8 @@ platform.post('/doctor-controller', async c => {
       // Default is `true` to match the Fly-exec flow (which always passed
       // --fix) and the admin UI checkbox default. Explicit `false` opts into
       // read-only diagnostics.
-      stub => stub.runDoctorViaController(result.data.fix ?? true).then(r => r),
-      'runDoctorViaController'
+      stub => stub.startDoctorViaController(result.data.fix ?? true).then(r => r),
+      'startDoctorViaController'
     );
     if (!response) {
       return jsonError(
@@ -2461,7 +2465,73 @@ platform.post('/doctor-controller', async c => {
     if (conflictResponse) return conflictResponse;
     return c.json(response, 200);
   } catch (err) {
-    const { message, status } = sanitizeError(err, 'doctor-controller');
+    const { message, status } = sanitizeError(err, 'doctor-controller/start');
+    return jsonError(message, status);
+  }
+});
+
+// GET /api/platform/doctor-controller/status?userId=...
+platform.get('/doctor-controller/status', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.getDoctorViaControllerStatus().then(r => r),
+      'getDoctorViaControllerStatus'
+    );
+    if (!response) {
+      return jsonError(
+        'Doctor runner not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    const conflictResponse = doctorRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'doctor-controller/status');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/doctor-controller/cancel
+platform.post('/doctor-controller/cancel', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub => stub.cancelDoctorViaController().then(r => r),
+      'cancelDoctorViaController'
+    );
+    if (!response) {
+      return jsonError(
+        'Doctor runner not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    const conflictResponse = doctorRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'doctor-controller/cancel');
     return jsonError(message, status);
   }
 });

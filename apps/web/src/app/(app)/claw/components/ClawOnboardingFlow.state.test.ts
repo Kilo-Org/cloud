@@ -332,6 +332,95 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('provisioning');
   });
 
+  describe('when calendar step is hidden (non-admin user)', () => {
+    test('drops calendar from total step count', () => {
+      const noCalendarNoPairing = getClawOnboardingFlowState(
+        createInput({ hasCalendarStep: false })
+      );
+      expect(noCalendarNoPairing.totalSteps).toBe(3);
+      expect(noCalendarNoPairing.hasCalendarStep).toBe(false);
+
+      const noCalendarWithPairing = getClawOnboardingFlowState(
+        createInput({ hasCalendarStep: false, selectedChannelId: 'telegram' })
+      );
+      expect(noCalendarWithPairing.totalSteps).toBe(4);
+    });
+
+    test('redirects calendar render step to channels in create-first mode', () => {
+      const state = getClawOnboardingFlowState(
+        createInput({
+          createSetupStarted: true,
+          onboardingStep: 'calendar',
+          hasBotIdentity: true,
+          hasCalendarStep: false,
+        })
+      );
+
+      expect(state.renderStep).toBe('channels');
+    });
+
+    test('redirects calendar render step to channels in post-provisioning mode', () => {
+      const state = getClawOnboardingFlowState(
+        createInput({
+          mode: 'post-provisioning',
+          status: createStatus('running'),
+          onboardingStep: 'calendar',
+          hasBotIdentity: true,
+          gatewayState: 'running',
+          hasCalendarStep: false,
+        })
+      );
+
+      expect(state.renderStep).toBe('channels');
+    });
+
+    test('reports channels as step 2 of 3 even when stored onboardingStep is calendar', () => {
+      // A non-admin briefly sitting on onboardingStep='calendar' (e.g. via a
+      // stale URL) gets normalized for both the rendered step and the
+      // progress indicator so the header doesn't read "Step 0 of 3".
+      const state = getClawOnboardingFlowState(
+        createInput({
+          createSetupStarted: true,
+          onboardingStep: 'calendar',
+          hasBotIdentity: true,
+          hasCalendarStep: false,
+        })
+      );
+
+      expect(state.renderStep).toBe('channels');
+      expect(state.currentStep).toBe(2);
+      expect(state.totalSteps).toBe(3);
+    });
+
+    test('getClawOnboardingStepProgress positions remaining steps correctly without calendar', () => {
+      expect(getClawOnboardingStepProgress('identity', false, false)).toEqual({
+        currentStep: 1,
+        totalSteps: 3,
+      });
+      expect(getClawOnboardingStepProgress('channels', false, false)).toEqual({
+        currentStep: 2,
+        totalSteps: 3,
+      });
+      expect(getClawOnboardingStepProgress('provisioning', false, false)).toEqual({
+        currentStep: 3,
+        totalSteps: 3,
+      });
+      expect(getClawOnboardingStepProgress('done', false, false)).toEqual({
+        currentStep: 3,
+        totalSteps: 3,
+      });
+
+      expect(getClawOnboardingStepProgress('identity', true, false)).toEqual({
+        currentStep: 1,
+        totalSteps: 4,
+      });
+      expect(getClawOnboardingStepProgress('pairing', true, false)).toEqual({
+        currentStep: 4,
+        totalSteps: 4,
+      });
+    });
+  });
+
   test('renders calendar in post-provisioning mode when explicit resume is requested', () => {
     // After the OAuth full-page reload, the wizard often remounts in
     // post-provisioning mode because the instance row is now visible.

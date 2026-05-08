@@ -1,5 +1,10 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import { kilocode_users, organizations, organization_memberships } from '@kilocode/db/schema';
+import {
+  kilocode_users,
+  kiloclaw_instances,
+  organizations,
+  organization_memberships,
+} from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 
 export { getWorkerDb, type WorkerDb };
@@ -43,6 +48,37 @@ function generateBotStripeCustomerId(): string {
   return `bot_stripe_${Array.from(bytes)
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')}`;
+}
+
+/**
+ * Resolve a kiloclaw_instances.id to its sandbox_id, returning null if the
+ * instance is missing, destroyed, or not owned by the given user. Used by
+ * the webhook-to-chat delivery path to translate a stored trigger config
+ * (which holds the instance UUID) into the sandboxId expected by kilo-chat.
+ *
+ * The userId filter is defense-in-depth: kilo-chat enforces ownership on
+ * the post path too, but scoping here means a stale or cross-user
+ * instanceId returns a clean "instance not found" instead of resolving to
+ * a different user's sandbox and failing downstream with a misleading
+ * forbidden.
+ */
+export async function findActiveSandboxIdForInstance(
+  db: WorkerDb,
+  instanceId: string,
+  userId: string
+): Promise<string | null> {
+  const rows = await db
+    .select({ sandbox_id: kiloclaw_instances.sandbox_id })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.id, instanceId),
+        eq(kiloclaw_instances.user_id, userId),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .limit(1);
+  return rows[0]?.sandbox_id ?? null;
 }
 
 export async function findUserForToken(db: WorkerDb, userId: string): Promise<UserForToken | null> {

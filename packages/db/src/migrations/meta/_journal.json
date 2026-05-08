@@ -866,8 +866,15 @@
     {
       "idx": 123,
       "version": "7",
-      "when": 1778233134456,
-      "tag": "0123_tricky_agent_brand",
+      "when": 1778231429988,
+      "tag": "0123_condemned_hobgoblin",
+      "breakpoints": true
+    },
+    {
+      "idx": 124,
+      "version": "7",
+      "when": 1778266255692,
+      "tag": "0124_modern_slayback",
       "breakpoints": true
     }
   ]

@@ -12,6 +12,7 @@ import {
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { readDb } from '@/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
+import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 
 const EXA_BASE_URL = 'https://api.exa.ai';
 
@@ -80,6 +81,9 @@ export async function POST(request: NextRequest) {
   const requestBody: Record<string, unknown> = await request.json();
   delete requestBody.stream;
 
+  const featureId = validateFeatureHeader(request.headers.get(FEATURE_HEADER)) ?? undefined;
+  const type = typeof requestBody.type === 'string' ? requestBody.type : undefined;
+
   const response = await fetch(`${EXA_BASE_URL}${exaPath}`, {
     method: 'POST',
     headers: {
@@ -115,6 +119,8 @@ export async function POST(request: NextRequest) {
           costMicrodollars,
           chargedToBalance: isPaidRequest,
           freeAllowanceMicrodollars: allowance,
+          featureId,
+          type,
         });
       }
     } catch (error) {

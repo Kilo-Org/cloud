@@ -401,6 +401,33 @@ export const GetSessionInput = z.object({
   cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to retrieve'),
 });
 
+export const SandboxStatusSchema = z
+  .enum(['healthy', 'destroyed', 'unreachable', 'unknown'])
+  .describe('Sandbox reachability status for the session container');
+
+export const SessionHealthExecutionSchema = z
+  .enum(['healthy', 'unknown', 'stale', 'none'])
+  .describe('Health status for the active execution, or none when no execution is active');
+
+export const ActiveExecutionStatusSchema = z
+  .enum(['pending', 'running', 'completed', 'failed', 'interrupted'])
+  .describe('Current status of the active execution');
+
+export const GetSessionHealthInput = z.object({
+  cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),
+});
+
+export const GetSessionHealthOutput = z.object({
+  cloudAgentSessionId: z.string().describe('Cloud-agent session ID'),
+  sandboxId: z.string().optional().describe('Sandbox ID for the session'),
+  sandboxStatus: SandboxStatusSchema,
+  executionHealth: SessionHealthExecutionSchema,
+  activeExecutionStatus: ActiveExecutionStatusSchema.optional(),
+  activeExecutionId: z.string().optional(),
+});
+
+export type GetSessionHealthResponse = z.infer<typeof GetSessionHealthOutput>;
+
 /**
  * Output schema for getSession endpoint.
  * Returns sanitized session metadata with lifecycle timestamps for idempotency.

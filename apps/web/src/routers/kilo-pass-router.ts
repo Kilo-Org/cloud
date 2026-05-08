@@ -34,7 +34,6 @@ import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-s
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import {
-  KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
   KILO_PASS_TIER_CONFIG,
 } from '@/lib/kilo-pass/constants';
@@ -597,22 +596,14 @@ export const kiloPassRouter = createTRPCRouter({
       currentPeriodBonusCreditsUsd = roundToCents(usd);
     } else {
       const streakMonths = Math.max(1, subscriptionBase.currentStreakMonths);
-      const shouldShowFirstMonthPromo =
-        streakMonths === 1 && isFirstTimeSubscriberEver && isTwoMonthPromoOfferActive();
-
-      if (shouldShowFirstMonthPromo) {
-        const cents = Math.round(baseAmountUsd * KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT * 100);
-        currentPeriodBonusCreditsUsd = cents / 100;
-      } else {
-        const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
-          tier: subscriptionBase.tier,
-          streakMonths,
-          isFirstTimeSubscriberEver,
-          subscriptionStartedAtIso: subscriptionBase.startedAt,
-        });
-        const cents = Math.round(baseAmountUsd * bonusPercentApplied * 100);
-        currentPeriodBonusCreditsUsd = cents / 100;
-      }
+      const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
+        tier: subscriptionBase.tier,
+        streakMonths,
+        isFirstTimeSubscriberEver,
+        subscriptionStartedAtIso: subscriptionBase.startedAt,
+      });
+      const cents = Math.round(baseAmountUsd * bonusPercentApplied * 100);
+      currentPeriodBonusCreditsUsd = cents / 100;
     }
 
     const nowUtc = dayjs().utc();

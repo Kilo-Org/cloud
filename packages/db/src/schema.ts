@@ -5471,6 +5471,8 @@ export const exa_usage_log = pgTable(
     path: text().notNull(),
     cost_microdollars: bigint({ mode: 'number' }).notNull(),
     charged_to_balance: boolean().notNull().default(false),
+    feature_id: text(),
+    type: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [

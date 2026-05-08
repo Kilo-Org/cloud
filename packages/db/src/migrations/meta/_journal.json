@@ -862,6 +862,13 @@
       "when": 1778225020635,
       "tag": "0122_eager_gertrude_yorkes",
       "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1778231429988,
+      "tag": "0123_condemned_hobgoblin",
+      "breakpoints": true
     }
   ]
 }

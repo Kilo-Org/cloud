@@ -183,9 +183,10 @@ describe('listClaims', () => {
     const result = await caller.listClaims({ wastelandId: WASTELAND_ID });
 
     expect(result).toHaveLength(1);
-    expect(result[0].pending_pr).not.toBeNull();
-    expect(result[0].pending_pr!.kind).toBe('claim');
-    expect(result[0].pending_pr!.pull_id).toBe('pr-1');
+    const pr = result[0].pending_pr;
+    expect(pr).not.toBeNull();
+    expect(pr?.kind).toBe('claim');
+    expect(pr?.pull_id).toBe('pr-1');
   });
 
   it('returns pending_pr with kind=done for done PRs', async () => {
@@ -229,7 +230,7 @@ describe('listClaims', () => {
     const result = await caller.listClaims({ wastelandId: WASTELAND_ID });
 
     expect(result).toHaveLength(1);
-    expect(result[0].pending_pr!.kind).toBe('done');
+    expect(result[0].pending_pr?.kind).toBe('done');
   });
 
   it('returns empty array when DoltHub enrichment fails', async () => {
@@ -320,14 +321,17 @@ describe('forceUnclaimWantedItem', () => {
       })
     ).rejects.toThrow(TRPCError);
 
-    try {
-      await caller.forceUnclaimWantedItem({
-        wastelandId: WASTELAND_ID,
-        itemId: 'w-1',
-        reason: 'Stale claim',
-      });
-    } catch (err) {
-      expect((err as TRPCError).code).toBe('FORBIDDEN');
+    const err = await caller.forceUnclaimWantedItem({
+      wastelandId: WASTELAND_ID,
+      itemId: 'w-1',
+      reason: 'Stale claim',
+    }).then(
+      () => { throw new Error('Expected rejection') },
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(TRPCError);
+    if (err instanceof TRPCError) {
+      expect(err.code).toBe('FORBIDDEN');
     }
   });
 

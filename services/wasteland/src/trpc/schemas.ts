@@ -107,6 +107,27 @@ export const WantedBoardRowOutput = z.object({
   updated_at: z.string().nullable().default(null),
 });
 
+// ── Claim with optional in-flight PR ────────────────────────────────────
+// Enriches a claimed wanted item with metadata about any open DoltHub PR
+// (claim, done, unclaim, or edit) so the Claims page can show "PR pending"
+// badges per row.
+
+export const RpcClaimOutput = z.object({
+  item: WantedBoardRowOutput,
+  pending_pr: z
+    .object({
+      pull_id: z.string(),
+      pr_url: z.string(),
+      kind: z.enum(['claim', 'done', 'unclaim', 'edit', 'unknown']),
+      from_branch: z.string(),
+      state: z.literal('Open'),
+      created_at: z.string().nullable(),
+      updated_at: z.string().nullable(),
+    })
+    .nullable(),
+});
+export type RpcClaim = z.infer<typeof RpcClaimOutput>;
+
 // ── Admin: mergeUpstreamPR result ───────────────────────────────────────
 
 export const MergePullOutput = z.object({
@@ -308,3 +329,4 @@ export const RpcRigDetailOutput = rpcSafe(RigDetailOutput);
 export const RpcCompletionOutput = rpcSafe(CompletionOutput);
 export const RpcStampOutput = rpcSafe(StampOutput);
 export const RpcRigActivityOutput = rpcSafe(RigActivityOutput);
+export const RpcClaimListOutput = rpcSafe(z.object({ claims: z.array(RpcClaimOutput) }));

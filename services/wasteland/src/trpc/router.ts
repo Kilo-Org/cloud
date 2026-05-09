@@ -18,6 +18,8 @@ import * as wantedBoard from '../wanted-board/wanted-board-ops';
 import { WantedBoardOpError } from '../wanted-board/wanted-board-ops';
 import * as doltApi from '../util/dolthub-api.util';
 import * as inbox from '../inbox/inbox-classifier';
+import { writeEvent } from '../util/analytics.util';
+import { inferPrKind } from './claims.util';
 import {
   RpcWastelandOutput,
   RpcWastelandMemberOutput,
@@ -32,6 +34,7 @@ import {
   RpcUpstreamRigOutput,
   RpcRigDetailOutput,
   RpcRigActivityOutput,
+  RpcClaimListOutput,
   WantedBoardRowOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
@@ -1023,6 +1026,123 @@ export const wastelandRouter = router({
       } catch {
         return { items: [] };
       }
+    }),
+
+  // ── Claims overview (all claimed items + in-flight PRs) ────────────
+  // Returns every currently claimed wanted item in the wasteland, enriched
+  // with metadata about any open DoltHub PR so the Claims page can show
+  // "PR pending merge" badges per row. Owner-access gated (admin view).
+
+  listClaims: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        rigHandle: z
+          .string()
+          .min(1)
+          .max(64)
+          .regex(/^[a-zA-Z0-9_-]+$/)
+          .optional(),
+        limit: z.number().int().min(1).max(200).default(100),
+      })
+    )
+    .output(RpcClaimListOutput)
+    .query(async ({ ctx, input }) => {
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+      let loaded: Awaited<ReturnType<typeof loadAdminContext>>;
+      try {
+        loaded = await loadAdminContext(ctx.env, input.wastelandId, ctx.userId);
+      } catch {
+        return { claims: [] };
+      }
+      const { token, upstream } = loaded;
+      const wantedCols =
+        'id, title, description, project, type, priority, tags, posted_by, claimed_by, status, effort_level, evidence_url, sandbox_required, sandbox_scope, sandbox_min_tier, created_at, updated_at';
+
+      let sql = `SELECT ${wantedCols} FROM wanted WHERE status = 'claimed'`;
+      if (input.rigHandle) {
+        sql += ` AND claimed_by = '${input.rigHandle}'`;
+      }
+      sql += ` ORDER BY updated_at DESC LIMIT ${input.limit}`;
+
+      let claimedRows: z.infer<typeof WantedBoardRowOutput>[] = [];
+      try {
+        const result = await doltApi.runUnsafeSql(upstream, token, 'main', sql);
+        claimedRows = parseWantedBoardRows(result.rows ?? []);
+      } catch {
+        return { claims: [] };
+      }
+
+      let openPulls: Awaited<ReturnType<typeof doltApi.listPulls>> = [];
+      try {
+        openPulls = await doltApi.listPulls(upstream, token, { state: 'Open' });
+      } catch {
+        return { claims: claimedRows.map(item => ({ item, pending_pr: null })) };
+      }
+
+      const rigFilter = input.rigHandle ?? null;
+      const candidates = openPulls.filter(
+        p => !rigFilter || !p.creator_name || p.creator_name === rigFilter
+      );
+
+      let pullDetails: (Awaited<ReturnType<typeof doltApi.getPull>> | null)[] = [];
+      try {
+        pullDetails = await doltApi.mapWithLimit(candidates, 6, p =>
+          doltApi.getPull(upstream, token, p.pull_id).catch(() => null)
+        );
+      } catch {
+        return { claims: claimedRows.map(item => ({ item, pending_pr: null })) };
+      }
+
+      type PrEntry = {
+        pull_id: string;
+        pr_url: string;
+        kind: 'claim' | 'done' | 'unclaim' | 'edit' | 'unknown';
+        from_branch: string;
+        state: 'Open';
+        created_at: string | null;
+        updated_at: string | null;
+      };
+
+      const prByItemId = new Map<string, PrEntry>();
+
+      for (const detail of pullDetails) {
+        if (!detail) continue;
+        const branchInfo = doltApi.parseWlBranch(detail.from_branch_name);
+        if (!branchInfo) continue;
+        if (rigFilter && branchInfo.rigHandle !== rigFilter) continue;
+
+        const itemId = branchInfo.itemId;
+        const kind = inferPrKind(detail.title);
+        const entry: PrEntry = {
+          pull_id: detail.pull_id,
+          pr_url: doltApi.buildPullWebUrl(upstream, detail.pull_id),
+          kind,
+          from_branch: detail.from_branch_name ?? '',
+          state: 'Open' as const,
+          created_at: detail.created_at,
+          updated_at: detail.updated_at,
+        };
+
+        const existing = prByItemId.get(itemId);
+        if (!existing) {
+          prByItemId.set(itemId, entry);
+        }
+      }
+
+      writeEvent(ctx.env, {
+        event: 'claims.list',
+        delivery: 'trpc',
+        userId: ctx.userId,
+        wastelandId: input.wastelandId,
+      });
+
+      return {
+        claims: claimedRows.map(item => ({
+          item,
+          pending_pr: prByItemId.get(item.id) ?? null,
+        })),
+      };
     }),
 
   // ── Wanted Board Mutations ────────────────────────────────────────

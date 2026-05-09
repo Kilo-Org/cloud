@@ -14,6 +14,7 @@ export type WastelandEventName =
   | 'wanted.done'
   | 'wanted.post'
   | 'wanted.sync'
+  | 'claims.list'
   // Controller-level events (HTTP) use string to avoid maintaining
   // a massive union — event names are derived from route patterns.
   | (string & {});

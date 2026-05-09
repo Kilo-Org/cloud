@@ -26,6 +26,7 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
   'wasteland.markWantedItemDone': { maxRequests: 10, windowMs: 60_000 },
   'wasteland.postWantedItem': { maxRequests: 5, windowMs: 60_000 },
   'wasteland.browseWantedBoard': { maxRequests: 60, windowMs: 60_000 },
+  'wasteland.listClaims': { maxRequests: 30, windowMs: 60_000 },
 };
 
 // Global store — lives for the lifetime of the worker isolate.

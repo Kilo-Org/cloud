@@ -338,6 +338,39 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
+    listClaims: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        wastelandId: string;
+        rigHandle?: string | undefined;
+      };
+      output: {
+        item: {
+          id: string;
+          title: string;
+          description: string | null;
+          project: string | null;
+          type: string | null;
+          priority: string | number | null;
+          tags: string | null;
+          posted_by: string | null;
+          claimed_by: string | null;
+          status: string;
+          effort_level: string | null;
+          evidence_url: string | null;
+          sandbox_required: string | number | null;
+          sandbox_scope: string | null;
+          sandbox_min_tier: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        pending_pr: {
+          pull_id: string;
+          pr_url: string;
+          kind: 'claim' | 'done' | 'unclaim';
+        } | null;
+      }[];
+      meta: object;
+    }>;
     claimWantedItem: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         wastelandId: string;
@@ -1091,6 +1124,39 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
               updated_at: string | null;
             }>;
           };
+          meta: object;
+        }>;
+        listClaims: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            wastelandId: string;
+            rigHandle?: string | undefined;
+          };
+          output: {
+            item: {
+              id: string;
+              title: string;
+              description: string | null;
+              project: string | null;
+              type: string | null;
+              priority: string | number | null;
+              tags: string | null;
+              posted_by: string | null;
+              claimed_by: string | null;
+              status: string;
+              effort_level: string | null;
+              evidence_url: string | null;
+              sandbox_required: string | number | null;
+              sandbox_scope: string | null;
+              sandbox_min_tier: string | null;
+              created_at: string | null;
+              updated_at: string | null;
+            };
+            pending_pr: {
+              pull_id: string;
+              pr_url: string;
+              kind: 'claim' | 'done' | 'unclaim';
+            } | null;
+          }[];
           meta: object;
         }>;
         claimWantedItem: import('@trpc/server').TRPCMutationProcedure<{

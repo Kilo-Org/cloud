@@ -5,11 +5,19 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('@kilocode/sdk', () => ({
   createKilo: vi.fn(),
 }));
+// Mock workspace helpers to return a path that actually exists on the
+// test runner so ensureSDKServer's process.chdir doesn't ENOENT.
+const TEST_WORKSPACE = process.cwd();
 vi.mock('./agent-runner', () => ({
   runAgent: vi.fn(),
-  buildKiloConfigContent: vi.fn(),
+  buildKiloConfigContent: vi.fn(
+    (kilocodeToken: string, model: string, smallModel: string, organizationId?: string) =>
+      JSON.stringify({ kilocodeToken, model, smallModel, organizationId })
+  ),
   resolveGitCredentials: vi.fn(),
   writeMayorSystemPromptToAgentsMd: vi.fn(),
+  ensureMayorWorkspaceForTown: vi.fn(async (_townId: string) => TEST_WORKSPACE),
+  mayorWorkdirForTown: vi.fn((_townId: string) => TEST_WORKSPACE),
 }));
 vi.mock('./control-server', () => ({
   getCurrentTownConfig: vi.fn(() => ({})),
@@ -24,7 +32,8 @@ vi.mock('./token-refresh', () => ({
   refreshTokenIfNearExpiry: vi.fn(),
 }));
 
-const { applyModelToSession, withStartAgentLock } = await import('./process-manager');
+const { applyModelToSession, withStartAgentLock, awaitHydration, bootHydration } =
+  await import('./process-manager');
 
 type PromptCall = {
   path: { id: string };
@@ -176,5 +185,157 @@ describe('withStartAgentLock', () => {
 
     const result = await withStartAgentLock('agent-err', async () => 'ok');
     expect(result).toBe('ok');
+  });
+});
+
+describe('awaitHydration', () => {
+  it('resolves immediately before any bootHydration call', async () => {
+    // Module-init state must not block /agents/start in test/dev contexts
+    // where bootHydration never runs.
+    let resolved = false;
+    void awaitHydration().then(() => {
+      resolved = true;
+    });
+    await new Promise(r => setTimeout(r, 0));
+    expect(resolved).toBe(true);
+  });
+
+  it('prewarms mayor SDK with env that mirrors buildAgentEnv (mayor tools require GASTOWN_AGENT_ROLE/AGENT_ID/TOWN_ID)', async () => {
+    // Without these env vars in the snapshot kilo serve takes at spawn,
+    // GastownPlugin (plugin/index.ts) treats the prewarmed mayor as a
+    // rig agent (or fails the createMayorClientFromEnv guard) and the
+    // server boots with NO mayor tools. ensureSDKServer's cache hit on
+    // the next /agents/start hands back that defective server.
+    const { createKilo } = (await import('@kilocode/sdk')) as unknown as {
+      createKilo: ReturnType<typeof vi.fn>;
+    };
+
+    const prev = {
+      apiUrl: process.env.GASTOWN_API_URL,
+      townId: process.env.GASTOWN_TOWN_ID,
+      token: process.env.GASTOWN_CONTAINER_TOKEN,
+    };
+    process.env.GASTOWN_API_URL = 'http://test.invalid';
+    process.env.GASTOWN_TOWN_ID = 'town-prewarm';
+    process.env.GASTOWN_CONTAINER_TOKEN = 'tok-prewarm';
+
+    let capturedEnv: Record<string, string | undefined> | null = null;
+    createKilo.mockImplementationOnce(() => {
+      // Snapshot the keys plugin/index.ts and plugin/client.ts read.
+      capturedEnv = {
+        GASTOWN_AGENT_ID: process.env.GASTOWN_AGENT_ID,
+        GASTOWN_AGENT_ROLE: process.env.GASTOWN_AGENT_ROLE,
+        GASTOWN_TOWN_ID: process.env.GASTOWN_TOWN_ID,
+        GASTOWN_API_URL: process.env.GASTOWN_API_URL,
+        GASTOWN_CONTAINER_TOKEN: process.env.GASTOWN_CONTAINER_TOKEN,
+        KILO_CONFIG_CONTENT: process.env.KILO_CONFIG_CONTENT,
+      };
+      return Promise.resolve({
+        client: {} as unknown,
+        server: { url: 'http://127.0.0.1:9999/', close: () => {} },
+      });
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('/container-registry')) {
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      }
+      if (url.includes('/mayor-id')) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            agentId: 'mayor-agent-1',
+            model: 'anthropic/claude-sonnet-4.6',
+            smallModel: 'anthropic/claude-haiku-4.5',
+            kilocodeToken: 'kc-tok',
+            organizationId: null,
+          }),
+          { status: 200 }
+        );
+      }
+      // db-snapshot etc: 404 -> fresh start
+      return new Response('not found', { status: 404 });
+    }) as unknown as typeof fetch;
+
+    try {
+      await bootHydration();
+      const env = capturedEnv as Record<string, string | undefined> | null;
+      expect(env).not.toBeNull();
+      expect(env).toMatchObject({
+        GASTOWN_AGENT_ID: 'mayor-agent-1',
+        GASTOWN_AGENT_ROLE: 'mayor',
+        GASTOWN_TOWN_ID: 'town-prewarm',
+        GASTOWN_CONTAINER_TOKEN: 'tok-prewarm',
+      });
+      expect(env?.KILO_CONFIG_CONTENT).toBeTruthy();
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (prev.apiUrl !== undefined) process.env.GASTOWN_API_URL = prev.apiUrl;
+      else delete process.env.GASTOWN_API_URL;
+      if (prev.townId !== undefined) process.env.GASTOWN_TOWN_ID = prev.townId;
+      else delete process.env.GASTOWN_TOWN_ID;
+      if (prev.token !== undefined) process.env.GASTOWN_CONTAINER_TOKEN = prev.token;
+      else delete process.env.GASTOWN_CONTAINER_TOKEN;
+    }
+  });
+
+  it('blocks awaiters while bootHydration is in flight and releases them when it returns', async () => {
+    // Drive bootHydration into its registry-fetch path with a fetch
+    // stub that we can hold open from the test, so we can observe a
+    // real "in flight" window for the gate.
+    const prev = {
+      apiUrl: process.env.GASTOWN_API_URL,
+      townId: process.env.GASTOWN_TOWN_ID,
+      token: process.env.GASTOWN_CONTAINER_TOKEN,
+    };
+    process.env.GASTOWN_API_URL = 'http://test.invalid';
+    process.env.GASTOWN_TOWN_ID = 'town-test';
+    process.env.GASTOWN_CONTAINER_TOKEN = 'tok-test';
+
+    // Use a single barrier the fetch stub awaits so every call (registry
+    // fetch + prewarm endpoints) holds the gate until we release it,
+    // and each call gets its own Response (avoids "body already read").
+    let releaseFetch!: () => void;
+    const fetchBarrier = new Promise<void>(resolve => {
+      releaseFetch = resolve;
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      await fetchBarrier;
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('/container-registry')) {
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ success: true, agentId: null }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    try {
+      const hydrationPromise = bootHydration();
+      let awaiterResolved = false;
+      void awaitHydration().then(() => {
+        awaiterResolved = true;
+      });
+
+      // Yield to let the registry fetch start. The gate is now held
+      // until the fetch resolves.
+      await new Promise(r => setTimeout(r, 10));
+      expect(awaiterResolved).toBe(false);
+
+      releaseFetch();
+      await hydrationPromise;
+      // After bootHydration returns, the gate must release any awaiters.
+      await new Promise(r => setTimeout(r, 0));
+      expect(awaiterResolved).toBe(true);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (prev.apiUrl !== undefined) process.env.GASTOWN_API_URL = prev.apiUrl;
+      else delete process.env.GASTOWN_API_URL;
+      if (prev.townId !== undefined) process.env.GASTOWN_TOWN_ID = prev.townId;
+      else delete process.env.GASTOWN_TOWN_ID;
+      if (prev.token !== undefined) process.env.GASTOWN_CONTAINER_TOKEN = prev.token;
+      else delete process.env.GASTOWN_CONTAINER_TOKEN;
+    }
   });
 });

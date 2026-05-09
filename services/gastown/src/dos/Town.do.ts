@@ -2659,6 +2659,43 @@ export class TownDO extends DurableObject<Env> {
     return mayor?.id ?? null;
   }
 
+  /**
+   * Returns everything the container needs to prewarm the mayor SDK
+   * server with a config that matches what the next /agents/start will
+   * use — so the prewarm cache hit is real instead of triggering the
+   * "config mismatch, evicting prewarmed server" eviction path.
+   *
+   * Returns null when there's no mayor yet, or when the kilocode token
+   * isn't available (in which case prewarm should skip — the next
+   * /agents/start will defer too).
+   */
+  async getMayorPrewarmContext(): Promise<{
+    agentId: string;
+    model: string;
+    smallModel: string;
+    kilocodeToken: string;
+    organizationId: string | null;
+  } | null> {
+    const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
+    if (!mayor) return null;
+
+    const kilocodeToken = await this.resolveKilocodeToken();
+    if (!kilocodeToken) return null;
+
+    const townConfig = await this.getTownConfig();
+    // _ensureMayor dispatches the mayor without a per-rig override
+    // (Town.do.ts:2766-2790). Match that resolution here so the prewarm
+    // KILO_CONFIG_CONTENT is byte-identical to what /agents/start will
+    // build, and ensureSDKServer's config-mismatch eviction never fires.
+    return {
+      agentId: mayor.id,
+      model: config.resolveModel(townConfig, null, 'mayor'),
+      smallModel: config.resolveSmallModel(townConfig),
+      kilocodeToken,
+      organizationId: townConfig.organization_id ?? null,
+    };
+  }
+
   async ensureMayor(): Promise<{
     agentId: string;
     sessionStatus: 'idle' | 'active' | 'starting';

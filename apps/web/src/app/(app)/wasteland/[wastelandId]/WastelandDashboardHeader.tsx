@@ -9,11 +9,6 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Skull, Globe, Lock } from 'lucide-react';
 import { useWastelandPageHeader } from './WastelandPageHeaderContext';
 
-const statusStyles: Record<string, string> = {
-  active: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  deleted: 'bg-red-500/10 text-red-400 border-red-500/20',
-};
-
 export function WastelandDashboardHeader() {
   const params = useParams<{ wastelandId: string }>();
   const wastelandId = params.wastelandId;
@@ -46,22 +41,14 @@ export function WastelandDashboardHeader() {
               {wasteland?.name ?? 'Wasteland'}
             </h1>
             {wasteland && (
-              <>
-                <Badge
-                  variant="outline"
-                  className={statusStyles[wasteland.status] ?? statusStyles.active}
-                >
-                  {wasteland.status}
-                </Badge>
-                <Badge variant="outline" className="gap-1 border-white/10 text-white/50">
-                  {wasteland.visibility === 'public' ? (
-                    <Globe className="size-3" />
-                  ) : (
-                    <Lock className="size-3" />
-                  )}
-                  {wasteland.visibility}
-                </Badge>
-              </>
+              <Badge variant="outline" className="gap-1 border-white/10 text-white/50">
+                {wasteland.visibility === 'public' ? (
+                  <Globe className="size-3" />
+                ) : (
+                  <Lock className="size-3" />
+                )}
+                {wasteland.visibility}
+              </Badge>
             )}
           </div>
         )}

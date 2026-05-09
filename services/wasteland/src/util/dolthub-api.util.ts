@@ -31,6 +31,15 @@ export function parseUpstream(upstream: string): { owner: string; db: string } {
   return { owner, db };
 }
 
+/**
+ * Build the DoltHub web URL for a pull request on `upstream`. Used to
+ * surface a "view this PR" link in the wanted-board UI.
+ */
+export function buildPullWebUrl(upstream: string, pullId: string): string {
+  const { owner, db } = parseUpstream(upstream);
+  return `https://www.dolthub.com/repositories/${owner}/${db}/pulls/${pullId}`;
+}
+
 type DoltFetchInit = Omit<RequestInit, 'headers'> & { headers?: Record<string, string> };
 
 async function doltFetch(
@@ -38,9 +47,16 @@ async function doltFetch(
   token: string,
   init?: DoltFetchInit
 ): Promise<{ status: number; data: unknown }> {
+  // Bypass any edge cache between us and DoltHub. Merged PRs and
+  // freshly-opened pulls need to be visible to the worker immediately;
+  // stale reads surface as stuck "pending review" badges or a wanted
+  // board that doesn't reflect the post-merge state. Workerd rejects
+  // the standard DOM `cache: 'no-store'` init option — the cache-control
+  // header is what actually propagates through its subrequest cache.
   const res = await fetch(`${DOLTHUB_API_BASE}${path}`, {
     ...init,
     headers: {
+      'cache-control': 'no-cache',
       ...(init?.headers ?? {}),
       authorization: `token ${token}`,
     },

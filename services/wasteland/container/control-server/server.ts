@@ -1,3 +1,6 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join as pathJoin } from 'node:path';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -366,8 +369,17 @@ async function dolthubSql(
 
   let res: Response;
   try {
+    // `cache: 'no-store'` + `cache-control: no-cache` defeats any edge
+    // cache between us and DoltHub. Without this, freshly merged rows can
+    // take up to a minute to become visible via the SQL API even though
+    // the merge has completed — we'd rather pay the round-trip every time
+    // than show stale claim state on the board.
     res = await fetch(url, {
-      headers: { authorization: `token ${token}` },
+      cache: 'no-store',
+      headers: {
+        authorization: `token ${token}`,
+        'cache-control': 'no-cache',
+      },
     });
   } catch (err) {
     return {
@@ -460,10 +472,107 @@ async function configureDolt(): Promise<void> {
   log.info('dolt config set', { userName, userEmail });
 }
 
+/**
+ * Parse an upstream path like "jrf0110/wl-commons" into { org, db }.
+ */
+function parseUpstream(upstream: string): { org: string; db: string } | null {
+  const parts = upstream.split('/');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
+  return { org: parts[0], db: parts[1] };
+}
+
+/**
+ * Check whether the given rig handle is already registered in the upstream
+ * `rigs` table. Returns false on any API error (caller falls back to `wl join`
+ * which will report a clearer error if DoltHub is genuinely unreachable).
+ */
+async function isRigRegisteredOnUpstream(
+  upstream: string,
+  handle: string,
+  token: string
+): Promise<boolean> {
+  const escaped = handle.replace(/'/g, "''");
+  const result = await dolthubSql(
+    upstream,
+    `SELECT handle FROM rigs WHERE handle = '${escaped}' LIMIT 1`,
+    token
+  );
+  if (result.error) {
+    log.warn('rigs pre-flight check failed — falling through to wl join', {
+      upstream,
+      handle,
+      error: result.error,
+    });
+    return false;
+  }
+  return result.rows.length > 0;
+}
+
+/**
+ * Write a synthetic wasteland config file so subsequent `wl` commands
+ * (claim, post, done, …) treat this container as already joined.
+ *
+ * Uses backend=remote, which instructs the CLI to route all reads/writes
+ * through the DoltHub REST API rather than a local dolt clone. This means
+ * we don't need to fork the upstream or materialize a local clone on disk
+ * just to satisfy the CLI's "am I joined?" check.
+ */
+async function writeJoinedConfig(upstream: string, handle: string, email: string): Promise<void> {
+  const parsed = parseUpstream(upstream);
+  if (!parsed) {
+    throw new Error(`writeJoinedConfig: invalid upstream ${upstream}`);
+  }
+
+  const configDir = pathJoin(homedir(), '.config', 'wasteland', 'wastelands', parsed.org);
+  const configPath = pathJoin(configDir, `${parsed.db}.json`);
+
+  const cfg = {
+    upstream,
+    provider_type: 'dolthub',
+    upstream_url: `https://doltremoteapi.dolthub.com/${parsed.org}/${parsed.db}`,
+    fork_org: handle,
+    fork_db: parsed.db,
+    local_dir: '',
+    rig_handle: handle,
+    hop_uri: `hop://${email}/${handle}/`,
+    joined_at: new Date().toISOString(),
+    mode: 'pr',
+    backend: 'remote',
+  };
+
+  await mkdir(configDir, { recursive: true });
+  await writeFile(configPath, JSON.stringify(cfg, null, 2) + '\n', 'utf8');
+  log.info('wrote synthetic wasteland config', { configPath, handle });
+}
+
 async function joinUpstream(token: string, upstream: string): Promise<void> {
   if (joined) return;
 
   await configureDolt();
+
+  const handle = process.env.DOLTHUB_ORG ?? '';
+  // Pre-flight: if this rig is already registered on the upstream, skip the
+  // full `wl join` flow (fork → clone → branch → registration PR). A fresh
+  // container has no XDG config, so stock `wl join` would otherwise open a
+  // redundant "Register rig" PR on every cold start.
+  if (handle) {
+    const alreadyRegistered = await isRigRegisteredOnUpstream(upstream, handle, token);
+    if (alreadyRegistered) {
+      const email = process.env.DOLT_USER_EMAIL || `${handle}@wasteland.kilo.ai`;
+      try {
+        await writeJoinedConfig(upstream, handle, email);
+        joined = true;
+        log.info('skipped wl join: rig already registered upstream', { upstream, handle });
+        return;
+      } catch (err) {
+        log.warn('writeJoinedConfig failed — falling through to wl join', {
+          upstream,
+          handle,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
 
   const env = buildEnv(token, upstream);
   const result = await execWl(['join', upstream], env, CLI_TIMEOUT_LONG_MS);
@@ -588,6 +697,23 @@ async function handleBrowse(req: Request): Promise<Response> {
   return jsonResponse({ items: result.rows });
 }
 
+/**
+ * Parse the `PR: <url>` line emitted by `wl`'s renderMutationResult helper
+ * when a mutation was pushed to a fork branch and a PR was opened. Returns
+ * null when the output carries no PR line (e.g. direct mode, or upstream
+ * provider that doesn't support PRs). We match on a URL prefix rather than
+ * a full regex to stay resilient to DoltHub domain changes.
+ */
+function parsePrUrlFromWlOutput(stdout: string): string | null {
+  for (const rawLine of stdout.split('\n')) {
+    const line = rawLine.trim();
+    if (!line.startsWith('PR:')) continue;
+    const rest = line.slice(3).trim();
+    if (rest.startsWith('http://') || rest.startsWith('https://')) return rest;
+  }
+  return null;
+}
+
 async function handleClaim(req: Request): Promise<Response> {
   const token = extractToken(req);
   if (!token) return errorResponse('Missing DOLTHUB_TOKEN header', 401);
@@ -612,9 +738,10 @@ async function handleClaim(req: Request): Promise<Response> {
       return errorResponse(`wl claim failed: ${result.stderr}`, 502);
     }
 
+    const prUrl = parsePrUrlFromWlOutput(result.stdout);
     lastOperationTimestamp = new Date().toISOString();
-    log.info('wl claim completed', { itemId: body.data.itemId });
-    return jsonResponse({ success: true });
+    log.info('wl claim completed', { itemId: body.data.itemId, prUrl });
+    return jsonResponse({ success: true, pr_url: prUrl });
   } finally {
     mutationMutex.release();
   }

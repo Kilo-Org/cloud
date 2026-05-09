@@ -28,6 +28,7 @@ import {
   RpcInboxItemOutput,
   RpcUpstreamAdminVerifyOutput,
   RpcMergePullOutput,
+  RpcPendingClaimOutput,
   RpcUpstreamRigOutput,
   RpcRigDetailOutput,
   RpcRigActivityOutput,
@@ -113,14 +114,16 @@ function wantedBoardErrorToTRPC(err: unknown): never {
 
 /**
  * Load a decrypted DoltHub token + upstream for the caller's credential.
- * Used by admin-only procedures that call DoltHub's REST API directly
- * (listInboxItems, mergeUpstreamPR, verifyUpstreamAdmin, etc.).
+ * Shared between admin procedures (mergeUpstreamPR, verifyUpstreamAdmin)
+ * and any non-admin procedure that needs a DoltHub REST API call on the
+ * caller's behalf (listMyPendingClaims). Admin-only procedures enforce
+ * `isUpstreamAdmin` themselves — the name is historical.
  */
 async function loadAdminContext(
   env: Env,
   wastelandId: string,
   userId: string
-): Promise<{ token: string; upstream: string; isUpstreamAdmin: boolean }> {
+): Promise<{ token: string; upstream: string; isUpstreamAdmin: boolean; rigHandle: string }> {
   const doStub = getWastelandDOStub(env, wastelandId);
   const config = await doStub.getConfig();
   if (!config?.dolthub_upstream) {
@@ -149,6 +152,7 @@ async function loadAdminContext(
     token,
     upstream: config.dolthub_upstream,
     isUpstreamAdmin: credential.is_upstream_admin,
+    rigHandle: credential.rig_handle ?? credential.dolthub_org,
   };
 }
 
@@ -967,6 +971,60 @@ export const wastelandRouter = router({
       }
     }),
 
+  // List open pull requests on the upstream that this user opened from
+  // `wl/<rigHandle>/<itemId>` branches. Powers the "Pending review" badge
+  // on the wanted board — while a claim/done/unclaim/edit PR is open but
+  // not yet merged, upstream `main` still shows the prior state, so the
+  // board alone can't show the user's in-flight work.
+  //
+  // Returns an empty list (never throws) when DoltHub is unreachable or
+  // the caller has no credential yet — the badge is informational and
+  // shouldn't break the board when upstream is degraded.
+  listMyPendingClaims: procedure
+    .input(z.object({ wastelandId: z.string().uuid() }))
+    .output(z.object({ items: z.array(RpcPendingClaimOutput) }))
+    .query(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      let loaded: Awaited<ReturnType<typeof loadAdminContext>>;
+      try {
+        loaded = await loadAdminContext(ctx.env, input.wastelandId, ctx.userId);
+      } catch {
+        // No credential / no upstream configured → no pending claims.
+        return { items: [] };
+      }
+      const { token, upstream, rigHandle } = loaded;
+      try {
+        const openPulls = await doltApi.listPulls(upstream, token, { state: 'Open' });
+        // Fast filter: DoltHub's list endpoint returns `creator_name` but
+        // not the from-branch. The PR creator is the fork owner, which in
+        // hosted mode is the rig handle. Drop anything created by someone
+        // else before spending detail requests.
+        const candidates = openPulls.filter(p => !p.creator_name || p.creator_name === rigHandle);
+        const details = await doltApi.mapWithLimit(candidates, 6, p =>
+          doltApi.getPull(upstream, token, p.pull_id).catch(() => null)
+        );
+        const items = details.flatMap(detail => {
+          if (!detail) return [];
+          const parsed = doltApi.parseWlBranch(detail.from_branch_name);
+          if (!parsed || parsed.rigHandle !== rigHandle) return [];
+          return [
+            {
+              item_id: parsed.itemId,
+              pull_id: detail.pull_id,
+              pr_url: doltApi.buildPullWebUrl(upstream, detail.pull_id),
+              from_branch: detail.from_branch_name ?? '',
+              state: 'Open' as const,
+              created_at: detail.created_at,
+              updated_at: detail.updated_at,
+            },
+          ];
+        });
+        return { items };
+      } catch {
+        return { items: [] };
+      }
+    }),
+
   // ── Wanted Board Mutations ────────────────────────────────────────
 
   claimWantedItem: procedure
@@ -977,7 +1035,7 @@ export const wastelandRouter = router({
         direct: z.boolean().optional(),
       })
     )
-    .output(z.object({ success: z.boolean() }))
+    .output(z.object({ success: z.boolean(), pr_url: z.string().nullable() }))
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {

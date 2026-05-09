@@ -19,10 +19,7 @@ export function WastelandCard({
       onClick={onClick}
     >
       <CardContent className="flex flex-col gap-3 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="truncate text-base font-medium text-white/90">{wasteland.name}</h3>
-          <StatusPill status={wasteland.status} />
-        </div>
+        <h3 className="truncate text-base font-medium text-white/90">{wasteland.name}</h3>
 
         <div className="flex flex-wrap items-center gap-2">
           <VisibilityBadge visibility={wasteland.visibility} />
@@ -36,23 +33,6 @@ export function WastelandCard({
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-export function StatusPill({ status }: { status: 'active' | 'deleted' }) {
-  if (status === 'active') {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/20">
-        <span className="size-1.5 rounded-full bg-emerald-400" />
-        Active
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-400 ring-1 ring-red-500/20">
-      <span className="size-1.5 rounded-full bg-red-400" />
-      Deleted
-    </span>
   );
 }
 

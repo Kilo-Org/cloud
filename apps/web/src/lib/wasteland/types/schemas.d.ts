@@ -138,6 +138,22 @@ export declare const MergePullOutput: z.ZodObject<
   },
   z.core.$strip
 >;
+export declare const PendingClaimOutput: z.ZodObject<
+  {
+    item_id: z.ZodString;
+    pull_id: z.ZodString;
+    pr_url: z.ZodString;
+    from_branch: z.ZodString;
+    state: z.ZodEnum<{
+      Open: 'Open';
+      Closed: 'Closed';
+      Merged: 'Merged';
+    }>;
+    created_at: z.ZodNullable<z.ZodString>;
+    updated_at: z.ZodNullable<z.ZodString>;
+  },
+  z.core.$strip
+>;
 export declare const UpstreamAdminVerifyOutput: z.ZodObject<
   {
     hasWriteAccess: z.ZodBoolean;
@@ -459,6 +475,25 @@ export declare const RpcMergePullOutput: z.ZodPipe<
     {
       pull_id: z.ZodString;
       state: z.ZodString;
+    },
+    z.core.$strip
+  >
+>;
+export declare const RpcPendingClaimOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodObject<
+    {
+      item_id: z.ZodString;
+      pull_id: z.ZodString;
+      pr_url: z.ZodString;
+      from_branch: z.ZodString;
+      state: z.ZodEnum<{
+        Open: 'Open';
+        Closed: 'Closed';
+        Merged: 'Merged';
+      }>;
+      created_at: z.ZodNullable<z.ZodString>;
+      updated_at: z.ZodNullable<z.ZodString>;
     },
     z.core.$strip
   >

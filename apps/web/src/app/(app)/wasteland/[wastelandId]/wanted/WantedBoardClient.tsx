@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ArrowUpDown, Loader2, Plus, RefreshCw, ScrollText, Search } from 'lucide-react';
+import { ArrowUpDown, Hourglass, Loader2, Plus, RefreshCw, ScrollText, Search } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
@@ -103,7 +103,6 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
   const [sortField, setSortField] = useState<SortField>('activity');
 
   // Dialog state
-  const [claimItem, setClaimItem] = useState<WantedItem | null>(null);
   const [doneItem, setDoneItem] = useState<WantedItem | null>(null);
   const [acceptItem, setAcceptItem] = useState<WantedItem | null>(null);
   const [rejectItem, setRejectItem] = useState<WantedItem | null>(null);
@@ -123,11 +122,54 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
   );
   const isAdmin = credentialQuery.data?.is_upstream_admin ?? false;
 
+  // This user's open claim/done/edit PRs on upstream. Used to decorate
+  // rows with a "Pending review" badge between submit-click and admin-
+  // merge. Polls at 30s; the drawer's panel polls faster (15s) since the
+  // user is actively watching that row. Degrades to empty on error.
+  const pendingClaimsQuery = useQuery({
+    ...trpc.wasteland.listMyPendingClaims.queryOptions({ wastelandId }),
+    refetchInterval: 30_000,
+  });
+  const pendingByItemId = useMemo(() => {
+    const map = new Map<string, { pullId: string; prUrl: string }>();
+    for (const p of pendingClaimsQuery.data?.items ?? []) {
+      map.set(p.item_id, { pullId: p.pull_id, prUrl: p.pr_url });
+    }
+    return map;
+  }, [pendingClaimsQuery.data]);
+
+  // When a previously-tracked pending claim drops out of the set, the
+  // admin merged (or closed) the PR upstream. Kick the board so the row
+  // picks up the new upstream state without waiting for its own 30s
+  // poll — otherwise the user sees `open` + empty pending-review for a
+  // moment before the board catches up.
+  const prevPendingIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const current = new Set(pendingByItemId.keys());
+    const prev = prevPendingIdsRef.current;
+    let disappeared = false;
+    for (const id of prev) {
+      if (!current.has(id)) {
+        disappeared = true;
+        break;
+      }
+    }
+    prevPendingIdsRef.current = current;
+    if (disappeared) {
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId }),
+      });
+    }
+  }, [pendingByItemId, queryClient, trpc, wastelandId]);
+
   const refreshMutation = {
     isPending: false,
     mutate: () => {
       void queryClient.invalidateQueries({
         queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.listMyPendingClaims.queryKey({ wastelandId }),
       });
     },
   };
@@ -135,6 +177,9 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
   const invalidateBoard = useCallback(() => {
     void queryClient.invalidateQueries({
       queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId }),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.wasteland.listMyPendingClaims.queryKey({ wastelandId }),
     });
   }, [queryClient, trpc, wastelandId]);
 
@@ -193,7 +238,6 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
         item,
         actions: {
           isAdmin,
-          onClaim: setClaimItem,
           onDone: setDoneItem,
           onAccept: setAcceptItem,
           onReject: setRejectItem,
@@ -298,78 +342,85 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
           )}
 
           <AnimatePresence mode="popLayout">
-            {filteredItems.map((item, i) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ delay: Math.min(i * 0.02, 0.3), duration: 0.15 }}
-                onClick={() => handleOpenItem(item)}
-                className="group flex cursor-pointer items-center gap-3 border-b border-white/[0.04] px-6 py-2.5 transition-colors hover:bg-white/[0.02]"
-              >
-                <span
-                  className={`size-2 shrink-0 rounded-full ${STATUS_DOT[item.status] ?? 'bg-white/20'}`}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm text-white/80">{item.title}</span>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] ${TYPE_COLORS[item.type ?? 'other'] ?? TYPE_COLORS.other}`}
-                    >
-                      {item.type ?? 'other'}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] ${STATUS_COLORS[item.status] ?? ''}`}
-                    >
-                      {item.status}
-                    </Badge>
-                  </div>
-                  <div className="mt-0.5 flex items-center gap-2 text-[10px] text-white/30">
-                    {item.description && (
-                      <span className="line-clamp-1 max-w-xs">{item.description}</span>
-                    )}
-                    {'posted_by' in item && (
-                      <>
-                        <span className="text-white/15">|</span>
-                        <span>{String(item.posted_by)}</span>
-                      </>
-                    )}
-                    {(() => {
-                      const activity = Math.max(
-                        parseDoltDate(item.updated_at)?.getTime() ?? 0,
-                        parseDoltDate(item.created_at)?.getTime() ?? 0
-                      );
-                      if (!activity) return null;
-                      return (
+            {filteredItems.map((item, i) => {
+              const pending = pendingByItemId.get(item.id);
+              return (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ delay: Math.min(i * 0.02, 0.3), duration: 0.15 }}
+                  onClick={() => handleOpenItem(item)}
+                  className="group flex cursor-pointer items-center gap-3 border-b border-white/[0.04] px-6 py-2.5 transition-colors hover:bg-white/[0.02]"
+                >
+                  <span
+                    className={`size-2 shrink-0 rounded-full ${STATUS_DOT[item.status] ?? 'bg-white/20'}`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm text-white/80">{item.title}</span>
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] ${TYPE_COLORS[item.type ?? 'other'] ?? TYPE_COLORS.other}`}
+                      >
+                        {item.type ?? 'other'}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] ${STATUS_COLORS[item.status] ?? ''}`}
+                      >
+                        {item.status}
+                      </Badge>
+                      {pending && (
+                        <Badge
+                          variant="outline"
+                          className="gap-1 border-amber-500/20 bg-amber-500/10 text-[9px] text-amber-300"
+                          title={`You have an open PR (#${pending.pullId}) for this item awaiting review.`}
+                        >
+                          <Hourglass className="size-2.5" />
+                          pending review
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-2 text-[10px] text-white/30">
+                      {item.description && (
+                        <span className="line-clamp-1 max-w-xs">{item.description}</span>
+                      )}
+                      {'posted_by' in item && (
                         <>
                           <span className="text-white/15">|</span>
-                          <span>{formatDistanceToNow(activity, { addSuffix: true })}</span>
+                          <span>{String(item.posted_by)}</span>
                         </>
-                      );
-                    })()}
+                      )}
+                      {(() => {
+                        const activity = Math.max(
+                          parseDoltDate(item.updated_at)?.getTime() ?? 0,
+                          parseDoltDate(item.created_at)?.getTime() ?? 0
+                        );
+                        if (!activity) return null;
+                        return (
+                          <>
+                            <span className="text-white/15">|</span>
+                            <span>{formatDistanceToNow(activity, { addSuffix: true })}</span>
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
-                </div>
-                <span
-                  className={`shrink-0 text-[10px] font-medium ${PRIORITY_COLORS[String(item.priority ?? 'medium')] ?? 'text-white/40'}`}
-                >
-                  {item.priority ?? 'medium'}
-                </span>
-              </motion.div>
-            ))}
+                  <span
+                    className={`shrink-0 text-[10px] font-medium ${PRIORITY_COLORS[String(item.priority ?? 'medium')] ?? 'text-white/40'}`}
+                  >
+                    {item.priority ?? 'medium'}
+                  </span>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
       </div>
 
       {/* Dialogs */}
-      <ClaimDialog
-        wastelandId={wastelandId}
-        item={claimItem}
-        onClose={() => setClaimItem(null)}
-        onSuccess={invalidateBoard}
-      />
       <MarkDoneDialog
         wastelandId={wastelandId}
         item={doneItem}
@@ -407,83 +458,6 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
         onSuccess={invalidateBoard}
       />
     </div>
-  );
-}
-
-// ── Claim dialog ──────────────────────────────────────────────────────────
-
-function ClaimDialog({
-  wastelandId,
-  item,
-  onClose,
-  onSuccess,
-}: {
-  wastelandId: string;
-  item: WantedItem | null;
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const trpc = useWastelandTRPC();
-
-  const claimMutation = useMutation({
-    ...trpc.wasteland.claimWantedItem.mutationOptions(),
-    onSuccess: () => {
-      toast.success('Item claimed successfully');
-      onSuccess();
-      onClose();
-    },
-    onError: err => {
-      toast.error(err.message || 'Failed to claim item');
-    },
-  });
-
-  useSlowOperationToast(claimMutation.isPending);
-
-  return (
-    <Dialog
-      open={item !== null}
-      onOpenChange={open => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent className="border-white/10 bg-[color:oklch(0.155_0_0)]">
-        <DialogHeader>
-          <DialogTitle className="text-white/90">Claim wanted item</DialogTitle>
-          <DialogDescription className="text-white/50">
-            Claim this item? You&apos;ll be responsible for completing it.
-          </DialogDescription>
-        </DialogHeader>
-
-        {item && (
-          <div className="rounded-md border border-white/[0.08] bg-white/[0.03] p-3">
-            <p className="text-sm font-medium text-white/80">{item.title}</p>
-            <p className="mt-1 text-xs text-white/40 line-clamp-2">{item.description}</p>
-          </div>
-        )}
-
-        <DialogFooter>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={claimMutation.isPending}
-            className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-white/60 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={claimMutation.isPending || !item}
-            onClick={() => {
-              if (item) claimMutation.mutate({ wastelandId, itemId: item.id });
-            }}
-            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
-          >
-            {claimMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
-            Claim
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 

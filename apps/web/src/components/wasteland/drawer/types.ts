@@ -15,7 +15,6 @@ export type RigActivity = WastelandOutputs['wasteland']['listRigActivity'];
  */
 export type WantedPanelActions = {
   isAdmin: boolean;
-  onClaim: (item: WantedItem) => void;
   onDone: (item: WantedItem) => void;
   onAccept: (item: WantedItem) => void;
   onReject: (item: WantedItem) => void;

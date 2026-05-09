@@ -321,6 +321,23 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       }[];
       meta: object;
     }>;
+    listMyPendingClaims: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        wastelandId: string;
+      };
+      output: {
+        items: Array<{
+          item_id: string;
+          pull_id: string;
+          pr_url: string;
+          from_branch: string;
+          state: 'Open' | 'Closed' | 'Merged';
+          created_at: string | null;
+          updated_at: string | null;
+        }>;
+      };
+      meta: object;
+    }>;
     claimWantedItem: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         wastelandId: string;
@@ -329,6 +346,7 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       output: {
         success: boolean;
+        pr_url: string | null;
       };
       meta: object;
     }>;
@@ -1058,6 +1076,23 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
           }[];
           meta: object;
         }>;
+        listMyPendingClaims: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            wastelandId: string;
+          };
+          output: {
+            items: Array<{
+              item_id: string;
+              pull_id: string;
+              pr_url: string;
+              from_branch: string;
+              state: 'Open' | 'Closed' | 'Merged';
+              created_at: string | null;
+              updated_at: string | null;
+            }>;
+          };
+          meta: object;
+        }>;
         claimWantedItem: import('@trpc/server').TRPCMutationProcedure<{
           input: {
             wastelandId: string;
@@ -1066,6 +1101,7 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
           };
           output: {
             success: boolean;
+            pr_url: string | null;
           };
           meta: object;
         }>;

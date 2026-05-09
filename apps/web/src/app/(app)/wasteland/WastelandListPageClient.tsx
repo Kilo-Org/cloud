@@ -21,7 +21,6 @@ export function WastelandListPageClient() {
   });
 
   const wastelands = wastelandsQuery.data ?? [];
-  const activeWastelands = wastelands.filter(w => w.status === 'active');
 
   return (
     <PageContainer>
@@ -49,15 +48,9 @@ export function WastelandListPageClient() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
               <div className="text-[11px] tracking-wider text-white/40 uppercase">Wastelands</div>
-              <div className="mt-0.5 text-lg font-semibold text-white/85">
-                {wastelandsQuery.isLoading ? '…' : activeWastelands.length}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-              <div className="text-[11px] tracking-wider text-white/40 uppercase">Total</div>
               <div className="mt-0.5 text-lg font-semibold text-white/85">
                 {wastelandsQuery.isLoading ? '…' : wastelands.length}
               </div>

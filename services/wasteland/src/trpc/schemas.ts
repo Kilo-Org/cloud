@@ -114,6 +114,20 @@ export const MergePullOutput = z.object({
   state: z.string(),
 });
 
+// ── A pending claim PR owned by the current user ────────────────────────
+// One row per open pull on upstream whose fork branch matches
+// `wl/<rigHandle>/<itemId>`. The UI uses this to render a "Pending review"
+// badge on the corresponding wanted item until an admin merges the PR.
+export const PendingClaimOutput = z.object({
+  item_id: z.string(),
+  pull_id: z.string(),
+  pr_url: z.string(),
+  from_branch: z.string(),
+  state: z.enum(['Open', 'Closed', 'Merged']),
+  created_at: z.string().nullable(),
+  updated_at: z.string().nullable(),
+});
+
 // ── Admin: verifyUpstreamAdmin ─────────────────────────────────────────
 
 export const UpstreamAdminVerifyOutput = z.object({
@@ -286,6 +300,7 @@ export const RpcConnectedTownOutput = rpcSafe(ConnectedTownOutput);
 export const RpcWantedItemOutput = rpcSafe(WantedItemOutput);
 export const RpcWantedBoardRowOutput = rpcSafe(WantedBoardRowOutput);
 export const RpcMergePullOutput = rpcSafe(MergePullOutput);
+export const RpcPendingClaimOutput = rpcSafe(PendingClaimOutput);
 export const RpcUpstreamAdminVerifyOutput = rpcSafe(UpstreamAdminVerifyOutput);
 export const RpcUpstreamRigOutput = rpcSafe(UpstreamRigOutput);
 export const RpcInboxItemOutput = rpcSafe(InboxItemOutput);

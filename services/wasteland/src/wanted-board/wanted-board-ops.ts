@@ -163,11 +163,11 @@ export async function claimWantedItem(
   userId: string,
   itemId: string,
   options?: { direct?: boolean }
-): Promise<{ success: true }> {
+): Promise<{ success: true; pr_url: string | null }> {
   const { doStub, token, upstream, isUpstreamAdmin } = await loadContext(env, wastelandId, userId);
   const direct = resolveDirect(options?.direct, isUpstreamAdmin);
 
-  await callContainer(
+  const raw = await callContainer(
     env,
     wastelandId,
     '/wl/claim',
@@ -175,6 +175,11 @@ export async function claimWantedItem(
     { upstream, itemId, userId, direct },
     'Claim'
   );
+  const parsed = z
+    .object({ pr_url: z.string().url().nullable().optional() })
+    .passthrough()
+    .safeParse(raw);
+  const prUrl = parsed.success ? (parsed.data.pr_url ?? null) : null;
 
   await doStub.refreshWantedBoard();
 
@@ -185,7 +190,7 @@ export async function claimWantedItem(
     label: 'claim',
   });
 
-  return { success: true };
+  return { success: true, pr_url: prUrl };
 }
 
 export async function unclaimWantedItem(

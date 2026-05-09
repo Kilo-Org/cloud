@@ -14,6 +14,7 @@ import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
 import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.util';
 import { resolveSecret } from '../util/secret.util';
 import { meterEvent } from '../util/billing.util';
+import { writeEvent } from '../util/analytics.util';
 import * as wantedBoard from '../wanted-board/wanted-board-ops';
 import { WantedBoardOpError } from '../wanted-board/wanted-board-ops';
 import * as doltApi from '../util/dolthub-api.util';
@@ -1162,6 +1163,136 @@ export const wastelandRouter = router({
         );
       } catch (err) {
         return wantedBoardErrorToTRPC(err);
+      }
+    }),
+
+  // ── Admin: Force unclaim another rig's claim ────────────────────────
+  // `wl unclaim` is scoped to the caller's own claim (it uses the rig
+  // handle from the fork). For an admin to force-release someone ELSE's
+  // claim, we write directly to the DoltHub `wanted` table on a scratch
+  // branch, then open + merge a PR to land the change on `main`. This
+  // matches the pattern used by `setUpstreamRigTrust`.
+
+  forceUnclaimWantedItem: adminProcedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        itemId: z
+          .string()
+          .min(1)
+          .max(64)
+          .regex(/^[A-Za-z0-9_.:-]+$/, 'itemId must be alphanumeric with _ . : - only'),
+        reason: z.string().min(1).max(500),
+      })
+    )
+    .output(z.object({ ok: z.literal(true) }))
+    .mutation(async ({ ctx, input }) => {
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+      const { token, upstream, isUpstreamAdmin, rigHandle: adminHandle } = await loadAdminContext(
+        ctx.env,
+        input.wastelandId,
+        ctx.userId
+      );
+      if (!isUpstreamAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admin mode required to force-unclaim wanted items',
+        });
+      }
+
+      const targetRow = await doltApi.runUnsafeSql(
+        upstream,
+        token,
+        'main',
+        `SELECT claimed_by FROM wanted WHERE id = '${input.itemId}'`
+      );
+      const targetHandle =
+        targetRow.rows.length > 0 ? String(targetRow.rows[0]?.claimed_by ?? '') : '';
+
+      const scratchBranch = `force-unclaim-${input.itemId}-${crypto.randomUUID().slice(0, 8)}`;
+      let orphanedPullId: string | null = null;
+      let mergeConfirmed = false;
+      try {
+        // `input.itemId` is Zod-validated against /^[A-Za-z0-9_.:-]+$/ —
+        // the string CANNOT carry quotes, spaces, semicolons, comment
+        // markers, or any other SQL injection vector.
+        await doltApi.runWrite(
+          upstream,
+          token,
+          'main',
+          scratchBranch,
+          `UPDATE wanted SET status = 'open', claimed_by = NULL, updated_at = NOW() WHERE id = '${input.itemId}'`
+        );
+
+        const pull = await doltApi.createPull(upstream, token, {
+          title: `[wl] force-unclaim ${input.itemId} by ${adminHandle}`,
+          description: `Admin force-unclaim by ${adminHandle}. Reason: ${input.reason}`,
+          fromBranch: scratchBranch,
+          toBranch: 'main',
+        });
+        orphanedPullId = pull.pullId;
+
+        const merge = await doltApi.mergePull(upstream, token, orphanedPullId);
+
+        if (merge.state === 'merged') {
+          mergeConfirmed = true;
+        } else if (merge.operationName) {
+          const result = await doltApi.waitForMergeCompletion(
+            upstream,
+            token,
+            orphanedPullId,
+            merge.operationName
+          );
+          if (!result.success) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `Merge job completed but DoltHub reported failure for pull ${orphanedPullId}`,
+            });
+          }
+          mergeConfirmed = true;
+        } else {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Merge for pull ${orphanedPullId} returned state=${merge.state} without an operation_name; cannot confirm completion`,
+          });
+        }
+
+        orphanedPullId = null;
+
+        const doStub = getWastelandDOStub(ctx.env, input.wastelandId);
+        await doStub.refreshWantedBoard();
+
+        writeEvent(ctx.env, {
+          event: 'claims.force_unclaim',
+          delivery: 'trpc',
+          userId: ctx.userId,
+          wastelandId: input.wastelandId,
+          label: `${input.itemId}:${targetHandle}:${adminHandle}:${input.reason}`,
+        });
+
+        meterEvent(ctx.env, {
+          event: 'billing.api_operation',
+          userId: ctx.userId,
+          wastelandId: input.wastelandId,
+          label: 'force_unclaim',
+        });
+
+        return { ok: true as const };
+      } catch (err) {
+        if (err instanceof doltApi.DoltHubApiError) {
+          throw new TRPCError({
+            code: err.status === 401 || err.status === 403 ? 'FORBIDDEN' : 'INTERNAL_SERVER_ERROR',
+            message: err.message,
+          });
+        }
+        throw err;
+      } finally {
+        if (orphanedPullId) {
+          await doltApi.closePull(upstream, token, orphanedPullId).catch(() => {});
+        }
+        if (mergeConfirmed) {
+          await doltApi.deleteBranch(upstream, token, scratchBranch).catch(() => {});
+        }
       }
     }),
 

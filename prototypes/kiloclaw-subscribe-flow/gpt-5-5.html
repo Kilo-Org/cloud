@@ -7,28 +7,30 @@
     <style>
       :root {
         color-scheme: dark;
-        --bg: oklch(16% 0.006 110);
-        --surface: oklch(21% 0.007 110);
-        --surface-raised: oklch(25% 0.008 110);
-        --surface-soft: oklch(19% 0.006 110);
-        --muted: oklch(34% 0.007 110);
-        --text: oklch(97% 0.004 110);
-        --text-muted: oklch(72% 0.005 110);
-        --text-subtle: oklch(56% 0.005 110);
-        --border: oklch(100% 0 0 / 0.11);
-        --border-strong: oklch(100% 0 0 / 0.2);
-        --primary: oklch(93% 0.21 118);
-        --primary-hover: oklch(88% 0.2 118);
-        --on-primary: oklch(18% 0.006 110);
-        --success: oklch(74% 0.18 153);
-        --warning: oklch(80% 0.17 82);
-        --danger: oklch(66% 0.21 28);
-        --focus: oklch(93% 0.21 118 / 0.42);
+        --bg: #121212;
+        --surface: #2b2b2b;
+        --surface-raised: #333333;
+        --surface-soft: #242424;
+        --muted: #3d3d3d;
+        --text: #fafafa;
+        --text-muted: #a3a3a3;
+        --text-subtle: #7a7a7a;
+        --border: rgb(255 255 255 / 0.1);
+        --border-strong: rgb(255 255 255 / 0.18);
+        --input-bg: rgb(255 255 255 / 0.06);
+        --primary: #edff00;
+        --primary-hover: #d6e600;
+        --on-primary: #1f1f1f;
+        --success: #4ade80;
+        --warning: #facc15;
+        --danger: #f87171;
+        --focus: rgb(237 255 0 / 0.35);
+        --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
         --radius-sm: 6px;
         --radius-md: 8px;
         --radius-lg: 10px;
         --radius-xl: 14px;
-        --shadow-dialog: 0 24px 80px oklch(0% 0 0 / 0.48);
+        --shadow-dialog: 0 24px 64px rgb(0 0 0 / 0.55), 0 4px 12px rgb(0 0 0 / 0.35);
       }
 
       * {
@@ -42,13 +44,17 @@
 
       body {
         margin: 0;
-        background:
-          radial-gradient(circle at 20% 0%, oklch(22% 0.035 125 / 0.32), transparent 34rem),
-          linear-gradient(180deg, oklch(13% 0.006 110), oklch(10% 0.006 110));
+        background: var(--bg);
         color: var(--text);
         font-family:
-          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        font-size: 16px;
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        font-size: 14px;
         line-height: 1.5;
         -webkit-font-smoothing: antialiased;
         font-variant-numeric: tabular-nums;
@@ -69,21 +75,14 @@
       .backdrop {
         position: fixed;
         inset: 0;
-        background:
-          linear-gradient(oklch(0% 0 0 / 0.62), oklch(0% 0 0 / 0.78)),
-          repeating-linear-gradient(
-            0deg,
-            transparent 0,
-            transparent 39px,
-            oklch(100% 0 0 / 0.035) 40px
-          );
+        background: rgb(0 0 0 / 0.66);
       }
 
       .modal {
         position: relative;
         z-index: 1;
-        width: min(1120px, 100%);
-        max-height: min(900px, calc(100vh - 32px));
+        width: min(1040px, 100%);
+        max-height: min(820px, calc(100vh - 32px));
         overflow: auto;
         border: 1px solid var(--border-strong);
         border-radius: var(--radius-xl);
@@ -96,14 +95,14 @@
         grid-template-columns: 1fr auto;
         gap: 16px;
         align-items: start;
-        padding: 28px 28px 18px;
+        padding: 24px 24px 16px;
         border-bottom: 1px solid var(--border);
       }
 
       .eyebrow {
         margin: 0 0 8px;
-        color: var(--primary);
-        font-size: 0.72rem;
+        color: var(--text-subtle);
+        font-size: 0.6875rem;
         font-weight: 650;
         letter-spacing: 0.08em;
         text-transform: uppercase;
@@ -111,23 +110,23 @@
 
       h1 {
         margin: 0;
-        max-width: 18ch;
-        font-size: 2rem;
-        line-height: 1.1;
-        letter-spacing: 0;
+        max-width: 24ch;
+        font-size: 1.5rem;
+        line-height: 1.2;
+        letter-spacing: -0.015em;
         text-wrap: balance;
       }
 
       .lead {
-        margin: 12px 0 0;
+        margin: 10px 0 0;
         max-width: 64ch;
         color: var(--text-muted);
-        font-size: 1rem;
+        font-size: 0.875rem;
       }
 
       .close {
-        width: 40px;
-        height: 40px;
+        width: 36px;
+        height: 36px;
         display: grid;
         place-items: center;
         border: 1px solid transparent;
@@ -138,7 +137,7 @@
       }
 
       .close:hover {
-        background: oklch(100% 0 0 / 0.06);
+        background: var(--input-bg);
         color: var(--text);
       }
 
@@ -158,7 +157,7 @@
       }
 
       .step-button {
-        min-height: 64px;
+        min-height: 56px;
         border: 0;
         border-right: 1px solid var(--border);
         background: var(--surface-soft);
@@ -171,7 +170,7 @@
         border-right: 0;
       }
 
-      .step-button[aria-current="step"] {
+      .step-button[aria-current='step'] {
         background: var(--surface);
         color: var(--text);
       }
@@ -180,7 +179,7 @@
         display: flex;
         gap: 12px;
         align-items: center;
-        padding: 14px 24px;
+        padding: 12px 20px;
       }
 
       .step-index {
@@ -196,11 +195,11 @@
         font-weight: 700;
       }
 
-      .step-button[aria-current="step"] .step-index,
-      .step-button[data-complete="true"] .step-index {
-        border-color: oklch(93% 0.21 118 / 0.5);
-        background: oklch(93% 0.21 118 / 0.12);
-        color: var(--primary);
+      .step-button[aria-current='step'] .step-index,
+      .step-button[data-complete='true'] .step-index {
+        border-color: var(--border-strong);
+        background: var(--muted);
+        color: var(--text);
       }
 
       .step-title {
@@ -217,14 +216,14 @@
       }
 
       .content {
-        padding: 26px 28px 0;
+        padding: 24px 24px 0;
       }
 
       .panel {
         display: none;
       }
 
-      .panel[data-active="true"] {
+      .panel[data-active='true'] {
         display: block;
       }
 
@@ -243,15 +242,15 @@
       .section-title {
         margin: 0;
         color: var(--text);
-        font-size: 1.12rem;
-        font-weight: 700;
+        font-size: 1rem;
+        font-weight: 650;
       }
 
       .section-copy {
         margin: 6px 0 0;
         max-width: 66ch;
         color: var(--text-muted);
-        font-size: 0.92rem;
+        font-size: 0.875rem;
       }
 
       .segmented {
@@ -261,7 +260,7 @@
         padding: 4px;
         border: 1px solid var(--border);
         border-radius: var(--radius-md);
-        background: oklch(100% 0 0 / 0.045);
+        background: var(--input-bg);
       }
 
       .segmented button {
@@ -275,7 +274,7 @@
         font-weight: 650;
       }
 
-      .segmented button[aria-pressed="true"] {
+      .segmented button[aria-pressed='true'] {
         background: var(--surface-raised);
         color: var(--text);
         box-shadow: inset 0 0 0 1px var(--border-strong);
@@ -302,18 +301,21 @@
         color: var(--text);
         cursor: pointer;
         text-align: left;
+        transition:
+          background 140ms var(--ease-out-strong),
+          border-color 140ms var(--ease-out-strong),
+          box-shadow 140ms var(--ease-out-strong);
       }
 
       .option:hover {
         border-color: var(--border-strong);
-        background: oklch(24% 0.008 110);
+        background: var(--surface-raised);
       }
 
-      .option[aria-pressed="true"] {
-        border-color: oklch(93% 0.21 118 / 0.58);
-        background:
-          linear-gradient(90deg, oklch(93% 0.21 118 / 0.08), transparent 42%),
-          var(--surface-soft);
+      .option[aria-pressed='true'] {
+        border-color: var(--border-strong);
+        background: var(--surface-raised);
+        box-shadow: inset 0 0 0 1px var(--border-strong);
       }
 
       .size-option {
@@ -356,7 +358,7 @@
         padding: 10px 12px;
         border: 1px solid var(--border);
         border-radius: var(--radius-md);
-        background: oklch(100% 0 0 / 0.035);
+        background: var(--input-bg);
       }
 
       .spec-value {
@@ -413,9 +415,14 @@
       }
 
       .summary-price {
-        color: var(--primary);
-        font-size: 1.35rem;
-        font-weight: 780;
+        color: var(--text);
+        font-family:
+          Roboto Mono,
+          ui-monospace,
+          SFMono-Regular,
+          monospace;
+        font-size: 1.1rem;
+        font-weight: 600;
         white-space: nowrap;
       }
 
@@ -427,7 +434,7 @@
         border-top: 1px solid var(--border);
       }
 
-      .option[aria-pressed="true"] .funding-detail {
+      .option[aria-pressed='true'] .funding-detail {
         display: block;
       }
 
@@ -441,7 +448,7 @@
         padding: 9px 10px;
         border: 1px solid var(--border);
         border-radius: var(--radius-sm);
-        background: oklch(100% 0 0 / 0.035);
+        background: var(--input-bg);
       }
 
       .detail span {
@@ -462,10 +469,10 @@
         min-height: 42px;
         margin-top: 12px;
         padding: 10px 12px;
-        border: 1px solid oklch(80% 0.17 82 / 0.38);
+        border: 1px solid rgb(250 204 21 / 0.24);
         border-radius: var(--radius-sm);
-        background: oklch(80% 0.17 82 / 0.09);
-        color: oklch(87% 0.12 82);
+        background: rgb(250 204 21 / 0.08);
+        color: var(--warning);
         font-size: 0.83rem;
       }
 
@@ -479,7 +486,7 @@
         margin-top: 26px;
         padding: 16px 28px;
         border-top: 1px solid var(--border);
-        background: oklch(21% 0.007 110 / 0.96);
+        background: rgb(43 43 43 / 0.96);
       }
 
       .footer-note {
@@ -495,7 +502,7 @@
 
       .primary-action,
       .secondary-action {
-        min-height: 40px;
+        min-height: 36px;
         border-radius: var(--radius-sm);
         padding: 0 16px;
         cursor: pointer;
@@ -655,7 +662,7 @@
           bottom: 0;
           left: 0;
           z-index: 2;
-          box-shadow: 0 -18px 36px oklch(0% 0 0 / 0.34);
+          box-shadow: 0 -18px 36px rgb(0 0 0 / 0.34);
         }
 
         .payment-option .price strong {
@@ -675,7 +682,7 @@
             <p class="eyebrow">KiloClaw hosting</p>
             <h1 id="modal-title">Choose subscription</h1>
             <p class="lead">
-              Pick compute for this instance, then choose whether renewal comes from Kilo
+              Choose the hosting size for this instance, then choose whether renewals use Kilo
               Credits or Stripe.
             </p>
           </div>
@@ -730,7 +737,12 @@
               </div>
 
               <div class="size-list" aria-label="Instance size">
-                <button class="option size-option" type="button" data-size="good" aria-pressed="true">
+                <button
+                  class="option size-option"
+                  type="button"
+                  data-size="good"
+                  aria-pressed="true"
+                >
                   <span>
                     <span class="option-title">Good</span>
                     <span class="option-subtitle">Solo agent work, smaller repos, light tools</span>
@@ -752,10 +764,17 @@
                   <span class="price"><strong id="good-price">$9</strong><span>/mo</span></span>
                 </button>
 
-                <button class="option size-option" type="button" data-size="better" aria-pressed="false">
+                <button
+                  class="option size-option"
+                  type="button"
+                  data-size="better"
+                  aria-pressed="false"
+                >
                   <span>
                     <span class="option-title">Better</span>
-                    <span class="option-subtitle">Larger repos, heavier toolchains, parallel context</span>
+                    <span class="option-subtitle"
+                      >Larger repos, heavier toolchains, parallel context</span
+                    >
                   </span>
                   <span class="specs" aria-hidden="true">
                     <span class="spec">
@@ -774,10 +793,17 @@
                   <span class="price"><strong id="better-price">$86</strong><span>/mo</span></span>
                 </button>
 
-                <button class="option size-option" type="button" data-size="best" aria-pressed="false">
+                <button
+                  class="option size-option"
+                  type="button"
+                  data-size="best"
+                  aria-pressed="false"
+                >
                   <span>
                     <span class="option-title">Best</span>
-                    <span class="option-subtitle">Memory-heavy builds, indexing, long-running sessions</span>
+                    <span class="option-subtitle"
+                      >Memory-heavy builds, indexing, long-running sessions</span
+                    >
                   </span>
                   <span class="specs" aria-hidden="true">
                     <span class="spec">
@@ -812,15 +838,22 @@
               <div>
                 <h2 class="section-title">Choose payment</h2>
                 <p class="section-copy">
-                  Kilo Credits renew from your balance. Credit card redirects to Stripe checkout.
+                  Kilo Credits renew from your balance. Card payments go through Stripe checkout.
                 </p>
               </div>
 
               <div class="payment-list" aria-label="Payment source">
-                <button class="option payment-option" type="button" data-payment="credits" aria-pressed="false">
+                <button
+                  class="option payment-option"
+                  type="button"
+                  data-payment="credits"
+                  aria-pressed="false"
+                >
                   <span>
                     <span class="option-title">Kilo Credits</span>
-                    <span class="option-subtitle">Use available credits for this subscription period.</span>
+                    <span class="option-subtitle"
+                      >Use available credits for this subscription period.</span
+                    >
                     <span class="funding-detail">
                       <span class="detail-grid">
                         <span class="detail">
@@ -837,18 +870,25 @@
                         </span>
                       </span>
                       <span class="callout hidden" id="credit-shortfall">
-                        Balance short by <strong id="shortfall-value">$44.00</strong>. Add credits before
-                        this subscription can start.
+                        Balance short by <strong id="shortfall-value">$44.00</strong>. Add credits
+                        before this subscription can start.
                       </span>
                     </span>
                   </span>
                   <span class="price"><strong>Credits</strong></span>
                 </button>
 
-                <button class="option payment-option" type="button" data-payment="stripe" aria-pressed="false">
+                <button
+                  class="option payment-option"
+                  type="button"
+                  data-payment="stripe"
+                  aria-pressed="false"
+                >
                   <span>
                     <span class="option-title">Credit card</span>
-                    <span class="option-subtitle">Go to Stripe checkout and activate after payment.</span>
+                    <span class="option-subtitle"
+                      >Go to Stripe checkout and activate after payment.</span
+                    >
                   </span>
                   <span class="price"><strong>Stripe</strong></span>
                 </button>
@@ -874,27 +914,27 @@
       };
 
       const specs = {
-        good: "1 core, 3 GB memory",
-        better: "4 cores, 8 GB memory",
-        best: "4 cores, 16 GB memory",
+        good: '1 core, 3 GB memory',
+        better: '4 cores, 8 GB memory',
+        best: '4 cores, 16 GB memory',
       };
 
       const balance = 42;
-      let currentStep = "hosting";
-      let plan = "standard";
-      let size = "good";
-      let payment = "";
+      let currentStep = 'hosting';
+      let plan = 'standard';
+      let size = 'good';
+      let payment = '';
 
       const titleCase = value => value.charAt(0).toUpperCase() + value.slice(1);
       const money = value => `$${value.toFixed(2)}`;
 
-      const hostingPanel = document.querySelector("#hosting-panel");
-      const paymentPanel = document.querySelector("#payment-panel");
-      const stepHosting = document.querySelector("#step-hosting");
-      const stepPayment = document.querySelector("#step-payment");
-      const primaryAction = document.querySelector("#primary-action");
-      const backAction = document.querySelector("#back-action");
-      const footerNote = document.querySelector("#footer-note");
+      const hostingPanel = document.querySelector('#hosting-panel');
+      const paymentPanel = document.querySelector('#payment-panel');
+      const stepHosting = document.querySelector('#step-hosting');
+      const stepPayment = document.querySelector('#step-payment');
+      const primaryAction = document.querySelector('#primary-action');
+      const backAction = document.querySelector('#back-action');
+      const footerNote = document.querySelector('#footer-note');
 
       function selectedPrice() {
         return prices[plan][size];
@@ -912,58 +952,58 @@
 
       function updateSummary() {
         const price = selectedPrice();
-        document.querySelector("#hosting-meta").textContent =
+        document.querySelector('#hosting-meta').textContent =
           `${titleCase(plan)} ${titleCase(size)} selected`;
-        document.querySelector("#summary-value").textContent =
+        document.querySelector('#summary-value').textContent =
           `${titleCase(plan)} ${titleCase(size)}, ${specs[size]}`;
-        document.querySelector("#summary-price").textContent = `$${price}/mo`;
-        document.querySelector("#credit-due").textContent = money(price);
+        document.querySelector('#summary-price').textContent = `$${price}/mo`;
+        document.querySelector('#credit-due').textContent = money(price);
 
         const remaining = balance - price;
-        document.querySelector("#credit-remaining").textContent =
-          remaining >= 0 ? money(remaining) : "$0.00";
-        document.querySelector("#credit-shortfall").classList.toggle("hidden", remaining >= 0);
-        document.querySelector("#shortfall-value").textContent = money(Math.abs(remaining));
+        document.querySelector('#credit-remaining').textContent =
+          remaining >= 0 ? money(remaining) : '$0.00';
+        document.querySelector('#credit-shortfall').classList.toggle('hidden', remaining >= 0);
+        document.querySelector('#shortfall-value').textContent = money(Math.abs(remaining));
 
         const paymentMeta =
-          payment === "credits"
-            ? "Kilo Credits selected"
-            : payment === "stripe"
-              ? "Credit card selected"
-              : "Choose funding source";
-        document.querySelector("#payment-meta").textContent = paymentMeta;
+          payment === 'credits'
+            ? 'Kilo Credits selected'
+            : payment === 'stripe'
+              ? 'Card via Stripe selected'
+              : 'Choose funding source';
+        document.querySelector('#payment-meta').textContent = paymentMeta;
       }
 
       function updateStep() {
-        const isHosting = currentStep === "hosting";
+        const isHosting = currentStep === 'hosting';
         hostingPanel.dataset.active = String(isHosting);
         paymentPanel.dataset.active = String(!isHosting);
-        stepHosting.setAttribute("aria-current", isHosting ? "step" : "false");
+        stepHosting.setAttribute('aria-current', isHosting ? 'step' : 'false');
         stepHosting.dataset.complete = String(!isHosting);
-        stepPayment.setAttribute("aria-current", !isHosting ? "step" : "false");
-        backAction.classList.toggle("hidden", isHosting);
+        stepPayment.setAttribute('aria-current', !isHosting ? 'step' : 'false');
+        backAction.classList.toggle('hidden', isHosting);
 
         const creditShortfall = hasCreditShortfall();
         primaryAction.textContent = isHosting
-          ? "Continue"
-          : payment === "credits"
+          ? 'Continue'
+          : payment === 'credits'
             ? creditShortfall
-              ? "Add Kilo Credits"
-              : "Pay with Kilo Credits"
-            : payment === "stripe"
-              ? "Continue to Stripe"
-              : "Choose payment";
+              ? 'Add credits'
+              : 'Pay with Kilo Credits'
+            : payment === 'stripe'
+              ? 'Continue to Stripe'
+              : 'Choose payment';
         primaryAction.disabled = !isHosting && !payment;
 
         footerNote.textContent = isHosting
-          ? "Next: choose how this instance is funded."
-          : payment === "credits"
+          ? 'Next: choose how this instance is funded.'
+          : payment === 'credits'
             ? creditShortfall
-              ? "Add credits to cover the shortfall before this subscription starts."
-              : "Kilo Credits will be deducted when you confirm."
-            : payment === "stripe"
-              ? "Stripe opens next. Subscription activates after checkout completes."
-              : "Select one payment source to continue.";
+              ? 'Add credits to cover the shortfall before this subscription starts.'
+              : 'Kilo Credits will be deducted when you confirm.'
+            : payment === 'stripe'
+              ? 'Stripe opens next. Subscription activates after checkout completes.'
+              : 'Select one payment source to continue.';
       }
 
       function render() {
@@ -972,63 +1012,63 @@
         updateStep();
       }
 
-      document.querySelectorAll("[data-plan]").forEach(button => {
-        button.addEventListener("click", () => {
+      document.querySelectorAll('[data-plan]').forEach(button => {
+        button.addEventListener('click', () => {
           plan = button.dataset.plan;
-          document.querySelectorAll("[data-plan]").forEach(item => {
-            item.setAttribute("aria-pressed", String(item === button));
+          document.querySelectorAll('[data-plan]').forEach(item => {
+            item.setAttribute('aria-pressed', String(item === button));
           });
-          payment = "";
-          document.querySelectorAll("[data-payment]").forEach(item => {
-            item.setAttribute("aria-pressed", "false");
+          payment = '';
+          document.querySelectorAll('[data-payment]').forEach(item => {
+            item.setAttribute('aria-pressed', 'false');
           });
           render();
         });
       });
 
-      document.querySelectorAll("[data-size]").forEach(button => {
-        button.addEventListener("click", () => {
+      document.querySelectorAll('[data-size]').forEach(button => {
+        button.addEventListener('click', () => {
           size = button.dataset.size;
-          document.querySelectorAll("[data-size]").forEach(item => {
-            item.setAttribute("aria-pressed", String(item === button));
+          document.querySelectorAll('[data-size]').forEach(item => {
+            item.setAttribute('aria-pressed', String(item === button));
           });
-          payment = "";
-          document.querySelectorAll("[data-payment]").forEach(item => {
-            item.setAttribute("aria-pressed", "false");
+          payment = '';
+          document.querySelectorAll('[data-payment]').forEach(item => {
+            item.setAttribute('aria-pressed', 'false');
           });
           render();
         });
       });
 
-      document.querySelectorAll("[data-payment]").forEach(button => {
-        button.addEventListener("click", () => {
+      document.querySelectorAll('[data-payment]').forEach(button => {
+        button.addEventListener('click', () => {
           payment = button.dataset.payment;
-          document.querySelectorAll("[data-payment]").forEach(item => {
-            item.setAttribute("aria-pressed", String(item === button));
+          document.querySelectorAll('[data-payment]').forEach(item => {
+            item.setAttribute('aria-pressed', String(item === button));
           });
           render();
         });
       });
 
-      stepHosting.addEventListener("click", () => {
-        currentStep = "hosting";
+      stepHosting.addEventListener('click', () => {
+        currentStep = 'hosting';
         render();
       });
 
-      stepPayment.addEventListener("click", () => {
-        currentStep = "payment";
+      stepPayment.addEventListener('click', () => {
+        currentStep = 'payment';
         render();
       });
 
-      primaryAction.addEventListener("click", () => {
-        if (currentStep === "hosting") {
-          currentStep = "payment";
+      primaryAction.addEventListener('click', () => {
+        if (currentStep === 'hosting') {
+          currentStep = 'payment';
           render();
         }
       });
 
-      backAction.addEventListener("click", () => {
-        currentStep = "hosting";
+      backAction.addEventListener('click', () => {
+        currentStep = 'hosting';
         render();
       });
 

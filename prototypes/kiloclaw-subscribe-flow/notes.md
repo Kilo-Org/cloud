@@ -20,11 +20,11 @@ Per-instance subscriptions per `Plans rule 5`. Instance name surfaces in the ste
 
 ## Pricing model encoded
 
-| Size   | Specs                                | Standard | Commit     |
-|--------|--------------------------------------|----------|------------|
-| Good   | 1 perf core · 3 GB · 10 GB           | $9/mo    | $8/mo      |
-| Better | 4 perf cores · 8 GB · 20 GB          | $86/mo   | $76/mo     |
-| Best   | 4 perf cores · 16 GB · 40 GB         | $172/mo  | $152/mo    |
+| Size   | Specs                        | Standard | Commit  |
+| ------ | ---------------------------- | -------- | ------- |
+| Good   | 1 perf core · 3 GB · 10 GB   | $9/mo    | $8/mo   |
+| Better | 4 perf cores · 8 GB · 20 GB  | $86/mo   | $76/mo  |
+| Best   | 4 perf cores · 16 GB · 40 GB | $172/mo  | $152/mo |
 
 - Standard first month = $4 (per `Subscription Checkout rule 5`, `Credit Enrollment rule 3`). Same value for both payment methods.
 - Commit pays 6 months upfront (e.g. Best = $912 first period). No first-month discount on Commit per spec.
@@ -32,12 +32,13 @@ Per-instance subscriptions per `Plans rule 5`. Instance name surfaces in the ste
 
 ## Demo controls (top-left)
 
-| Toggle              | What it does                                                                |
-|---------------------|------------------------------------------------------------------------------|
-| Credit balance      | $200 (covers any plan), $42 (covers Standard, not Commit), $0 (empty)        |
-| Re-open dialog      | Resets to step 1 if you closed via X / Esc / overlay click                   |
+| Toggle         | What it does                                                          |
+| -------------- | --------------------------------------------------------------------- |
+| Credit balance | $200 (covers any plan), $42 (covers Standard, not Commit), $0 (empty) |
+| Re-open dialog | Resets to step 1 if you closed via X / Esc / overlay click            |
 
 States to inspect:
+
 - Sufficient credits → credits card primary, "Subscribe with credits" CTA.
 - Insufficient credits for the selected plan → credits card disabled with reason and Top-up link, Stripe auto-selected, CTA flips to "Subscribe via card".
 - Standard at $42 is sufficient (only $4 due first period); Commit Best at $42 is blocked ($912 due).
@@ -65,11 +66,13 @@ States to inspect:
 ## Browser pass
 
 Inspected at:
+
 - 1280 × 900 (desktop)
 - 820 × 1180 (tablet)
 - 390 × 844 (mobile, iPhone-class)
 
 Issues found and fixed during the initial pass:
+
 1. Close button overlapped the "2 Payment" step label → added 36 px right padding to the stepper.
 2. The insufficient-credits warning rendered even when balance was sufficient because `[hidden]` was overridden by `display: flex` on `.warn` → added a global `[hidden] { display: none !important; }` rule.
 3. Demo toggle's `$42` option didn't actually exercise an insufficient state on the default selection (Standard first month is only $4) → added a `$0` option and rephrased the others.
@@ -99,13 +102,13 @@ Verified: zero console errors, keyboard end-to-end test still passes (Enter from
 
 Measured first, fixed only what was actually wasteful. Numbers from `agent-browser` performance API on a 1280×900 viewport:
 
-| Metric | Value |
-|---|---|
-| HTML transfer | 49.3 KB |
-| DOMContentLoaded | ~25 ms (warm cache) |
-| FCP | ~56 ms (warm cache) |
-| LCP | ~84 ms (warm cache) |
-| Subresources | 1 Google Fonts CSS link (~0.9 KB) |
+| Metric           | Value                             |
+| ---------------- | --------------------------------- |
+| HTML transfer    | 49.3 KB                           |
+| DOMContentLoaded | ~25 ms (warm cache)               |
+| FCP              | ~56 ms (warm cache)               |
+| LCP              | ~84 ms (warm cache)               |
+| Subresources     | 1 Google Fonts CSS link (~0.9 KB) |
 
 The page is fast on file://, so the meaningful optimization is what cold-cache real users will pay for. Auditing computed styles surfaced one real waste:
 

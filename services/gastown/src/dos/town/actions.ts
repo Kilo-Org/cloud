@@ -22,7 +22,7 @@ import * as reviewQueue from './review-queue';
 import * as patrol from './patrol';
 import { getRig } from './rigs';
 import { parseGitUrl } from '../../util/platform-pr.util';
-import type { PRStatusResult } from './town-scm';
+import type { PRStatusOutcome, PRStatusError } from './town-scm';
 
 // ── Bead mutations ──────────────────────────────────────────────────
 
@@ -300,8 +300,8 @@ export type ApplyActionContext = {
   dispatchAgent: (agentId: string, beadId: string, rigId: string) => Promise<boolean>;
   /** Stop an agent's container process. */
   stopAgent: (agentId: string) => Promise<void>;
-  /** Check a PR's status via GitHub/GitLab API. Returns PRStatusResult or null. */
-  checkPRStatus: (prUrl: string) => Promise<PRStatusResult | null>;
+  /** Check a PR's status via GitHub/GitLab API. Returns PRStatusOutcome. */
+  checkPRStatus: (prUrl: string) => Promise<PRStatusOutcome>;
   /** Check PR for unresolved review comments and failing CI checks. */
   checkPRFeedback: (prUrl: string) => Promise<PRFeedbackCheckResult | null>;
   /** Merge a PR via GitHub/GitLab API. */
@@ -330,8 +330,56 @@ const LOG = '[actions]';
 /** Fail MR bead after this many consecutive null poll results (#1632). */
 const PR_POLL_NULL_THRESHOLD = 10;
 
+/** Fail MR bead after this many consecutive non-transient errors (invalid_response, unrecognized_url, host_mismatch). */
+const PR_POLL_NON_TRANSIENT_THRESHOLD = 3;
+
 /** Minimum interval between PR polls per MR bead (ms) (#1632). */
 export const PR_POLL_INTERVAL_MS = 60_000; // 1 minute
+
+function failureMessageFor(error: PRStatusError): string {
+  switch (error.kind) {
+    case 'no_token':
+      return (
+        `No GitHub token resolved for this town. Tried (in order): ` +
+        error.resolutionChain.map(s => `\`${s}\``).join(', ') +
+        `. Configure one of these in town or rig settings. ` +
+        `Note: polecat agents use their own container credentials and ` +
+        `may have created the PR successfully — that does not imply the ` +
+        `town worker can poll PR status.`
+      );
+    case 'http_error':
+      if (error.status === 401) {
+        return `Town's GitHub token is invalid or expired (HTTP 401). Refresh the token in town settings.`;
+      }
+      if (error.status === 403) {
+        return `Town's GitHub token lacks permission for this PR (HTTP 403). Ensure the token has \`pull-requests: read\` scope on the repo, or check for a secondary rate limit.`;
+      }
+      if (error.status === 404) {
+        return `PR not found (HTTP 404). Was the branch deleted before the PR could be polled, or is the PR URL wrong?`;
+      }
+      return `${error.provider} API returned HTTP ${error.status} ${error.statusText}. ${error.transient ? 'Retrying.' : 'Not retryable.'}`;
+    case 'invalid_response':
+      return (
+        `${error.provider} API returned an unexpected response shape ` +
+        `(${error.reason})${error.sampleKeys ? `; top-level keys: ${error.sampleKeys.join(', ')}` : ''}. ` +
+        `Please file a bug — the API contract may have drifted.`
+      );
+    case 'unrecognized_url':
+      return `PR URL format not recognized: ${error.url}. Expected GitHub PR or GitLab MR URL.`;
+    case 'host_mismatch':
+      return `Refusing to send GitLab token to unexpected host \`${error.got}\` (configured: \`${error.expected}\`).`;
+  }
+}
+
+function shouldFailImmediately(error: PRStatusError): boolean {
+  if (error.kind === 'no_token') return true;
+  if (error.kind === 'http_error' && !error.transient) return true;
+  return false;
+}
+
+function shouldCountAsTransient(error: PRStatusError): boolean {
+  return error.kind === 'http_error' && error.transient;
+}
 
 function now(): string {
   return new Date().toISOString();
@@ -745,22 +793,23 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
       return async () => {
         try {
-          const prStatusResult = await ctx.checkPRStatus(action.pr_url);
-          if (prStatusResult !== null) {
-            // Any non-null result resets the consecutive null counter
+          const outcome = await ctx.checkPRStatus(action.pr_url);
+          if (outcome.ok) {
+            // Successful poll — reset consecutive null counter
             query(
               sql,
               /* sql */ `
                 UPDATE ${beads}
                 SET ${beads.columns.metadata} = json_set(
                   COALESCE(${beads.columns.metadata}, '{}'),
-                  '$.poll_null_count', 0
+                  '$.poll_null_count', 0,
+                  '$.poll_error_kind', NULL
                 )
                 WHERE ${beads.bead_id} = ?
               `,
               [action.bead_id]
             );
-            const { status, mergeable_state } = prStatusResult;
+            const { status, mergeable_state } = outcome.result;
             if (status !== 'open') {
               ctx.insertEvent('pr_status_changed', {
                 bead_id: action.bead_id,
@@ -1048,10 +1097,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               // If the PR was merged externally during that window, inserting
               // pr_feedback_detected would create a feedback bead for a merged
               // PR — leading to a duplicate PR on an already-merged branch.
-              const freshStatusResult = await ctx.checkPRStatus(action.pr_url);
-              if (freshStatusResult?.status !== 'open') {
+              const freshOutcome = await ctx.checkPRStatus(action.pr_url);
+              if (!freshOutcome.ok || freshOutcome.result.status !== 'open') {
                 console.log(
-                  `${LOG} poll_pr: PR status changed to '${freshStatusResult?.status ?? 'null'}' during feedback check, skipping feedback for bead=${action.bead_id}`
+                  `${LOG} poll_pr: PR status changed to '${freshOutcome.ok ? freshOutcome.result.status : 'error'}' during feedback check, skipping feedback for bead=${action.bead_id}`
                 );
               } else {
                 const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);
@@ -1179,39 +1228,41 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               }
             }
           } else {
-            // Null result — GitHub API unreachable (token missing, expired, rate-limited, or 5xx).
-            // Increment consecutive null counter; fail the bead after PR_POLL_NULL_THRESHOLD.
+            const error = outcome.error;
+
+            // Store the latest error kind for analytics
             query(
               sql,
               /* sql */ `
                 UPDATE ${beads}
                 SET ${beads.columns.metadata} = json_set(
                   COALESCE(${beads.columns.metadata}, '{}'),
-                  '$.poll_null_count',
-                  COALESCE(
-                    json_extract(${beads.columns.metadata}, '$.poll_null_count'),
-                    0
-                  ) + 1
+                  '$.poll_error_kind', ?
                 )
                 WHERE ${beads.bead_id} = ?
               `,
-              [action.bead_id]
+              [error.kind, action.bead_id]
             );
-            const rows = [
-              ...query(
-                sql,
-                /* sql */ `
-                  SELECT json_extract(${beads.columns.metadata}, '$.poll_null_count') AS null_count
-                  FROM ${beads}
-                  WHERE ${beads.bead_id} = ?
-                `,
-                [action.bead_id]
-              ),
-            ];
-            const nullCount = Number(rows[0]?.null_count ?? 0);
-            if (nullCount >= PR_POLL_NULL_THRESHOLD) {
+
+            const failRigRows = z
+              .object({ rig_id: z.string().nullable() })
+              .array()
+              .parse([
+                ...query(
+                  sql,
+                  /* sql */ `
+                    SELECT ${beads.columns.rig_id}
+                    FROM ${beads}
+                    WHERE ${beads.bead_id} = ?
+                  `,
+                  [action.bead_id]
+                ),
+              ]);
+            const failRigId = failRigRows[0]?.rig_id ?? '';
+
+            if (shouldFailImmediately(error)) {
               console.warn(
-                `${LOG} poll_pr: ${nullCount} consecutive null results for bead=${action.bead_id}, failing`
+                `${LOG} poll_pr: immediate-fail error kind=${error.kind} for bead=${action.bead_id}, failing`
               );
               beadOps.updateBeadStatus(sql, action.bead_id, 'failed', 'system');
               query(
@@ -1221,15 +1272,141 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                   SET ${beads.columns.metadata} = json_set(
                     COALESCE(${beads.columns.metadata}, '{}'),
                     '$.failureReason', 'pr_poll_failed',
+                    '$.failureKind', ?,
                     '$.failureMessage', ?
                   )
                   WHERE ${beads.bead_id} = ?
                 `,
-                [
-                  `Cannot poll PR status — GitHub API returned null ${nullCount} consecutive times. Check that a valid GitHub token is configured in town settings and that the GitHub API is reachable.`,
-                  action.bead_id,
-                ]
+                [error.kind, failureMessageFor(error), action.bead_id]
               );
+              ctx.emitEvent({
+                event: 'pr.poll_failed',
+                townId,
+                beadId: action.bead_id,
+                rigId: failRigId,
+                reason: error.kind,
+                label: 'provider' in error ? error.provider : '',
+                statusCode: error.kind === 'http_error' ? error.status : undefined,
+              });
+            } else if (shouldCountAsTransient(error)) {
+              // Transient HTTP errors (5xx, 429) count toward the existing 10-strike threshold
+              query(
+                sql,
+                /* sql */ `
+                  UPDATE ${beads}
+                  SET ${beads.columns.metadata} = json_set(
+                    COALESCE(${beads.columns.metadata}, '{}'),
+                    '$.poll_null_count',
+                    COALESCE(
+                      json_extract(${beads.columns.metadata}, '$.poll_null_count'),
+                      0
+                    ) + 1
+                  )
+                  WHERE ${beads.bead_id} = ?
+                `,
+                [action.bead_id]
+              );
+              const rows = [
+                ...query(
+                  sql,
+                  /* sql */ `
+                    SELECT json_extract(${beads.columns.metadata}, '$.poll_null_count') AS null_count
+                    FROM ${beads}
+                    WHERE ${beads.bead_id} = ?
+                  `,
+                  [action.bead_id]
+                ),
+              ];
+              const nullCount = Number(rows[0]?.null_count ?? 0);
+              if (nullCount >= PR_POLL_NULL_THRESHOLD) {
+                console.warn(
+                  `${LOG} poll_pr: ${nullCount} consecutive transient errors for bead=${action.bead_id}, failing`
+                );
+                beadOps.updateBeadStatus(sql, action.bead_id, 'failed', 'system');
+                query(
+                  sql,
+                  /* sql */ `
+                    UPDATE ${beads}
+                    SET ${beads.columns.metadata} = json_set(
+                      COALESCE(${beads.columns.metadata}, '{}'),
+                      '$.failureReason', 'pr_poll_failed',
+                      '$.failureKind', ?,
+                      '$.failureMessage', ?
+                    )
+                    WHERE ${beads.bead_id} = ?
+                  `,
+                  [error.kind, failureMessageFor(error), action.bead_id]
+                );
+                ctx.emitEvent({
+                  event: 'pr.poll_failed',
+                  townId,
+                  beadId: action.bead_id,
+                  rigId: failRigId,
+                  reason: error.kind,
+                  label: 'provider' in error ? error.provider : '',
+                  statusCode: error.kind === 'http_error' ? error.status : undefined,
+                });
+              }
+            } else {
+              // Non-transient, non-immediate errors (invalid_response, unrecognized_url, host_mismatch)
+              // count toward a lower 3-strike threshold
+              query(
+                sql,
+                /* sql */ `
+                  UPDATE ${beads}
+                  SET ${beads.columns.metadata} = json_set(
+                    COALESCE(${beads.columns.metadata}, '{}'),
+                    '$.poll_null_count',
+                    COALESCE(
+                      json_extract(${beads.columns.metadata}, '$.poll_null_count'),
+                      0
+                    ) + 1
+                  )
+                  WHERE ${beads.bead_id} = ?
+                `,
+                [action.bead_id]
+              );
+              const rows = [
+                ...query(
+                  sql,
+                  /* sql */ `
+                    SELECT json_extract(${beads.columns.metadata}, '$.poll_null_count') AS null_count
+                    FROM ${beads}
+                    WHERE ${beads.bead_id} = ?
+                  `,
+                  [action.bead_id]
+                ),
+              ];
+              const nullCount = Number(rows[0]?.null_count ?? 0);
+              if (nullCount >= PR_POLL_NON_TRANSIENT_THRESHOLD) {
+                console.warn(
+                  `${LOG} poll_pr: ${nullCount} consecutive non-transient errors kind=${error.kind} for bead=${action.bead_id}, failing`
+                );
+                beadOps.updateBeadStatus(sql, action.bead_id, 'failed', 'system');
+                query(
+                  sql,
+                  /* sql */ `
+                    UPDATE ${beads}
+                    SET ${beads.columns.metadata} = json_set(
+                      COALESCE(${beads.columns.metadata}, '{}'),
+                      '$.failureReason', 'pr_poll_failed',
+                      '$.failureKind', ?,
+                      '$.failureMessage', ?
+                    )
+                    WHERE ${beads.bead_id} = ?
+                  `,
+                  [error.kind, failureMessageFor(error), action.bead_id]
+                );
+                ctx.emitEvent({
+                  event: 'pr.poll_failed',
+                  townId,
+                  beadId: action.bead_id,
+                  rigId: failRigId,
+                  reason: error.kind,
+                  label: 'provider' in error ? error.provider : '',
+                  statusCode: error.kind === 'http_error' ? error.status : undefined,
+                });
+              }
             }
           }
           // status === 'open' — no action needed, poll again next tick
@@ -1483,3 +1660,4 @@ function parsePrUrl(prUrl: string): { repo: string; prNumber: number } | null {
 
 // Exported for testing
 export { hasExistingFeedbackBead as _hasExistingFeedbackBead, parsePrUrl as _parsePrUrl };
+export { failureMessageFor as _failureMessageFor, shouldFailImmediately as _shouldFailImmediately, shouldCountAsTransient as _shouldCountAsTransient };

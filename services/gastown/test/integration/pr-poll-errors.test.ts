@@ -82,9 +82,7 @@ describe('PR poll error discrimination (#3149)', () => {
     it('should fail the MR bead immediately (1 strike) with failureKind "no_token"', async () => {
       // Town is set up with no git_auth, so resolveGitHubToken will return
       // { ok: false, tried: [...] } and checkPRStatus will return a no_token error.
-      const { mrBeadId } = await setupMrBeadWithPrUrl(
-        'https://github.com/test/repo/pull/1'
-      );
+      const { mrBeadId } = await setupMrBeadWithPrUrl('https://github.com/test/repo/pull/1');
 
       // Run alarm — the reconciler should generate a poll_pr action, which
       // calls checkPRStatus and gets a no_token error. Since no_token is an

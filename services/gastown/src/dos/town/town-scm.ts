@@ -35,7 +35,11 @@ export async function resolveGitHubToken(ctx: SCMContext): Promise<GitHubTokenRe
   const townConfig = await ctx.getTownConfig();
 
   if (townConfig.git_auth?.github_token) {
-    return { ok: true, token: townConfig.git_auth.github_token, source: 'town.git_auth.github_token' };
+    return {
+      ok: true,
+      token: townConfig.git_auth.github_token,
+      source: 'town.git_auth.github_token',
+    };
   }
   tried.push('town.git_auth.github_token');
 
@@ -74,8 +78,19 @@ export type PRStatusResult = {
 export type PRStatusError =
   | { kind: 'no_token'; provider: 'github' | 'gitlab'; resolutionChain: string[] }
   | { kind: 'unrecognized_url'; url: string }
-  | { kind: 'http_error'; provider: 'github' | 'gitlab'; status: number; statusText: string; transient: boolean }
-  | { kind: 'invalid_response'; provider: 'github' | 'gitlab'; reason: 'json_parse' | 'schema_mismatch'; sampleKeys?: string[] }
+  | {
+      kind: 'http_error';
+      provider: 'github' | 'gitlab';
+      status: number;
+      statusText: string;
+      transient: boolean;
+    }
+  | {
+      kind: 'invalid_response';
+      provider: 'github' | 'gitlab';
+      reason: 'json_parse' | 'schema_mismatch';
+      sampleKeys?: string[];
+    }
   | { kind: 'host_mismatch'; provider: 'gitlab'; expected: string; got: string };
 
 export type PRStatusOutcome =
@@ -91,10 +106,7 @@ function isTransientHttpStatus(status: number): boolean {
  * Returns a PRStatusOutcome discriminated union — { ok: true, result } on success,
  * or { ok: false, error } with a structured PRStatusError describing why.
  */
-export async function checkPRStatus(
-  ctx: SCMContext,
-  prUrl: string
-): Promise<PRStatusOutcome> {
+export async function checkPRStatus(ctx: SCMContext, prUrl: string): Promise<PRStatusOutcome> {
   const townConfig = await ctx.getTownConfig();
 
   // GitHub PR URL format: https://github.com/{owner}/{repo}/pull/{number}
@@ -104,7 +116,10 @@ export async function checkPRStatus(
     const resolution = await resolveGitHubToken(ctx);
     if (!resolution.ok) {
       console.warn(`${TOWN_LOG} checkPRStatus: no GitHub token available, cannot poll ${prUrl}`);
-      return { ok: false, error: { kind: 'no_token', provider: 'github', resolutionChain: resolution.tried } };
+      return {
+        ok: false,
+        error: { kind: 'no_token', provider: 'github', resolutionChain: resolution.tried },
+      };
     }
 
     const response = await fetch(
@@ -123,19 +138,33 @@ export async function checkPRStatus(
       );
       return {
         ok: false,
-        error: { kind: 'http_error', provider: 'github', status: response.status, statusText: response.statusText, transient: isTransientHttpStatus(response.status) },
+        error: {
+          kind: 'http_error',
+          provider: 'github',
+          status: response.status,
+          statusText: response.statusText,
+          transient: isTransientHttpStatus(response.status),
+        },
       };
     }
 
     const json = await response.json().catch(() => null);
     if (!json) {
-      return { ok: false, error: { kind: 'invalid_response', provider: 'github', reason: 'json_parse' } };
+      return {
+        ok: false,
+        error: { kind: 'invalid_response', provider: 'github', reason: 'json_parse' },
+      };
     }
     const data = GitHubPRStatusSchema.safeParse(json);
     if (!data.success) {
       return {
         ok: false,
-        error: { kind: 'invalid_response', provider: 'github', reason: 'schema_mismatch', sampleKeys: Object.keys(json).slice(0, 8) },
+        error: {
+          kind: 'invalid_response',
+          provider: 'github',
+          reason: 'schema_mismatch',
+          sampleKeys: Object.keys(json).slice(0, 8),
+        },
       };
     }
 
@@ -151,7 +180,14 @@ export async function checkPRStatus(
     const token = townConfig.git_auth?.gitlab_token;
     if (!token) {
       console.warn(`${TOWN_LOG} checkPRStatus: no gitlab_token configured, cannot poll ${prUrl}`);
-      return { ok: false, error: { kind: 'no_token', provider: 'gitlab', resolutionChain: ['town.git_auth.gitlab_token'] } };
+      return {
+        ok: false,
+        error: {
+          kind: 'no_token',
+          provider: 'gitlab',
+          resolutionChain: ['town.git_auth.gitlab_token'],
+        },
+      };
     }
 
     // Validate the host against known GitLab hosts to prevent SSRF/token leak.
@@ -165,7 +201,12 @@ export async function checkPRStatus(
       );
       return {
         ok: false,
-        error: { kind: 'host_mismatch', provider: 'gitlab', expected: configuredHost ?? 'gitlab.com', got: prHost },
+        error: {
+          kind: 'host_mismatch',
+          provider: 'gitlab',
+          expected: configuredHost ?? 'gitlab.com',
+          got: prHost,
+        },
       };
     }
 
@@ -182,19 +223,33 @@ export async function checkPRStatus(
       );
       return {
         ok: false,
-        error: { kind: 'http_error', provider: 'gitlab', status: response.status, statusText: response.statusText, transient: isTransientHttpStatus(response.status) },
+        error: {
+          kind: 'http_error',
+          provider: 'gitlab',
+          status: response.status,
+          statusText: response.statusText,
+          transient: isTransientHttpStatus(response.status),
+        },
       };
     }
 
     const glJson = await response.json().catch(() => null);
     if (!glJson) {
-      return { ok: false, error: { kind: 'invalid_response', provider: 'gitlab', reason: 'json_parse' } };
+      return {
+        ok: false,
+        error: { kind: 'invalid_response', provider: 'gitlab', reason: 'json_parse' },
+      };
     }
     const data = GitLabMRStatusSchema.safeParse(glJson);
     if (!data.success) {
       return {
         ok: false,
-        error: { kind: 'invalid_response', provider: 'gitlab', reason: 'schema_mismatch', sampleKeys: Object.keys(glJson).slice(0, 8) },
+        error: {
+          kind: 'invalid_response',
+          provider: 'gitlab',
+          reason: 'schema_mismatch',
+          sampleKeys: Object.keys(glJson).slice(0, 8),
+        },
       };
     }
 

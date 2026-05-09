@@ -1173,7 +1173,7 @@ export const wastelandRouter = router({
   // branch, then open + merge a PR to land the change on `main`. This
   // matches the pattern used by `setUpstreamRigTrust`.
 
-  forceUnclaimWantedItem: adminProcedure
+  forceUnclaimWantedItem: procedure
     .input(
       z.object({
         wastelandId: z.string().uuid(),
@@ -1211,6 +1211,7 @@ export const wastelandRouter = router({
 
       const scratchBranch = `force-unclaim-${input.itemId}-${crypto.randomUUID().slice(0, 8)}`;
       let orphanedPullId: string | null = null;
+      let branchCreated = false;
       let mergeConfirmed = false;
       try {
         // `input.itemId` is Zod-validated against /^[A-Za-z0-9_.:-]+$/ —
@@ -1223,10 +1224,11 @@ export const wastelandRouter = router({
           scratchBranch,
           `UPDATE wanted SET status = 'open', claimed_by = NULL, updated_at = NOW() WHERE id = '${input.itemId}'`
         );
+        branchCreated = true;
 
         const pull = await doltApi.createPull(upstream, token, {
           title: `[wl] force-unclaim ${input.itemId} by ${adminHandle}`,
-          description: `Admin force-unclaim by ${adminHandle}. Reason: ${input.reason}`,
+          description: `Admin force-unclaim by ${adminHandle}.\n\nReason:\n> ${input.reason.replace(/\n/g, '\n> ')}`,
           fromBranch: scratchBranch,
           toBranch: 'main',
         });
@@ -1291,6 +1293,8 @@ export const wastelandRouter = router({
           await doltApi.closePull(upstream, token, orphanedPullId).catch(() => {});
         }
         if (mergeConfirmed) {
+          await doltApi.deleteBranch(upstream, token, scratchBranch).catch(() => {});
+        } else if (branchCreated) {
           await doltApi.deleteBranch(upstream, token, scratchBranch).catch(() => {});
         }
       }

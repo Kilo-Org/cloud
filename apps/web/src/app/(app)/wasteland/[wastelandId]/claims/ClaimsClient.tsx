@@ -113,7 +113,7 @@ export function ClaimsClient({ wastelandId }: { wastelandId: string }) {
   const isUpstreamAdmin = credentialQuery.data?.is_upstream_admin === true;
   const currentUserMember = membersQuery.data?.find(m => m.user_id === currentUser?.id);
   const isOwner = currentUserMember?.role === 'owner' || currentUser?.is_admin === true;
-  const canForceUnclaim = isOwner || isUpstreamAdmin;
+  const canForceUnclaim = isOwner && isUpstreamAdmin;
 
   const forceUnclaimMutation = useMutation({
     ...trpc.wasteland.forceUnclaimWantedItem.mutationOptions(),

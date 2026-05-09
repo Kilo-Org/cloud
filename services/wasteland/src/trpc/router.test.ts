@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TRPCError } from '@trpc/server';
 import { createCallerFactory } from './init';
 import { wastelandRouter } from './router';
 
@@ -319,20 +318,7 @@ describe('forceUnclaimWantedItem', () => {
         itemId: 'w-1',
         reason: 'Stale claim',
       })
-    ).rejects.toThrow(TRPCError);
-
-    const err = await caller.forceUnclaimWantedItem({
-      wastelandId: WASTELAND_ID,
-      itemId: 'w-1',
-      reason: 'Stale claim',
-    }).then(
-      () => { throw new Error('Expected rejection') },
-      (e: unknown) => e,
-    );
-    expect(err).toBeInstanceOf(TRPCError);
-    if (err instanceof TRPCError) {
-      expect(err.code).toBe('FORBIDDEN');
-    }
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
   it('rejects itemId with invalid characters', async () => {

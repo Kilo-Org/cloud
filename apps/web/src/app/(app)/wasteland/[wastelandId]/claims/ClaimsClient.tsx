@@ -1,27 +1,40 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import type { WastelandOutputs } from '@/lib/wasteland/trpc';
 import { useSetWastelandPageHeader } from '../WastelandPageHeaderContext';
 import { useDrawerStack } from '@/components/wasteland/drawer/WastelandDrawerStack';
 import { Badge } from '@/components/ui/badge';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   ArrowUpDown,
   ExternalLink,
   Hourglass,
+  Loader2,
   MoreHorizontal,
   RefreshCw,
   Search,
   ShieldAlert,
   ScrollText,
+  TriangleAlert,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
 import { parseDoltDate } from '@/lib/wasteland/date';
 import { STATUS_DOT, PRIORITY_COLORS, TYPE_COLORS } from '@/lib/wasteland/status-colors';
+import { useUser } from '@/hooks/useUser';
 import Link from 'next/link';
 
 type ClaimRow = WastelandOutputs['wasteland']['listClaims'][number];
@@ -67,12 +80,15 @@ export function ClaimsClient({ wastelandId }: { wastelandId: string }) {
   const trpc = useWastelandTRPC();
   const queryClient = useQueryClient();
   const { open: openDrawer } = useDrawerStack();
+  const { data: currentUser } = useUser();
 
   const [search, setSearch] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [rigHandleFilter, setRigHandleFilter] = useState<string | null>(null);
   const [pendingPrOnly, setPendingPrOnly] = useState(false);
   const [activeMenuItemId, setActiveMenuItemId] = useState<string | null>(null);
+  const [forceUnclaimTarget, setForceUnclaimTarget] = useState<ClaimRow | null>(null);
+  const [forceUnclaimReason, setForceUnclaimReason] = useState('');
 
   useEffect(() => {
     if (!activeMenuItemId) return;
@@ -92,7 +108,25 @@ export function ClaimsClient({ wastelandId }: { wastelandId: string }) {
   const credentialQuery = useQuery(
     trpc.wasteland.getCredentialStatus.queryOptions({ wastelandId })
   );
-  const isAdmin = credentialQuery.data?.is_upstream_admin ?? false;
+  const membersQuery = useQuery(trpc.wasteland.listMembers.queryOptions({ wastelandId }));
+
+  const isUpstreamAdmin = credentialQuery.data?.is_upstream_admin === true;
+  const currentUserMember = membersQuery.data?.find(m => m.user_id === currentUser?.id);
+  const isOwner = currentUserMember?.role === 'owner' || currentUser?.is_admin === true;
+  const canForceUnclaim = isOwner && isUpstreamAdmin;
+
+  const forceUnclaimMutation = useMutation({
+    ...trpc.wasteland.forceUnclaimWantedItem.mutationOptions(),
+    onSuccess: () => {
+      toast.success('Claim force-released');
+      setForceUnclaimTarget(null);
+      setForceUnclaimReason('');
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.listClaims.queryKey({ wastelandId }),
+      });
+    },
+    onError: err => toast.error(`Force unclaim failed: ${err.message}`),
+  });
 
   useSlowOperationToast(claimsQuery.isLoading && !claimsQuery.data);
 
@@ -172,7 +206,7 @@ export function ClaimsClient({ wastelandId }: { wastelandId: string }) {
         wastelandId,
         item,
         actions: {
-          isAdmin,
+          isAdmin: isUpstreamAdmin,
           onDone: () => {},
           onAccept: () => {},
           onReject: () => {},
@@ -181,7 +215,7 @@ export function ClaimsClient({ wastelandId }: { wastelandId: string }) {
         },
       });
     },
-    [openDrawer, wastelandId, isAdmin]
+    [openDrawer, wastelandId, isUpstreamAdmin]
   );
 
   const cycleSort = useCallback(() => {
@@ -326,8 +360,9 @@ export function ClaimsClient({ wastelandId }: { wastelandId: string }) {
                 key={claim.item.id}
                 claim={claim}
                 wastelandId={wastelandId}
-                isAdmin={isAdmin}
+                canForceUnclaim={canForceUnclaim}
                 onClick={() => handleOpenItem(claim.item)}
+                onForceUnclaim={() => setForceUnclaimTarget(claim)}
                 activeMenuItemId={activeMenuItemId}
                 setActiveMenuItemId={setActiveMenuItemId}
                 delay={Math.min(i * 0.02, 0.3)}
@@ -336,6 +371,72 @@ export function ClaimsClient({ wastelandId }: { wastelandId: string }) {
           </AnimatePresence>
         </div>
       </div>
+
+      <AlertDialog
+        open={forceUnclaimTarget !== null}
+        onOpenChange={open => {
+          if (!open) {
+            setForceUnclaimTarget(null);
+            setForceUnclaimReason('');
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Force unclaim</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Release the claim on{' '}
+                  <span className="font-medium text-white/80">
+                    {forceUnclaimTarget?.item.title}
+                  </span>{' '}
+                  by{' '}
+                  <span className="font-mono text-white/80">
+                    {forceUnclaimTarget?.item.claimed_by}
+                  </span>
+                  ?
+                </p>
+                <div className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2">
+                  <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-400" />
+                  <p className="text-xs text-amber-200/80">
+                    This releases the claim and creates an audit log entry. The claiming rig will
+                    lose any in-flight work.
+                  </p>
+                </div>
+                <textarea
+                  value={forceUnclaimReason}
+                  onChange={e => setForceUnclaimReason(e.target.value)}
+                  placeholder="Why are you forcing an unclaim?"
+                  maxLength={500}
+                  rows={3}
+                  className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none placeholder:text-white/25 focus:border-white/20"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={forceUnclaimMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={
+                !forceUnclaimReason.trim() || forceUnclaimMutation.isPending
+              }
+              className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-600 disabled:opacity-50"
+              onClick={() => {
+                if (!forceUnclaimTarget) return;
+                forceUnclaimMutation.mutate({
+                  wastelandId,
+                  itemId: forceUnclaimTarget.item.id,
+                  reason: forceUnclaimReason.trim(),
+                });
+              }}
+            >
+              {forceUnclaimMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
+              Force unclaim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -343,16 +444,18 @@ export function ClaimsClient({ wastelandId }: { wastelandId: string }) {
 function ClaimRowComponent({
   claim,
   wastelandId,
-  isAdmin,
+  canForceUnclaim,
   onClick,
+  onForceUnclaim,
   activeMenuItemId,
   setActiveMenuItemId,
   delay,
 }: {
   claim: ClaimRow;
   wastelandId: string;
-  isAdmin: boolean;
+  canForceUnclaim: boolean;
   onClick: () => void;
+  onForceUnclaim: () => void;
   activeMenuItemId: string | null;
   setActiveMenuItemId: (id: string | null) => void;
   delay: number;
@@ -460,14 +563,14 @@ function ClaimRowComponent({
                 View on DoltHub
               </a>
             )}
-            {isAdmin && (
+            {canForceUnclaim && (
               <button
                 type="button"
                 className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-xs text-red-400/70 transition-colors hover:bg-red-500/10 hover:text-red-400"
                 onClick={e => {
                   e.stopPropagation();
                   setActiveMenuItemId(null);
-                  toast.info('Force unclaim will be available in a future update');
+                  onForceUnclaim();
                 }}
               >
                 <ShieldAlert className="size-3" />

@@ -18,6 +18,7 @@ import {
   registerEventSink,
   refreshTokenForAllAgents,
   listAgents,
+  awaitHydration,
 } from './process-manager';
 import { log } from './logger';
 import { startHeartbeat, stopHeartbeat, notifyContainerReady } from './heartbeat';
@@ -264,6 +265,12 @@ app.post('/refresh-token', async c => {
   }
   process.env.GASTOWN_CONTAINER_TOKEN = body.token;
 
+  // Wait for boot hydration to release the global sdkServerLock before
+  // we serialise N agent restarts through it. Without this, agent k
+  // queues behind every in-flight hydration ensureSDKServer and easily
+  // blows past REFRESH_AGENT_TIMEOUT_MS (6s) on warm-restart containers.
+  await awaitHydration();
+
   const activeAgents = listAgents().filter(a => a.status === 'running' || a.status === 'starting');
   log.info('refresh_token.received', {
     agentCount: activeAgents.length,
@@ -311,6 +318,15 @@ app.post('/agents/start', async c => {
     console.error('[control-server] /agents/start: invalid request body', parsed.error.issues);
     return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
   }
+
+  // Wait for boot hydration to release the global sdkServerLock. The
+  // control server starts accepting requests immediately at boot, before
+  // bootHydration finishes resuming registry agents and prewarming the
+  // mayor — without this gate, fresh dispatches queue behind every
+  // serialised SDK spawn and the DO-side AbortSignal.timeout(60s) fires
+  // before they ever get the lock, surfacing as the
+  // "startAgentInContainer EXCEPTION TimeoutError" pattern.
+  await awaitHydration();
 
   // Persist the organization ID as a standalone env var so it survives
   // config rebuilds (e.g. model hot-swap). The env var is the primary
@@ -385,6 +401,15 @@ app.patch('/agents/:agentId/model', async c => {
   if (!parsed.success) {
     return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
   }
+
+  // Model hot-swap restarts the SDK server (see updateAgentModel) and
+  // contends for the same global sdkServerLock that boot hydration is
+  // holding. Wait for hydration to drain BEFORE the env mutations
+  // below: concurrent PATCH requests landing during hydration would
+  // otherwise race on process.env writes before any of them holds the
+  // SDK lock, and the env visible to the eventual `kilo serve` spawn
+  // would be non-deterministic.
+  await awaitHydration();
 
   // Update org billing context from the request body if provided.
   if (parsed.data.organizationId) {

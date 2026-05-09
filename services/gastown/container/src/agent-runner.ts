@@ -414,6 +414,19 @@ async function createMayorWorkspace(rigId: string): Promise<string> {
 }
 
 /**
+ * Ensure the mayor workdir exists on disk for a given town, creating
+ * a lightweight git-initialized workspace if needed.
+ *
+ * Used by `prewarmMayorSDK`, which runs before `runAgent` and so cannot
+ * rely on `createMayorWorkspace` having been called yet — without this,
+ * `ensureSDKServer` would throw `ENOENT` from `process.chdir(workdir)`
+ * and the prewarm benefit would never materialize on cold containers.
+ */
+export async function ensureMayorWorkspaceForTown(townId: string): Promise<string> {
+  return createMayorWorkspace(`mayor-${townId}`);
+}
+
+/**
  * Write the mayor's system prompt to AGENTS.md in the workspace.
  *
  * kilo/opencode reads AGENTS.md from the project root for ALL sessions,

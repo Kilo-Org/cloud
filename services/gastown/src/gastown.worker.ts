@@ -642,6 +642,19 @@ app.use('/api/towns/:townId/mayor-id', async (c: Context<GastownEnv, string>, ne
 app.get('/api/towns/:townId/mayor-id', async c => {
   const townId = c.req.param('townId');
   const town = getTownDOStub(c.env, townId);
+  // Response contract (consumed by fetchMayorPrewarmContext in the
+  // container's process-manager.ts):
+  // - When the town has a mayor AND a kilocode token, return the full
+  //   prewarm context so KILO_CONFIG_CONTENT matches what /agents/start
+  //   will send (no eviction churn in ensureSDKServer).
+  // - When the mayor agent exists but no kilocode token is available,
+  //   return { agentId } only — the container will skip prewarm.
+  // - When there is no mayor at all, return { agentId: null } — the
+  //   container treats missing/null agentId as "no mayor, skip prewarm".
+  const ctx = await town.getMayorPrewarmContext();
+  if (ctx) {
+    return c.json({ success: true, ...ctx });
+  }
   const agentId = await town.getMayorAgentId();
   return c.json({ success: true, agentId });
 });

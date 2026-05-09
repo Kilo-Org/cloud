@@ -28,10 +28,10 @@ export const BlacklistDomainsInputSchema = z.object({
 function getEnvFallbackDomains(): string[] {
   const envVal = getEnvVariable('BLACKLIST_DOMAINS');
   return envVal
-    ? envVal
-        .split('|')
-        .map((d: string) => d.trim())
-        .filter(Boolean)
+    ? envVal.split('|').flatMap((d: string) => {
+        const domain = d.trim();
+        return domain ? [domain] : [];
+      })
     : [];
 }
 

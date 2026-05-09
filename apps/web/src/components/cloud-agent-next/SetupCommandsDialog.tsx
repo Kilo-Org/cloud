@@ -33,7 +33,7 @@ const EXAMPLE_JSON = `[
 
 export function SetupCommandsDialog({ value, onChange }: SetupCommandsDialogProps) {
   const [open, setOpen] = useState(false);
-  const [jsonText, setJsonText] = useState(JSON.stringify(value, null, 2));
+  const [jsonText, setJsonText] = useState(() => JSON.stringify(value, null, 2));
   const [error, setError] = useState<string | null>(null);
 
   const handleOpen = (isOpen: boolean) => {
@@ -102,7 +102,7 @@ export function SetupCommandsDialog({ value, onChange }: SetupCommandsDialogProp
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <Terminal className="mr-2 h-4 w-4" />
+          <Terminal className="mr-2 size-4" />
           Setup Commands
           {commandsCount > 0 && (
             <span className="bg-primary/10 ml-2 rounded-full px-2 py-0.5 text-xs">
@@ -139,7 +139,7 @@ export function SetupCommandsDialog({ value, onChange }: SetupCommandsDialogProp
 
           {error && (
             <div className="text-destructive flex items-start gap-2 text-sm">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}

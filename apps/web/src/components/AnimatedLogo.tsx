@@ -1,25 +1,23 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useRef, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 
 export function AnimatedLogo() {
-  const [isHovered, setIsHovered] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { status } = useSession();
 
-  useEffect(() => {
-    if (videoRef.current) {
-      if (isHovered) {
-        void videoRef.current.play();
-      } else {
-        videoRef.current.pause();
-        videoRef.current.currentTime = 0; // Reset to first frame
-      }
-    }
-  }, [isHovered]);
+  const playLogoAnimation = () => {
+    void videoRef.current?.play();
+  };
+
+  const resetLogoAnimation = () => {
+    if (!videoRef.current) return;
+    videoRef.current.pause();
+    videoRef.current.currentTime = 0;
+  };
 
   const href = useMemo(() => {
     if (status === 'authenticated') {
@@ -32,8 +30,8 @@ export function AnimatedLogo() {
     <Link
       href={href}
       className="flex cursor-pointer items-center transition-opacity hover:opacity-80"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={playLogoAnimation}
+      onMouseLeave={resetLogoAnimation}
     >
       <video
         ref={videoRef}

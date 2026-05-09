@@ -17,6 +17,8 @@ import { CalendarClock } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { KiloClawScheduledActionStatusBlock } from '@/lib/kiloclaw/types';
 
+const timezoneNameFormatter = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' });
+
 type Props = {
   scheduledAction: KiloClawScheduledActionStatusBlock | null;
   /**
@@ -47,7 +49,7 @@ function formatScheduledAt(iso: string): string {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     const dateStr = d.toLocaleString();
-    const tzPart = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
+    const tzPart = timezoneNameFormatter
       .formatToParts(d)
       .find(p => p.type === 'timeZoneName')?.value;
     return tzPart ? `${dateStr} ${tzPart}` : dateStr;
@@ -80,7 +82,7 @@ export function KiloClawScheduledActionBanner({ scheduledAction, instanceName }:
 
   return (
     <Alert className="border-yellow-500/30 bg-yellow-500/5">
-      <CalendarClock className="h-4 w-4 text-yellow-400" />
+      <CalendarClock className="size-4 text-yellow-400" />
       <AlertDescription>
         {isVersionChange ? (
           <>

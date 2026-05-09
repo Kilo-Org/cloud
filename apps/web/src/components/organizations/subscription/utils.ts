@@ -1,6 +1,11 @@
 import type Stripe from 'stripe';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 
+const subscriptionCurrencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+});
+
 // Module-level formatting functions
 export const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleDateString('en-US', {
@@ -11,10 +16,7 @@ export const formatDate = (timestamp: number) => {
 };
 
 export const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount / 100); // Stripe amounts are in cents
+  return subscriptionCurrencyFormatter.format(amount / 100); // Stripe amounts are in cents
 };
 
 /** True for roles that may manage billing (owner or billing_manager). */

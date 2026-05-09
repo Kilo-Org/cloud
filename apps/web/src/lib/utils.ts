@@ -22,6 +22,27 @@ export function stripRequiredPrefix(str: string, prefix: string): string | null 
 }
 
 const parseFloatOrNull = (value: string | null) => (value === null ? null : parseFloat(value));
+const currencyFormatters = new Map<string, Intl.NumberFormat>();
+const dollarsFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+function getCurrencyFormatter(currency: string): Intl.NumberFormat {
+  const normalizedCurrency = currency.toUpperCase();
+  const existing = currencyFormatters.get(normalizedCurrency);
+  if (existing) return existing;
+
+  const formatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: normalizedCurrency,
+  });
+  currencyFormatters.set(normalizedCurrency, formatter);
+  return formatter;
+}
+
 export const EmptyFraudDetectionHeaders = getFraudDetectionHeaders(new Headers());
 export type FraudDetectionHeaders = ReturnType<typeof getFraudDetectionHeaders>;
 export function getFraudDetectionHeaders(headers: Headers) {
@@ -63,19 +84,11 @@ export function getInitialsFromName(name: string): string {
 }
 
 export function formatCents(amount: number, currency: string = 'USD') {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency.toUpperCase(),
-  }).format(amount / 100);
+  return getCurrencyFormatter(currency).format(amount / 100);
 }
 
 export function formatDollars(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  return dollarsFormatter.format(amount);
 }
 
 export function formatDate(timestamp: number) {

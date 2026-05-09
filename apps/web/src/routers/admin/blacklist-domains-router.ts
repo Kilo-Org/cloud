@@ -31,7 +31,12 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
   set: adminProcedure.input(BlacklistDomainsInputSchema).mutation(async ({ input, ctx }) => {
     // Deduplicate and normalize domains
     const normalizedDomains = [
-      ...new Set(input.domains.map(d => d.toLowerCase().trim()).filter(Boolean)),
+      ...new Set(
+        input.domains.flatMap(d => {
+          const domain = d.toLowerCase().trim();
+          return domain ? [domain] : [];
+        })
+      ),
     ];
 
     const config: BlacklistDomainsConfig = {

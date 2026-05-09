@@ -12,11 +12,23 @@ type Props = {
   timePeriod?: string;
 };
 
-function formatCurrency(amount: number, currency: string): string {
-  return new Intl.NumberFormat('en-US', {
+const invoiceCurrencyFormatters = new Map<string, Intl.NumberFormat>();
+
+function getInvoiceCurrencyFormatter(currency: string): Intl.NumberFormat {
+  const normalizedCurrency = currency.toUpperCase();
+  const existing = invoiceCurrencyFormatters.get(normalizedCurrency);
+  if (existing) return existing;
+
+  const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: currency.toUpperCase(),
-  }).format(amount / 100); // Stripe amounts are in cents
+    currency: normalizedCurrency,
+  });
+  invoiceCurrencyFormatters.set(normalizedCurrency, formatter);
+  return formatter;
+}
+
+function formatCurrency(amount: number, currency: string): string {
+  return getInvoiceCurrencyFormatter(currency).format(amount / 100); // Stripe amounts are in cents
 }
 
 function formatDate(timestamp: number): string {
@@ -31,7 +43,7 @@ function InvoiceRow({ invoice }: { invoice: UnifiedInvoice }) {
   return (
     <div className="border-border flex items-center justify-between border-b py-3 last:border-b-0">
       <div className="flex items-center gap-3">
-        <FileText className="text-muted-foreground h-4 w-4" />
+        <FileText className="text-muted-foreground size-4" />
         <div className="min-w-30">
           <div className="text-sm font-medium">
             {invoice.number || `Invoice ${invoice.id.slice(-8)}`}
@@ -64,7 +76,7 @@ function InvoiceRow({ invoice }: { invoice: UnifiedInvoice }) {
             className="inline-flex items-center gap-1 text-sm text-blue-600 transition-colors hover:text-blue-300"
           >
             View
-            <ExternalLink className="h-3 w-3" />
+            <ExternalLink className="size-3" />
           </a>
         )}
         {invoice.invoice_pdf && (
@@ -74,7 +86,7 @@ function InvoiceRow({ invoice }: { invoice: UnifiedInvoice }) {
             className="inline-flex items-center gap-1 text-sm text-blue-600 transition-colors hover:text-blue-300"
           >
             PDF
-            <ExternalLink className="h-3 w-3" />
+            <ExternalLink className="size-3" />
           </a>
         )}
       </div>
@@ -105,7 +117,7 @@ export function OrganizationInvoicesCard({ organizationId, timePeriod = 'month' 
     <Card>
       <CardHeader>
         <CardTitle>
-          <DollarSign className="mr-2 inline h-5 w-5" />
+          <DollarSign className="mr-2 inline size-5" />
           Invoices
         </CardTitle>
       </CardHeader>
@@ -118,7 +130,7 @@ export function OrganizationInvoicesCard({ organizationId, timePeriod = 'month' 
                 className="border-border flex items-center justify-between border-b py-3 last:border-b-0"
               >
                 <div className="flex items-center gap-3">
-                  <Skeleton className="h-4 w-4" />
+                  <Skeleton className="size-4" />
                   <div>
                     <Skeleton className="mb-1 h-4 w-32" />
                     <Skeleton className="h-3 w-24" />

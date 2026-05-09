@@ -168,7 +168,7 @@ export function ModeForm({
     formData.description !== initialFormData.description ||
     formData.whenToUse !== initialFormData.whenToUse ||
     formData.customInstructions !== initialFormData.customInstructions ||
-    JSON.stringify(selectedGroups.sort()) !== JSON.stringify(initialGroups.sort()) ||
+    JSON.stringify(selectedGroups.toSorted()) !== JSON.stringify(initialGroups.toSorted()) ||
     editGroupConfig.fileRegex !== initialEditConfig.fileRegex ||
     editGroupConfig.description !== initialEditConfig.description;
 
@@ -273,7 +273,7 @@ export function ModeForm({
         </Button>
       )}
       <Button type="submit" variant="primary" disabled={isSubmitting || !isDirty}>
-        <Save className="mr-2 h-4 w-4" />
+        <Save className="mr-2 size-4" />
         {isSubmitting ? 'Saving...' : mode ? 'Update Mode' : 'Create Mode'}
       </Button>
     </>
@@ -307,7 +307,7 @@ export function ModeForm({
                 {templates?.map(template => (
                   <SelectItem key={template.id} value={template.id}>
                     <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
+                      <FileText className="size-4" />
                       <span>{template.name}</span>
                     </div>
                   </SelectItem>
@@ -429,7 +429,7 @@ export function ModeForm({
             <div className="space-y-4">
               {availableGroups.map(group => (
                 <div key={group.value} className="space-y-3">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-x-2">
                     <Checkbox
                       id={group.value}
                       checked={selectedGroups.includes(group.value)}

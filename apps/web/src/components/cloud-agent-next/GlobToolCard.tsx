@@ -13,10 +13,10 @@ type GlobInput = {
 
 function parseGlobOutput(output: string | undefined): string[] {
   if (!output) return [];
-  return output
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean);
+  return output.split('\n').flatMap(line => {
+    const trimmedLine = line.trim();
+    return trimmedLine ? [trimmedLine] : [];
+  });
 }
 
 export function GlobToolCard({ toolPart }: GlobToolCardProps) {
@@ -50,8 +50,8 @@ export function GlobToolCard({ toolPart }: GlobToolCardProps) {
         <div>
           <div className="text-muted-foreground mb-1 text-xs">Matches:</div>
           <div className="bg-background max-h-60 overflow-auto rounded-md p-2">
-            {files.map((file, idx) => (
-              <div key={idx} className="truncate font-mono text-xs">
+            {files.map(file => (
+              <div key={file} className="truncate font-mono text-xs">
                 {file}
               </div>
             ))}
@@ -73,11 +73,11 @@ export function GlobToolCard({ toolPart }: GlobToolCardProps) {
       )}
       {/* Running state */}
       {state.status === 'running' && (
-        <div className="text-muted-foreground text-xs italic">Searching files...</div>
+        <div className="text-muted-foreground text-xs italic">Searching files…</div>
       )}
       {/* Pending state */}
       {state.status === 'pending' && (
-        <div className="text-muted-foreground text-xs italic">Waiting to search...</div>
+        <div className="text-muted-foreground text-xs italic">Waiting to search…</div>
       )}
     </ToolCardShell>
   );

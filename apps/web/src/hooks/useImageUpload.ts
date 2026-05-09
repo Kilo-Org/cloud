@@ -305,7 +305,7 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
     });
 
     return () => {
-      timeouts.forEach(clearTimeout);
+      timeouts.forEach(timeoutId => clearTimeout(timeoutId));
     };
   }, [images]);
 

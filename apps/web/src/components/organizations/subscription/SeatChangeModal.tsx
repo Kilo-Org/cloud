@@ -45,7 +45,7 @@ export function SeatChangeModal({
   price: number;
 }) {
   const [newSeatCount, setNewSeatCount] = useState(currentSeatCount);
-  const [inputValue, setInputValue] = useState(currentSeatCount.toString());
+  const [inputValue, setInputValue] = useState(() => currentSeatCount.toString());
   const [validationError, setValidationError] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -245,7 +245,7 @@ export function SeatChangeModal({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Edit className="h-5 w-5" />
+              <Edit className="size-5" />
               Change Seat Count
             </DialogTitle>
             <DialogDescription>
@@ -255,13 +255,13 @@ export function SeatChangeModal({
 
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Current Seats</label>
+              <div className="text-sm font-medium">Current Seats</div>
               <p className="text-muted-foreground text-sm">{currentSeatCount} seats</p>
             </div>
 
             {seatUsageQuery.data && (
               <div>
-                <label className="text-sm font-medium">Active Usage</label>
+                <div className="text-sm font-medium">Active Usage</div>
                 <p className="text-muted-foreground text-sm">
                   {seatUsageQuery.data.usedSeats} of {seatUsageQuery.data.totalSeats} seats in use
                 </p>
@@ -269,7 +269,9 @@ export function SeatChangeModal({
             )}
 
             <div>
-              <label className="text-sm font-medium">New Seat Count</label>
+              <label htmlFor="new-seat-count" className="text-sm font-medium">
+                New Seat Count
+              </label>
               <div className="mt-1">
                 <div className="flex items-center gap-2">
                   <Button
@@ -278,11 +280,12 @@ export function SeatChangeModal({
                     size="sm"
                     onClick={handleDecrement}
                     disabled={isLoading || parseInt(inputValue, 10) <= Math.max(1, activeSeatCount)}
-                    className="h-10 w-10 p-0"
+                    className="size-10 p-0"
                   >
-                    <Minus className="h-4 w-4" />
+                    <Minus className="size-4" />
                   </Button>
                   <Input
+                    id="new-seat-count"
                     type="text"
                     value={inputValue}
                     onChange={e => handleSeatCountChange(e.target.value)}
@@ -298,14 +301,14 @@ export function SeatChangeModal({
                     size="sm"
                     onClick={handleIncrement}
                     disabled={isLoading}
-                    className="h-10 w-10 p-0"
+                    className="size-10 p-0"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="size-4" />
                   </Button>
                 </div>
                 {validationError && (
                   <div className="mt-1 flex items-center gap-1 text-sm text-red-600">
-                    <AlertCircle className="h-4 w-4" />
+                    <AlertCircle className="size-4" />
                     <span>{validationError}</span>
                   </div>
                 )}
@@ -360,7 +363,7 @@ export function SeatChangeModal({
 
             {paymentError && (
               <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
+                <AlertCircle className="size-4" />
                 <AlertDescription>
                   <p className="font-medium">{paymentError}</p>
                   <p className="mt-1 text-sm">

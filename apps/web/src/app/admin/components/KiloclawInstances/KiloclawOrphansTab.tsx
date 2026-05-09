@@ -84,14 +84,14 @@ function TroubleshootingEventsDialog({
         <div className="overflow-y-auto">
           {isLoading && (
             <div className="flex items-center gap-2 py-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-muted-foreground text-sm">Loading events...</span>
+              <Loader2 className="size-4 animate-spin" />
+              <span className="text-muted-foreground text-sm">Loading events…</span>
             </div>
           )}
 
           {error && (
             <Alert>
-              <AlertTriangle className="h-4 w-4" />
+              <AlertTriangle className="size-4" />
               <AlertDescription>
                 {error instanceof Error ? error.message : 'Failed to load Analytics Engine events'}
               </AlertDescription>
@@ -148,10 +148,12 @@ export function KiloclawOrphansTab() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const [createdAfterInput, setCreatedAfterInput] = useState(
+  const [createdAfterInput, setCreatedAfterInput] = useState(() =>
     toDatetimeLocalInput(subDays(new Date(), 1))
   );
-  const [createdBeforeInput, setCreatedBeforeInput] = useState(toDatetimeLocalInput(new Date()));
+  const [createdBeforeInput, setCreatedBeforeInput] = useState(() =>
+    toDatetimeLocalInput(new Date())
+  );
   const [scanResult, setScanResult] = useState<{
     orphans: OrphanRow[];
     scanned: number;
@@ -187,11 +189,15 @@ export function KiloclawOrphansTab() {
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawInstances.stats.queryKey(),
         });
-        if (scanResult && destroyTarget) {
-          setScanResult({
-            ...scanResult,
-            orphans: scanResult.orphans.filter(orphan => orphan.id !== destroyTarget.id),
-          });
+        if (destroyTarget) {
+          setScanResult(prevScanResult =>
+            prevScanResult
+              ? {
+                  ...prevScanResult,
+                  orphans: prevScanResult.orphans.filter(orphan => orphan.id !== destroyTarget.id),
+                }
+              : prevScanResult
+          );
         }
       },
       onError: err => {
@@ -237,16 +243,22 @@ export function KiloclawOrphansTab() {
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-wrap items-end gap-4">
             <div className="flex min-w-[220px] flex-col gap-2">
-              <label className="text-sm font-medium">Created After</label>
+              <label htmlFor="created-after" className="text-sm font-medium">
+                Created After
+              </label>
               <Input
+                id="created-after"
                 type="datetime-local"
                 value={createdAfterInput}
                 onChange={e => setCreatedAfterInput(e.target.value)}
               />
             </div>
             <div className="flex min-w-[220px] flex-col gap-2">
-              <label className="text-sm font-medium">Created Before</label>
+              <label htmlFor="created-before" className="text-sm font-medium">
+                Created Before
+              </label>
               <Input
+                id="created-before"
                 type="datetime-local"
                 value={createdBeforeInput}
                 onChange={e => setCreatedBeforeInput(e.target.value)}
@@ -255,12 +267,12 @@ export function KiloclawOrphansTab() {
             <Button onClick={handleScan} disabled={detectOrphans.isPending}>
               {detectOrphans.isPending ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Scanning...
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Scanning…
                 </>
               ) : (
                 <>
-                  <Search className="mr-2 h-4 w-4" />
+                  <Search className="mr-2 size-4" />
                   Scan
                 </>
               )}
@@ -298,7 +310,7 @@ export function KiloclawOrphansTab() {
 
           {scanResult?.capped && (
             <Alert>
-              <AlertTriangle className="h-4 w-4" />
+              <AlertTriangle className="size-4" />
               <AlertDescription>
                 Results capped at 1000 rows. Narrow the date range to scan all matching instances.
               </AlertDescription>
@@ -368,7 +380,7 @@ export function KiloclawOrphansTab() {
                             {orphan.subscription_status}
                           </Badge>
                         ) : (
-                          <span className="text-muted-foreground text-sm">—</span>
+                          <span className="text-muted-foreground text-sm">None</span>
                         )}
                       </TableCell>
                       <TableCell title={new Date(orphan.created_at).toLocaleString()}>
@@ -397,7 +409,7 @@ export function KiloclawOrphansTab() {
                             size="sm"
                             onClick={() => setDestroyTarget(orphan)}
                           >
-                            <Trash2 className="mr-2 h-4 w-4" />
+                            <Trash2 className="mr-2 size-4" />
                             Destroy
                           </Button>
                         </div>
@@ -440,8 +452,8 @@ export function KiloclawOrphansTab() {
             >
               {destroyOrphan.isPending ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Destroying...
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Destroying…
                 </>
               ) : (
                 'Destroy orphan'

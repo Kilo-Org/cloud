@@ -30,7 +30,7 @@ function VerifyMagicLinkContent() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
           <div className="mb-4 rounded-md bg-red-950 p-4 text-red-300">{error}</div>
           <Link href="/users/sign_in" className="text-muted-foreground text-sm hover:underline">
@@ -42,10 +42,10 @@ function VerifyMagicLinkContent() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-black">
+    <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="text-center">
-        <div className="mx-auto mb-6 h-12 w-12 animate-spin rounded-full border-4 border-gray-800 border-t-white"></div>
-        <p className="text-muted-foreground">Signing you in...</p>
+        <div className="mx-auto mb-6 size-12 animate-spin rounded-full border-4 border-muted border-t-foreground"></div>
+        <p className="text-muted-foreground">Signing you in…</p>
       </div>
     </div>
   );
@@ -55,10 +55,10 @@ export default function VerifyMagicLinkPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="flex min-h-screen items-center justify-center bg-background">
           <div className="text-center">
-            <div className="mx-auto mb-6 h-12 w-12 animate-spin rounded-full border-4 border-gray-800 border-t-white"></div>
-            <p className="text-muted-foreground">Loading...</p>
+            <div className="mx-auto mb-6 size-12 animate-spin rounded-full border-4 border-muted border-t-foreground"></div>
+            <p className="text-muted-foreground">Loading…</p>
           </div>
         </div>
       }

@@ -53,16 +53,16 @@ function EditTab() {
   );
 
   function handleSave() {
-    const domains = inputValue
-      .split(/[\n|]/)
-      .map(part => part.trim().toLowerCase())
-      .filter(Boolean);
+    const domains = inputValue.split(/[\n|]/).flatMap(part => {
+      const domain = part.trim().toLowerCase();
+      return domain ? [domain] : [];
+    });
 
     mutation.mutate({ domains });
   }
 
   if (isLoading) {
-    return <div className="text-muted-foreground py-8 text-sm">Loading...</div>;
+    return <div className="text-muted-foreground py-8 text-sm">Loading…</div>;
   }
 
   const domainCount = data?.domains.length ?? 0;
@@ -73,7 +73,7 @@ function EditTab() {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
+              <Shield className="size-5" />
               Blacklisted Domains
             </CardTitle>
             <CardDescription>
@@ -101,7 +101,7 @@ function EditTab() {
 
         <div className="flex items-center gap-3">
           <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">
-            {mutation.isPending ? 'Saving...' : 'Save'}
+            {mutation.isPending ? 'Saving…' : 'Save'}
           </Button>
           {data?.updated_by_email && (
             <span className="text-muted-foreground text-sm">
@@ -143,7 +143,7 @@ function StatsTab() {
                 {stats.totalDomains} {stats.totalDomains === 1 ? 'domain' : 'domains'}
               </Badge>
               <Badge variant="destructive" className="px-3 py-1">
-                <Users className="mr-1 h-3 w-3" />
+                <Users className="mr-1 size-3" />
                 {stats.totalBlockedUsers.toLocaleString()} blocked users
               </Badge>
             </div>
@@ -152,7 +152,7 @@ function StatsTab() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="text-muted-foreground py-8 text-center text-sm">Loading stats...</div>
+          <div className="text-muted-foreground py-8 text-center text-sm">Loading stats…</div>
         ) : !stats || stats.domains.length === 0 ? (
           <div className="text-muted-foreground py-8 text-center">
             No blacklisted domains configured
@@ -219,7 +219,7 @@ function SuspiciousTab() {
                 {domains.length} {domains.length === 1 ? 'domain' : 'domains'}
               </Badge>
               <Badge variant="outline" className="px-3 py-1">
-                <Shield className="mr-1 h-3 w-3" />
+                <Shield className="mr-1 size-3" />
                 {blacklistedCount} already blacklisted
               </Badge>
             </div>
@@ -254,12 +254,12 @@ function SuspiciousTab() {
                     <TableCell>
                       {domain.isBlacklisted ? (
                         <Badge variant="secondary" className="gap-1">
-                          <CheckCircle2 className="h-3 w-3" />
+                          <CheckCircle2 className="size-3" />
                           Blacklisted
                         </Badge>
                       ) : (
                         <Badge variant="destructive" className="gap-1">
-                          <AlertTriangle className="h-3 w-3" />
+                          <AlertTriangle className="size-3" />
                           Not blacklisted
                         </Badge>
                       )}

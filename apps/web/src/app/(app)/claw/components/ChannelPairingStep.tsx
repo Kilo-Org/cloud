@@ -46,16 +46,27 @@ export function ChannelPairingStep({
 
   useEffect(() => {
     let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    function waitForNextPoll() {
+      return new Promise<void>(resolve => {
+        timeoutId = setTimeout(resolve, 1_000);
+      });
+    }
+
     async function poll() {
       while (!cancelled) {
         await refreshRef.current().catch(() => {});
         if (cancelled) break;
-        await new Promise(r => setTimeout(r, 1_000));
+        await waitForNextPoll();
       }
     }
     void poll();
     return () => {
       cancelled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, []);
 
@@ -143,7 +154,7 @@ export function ChannelPairingStepView({
       >
         <div className="border-border bg-muted/30 flex flex-col rounded-lg border">
           <div className="flex items-center gap-2 px-5 pt-5 pb-4">
-            <Send className="text-muted-foreground h-4 w-4" />
+            <Send className="text-muted-foreground size-4" />
             <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
               Pairing request received
             </span>
@@ -175,9 +186,9 @@ export function ChannelPairingStepView({
           disabled={isApproving}
         >
           {isApproving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="size-4 animate-spin" />
           ) : (
-            <CheckCircle2 className="h-4 w-4" />
+            <CheckCircle2 className="size-4" />
           )}
           Authorize this request
         </Button>
@@ -187,7 +198,7 @@ export function ChannelPairingStepView({
           className="text-muted-foreground/50 hover:text-muted-foreground mx-auto flex cursor-pointer items-center gap-1.5 text-sm transition-colors"
           onClick={onSkip}
         >
-          <XCircle className="h-3.5 w-3.5" />
+          <XCircle className="size-3.5" />
           Decline
         </button>
       </OnboardingStepView>
@@ -203,7 +214,7 @@ export function ChannelPairingStepView({
       contentClassName="gap-8"
     >
       <div className="flex flex-col items-center gap-8">
-        <div className="pairing-spinner relative h-24 w-24 my-6">
+        <div className="pairing-spinner relative size-24 my-6">
           <svg className="h-full w-full" viewBox="0 0 96 96">
             <circle
               cx="48"
@@ -238,7 +249,7 @@ export function ChannelPairingStepView({
 
         <div className="flex flex-col items-center gap-2 text-center">
           <h2 className="text-foreground text-lg font-semibold">
-            Waiting for you to message the bot...
+            Waiting for you to message the bot…
           </h2>
           <p className="text-muted-foreground text-sm">This page will update automatically.</p>
         </div>
@@ -247,7 +258,7 @@ export function ChannelPairingStepView({
           className="text-muted-foreground/50 cursor-pointer hover:text-muted-foreground text-sm transition-colors my-6"
           onClick={onSkip}
         >
-          Skip — I&apos;ll pair later from Settings
+          Skip. I&apos;ll pair later from Settings
         </button>
       </div>
     </OnboardingStepView>

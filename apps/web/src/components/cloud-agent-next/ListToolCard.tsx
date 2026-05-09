@@ -14,10 +14,10 @@ type ListInput = {
 
 function parseListOutput(output: string | undefined): string[] {
   if (!output) return [];
-  return output
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean);
+  return output.split('\n').flatMap(line => {
+    const trimmedLine = line.trim();
+    return trimmedLine ? [trimmedLine] : [];
+  });
 }
 
 export function ListToolCard({ toolPart }: ListToolCardProps) {
@@ -57,8 +57,8 @@ export function ListToolCard({ toolPart }: ListToolCardProps) {
       {/* Directory listing */}
       {entries.length > 0 && (
         <div className="bg-background max-h-60 overflow-auto rounded-md p-2">
-          {entries.map((entry, idx) => (
-            <div key={idx} className="truncate font-mono text-xs">
+          {entries.map(entry => (
+            <div key={entry} className="truncate font-mono text-xs">
               {entry}
             </div>
           ))}
@@ -82,12 +82,12 @@ export function ListToolCard({ toolPart }: ListToolCardProps) {
 
       {/* Running state */}
       {state.status === 'running' && (
-        <div className="text-muted-foreground text-xs italic">Listing directory...</div>
+        <div className="text-muted-foreground text-xs italic">Listing directory…</div>
       )}
 
       {/* Pending state */}
       {state.status === 'pending' && (
-        <div className="text-muted-foreground text-xs italic">Waiting to list...</div>
+        <div className="text-muted-foreground text-xs italic">Waiting to list…</div>
       )}
     </ToolCardShell>
   );

@@ -102,8 +102,8 @@ export function SubscriptionQuickActions({
         <CardHeader>
           <CardTitle className="m-2">Quick Actions</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col items-center space-y-3">
-          {canChangeSeatCount && (
+        <CardContent className="flex flex-col items-center gap-y-3">
+          {canChangeSeatCount ? (
             <Button
               variant="outline"
               className="w-64 justify-center border-green-800 text-green-400 hover:bg-green-950 hover:text-green-300"
@@ -111,10 +111,10 @@ export function SubscriptionQuickActions({
               disabled={isReadOnly}
               title={isReadOnly ? 'Upgrade to enable' : undefined}
             >
-              <Edit className="mr-2 h-4 w-4" />
+              <Edit className="mr-2 size-4" />
               Change Seats
             </Button>
-          )}
+          ) : null}
 
           {canChangeBillingCycle && (
             <Button
@@ -122,7 +122,7 @@ export function SubscriptionQuickActions({
               className="w-64 justify-center"
               onClick={() => setShowCycleChangeDialog(true)}
             >
-              <Repeat className="mr-2 h-4 w-4" />
+              <Repeat className="mr-2 size-4" />
               Switch to {isMonthly ? 'Annual' : 'Monthly'}
             </Button>
           )}
@@ -134,9 +134,9 @@ export function SubscriptionQuickActions({
             disabled={getCustomerPortalUrl.isPending || isNavigatingToPortal}
           >
             {getCustomerPortalUrl.isPending || isNavigatingToPortal ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 size-4 animate-spin" />
             ) : (
-              <CreditCard className="mr-2 h-4 w-4" />
+              <CreditCard className="mr-2 size-4" />
             )}
             Update Payment Method
           </Button>
@@ -147,7 +147,7 @@ export function SubscriptionQuickActions({
             asChild
           >
             <Link href={`/organizations/${organizationId}/payment-details`}>
-              <Download className="mr-2 h-4 w-4" />
+              <Download className="mr-2 size-4" />
               View Payment History
             </Link>
           </Button>
@@ -158,7 +158,7 @@ export function SubscriptionQuickActions({
               className="text-destructive w-64 justify-center border-red-800 hover:bg-red-950 hover:text-red-400"
               onClick={() => setShowCancelModal(true)}
             >
-              <AlertTriangle className="mr-2 h-4 w-4" />
+              <AlertTriangle className="mr-2 size-4" />
               Cancel Subscription
             </Button>
           )}

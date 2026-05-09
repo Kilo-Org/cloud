@@ -44,10 +44,10 @@ export default function InstallPage() {
     <PageLayout title="Install">
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="group border-brand-primary/20 hover:border-brand-primary/40 hover:shadow-brand-primary/5 relative flex flex-col justify-between overflow-hidden transition-all hover:shadow-lg">
-          <div className="bg-brand-primary/10 group-hover:bg-brand-primary/20 absolute top-0 right-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full blur-2xl transition-all" />
+          <div className="bg-brand-primary/10 group-hover:bg-brand-primary/20 absolute top-0 right-0 size-32 translate-x-8 -translate-y-8 rounded-full blur-2xl transition-all" />
           <CardHeader className="relative flex-1">
-            <div className="bg-brand-primary/10 text-brand-primary mb-4 flex h-12 w-12 items-center justify-center rounded-lg">
-              <CodeIcon className="h-6 w-6" />
+            <div className="bg-brand-primary/10 text-brand-primary mb-4 flex size-12 items-center justify-center rounded-lg">
+              <CodeIcon className="size-6" />
             </div>
             <CardTitle className="text-xl">IDE Extension</CardTitle>
             <CardDescription className="text-muted-foreground mt-2">
@@ -57,7 +57,7 @@ export default function InstallPage() {
           </CardHeader>
           <CardFooter>
             <Button
-              className="bg-brand-primary hover:text-brand-primary hover:ring-brand-primary w-full text-black hover:bg-black hover:ring-2"
+              className="bg-brand-primary hover:text-brand-primary hover:ring-brand-primary w-full text-primary-foreground hover:bg-background hover:ring-2"
               asChild
             >
               <Link href="https://kilo.ai/install" target="_blank" rel="noopener noreferrer">
@@ -68,10 +68,10 @@ export default function InstallPage() {
         </Card>
 
         <Card className="group border-brand-primary/20 hover:border-brand-primary/40 hover:shadow-brand-primary/5 relative flex flex-col justify-between overflow-hidden transition-all hover:shadow-lg">
-          <div className="bg-brand-primary/10 group-hover:bg-brand-primary/20 absolute top-0 right-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full blur-2xl transition-all" />
+          <div className="bg-brand-primary/10 group-hover:bg-brand-primary/20 absolute top-0 right-0 size-32 translate-x-8 -translate-y-8 rounded-full blur-2xl transition-all" />
           <CardHeader className="relative flex-1">
-            <div className="bg-brand-primary/10 text-brand-primary mb-4 flex h-12 w-12 items-center justify-center rounded-lg">
-              <TerminalIcon className="h-6 w-6" />
+            <div className="bg-brand-primary/10 text-brand-primary mb-4 flex size-12 items-center justify-center rounded-lg">
+              <TerminalIcon className="size-6" />
             </div>
             <CardTitle className="text-xl">Command Line Tool</CardTitle>
             <CardDescription className="text-muted-foreground mt-2">
@@ -80,7 +80,7 @@ export default function InstallPage() {
           </CardHeader>
           <CardFooter>
             <Button
-              className="bg-brand-primary hover:text-brand-primary hover:ring-brand-primary w-full text-black hover:bg-black hover:ring-2"
+              className="bg-brand-primary hover:text-brand-primary hover:ring-brand-primary w-full text-primary-foreground hover:bg-background hover:ring-2"
               asChild
             >
               <Link href="https://kilo.ai/install#cli" target="_blank" rel="noopener noreferrer">

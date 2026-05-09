@@ -1,17 +1,35 @@
 import { formatDistanceToNow } from 'date-fns';
 import type { PaymentMethodStatus } from '@/types/admin';
 
+const microdollarsFormatters = new Map<number, Intl.NumberFormat>();
+const adminDateFormatter = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+function getMicrodollarsFormatter(fractionDigits: number): Intl.NumberFormat {
+  const existing = microdollarsFormatters.get(fractionDigits);
+  if (existing) return existing;
+
+  const formatter = new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  });
+  microdollarsFormatters.set(fractionDigits, formatter);
+  return formatter;
+}
+
 /**
  * Converts microdollars to formatted currency string with exactly 2 decimal places
  */
 export function formatMicrodollars(microdollars: number, fractionDigits: number = 2): string {
   const dollars = microdollars / 1_000_000;
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  }).format(dollars);
+  return getMicrodollarsFormatter(fractionDigits).format(dollars);
 }
 
 /**
@@ -27,13 +45,7 @@ export function formatRelativeTime(date: Date | string): string {
  */
 export function formatDate(date: Date | string): string {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(dateObj);
+  return adminDateFormatter.format(dateObj);
 }
 
 export function getPaymentMethodBadgeVariant(

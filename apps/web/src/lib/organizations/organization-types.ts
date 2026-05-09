@@ -18,7 +18,7 @@ export {
 } from './organization-base-types';
 
 import type { OrganizationRole, OrganizationPlan } from './organization-base-types';
-import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
+import { OrganizationSettingsSchema } from './organization-base-types';
 import { OpenClawModelSettingsSchema, OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
 
 // API-facing billing cycle values: 'monthly' | 'annual'

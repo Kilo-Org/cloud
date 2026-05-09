@@ -17,6 +17,7 @@ export type TRPCContext = {
 const t = initTRPC.context<TRPCContext>().create();
 
 export const router = t.router;
+export const createCallerFactory = t.createCallerFactory;
 
 // tRPC procedure paths that correspond to key operations for Sentry breadcrumbs
 const BREADCRUMB_OPERATIONS = new Set([

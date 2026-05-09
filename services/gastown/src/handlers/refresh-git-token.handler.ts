@@ -52,7 +52,7 @@ export async function handleRefreshGitToken(
     platformIntegrationId: rigConfig?.platformIntegrationId,
   });
 
-  if (!freshToken) {
+  if (!freshToken.ok) {
     console.warn(
       `[refresh-git-token] no token available for town=${params.townId} rig=${params.rigId}`
     );
@@ -62,5 +62,5 @@ export async function handleRefreshGitToken(
   console.log(
     `[refresh-git-token] refreshed git token for town=${params.townId} rig=${params.rigId}`
   );
-  return c.json(resSuccess({ token: freshToken }), 200);
+  return c.json(resSuccess({ token: freshToken.token }), 200);
 }

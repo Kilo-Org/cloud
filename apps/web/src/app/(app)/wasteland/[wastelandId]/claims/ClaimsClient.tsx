@@ -55,6 +55,10 @@ function useSlowOperationToast(isPending: boolean) {
     }
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (toastIdRef.current !== null) {
+        toast.dismiss(toastIdRef.current);
+        toastIdRef.current = null;
+      }
     };
   }, [isPending]);
 }
@@ -396,14 +400,18 @@ function ClaimRowComponent({
         {item.type ?? 'other'}
       </Badge>
 
-      <Link
-        href={`/wasteland/${wastelandId}/rigs/${item.claimed_by}`}
-        className="shrink-0 font-mono text-[10px] text-white/50 underline decoration-white/10 decoration-dotted underline-offset-2 transition-colors hover:text-white/80 hover:decoration-white/40"
-        onClick={e => e.stopPropagation()}
-        data-claim-action
-      >
-        {item.claimed_by}
-      </Link>
+      {item.claimed_by ? (
+        <Link
+          href={`/wasteland/${wastelandId}/rigs/${item.claimed_by}`}
+          className="shrink-0 font-mono text-[10px] text-white/50 underline decoration-white/10 decoration-dotted underline-offset-2 transition-colors hover:text-white/80 hover:decoration-white/40"
+          onClick={e => e.stopPropagation()}
+          data-claim-action
+        >
+          {item.claimed_by}
+        </Link>
+      ) : (
+        <span className="shrink-0 font-mono text-[10px] text-white/25">unclaimed</span>
+      )}
 
       {(() => {
         const ts = parseDoltDate(item.updated_at);

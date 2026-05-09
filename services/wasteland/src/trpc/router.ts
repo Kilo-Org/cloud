@@ -1072,7 +1072,7 @@ export const wastelandRouter = router({
         );
 
         const claimedItemIds = new Set(
-          claimed.map(item => (typeof item.id === 'string' ? item.id : ''))
+          claimed.map(item => (typeof item.id === 'string' ? item.id : '')).filter(Boolean)
         );
 
         for (const detail of details) {

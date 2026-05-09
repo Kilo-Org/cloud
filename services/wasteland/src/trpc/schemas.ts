@@ -308,3 +308,19 @@ export const RpcRigDetailOutput = rpcSafe(RigDetailOutput);
 export const RpcCompletionOutput = rpcSafe(CompletionOutput);
 export const RpcStampOutput = rpcSafe(StampOutput);
 export const RpcRigActivityOutput = rpcSafe(RigActivityOutput);
+
+// ── Claims page: pending PR enrichment ────────────────────────────────
+
+export const PendingPrOutput = z.object({
+  pull_id: z.string(),
+  pr_url: z.string(),
+  kind: z.enum(['claim', 'done', 'unclaim']),
+});
+
+export const ClaimRowOutput = z.object({
+  item: WantedBoardRowOutput,
+  pending_pr: PendingPrOutput.nullable(),
+});
+
+export const RpcPendingPrOutput = rpcSafe(PendingPrOutput);
+export const RpcClaimRowOutput = rpcSafe(ClaimRowOutput);

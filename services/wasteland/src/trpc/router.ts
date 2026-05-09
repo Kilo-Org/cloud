@@ -32,6 +32,7 @@ import {
   RpcUpstreamRigOutput,
   RpcRigDetailOutput,
   RpcRigActivityOutput,
+  RpcClaimRowOutput,
   WantedBoardRowOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
@@ -1023,6 +1024,95 @@ export const wastelandRouter = router({
       } catch {
         return { items: [] };
       }
+    }),
+
+  // ── Claims page (claimed items with pending-PR enrichment) ─────────
+
+  listClaims: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        rigHandle: z.string().optional(),
+      })
+    )
+    .output(z.array(RpcClaimRowOutput))
+    .query(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+
+      let allItems: Array<Record<string, unknown>>;
+      try {
+        allItems = await wantedBoard.browseWantedBoard(ctx.env, input.wastelandId, ctx.userId);
+      } catch (err) {
+        if (err instanceof WantedBoardOpError && err.code === 'PRECONDITION_FAILED') {
+          return [];
+        }
+        return wantedBoardErrorToTRPC(err);
+      }
+
+      let claimed = allItems.filter(
+        item => typeof item.status === 'string' && item.status === 'claimed'
+      );
+
+      if (input.rigHandle) {
+        claimed = claimed.filter(
+          item => typeof item.claimed_by === 'string' && item.claimed_by === input.rigHandle
+        );
+      }
+
+      const prByItemId = new Map<
+        string,
+        { pull_id: string; pr_url: string; kind: 'claim' | 'done' | 'unclaim' }
+      >();
+
+      try {
+        const { token, upstream } = await loadAdminContext(ctx.env, input.wastelandId, ctx.userId);
+        const openPulls = await doltApi.listPulls(upstream, token, { state: 'Open' });
+        const details = await doltApi.mapWithLimit(openPulls, 6, p =>
+          doltApi.getPull(upstream, token, p.pull_id).catch(() => null)
+        );
+
+        const claimedItemIds = new Set(
+          claimed.map(item => (typeof item.id === 'string' ? item.id : ''))
+        );
+
+        for (const detail of details) {
+          if (!detail) continue;
+          const parsed = doltApi.parseWlBranch(detail.from_branch_name);
+          if (!parsed) continue;
+          if (!claimedItemIds.has(parsed.itemId)) continue;
+
+          const parsedCommit = inbox.parseCommitSubject(detail.title);
+          let kind: 'claim' | 'done' | 'unclaim' = 'claim';
+          if (parsedCommit.kind === 'wl') {
+            if (parsedCommit.verb === 'done') {
+              kind = 'done';
+            } else if (parsedCommit.verb === 'unclaim') {
+              kind = 'unclaim';
+            }
+          }
+
+          if (!prByItemId.has(parsed.itemId)) {
+            prByItemId.set(parsed.itemId, {
+              pull_id: detail.pull_id,
+              pr_url: doltApi.buildPullWebUrl(upstream, detail.pull_id),
+              kind,
+            });
+          }
+        }
+      } catch {
+        // PR enrichment is best-effort
+      }
+
+      return claimed.map(item => {
+        const itemId = typeof item.id === 'string' ? item.id : '';
+        const parsed = WantedBoardRowOutput.safeParse(item);
+        return {
+          item: parsed.success
+            ? parsed.data
+            : WantedBoardRowOutput.parse({ id: itemId, title: '', status: 'claimed' }),
+          pending_pr: prByItemId.get(itemId) ?? null,
+        };
+      });
     }),
 
   // ── Wanted Board Mutations ────────────────────────────────────────

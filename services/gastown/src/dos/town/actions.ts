@@ -1660,4 +1660,8 @@ function parsePrUrl(prUrl: string): { repo: string; prNumber: number } | null {
 
 // Exported for testing
 export { hasExistingFeedbackBead as _hasExistingFeedbackBead, parsePrUrl as _parsePrUrl };
-export { failureMessageFor as _failureMessageFor, shouldFailImmediately as _shouldFailImmediately, shouldCountAsTransient as _shouldCountAsTransient };
+export {
+  failureMessageFor as _failureMessageFor,
+  shouldFailImmediately as _shouldFailImmediately,
+  shouldCountAsTransient as _shouldCountAsTransient,
+};

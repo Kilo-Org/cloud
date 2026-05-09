@@ -19,8 +19,7 @@ function mockSCMContext(overrides: Partial<SCMContext> = {}): SCMContext {
 describe('resolveGitHubToken', () => {
   it('returns ok:true with source when github_token is configured', async () => {
     const ctx = mockSCMContext({
-      getTownConfig: async () =>
-        ({ git_auth: { github_token: 'ghp_abc123' } }) as TownConfig,
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_abc123' } }) as TownConfig,
     });
     const result = await resolveGitHubToken(ctx);
     expect(result.ok).toBe(true);
@@ -109,8 +108,7 @@ describe('checkPRStatus', () => {
       new Response('Server Error', { status: 503, statusText: 'Service Unavailable' })
     );
     const ctx = mockSCMContext({
-      getTownConfig: async () =>
-        ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
     });
     const outcome = await checkPRStatus(ctx, 'https://github.com/owner/repo/pull/1');
     expect(outcome.ok).toBe(false);
@@ -126,8 +124,7 @@ describe('checkPRStatus', () => {
       new Response('Rate Limited', { status: 429, statusText: 'Too Many Requests' })
     );
     const ctx = mockSCMContext({
-      getTownConfig: async () =>
-        ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
     });
     const outcome = await checkPRStatus(ctx, 'https://github.com/owner/repo/pull/1');
     expect(outcome.ok).toBe(false);
@@ -142,8 +139,7 @@ describe('checkPRStatus', () => {
       new Response('Unauthorized', { status: 401, statusText: 'Unauthorized' })
     );
     const ctx = mockSCMContext({
-      getTownConfig: async () =>
-        ({ git_auth: { github_token: 'ghp_bad' } }) as TownConfig,
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_bad' } }) as TownConfig,
     });
     const outcome = await checkPRStatus(ctx, 'https://github.com/owner/repo/pull/1');
     expect(outcome.ok).toBe(false);
@@ -158,8 +154,7 @@ describe('checkPRStatus', () => {
       new Response('Forbidden', { status: 403, statusText: 'Forbidden' })
     );
     const ctx = mockSCMContext({
-      getTownConfig: async () =>
-        ({ git_auth: { github_token: 'ghp_limited' } }) as TownConfig,
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_limited' } }) as TownConfig,
     });
     const outcome = await checkPRStatus(ctx, 'https://github.com/owner/repo/pull/1');
     expect(outcome.ok).toBe(false);
@@ -174,8 +169,7 @@ describe('checkPRStatus', () => {
       new Response('Not Found', { status: 404, statusText: 'Not Found' })
     );
     const ctx = mockSCMContext({
-      getTownConfig: async () =>
-        ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
     });
     const outcome = await checkPRStatus(ctx, 'https://github.com/owner/repo/pull/1');
     expect(outcome.ok).toBe(false);
@@ -193,8 +187,7 @@ describe('checkPRStatus', () => {
       })
     );
     const ctx = mockSCMContext({
-      getTownConfig: async () =>
-        ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
     });
     const outcome = await checkPRStatus(ctx, 'https://github.com/owner/repo/pull/1');
     expect(outcome.ok).toBe(false);
@@ -212,8 +205,7 @@ describe('checkPRStatus', () => {
       })
     );
     const ctx = mockSCMContext({
-      getTownConfig: async () =>
-        ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
     });
     const outcome = await checkPRStatus(ctx, 'https://github.com/owner/repo/pull/1');
     expect(outcome.ok).toBe(false);
@@ -244,8 +236,7 @@ describe('checkPRStatus', () => {
       })
     );
     const ctx = mockSCMContext({
-      getTownConfig: async () =>
-        ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
     });
     const outcome = await checkPRStatus(ctx, 'https://github.com/owner/repo/pull/1');
     expect(outcome.ok).toBe(true);
@@ -256,14 +247,13 @@ describe('checkPRStatus', () => {
 
   it('returns ok:true with open status for open PR', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({ state: 'open', merged: false, mergeable_state: 'clean' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+      new Response(JSON.stringify({ state: 'open', merged: false, mergeable_state: 'clean' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
     );
     const ctx = mockSCMContext({
-      getTownConfig: async () =>
-        ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_test' } }) as TownConfig,
     });
     const outcome = await checkPRStatus(ctx, 'https://github.com/owner/repo/pull/1');
     expect(outcome.ok).toBe(true);
@@ -283,7 +273,10 @@ describe('checkPRStatus', () => {
           },
         }) as TownConfig,
     });
-    const outcome = await checkPRStatus(ctx, 'https://gitlab.evil.com/group/project/-/merge_requests/5');
+    const outcome = await checkPRStatus(
+      ctx,
+      'https://gitlab.evil.com/group/project/-/merge_requests/5'
+    );
     expect(outcome.ok).toBe(false);
     if (!outcome.ok && outcome.error.kind === 'host_mismatch') {
       expect(outcome.error.got).toBe('gitlab.evil.com');
@@ -299,8 +292,7 @@ describe('checkPRStatus', () => {
       })
     );
     const ctx = mockSCMContext({
-      getTownConfig: async () =>
-        ({ git_auth: { gitlab_token: 'glpat_test' } }) as TownConfig,
+      getTownConfig: async () => ({ git_auth: { gitlab_token: 'glpat_test' } }) as TownConfig,
     });
     const outcome = await checkPRStatus(ctx, 'https://gitlab.com/group/project/-/merge_requests/5');
     expect(outcome.ok).toBe(true);

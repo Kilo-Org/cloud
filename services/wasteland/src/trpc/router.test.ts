@@ -289,7 +289,7 @@ describe('forceUnclaimWantedItem', () => {
         itemId: 'w-1',
         reason: '   ',
       })
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
   it('requires upstream admin (isUpstreamAdmin=false yields FORBIDDEN)', async () => {

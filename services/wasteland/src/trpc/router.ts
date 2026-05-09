@@ -1182,7 +1182,7 @@ export const wastelandRouter = router({
           .min(1)
           .max(64)
           .regex(/^[A-Za-z0-9_.:-]+$/, 'itemId must be alphanumeric with _ . : - only'),
-        reason: z.string().min(1).max(500),
+        reason: z.string().trim().min(1).max(500),
       })
     )
     .output(z.object({ ok: z.literal(true) }))

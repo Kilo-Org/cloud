@@ -488,6 +488,66 @@ Documented at length in `e2e-testing.md`; quick recap:
   `GET /pulls/:id` after `POST /merge` and display an intermediate
   state until `state === 'Merged'`.
 
+## Claims page
+
+The Claims page (`/wasteland/<id>/claims`) shows all wanted items
+currently in `claimed` status across the wasteland. It is the central
+view for monitoring active work and spotting stalled or orphaned claims.
+
+### What it shows
+
+- Every wanted item whose `status` column on DoltHub equals `claimed`,
+  with the claimer's rig handle, item title, priority, type, and last
+  activity timestamp.
+- An optional `rigHandle` filter (dropdown) to scope the list to one
+  rig's claims.
+- A `pending_pr` badge per item when an open DoltHub PR exists on a
+  `wl/<rigHandle>/<itemId>` branch. The badge shows the PR kind —
+  `claim PR`, `done PR`, or `unclaim PR` — derived from the first
+  commit subject via `inbox.parseCommitSubject`. A "View on DoltHub"
+  link opens the PR directly.
+- Stats strip: total claims, claims with a pending PR, and stale claims
+  (not updated in >24h).
+
+### Force unclaim
+
+Owners who also have `is_upstream_admin = true` see a "Force unclaim"
+option in each claim row's kebab menu. This calls the
+`forceUnclaimWantedItem` tRPC procedure, which:
+
+1. Verifies `requireOwnerAccess` (wasteland owner or org owner + site
+   admin).
+2. Loads the caller's credential via `loadAdminContext` and checks
+   `is_upstream_admin`. Non-admins receive `FORBIDDEN`.
+3. Writes a `SET status='open', claimed_by=NULL` update on a scratch
+   branch, opens a PR, and merges it to `main` on DoltHub.
+4. Refreshes the wanted-board cache on the DO.
+5. Emits a `claims.force_unclaim` analytics event containing
+   `<itemId>:<targetHandle>:<adminHandle>:<reason>` for audit.
+
+The PR title and description encode the admin handle and the mandatory
+reason string (1–500 chars), producing a durable audit trail on the
+DoltHub repo. If the merge fails, the scratch branch is cleaned up and
+the orphaned PR is closed.
+
+### `pending_pr` and in-flight DoltHub PRs
+
+`listClaims` enriches each claimed item with `pending_pr` by:
+
+1. Calling `loadAdminContext` to get a decrypted DoltHub token + the
+   upstream repo. If the caller has no credential or no upstream is
+   configured, enrichment is skipped and `pending_pr` is `null`.
+2. Listing all open pulls on the upstream via `doltApi.listPulls`.
+3. For each PR whose `from_branch` matches `wl/<rigHandle>/<itemId>`,
+   parsing the first commit subject to determine the PR kind (claim /
+   done / unclaim).
+4. Matching PRs against claimed item IDs and attaching the first
+   matching PR per item.
+
+Enrichment is best-effort: if DoltHub is unreachable or the credential
+is invalid, `pending_pr` is simply `null` and the claims list still
+renders.
+
 ## Open design questions
 
 None blocking. Things we might revisit after landing the above:

@@ -40,19 +40,19 @@ export function AuditLogsFilters({
 
   return (
     <>
-      <style jsx>{`
-        input[type='date']::-webkit-calendar-picker-indicator,
-        input[type='time']::-webkit-calendar-picker-indicator {
+      <style>{`
+        .audit-logs-filters input[type='date']::-webkit-calendar-picker-indicator,
+        .audit-logs-filters input[type='time']::-webkit-calendar-picker-indicator {
           filter: invert(0.5);
           opacity: 0.7;
         }
       `}</style>
-      <div className="space-y-4">
+      <div className="audit-logs-filters space-y-4">
         {/* Header with search and filter toggle */}
         <div className="flex items-center justify-between">
           {/* Always visible search */}
           <div className="relative w-64">
-            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+            <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
               placeholder="Search logs..."
               value={filters?.fuzzySearch || ''}
@@ -69,16 +69,16 @@ export function AuditLogsFilters({
               onClick={() => setFiltersExpanded(!filtersExpanded)}
               className="flex items-center gap-2"
             >
-              <Filter className="h-4 w-4" />
+              <Filter className="size-4" />
               Filters
               <ChevronDown
-                className={`h-4 w-4 transition-transform ${filtersExpanded ? 'rotate-180' : ''}`}
+                className={`size-4 transition-transform ${filtersExpanded ? 'rotate-180' : ''}`}
               />
-              {hasActiveFilters && <div className="bg-primary ml-1 h-2 w-2 rounded-full" />}
+              {hasActiveFilters && <div className="bg-primary ml-1 size-2 rounded-full" />}
             </Button>
             {hasActiveFilters && (
               <Button variant="outline" size="sm" onClick={onClearFilters}>
-                <X className="mr-2 h-4 w-4" />
+                <X className="mr-2 size-4" />
                 Clear filters
               </Button>
             )}
@@ -105,7 +105,7 @@ export function AuditLogsFilters({
                             )
                             .join(', ')
                         : 'All actions'}
-                      <ChevronDown className="h-4 w-4 opacity-50" />
+                      <ChevronDown className="size-4 opacity-50" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-56" align="start">

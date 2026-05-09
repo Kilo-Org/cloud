@@ -45,16 +45,30 @@ export function ProviderCard({
     onToggleExpansion();
   };
 
+  const handleProviderKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('[data-provider-checkbox]')) {
+      return;
+    }
+
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onToggleExpansion();
+    }
+  };
+
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-0">
         {/* Provider Header */}
         <div
+          role="button"
+          tabIndex={0}
           className="hover:bg-muted/50 flex cursor-pointer items-center justify-between p-4"
           onClick={handleProviderClick}
+          onKeyDown={handleProviderKeyDown}
         >
           <div className="flex items-center gap-3">
-            <div data-provider-checkbox className="leading-0" onClick={e => e.stopPropagation()}>
+            <div data-provider-checkbox className="leading-0">
               <Checkbox
                 checked={isFullySelected}
                 ref={el => {
@@ -75,7 +89,7 @@ export function ProviderCard({
                       : `https://openrouter.ai${provider.icon.url}`
                   }
                   alt={provider.displayName}
-                  className={cn('h-5 w-5', provider.icon.className)}
+                  className={cn('size-5', provider.icon.className)}
                 />
               )}
               <div className="flex-1">
@@ -144,7 +158,7 @@ export function ProviderCard({
               animate={{ rotate: isExpanded ? 90 : 0 }}
               transition={{ duration: 0.2, ease: 'easeInOut' }}
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="size-4" />
             </motion.div>
           </div>
         </div>

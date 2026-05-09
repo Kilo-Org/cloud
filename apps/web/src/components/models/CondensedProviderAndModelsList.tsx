@@ -38,12 +38,17 @@ export function CondensedProviderAndModelsList({
     if (!selections) return [];
 
     return selections
-      .filter(selection => selection.models.length > 0)
-      .map(selection => ({
-        slug: selection.slug,
-        displayName: providerDisplayNames.get(selection.slug) || selection.slug,
-        modelCount: selection.models.length,
-      }))
+      .flatMap(selection =>
+        selection.models.length > 0
+          ? [
+              {
+                slug: selection.slug,
+                displayName: providerDisplayNames.get(selection.slug) || selection.slug,
+                modelCount: selection.models.length,
+              },
+            ]
+          : []
+      )
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
   }, [selections, providerDisplayNames]);
 
@@ -54,7 +59,7 @@ export function CondensedProviderAndModelsList({
   const hasMore = providersWithSelections.length > maxVisible;
 
   if (isLoading) {
-    return <div className="text-muted-foreground text-sm">Loading providers...</div>;
+    return <div className="text-muted-foreground text-sm">Loading providers…</div>;
   }
 
   if (!selections || providersWithSelections.length === 0) {
@@ -66,22 +71,23 @@ export function CondensedProviderAndModelsList({
       {/* Default model row */}
       {defaultModel ? (
         readonly ? (
-          <div className="bg-muted/25 mb-6 flex items-center justify-between rounded-md border border-gray-500 px-3 py-2">
+          <div className="bg-muted/25 border-border mb-6 flex items-center justify-between rounded-md border px-3 py-2">
             <span className="mr-3 flex-1 truncate text-sm font-bold">{defaultModel}</span>
             <Badge variant="secondary" className="flex-shrink-0 text-xs">
               Default model
             </Badge>
           </div>
         ) : (
-          <div
+          <button
+            type="button"
             onClick={onDefaultModelClick}
-            className="bg-muted/25 hover:bg-muted/30 mb-6 flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 transition-all hover:border-yellow-300"
+            className="bg-muted/25 hover:bg-muted/30 mb-6 flex w-full cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-left transition-all hover:border-yellow-300"
           >
             <span className="mr-3 flex-1 truncate text-sm font-bold">{defaultModel}</span>
             <Badge variant="secondary" className="flex-shrink-0 text-xs">
               Default model
             </Badge>
-          </div>
+          </button>
         )
       ) : readonly ? (
         <TooltipProvider>
@@ -91,7 +97,7 @@ export function CondensedProviderAndModelsList({
                 <span className="text-muted-foreground mr-3 flex-1 truncate text-sm font-medium">
                   Set default model
                 </span>
-                <Lock className="text-muted-foreground h-4 w-4" />
+                <Lock className="text-muted-foreground size-4" />
               </div>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
@@ -103,15 +109,16 @@ export function CondensedProviderAndModelsList({
           </Tooltip>
         </TooltipProvider>
       ) : (
-        <div
+        <button
+          type="button"
           onClick={onDefaultModelClick}
-          className="group bg-muted/10 border-muted-foreground/30 hover:border-muted-foreground/50 hover:bg-muted/20 mb-6 flex cursor-pointer items-center justify-between rounded-md border-2 border-dashed px-3 py-2 transition-all duration-200"
+          className="group bg-muted/10 border-muted-foreground/30 hover:border-muted-foreground/50 hover:bg-muted/20 mb-6 flex w-full cursor-pointer items-center justify-between rounded-md border-2 border-dashed px-3 py-2 text-left transition-all duration-200"
         >
           <span className="text-muted-foreground group-hover:text-foreground mr-3 flex-1 truncate text-sm font-medium transition-colors">
             Set default model
           </span>
-          <Settings className="text-muted-foreground group-hover:text-foreground h-4 w-4 transition-colors" />
-        </div>
+          <Settings className="text-muted-foreground group-hover:text-foreground size-4 transition-colors" />
+        </button>
       )}
 
       {visibleProviders.map(provider => (
@@ -132,12 +139,12 @@ export function CondensedProviderAndModelsList({
         >
           {showAll ? (
             <>
-              <ChevronUp className="mr-1 h-3 w-3" />
+              <ChevronUp className="mr-1 size-3" />
               Show less
             </>
           ) : (
             <>
-              <ChevronDown className="mr-1 h-3 w-3" />
+              <ChevronDown className="mr-1 size-3" />
               Show {providersWithSelections.length - maxVisible} more
             </>
           )}

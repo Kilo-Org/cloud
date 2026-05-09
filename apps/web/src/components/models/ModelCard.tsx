@@ -49,7 +49,7 @@ export function ModelCard({ model, isSelected, onToggle, readonly = false }: Mod
       <CardContent className="p-4">
         <div className="mb-2 flex items-start justify-between">
           <div className="flex min-w-0 flex-1 items-start gap-3">
-            <div data-model-checkbox onClick={e => e.stopPropagation()} className="mt-0.5">
+            <div data-model-checkbox className="mt-0.5">
               <Checkbox
                 checked={isSelected}
                 onCheckedChange={readonly ? undefined : onToggle}
@@ -63,9 +63,9 @@ export function ModelCard({ model, isSelected, onToggle, readonly = false }: Mod
                 className="hover:text-primary flex items-center gap-1 text-left transition-colors"
               >
                 {showDescription ? (
-                  <ChevronDown className="h-3 w-3 flex-shrink-0" />
+                  <ChevronDown className="size-3 flex-shrink-0" />
                 ) : (
-                  <ChevronRight className="h-3 w-3 flex-shrink-0" />
+                  <ChevronRight className="size-3 flex-shrink-0" />
                 )}
                 <h3 className="truncate text-sm font-semibold">{model.name}</h3>
               </button>

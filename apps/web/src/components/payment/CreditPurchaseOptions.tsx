@@ -40,8 +40,8 @@ type CreditPurchaseOptionsProps = {
 
 const OrgPurchasWarning = () => {
   return (
-    <div className="bg-background flex items-start gap-2 rounded-md border border-gray-700 p-3">
-      <AlertTriangle className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+    <div className="bg-background border-border flex items-start gap-2 rounded-md border p-3">
+      <AlertTriangle className="text-muted-foreground mt-0.5 size-4 shrink-0" />
       <div className="text-muted-foreground text-xs">
         Personal credits are for your account only. Need organization credits?{' '}
         <Link className="text-blue-400 hover:underline" href="/organizations">
@@ -164,7 +164,7 @@ export default function CreditPurchaseOptions({
       <Card className="w-full rounded-xl shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2">
-            <Coins className="h-5 w-5" />
+            <Coins className="size-5" />
             {cardTitle}
           </CardTitle>
         </CardHeader>
@@ -185,7 +185,7 @@ export default function CreditPurchaseOptions({
             </div>
           )}
 
-          <div className="flex flex-col space-y-4">
+          <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {purchaseAmounts.map(amount => {
                 const totalAmount = showFirstPurchasePromo
@@ -327,7 +327,7 @@ export default function CreditPurchaseOptions({
           </div>
         </CardContent>
       </Card>
-      <style jsx>{
+      <style>{
         /* css */ `
           @keyframes liquidRipple {
             0% {

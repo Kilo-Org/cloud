@@ -747,7 +747,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         <MobileSidebarToggle />
         <div className="w-full max-w-2xl rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-6">
           <div className="mb-3 flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-400" />
+            <AlertCircle className="size-5 text-amber-400" />
             <h2 className="text-lg font-semibold">Connect GitHub or GitLab to start a session</h2>
           </div>
           <p className="text-muted-foreground mb-4 text-sm">{integrationMessage}</p>
@@ -807,7 +807,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                   isImageLimitReached ? 'text-amber-400' : 'text-primary'
                 )}
               >
-                <Upload className="h-4 w-4" />
+                <Upload className="size-4" />
                 {isImageLimitReached
                   ? `Maximum ${CLOUD_AGENT_IMAGE_MAX_COUNT} images attached`
                   : 'Drop images here'}
@@ -923,7 +923,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div className="text-muted-foreground flex h-9 min-w-0 items-center gap-1.5 rounded-md border border-dashed px-2 text-xs">
-                          <Brain className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                          <Brain className="size-3.5 shrink-0 opacity-70" />
                           <span className="truncate">{thinkingEffortLabel(displayVariant)}</span>
                         </div>
                       </TooltipTrigger>
@@ -945,17 +945,17 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
             <div className="flex-1" />
 
-            {isPreparing && <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />}
+            {isPreparing && <Loader2 className="text-muted-foreground size-4 animate-spin" />}
             <UIButton
               type="button"
               variant="ghost"
               size="icon"
               onClick={() => fileInputRef.current?.click()}
               disabled={isPreparing}
-              className="h-8 w-8 rounded-lg"
+              className="size-8 rounded-lg"
               title="Attach images"
             >
-              <Paperclip className="h-4 w-4" />
+              <Paperclip className="size-4" />
             </UIButton>
             <UIButton
               type="button"
@@ -963,9 +963,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               size="icon"
               onClick={() => void handleStartSession()}
               disabled={!isFormValid || isPreparing || imageUpload.hasUploadingImages}
-              className="h-8 w-8 rounded-lg"
+              className="size-8 rounded-lg"
             >
-              <Send className="h-4 w-4" />
+              <Send className="size-4" />
             </UIButton>
           </div>
         </div>
@@ -983,14 +983,14 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                 )}
                 disabled={isPreparing}
               >
-                <FolderGit2 className="h-3.5 w-3.5" />
+                <FolderGit2 className="size-3.5" />
                 <span className="max-w-[16rem] truncate">{selectedRepo || 'Repository'}</span>
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] p-0" align="start">
               {isLoadingRepos ? (
                 <div className="text-muted-foreground p-4 text-center text-sm">
-                  Loading repositories...
+                  Loading repositories…
                 </div>
               ) : repoError ? (
                 <div className="p-4 text-center text-sm text-red-400">
@@ -1002,7 +1002,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                 </div>
               ) : (
                 <Command>
-                  <div className="flex items-center border-b pr-2 [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:border-b-0">
+                  <div className="flex items-center border-b pr-2 [&_[data-cmdk-input-wrapper]]:flex-1 [&_[data-cmdk-input-wrapper]]:border-b-0">
                     <CommandInput placeholder="Search repositories..." />
                     <button
                       type="button"
@@ -1011,9 +1011,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                       className="text-muted-foreground hover:text-foreground shrink-0 rounded-sm p-1 disabled:opacity-50"
                       title="Refresh repositories"
                     >
-                      <RefreshCw
-                        className={cn('h-3.5 w-3.5', isRefreshingRepos && 'animate-spin')}
-                      />
+                      <RefreshCw className={cn('size-3.5', isRefreshingRepos && 'animate-spin')} />
                     </button>
                   </div>
                   <CommandEmpty>No repositories match your search</CommandEmpty>
@@ -1119,10 +1117,10 @@ function RepoCommandItem({
       {repo.private ? (
         <Lock className="size-3.5 text-yellow-500" />
       ) : (
-        <Unlock className="size-3.5 text-gray-500" />
+        <Unlock className="text-muted-foreground size-3.5" />
       )}
       <span className="truncate">{repo.fullName}</span>
-      <Check className={cn('ml-auto h-4 w-4', isSelected ? 'opacity-100' : 'opacity-0')} />
+      <Check className={cn('ml-auto size-4', isSelected ? 'opacity-100' : 'opacity-0')} />
     </CommandItem>
   );
 }

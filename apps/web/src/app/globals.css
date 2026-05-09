@@ -214,6 +214,41 @@
     animation: pulse-glow 0.6s ease-out;
   }
 
+  @keyframes typing-dot-pulse {
+    0%,
+    80%,
+    100% {
+      opacity: 0.35;
+      transform: translateY(0);
+    }
+    40% {
+      opacity: 1;
+      transform: translateY(-2px);
+    }
+  }
+
+  @keyframes typing-dot-opacity {
+    0%,
+    80%,
+    100% {
+      opacity: 0.35;
+    }
+    40% {
+      opacity: 1;
+    }
+  }
+
+  .animate-typing-dot {
+    animation: typing-dot-pulse 1.2s var(--ease-out-strong) infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-typing-dot {
+      animation-name: typing-dot-opacity;
+      transform: none;
+    }
+  }
+
   @keyframes pulse-opacity {
     0%,
     100% {

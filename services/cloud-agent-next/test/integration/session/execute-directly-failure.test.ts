@@ -56,7 +56,7 @@ describe('executeDirectly failure handling', () => {
       const request: StartExecutionV2Request = {
         kind: 'followup',
         userId,
-        prompt: 'do some work',
+        payload: { type: 'prompt', prompt: 'do some work' },
       };
 
       const startResult = await instance.startExecutionV2(request);

@@ -66,6 +66,8 @@ export type WrapperPromptOptions = {
 export type WrapperCommandOptions = {
   command: string;
   args?: string;
+  autoCommit?: boolean;
+  condenseOnComplete?: boolean;
   execution?: ExecutionBinding;
 };
 

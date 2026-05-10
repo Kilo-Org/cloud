@@ -67,10 +67,12 @@ import type {
   PreparingEventData,
   CloudStatusData,
 } from '../shared/protocol.js';
+import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { STALE_THRESHOLD_MS, SANDBOX_SLEEP_AFTER_SECONDS } from '../core/lease.js';
 import { ExecutionOrchestrator, type OrchestratorDeps } from '../execution/orchestrator.js';
 import type {
   ExecutionMode,
+  ExecutionPayload,
   ExecutionPlan,
   StartExecutionV2Request,
   StartExecutionV2Result,
@@ -300,6 +302,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (!this.streamHandler || this.streamHandlerSessionId !== sessionId) {
       this.streamHandler = createStreamHandler(this.ctx, this.eventQueries, sessionId, {
         deriveCloudStatus: () => this.deriveCloudStatus(),
+        getAvailableCommands: () => this.getAvailableCommands(),
       });
       this.streamHandlerSessionId = sessionId;
     }
@@ -316,6 +319,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         clearActiveExecution: () => this.clearActiveExecution(),
         getActiveExecutionId: () => this.executionQueries.getActiveExecutionId(),
         cancelDisconnectGrace: () => this.cancelDisconnectGrace(),
+        setAvailableCommands: (commands: SlashCommandInfo[]) => this.setAvailableCommands(commands),
         getExecution: async (executionId: string) => {
           const execution = await this.executionQueries.get(executionId as ExecutionId);
           if (!execution) return null;
@@ -758,6 +762,21 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     };
 
     await this.updateMetadata(updated);
+  }
+
+  /**
+   * Persist the slash-command catalog reported by the wrapper. Stored as a
+   * dedicated DO storage key (not part of session metadata) because the
+   * catalog is a runtime cache derived from the kilo server, not durable
+   * session config — keeping it separate avoids polluting MetadataSchema.
+   */
+  async setAvailableCommands(commands: SlashCommandInfo[]): Promise<void> {
+    await this.ctx.storage.put('availableCommands', commands);
+  }
+
+  /** Read the cached slash-command catalog. Returns [] if never populated. */
+  async getAvailableCommands(): Promise<SlashCommandInfo[]> {
+    return (await this.ctx.storage.get<SlashCommandInfo[]>('availableCommands')) ?? [];
   }
 
   /**
@@ -2228,7 +2247,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     userId: UserId;
     orgId?: string;
     mode: ExecutionMode;
-    prompt: string;
+    payload: ExecutionPayload;
     model?: string;
     variant?: string;
     autoCommit?: boolean;
@@ -2287,7 +2306,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       sessionId: params.sessionId,
       userId: params.userId,
       orgId: params.orgId,
-      prompt: params.prompt,
+      payload: params.payload,
       mode: params.mode,
       workspace,
       wrapper: {
@@ -2525,7 +2544,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           userId: request.userId,
           orgId: request.orgId,
           mode: request.mode,
-          prompt: request.prompt,
+          payload: {
+            type: 'prompt',
+            prompt: request.prompt,
+            mode: request.mode,
+            model: normalizedModel ?? undefined,
+            variant: request.variant,
+          },
           model: normalizedModel,
           variant: request.variant,
           autoCommit: request.autoCommit,
@@ -2623,7 +2648,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           userId: metadata.userId as UserId,
           orgId: metadata.orgId,
           mode: metadata.mode,
-          prompt: metadata.prompt,
+          payload: {
+            type: 'prompt',
+            prompt: metadata.prompt,
+            mode: metadata.mode,
+            model: metadata.model,
+            variant: metadata.variant,
+          },
           model: metadata.model,
           variant: metadata.variant,
           autoCommit: metadata.autoCommit,
@@ -2655,10 +2686,23 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         await this.updateGitToken(request.tokenOverrides.gitToken);
         metadata.gitToken = request.tokenOverrides.gitToken;
       }
-      const mode = request.mode ?? metadata.mode ?? 'code';
-      const model = normalizeKilocodeModel(request.model ?? metadata.model);
-      const variant = request.variant ?? metadata.variant;
-      if (!model) {
+
+      // Slash commands carry their own agent/model overrides on the kilo side
+      // (Command.Info.agent / .model) — for the cloud-agent-next plan we just
+      // reuse the session's existing mode/model so logger tags + plan shape
+      // stay sensible. Mode/model validation only applies to prompt payloads.
+      const isCommand = request.payload.type === 'command';
+      const mode =
+        (request.payload.type === 'prompt' ? request.payload.mode : undefined) ??
+        metadata.mode ??
+        'code';
+      const model = normalizeKilocodeModel(
+        (request.payload.type === 'prompt' ? request.payload.model : undefined) ?? metadata.model
+      );
+      const variant =
+        (request.payload.type === 'prompt' ? request.payload.variant : undefined) ??
+        metadata.variant;
+      if (!model && !isCommand) {
         return this.buildStartError(
           'BAD_REQUEST',
           'No model specified and session has no default model'
@@ -2710,9 +2754,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           metadata.sessionId,
           metadata.botId
         ));
+      // For command payloads `model` may be undefined (command's own
+      // Command.Info.model takes effect); fall back to the session's stored
+      // model so the resume context still has a string for kilo to log.
       const resumeContext: TokenResumeContext = {
         kilocodeToken: metadata.kilocodeToken ?? '',
-        kilocodeModel: model,
+        kilocodeModel: model ?? metadata.model ?? '',
         githubToken,
         gitToken,
       };
@@ -2724,7 +2771,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         userId: metadata.userId as UserId,
         orgId: metadata.orgId,
         mode,
-        prompt: request.prompt,
+        payload: request.payload,
         model,
         variant,
         autoCommit: request.autoCommit ?? metadata.autoCommit,

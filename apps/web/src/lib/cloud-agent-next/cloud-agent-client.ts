@@ -148,14 +148,29 @@ export type InitiateFromPreparedSessionInput = {
   kilocodeOrganizationId?: string;
 };
 
+/**
+ * Discriminated payload for V2 sendMessage — free-text prompt or structured
+ * slash command. Mirrors the worker's SendMessageV2Payload schema.
+ */
+export type SendMessagePayload =
+  | {
+      type: 'prompt';
+      prompt: string;
+      /** Built-in slug or a slug in the session's runtimeAgents. `custom` is rejected here. */
+      mode: AgentMode;
+      model: string;
+      variant?: string;
+    }
+  | {
+      type: 'command';
+      command: string;
+      arguments: string;
+    };
+
 /** Input for sendMessage procedure (V2 - uses cloudAgentSessionId) */
 export type SendMessageInput = {
   cloudAgentSessionId: string;
-  prompt: string;
-  /** Built-in slug or a slug in the session's runtimeAgents. `custom` is rejected here. */
-  mode: AgentMode;
-  model: string;
-  variant?: string;
+  payload: SendMessagePayload;
   autoCommit?: boolean;
   githubToken?: string;
   gitToken?: string;

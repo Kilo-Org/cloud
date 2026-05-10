@@ -186,10 +186,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       try {
         return await client.sendMessage({
           cloudAgentSessionId: input.cloudAgentSessionId,
-          prompt: input.prompt,
-          mode: input.mode,
-          model: input.model,
-          variant: input.variant,
+          payload: input.payload,
           autoCommit: input.autoCommit,
           messageId: input.messageId,
           images: input.images,

@@ -243,6 +243,28 @@ export function createConnectionManager(
   }
 
   /**
+   * Fetch the kilo slash-command catalog and send it to the DO as a
+   * `commands.available` event. Called after the ingest WS opens (initial
+   * connect and reconnect) so the DO's cache is always fresh for clients.
+   * Best-effort: failures are logged but don't block the connection.
+   */
+  async function sendCommandsAvailable(): Promise<void> {
+    try {
+      const commands = await config.kiloClient.listCommands();
+      sendToIngest({
+        streamEventType: 'commands.available',
+        data: { commands },
+        timestamp: new Date().toISOString(),
+      });
+      logToFile(`commands.available sent: count=${commands.length}`);
+    } catch (err) {
+      logToFile(
+        `failed to send commands.available: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  /**
    * Open the ingest WebSocket connection.
    * @param expectedGeneration If provided, the connection is only accepted when
    *   `generation` still matches. This prevents a stale reconnect from assigning
@@ -556,6 +578,8 @@ export function createConnectionManager(
     }
     // Send fresh kilo state snapshot after reconnecting
     void sendKiloSnapshot();
+    // Re-push command catalog — DO cache may have been evicted in the interim.
+    void sendCommandsAvailable();
     callbacks.onReconnected?.();
   }
 
@@ -623,6 +647,10 @@ export function createConnectionManager(
 
       // Send initial kilo state snapshot before starting event subscription
       await sendKiloSnapshot();
+
+      // Push the slash-command catalog so the DO can hydrate connected clients.
+      // Best-effort: fire-and-forget, doesn't block readiness.
+      void sendCommandsAvailable();
 
       // Start SDK event subscription (runs in background)
       startEventSubscription();

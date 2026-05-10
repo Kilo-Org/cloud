@@ -321,6 +321,26 @@ export const connectedDataSchema = z.object({
 });
 export type ConnectedData = z.infer<typeof connectedDataSchema>;
 
+/**
+ * Slash command catalog item — the trimmed `Command.Info` we get over the wire.
+ * The wrapper strips `template` server-side because kilo handles substitution.
+ */
+export const slashCommandInfoSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  agent: z.string().optional(),
+  model: z.string().optional(),
+  source: z.enum(['command', 'mcp', 'skill']).optional(),
+  hints: z.array(z.string()).default([]),
+  subtask: z.boolean().optional(),
+});
+export type SlashCommandInfo = z.infer<typeof slashCommandInfoSchema>;
+
+export const commandsAvailableDataSchema = z.object({
+  commands: z.array(slashCommandInfoSchema),
+});
+export type CommandsAvailableData = z.infer<typeof commandsAvailableDataSchema>;
+
 // ---------------------------------------------------------------------------
 // Session snapshot (historical transport / replay)
 // ---------------------------------------------------------------------------

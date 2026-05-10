@@ -28,6 +28,13 @@ import type { AgentMode } from './types';
 
 type ChatInputProps = {
   onSend: (message: string, images?: Images) => Promise<boolean>;
+  /**
+   * Invoked when the user submits a slash command (input starts with `/<name>`
+   * and `<name>` matches a known entry in `slashCommands`). When omitted or
+   * the input doesn't match a known command, the input is forwarded to
+   * `onSend` as plain text instead.
+   */
+  onSendCommand?: (command: string, args: string, images?: Images) => Promise<boolean>;
   onStop?: () => void;
   disabled?: boolean;
   isStreaming?: boolean;
@@ -71,6 +78,7 @@ type ChatInputProps = {
 
 export function ChatInput({
   onSend,
+  onSendCommand,
   onStop,
   disabled = false,
   isStreaming = false,
@@ -186,7 +194,23 @@ export function ChatInput({
         textareaRef.current.style.height = 'auto';
       }
 
-      const accepted = await onSend(trimmed, imagesData);
+      // Re-match against the trimmed value at submit time — `matchedSlashCommand`
+      // is memoized off `value`, but Enter handler may submit synchronously.
+      let accepted: boolean;
+      const slashMatch = onSendCommand
+        ? /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(trimmed)
+        : null;
+      const slashCommand =
+        slashMatch && slashCommands?.some(c => c.trigger === slashMatch[1])
+          ? { command: slashMatch[1], args: slashMatch[2]?.trim() ?? '' }
+          : null;
+
+      if (slashCommand && onSendCommand) {
+        accepted = await onSendCommand(slashCommand.command, slashCommand.args, imagesData);
+      } else {
+        accepted = await onSend(trimmed, imagesData);
+      }
+
       if (!accepted) {
         if (valueRef.current === '') {
           setInputValue(trimmed);
@@ -197,7 +221,7 @@ export function ChatInput({
 
       return true;
     },
-    [disabled, imageUpload, onSend, setInputValue]
+    [disabled, imageUpload, onSend, onSendCommand, setInputValue, slashCommands]
   );
 
   const handleSend = () => {
@@ -211,23 +235,27 @@ export function ChatInput({
   };
 
   const handleSelectCommand = (command: SlashCommand, autoSend = false) => {
-    const expansion = command.expansion;
     setShowAutocomplete(false);
     setSelectedIndex(0);
 
     if (autoSend) {
-      void sendMessage(expansion);
+      // Send the structured command immediately. `sendMessage` re-parses the
+      // submitted text and routes through `onSendCommand` when the first
+      // token matches a known command.
+      void sendMessage(`/${command.trigger}`);
     } else {
-      // Just fill the input for editing
-      setInputValue(expansion);
-      // Force height recalculation for expanded text
+      // Insert `/<trigger> ` so the user can type args before submitting.
+      const inserted = `/${command.trigger} `;
+      setInputValue(inserted);
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
         textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+        // Move cursor to the end so typing continues args.
+        const end = inserted.length;
+        textareaRef.current.setSelectionRange(end, end);
       }
     }
 
-    // Keep focus on textarea
     textareaRef.current?.focus();
   };
 

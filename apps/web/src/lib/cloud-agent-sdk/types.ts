@@ -108,6 +108,21 @@ export type SuggestionState = {
   callId?: string;
 };
 
+/**
+ * Slash command catalog item from kilo. Mirrors the wire shape sent over
+ * `commands.available` events — `template` is intentionally omitted because
+ * kilo handles `$1`/`$2`/`$ARGUMENTS` substitution server-side.
+ */
+export type SlashCommandInfo = {
+  name: string;
+  description?: string;
+  agent?: string;
+  model?: string;
+  source?: 'command' | 'mcp' | 'skill';
+  hints: string[];
+  subtask?: boolean;
+};
+
 /** Full service state — all non-chat state in one place. */
 export type ServiceStateSnapshot = {
   activity: SessionActivity;

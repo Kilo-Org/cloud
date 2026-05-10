@@ -90,17 +90,34 @@ export const baseSendMessageSchema = z.object({
   autoCommit: z.boolean().optional().default(false),
 });
 
+/**
+ * Discriminated payload variants for sendMessageV2 — mirrors the worker's
+ * SendMessageV2Payload. `prompt` carries free text + mode/model; `command`
+ * carries a structured slash command + args (kilo expands the template).
+ */
+export const sendMessageV2PayloadSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('prompt'),
+    prompt: z.string().min(1),
+    mode: agentModeSchema,
+    model: z.string().min(1),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
+  }),
+  z.object({
+    type: z.literal('command'),
+    command: z.string().min(1),
+    arguments: z.string().default(''),
+  }),
+]);
+
 // V2 schema for sending a message - uses cloudAgentSessionId to match worker schema
 export const baseSendMessageV2Schema = z.object({
   cloudAgentSessionId: z.string(),
-  prompt: z.string().min(1),
-  mode: agentModeSchema,
-  model: z.string().min(1),
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
+  payload: sendMessageV2PayloadSchema,
   autoCommit: z.boolean().optional().default(false),
 });
 

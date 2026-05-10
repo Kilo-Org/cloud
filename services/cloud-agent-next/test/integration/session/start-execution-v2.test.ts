@@ -96,7 +96,7 @@ describe('CloudAgentSession.startExecutionV2', () => {
       const request: StartExecutionV2Request = {
         kind: 'followup',
         userId,
-        prompt: 'followup prompt',
+        payload: { type: 'prompt', prompt: 'followup prompt' },
         tokenOverrides: {
           gitToken: 'new-token',
         },

@@ -235,17 +235,34 @@ export const agentModeSendMessageSchema = z
     message: 'Custom mode requires prepareSession/updateSession, not sendMessage',
   });
 
+/**
+ * Discriminated payload for sendMessage — free-text prompt or structured slash
+ * command. Mirrors the worker's SendMessageV2Payload schema; both variants
+ * ride the same execution pipeline on the cloud-agent-next side.
+ */
+export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('prompt'),
+    prompt: z.string().min(1),
+    mode: agentModeSendMessageSchema,
+    model: z.string().min(1),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
+  }),
+  z.object({
+    type: z.literal('command'),
+    command: z.string().min(1),
+    arguments: z.string().default(''),
+  }),
+]);
+
 // Schema for sending a message (V2 - uses cloudAgentSessionId)
 export const baseSendMessageNextSchema = z.object({
   cloudAgentSessionId: z.string(),
-  prompt: z.string().min(1),
-  mode: agentModeSendMessageSchema,
-  model: z.string().min(1),
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
+  payload: sendMessageNextPayloadSchema,
   autoCommit: z.boolean().optional(),
   messageId: z.string().startsWith('msg_').length(30).optional(),
   images: cloudAgentImagesSchema,

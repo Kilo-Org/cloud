@@ -587,7 +587,9 @@ describe('createSessionManager', () => {
       await mgr.switchSession(kiloId('ses-1'));
 
       mockSession.send.mockImplementation(() => new Promise(() => {}));
-      void mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
+      void mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
 
       const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
       expect(messages).toHaveLength(1);
@@ -599,10 +601,7 @@ describe('createSessionManager', () => {
       expect(optimisticMessage?.parts[0]?.messageID).toBe(optimisticMessage?.info.id);
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
-        variant: undefined,
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
         images: undefined,
       });
     });
@@ -618,7 +617,9 @@ describe('createSessionManager', () => {
       if (!latestStorage) throw new Error('expected session storage');
 
       mockSession.send.mockImplementation(() => new Promise(() => {}));
-      void mgr.send({ prompt, mode: 'code', model: 'claude-3-5-sonnet' });
+      void mgr.send({
+        payload: { type: 'prompt', prompt, mode: 'code', model: 'claude-3-5-sonnet' },
+      });
 
       const [optimisticMessage] = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
       const messageId = optimisticMessage?.info.id;
@@ -658,13 +659,13 @@ describe('createSessionManager', () => {
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
 
       mockSession.send.mockResolvedValue(undefined);
-      await mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
 
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
       });
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
     });
@@ -677,9 +678,7 @@ describe('createSessionManager', () => {
 
       mockSession.send.mockRejectedValue(new Error('ECONNREFUSED'));
       const accepted = await mgr.send({
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
       });
 
       expect(accepted).toBe(false);
@@ -704,7 +703,9 @@ describe('createSessionManager', () => {
 
       const error = new Error('fail');
       mockSession.send.mockRejectedValue(error);
-      await mgr.send({ prompt: 'My prompt', mode: 'code', model: 'claude-3-5-sonnet' });
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'My prompt', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
 
       expect(onSendFailed).toHaveBeenCalledWith(
         'My prompt',
@@ -735,9 +736,7 @@ describe('createSessionManager', () => {
 
       mockSession.send.mockRejectedValue(new Error('Transport disconnected'));
       const accepted = await mgr.send({
-        prompt: 'My prompt',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
+        payload: { type: 'prompt', prompt: 'My prompt', mode: 'code', model: 'claude-3-5-sonnet' },
       });
 
       expect(accepted).toBe(false);
@@ -762,18 +761,24 @@ describe('createSessionManager', () => {
 
       mockSession.send.mockResolvedValue(undefined);
       await mgr.send({
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
-        variant: 'high',
+        payload: {
+          type: 'prompt',
+          prompt: 'Hello',
+          mode: 'code',
+          model: 'claude-3-5-sonnet',
+          variant: 'high',
+        },
       });
 
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
-        variant: 'high',
+        payload: {
+          type: 'prompt',
+          prompt: 'Hello',
+          mode: 'code',
+          model: 'claude-3-5-sonnet',
+          variant: 'high',
+        },
         images: undefined,
       });
     });
@@ -787,19 +792,14 @@ describe('createSessionManager', () => {
 
       mockSession.send.mockResolvedValue(undefined);
       const accepted = await mgr.send({
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
         images,
       });
 
       expect(accepted).toBe(true);
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
-        variant: undefined,
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
         images,
       });
     });
@@ -811,14 +811,13 @@ describe('createSessionManager', () => {
       await mgr.switchSession(kiloId('ses-1'));
 
       mockSession.send.mockResolvedValue(undefined);
-      await mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
 
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
-        variant: undefined,
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
       });
     });
 
@@ -828,9 +827,7 @@ describe('createSessionManager', () => {
 
       // No switchSession — no active session
       const accepted = await mgr.send({
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
       });
 
       expect(accepted).toBe(false);
@@ -1137,7 +1134,14 @@ describe('createSessionManager', () => {
       // After interrupt, send should NOT throw — transport should still be alive
       mockSession.send.mockResolvedValue({});
       await expect(
-        mgr.send({ prompt: 'follow-up message', mode: 'code', model: 'claude-3-5-sonnet' })
+        mgr.send({
+          payload: {
+            type: 'prompt',
+            prompt: 'follow-up message',
+            mode: 'code',
+            model: 'claude-3-5-sonnet',
+          },
+        })
       ).resolves.not.toThrow();
       expect(mockSession.send).toHaveBeenCalledTimes(1);
     });
@@ -1382,6 +1386,37 @@ describe('createSessionManager', () => {
 
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
       expect(atomValue(config.store, mgr.atoms.activePermission)).toBeNull();
+    });
+
+    it('switchSession clears availableCommands immediately', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // Simulate a commands.available event from session A
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+      const sessionConfig = mockedCreate.mock.calls[0][0];
+      sessionConfig.onEvent?.({
+        type: 'commands.available',
+        commands: [{ name: 'review', description: 'Review code', hints: [] }],
+      });
+      expect(
+        atomValue<{ name: string; description: string }[]>(
+          config.store,
+          mgr.atoms.availableCommands
+        )
+      ).toHaveLength(1);
+
+      // Switch to session B — commands should be cleared before any new event arrives
+      const switchPromise = mgr.switchSession(kiloId('ses-2'));
+      expect(
+        atomValue<{ name: string; description: string }[]>(
+          config.store,
+          mgr.atoms.availableCommands
+        )
+      ).toHaveLength(0);
+
+      await switchPromise;
     });
   });
 

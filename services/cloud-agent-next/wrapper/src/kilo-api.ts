@@ -11,6 +11,7 @@
 import type { KiloClient as SDKClient } from '@kilocode/sdk';
 import { createKiloClient as createV2Client } from '@kilocode/sdk/v2';
 import { logToFile } from './utils.js';
+import { toSlashCommandInfo, type SlashCommandInfo } from '../../src/shared/slash-commands.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,6 +50,8 @@ export type WrapperKiloClient = {
   }) => Promise<void>;
   abortSession: (opts: { sessionId: string }) => Promise<boolean>;
   sendCommand: (opts: { sessionId: string; command: string; args?: string }) => Promise<unknown>;
+  /** Fetch the full slash command catalog from kilo, trimmed to wire shape. */
+  listCommands: () => Promise<SlashCommandInfo[]>;
   answerPermission: (permissionId: string, response: PermissionResponse) => Promise<boolean>;
   answerQuestion: (questionId: string, answers: string[][]) => Promise<boolean>;
   rejectQuestion: (questionId: string) => Promise<boolean>;
@@ -163,6 +166,17 @@ export function createWrapperKiloClient(
         },
       });
       return result.data;
+    },
+
+    listCommands: async () => {
+      const result = await sdkClient.command.list();
+      const raw = (result.data ?? []) as unknown[];
+      const commands: SlashCommandInfo[] = [];
+      for (const item of raw) {
+        const trimmed = toSlashCommandInfo(item);
+        if (trimmed) commands.push(trimmed);
+      }
+      return commands;
     },
 
     answerPermission: async (permissionId, response) => {

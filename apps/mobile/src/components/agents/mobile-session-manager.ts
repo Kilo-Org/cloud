@@ -114,28 +114,53 @@ export function createMobileAgentSessionManager({
       return result.token;
     },
     api: {
-      send: async payload => {
+      send: async input => {
         await withCloudAgentDiagnostics('send', organizationId, async () => {
-          if (!payload.model) {
-            throw new Error('Model is required');
-          }
-          const input = {
-            cloudAgentSessionId: payload.sessionId as string,
-            prompt: payload.prompt,
-            mode: normalizeAgentMode(payload.mode),
-            model: payload.model,
-            variant: payload.variant,
+          // The cloud-agent-next SDK transport now passes a discriminated payload.
+          // For prompt payloads we still require mode/model client-side; commands
+          // carry their own agent/model overrides on the kilo side.
+          type WorkerPayload =
+            | {
+                type: 'prompt';
+                prompt: string;
+                mode: string;
+                model: string;
+                variant?: string;
+              }
+            | { type: 'command'; command: string; arguments: string };
+          const payload: WorkerPayload = (() => {
+            if (input.payload.type === 'prompt') {
+              if (!input.payload.model) {
+                throw new Error('Model is required');
+              }
+              return {
+                type: 'prompt' as const,
+                prompt: input.payload.prompt,
+                mode: normalizeAgentMode(input.payload.mode),
+                model: input.payload.model,
+                variant: input.payload.variant,
+              };
+            }
+            return {
+              type: 'command' as const,
+              command: input.payload.command,
+              arguments: input.payload.arguments,
+            };
+          })();
+          const baseInput = {
+            cloudAgentSessionId: input.sessionId as string,
+            payload,
             autoCommit: true,
-            messageId: payload.messageId,
+            messageId: input.messageId,
           };
           if (organizationId) {
             await trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
-              { ...input, organizationId },
+              { ...baseInput, organizationId },
               skipBatchOptions
             );
             return;
           }
-          await trpcClient.cloudAgentNext.sendMessage.mutate(input, skipBatchOptions);
+          await trpcClient.cloudAgentNext.sendMessage.mutate(baseInput, skipBatchOptions);
         });
       },
       interrupt: async payload => {

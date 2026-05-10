@@ -98,13 +98,12 @@ describe('session transport delegation (cloud agent)', () => {
     const session = createCloudAgentResolvedSession(api);
 
     await connectSession(session);
-    await session.send({ prompt: 'hello', mode: 'auto' });
+    await session.send({ payload: { type: 'prompt', prompt: 'hello', mode: 'auto' } });
 
     expect(api.send).toHaveBeenCalledTimes(1);
     expect(api.send).toHaveBeenCalledWith({
       sessionId: cloudAgentSessionId,
-      prompt: 'hello',
-      mode: 'auto',
+      payload: { type: 'prompt', prompt: 'hello', mode: 'auto' },
     });
 
     session.destroy();
@@ -179,7 +178,7 @@ describe('commands throw before transport is connected', () => {
     const api = createMockApi();
     const session = createCloudAgentResolvedSession(api);
 
-    expect(() => session.send({ prompt: 'hello' })).toThrow(
+    expect(() => session.send({ payload: { type: 'prompt', prompt: 'hello' } })).toThrow(
       'CloudAgentSession transport.send is not configured'
     );
 
@@ -222,7 +221,7 @@ describe('session transport missing command methods (read-only session)', () => 
     const session = createHistoricalSession();
     await connectHistorical(session);
 
-    expect(() => session.send({ prompt: 'hello' })).toThrow(
+    expect(() => session.send({ payload: { type: 'prompt', prompt: 'hello' } })).toThrow(
       'CloudAgentSession transport.send is not configured'
     );
 
@@ -292,9 +291,7 @@ describe('remote session send via typed transport methods', () => {
 
     // Now send a message via the typed send method
     const sendPromise = session.send({
-      prompt: 'Hello world',
-      mode: 'code',
-      model: 'test/model-1',
+      payload: { type: 'prompt', prompt: 'Hello world', mode: 'code', model: 'test/model-1' },
     });
 
     // The transport wraps this into a WebSocket command

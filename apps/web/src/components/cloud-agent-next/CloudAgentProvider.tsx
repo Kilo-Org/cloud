@@ -109,37 +109,53 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       lifecycleHooks: createBrowserLifecycleHooks(),
 
       api: {
-        send: async payload => {
-          const mode = payload.mode ?? 'code';
-          if (payload.model === undefined) {
-            throw new Error('Cloud Agent model is required');
+        send: async input => {
+          // The transport-level SendPromptPayload makes mode/model optional (CLI
+          // live transport accepts them as optional). The cloud-agent worker
+          // schema requires them for prompts, so coerce here and fail loudly
+          // if missing.
+          type WorkerPayload =
+            | { type: 'prompt'; prompt: string; mode: string; model: string; variant?: string }
+            | { type: 'command'; command: string; arguments: string };
+          let normalizedPayload: WorkerPayload;
+          if (input.payload.type === 'prompt') {
+            if (!input.payload.mode) throw new Error('Cloud Agent mode is required');
+            if (!input.payload.model) throw new Error('Cloud Agent model is required');
+            normalizedPayload = {
+              type: 'prompt',
+              prompt: input.payload.prompt,
+              mode: input.payload.mode,
+              model: input.payload.model,
+              variant: input.payload.variant,
+            };
+          } else {
+            normalizedPayload = {
+              type: 'command',
+              command: input.payload.command,
+              arguments: input.payload.arguments,
+            };
           }
+
           if (organizationId) {
             return trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
               {
-                cloudAgentSessionId: payload.sessionId,
-                prompt: payload.prompt,
-                mode,
-                model: payload.model,
-                variant: payload.variant,
+                cloudAgentSessionId: input.sessionId,
+                payload: normalizedPayload,
                 autoCommit: true,
                 organizationId,
-                messageId: payload.messageId,
-                images: payload.images,
+                messageId: input.messageId,
+                images: input.images,
               },
               { context: { skipBatch: true } }
             );
           }
           return trpcClient.cloudAgentNext.sendMessage.mutate(
             {
-              cloudAgentSessionId: payload.sessionId,
-              prompt: payload.prompt,
-              mode,
-              model: payload.model,
-              variant: payload.variant,
+              cloudAgentSessionId: input.sessionId,
+              payload: normalizedPayload,
               autoCommit: true,
-              messageId: payload.messageId,
-              images: payload.images,
+              messageId: input.messageId,
+              images: input.images,
             },
             { context: { skipBatch: true } }
           );

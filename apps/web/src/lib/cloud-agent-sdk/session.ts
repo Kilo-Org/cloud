@@ -21,6 +21,7 @@ import type {
   CloudAgentStreamTicketResult,
   TransportFactory,
   TransportSink,
+  TransportSendPayload,
   Transport,
 } from './transport';
 import { createMemoryStorage } from './storage/memory';
@@ -65,10 +66,7 @@ type CloudAgentSessionConfig = {
 };
 
 type CloudAgentSessionSendInput = {
-  prompt: string;
-  mode?: string;
-  model?: string;
-  variant?: string;
+  payload: TransportSendPayload;
   messageId?: string;
   images?: Images;
 };

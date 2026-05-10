@@ -80,6 +80,20 @@ describe('resolveGitHubToken', () => {
       expect(result.tried).toContain('rig platform integration');
     }
   });
+
+  it('includes GIT_TOKEN_SERVICE not bound annotation when integrationId set but service missing', async () => {
+    const ctx = mockSCMContext({
+      platformIntegrationId: 'integration-789',
+      env: {} as SCMContext['env'],
+      getTownConfig: async () =>
+        ({ git_auth: { platform_integration_id: 'integration-789' } }) as TownConfig,
+    });
+    const result = await resolveGitHubToken(ctx);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.tried).toContain('town platform integration (GIT_TOKEN_SERVICE not bound)');
+    }
+  });
 });
 
 describe('checkPRStatus', () => {

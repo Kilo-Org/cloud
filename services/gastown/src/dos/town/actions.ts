@@ -330,7 +330,7 @@ const LOG = '[actions]';
 /** Fail MR bead after this many consecutive null poll results (#1632). */
 const PR_POLL_NULL_THRESHOLD = 10;
 
-/** Fail MR bead after this many consecutive non-transient errors (invalid_response, unrecognized_url, host_mismatch). */
+/** Fail MR bead after this many consecutive non-transient errors (invalid_response). */
 const PR_POLL_NON_TRANSIENT_THRESHOLD = 3;
 
 /** Minimum interval between PR polls per MR bead (ms) (#1632). */
@@ -372,9 +372,18 @@ function failureMessageFor(error: PRStatusError): string {
 }
 
 function shouldFailImmediately(error: PRStatusError): boolean {
-  if (error.kind === 'no_token') return true;
-  if (error.kind === 'http_error' && !error.transient) return true;
-  return false;
+  switch (error.kind) {
+    case 'no_token':
+      return true;
+    case 'unrecognized_url':
+      return true;
+    case 'host_mismatch':
+      return true;
+    case 'http_error':
+      return !error.transient;
+    case 'invalid_response':
+      return false;
+  }
 }
 
 function shouldCountAsTransient(error: PRStatusError): boolean {

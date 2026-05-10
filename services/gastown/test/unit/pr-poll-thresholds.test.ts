@@ -199,19 +199,19 @@ describe('shouldFailImmediately', () => {
     expect(_shouldFailImmediately(error)).toBe(false);
   });
 
-  it('returns false for unrecognized_url', () => {
+  it('returns true for unrecognized_url', () => {
     const error: PRStatusError = { kind: 'unrecognized_url', url: 'https://example.com' };
-    expect(_shouldFailImmediately(error)).toBe(false);
+    expect(_shouldFailImmediately(error)).toBe(true);
   });
 
-  it('returns false for host_mismatch', () => {
+  it('returns true for host_mismatch', () => {
     const error: PRStatusError = {
       kind: 'host_mismatch',
       provider: 'gitlab',
       expected: 'gitlab.com',
       got: 'evil.com',
     };
-    expect(_shouldFailImmediately(error)).toBe(false);
+    expect(_shouldFailImmediately(error)).toBe(true);
   });
 });
 

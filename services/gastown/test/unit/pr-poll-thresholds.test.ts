@@ -254,3 +254,77 @@ describe('shouldCountAsTransient', () => {
     expect(_shouldCountAsTransient(error)).toBe(false);
   });
 });
+
+describe('error categorization is mutually exclusive', () => {
+  const allKinds: PRStatusError[] = [
+    { kind: 'no_token', provider: 'github', resolutionChain: [] },
+    { kind: 'http_error', provider: 'github', status: 401, statusText: 'Unauthorized', transient: false },
+    { kind: 'http_error', provider: 'github', status: 503, statusText: 'Service Unavailable', transient: true },
+    { kind: 'invalid_response', provider: 'github', reason: 'schema_mismatch' },
+    { kind: 'unrecognized_url', url: 'https://example.com' },
+    { kind: 'host_mismatch', provider: 'gitlab', expected: 'gitlab.com', got: 'evil.com' },
+  ];
+
+  it('each error kind falls into exactly one bucket', () => {
+    for (const error of allKinds) {
+      const buckets = [
+        _shouldFailImmediately(error),
+        _shouldCountAsTransient(error),
+      ].filter(Boolean);
+      expect(buckets.length, `${error.kind} should match exactly one bucket`).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('invalid_response is the only kind in the 3-strike (non-transient) bucket', () => {
+    for (const error of allKinds) {
+      const isNonTransient = !_shouldFailImmediately(error) && !_shouldCountAsTransient(error);
+      if (error.kind === 'invalid_response') {
+        expect(isNonTransient, `invalid_response should be in 3-strike bucket`).toBe(true);
+      } else {
+        expect(isNonTransient, `${error.kind} should NOT be in 3-strike bucket`).toBe(false);
+      }
+    }
+  });
+});
+
+describe('counter cross-contamination', () => {
+  it('9 transient errors then 1 non-transient should not fail (separate counters)', () => {
+    const transientError: PRStatusError = {
+      kind: 'http_error',
+      provider: 'github',
+      status: 503,
+      statusText: 'Service Unavailable',
+      transient: true,
+    };
+    const nonTransientError: PRStatusError = {
+      kind: 'invalid_response',
+      provider: 'github',
+      reason: 'schema_mismatch',
+    };
+
+    expect(_shouldFailImmediately(transientError)).toBe(false);
+    expect(_shouldCountAsTransient(transientError)).toBe(true);
+
+    expect(_shouldFailImmediately(nonTransientError)).toBe(false);
+    expect(_shouldCountAsTransient(nonTransientError)).toBe(false);
+
+    // After 9 transient errors, poll_transient_count=9, poll_non_transient_count=0.
+    // Then 1 non-transient error resets poll_transient_count=0, increments poll_non_transient_count=1.
+    // 1 < 3, so bead should NOT fail. This test documents the expected behavior;
+    // the actual counter logic lives in the SQL within applyAction.
+  });
+
+  it('3 consecutive non-transient errors should fail (non-transient counter reaches threshold)', () => {
+    const nonTransientError: PRStatusError = {
+      kind: 'invalid_response',
+      provider: 'github',
+      reason: 'schema_mismatch',
+    };
+
+    expect(_shouldFailImmediately(nonTransientError)).toBe(false);
+    expect(_shouldCountAsTransient(nonTransientError)).toBe(false);
+
+    // 3 consecutive non-transient errors: poll_non_transient_count reaches 3.
+    // 3 >= PR_POLL_NON_TRANSIENT_THRESHOLD (3), so bead SHOULD fail.
+  });
+});

@@ -804,14 +804,15 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
         try {
           const outcome = await ctx.checkPRStatus(action.pr_url);
           if (outcome.ok) {
-            // Successful poll — reset consecutive null counter
+            // Successful poll — reset both consecutive error counters
             query(
               sql,
               /* sql */ `
                 UPDATE ${beads}
                 SET ${beads.columns.metadata} = json_set(
                   COALESCE(${beads.columns.metadata}, '{}'),
-                  '$.poll_null_count', 0,
+                  '$.poll_transient_count', 0,
+                  '$.poll_non_transient_count', 0,
                   '$.poll_error_kind', NULL
                 )
                 WHERE ${beads.bead_id} = ?
@@ -1298,18 +1299,21 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 statusCode: error.kind === 'http_error' ? error.status : undefined,
               });
             } else if (shouldCountAsTransient(error)) {
-              // Transient HTTP errors (5xx, 429) count toward the existing 10-strike threshold
+              // Transient HTTP errors (5xx, 429) count toward the 10-strike threshold.
+              // Migrate legacy poll_null_count into poll_transient_count on first read.
               query(
                 sql,
                 /* sql */ `
                   UPDATE ${beads}
                   SET ${beads.columns.metadata} = json_set(
                     COALESCE(${beads.columns.metadata}, '{}'),
-                    '$.poll_null_count',
+                    '$.poll_transient_count',
                     COALESCE(
+                      json_extract(${beads.columns.metadata}, '$.poll_transient_count'),
                       json_extract(${beads.columns.metadata}, '$.poll_null_count'),
                       0
-                    ) + 1
+                    ) + 1,
+                    '$.poll_non_transient_count', 0
                   )
                   WHERE ${beads.bead_id} = ?
                 `,
@@ -1319,17 +1323,17 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 ...query(
                   sql,
                   /* sql */ `
-                    SELECT json_extract(${beads.columns.metadata}, '$.poll_null_count') AS null_count
+                    SELECT json_extract(${beads.columns.metadata}, '$.poll_transient_count') AS transient_count
                     FROM ${beads}
                     WHERE ${beads.bead_id} = ?
                   `,
                   [action.bead_id]
                 ),
               ];
-              const nullCount = Number(rows[0]?.null_count ?? 0);
-              if (nullCount >= PR_POLL_NULL_THRESHOLD) {
+              const transientCount = Number(rows[0]?.transient_count ?? 0);
+              if (transientCount >= PR_POLL_NULL_THRESHOLD) {
                 console.warn(
-                  `${LOG} poll_pr: ${nullCount} consecutive transient errors for bead=${action.bead_id}, failing`
+                  `${LOG} poll_pr: ${transientCount} consecutive transient errors for bead=${action.bead_id}, failing`
                 );
                 beadOps.updateBeadStatus(sql, action.bead_id, 'failed', 'system');
                 query(
@@ -1357,19 +1361,21 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 });
               }
             } else {
-              // Non-transient, non-immediate errors (invalid_response, unrecognized_url, host_mismatch)
-              // count toward a lower 3-strike threshold
+              // Non-transient, non-immediate errors (invalid_response only)
+              // count toward a lower 3-strike threshold.
+              // Migrate legacy poll_null_count into poll_non_transient_count on first read.
               query(
                 sql,
                 /* sql */ `
                   UPDATE ${beads}
                   SET ${beads.columns.metadata} = json_set(
                     COALESCE(${beads.columns.metadata}, '{}'),
-                    '$.poll_null_count',
+                    '$.poll_non_transient_count',
                     COALESCE(
-                      json_extract(${beads.columns.metadata}, '$.poll_null_count'),
+                      json_extract(${beads.columns.metadata}, '$.poll_non_transient_count'),
                       0
-                    ) + 1
+                    ) + 1,
+                    '$.poll_transient_count', 0
                   )
                   WHERE ${beads.bead_id} = ?
                 `,
@@ -1379,17 +1385,17 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 ...query(
                   sql,
                   /* sql */ `
-                    SELECT json_extract(${beads.columns.metadata}, '$.poll_null_count') AS null_count
+                    SELECT json_extract(${beads.columns.metadata}, '$.poll_non_transient_count') AS non_transient_count
                     FROM ${beads}
                     WHERE ${beads.bead_id} = ?
                   `,
                   [action.bead_id]
                 ),
               ];
-              const nullCount = Number(rows[0]?.null_count ?? 0);
-              if (nullCount >= PR_POLL_NON_TRANSIENT_THRESHOLD) {
+              const nonTransientCount = Number(rows[0]?.non_transient_count ?? 0);
+              if (nonTransientCount >= PR_POLL_NON_TRANSIENT_THRESHOLD) {
                 console.warn(
-                  `${LOG} poll_pr: ${nullCount} consecutive non-transient errors kind=${error.kind} for bead=${action.bead_id}, failing`
+                  `${LOG} poll_pr: ${nonTransientCount} consecutive non-transient errors kind=${error.kind} for bead=${action.bead_id}, failing`
                 );
                 beadOps.updateBeadStatus(sql, action.bead_id, 'failed', 'system');
                 query(

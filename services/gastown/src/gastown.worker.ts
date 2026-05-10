@@ -9,6 +9,7 @@ import { getTownDOStub } from './dos/Town.do';
 import { TownConfigUpdateSchema } from './types';
 import { resError } from './util/res.util';
 import { writeEvent } from './util/analytics.util';
+import { logger } from './util/log.util';
 import {
   authMiddleware,
   agentOnlyMiddleware,
@@ -171,6 +172,62 @@ app.use('*', timingMiddleware);
 // Establishes AsyncLocalStorage context so all downstream logs are tagged.
 // Cast needed: workers-tagged-logger@1.0.0 was built against an older Hono.
 app.use('*', useWorkersLogger('gastown-worker') as unknown as MiddlewareHandler);
+
+// ── Per-route logger tagging ────────────────────────────────────────
+// Use Hono path matching (not regex) so tags are sourced from
+// c.req.param() once the route is matched. Each handler runs only
+// when its prefix matches; if a request hits /api/towns/:townId/rigs/:rigId,
+// both town and rig handlers run in order.
+app.use('/api/orgs/:orgId/*', async (c, next) => {
+  const orgId = c.req.param('orgId');
+  if (orgId) logger.setTags({ orgId });
+  await next();
+});
+app.use('/api/towns/:townId/*', async (c, next) => {
+  const townId = c.req.param('townId');
+  if (townId) logger.setTags({ townId });
+  await next();
+});
+app.use('/api/mayor/:townId/*', async (c, next) => {
+  const townId = c.req.param('townId');
+  if (townId) logger.setTags({ townId });
+  await next();
+});
+app.use('/api/orgs/:orgId/towns/:townId/*', async (c, next) => {
+  const townId = c.req.param('townId');
+  if (townId) logger.setTags({ townId });
+  await next();
+});
+app.use('/api/users/:userId/towns/:townId/*', async (c, next) => {
+  const townId = c.req.param('townId');
+  if (townId) logger.setTags({ townId });
+  await next();
+});
+app.use('/api/towns/:townId/rigs/:rigId/*', async (c, next) => {
+  const rigId = c.req.param('rigId');
+  if (rigId) logger.setTags({ rigId });
+  await next();
+});
+app.use('/api/orgs/:orgId/rigs/:rigId/*', async (c, next) => {
+  const rigId = c.req.param('rigId');
+  if (rigId) logger.setTags({ rigId });
+  await next();
+});
+app.use('/api/mayor/:townId/tools/rigs/:rigId/*', async (c, next) => {
+  const rigId = c.req.param('rigId');
+  if (rigId) logger.setTags({ rigId });
+  await next();
+});
+app.use('/api/towns/:townId/rigs/:rigId/agents/:agentId/*', async (c, next) => {
+  const agentId = c.req.param('agentId');
+  if (agentId) logger.setTags({ agentId });
+  await next();
+});
+app.use('/api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/*', async (c, next) => {
+  const agentId = c.req.param('agentId');
+  if (agentId) logger.setTags({ agentId });
+  await next();
+});
 
 // ── CORS ────────────────────────────────────────────────────────────────
 // Allow browser requests from the main Kilo app. In development, allow

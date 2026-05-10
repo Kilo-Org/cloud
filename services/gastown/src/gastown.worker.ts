@@ -9,6 +9,7 @@ import { getTownDOStub } from './dos/Town.do';
 import { TownConfigUpdateSchema } from './types';
 import { resError } from './util/res.util';
 import { writeEvent } from './util/analytics.util';
+import { logger } from './util/log.util';
 import {
   authMiddleware,
   agentOnlyMiddleware,
@@ -128,7 +129,6 @@ import { townAuthMiddleware } from './middleware/town-auth.middleware';
 import { orgAuthMiddleware } from './middleware/org-auth.middleware';
 import { adminAuditMiddleware } from './middleware/admin-audit.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
-import { logger } from './util/log.util';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
 import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
@@ -173,33 +173,60 @@ app.use('*', timingMiddleware);
 // Cast needed: workers-tagged-logger@1.0.0 was built against an older Hono.
 app.use('*', useWorkersLogger('gastown-worker') as unknown as MiddlewareHandler);
 
-// ── Request logging ─────────────────────────────────────────────────────
-// Extract IDs from the URL path directly — c.req.param() only works
-// after Hono has matched a route, which hasn't happened yet in a
-// wildcard middleware.
-// Matches /orgs/:orgId, /towns/:townId, /rigs/:rigId, /agents/:agentId
-// in any combination that appears in our route patterns.
-const RE_ORG = /\/orgs\/(?<orgId>[^/]+)/;
-const RE_TOWN = /\/towns\/(?<townId>[^/]+)/;
-const RE_RIG = /\/rigs\/(?<rigId>[^/]+)/;
-const RE_AGENT = /\/agents\/(?<agentId>[^/]+)/;
-
-app.use('*', async (c, next) => {
-  const method = c.req.method;
-  const path = c.req.path;
-  // Tag with route params immediately so all downstream logs (auth,
-  // handlers, DO calls) inherit them. Auth-derived tags (userId, orgId)
-  // are set by kiloAuthMiddleware and orgAuthMiddleware when they run.
-  logger.setTags({
-    orgId: RE_ORG.exec(path)?.groups?.orgId,
-    townId: RE_TOWN.exec(path)?.groups?.townId,
-    rigId: RE_RIG.exec(path)?.groups?.rigId,
-    agentId: RE_AGENT.exec(path)?.groups?.agentId,
-  });
-  logger.info(`--> ${method} ${path}`);
+// ── Per-route logger tagging ────────────────────────────────────────
+// Use Hono path matching (not regex) so tags are sourced from
+// c.req.param() once the route is matched. Each handler runs only
+// when its prefix matches; if a request hits /api/towns/:townId/rigs/:rigId,
+// both town and rig handlers run in order.
+app.use('/api/orgs/:orgId/*', async (c, next) => {
+  const orgId = c.req.param('orgId');
+  if (orgId) logger.setTags({ orgId });
   await next();
-  const elapsed = Math.round(performance.now() - (c.get('requestStartTime') ?? 0));
-  logger.info(`<-- ${method} ${path} ${c.res.status}`, { durationMs: elapsed });
+});
+app.use('/api/towns/:townId/*', async (c, next) => {
+  const townId = c.req.param('townId');
+  if (townId) logger.setTags({ townId });
+  await next();
+});
+app.use('/api/mayor/:townId/*', async (c, next) => {
+  const townId = c.req.param('townId');
+  if (townId) logger.setTags({ townId });
+  await next();
+});
+app.use('/api/orgs/:orgId/towns/:townId/*', async (c, next) => {
+  const townId = c.req.param('townId');
+  if (townId) logger.setTags({ townId });
+  await next();
+});
+app.use('/api/users/:userId/towns/:townId/*', async (c, next) => {
+  const townId = c.req.param('townId');
+  if (townId) logger.setTags({ townId });
+  await next();
+});
+app.use('/api/towns/:townId/rigs/:rigId/*', async (c, next) => {
+  const rigId = c.req.param('rigId');
+  if (rigId) logger.setTags({ rigId });
+  await next();
+});
+app.use('/api/orgs/:orgId/rigs/:rigId/*', async (c, next) => {
+  const rigId = c.req.param('rigId');
+  if (rigId) logger.setTags({ rigId });
+  await next();
+});
+app.use('/api/mayor/:townId/tools/rigs/:rigId/*', async (c, next) => {
+  const rigId = c.req.param('rigId');
+  if (rigId) logger.setTags({ rigId });
+  await next();
+});
+app.use('/api/towns/:townId/rigs/:rigId/agents/:agentId/*', async (c, next) => {
+  const agentId = c.req.param('agentId');
+  if (agentId) logger.setTags({ agentId });
+  await next();
+});
+app.use('/api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/*', async (c, next) => {
+  const agentId = c.req.param('agentId');
+  if (agentId) logger.setTags({ agentId });
+  await next();
 });
 
 // ── CORS ────────────────────────────────────────────────────────────────

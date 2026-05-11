@@ -44,15 +44,8 @@ export type {
   CloudAgentActiveExecutionStatus,
   CloudAgentInterruptInput,
   CloudAgentInterruptOutput,
-  CloudAgentNextSandboxDestroyedErrorData,
 } from './cloud-agent-next-client.js';
-export {
-  CloudAgentNextBillingError,
-  CloudAgentNextError,
-  SANDBOX_DESTROYED_AFTER_500_ERROR,
-  getCloudAgentNextSandboxDestroyedError,
-  parseCloudAgentNextSandboxDestroyedError,
-} from './cloud-agent-next-client.js';
+export { CloudAgentNextBillingError, CloudAgentNextError } from './cloud-agent-next-client.js';
 
 export {
   signKiloToken,

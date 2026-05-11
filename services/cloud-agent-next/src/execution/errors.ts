@@ -13,7 +13,6 @@
  */
 export type RetryableErrorCode =
   | 'SANDBOX_CONNECT_FAILED' // Sandbox may be waking up or network issue
-  | 'SANDBOX_DESTROYED_AFTER_500' // Sandbox was destroyed after a confirmed SDK/internal 500
   | 'WORKSPACE_SETUP_FAILED' // Git clone/network transient failure
   | 'KILO_SERVER_FAILED' // Kilo server starting up
   | 'WRAPPER_START_FAILED'; // Wrapper process starting
@@ -70,10 +69,6 @@ export class ExecutionError extends Error {
    */
   static sandboxConnectFailed(message: string, cause?: unknown): ExecutionError {
     return new ExecutionError('SANDBOX_CONNECT_FAILED', message, { retryable: true, cause });
-  }
-
-  static sandboxDestroyedAfter500(message: string, cause?: unknown): ExecutionError {
-    return new ExecutionError('SANDBOX_DESTROYED_AFTER_500', message, { retryable: true, cause });
   }
 
   /**

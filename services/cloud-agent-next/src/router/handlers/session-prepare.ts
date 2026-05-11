@@ -51,9 +51,8 @@ import {
 import { getPgDb } from '../../db/pg.js';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import {
-  SANDBOX_DESTROYED_AFTER_500_ERROR,
   destroySandboxAfterInternalServerError,
-  type SandboxDestroyedAfter500Data,
+  isSandboxInternalServerError,
 } from '../../sandbox-recovery.js';
 
 type SessionPrepareHandlers = {
@@ -190,32 +189,6 @@ function setCollectionUpdate<T>(
   updates[key] = isEmpty(value) ? null : value;
 }
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
-
-function sandboxDestroyedTrpcError(
-  data: SandboxDestroyedAfter500Data,
-  originalError?: unknown
-): TRPCError {
-  return new TRPCError({
-    code: 'INTERNAL_SERVER_ERROR',
-    message: originalError
-      ? getErrorMessage(originalError)
-      : `Sandbox ${data.sandboxId} was destroyed after an internal server error`,
-    cause: {
-      error: SANDBOX_DESTROYED_AFTER_500_ERROR,
-      code: SANDBOX_DESTROYED_AFTER_500_ERROR,
-      sandboxId: data.sandboxId,
-      phase: data.phase,
-      sessionId: data.sessionId,
-      destroyedAt: data.destroyedAt,
-      retryable: true,
-    },
-  });
-}
-
 /**
  * Creates session preparation handlers.
  * These handlers are protected by internal API authentication (backend-to-backend).
@@ -249,7 +222,7 @@ export function createSessionPrepareHandlers(): SessionPrepareHandlers {
  * 4. Run setup commands and configure MCP
  * 5. Start kilo server and create CLI session
  * 6. Store all metadata in Durable Object
- * 7. Return { cloudAgentSessionId, kiloSessionId, sandboxId }
+ * 7. Return { cloudAgentSessionId, kiloSessionId }
  *
  * Protected by internal API authentication (x-internal-api-key header).
  */
@@ -446,7 +419,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
         }
 
         logger.info('Session registered, async preparation scheduled');
-        return { cloudAgentSessionId, kiloSessionId, sandboxId };
+        return { cloudAgentSessionId, kiloSessionId };
       }
 
       // 3. Get sandbox
@@ -608,18 +581,22 @@ const prepareSessionHandler = internalApiProtectedProcedure
       try {
         preparedWorkspace = await prepareWorkspace();
       } catch (error) {
-        const recovery = await destroySandboxAfterInternalServerError(
+        const sandboxInternalServerError = isSandboxInternalServerError(error);
+        await destroySandboxAfterInternalServerError(
           {
             sandbox,
             sandboxId,
             sessionId: cloudAgentSessionId,
             phase: 'prepareSession',
-            env: ctx.env,
           },
           error
         );
-        if (recovery.destroyed) {
-          throw sandboxDestroyedTrpcError(recovery.data, error);
+        if (sandboxInternalServerError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Sandbox returned 500 during workspace preparation',
+            cause: { error: 'sandbox_internal_server_error', retryable: true },
+          });
         }
         throw error;
       }
@@ -742,7 +719,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
       logger.info('Session prepared successfully');
 
       // 16. Return both IDs
-      return { cloudAgentSessionId, kiloSessionId, sandboxId };
+      return { cloudAgentSessionId, kiloSessionId };
     });
   });
 

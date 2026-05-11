@@ -80,7 +80,6 @@ export type SessionInput = {
 
 export type CodeReviewPayload = {
   reviewId: string;
-  attempt?: number;
   authToken: string;
   sessionInput: SessionInput;
   owner: Owner;
@@ -318,10 +317,7 @@ export async function prepareReviewPayload(
         platform
       );
       previousHeadSha = previousReview?.head_sha ?? null;
-      previousCloudAgentSessionId =
-        review.sandbox_retry_count > 0 || review.sandbox_retry_reason
-          ? undefined
-          : (previousReview?.session_id ?? undefined);
+      previousCloudAgentSessionId = previousReview?.session_id ?? undefined;
 
       if (previousHeadSha) {
         logExceptInTest(

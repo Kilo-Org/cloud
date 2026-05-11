@@ -198,26 +198,24 @@ export async function handlePullRequestCodeReview(
 
     // 5. Cancel any existing reviews for this PR (different SHA)
     // This prevents spam when user pushes multiple commits quickly
-    const oldReviews = await findActiveReviewsForPR(
+    const oldReviewIds = await findActiveReviewsForPR(
       repository.full_name,
       pull_request.number,
       pull_request.head.sha
     );
 
-    if (oldReviews.length > 0) {
+    if (oldReviewIds.length > 0) {
       logExceptInTest(
-        `Cancelling ${oldReviews.length} old review(s) for ${repository.full_name}#${pull_request.number}`
+        `Cancelling ${oldReviewIds.length} old review(s) for ${repository.full_name}#${pull_request.number}`
       );
 
       // Cancel each review via the orchestrator (fire-and-forget, don't block new review)
       await Promise.allSettled(
-        oldReviews.map(review =>
-          codeReviewWorkerClient
-            .cancelReview(review.id, 'Superseded by new push', review.current_attempt ?? 1)
-            .catch(err => {
-              logExceptInTest(`Failed to cancel review ${review.id}:`, err);
-              return { success: false, reviewId: review.id };
-            })
+        oldReviewIds.map(reviewId =>
+          codeReviewWorkerClient.cancelReview(reviewId, 'Superseded by new push').catch(err => {
+            logExceptInTest(`Failed to cancel review ${reviewId}:`, err);
+            return { success: false, reviewId };
+          })
         )
       );
     }
@@ -434,19 +432,17 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
   if (args.appType === 'lite') return;
 
   try {
-    const activeReviews = await findActiveReviewsForPR(
+    const activeReviewIds = await findActiveReviewsForPR(
       args.repoFullName,
       args.prNumber,
       args.newHeadSha
     );
-    if (activeReviews.length === 0) return;
+    if (activeReviewIds.length === 0) return;
 
     // In practice a PR has at most one active review at a time; migrate the
     // first one to the new SHA. Any extras stay pinned to their old SHAs
     // and will be cancelled on the next non-merge push.
-    const [activeReview] = activeReviews;
-    if (!activeReview) return;
-    const reviewId = activeReview.id;
+    const [reviewId] = activeReviewIds;
     const detailsUrl = `${APP_URL}/code-reviews/${reviewId}`;
 
     let newCheckRunId: number | undefined;

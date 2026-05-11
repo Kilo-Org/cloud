@@ -3,7 +3,6 @@ import {
   createCloudAgentNextFetchClient,
   CloudAgentNextBillingError,
   CloudAgentNextError,
-  parseCloudAgentNextSandboxDestroyedError,
 } from './cloud-agent-next-client.js';
 
 const BASE_URL = 'https://cloud-agent-next.test';
@@ -23,30 +22,6 @@ afterEach(() => {
 });
 
 describe('CloudAgentNextFetchClient billing error detection', () => {
-  it('accepts sandboxId in prepareSession output', async () => {
-    vi.stubGlobal(
-      'fetch',
-      mockFetch(200, {
-        result: {
-          data: {
-            cloudAgentSessionId: 'agent_123',
-            kiloSessionId: 'ses_123',
-            sandboxId: 'usr-sandbox',
-          },
-        },
-      })
-    );
-    const client = createCloudAgentNextFetchClient(BASE_URL);
-
-    await expect(
-      client.prepareSession({}, { prompt: 'test', mode: 'code', model: 'test-model' })
-    ).resolves.toEqual({
-      cloudAgentSessionId: 'agent_123',
-      kiloSessionId: 'ses_123',
-      sandboxId: 'usr-sandbox',
-    });
-  });
-
   it('throws CloudAgentNextBillingError on 402 status', async () => {
     vi.stubGlobal('fetch', mockFetch(402, 'Payment Required'));
     const client = createCloudAgentNextFetchClient(BASE_URL);
@@ -205,29 +180,6 @@ describe('CloudAgentNextFetchClient billing error detection', () => {
         }
       )
     ).rejects.not.toThrow(CloudAgentNextBillingError);
-  });
-
-  it('parses structured sandbox destroyed tRPC error data', () => {
-    const parsed = parseCloudAgentNextSandboxDestroyedError(
-      JSON.stringify({
-        error: {
-          message: 'Sandbox destroyed',
-          data: {
-            code: 'INTERNAL_SERVER_ERROR',
-            error: 'SANDBOX_DESTROYED_AFTER_500',
-            sandboxId: 'usr-sandbox',
-            phase: 'prepareSession',
-          },
-        },
-      })
-    );
-
-    expect(parsed).toEqual({
-      code: 'SANDBOX_DESTROYED_AFTER_500',
-      sandboxId: 'usr-sandbox',
-      phase: 'prepareSession',
-      destroyedAt: undefined,
-    });
   });
 });
 

@@ -125,7 +125,6 @@ export async function executePreparationSteps(
       sandboxId,
       sessionId: input.sessionId,
       phase: 'asyncPreparation',
-      env,
     },
     async () => {
       await checkDiskAndCleanBeforeSetup(sandbox, input.orgId, input.userId, input.sessionId);

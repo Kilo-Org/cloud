@@ -59,7 +59,7 @@ describe('tryDispatchPendingReviews', () => {
   });
 
   beforeEach(() => {
-    mockDispatchReview.mockResolvedValue({ reviewId: 'unused', status: 'queued' });
+    mockDispatchReview.mockResolvedValue(undefined);
     mockGetReviewStatus.mockResolvedValue(null);
     mockGetAgentConfigForOwner.mockResolvedValue({ id: 'test-agent-config', config: {} });
     mockPrepareReviewPayload.mockImplementation((params: { reviewId: string }) => ({
@@ -505,101 +505,8 @@ describe('tryDispatchPendingReviews', () => {
       pending: 0,
       activeCount: 1,
     });
-    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id, 1);
+    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id);
     expect(storedReview?.status).toBe('queued');
-  });
-
-  it('passes current attempt to the Worker dispatch', async () => {
-    const recentTimestamp = minutesAgo(1);
-    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
-    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
-
-    const [review] = await db
-      .insert(cloud_agent_code_reviews)
-      .values({
-        ...reviewValues({
-          owner,
-          status: 'pending',
-          createdAt: recentTimestamp,
-          updatedAt: recentTimestamp,
-        }),
-        current_attempt: 2,
-      })
-      .returning({ id: cloud_agent_code_reviews.id });
-
-    if (!review) throw new Error('Expected review to be inserted');
-
-    await tryDispatchPendingReviews({ type: 'user', id: testUser.id, userId: testUser.id });
-
-    expect(mockDispatchReview).toHaveBeenCalledWith(
-      expect.objectContaining({ reviewId: review.id, attempt: 2 })
-    );
-  });
-
-  it('disables session continuation for sandbox retry reviews', async () => {
-    const recentTimestamp = minutesAgo(1);
-    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
-    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
-    mockPrepareReviewPayload.mockImplementation((params: { reviewId: string }) => ({
-      reviewId: params.reviewId,
-      previousCloudAgentSessionId: 'agent_previous',
-    }));
-
-    await db.insert(cloud_agent_code_reviews).values({
-      ...reviewValues({
-        owner,
-        status: 'pending',
-        createdAt: recentTimestamp,
-        updatedAt: recentTimestamp,
-      }),
-      sandbox_retry_count: 1,
-      sandbox_retry_reason: 'sandbox_500_destroyed',
-    });
-
-    await tryDispatchPendingReviews({ type: 'user', id: testUser.id, userId: testUser.id });
-
-    expect(mockDispatchReview).toHaveBeenCalledWith(
-      expect.not.objectContaining({ previousCloudAgentSessionId: expect.any(String) })
-    );
-  });
-
-  it('mirrors terminal Worker status returned from dispatch', async () => {
-    const recentTimestamp = minutesAgo(1);
-    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
-    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
-    mockDispatchReview.mockResolvedValue({ reviewId: 'unused', status: 'failed' });
-    mockGetReviewStatus.mockResolvedValue({
-      reviewId: 'unused',
-      status: 'failed',
-      errorMessage: 'Sandbox destroyed',
-      terminalReason: 'sandbox_error',
-      sandboxId: 'usr-sandbox',
-      completedAt: new Date().toISOString(),
-    });
-
-    const [review] = await db
-      .insert(cloud_agent_code_reviews)
-      .values(
-        reviewValues({
-          owner,
-          status: 'pending',
-          createdAt: recentTimestamp,
-          updatedAt: recentTimestamp,
-        })
-      )
-      .returning({ id: cloud_agent_code_reviews.id });
-
-    if (!review) throw new Error('Expected review to be inserted');
-
-    await tryDispatchPendingReviews({ type: 'user', id: testUser.id, userId: testUser.id });
-
-    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
-      where: eq(cloud_agent_code_reviews.id, review.id),
-    });
-
-    expect(storedReview?.status).toBe('failed');
-    expect(storedReview?.terminal_reason).toBe('sandbox_error');
-    expect(storedReview?.sandbox_id).toBe('usr-sandbox');
   });
 
   it('releases a dispatch timeout claim when the Worker status probe finds no DO state', async () => {
@@ -640,7 +547,7 @@ describe('tryDispatchPendingReviews', () => {
       pending: 1,
       activeCount: 0,
     });
-    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id, 1);
+    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id);
     expect(storedReview?.status).toBe('pending');
   });
 
@@ -682,7 +589,7 @@ describe('tryDispatchPendingReviews', () => {
       pending: 1,
       activeCount: 0,
     });
-    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id, 1);
+    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id);
     expect(storedReview?.status).toBe('queued');
   });
 });

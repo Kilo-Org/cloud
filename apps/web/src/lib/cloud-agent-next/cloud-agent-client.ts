@@ -140,7 +140,6 @@ export type PrepareSessionOutput = {
   /** The Kilo CLI session ID */
   kiloSessionId: string;
   cloudAgentSessionId: string;
-  sandboxId: string;
 };
 
 /** Input for initiating from a prepared session */
@@ -543,7 +542,6 @@ export class CloudAgentNextClient {
         elapsed: Date.now() - startTime,
         kiloSessionId: result.kiloSessionId,
         cloudAgentSessionId: result.cloudAgentSessionId,
-        sandboxId: result.sandboxId,
       });
       return result;
     } catch (error) {

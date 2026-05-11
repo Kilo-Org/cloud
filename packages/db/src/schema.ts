@@ -2984,13 +2984,6 @@ export const cloud_agent_code_reviews = pgTable(
     // Cloud agent session
     session_id: text(), // Cloud agent session ID (agent_xxx)
     cli_session_id: text(), // Kilo CLI session ID (ses_xxx from cli_sessions_v2, or legacy UUID from cli_sessions v1)
-    sandbox_id: text(), // Latest cloud-agent sandbox ID associated with this review
-
-    // Sandbox recovery retry tracking
-    sandbox_retry_count: integer().notNull().default(0),
-    sandbox_retry_reason: text(),
-    sandbox_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
-    current_attempt: integer().notNull().default(1),
 
     // Review status
     status: text().notNull().default('pending'), // 'pending' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
@@ -3032,7 +3025,6 @@ export const cloud_agent_code_reviews = pgTable(
     // Indexes for session and status lookups
     index('idx_cloud_agent_code_reviews_session_id').on(table.session_id),
     index('idx_cloud_agent_code_reviews_cli_session_id').on(table.cli_session_id),
-    index('idx_cloud_agent_code_reviews_sandbox_id').on(table.sandbox_id),
     index('idx_cloud_agent_code_reviews_status').on(table.status),
     // Indexes for repo and PR lookups
     index('idx_cloud_agent_code_reviews_repo').on(table.repo_full_name),

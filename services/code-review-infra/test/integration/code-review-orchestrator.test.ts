@@ -146,40 +146,6 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
   });
 
-  it('status route can read attempt-aware DO state', async () => {
-    const reviewId = crypto.randomUUID();
-    const attemptOneStub = getReviewStub(reviewId);
-    const attemptTwoStub = getReviewStub(`${reviewId}:2`);
-    await attemptOneStub.start({
-      reviewId,
-      attempt: 1,
-      authToken: 'test-auth-token',
-      sessionInput: sessionInput(),
-      owner: { type: 'user', id: 'user-id', userId: 'user-id' },
-      agentVersion: 'v2',
-    });
-    await attemptTwoStub.start({
-      reviewId,
-      attempt: 2,
-      authToken: 'test-auth-token',
-      sessionInput: sessionInput(),
-      owner: { type: 'user', id: 'user-id', userId: 'user-id' },
-      agentVersion: 'v2',
-    });
-
-    const attemptTwoResponse = await SELF.fetch(
-      `https://worker.test/reviews/${reviewId}/status?attempt=2`,
-      { headers: workerAuthHeaders() }
-    );
-
-    expect(attemptTwoResponse.status).toBe(200);
-    await expect(attemptTwoResponse.json()).resolves.toMatchObject({
-      reviewId,
-      attempt: 2,
-      status: 'queued',
-    });
-  });
-
   it('queued review alarm retries runReview and transitions to running', async () => {
     const stub = getReviewStub();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
@@ -191,7 +157,6 @@ describe('CodeReviewOrchestrator recovery', () => {
         return trpcSuccess({
           cloudAgentSessionId: 'agent-test-session',
           kiloSessionId: 'ses_test_session',
-          sandboxId: 'usr-test-sandbox',
         });
       }
       if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
@@ -214,16 +179,9 @@ describe('CodeReviewOrchestrator recovery', () => {
       status: 'running',
       sessionId: 'agent-test-session',
       cliSessionId: 'ses_test_session',
-      sandboxId: 'usr-test-sandbox',
     });
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(true);
     expect(hasFetchCall(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toBe(true);
-    const prepareCall = getFetchCall(fetchMock, '/trpc/prepareSession');
-    expect(prepareCall).toBeDefined();
-    const prepareBody = JSON.parse((prepareCall?.[1] as RequestInit).body as string) as {
-      callbackTarget?: { url?: string };
-    };
-    expect(prepareBody.callbackTarget?.url).toContain('attempt=1');
   });
 
   it('retries prepareSession once after a sandbox 500 and initiates the retry session', async () => {
@@ -242,7 +200,6 @@ describe('CodeReviewOrchestrator recovery', () => {
         return trpcSuccess({
           cloudAgentSessionId: 'agent-retry-session',
           kiloSessionId: 'ses_retry_session',
-          sandboxId: 'usr-retry-sandbox',
         });
       }
       if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
@@ -280,6 +237,15 @@ describe('CodeReviewOrchestrator recovery', () => {
       sessionId: 'agent-retry-session',
       cliSessionId: 'ses_retry_session',
     });
+
+    const failedStatusUpdates = fetchCalls(fetchMock, '/api/internal/code-review-status/').filter(
+      call => {
+        const init = call[1] as RequestInit | undefined;
+        if (typeof init?.body !== 'string') return false;
+        return (JSON.parse(init.body) as { status?: string }).status === 'failed';
+      }
+    );
+    expect(failedStatusUpdates).toHaveLength(0);
   });
 
   it('fails after a second sandbox 500 without initiating', async () => {
@@ -304,12 +270,20 @@ describe('CodeReviewOrchestrator recovery', () => {
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
-    await expect(stub.status()).resolves.toMatchObject({ status: 'failed' });
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'failed',
+      terminalReason: 'sandbox_error',
+    });
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
+      status: 'failed',
+      terminalReason: 'sandbox_error',
+    });
     await expect(storedReview(stub)).resolves.toMatchObject({
       status: 'failed',
       sandboxRetryAttempted: true,
+      terminalReason: 'sandbox_error',
     });
   });
 
@@ -449,7 +423,6 @@ describe('CodeReviewOrchestrator recovery', () => {
         return trpcSuccess({
           cloudAgentSessionId: 'agent-fresh-session',
           kiloSessionId: 'ses_fresh_session',
-          sandboxId: 'usr-fresh-sandbox',
         });
       }
       if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
@@ -505,7 +478,6 @@ describe('CodeReviewOrchestrator recovery', () => {
         return trpcSuccess({
           cloudAgentSessionId: 'agent-fresh-stale',
           kiloSessionId: 'ses_fresh_stale',
-          sandboxId: 'usr-fresh-stale-sandbox',
         });
       }
       if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
@@ -560,7 +532,6 @@ describe('CodeReviewOrchestrator recovery', () => {
         return trpcSuccess({
           cloudAgentSessionId: 'agent-fresh-active',
           kiloSessionId: 'ses_fresh_active',
-          sandboxId: 'usr-fresh-active-sandbox',
         });
       }
       if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
@@ -609,7 +580,6 @@ describe('CodeReviewOrchestrator recovery', () => {
         return trpcSuccess({
           cloudAgentSessionId: 'agent-fresh-after-error',
           kiloSessionId: 'ses_fresh_after_error',
-          sandboxId: 'usr-fresh-after-error-sandbox',
         });
       }
       if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
@@ -669,7 +639,6 @@ describe('CodeReviewOrchestrator recovery', () => {
         return trpcSuccess({
           cloudAgentSessionId: 'agent-fresh-after-send-failure',
           kiloSessionId: 'ses_fresh_after_send_failure',
-          sandboxId: 'usr-fresh-after-send-failure-sandbox',
         });
       }
       if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
@@ -710,6 +679,129 @@ describe('CodeReviewOrchestrator recovery', () => {
       callbackTarget: {
         url: expect.stringContaining('/api/internal/code-review-status/'),
       },
+    });
+  });
+
+  it('retries with a fresh session when sendMessageV2 fails with a sandbox 500', async () => {
+    const stub = getReviewStub();
+    const previousSessionId = 'agent_previous_sandbox_500';
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/getSessionHealth')) {
+        return trpcSuccess({
+          cloudAgentSessionId: previousSessionId,
+          sandboxStatus: 'healthy',
+          executionHealth: 'none',
+        });
+      }
+      if (url.includes('/trpc/updateSession')) {
+        return trpcSuccess({ success: true });
+      }
+      if (url.includes('/trpc/sendMessageV2')) {
+        return trpcError(500, 'Container failed with internal server error status: 500');
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-fresh-after-sandbox-500',
+          kiloSessionId: 'ses_fresh_after_sandbox_500',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-fresh-sandbox', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          previousCloudAgentSessionId: previousSessionId,
+          sessionId: previousSessionId,
+          cliSessionId: 'ses_previous',
+        })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-fresh-after-sandbox-500',
+      cliSessionId: 'ses_fresh_after_sandbox_500',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/getSessionHealth')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/updateSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+
+    const stored = await storedReview(stub);
+    expect(stored).toMatchObject({
+      sandboxRetryAttempted: true,
+      sessionId: 'agent-fresh-after-sandbox-500',
+      cliSessionId: 'ses_fresh_after_sandbox_500',
+    });
+    expect(stored?.previousCloudAgentSessionId).toBeUndefined();
+  });
+
+  it('fails with sandbox_error when sendMessageV2 retry also hits a sandbox 500', async () => {
+    const stub = getReviewStub();
+    const previousSessionId = 'agent_previous_sandbox_repeat';
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/getSessionHealth')) {
+        return trpcSuccess({
+          cloudAgentSessionId: previousSessionId,
+          sandboxStatus: 'healthy',
+          executionHealth: 'none',
+        });
+      }
+      if (url.includes('/trpc/updateSession')) {
+        return trpcSuccess({ success: true });
+      }
+      if (url.includes('/trpc/sendMessageV2')) {
+        return trpcError(500, 'SandboxError: HTTP error! status: 500 during resume');
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(500, 'SandboxError: HTTP error! status: 500 during setup');
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          previousCloudAgentSessionId: previousSessionId,
+        })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'failed',
+      terminalReason: 'sandbox_error',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
+      status: 'failed',
+      terminalReason: 'sandbox_error',
     });
   });
 

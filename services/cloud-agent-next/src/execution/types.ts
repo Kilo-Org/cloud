@@ -171,7 +171,6 @@ export type StartExecutionV2Request =
  */
 export type RetryableResultCode =
   | 'SANDBOX_CONNECT_FAILED'
-  | 'SANDBOX_DESTROYED_AFTER_500'
   | 'WORKSPACE_SETUP_FAILED'
   | 'KILO_SERVER_FAILED'
   | 'WRAPPER_START_FAILED';
@@ -204,10 +203,6 @@ export type StartExecutionV2Result =
       error: string;
       /** For EXECUTION_IN_PROGRESS, the currently active execution ID */
       activeExecutionId?: ExecutionId;
-      sandboxId?: string;
-      phase?: string;
-      sessionId?: string;
-      destroyedAt?: string;
     };
 
 // ---------------------------------------------------------------------------

@@ -87,7 +87,6 @@ import { stopWrapper } from '../kilo/wrapper-manager.js';
 import { SessionService } from '../session-service.js';
 import { executePreparationSteps } from './async-preparation.js';
 import { resolveManagedGitLabToken } from '../services/git-token-service-client.js';
-import { getSandboxDestroyedAfter500Error } from '../sandbox-recovery.js';
 
 // ---------------------------------------------------------------------------
 // Alarm Constants
@@ -213,7 +212,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         errorMessage: error,
         lastSeenBranch: metadata.upstreamBranch,
         kiloSessionId: metadata.kiloSessionId,
-        sandboxId: metadata.sandboxId,
         gateResult,
         lastAssistantMessageText,
       },
@@ -851,38 +849,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return { success: true };
   }
 
-  async markSandboxDestroyed(input: {
-    sandboxId: string;
-    destroyedAt: string;
-    reason: string;
-  }): Promise<OperationResult> {
-    const metadata = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
-    if (!metadata) {
-      return { success: false, error: 'Session metadata not found' };
-    }
-
-    const updated: CloudAgentSessionState = {
-      ...metadata,
-      sandboxId: input.sandboxId as SandboxId,
-      sandboxStatus: 'destroyed',
-      sandboxDestroyedAt: input.destroyedAt,
-      sandboxFailureReason: input.reason,
-      version: Date.now(),
-      timestamp: Date.now(),
-    };
-
-    const parseResult = MetadataSchema.safeParse(updated);
-    if (!parseResult.success) {
-      return {
-        success: false,
-        error: `Invalid metadata: ${JSON.stringify(parseResult.error.format())}`,
-      };
-    }
-
-    await this.ctx.storage.put('metadata', parseResult.data);
-    return { success: true };
-  }
-
   /**
    * Delete session and all associated data.
    */
@@ -1232,22 +1198,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       emitProgress('ready', 'Session ready', { branch: result.branchName });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const recoveryError = getSandboxDestroyedAfter500Error(error);
-      if (recoveryError) {
-        await this.markSandboxDestroyed({
-          sandboxId: recoveryError.data.sandboxId,
-          destroyedAt: recoveryError.data.destroyedAt,
-          reason: 'sandbox_500_destroyed',
-        }).catch(markError => {
-          logger
-            .withFields({
-              sessionId,
-              sandboxId: recoveryError.data.sandboxId,
-              error: markError instanceof Error ? markError.message : String(markError),
-            })
-            .warn('Failed to mark sandbox destroyed after async preparation error');
-        });
-      }
       logger
         .withFields({
           sessionId,
@@ -2795,18 +2745,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     } catch (error) {
       // Handle ExecutionError specifically for proper error code mapping
       if (isExecutionError(error)) {
-        const recoveryError = getSandboxDestroyedAfter500Error(error);
-        if (recoveryError) {
-          return {
-            success: false,
-            code: 'SANDBOX_DESTROYED_AFTER_500',
-            error: error.message,
-            sandboxId: recoveryError.data.sandboxId,
-            phase: recoveryError.data.phase,
-            sessionId: recoveryError.data.sessionId,
-            destroyedAt: recoveryError.data.destroyedAt,
-          };
-        }
         if (error.code === 'EXECUTION_IN_PROGRESS') {
           return this.buildStartError(
             'EXECUTION_IN_PROGRESS',
@@ -2923,22 +2861,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return this.buildStartResult(executionId);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const recoveryError = getSandboxDestroyedAfter500Error(error);
-      if (recoveryError) {
-        await this.markSandboxDestroyed({
-          sandboxId: recoveryError.data.sandboxId,
-          destroyedAt: recoveryError.data.destroyedAt,
-          reason: 'sandbox_500_destroyed',
-        }).catch(markError => {
-          logger
-            .withFields({
-              sessionId,
-              sandboxId: recoveryError.data.sandboxId,
-              error: markError instanceof Error ? markError.message : String(markError),
-            })
-            .warn('Failed to mark sandbox destroyed after execution error');
-        });
-      }
 
       try {
         this.broadcastVolatileEvent({

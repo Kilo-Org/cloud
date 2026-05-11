@@ -44,14 +44,13 @@ export interface CodeReviewEvent {
 
 export interface CodeReview {
   reviewId: string;
-  attempt?: number;
   authToken: string;
   sessionInput: SessionInput;
   owner: Owner;
   status: CodeReviewStatus;
   sessionId?: string; // Cloud agent session ID (agent_xxx)
   cliSessionId?: string; // CLI session UUID (from session_created event or prepareSession)
-  sandboxId?: string; // Cloud agent sandbox ID
+  sandboxId?: string;
   errorMessage?: string;
   terminalReason?: CloudAgentTerminalReason;
   startedAt?: string;
@@ -76,11 +75,9 @@ export interface CodeReview {
 
 export interface CodeReviewStatusResponse {
   reviewId: string;
-  attempt?: number;
   status: CodeReviewStatus;
   sessionId?: string; // Cloud agent session ID (agent_xxx)
   cliSessionId?: string; // CLI session UUID
-  sandboxId?: string;
   startedAt?: string;
   completedAt?: string;
   /** LLM model used (captured from first api_req_started event) */
@@ -121,7 +118,6 @@ export type InternalStatusResponse = z.infer<typeof InternalStatusResponseSchema
 
 export interface CodeReviewRequest {
   reviewId: string;
-  attempt?: number;
   authToken: string;
   sessionInput: SessionInput;
   owner: Owner;
@@ -134,7 +130,6 @@ export interface CodeReviewRequest {
 
 export interface CodeReviewResponse {
   reviewId: string;
-  attempt?: number;
   status: CodeReviewStatus;
 }
 

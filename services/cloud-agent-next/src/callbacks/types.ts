@@ -9,8 +9,6 @@ export type ExecutionCallbackPayload = {
   executionId: string;
   status: 'completed' | 'failed' | 'interrupted';
   errorMessage?: string;
-  terminalReason?: string;
-  sandboxId?: string;
   lastSeenBranch?: string;
   kiloSessionId?: string;
   /** Gate result reported by the agent when gate_threshold is active */

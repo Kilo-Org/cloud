@@ -382,9 +382,6 @@ export const MetadataSchema = z.object({
     )
     .transform(s => s as SandboxId)
     .optional(),
-  sandboxStatus: z.enum(['healthy', 'destroyed', 'unhealthy']).optional(),
-  sandboxDestroyedAt: z.string().optional(),
-  sandboxFailureReason: z.string().optional(),
 
   // Initial message ID for correlation
   initialMessageId: z.string().startsWith('msg_').length(30).optional(),

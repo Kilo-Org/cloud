@@ -198,22 +198,20 @@ export async function handleMergeRequestCodeReview(
 
     // 5. Cancel any existing reviews for this MR (different SHA)
     // This prevents spam when user pushes multiple commits quickly
-    const oldReviews = await findActiveReviewsForPR(project.path_with_namespace, mr.iid, headSha);
+    const oldReviewIds = await findActiveReviewsForPR(project.path_with_namespace, mr.iid, headSha);
 
-    if (oldReviews.length > 0) {
+    if (oldReviewIds.length > 0) {
       logExceptInTest(
-        `Cancelling ${oldReviews.length} old review(s) for ${project.path_with_namespace}!${mr.iid}`
+        `Cancelling ${oldReviewIds.length} old review(s) for ${project.path_with_namespace}!${mr.iid}`
       );
 
       // Cancel each review via the orchestrator (fire-and-forget, don't block new review)
       await Promise.allSettled(
-        oldReviews.map(review =>
-          codeReviewWorkerClient
-            .cancelReview(review.id, 'Superseded by new push', review.current_attempt ?? 1)
-            .catch(err => {
-              logExceptInTest(`Failed to cancel review ${review.id}:`, err);
-              return { success: false, reviewId: review.id };
-            })
+        oldReviewIds.map(reviewId =>
+          codeReviewWorkerClient.cancelReview(reviewId, 'Superseded by new push').catch(err => {
+            logExceptInTest(`Failed to cancel review ${reviewId}:`, err);
+            return { success: false, reviewId };
+          })
         )
       );
     }
@@ -397,12 +395,12 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
   newHeadSha: string;
 }) {
   try {
-    const activeReviews = await findActiveReviewsForPR(
+    const activeReviewIds = await findActiveReviewsForPR(
       args.repoFullName,
       args.mrIid,
       args.newHeadSha
     );
-    if (activeReviews.length === 0) return;
+    if (activeReviewIds.length === 0) return;
 
     const fullIntegration = await getIntegrationById(args.integrationId);
     if (!fullIntegration) return;
@@ -410,9 +408,7 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
     const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
 
     // In practice an MR has at most one active review; migrate the first.
-    const [activeReview] = activeReviews;
-    if (!activeReview) return;
-    const reviewId = activeReview.id;
+    const [reviewId] = activeReviewIds;
 
     // Update the DB row first. If this fails we never touched the new SHA,
     // so there's nothing to clean up. If it succeeds but setCommitStatus

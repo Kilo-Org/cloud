@@ -26,10 +26,7 @@ import { withDORetry } from '../utils/do-retry.js';
 import { normalizeAgentMode } from '../schema.js';
 import { buildImagePromptParts, downloadImagePromptParts } from './image-prompt-parts.js';
 import { withTimeout } from '@kilocode/worker-utils';
-import {
-  getSandboxDestroyedAfter500Error,
-  withSandboxInternalServerErrorRecovery,
-} from '../sandbox-recovery.js';
+import { withSandboxInternalServerErrorRecovery } from '../sandbox-recovery.js';
 
 /** Maximum time allowed for workspace preparation (resume, init, fast path). */
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -203,7 +200,6 @@ export class ExecutionOrchestrator {
           sandboxId,
           sessionId,
           phase: 'executionWorkspacePreparation',
-          env: this.deps.env,
         },
         prepareExecution
       );
@@ -424,13 +420,6 @@ export class ExecutionOrchestrator {
         'new session initialization'
       );
     } catch (error) {
-      const recoveryError = getSandboxDestroyedAfter500Error(error);
-      if (recoveryError) {
-        throw ExecutionError.sandboxDestroyedAfter500(
-          error instanceof Error ? error.message : String(error),
-          error
-        );
-      }
       if (error instanceof ExecutionError) throw error;
       throw ExecutionError.workspaceSetupFailed(
         `Failed to prepare workspace: ${error instanceof Error ? error.message : String(error)}`,

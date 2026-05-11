@@ -664,12 +664,12 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(subscription?.ended_at).toBeNull();
   });
 
-  it('subtracts the Apple refunded amount and all bonus credits for the refunded issuance', async () => {
+  it('reverses the issued base, bonus, and promo credits for the refunded issuance', async () => {
     const user = await insertTestUser();
     const decodedTransaction = transaction({
       appAccountToken: user.app_store_account_token,
       currency: 'USD',
-      price: 5000,
+      price: 24700,
     });
     await processAppStoreKiloPassNotification({
       signedPayload: 'refund-initial-buy',
@@ -695,33 +695,54 @@ describe('processAppStoreKiloPassNotification', () => {
     });
     expect(issuance).toBeDefined();
 
-    const bonusTransaction = await db
-      .insert(credit_transactions)
-      .values({
-        kilo_user_id: user.id,
-        amount_microdollars: toMicrodollars(9.5),
-        is_free: true,
-        description: 'test Kilo Pass bonus credits',
-        credit_category: `test-kilo-pass-bonus-${crypto.randomUUID()}`,
-      })
-      .returning({ id: credit_transactions.id });
+    const [bonusTransaction, promoTransaction] = await Promise.all([
+      db
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: user.id,
+          amount_microdollars: toMicrodollars(9.5),
+          is_free: true,
+          description: 'test Kilo Pass bonus credits',
+          credit_category: `test-kilo-pass-bonus-${crypto.randomUUID()}`,
+        })
+        .returning({ id: credit_transactions.id }),
+      db
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: user.id,
+          amount_microdollars: toMicrodollars(4.75),
+          is_free: true,
+          description: 'test Kilo Pass promo credits',
+          credit_category: `test-kilo-pass-promo-${crypto.randomUUID()}`,
+        })
+        .returning({ id: credit_transactions.id }),
+    ]);
 
     await db
       .update(kilocode_users)
       .set({
         total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${toMicrodollars(
-          9.5
+          14.25
         )}`,
       })
       .where(eq(kilocode_users.id, user.id));
 
-    await db.insert(kilo_pass_issuance_items).values({
-      kilo_pass_issuance_id: issuance?.id ?? '',
-      kind: KiloPassIssuanceItemKind.Bonus,
-      credit_transaction_id: bonusTransaction[0]?.id ?? '',
-      amount_usd: 9.5,
-      bonus_percent_applied: 0.5,
-    });
+    await db.insert(kilo_pass_issuance_items).values([
+      {
+        kilo_pass_issuance_id: issuance?.id ?? '',
+        kind: KiloPassIssuanceItemKind.Bonus,
+        credit_transaction_id: bonusTransaction[0]?.id ?? '',
+        amount_usd: 9.5,
+        bonus_percent_applied: 0.5,
+      },
+      {
+        kilo_pass_issuance_id: issuance?.id ?? '',
+        kind: KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+        credit_transaction_id: promoTransaction[0]?.id ?? '',
+        amount_usd: 4.75,
+        bonus_percent_applied: 0.25,
+      },
+    ]);
 
     const result = await processAppStoreKiloPassNotification({
       signedPayload: 'refund',
@@ -736,7 +757,7 @@ describe('processAppStoreKiloPassNotification', () => {
           ...decodedTransaction,
           revocationDate: 1_777_700_000_000,
           currency: 'USD',
-          price: 5000,
+          price: 24700,
         }),
     });
 
@@ -755,7 +776,7 @@ describe('processAppStoreKiloPassNotification', () => {
           ...decodedTransaction,
           revocationDate: 1_777_700_000_000,
           currency: 'USD',
-          price: 5000,
+          price: 24700,
         }),
     });
     expect(replayedResult).toEqual({ processed: true });
@@ -767,16 +788,27 @@ describe('processAppStoreKiloPassNotification', () => {
       })
       .from(credit_transactions)
       .where(eq(credit_transactions.kilo_user_id, user.id));
-    expect(creditTransactions.filter(row => row.amountMicrodollars < 0)).toHaveLength(2);
+    expect(creditTransactions.filter(row => row.amountMicrodollars < 0)).toHaveLength(3);
     expect(creditTransactions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          amountMicrodollars: -toMicrodollars(5),
+          amountMicrodollars: -toMicrodollars(19),
           description: 'App Store Kilo Pass refund clawback',
         }),
         expect.objectContaining({
           amountMicrodollars: -toMicrodollars(9.5),
           description: 'App Store Kilo Pass bonus refund clawback',
+        }),
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(4.75),
+          description: 'App Store Kilo Pass promo refund clawback',
+        }),
+      ])
+    );
+    expect(creditTransactions).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(24.7),
         }),
       ])
     );
@@ -784,6 +816,6 @@ describe('processAppStoreKiloPassNotification', () => {
     const updatedUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
-    expect(updatedUser?.total_microdollars_acquired).toBe(toMicrodollars(14));
+    expect(updatedUser?.total_microdollars_acquired).toBe(0);
   });
 });

@@ -6,7 +6,7 @@ import {
   Subtype,
   type ConsumptionRequest,
 } from '@apple/app-store-server-library';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 import {
@@ -20,7 +20,6 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { toMicrodollars } from '@/lib/utils';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult, KiloPassPaymentProvider } from './enums';
 import { KiloPassIssuanceItemKind } from './enums';
 import { appendKiloPassAuditLog } from './issuance';
@@ -237,22 +236,10 @@ function getStoreEventPayload(params: {
 
 type CreditReversalResult = {
   storePurchaseFound: boolean;
-  baseCreditTransactionId: string | null;
-  baseReversalMicrodollars: number;
-  bonusCreditTransactionId: string | null;
-  bonusReversalMicrodollars: number;
+  creditTransactionIds: string[];
+  totalReversalMicrodollars: number;
+  reversedItemKinds: KiloPassIssuanceItemKind[];
 };
-
-function getRefundedAmountMicrodollars(transaction: AppleStoreDecodedTransaction): number {
-  if (transaction.currency !== 'USD') {
-    throw new Error('App Store refund transaction missing USD price data');
-  }
-  if (transaction.price == null || transaction.price <= 0) {
-    throw new Error('App Store refund transaction missing price data');
-  }
-
-  return transaction.price * 1000;
-}
 
 async function insertCreditReversal(
   tx: DrizzleTransaction,
@@ -304,6 +291,16 @@ async function insertCreditReversal(
   return { wasInserted: true, creditTransactionId };
 }
 
+function getRefundReversalDescription(kind: KiloPassIssuanceItemKind): string {
+  if (kind === KiloPassIssuanceItemKind.Base) {
+    return 'App Store Kilo Pass refund clawback';
+  }
+  if (kind === KiloPassIssuanceItemKind.Bonus) {
+    return 'App Store Kilo Pass bonus refund clawback';
+  }
+  return 'App Store Kilo Pass promo refund clawback';
+}
+
 async function reverseAppStoreRefundCredits(
   transaction: AppleStoreDecodedTransaction
 ): Promise<CreditReversalResult> {
@@ -318,10 +315,9 @@ async function reverseAppStoreRefundCredits(
     if (!storePurchase) {
       return {
         storePurchaseFound: false,
-        baseCreditTransactionId: null,
-        baseReversalMicrodollars: 0,
-        bonusCreditTransactionId: null,
-        bonusReversalMicrodollars: 0,
+        creditTransactionIds: [],
+        totalReversalMicrodollars: 0,
+        reversedItemKinds: [],
       };
     }
 
@@ -336,16 +332,6 @@ async function reverseAppStoreRefundCredits(
       throw new Error('App Store refund cannot find the subscribed user');
     }
 
-    const baseReversalMicrodollars = getRefundedAmountMicrodollars(transaction);
-    const baseReversal = await insertCreditReversal(tx, {
-      kiloUserId: storePurchase.kilo_user_id,
-      amountMicrodollars: baseReversalMicrodollars,
-      isFree: false,
-      description: 'App Store Kilo Pass refund clawback',
-      creditCategory: `kilo-pass-store-refund-base:${KiloPassPaymentProvider.AppStore}:${transaction.transactionId}`,
-      originalBaselineMicrodollarsUsed: user.microdollarsUsed,
-    });
-
     const issueMonth = dayjs(storePurchase.purchased_at).utc().format('YYYY-MM-01');
     const issuance = await tx.query.kilo_pass_issuances.findFirst({
       where: and(
@@ -354,37 +340,68 @@ async function reverseAppStoreRefundCredits(
       ),
     });
 
-    let bonusCreditTransactionId: string | null = null;
-    let bonusReversalMicrodollars = 0;
-    if (issuance) {
-      const bonusItem = await tx.query.kilo_pass_issuance_items.findFirst({
-        where: and(
-          eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.id),
-          eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
-        ),
-      });
+    if (!issuance) {
+      return {
+        storePurchaseFound: true,
+        creditTransactionIds: [],
+        totalReversalMicrodollars: 0,
+        reversedItemKinds: [],
+      };
+    }
 
-      if (bonusItem) {
-        const bonusAmountMicrodollars = toMicrodollars(bonusItem.amount_usd);
-        const bonusReversal = await insertCreditReversal(tx, {
-          kiloUserId: storePurchase.kilo_user_id,
-          amountMicrodollars: bonusAmountMicrodollars,
-          isFree: true,
-          description: 'App Store Kilo Pass bonus refund clawback',
-          creditCategory: `kilo-pass-store-refund-bonus:${KiloPassPaymentProvider.AppStore}:${transaction.transactionId}:${bonusItem.id}`,
-          originalBaselineMicrodollarsUsed: user.microdollarsUsed,
-        });
-        bonusCreditTransactionId = bonusReversal.creditTransactionId;
-        bonusReversalMicrodollars = bonusReversal.wasInserted ? bonusAmountMicrodollars : 0;
+    const issuedItems = await tx
+      .select({
+        itemId: kilo_pass_issuance_items.id,
+        kind: kilo_pass_issuance_items.kind,
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        isFree: credit_transactions.is_free,
+      })
+      .from(kilo_pass_issuance_items)
+      .innerJoin(
+        credit_transactions,
+        eq(kilo_pass_issuance_items.credit_transaction_id, credit_transactions.id)
+      )
+      .where(
+        and(
+          eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.id),
+          inArray(kilo_pass_issuance_items.kind, [
+            KiloPassIssuanceItemKind.Base,
+            KiloPassIssuanceItemKind.Bonus,
+            KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+          ])
+        )
+      );
+
+    const creditTransactionIds: string[] = [];
+    const reversedItemKinds: KiloPassIssuanceItemKind[] = [];
+    let totalReversalMicrodollars = 0;
+    for (const item of issuedItems) {
+      if (item.amountMicrodollars <= 0) {
+        continue;
+      }
+
+      const reversal = await insertCreditReversal(tx, {
+        kiloUserId: storePurchase.kilo_user_id,
+        amountMicrodollars: item.amountMicrodollars,
+        isFree: item.isFree,
+        description: getRefundReversalDescription(item.kind),
+        creditCategory: `kilo-pass-store-refund:${KiloPassPaymentProvider.AppStore}:${transaction.transactionId}:${item.kind}:${item.itemId}`,
+        originalBaselineMicrodollarsUsed: user.microdollarsUsed,
+      });
+      if (reversal.creditTransactionId) {
+        creditTransactionIds.push(reversal.creditTransactionId);
+      }
+      if (reversal.wasInserted) {
+        totalReversalMicrodollars += item.amountMicrodollars;
+        reversedItemKinds.push(item.kind);
       }
     }
 
     return {
       storePurchaseFound: true,
-      baseCreditTransactionId: baseReversal.creditTransactionId,
-      baseReversalMicrodollars: baseReversal.wasInserted ? baseReversalMicrodollars : 0,
-      bonusCreditTransactionId,
-      bonusReversalMicrodollars,
+      creditTransactionIds,
+      totalReversalMicrodollars,
+      reversedItemKinds,
     };
   });
 }
@@ -535,10 +552,9 @@ export async function processAppStoreKiloPassNotification(params: {
         providerSubscriptionId: transaction.originalTransactionId,
         providerTransactionId: transaction.transactionId,
         storePurchaseFound: reversal.storePurchaseFound,
-        baseCreditTransactionId: reversal.baseCreditTransactionId,
-        baseReversalMicrodollars: reversal.baseReversalMicrodollars,
-        bonusCreditTransactionId: reversal.bonusCreditTransactionId,
-        bonusReversalMicrodollars: reversal.bonusReversalMicrodollars,
+        creditTransactionIds: reversal.creditTransactionIds,
+        totalReversalMicrodollars: reversal.totalReversalMicrodollars,
+        reversedItemKinds: reversal.reversedItemKinds,
       },
     });
   }

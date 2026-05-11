@@ -1,4 +1,5 @@
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@/lib/drizzle';
 import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
 import { client as stripe } from '@/lib/stripe-client';
@@ -160,6 +161,49 @@ function assertAppStoreAccountTokenMatchesUser(params: {
       message: 'App Store purchase account token does not match the signed-in user.',
     });
   }
+}
+
+function mapAppStoreCompletionError(error: unknown, userId: string): TRPCError {
+  if (error instanceof TRPCError) {
+    return error;
+  }
+
+  captureException(error, {
+    tags: {
+      area: 'kilo-pass',
+      operation: 'complete-app-store-purchase',
+    },
+    extra: {
+      kiloUserId: userId,
+    },
+  });
+
+  const message = error instanceof Error ? error.message : '';
+  const isVerifierFailure =
+    message.startsWith('Apple ') || message.includes('transaction') || message.includes('product');
+  const isDomainFailure =
+    message.includes('already belongs') ||
+    message.includes('already have an active Kilo Pass subscription') ||
+    message.includes('previous period expiration');
+
+  if (isVerifierFailure) {
+    return new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'We could not verify this App Store purchase. Please try again.',
+    });
+  }
+
+  if (isDomainFailure) {
+    return new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'This App Store purchase cannot be used for your account.',
+    });
+  }
+
+  return new TRPCError({
+    code: 'INTERNAL_SERVER_ERROR',
+    message: 'We could not finish this App Store purchase. Please try again.',
+  });
 }
 
 function isTwoMonthPromoOfferActive(): boolean {
@@ -535,12 +579,16 @@ export const kiloPassRouter = createTRPCRouter({
     .input(z.object({ signedTransactionJws: z.string().min(1) }))
     .output(CompleteStorePurchaseOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      const purchase = await verifyAppleKiloPassTransactionJws(input.signedTransactionJws);
-      assertAppStoreAccountTokenMatchesUser({
-        appAccountToken: purchase.appAccountToken,
-        userAppStoreAccountToken: ctx.user.app_store_account_token,
-      });
-      return completeStoreKiloPassPurchase({ user: ctx.user, purchase });
+      try {
+        const purchase = await verifyAppleKiloPassTransactionJws(input.signedTransactionJws);
+        assertAppStoreAccountTokenMatchesUser({
+          appAccountToken: purchase.appAccountToken,
+          userAppStoreAccountToken: ctx.user.app_store_account_token,
+        });
+        return await completeStoreKiloPassPurchase({ user: ctx.user, purchase });
+      } catch (error) {
+        throw mapAppStoreCompletionError(error, ctx.user.id);
+      }
     }),
 
   getAverageMonthlyUsageLast3Months: baseProcedure

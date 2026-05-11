@@ -33,6 +33,7 @@ import {
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { BillingHistoryEntry } from '@/lib/subscriptions/subscription-center';
+import type { ValidatedStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
 import type Stripe from 'stripe';
 import type dayjsType from 'dayjs';
 import type utcType from 'dayjs/plugin/utc';
@@ -68,9 +69,33 @@ type StripeMock = {
   };
 };
 
+type AppStoreVerifierMock = {
+  verifyAppleKiloPassTransactionJws: ReturnType<typeof jest.fn>;
+};
+
+type StoreCompletionMock = {
+  completeStoreKiloPassPurchase: ReturnType<typeof jest.fn>;
+};
+
+type SentryMock = {
+  captureException: ReturnType<typeof jest.fn>;
+};
+
 function getStripeMock(): StripeMock {
   const mod: { __stripeMock: StripeMock } = jest.requireMock('@/lib/stripe-client');
   return mod.__stripeMock;
+}
+
+function getAppStoreVerifierMock(): AppStoreVerifierMock {
+  return jest.requireMock('@/lib/kilo-pass/apple-store-verifier') as AppStoreVerifierMock;
+}
+
+function getStoreCompletionMock(): StoreCompletionMock {
+  return jest.requireMock('@/lib/kilo-pass/store-subscription-completion') as StoreCompletionMock;
+}
+
+function getSentryMock(): SentryMock {
+  return jest.requireMock('@sentry/nextjs') as SentryMock;
 }
 
 type KiloPassCaller = {
@@ -79,6 +104,12 @@ type KiloPassCaller = {
     products: Array<{
       appleProductId: string;
     }>;
+  }>;
+  completeAppStorePurchase: (input: { signedTransactionJws: string }) => Promise<{
+    subscriptionId: string;
+    tier: KiloPassTier;
+    cadence: KiloPassCadence;
+    alreadyProcessed: boolean;
   }>;
   getState: () => Promise<{
     subscription: {
@@ -273,6 +304,27 @@ async function insertSubscription(params: {
   return { id: row.id };
 }
 
+function appStorePurchaseFixture(
+  overrides: Partial<ValidatedStoreKiloPassPurchase> = {}
+): ValidatedStoreKiloPassPurchase {
+  return {
+    paymentProvider: KiloPassPaymentProvider.AppStore,
+    productId: 'kilopass.tier19.monthly.v1',
+    providerTransactionId: 'app-store-router-test-tx',
+    providerOriginalTransactionId: 'app-store-router-test-original',
+    providerSubscriptionId: 'app-store-router-test-original',
+    appAccountToken: crypto.randomUUID(),
+    purchaseToken: null,
+    environment: 'Sandbox',
+    purchasedAtIso: '2026-05-01T00:00:00.000Z',
+    expiresAtIso: '2026-06-01T00:00:00.000Z',
+    tier: KiloPassTier.Tier19,
+    cadence: KiloPassCadence.Monthly,
+    rawPayload: {},
+    ...overrides,
+  };
+}
+
 async function insertBaseCreditsIssuance(params: {
   subscriptionId: string;
   kiloUserId: string;
@@ -342,6 +394,9 @@ describe('kiloPassRouter', () => {
     stripeMock.checkout.sessions.create.mockReset();
     stripeMock.billingPortal.sessions.create.mockReset();
     stripeMock.invoices.list.mockReset();
+    getAppStoreVerifierMock().verifyAppleKiloPassTransactionJws.mockReset();
+    getStoreCompletionMock().completeStoreKiloPassPurchase.mockReset();
+    getSentryMock().captureException.mockReset();
   });
 
   afterEach(() => {
@@ -357,6 +412,74 @@ describe('kiloPassRouter', () => {
 
       expect(result.appAccountToken).toBe(user.app_store_account_token);
       expect(result.products.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('completeAppStorePurchase', () => {
+    it('maps verifier failures to mobile-safe copy', async () => {
+      const verifierMock = getAppStoreVerifierMock();
+      const sentryMock = getSentryMock();
+      verifierMock.verifyAppleKiloPassTransactionJws.mockRejectedValue(
+        new Error('Apple Kilo Pass product is not enabled')
+      );
+
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      await expect(
+        caller.kiloPass.completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+      ).rejects.toThrow('We could not verify this App Store purchase. Please try again.');
+      expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps account mismatch copy stable and does not log it as an internal failure', async () => {
+      const verifierMock = getAppStoreVerifierMock();
+      const completionMock = getStoreCompletionMock();
+      const sentryMock = getSentryMock();
+      verifierMock.verifyAppleKiloPassTransactionJws.mockResolvedValue(appStorePurchaseFixture());
+
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      await expect(
+        caller.kiloPass.completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+      ).rejects.toThrow('App Store purchase account token does not match the signed-in user.');
+      expect(completionMock.completeStoreKiloPassPurchase).not.toHaveBeenCalled();
+      expect(sentryMock.captureException).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        'You already have an active Kilo Pass subscription',
+        'This App Store purchase cannot be used for your account.',
+      ],
+      [
+        'App Store upgrade cannot be processed without previous period expiration',
+        'This App Store purchase cannot be used for your account.',
+      ],
+      [
+        'Failed to persist store Kilo Pass subscription',
+        'We could not finish this App Store purchase. Please try again.',
+      ],
+    ])('maps completion failure "%s" to safe copy', async (internalMessage, safeMessage) => {
+      const verifierMock = getAppStoreVerifierMock();
+      const completionMock = getStoreCompletionMock();
+      const sentryMock = getSentryMock();
+      const user = await insertTestUser();
+      verifierMock.verifyAppleKiloPassTransactionJws.mockResolvedValue(
+        appStorePurchaseFixture({ appAccountToken: user.app_store_account_token })
+      );
+      completionMock.completeStoreKiloPassPurchase.mockRejectedValue(new Error(internalMessage));
+
+      const caller = await createCallerForUser(user.id);
+
+      await expect(
+        caller.kiloPass.completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+      ).rejects.toThrow(safeMessage);
+      await expect(
+        caller.kiloPass.completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+      ).rejects.not.toThrow(internalMessage);
+      expect(sentryMock.captureException).toHaveBeenCalled();
     });
   });
 

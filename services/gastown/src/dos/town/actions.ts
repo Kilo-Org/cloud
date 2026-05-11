@@ -1363,7 +1363,9 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             } else {
               // Non-transient, non-immediate errors (invalid_response only)
               // count toward a lower 3-strike threshold.
-              // Migrate legacy poll_null_count into poll_non_transient_count on first read.
+              // No legacy poll_null_count migration needed: invalid_response
+              // is a new error kind that couldn't have accumulated under the
+              // old transient/null classification.
               query(
                 sql,
                 /* sql */ `

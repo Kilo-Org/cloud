@@ -97,7 +97,7 @@ describe('processAppStoreKiloPassNotification', () => {
   it('records a renewal notification and completes the subscription once', async () => {
     const user = await insertTestUser();
     const decodedNotification = notification();
-    const decodedTransaction = transaction();
+    const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
 
     const result = await processAppStoreKiloPassNotification({
       signedPayload: 'payload',
@@ -114,6 +114,21 @@ describe('processAppStoreKiloPassNotification', () => {
       .where(eq(kilo_pass_store_events.event_id, decodedNotification.notificationUUID));
     expect(events).toHaveLength(1);
     expect(events[0]?.payment_provider).toBe(KiloPassPaymentProvider.AppStore);
+    expect(events[0]?.app_account_token).toBe(user.app_store_account_token);
+
+    const eventPayloadJson = JSON.stringify(events[0]?.payload_json);
+    expect(eventPayloadJson).not.toContain(user.app_store_account_token);
+    expect(events[0]?.payload_json).toMatchObject({
+      notificationType: decodedNotification.notificationType,
+      rawTransaction: {
+        providerTransactionId: decodedTransaction.transactionId,
+        providerSubscriptionId: decodedTransaction.originalTransactionId,
+      },
+      transaction: {
+        providerTransactionId: decodedTransaction.transactionId,
+        providerSubscriptionId: decodedTransaction.originalTransactionId,
+      },
+    });
 
     const subscriptions = await db
       .select()

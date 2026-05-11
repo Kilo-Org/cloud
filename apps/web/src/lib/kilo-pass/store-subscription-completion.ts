@@ -30,6 +30,7 @@ import {
   issueBaseCreditsForIssuance,
 } from './issuance';
 import { getPausedMonthSet } from './pause-events';
+import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { isStripeSubscriptionEnded } from './stripe-subscription-status';
 import { getPreviousIssueMonth } from './stripe-handlers-utils';
 
@@ -578,11 +579,14 @@ export async function completeStoreKiloPassPurchase(params: {
         provider_transaction_id: purchase.providerTransactionId,
         provider_original_transaction_id: purchase.providerOriginalTransactionId,
         app_account_token: purchase.appAccountToken,
-        purchase_token: purchase.purchaseToken,
+        purchase_token:
+          purchase.paymentProvider === KiloPassPaymentProvider.AppStore
+            ? null
+            : purchase.purchaseToken,
         environment: purchase.environment,
         purchased_at: purchase.purchasedAtIso,
         expires_at: purchase.expiresAtIso,
-        raw_payload_json: purchase.rawPayload,
+        raw_payload_json: redactStoreAccountLinkedJson(purchase.rawPayload),
       })
       .onConflictDoNothing({
         target: [

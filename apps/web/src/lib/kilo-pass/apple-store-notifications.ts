@@ -34,6 +34,7 @@ import {
   createAppleStoreSignedDataVerifier,
 } from './apple-store-sdk';
 import { completeStoreKiloPassPurchase } from './store-subscription-completion';
+import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { dayjs } from './dayjs';
 
 export type AppleStoreDecodedNotification = {
@@ -200,7 +201,7 @@ function getStoreEventPayload(params: {
   purchase: ReturnType<typeof mapAppleKiloPassTransaction> | null;
   transaction: AppleStoreDecodedTransaction | null;
 }): Record<string, unknown> {
-  return {
+  return redactStoreAccountLinkedJson({
     notificationType: params.notification.notificationType,
     subtype: params.notification.subtype ?? null,
     transaction: params.purchase
@@ -231,7 +232,7 @@ function getStoreEventPayload(params: {
           price: params.transaction.price ?? null,
         }
       : null,
-  };
+  });
 }
 
 type CreditReversalResult = {

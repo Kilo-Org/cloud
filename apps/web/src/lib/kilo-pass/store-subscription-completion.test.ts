@@ -121,6 +121,60 @@ describe('completeStoreKiloPassPurchase', () => {
     expect(storePurchases).toHaveLength(1);
   });
 
+  it('does not persist signed App Store JWS or account tokens in retained purchase JSON', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const appAccountToken = crypto.randomUUID();
+    const signedTransactionJws = `signed-jws-${crypto.randomUUID()}`;
+    const providerTransactionId = `tx-${crypto.randomUUID()}`;
+    const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+
+    await completeStoreKiloPassPurchase({
+      user,
+      purchase: applePurchase({
+        appAccountToken,
+        purchaseToken: signedTransactionJws,
+        providerTransactionId,
+        providerOriginalTransactionId: providerSubscriptionId,
+        providerSubscriptionId,
+        rawPayload: {
+          appAccountToken,
+          signedTransactionInfo: signedTransactionJws,
+          purchaseToken: signedTransactionJws,
+          transactionId: providerTransactionId,
+          originalTransactionId: providerSubscriptionId,
+          nested: {
+            appAccountToken,
+            transactionId: providerTransactionId,
+          },
+        },
+      }),
+    });
+
+    const [storePurchase] = await db
+      .select()
+      .from(kilo_pass_store_purchases)
+      .where(eq(kilo_pass_store_purchases.provider_transaction_id, providerTransactionId));
+
+    expect(storePurchase?.app_account_token).toBe(appAccountToken);
+    expect(storePurchase?.purchase_token).toBeNull();
+    expect(storePurchase?.provider_subscription_id).toBe(providerSubscriptionId);
+
+    const persistedPayloadJson = JSON.stringify(storePurchase?.raw_payload_json);
+    expect(persistedPayloadJson).not.toContain(appAccountToken);
+    expect(persistedPayloadJson).not.toContain(signedTransactionJws);
+    expect(storePurchase?.raw_payload_json).toMatchObject({
+      appAccountToken: null,
+      signedTransactionInfo: null,
+      purchaseToken: null,
+      transactionId: providerTransactionId,
+      originalTransactionId: providerSubscriptionId,
+      nested: {
+        appAccountToken: null,
+        transactionId: providerTransactionId,
+      },
+    });
+  });
+
   it('returns idempotently when the same provider transaction is completed concurrently', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const purchase = applePurchase();

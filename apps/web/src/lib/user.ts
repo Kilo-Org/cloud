@@ -106,37 +106,9 @@ import {
   type ParsedImpactAffiliateTouch,
   type ParsedImpactReferralTouch,
 } from '@/lib/impact-referral-utils';
+import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
 
 const workos = new WorkOS(WORKOS_API_KEY);
-
-const STORE_JSON_TOKEN_KEYS = new Set([
-  'appAccountToken',
-  'purchaseToken',
-  'signedPayload',
-  'signedTransactionInfo',
-  'signedTransactionJws',
-]);
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function scrubStoreAccountLinkedJson(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(item => scrubStoreAccountLinkedJson(item));
-  }
-
-  if (!isJsonObject(value)) {
-    return value;
-  }
-
-  return Object.fromEntries(
-    Object.entries(value).map(([key, nestedValue]) => [
-      key,
-      STORE_JSON_TOKEN_KEYS.has(key) ? null : scrubStoreAccountLinkedJson(nestedValue),
-    ])
-  );
-}
 
 /**
  * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
@@ -1040,10 +1012,7 @@ export async function softDeleteUser(userId: string) {
         .set({
           app_account_token: null,
           purchase_token: null,
-          raw_payload_json: scrubStoreAccountLinkedJson(purchase.rawPayloadJson) as Record<
-            string,
-            unknown
-          >,
+          raw_payload_json: redactStoreAccountLinkedJson(purchase.rawPayloadJson),
         })
         .where(eq(kilo_pass_store_purchases.id, purchase.id));
     }
@@ -1061,7 +1030,7 @@ export async function softDeleteUser(userId: string) {
         .update(kilo_pass_store_events)
         .set({
           app_account_token: null,
-          payload_json: scrubStoreAccountLinkedJson(event.payloadJson) as Record<string, unknown>,
+          payload_json: redactStoreAccountLinkedJson(event.payloadJson),
         })
         .where(eq(kilo_pass_store_events.id, event.id));
     }

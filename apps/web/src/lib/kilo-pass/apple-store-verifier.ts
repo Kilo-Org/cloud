@@ -123,8 +123,5 @@ export async function verifyAppleKiloPassTransactionJws(
   signedTransactionJws: string
 ): Promise<ValidatedStoreKiloPassPurchase> {
   const transaction = await decodeAppleStoreTransactionJws(signedTransactionJws);
-  return {
-    ...mapAppleKiloPassTransaction(transaction),
-    purchaseToken: signedTransactionJws,
-  };
+  return mapAppleKiloPassTransaction(transaction);
 }

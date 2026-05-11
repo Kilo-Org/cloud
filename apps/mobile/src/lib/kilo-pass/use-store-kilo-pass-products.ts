@@ -11,6 +11,8 @@ import {
   NO_MATCHING_KILO_PASS_PRODUCTS_MESSAGE,
 } from './store-products-loader';
 
+const STORE_KILO_PASS_PRODUCTS_STALE_TIME_MS = 5 * 60 * 1000;
+
 function toStoreKiloPassProduct(product: ProductOrSubscription): StoreKiloPassProduct | null {
   if (product.type !== 'subs') {
     return null;
@@ -69,6 +71,7 @@ export function useStoreKiloPassProducts() {
       return loadedProducts;
     },
     enabled: Platform.OS === 'ios' && connected,
+    staleTime: STORE_KILO_PASS_PRODUCTS_STALE_TIME_MS,
   });
 
   const { refetch: refetchProducts } = productsQuery;

@@ -58,7 +58,10 @@ vi.mock('@tanstack/react-query', () => ({
     mutateAsync: mockedReactQuery.completeAppStorePurchase,
   }),
   useQuery: () => ({
-    data: { products: [{ appleProductId: 'com.kilo.pass.tier19.monthly' }] },
+    data: {
+      appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+      products: [{ appleProductId: 'com.kilo.pass.tier19.monthly' }],
+    },
   }),
   useQueryClient: () => ({ invalidateQueries: mockedReactQuery.invalidateQueries }),
 }));
@@ -83,6 +86,7 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 type StoreKiloPassPurchaseContextValue = {
+  appStoreOwnershipPreflight: 'owned-by-another-account' | null;
   purchase: (
     product: AppStoreKiloPassProduct,
     options?: { onCompleted?: () => void }
@@ -587,6 +591,17 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 });
 
 describe('StoreKiloPassPurchaseProvider', () => {
+  it('exposes an App Store ownership mismatch preflight from available purchases', () => {
+    mockedIap.availablePurchases = [
+      createPurchase({ appAccountToken: '550e8400-e29b-41d4-a716-446655440001' }),
+    ];
+    const provider = renderStoreKiloPassPurchaseProvider();
+
+    const value = provider.render();
+
+    expect(value.appStoreOwnershipPreflight).toBe('owned-by-another-account');
+  });
+
   it('keeps the purchase locked after requestPurchase resolves until purchase success arrives', async () => {
     const firstCompletion = vi.fn();
     const secondCompletion = vi.fn();

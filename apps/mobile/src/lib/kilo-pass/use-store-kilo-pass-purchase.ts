@@ -19,6 +19,10 @@ import { z } from 'zod';
 
 import { useTRPC } from '@/lib/trpc';
 import { type AppStoreKiloPassProduct } from './store-products';
+import {
+  type AppStoreKiloPassOwnershipPreflight,
+  getAppStoreKiloPassOwnershipPreflight,
+} from './subscription-card-state';
 
 const userCancelledPurchaseErrorSchema = z.object({
   code: z.literal(ErrorCode.UserCancelled),
@@ -57,6 +61,7 @@ type StoreKiloPassPurchaseOptions = {
 };
 
 type StoreKiloPassPurchaseContextValue = {
+  appStoreOwnershipPreflight: AppStoreKiloPassOwnershipPreflight;
   purchase: (
     product: AppStoreKiloPassProduct,
     options?: StoreKiloPassPurchaseOptions
@@ -264,7 +269,6 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
     () => mobileStoreProductsQuery.data?.products.map(product => product.appleProductId) ?? [],
     [mobileStoreProductsQuery.data]
   );
-
   const invalidateAfterCompletion = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter()),
@@ -305,6 +309,16 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
     getAvailablePurchases,
     requestPurchase,
   } = actionsRef;
+  const appStoreOwnershipPreflight = useMemo(
+    () =>
+      getAppStoreKiloPassOwnershipPreflight({
+        availablePurchases,
+        currentAppAccountToken: mobileStoreProductsQuery.data?.appAccountToken,
+        enabledAppleProductIds,
+        platformOS: Platform.OS,
+      }),
+    [availablePurchases, enabledAppleProductIds, mobileStoreProductsQuery.data?.appAccountToken]
+  );
 
   const actions = useMemo(
     () =>
@@ -405,10 +419,16 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
 
   const value = useMemo(
     () => ({
+      appStoreOwnershipPreflight,
       purchase: startPurchase,
       isPending: isRequestingPurchase || completeAppStorePurchase.isPending,
     }),
-    [completeAppStorePurchase.isPending, isRequestingPurchase, startPurchase]
+    [
+      appStoreOwnershipPreflight,
+      completeAppStorePurchase.isPending,
+      isRequestingPurchase,
+      startPurchase,
+    ]
   );
 
   return createElement(StoreKiloPassPurchaseContext.Provider, { value }, children);

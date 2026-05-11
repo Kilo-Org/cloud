@@ -19,6 +19,15 @@ type KiloPassSubscriptionCardStateOptions = {
   platformOS?: string;
 };
 
+export type AppStoreKiloPassOwnershipPreflight = 'owned-by-another-account' | null;
+
+type AppStoreKiloPassAvailablePurchase = {
+  appAccountToken?: string | null;
+  productId: string;
+  purchaseState?: string | null;
+  store?: string | null;
+};
+
 type KiloPassSubscriptionCardContentState =
   | {
       kind: 'card';
@@ -68,7 +77,31 @@ export function shouldRenderKiloPassSubscriptionCard(params: {
   );
 }
 
+export function getAppStoreKiloPassOwnershipPreflight(params: {
+  availablePurchases: readonly AppStoreKiloPassAvailablePurchase[];
+  currentAppAccountToken: string | null | undefined;
+  enabledAppleProductIds: readonly string[];
+  platformOS: string;
+}): AppStoreKiloPassOwnershipPreflight {
+  if (params.platformOS !== 'ios' || !params.currentAppAccountToken) {
+    return null;
+  }
+
+  const enabledAppleProductIds = new Set(params.enabledAppleProductIds);
+  const hasDifferentOwnerPurchase = params.availablePurchases.some(
+    purchase =>
+      purchase.store === 'apple' &&
+      purchase.purchaseState !== 'pending' &&
+      enabledAppleProductIds.has(purchase.productId) &&
+      Boolean(purchase.appAccountToken) &&
+      purchase.appAccountToken !== params.currentAppAccountToken
+  );
+
+  return hasDifferentOwnerPurchase ? 'owned-by-another-account' : null;
+}
+
 export function getKiloPassSubscriptionCardContentState(params: {
+  appStoreOwnershipPreflight?: AppStoreKiloPassOwnershipPreflight;
   data: { subscription: KiloPassSubscriptionCardSubscription | null } | undefined;
   isError: boolean;
   isPending: boolean;
@@ -85,6 +118,23 @@ export function getKiloPassSubscriptionCardContentState(params: {
     }
 
     return { kind: 'loading' };
+  }
+
+  if (
+    params.platformOS === 'ios' &&
+    params.appStoreOwnershipPreflight === 'owned-by-another-account' &&
+    (params.data.subscription === null ||
+      isEndedSubscriptionStatus(params.data.subscription.status))
+  ) {
+    return {
+      kind: 'card',
+      state: {
+        action: 'none',
+        actionLabel: null,
+        description: 'Kilo Pass subscription is owned by another account',
+        title: 'Kilo Pass',
+      },
+    };
   }
 
   const state = getKiloPassSubscriptionCardState(params.data.subscription, {

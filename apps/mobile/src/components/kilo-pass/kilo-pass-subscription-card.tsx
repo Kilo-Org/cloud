@@ -19,6 +19,7 @@ import {
   getKiloPassSubscriptionCardAccessibility,
   getKiloPassSubscriptionCardContentState,
 } from '@/lib/kilo-pass/subscription-card-state';
+import { useStoreKiloPassPurchase } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 
 const KILO_PASS_MANAGE_URL = `${WEB_BASE_URL}/subscriptions/kilo-pass`;
 
@@ -28,6 +29,7 @@ export function KiloPassSubscriptionCard() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
+  const { appStoreOwnershipPreflight } = useStoreKiloPassPurchase();
   const mobileStoreProductsQuery = useQuery({
     ...trpc.kiloPass.getMobileStoreProducts.queryOptions(),
     // Dev-only: the profile card needs App Store product IDs only to expose the
@@ -36,6 +38,7 @@ export function KiloPassSubscriptionCard() {
   });
   const subscription = stateQuery.data?.subscription;
   const contentState = getKiloPassSubscriptionCardContentState({
+    appStoreOwnershipPreflight,
     data: stateQuery.data,
     isError: stateQuery.isError,
     isPending: stateQuery.isPending,

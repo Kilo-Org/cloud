@@ -81,6 +81,46 @@ describe('getKiloPassSubscriptionCardContentState', () => {
     });
   });
 
+  it('renders an inert iOS ownership mismatch before subscribe', () => {
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        appStoreOwnershipPreflight: 'owned-by-another-account',
+        data: { subscription: null },
+        isError: false,
+        isPending: false,
+        platformOS: 'ios',
+      })
+    ).toEqual({
+      kind: 'card',
+      state: {
+        action: 'none',
+        actionLabel: null,
+        description: 'Kilo Pass subscription is owned by another account',
+        title: 'Kilo Pass',
+      },
+    });
+  });
+
+  it('does not override an active local subscription with ownership preflight copy', () => {
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        appStoreOwnershipPreflight: 'owned-by-another-account',
+        data: { subscription: activeAppStoreSubscription },
+        isError: false,
+        isPending: false,
+        platformOS: 'ios',
+      })
+    ).toEqual({
+      kind: 'card',
+      state: {
+        action: 'open-store-management',
+        actionLabel: 'Manage',
+        description: '$19 monthly credits · Managed in App Store',
+        title: 'Kilo Pass active',
+      },
+    });
+  });
+
   it('keeps confirmed null subscriptions hidden on Android', () => {
     expect(
       getKiloPassSubscriptionCardContentState({

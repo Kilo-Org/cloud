@@ -8,7 +8,6 @@ import { APP_URL } from '@/lib/constants';
 import { TRPCError } from '@trpc/server';
 import {
   credit_transactions,
-  kilo_pass_audit_log,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
   kilo_pass_scheduled_changes,
@@ -67,7 +66,6 @@ const KiloPassCreditHistoryEntrySchema = z.object({
     KiloPassIssuanceItemKind.Base,
     KiloPassIssuanceItemKind.Bonus,
     KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
-    'upgrade_adjustment',
   ]),
   description: z.string(),
 });
@@ -1360,9 +1358,7 @@ export const kiloPassRouter = createTRPCRouter({
       }
 
       const offset = parseOffsetCursor(input.cursor);
-      const pageSize = 25;
-      const fetchLimit = offset + pageSize + 1;
-      const issuanceRows = await db
+      const rows = await db
         .select({
           id: kilo_pass_issuance_items.id,
           kind: kilo_pass_issuance_items.kind,
@@ -1381,49 +1377,21 @@ export const kiloPassRouter = createTRPCRouter({
         )
         .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, subscription.subscriptionId))
         .orderBy(desc(credit_transactions.created_at), desc(kilo_pass_issuance_items.id))
-        .limit(fetchLimit);
+        .limit(26)
+        .offset(offset);
 
-      const upgradeAdjustmentRows = await db
-        .select({
-          id: credit_transactions.id,
-          kind: sql<'upgrade_adjustment'>`'upgrade_adjustment'`,
-          amountUsd: sql<number>`${credit_transactions.amount_microdollars} / 1000000.0`,
-          createdAt: credit_transactions.created_at,
-          description: credit_transactions.description,
-        })
-        .from(credit_transactions)
-        .innerJoin(
-          kilo_pass_audit_log,
-          eq(kilo_pass_audit_log.related_credit_transaction_id, credit_transactions.id)
-        )
-        .where(
-          and(
-            eq(kilo_pass_audit_log.kilo_pass_subscription_id, subscription.subscriptionId),
-            sql`(${credit_transactions.credit_category} LIKE 'kilo-pass-upgrade-refund:%' OR ${credit_transactions.credit_category} LIKE 'kilo-pass-upgrade-base:%')`
-          )
-        )
-        .orderBy(desc(credit_transactions.created_at), desc(credit_transactions.id))
-        .limit(fetchLimit);
-
-      const rows = [...issuanceRows, ...upgradeAdjustmentRows].sort((a, b) => {
-        const createdAtDiff = dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf();
-        if (createdAtDiff !== 0) return createdAtDiff;
-        return b.id.localeCompare(a.id);
-      });
-
-      const pageRows = rows.slice(offset, offset + pageSize);
-      const entries = pageRows.map(row => ({
+      const entries = rows.slice(0, 25).map(row => ({
         id: row.id,
         date: dayjs(row.createdAt).utc().toISOString(),
-        amountUsd: Number(row.amountUsd),
+        amountUsd: row.amountUsd,
         kind: row.kind,
         description: row.description ?? `${row.kind} credits`,
       }));
 
       return {
         entries,
-        hasMore: rows.length > offset + pageSize,
-        cursor: rows.length > offset + pageSize ? String(offset + pageSize) : null,
+        hasMore: rows.length > 25,
+        cursor: rows.length > 25 ? String(offset + 25) : null,
       };
     }),
 

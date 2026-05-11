@@ -1,6 +1,6 @@
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db, readDb } from '@/lib/drizzle';
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
+import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
 import { client as stripe } from '@/lib/stripe-client';
 import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
 import { APP_URL } from '@/lib/constants';
@@ -10,6 +10,7 @@ import {
   kilo_pass_issuance_items,
   kilo_pass_issuances,
   kilo_pass_scheduled_changes,
+  kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   microdollar_usage,
 } from '@kilocode/db/schema';
@@ -166,6 +167,95 @@ function roundToCents(usd: number): number {
 
 function secondsToIso(seconds: number): string {
   return dayjs.unix(seconds).utc().toISOString();
+}
+
+function normalizeTimestampToIso(timestamp: string | null | undefined): string | null {
+  if (!timestamp) return null;
+  const parsed = dayjs(timestamp).utc();
+  return parsed.isValid() ? parsed.toISOString() : timestamp;
+}
+
+function getNextBillingAtFromSubscriptionStart(subscription: {
+  cadence: KiloPassCadence;
+  startedAt: string | null;
+}): string | null {
+  const startedAtUtc = subscription.startedAt ? dayjs(subscription.startedAt).utc() : null;
+  if (startedAtUtc?.isValid() !== true) return null;
+
+  return startedAtUtc
+    .add(1, subscription.cadence === KiloPassCadence.Yearly ? 'year' : 'month')
+    .toISOString();
+}
+
+function getNextKiloPassBonusCreditsUsd(params: {
+  subscription: KiloPassSubscriptionState;
+  baseAmountUsd: number;
+  isFirstTimeSubscriberEver: boolean;
+}): number {
+  if (params.subscription.cadence === KiloPassCadence.Yearly) {
+    return roundToCents(computeYearlyCadenceMonthlyBonusUsd(params.subscription.tier));
+  }
+
+  const predictedStreakMonths = Math.max(1, params.subscription.currentStreakMonths + 1);
+  const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
+    tier: params.subscription.tier,
+    streakMonths: predictedStreakMonths,
+    isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
+    subscriptionStartedAtIso: params.subscription.startedAt,
+  });
+
+  const baseCents = Math.round(params.baseAmountUsd * 100);
+  const bonusCents = Math.round(baseCents * bonusPercentApplied);
+  return bonusCents / 100;
+}
+
+function getCurrentKiloPassBonusCreditsUsd(params: {
+  subscription: KiloPassSubscriptionState;
+  baseAmountUsd: number;
+  isFirstTimeSubscriberEver: boolean;
+}): number {
+  if (params.subscription.cadence === KiloPassCadence.Yearly) {
+    return roundToCents(computeYearlyCadenceMonthlyBonusUsd(params.subscription.tier));
+  }
+
+  const streakMonths = Math.max(1, params.subscription.currentStreakMonths);
+  const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
+    tier: params.subscription.tier,
+    streakMonths,
+    isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
+    subscriptionStartedAtIso: params.subscription.startedAt,
+  });
+  const cents = Math.round(params.baseAmountUsd * bonusPercentApplied * 100);
+  return cents / 100;
+}
+
+function getUsageStartInclusiveIso(params: {
+  subscription: KiloPassSubscriptionState;
+  baseCreditsIssuedAtIso: string | null;
+  periodStartIso: string;
+  nowUtc: ReturnType<typeof dayjs>;
+}): string {
+  let usageStartInclusiveIso = params.baseCreditsIssuedAtIso ?? params.periodStartIso;
+  if (params.subscription.cadence !== KiloPassCadence.Yearly) {
+    return usageStartInclusiveIso;
+  }
+
+  const nextYearlyIssueAtUtc =
+    params.subscription.nextYearlyIssueAt != null
+      ? dayjs(params.subscription.nextYearlyIssueAt).utc()
+      : null;
+
+  if (nextYearlyIssueAtUtc?.isValid() && params.nowUtc.isBefore(nextYearlyIssueAtUtc)) {
+    usageStartInclusiveIso = nextYearlyIssueAtUtc.subtract(1, 'month').toISOString();
+  } else if (params.subscription.startedAt != null) {
+    const startedAtUtc = dayjs(params.subscription.startedAt).utc();
+    if (startedAtUtc.isValid()) {
+      const monthsElapsed = Math.max(0, params.nowUtc.diff(startedAtUtc, 'month'));
+      usageStartInclusiveIso = startedAtUtc.add(monthsElapsed, 'month').toISOString();
+    }
+  }
+
+  return usageStartInclusiveIso;
 }
 
 function getStripePeriodEndSeconds(subscription: Stripe.Subscription): number | null {
@@ -350,6 +440,35 @@ async function getCurrentPeriodHostingCostUsd(params: {
   return roundToCents(fromMicrodollars(totalDeduction_mUsd));
 }
 
+async function getCurrentPeriodSpendUsd(params: {
+  kiloUserId: string;
+  startInclusiveIso: string;
+  endExclusiveIso: string;
+}): Promise<{
+  currentPeriodUsageUsd: number;
+  currentPeriodHostingCostUsd: number;
+}> {
+  const [currentPeriodInferenceUsageUsd, currentPeriodHostingCostUsdValue] = await Promise.all([
+    getCurrentPeriodUsageUsd({
+      kiloUserId: params.kiloUserId,
+      startInclusiveIso: params.startInclusiveIso,
+      endExclusiveIso: params.endExclusiveIso,
+    }),
+    getCurrentPeriodHostingCostUsd({
+      kiloUserId: params.kiloUserId,
+      startInclusiveIso: params.startInclusiveIso,
+      endExclusiveIso: params.endExclusiveIso,
+    }),
+  ]);
+
+  return {
+    currentPeriodUsageUsd: roundToCents(
+      currentPeriodInferenceUsageUsd + currentPeriodHostingCostUsdValue
+    ),
+    currentPeriodHostingCostUsd: currentPeriodHostingCostUsdValue,
+  };
+}
+
 const GetCheckoutReturnStateOutputSchema = z.object({
   subscription: KiloPassSubscriptionStateBaseSchema.nullable(),
   creditsAwarded: z.boolean(),
@@ -464,42 +583,64 @@ export const kiloPassRouter = createTRPCRouter({
         subscriptionId: subscriptionBase.subscriptionId,
       });
       const baseAmountUsd = getMonthlyPriceUsd(subscriptionBase.tier);
-      const startedAtUtc = subscriptionBase.startedAt
-        ? dayjs(subscriptionBase.startedAt).utc()
-        : null;
+      const latestStorePurchase = await db.query.kilo_pass_store_purchases.findFirst({
+        where: and(
+          eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscriptionBase.subscriptionId),
+          eq(kilo_pass_store_purchases.payment_provider, subscriptionBase.paymentProvider)
+        ),
+        orderBy: desc(kilo_pass_store_purchases.purchased_at),
+      });
       const nextBillingAt =
-        startedAtUtc?.isValid() === true
-          ? startedAtUtc
-              .add(1, subscriptionBase.cadence === KiloPassCadence.Yearly ? 'year' : 'month')
-              .toISOString()
-          : null;
+        normalizeTimestampToIso(latestStorePurchase?.expires_at) ??
+        getNextBillingAtFromSubscriptionStart(subscriptionBase);
       const isBonusUnlocked = await getIsBonusUnlockedForSubscriptionId(
         subscriptionBase.subscriptionId
+      );
+      const nowUtc = dayjs().utc();
+      const nowIso = nowUtc.toISOString();
+      const baseCreditsIssuedAtIso = await getBaseCreditsIssuedAtForSubscription(
+        subscriptionBase.subscriptionId
+      );
+      const usageStartInclusiveIso = getUsageStartInclusiveIso({
+        subscription: subscriptionBase,
+        baseCreditsIssuedAtIso,
+        periodStartIso:
+          normalizeTimestampToIso(latestStorePurchase?.purchased_at) ??
+          subscriptionBase.startedAt ??
+          nowIso,
+        nowUtc,
+      });
+      const { currentPeriodUsageUsd, currentPeriodHostingCostUsd } = await getCurrentPeriodSpendUsd(
+        {
+          kiloUserId: ctx.user.id,
+          startInclusiveIso: usageStartInclusiveIso,
+          endExclusiveIso: nowIso,
+        }
       );
 
       return {
         subscription: {
           ...subscriptionBase,
-          nextBonusCreditsUsd:
-            subscriptionBase.cadence === KiloPassCadence.Yearly
-              ? roundToCents(computeYearlyCadenceMonthlyBonusUsd(subscriptionBase.tier))
-              : roundToCents(
-                  baseAmountUsd *
-                    computeMonthlyCadenceBonusPercent({
-                      tier: subscriptionBase.tier,
-                      streakMonths: Math.max(1, subscriptionBase.currentStreakMonths + 1),
-                      isFirstTimeSubscriberEver,
-                      subscriptionStartedAtIso: subscriptionBase.startedAt,
-                    })
-                ),
+          nextBonusCreditsUsd: getNextKiloPassBonusCreditsUsd({
+            subscription: subscriptionBase,
+            baseAmountUsd,
+            isFirstTimeSubscriberEver,
+          }),
           nextBillingAt,
           isFirstTimeSubscriberEver,
           currentPeriodBaseCreditsUsd: baseAmountUsd,
-          currentPeriodUsageUsd: 0,
-          currentPeriodHostingCostUsd: 0,
-          currentPeriodBonusCreditsUsd: null,
+          currentPeriodUsageUsd,
+          currentPeriodHostingCostUsd,
+          currentPeriodBonusCreditsUsd: getCurrentKiloPassBonusCreditsUsd({
+            subscription: subscriptionBase,
+            baseAmountUsd,
+            isFirstTimeSubscriberEver,
+          }),
           isBonusUnlocked,
-          refillAt: subscriptionBase.nextYearlyIssueAt ?? nextBillingAt,
+          refillAt:
+            subscriptionBase.cadence === KiloPassCadence.Yearly
+              ? (subscriptionBase.nextYearlyIssueAt ?? nextBillingAt)
+              : nextBillingAt,
         },
         isEligibleForFirstMonthPromo: false,
       };
@@ -570,41 +711,17 @@ export const kiloPassRouter = createTRPCRouter({
       subscriptionBase.subscriptionId
     );
 
-    let nextBonusCreditsUsd: number | null = null;
     const baseAmountUsd = getMonthlyPriceUsd(subscriptionBase.tier);
-
-    if (subscriptionBase.cadence === KiloPassCadence.Yearly) {
-      const usd = computeYearlyCadenceMonthlyBonusUsd(subscriptionBase.tier);
-      nextBonusCreditsUsd = roundToCents(usd);
-    } else {
-      const predictedStreakMonths = Math.max(1, subscriptionBase.currentStreakMonths + 1);
-      const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
-        tier: subscriptionBase.tier,
-        streakMonths: predictedStreakMonths,
-        isFirstTimeSubscriberEver,
-        subscriptionStartedAtIso: subscriptionBase.startedAt,
-      });
-
-      const baseCents = Math.round(baseAmountUsd * 100);
-      const bonusCents = Math.round(baseCents * bonusPercentApplied);
-      nextBonusCreditsUsd = bonusCents / 100;
-    }
-
-    let currentPeriodBonusCreditsUsd: number | null = null;
-    if (subscriptionBase.cadence === KiloPassCadence.Yearly) {
-      const usd = computeYearlyCadenceMonthlyBonusUsd(subscriptionBase.tier);
-      currentPeriodBonusCreditsUsd = roundToCents(usd);
-    } else {
-      const streakMonths = Math.max(1, subscriptionBase.currentStreakMonths);
-      const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
-        tier: subscriptionBase.tier,
-        streakMonths,
-        isFirstTimeSubscriberEver,
-        subscriptionStartedAtIso: subscriptionBase.startedAt,
-      });
-      const cents = Math.round(baseAmountUsd * bonusPercentApplied * 100);
-      currentPeriodBonusCreditsUsd = cents / 100;
-    }
+    const nextBonusCreditsUsd = getNextKiloPassBonusCreditsUsd({
+      subscription: subscriptionBase,
+      baseAmountUsd,
+      isFirstTimeSubscriberEver,
+    });
+    const currentPeriodBonusCreditsUsd = getCurrentKiloPassBonusCreditsUsd({
+      subscription: subscriptionBase,
+      baseAmountUsd,
+      isFirstTimeSubscriberEver,
+    });
 
     const nowUtc = dayjs().utc();
     const nowIso = nowUtc.toISOString();
@@ -616,40 +733,17 @@ export const kiloPassRouter = createTRPCRouter({
     const baseCreditsIssuedAtIso = await getBaseCreditsIssuedAtForSubscription(
       subscriptionBase.subscriptionId
     );
-    let usageStartInclusiveIso = baseCreditsIssuedAtIso ?? secondsToIso(periodStartSeconds);
-    if (subscriptionBase.cadence === KiloPassCadence.Yearly) {
-      const nextYearlyIssueAtUtc =
-        subscriptionBase.nextYearlyIssueAt != null
-          ? dayjs(subscriptionBase.nextYearlyIssueAt).utc()
-          : null;
-
-      if (nextYearlyIssueAtUtc?.isValid() && nowUtc.isBefore(nextYearlyIssueAtUtc)) {
-        usageStartInclusiveIso = nextYearlyIssueAtUtc.subtract(1, 'month').toISOString();
-      } else if (subscriptionBase.startedAt != null) {
-        const startedAtUtc = dayjs(subscriptionBase.startedAt).utc();
-        if (startedAtUtc.isValid()) {
-          const monthsElapsed = Math.max(0, nowUtc.diff(startedAtUtc, 'month'));
-          usageStartInclusiveIso = startedAtUtc.add(monthsElapsed, 'month').toISOString();
-        }
-      }
-    }
-
-    const [currentPeriodInferenceUsageUsd, currentPeriodHostingCostUsdValue] = await Promise.all([
-      getCurrentPeriodUsageUsd({
-        kiloUserId: ctx.user.id,
-        startInclusiveIso: usageStartInclusiveIso,
-        endExclusiveIso: nowIso,
-      }),
-      getCurrentPeriodHostingCostUsd({
-        kiloUserId: ctx.user.id,
-        startInclusiveIso: usageStartInclusiveIso,
-        endExclusiveIso: nowIso,
-      }),
-    ]);
-
-    const currentPeriodUsageUsd = roundToCents(
-      currentPeriodInferenceUsageUsd + currentPeriodHostingCostUsdValue
-    );
+    const usageStartInclusiveIso = getUsageStartInclusiveIso({
+      subscription: subscriptionBase,
+      baseCreditsIssuedAtIso,
+      periodStartIso: secondsToIso(periodStartSeconds),
+      nowUtc,
+    });
+    const { currentPeriodUsageUsd, currentPeriodHostingCostUsd } = await getCurrentPeriodSpendUsd({
+      kiloUserId: ctx.user.id,
+      startInclusiveIso: usageStartInclusiveIso,
+      endExclusiveIso: nowIso,
+    });
 
     const refillAt =
       subscriptionBase.cadence === KiloPassCadence.Yearly
@@ -666,7 +760,7 @@ export const kiloPassRouter = createTRPCRouter({
 
         currentPeriodBaseCreditsUsd: baseAmountUsd,
         currentPeriodUsageUsd,
-        currentPeriodHostingCostUsd: currentPeriodHostingCostUsdValue,
+        currentPeriodHostingCostUsd,
         currentPeriodBonusCreditsUsd,
         isBonusUnlocked,
         refillAt,

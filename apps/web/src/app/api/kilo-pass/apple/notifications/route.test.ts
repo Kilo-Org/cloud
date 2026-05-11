@@ -42,6 +42,24 @@ describe('POST /api/kilo-pass/apple/notifications', () => {
     expect(mockProcess).toHaveBeenCalledWith({ signedPayload: 'payload' });
   });
 
+  it('treats already-processed duplicate notifications as idempotent success', async () => {
+    mockProcess.mockResolvedValueOnce({ processed: true, status: 'already_processed' });
+
+    const response = await POST(request({ signedPayload: 'payload' }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ processed: true, status: 'already_processed' });
+  });
+
+  it('asks Apple to retry fresh in-flight duplicate notifications', async () => {
+    mockProcess.mockResolvedValueOnce({ processed: false, status: 'in_flight' });
+
+    const response = await POST(request({ signedPayload: 'payload' }));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ processed: false, status: 'in_flight' });
+  });
+
   it('captures processing failures without exposing details', async () => {
     const error = new Error('bad payload');
     mockProcess.mockRejectedValueOnce(error);

@@ -51,6 +51,11 @@ type SendConsumptionInformation = (
   transactionId: string,
   request: ConsumptionRequest
 ) => Promise<void>;
+type StoreEventClaimStatus = 'claimed' | 'already_processed' | 'in_flight';
+export type AppStoreKiloPassNotificationProcessingResult =
+  | { processed: true }
+  | { processed: true; status: 'already_processed' }
+  | { processed: false; status: 'in_flight' };
 
 const RENEWAL_TYPES = new Set<string>([
   NotificationTypeV2.DID_RENEW,
@@ -248,7 +253,7 @@ async function claimStoreEventForProcessing(params: {
   notification: AppleStoreDecodedNotification;
   purchase: ReturnType<typeof mapAppleKiloPassTransaction> | null;
   transaction: AppleStoreDecodedTransaction | null;
-}): Promise<boolean> {
+}): Promise<StoreEventClaimStatus> {
   const processingStartedAtIso = new Date().toISOString();
   const staleBeforeIso = new Date(Date.now() - STORE_EVENT_CLAIM_STALE_AFTER_MS).toISOString();
 
@@ -289,7 +294,19 @@ async function claimStoreEventForProcessing(params: {
     })
     .returning({ id: kilo_pass_store_events.id });
 
-  return claimedRows.length > 0;
+  if (claimedRows.length > 0) {
+    return 'claimed';
+  }
+
+  const existingEvent = await db.query.kilo_pass_store_events.findFirst({
+    columns: { processed_at: true },
+    where: and(
+      eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.AppStore),
+      eq(kilo_pass_store_events.event_id, params.notification.notificationUUID)
+    ),
+  });
+
+  return existingEvent?.processed_at ? 'already_processed' : 'in_flight';
 }
 
 type CreditReversalResult = {
@@ -606,7 +623,7 @@ export async function processAppStoreKiloPassNotification(params: {
   decodeNotification?: DecodeNotification;
   decodeTransaction?: DecodeTransaction;
   sendConsumptionInformation?: SendConsumptionInformation;
-}): Promise<{ processed: boolean }> {
+}): Promise<AppStoreKiloPassNotificationProcessingResult> {
   const decodeNotification = params.decodeNotification ?? decodeAppleStoreNotificationJws;
   const decodeTransaction = params.decodeTransaction ?? decodeAppleStoreTransactionJws;
   const sendConsumptionInformation =
@@ -622,8 +639,11 @@ export async function processAppStoreKiloPassNotification(params: {
       : null;
 
   const claimedEvent = await claimStoreEventForProcessing({ notification, purchase, transaction });
-  if (!claimedEvent) {
-    return { processed: false };
+  if (claimedEvent === 'already_processed') {
+    return { processed: true, status: 'already_processed' };
+  }
+  if (claimedEvent === 'in_flight') {
+    return { processed: false, status: 'in_flight' };
   }
 
   if (purchase && isImmediateStorePurchaseNotification(notification)) {

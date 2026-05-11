@@ -149,7 +149,7 @@ describe('processAppStoreKiloPassNotification', () => {
     await processAppStoreKiloPassNotification(params);
     const replay = await processAppStoreKiloPassNotification(params);
 
-    expect(replay).toEqual({ processed: false });
+    expect(replay).toEqual({ processed: true, status: 'already_processed' });
   });
 
   it('does not process concurrent duplicate notification deliveries twice', async () => {
@@ -174,6 +174,7 @@ describe('processAppStoreKiloPassNotification', () => {
     ]);
 
     expect(results.filter(result => result.processed)).toHaveLength(1);
+    expect(results).toContainEqual({ processed: false, status: 'in_flight' });
     expect(sendConsumptionInformation).toHaveBeenCalledTimes(1);
   });
 

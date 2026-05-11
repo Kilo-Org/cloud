@@ -17,6 +17,9 @@ export async function POST(request: Request) {
     const result = await processAppStoreKiloPassNotification({
       signedPayload: body.data.signedPayload,
     });
+    if ('status' in result && result.status === 'in_flight') {
+      return Response.json(result, { status: 503 });
+    }
     return Response.json(result);
   } catch (error) {
     captureException(error, { tags: { source: 'app_store_kilo_pass_notification' } });

@@ -15,7 +15,6 @@ import {
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   invalidRequestResponse,
-  modelDoesNotExistResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   modelNotAllowedResponse,
@@ -94,10 +93,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   const body = result.data;
-  if (typeof body.model !== 'string' || body.model.trim().length === 0) {
-    return modelDoesNotExistResponse();
-  }
-
   const requestedModel = body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
 

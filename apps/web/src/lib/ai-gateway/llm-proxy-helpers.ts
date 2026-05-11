@@ -859,12 +859,6 @@ export function countAndStoreTranscriptionUsage(
         return;
       }
 
-      usageStats.market_cost = usageStats.cost_mUsd;
-
-      if (usageContext.user_byok) {
-        usageStats.cost_mUsd = 0;
-      }
-
       return processTokenData(usageStats, usageContext);
     })
   );

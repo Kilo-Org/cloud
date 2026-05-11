@@ -389,6 +389,27 @@ describe('parseTranscriptionUsageFromResponse', () => {
     expect(result.outputTokens).toBe(4);
   });
 
+  it('uses BYOK upstream inference cost when present', () => {
+    const result = parseTranscriptionUsageFromResponse(
+      makeResponse({
+        usage: {
+          seconds: 2.5,
+          input_tokens: 10,
+          output_tokens: 4,
+          total_tokens: 14,
+          cost: 0,
+          is_byok: true,
+          cost_details: { upstream_inference_cost: 0.00004 },
+        },
+      }),
+      200,
+      'openai/gpt-4o-mini-transcribe'
+    );
+
+    expect(result.cost_mUsd).toBe(40);
+    expect(result.is_byok).toBe(true);
+  });
+
   it('stores duration as generation time', () => {
     const result = parseTranscriptionUsageFromResponse(
       makeResponse(),

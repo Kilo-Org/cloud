@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { getEmbeddingProvider } from '@/lib/ai-gateway/providers/get-provider';
+import {
+  getEmbeddingProvider,
+  getTranscriptionProvider,
+} from '@/lib/ai-gateway/providers/get-provider';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { createAnonymousContext } from '@/lib/anonymous';
 import {
@@ -95,6 +98,15 @@ describe('getEmbeddingProvider', () => {
     const result = await getEmbeddingProvider('mistralai/codestral-embed-2505', user, undefined);
 
     expect(result.provider.id).toBe('openrouter');
+    expect(result.userByok).toBeNull();
+  });
+});
+
+describe('getTranscriptionProvider', () => {
+  it('routes transcription requests to OpenRouter', async () => {
+    const result = await getTranscriptionProvider();
+
+    expect(result.provider).toBe(PROVIDERS.OPENROUTER);
     expect(result.userByok).toBeNull();
   });
 });

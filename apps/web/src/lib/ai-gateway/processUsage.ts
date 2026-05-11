@@ -882,7 +882,7 @@ export function calculateKiloExclusiveCost_mUsd(
   );
 }
 
-async function processTokenData(
+export async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
 ) {
@@ -977,6 +977,9 @@ function useGenerationLookup(
   const isGatewayProvider =
     usageContext.provider === 'openrouter' || usageContext.provider === 'vercel';
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
+  if (usageContext.api_kind === 'audio_transcriptions') {
+    return false;
+  }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
     isFreeModel(usageContext.requested_model) ||

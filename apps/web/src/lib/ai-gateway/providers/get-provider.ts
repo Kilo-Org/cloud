@@ -208,3 +208,10 @@ export async function getEmbeddingProvider(
   // 2. All non-BYOK embedding requests go through OpenRouter
   return { provider: PROVIDERS.OPENROUTER, userByok: null };
 }
+
+export async function getTranscriptionProvider(): Promise<{
+  provider: Provider;
+  userByok: BYOKResult[] | null;
+}> {
+  return { provider: PROVIDERS.OPENROUTER, userByok: null };
+}

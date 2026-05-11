@@ -927,4 +927,13 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     expect(metadata.finish_reason).toBe('stop');
     expect(metadata.message_id).toBe('msg-id');
   });
+
+  test('stores audio transcription api kind metadata', () => {
+    const { metadata } = toInsertableDbUsageRecord(
+      baseUsageStats,
+      extractUsageContextInfo(makeUsageContext({ api_kind: 'audio_transcriptions' }))
+    );
+
+    expect(metadata.api_kind).toBe('audio_transcriptions');
+  });
 });

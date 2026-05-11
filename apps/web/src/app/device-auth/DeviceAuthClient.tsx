@@ -38,6 +38,11 @@ function getUserInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+export function getDeviceAuthSignInUrl(code: string): string {
+  const callbackPath = `/device-auth?${new URLSearchParams({ code }).toString()}`;
+  return `/users/sign_in?${new URLSearchParams({ callbackPath }).toString()}`;
+}
+
 export function DeviceAuthClient({ code, user }: DeviceAuthClientProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'denied' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -47,14 +52,16 @@ export function DeviceAuthClient({ code, user }: DeviceAuthClientProps) {
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
-    const callbackPath = `/device-auth?${new URLSearchParams({ code }).toString()}`;
-    const callbackUrl = `/users/sign_in?${new URLSearchParams({ callbackPath }).toString()}`;
 
     try {
       await fetch('/api/auth/revoke-web-session', { method: 'POST' });
     } finally {
-      await signOut({ callbackUrl });
+      await signOut({ callbackUrl: getDeviceAuthSignInUrl(code) });
     }
+  };
+
+  const redirectToSignIn = () => {
+    window.location.assign(getDeviceAuthSignInUrl(code));
   };
 
   const handleAuthorize = async (approved: boolean) => {
@@ -72,6 +79,10 @@ export function DeviceAuthClient({ code, user }: DeviceAuthClientProps) {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          redirectToSignIn();
+          return;
+        }
         setStatus('error');
         setErrorMessage(await getApiErrorMessage(response, 'Failed to authorize device'));
         return;
@@ -83,6 +94,10 @@ export function DeviceAuthClient({ code, user }: DeviceAuthClientProps) {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          redirectToSignIn();
+          return;
+        }
         setStatus('error');
         setErrorMessage(await getApiErrorMessage(response, 'Failed to deny device'));
         return;

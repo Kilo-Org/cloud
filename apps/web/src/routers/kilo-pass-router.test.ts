@@ -82,7 +82,9 @@ type KiloPassCaller = {
   }>;
   getState: () => Promise<{
     subscription: {
-      stripeSubscriptionId: string;
+      stripeSubscriptionId: string | null;
+      paymentProvider: KiloPassPaymentProvider;
+      providerSubscriptionId: string | null;
       tier: KiloPassTier;
       cadence: KiloPassCadence;
       status: Stripe.Subscription.Status;
@@ -104,7 +106,7 @@ type KiloPassCaller = {
   getAverageMonthlyUsageLast3Months: () => Promise<{ averageMonthlyUsageUsd: number }>;
   getCheckoutReturnState: () => Promise<{
     subscription: {
-      stripeSubscriptionId: string;
+      stripeSubscriptionId: string | null;
       tier: KiloPassTier;
       cadence: KiloPassCadence;
       status: Stripe.Subscription.Status;
@@ -664,6 +666,7 @@ describe('kiloPassRouter', () => {
 
       expect(result.subscription).toEqual(
         expect.objectContaining({
+          stripeSubscriptionId: null,
           paymentProvider: KiloPassPaymentProvider.AppStore,
           providerSubscriptionId,
           nextBillingAt: expiresAt,

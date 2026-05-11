@@ -100,7 +100,7 @@ const KiloPassSubscriptionStatusSchema = z.union([
 
 const KiloPassSubscriptionStateBaseSchema = z.object({
   subscriptionId: z.string(),
-  stripeSubscriptionId: z.string(),
+  stripeSubscriptionId: z.string().nullable(),
   paymentProvider: KiloPassPaymentProviderSchema,
   providerSubscriptionId: z.string().nullable(),
   tier: KiloPassTierSchema,
@@ -144,6 +144,11 @@ const CompleteStorePurchaseOutputSchema = z.object({
   cadence: KiloPassCadenceSchema,
   alreadyProcessed: z.boolean(),
 });
+
+type StripeManagedKiloPassSubscription = KiloPassSubscriptionState & {
+  paymentProvider: typeof KiloPassPaymentProvider.Stripe;
+  stripeSubscriptionId: string;
+};
 
 function assertAppStoreAccountTokenMatchesUser(params: {
   appAccountToken: string | null;
@@ -302,10 +307,13 @@ async function getIsFirstTimeSubscriberEverBySubscriptionId(params: {
   return otherSubscriptions.length === 0;
 }
 
-function assertStripeManagedSubscription(subscription: {
-  paymentProvider: KiloPassPaymentProvider;
-}): void {
-  if (subscription.paymentProvider !== KiloPassPaymentProvider.Stripe) {
+function assertStripeManagedSubscription(
+  subscription: KiloPassSubscriptionState
+): asserts subscription is StripeManagedKiloPassSubscription {
+  if (
+    subscription.paymentProvider !== KiloPassPaymentProvider.Stripe ||
+    !subscription.stripeSubscriptionId
+  ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Manage this Kilo Pass subscription through the mobile app store.',
@@ -645,6 +653,8 @@ export const kiloPassRouter = createTRPCRouter({
         isEligibleForFirstMonthPromo: false,
       };
     }
+
+    assertStripeManagedSubscription(subscriptionBase);
 
     const stripeCustomerId = ctx.user.stripe_customer_id;
     if (!stripeCustomerId) {
@@ -990,6 +1000,7 @@ export const kiloPassRouter = createTRPCRouter({
       if (subscription.paymentProvider !== KiloPassPaymentProvider.Stripe) {
         return { scheduledChange: null };
       }
+      assertStripeManagedSubscription(subscription);
 
       const scheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
         columns: {

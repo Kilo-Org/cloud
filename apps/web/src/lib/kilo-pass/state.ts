@@ -19,7 +19,7 @@ type DbOrTx = Db | DrizzleTransaction;
 
 export type KiloPassSubscriptionState = {
   subscriptionId: string;
-  stripeSubscriptionId: string;
+  stripeSubscriptionId: string | null;
   paymentProvider: KiloPassPaymentProvider;
   providerSubscriptionId: string | null;
   tier: KiloPassTier;
@@ -146,7 +146,7 @@ export async function getKiloPassStateForUser(
 
   return {
     subscriptionId: selected.subscriptionId,
-    stripeSubscriptionId: selected.stripeSubscriptionId ?? selected.providerSubscriptionId ?? '',
+    stripeSubscriptionId: selected.stripeSubscriptionId,
     paymentProvider: selected.paymentProvider,
     providerSubscriptionId: selected.providerSubscriptionId,
     tier: selected.tier,

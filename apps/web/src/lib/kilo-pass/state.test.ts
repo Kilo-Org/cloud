@@ -6,7 +6,7 @@ import {
   kilo_pass_pause_events,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { KiloPassCadence } from './enums';
+import { KiloPassCadence, KiloPassPaymentProvider } from './enums';
 import { KiloPassTier } from '@/lib/kilo-pass/enums';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -153,6 +153,36 @@ describe('getKiloPassStateForUser', () => {
     const user = await insertTestUser();
     const state = await getKiloPassStateForUser(db, user.id);
     expect(state).toBeNull();
+  });
+
+  test('keeps stripeSubscriptionId null for App Store subscriptions', async () => {
+    const user = await insertTestUser();
+    const providerSubscriptionId = `test-app-store-original-${crypto.randomUUID()}`;
+
+    await db.insert(kilo_pass_subscriptions).values({
+      kilo_user_id: user.id,
+      payment_provider: KiloPassPaymentProvider.AppStore,
+      provider_subscription_id: providerSubscriptionId,
+      stripe_subscription_id: null,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      status: 'active',
+      cancel_at_period_end: false,
+      started_at: '2025-06-01T00:00:00.000Z',
+      ended_at: null,
+      current_streak_months: 1,
+      next_yearly_issue_at: null,
+    });
+
+    const state = await getKiloPassStateForUser(db, user.id);
+
+    expect(state).toEqual(
+      expect.objectContaining({
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerSubscriptionId,
+        stripeSubscriptionId: null,
+      })
+    );
   });
 
   test('returns paused status when DB status is active but an open pause event exists', async () => {

@@ -62,7 +62,11 @@ describe('resolveGitHubToken priority chain', () => {
       townId: 'town-1',
       getTownConfig: () => Promise.resolve(cfg),
     });
-    expect(result).toEqual({ ok: true, token: FRESH_INSTALLATION_TOKEN, source: 'town platform integration' });
+    expect(result).toEqual({
+      ok: true,
+      token: FRESH_INSTALLATION_TOKEN,
+      source: 'town platform integration',
+    });
   });
 
   it('falls back to stored github_token when no integration is configured', async () => {
@@ -72,7 +76,11 @@ describe('resolveGitHubToken priority chain', () => {
       townId: 'town-1',
       getTownConfig: () => Promise.resolve(cfg),
     });
-    expect(result).toEqual({ ok: true, token: STORED_GITHUB_TOKEN, source: 'town.git_auth.github_token' });
+    expect(result).toEqual({
+      ok: true,
+      token: STORED_GITHUB_TOKEN,
+      source: 'town.git_auth.github_token',
+    });
   });
 
   it('falls back to stored github_token when integration lookup throws', async () => {
@@ -85,7 +93,11 @@ describe('resolveGitHubToken priority chain', () => {
       townId: 'town-1',
       getTownConfig: () => Promise.resolve(cfg),
     });
-    expect(result).toEqual({ ok: true, token: STORED_GITHUB_TOKEN, source: 'town.git_auth.github_token' });
+    expect(result).toEqual({
+      ok: true,
+      token: STORED_GITHUB_TOKEN,
+      source: 'town.git_auth.github_token',
+    });
   });
 
   it('uses the rig-level platformIntegrationId when town config does not carry one', async () => {
@@ -96,7 +108,11 @@ describe('resolveGitHubToken priority chain', () => {
       getTownConfig: () => Promise.resolve(cfg),
       platformIntegrationId: INTEGRATION_ID,
     });
-    expect(result).toEqual({ ok: true, token: FRESH_INSTALLATION_TOKEN, source: 'rig platform integration' });
+    expect(result).toEqual({
+      ok: true,
+      token: FRESH_INSTALLATION_TOKEN,
+      source: 'rig platform integration',
+    });
   });
 
   it('returns ok:false with tried chain when nothing is configured', async () => {
@@ -108,7 +124,11 @@ describe('resolveGitHubToken priority chain', () => {
     });
     expect(result).toEqual({
       ok: false,
-      tried: ['town.github_cli_pat', 'platform integration (none configured)', 'town.git_auth.github_token'],
+      tried: [
+        'town.github_cli_pat',
+        'platform integration (none configured)',
+        'town.git_auth.github_token',
+      ],
     });
   });
 
@@ -122,6 +142,10 @@ describe('resolveGitHubToken priority chain', () => {
       townId: 'town-1',
       getTownConfig: () => Promise.resolve(cfg),
     });
-    expect(result).toEqual({ ok: true, token: STORED_GITHUB_TOKEN, source: 'town.git_auth.github_token' });
+    expect(result).toEqual({
+      ok: true,
+      token: STORED_GITHUB_TOKEN,
+      source: 'town.git_auth.github_token',
+    });
   });
 });

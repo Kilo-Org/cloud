@@ -258,8 +258,20 @@ describe('shouldCountAsTransient', () => {
 describe('error categorization is mutually exclusive', () => {
   const allKinds: PRStatusError[] = [
     { kind: 'no_token', provider: 'github', resolutionChain: [] },
-    { kind: 'http_error', provider: 'github', status: 401, statusText: 'Unauthorized', transient: false },
-    { kind: 'http_error', provider: 'github', status: 503, statusText: 'Service Unavailable', transient: true },
+    {
+      kind: 'http_error',
+      provider: 'github',
+      status: 401,
+      statusText: 'Unauthorized',
+      transient: false,
+    },
+    {
+      kind: 'http_error',
+      provider: 'github',
+      status: 503,
+      statusText: 'Service Unavailable',
+      transient: true,
+    },
     { kind: 'invalid_response', provider: 'github', reason: 'schema_mismatch' },
     { kind: 'unrecognized_url', url: 'https://example.com' },
     { kind: 'host_mismatch', provider: 'gitlab', expected: 'gitlab.com', got: 'evil.com' },
@@ -267,11 +279,12 @@ describe('error categorization is mutually exclusive', () => {
 
   it('each error kind falls into exactly one bucket', () => {
     for (const error of allKinds) {
-      const buckets = [
-        _shouldFailImmediately(error),
-        _shouldCountAsTransient(error),
-      ].filter(Boolean);
-      expect(buckets.length, `${error.kind} should match exactly one bucket`).toBeLessThanOrEqual(1);
+      const buckets = [_shouldFailImmediately(error), _shouldCountAsTransient(error)].filter(
+        Boolean
+      );
+      expect(buckets.length, `${error.kind} should match exactly one bucket`).toBeLessThanOrEqual(
+        1
+      );
     }
   });
 

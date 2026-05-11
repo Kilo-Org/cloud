@@ -89,7 +89,11 @@ export async function resolveGitHubToken(ctx: SCMContext): Promise<GitHubTokenRe
 
   // 3. Stored git_auth.github_token — last-resort fallback
   if (townConfig.git_auth?.github_token) {
-    return { ok: true, token: townConfig.git_auth.github_token, source: 'town.git_auth.github_token' };
+    return {
+      ok: true,
+      token: townConfig.git_auth.github_token,
+      source: 'town.git_auth.github_token',
+    };
   }
   tried.push('town.git_auth.github_token');
 

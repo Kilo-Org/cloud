@@ -2818,7 +2818,9 @@ async function prewarmMayorSDK(townId: string, apiUrl: string, token: string): P
  */
 export async function bootHydration(): Promise<void> {
   let resolve!: () => void;
-  _hydrationComplete = new Promise<void>(r => { resolve = r; });
+  _hydrationComplete = new Promise<void>(r => {
+    resolve = r;
+  });
   try {
     await bootHydrationImpl('[boot-hydration]');
   } finally {

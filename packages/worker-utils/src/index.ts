@@ -60,7 +60,7 @@ export type { SessionMetricsParams, SessionMetricsParamsInput } from './session-
 
 export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
 
-export { redactSensitiveHeaders } from './redact-headers.js';
+export { redactSensitiveHeaders, redactGitHubTokens } from './redact-headers.js';
 
 export { normalizeGitUrl } from './normalize-git-url.js';
 

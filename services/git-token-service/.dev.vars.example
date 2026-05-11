@@ -14,3 +14,6 @@ GITHUB_LITE_APP_PRIVATE_KEY=
 # GitLab App credentials (optional, used as fallback when metadata lacks client credentials)
 GITLAB_CLIENT_ID=
 GITLAB_CLIENT_SECRET=
+
+# Encryption key for GitHub App user-to-server tokens (AES-256-GCM, base64-encoded 32 bytes)
+USER_GH_APP_TOKEN_ENCRYPTION_KEY=

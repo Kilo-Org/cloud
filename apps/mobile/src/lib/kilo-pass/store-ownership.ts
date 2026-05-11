@@ -1,10 +1,10 @@
 import { type Purchase } from 'expo-iap';
 
-export type AppStoreKiloPassOwnership = 'checking' | 'current-account' | 'another-account' | 'none';
+type AppStoreKiloPassOwnership = 'checking' | 'current-account' | 'another-account' | 'none';
 
 type AppStorePurchase = Purchase & { appAccountToken?: string | null };
 
-export function isKiloPassAppStorePurchase(purchase: Purchase): purchase is AppStorePurchase {
+function isKiloPassAppStorePurchase(purchase: Purchase): purchase is AppStorePurchase {
   if (purchase.purchaseState === 'pending') {
     return false;
   }

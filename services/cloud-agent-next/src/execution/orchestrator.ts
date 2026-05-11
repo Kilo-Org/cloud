@@ -169,19 +169,7 @@ export class ExecutionOrchestrator {
         );
       }
 
-      // 5. Record activity for idle timeout tracking
-      try {
-        await withDORetry(
-          () => this.deps.getSessionStub(userId, sessionId),
-          stub => stub.recordKiloServerActivity(),
-          'recordKiloServerActivity'
-        );
-      } catch {
-        // Non-fatal - log but continue
-        logger.warn('Failed to record kilo server activity');
-      }
-
-      // 6. Download images from R2 to sandbox if provided
+      // 5. Download images from R2 to sandbox if provided
       const fileParts = await downloadImagePromptParts({
         env: this.deps.env,
         session: prepared.session,
@@ -204,7 +192,7 @@ export class ExecutionOrchestrator {
         prepareExecution
       );
 
-    // 7. Send prompt with execution binding (async - returns messageId immediately)
+    // 6. Send prompt with execution binding (async - returns messageId immediately)
     const ingestUrl = this.deps.getIngestUrl(sessionId, userId);
     const ingestToken = executionId;
     const kilocodeToken = this.getKilocodeToken(plan);

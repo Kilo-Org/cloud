@@ -702,20 +702,6 @@ const prepareSessionHandler = internalApiProtectedProcedure
         });
       }
 
-      // 15. Record kilo server activity for idle timeout tracking
-      try {
-        await withDORetry(
-          () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
-          s => s.recordKiloServerActivity(),
-          'recordKiloServerActivity'
-        );
-      } catch (error) {
-        // Non-fatal - log but continue
-        logger
-          .withFields({ error: error instanceof Error ? error.message : String(error) })
-          .warn('Failed to record kilo server activity');
-      }
-
       logger.info('Session prepared successfully');
 
       // 16. Return both IDs

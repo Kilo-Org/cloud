@@ -178,10 +178,6 @@ export type CloudAgentSessionState = {
   /** Optional image attachments to download from R2 to the sandbox */
   images?: Images;
 
-  // Kilo server lifecycle tracking
-  /** Timestamp of last kilo server activity (for idle timeout cleanup) */
-  kiloServerLastActivity?: number;
-
   // Workspace metadata (set during prepareSession)
   /** Workspace path where the repo was cloned */
   workspacePath?: string;

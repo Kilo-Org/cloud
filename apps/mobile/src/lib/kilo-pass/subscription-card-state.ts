@@ -8,14 +8,14 @@ type KiloPassSubscriptionCardSubscription = {
   status: string;
 };
 
-export type KiloPassSubscriptionCardState = {
+type KiloPassSubscriptionCardState = {
   action: 'none' | 'open-store-management' | 'open-store-sheet' | 'open-web-management';
   actionLabel: string | null;
   description: string;
   title: string;
 };
 
-export type KiloPassSubscriptionCardAccessibility = {
+type KiloPassSubscriptionCardAccessibility = {
   accessibilityHint: string | undefined;
   accessibilityLabel: string;
 };

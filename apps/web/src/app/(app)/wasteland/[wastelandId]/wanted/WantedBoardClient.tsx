@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import type { WastelandOutputs } from '@/lib/wasteland/trpc';
@@ -97,6 +98,20 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
   const trpc = useWastelandTRPC();
   const queryClient = useQueryClient();
   const { open: openDrawer } = useDrawerStack();
+  const searchParams = useSearchParams();
+
+  // Auto-open the wanted-item drawer when the page is loaded with
+  // `?itemId=...` (e.g. from a deep link in the gastown bead drawer).
+  // The `wanted-item-by-id` entry fetches the item directly so we don't
+  // have to wait for the board query before opening.
+  const autoOpenedItemRef = useRef<string | null>(null);
+  useEffect(() => {
+    const itemId = searchParams?.get('itemId');
+    if (!itemId) return;
+    if (autoOpenedItemRef.current === itemId) return;
+    autoOpenedItemRef.current = itemId;
+    openDrawer({ type: 'wanted-item-by-id', wastelandId, itemId });
+  }, [searchParams, openDrawer, wastelandId]);
 
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [search, setSearch] = useState('');

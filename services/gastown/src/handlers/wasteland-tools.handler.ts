@@ -4,6 +4,8 @@ import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 import { getTownDOStub } from '../dos/Town.do';
 import type { GastownEnv } from '../gastown.worker';
+import { pickRigIdForWastelandBead } from './wasteland-bead.helpers';
+import type { WastelandConnectionRecord } from '../dos/town/wasteland';
 
 const HANDLER_LOG = '[wasteland-tools.handler]';
 
@@ -42,6 +44,21 @@ async function resolveWastelandId(c: Context<GastownEnv>, townId: string): Promi
   // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
   const connection = await town.getWastelandConnection();
   return connection?.wasteland_id ?? null;
+}
+
+/**
+ * Resolve the full wasteland connection for this town. Returns null when
+ * the town is not connected. Used by code paths that need both the
+ * `wasteland_id` and the upstream `rig_handle` (e.g. to attach a bead to a
+ * matching local rig).
+ */
+async function resolveWastelandConnection(
+  c: Context<GastownEnv>,
+  townId: string
+): Promise<WastelandConnectionRecord | null> {
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  return town.getWastelandConnection();
 }
 
 /** Map a wasteland RPC failure into a Hono response. */
@@ -107,13 +124,20 @@ export async function handleWastelandBrowse(c: Context<GastownEnv>, params: { to
 
 /**
  * POST /api/mayor/:townId/tools/wasteland/claim
+ *
+ * Claims the upstream wanted item and returns a rich planning context to
+ * the mayor: the item title/body/priority/type, the upstream PR URL (if
+ * any), a suggested local `rig_id`, and the canonical `wasteland` origin
+ * tag the mayor MUST attach to whatever beads it creates next (single
+ * bead via gt_sling, or convoy via gt_sling_batch). The mayor decides the
+ * shape of the work; gastown does NOT create any beads here.
  */
 export async function handleWastelandClaim(c: Context<GastownEnv>, params: { townId: string }) {
   const userId = resolveUserId(c);
   if (!userId) return c.json(resError('Authentication required'), 401);
 
-  const wastelandId = await resolveWastelandId(c, params.townId);
-  if (!wastelandId) {
+  const connection = await resolveWastelandConnection(c, params.townId);
+  if (!connection) {
     return c.json(resError('This town is not connected to any wasteland'), 404);
   }
 
@@ -126,11 +150,11 @@ export async function handleWastelandClaim(c: Context<GastownEnv>, params: { tow
   }
 
   console.log(
-    `${HANDLER_LOG} handleWastelandClaim: townId=${params.townId} wastelandId=${wastelandId} itemId=${parsed.data.item_id}`
+    `${HANDLER_LOG} handleWastelandClaim: townId=${params.townId} wastelandId=${connection.wasteland_id} itemId=${parsed.data.item_id}`
   );
 
   const result = await c.env.WASTELAND_SERVICE.claimWantedItem({
-    wastelandId,
+    wastelandId: connection.wasteland_id,
     userId,
     itemId: parsed.data.item_id,
   });
@@ -139,7 +163,76 @@ export async function handleWastelandClaim(c: Context<GastownEnv>, params: { tow
     return wastelandFailureToResponse(c, result);
   }
 
-  return c.json(resSuccess(result.data));
+  const item = await fetchClaimedItem(c, connection.wasteland_id, userId, parsed.data.item_id);
+  const suggestedRigId = await suggestLocalRigId(c, params.townId, connection.rig_handle);
+
+  return c.json(
+    resSuccess({
+      claim: result.data,
+      item,
+      planning: {
+        wasteland_origin: {
+          kind: 'wanted-item-claim',
+          wasteland_id: connection.wasteland_id,
+          item_id: parsed.data.item_id,
+          pull_id: null,
+          source_url: result.data.pr_url,
+        },
+        suggested_rig_id: suggestedRigId,
+      },
+    })
+  );
+}
+
+/**
+ * Look up the just-claimed item on the wanted board so we can return its
+ * title, description, priority, and type to the mayor for planning. Best
+ * effort: returns null if the item can't be found.
+ */
+async function fetchClaimedItem(
+  c: Context<GastownEnv>,
+  wastelandId: string,
+  userId: string,
+  itemId: string
+): Promise<Record<string, unknown> | null> {
+  try {
+    const browse = await c.env.WASTELAND_SERVICE.browseWantedBoard({
+      wastelandId,
+      userId,
+    });
+    if (!browse.success) return null;
+    return browse.data.find(it => it.id === itemId) ?? null;
+  } catch (err) {
+    console.warn(
+      `${HANDLER_LOG} fetchClaimedItem: browse failed for wastelandId=${wastelandId} itemId=${itemId}:`,
+      err
+    );
+    return null;
+  }
+}
+
+/**
+ * Suggest a local rig id for the mayor to scope wasteland-originated work to.
+ * Uses the same rule the wasteland-bead helpers use: match by `rig_handle`,
+ * else pick the only rig if exactly one exists, else null.
+ */
+async function suggestLocalRigId(
+  c: Context<GastownEnv>,
+  townId: string,
+  rigHandle: string
+): Promise<string | null> {
+  try {
+    const town = getTownDOStub(c.env, townId);
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+    const rigList = await town.listRigs();
+    return pickRigIdForWastelandBead(
+      rigList.map(r => ({ id: r.id, name: r.name })),
+      rigHandle
+    );
+  } catch (err) {
+    console.warn(`${HANDLER_LOG} suggestLocalRigId: listRigs failed for townId=${townId}:`, err);
+    return null;
+  }
 }
 
 /**
@@ -215,6 +308,25 @@ export async function handleWastelandDone(c: Context<GastownEnv>, params: { town
 
   if (!result.success) {
     return wastelandFailureToResponse(c, result);
+  }
+
+  // Stamp the canonical bead so the auto-done reconciler doesn't re-fire
+  // for an item the mayor already reported manually. Best-effort: a stamp
+  // failure is logged but does NOT fail the response — the upstream call
+  // already succeeded.
+  try {
+    const town = getTownDOStub(c.env, params.townId);
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+    await town.stampWastelandReported({
+      wastelandId,
+      itemId: parsed.data.item_id,
+      evidence: parsed.data.evidence,
+    });
+  } catch (err) {
+    console.warn(
+      `${HANDLER_LOG} handleWastelandDone: stampWastelandReported failed for item=${parsed.data.item_id}:`,
+      err
+    );
   }
 
   return c.json(resSuccess(result.data));

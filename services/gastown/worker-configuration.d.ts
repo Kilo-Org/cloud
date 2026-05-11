@@ -35,7 +35,7 @@ type WastelandService = {
 		wastelandId: string;
 		userId: string;
 		itemId: string;
-	}): Promise<WastelandRpcResult<{ success: true }>>;
+	}): Promise<WastelandRpcResult<{ success: true; pr_url: string | null }>>;
 	postWantedItem(params: {
 		wastelandId: string;
 		userId: string;

@@ -16,6 +16,7 @@ import type {
   SlingBatchResult,
   SlingResult,
   UiActionInput,
+  WastelandClaimResult,
 } from './types';
 
 function isApiResponse(
@@ -420,6 +421,13 @@ export class MayorGastownClient {
     merge_mode?: 'review-then-land' | 'review-and-merge';
     parallel?: boolean;
     staged?: boolean;
+    /**
+     * Metadata stamped onto BOTH the convoy bead AND every task bead. Use
+     * this to propagate cross-cutting context like the `wasteland` origin
+     * tag returned by gt_wasteland_claim so every descendant bead links
+     * back to its source.
+     */
+    metadata?: Record<string, unknown>;
   }): Promise<SlingBatchResult> {
     return this.request<SlingBatchResult>(this.mayorPath('/sling-batch'), {
       method: 'POST',
@@ -585,8 +593,8 @@ export class MayorGastownClient {
     );
   }
 
-  async wastelandClaim(input: { item_id: string }): Promise<{ success: boolean }> {
-    return this.request<{ success: boolean }>(this.mayorPath(`/wasteland/claim`), {
+  async wastelandClaim(input: { item_id: string }): Promise<WastelandClaimResult> {
+    return this.request<WastelandClaimResult>(this.mayorPath(`/wasteland/claim`), {
       method: 'POST',
       body: JSON.stringify({ item_id: input.item_id }),
     });

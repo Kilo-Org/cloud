@@ -51,7 +51,10 @@ export function createMayorTools(client: MayorGastownClient) {
         metadata: tool.schema
           .record(tool.schema.string(), tool.schema.unknown())
           .describe(
-            'Metadata object for additional context (e.g. { pr_url, branch, target_branch })'
+            'Metadata object for additional context (e.g. { pr_url, branch, target_branch }). ' +
+              'When the work originates from a wasteland claim, you MUST include the `wasteland` ' +
+              'origin tag returned by gt_wasteland_claim, e.g. ' +
+              '`{ wasteland: <planning.wasteland_origin> }`, so the bead links back to the wanted item.'
           )
           .optional(),
         labels: tool.schema
@@ -194,6 +197,15 @@ export function createMayorTools(client: MayorGastownClient) {
               'Default: false (dispatch immediately).'
           )
           .optional(),
+        metadata: tool.schema
+          .record(tool.schema.string(), tool.schema.unknown())
+          .describe(
+            'Metadata stamped onto BOTH the convoy bead AND every task bead. Use this to propagate ' +
+              'cross-cutting context like the `wasteland` origin tag returned by gt_wasteland_claim ' +
+              '(pass `{ wasteland: <planning.wasteland_origin> }`) so every descendant bead links back ' +
+              'to its source.'
+          )
+          .optional(),
       },
       async execute(args) {
         const result = await client.slingBatch({
@@ -203,6 +215,7 @@ export function createMayorTools(client: MayorGastownClient) {
           merge_mode: args.merge_mode,
           parallel: args.parallel,
           staged: args.staged,
+          metadata: args.metadata,
         });
 
         const beadLines = result.beads.map(
@@ -550,7 +563,14 @@ export function createMayorTools(client: MayorGastownClient) {
     gt_wasteland_claim: tool({
       description:
         'Claim an open wanted item from the Wasteland this town is connected to. ' +
-        'Marks the item as claimed by you so others know it is being worked on.',
+        'Marks the item upstream as claimed and returns:\n' +
+        '  - `item`: the full wanted-item record (title, description, priority, type) so you can plan.\n' +
+        "  - `planning.suggested_rig_id`: the local rig that maps to this wasteland's upstream rig handle.\n" +
+        '  - `planning.wasteland_origin`: an opaque origin tag you MUST forward verbatim as `metadata.wasteland` ' +
+        'on whatever bead(s) you create next via gt_sling or gt_sling_batch. This links every descendant bead ' +
+        'back to the wanted item so progress is tracked end-to-end.\n' +
+        'After claiming, decide whether the work is one bead (gt_sling) or several (gt_sling_batch), then ' +
+        'create them with the wasteland_origin tag attached.',
       args: {
         item_id: tool.schema.string().describe('The ID of the wanted item to claim'),
       },
@@ -558,9 +578,10 @@ export function createMayorTools(client: MayorGastownClient) {
         const result = await client.wastelandClaim({
           item_id: args.item_id,
         });
-        return result.success
-          ? `Successfully claimed item ${args.item_id}.`
-          : `Failed to claim item ${args.item_id}.`;
+        const preamble = result.item
+          ? 'Claim succeeded. Plan the work using the item context below; forward `planning.wasteland_origin` verbatim as `metadata.wasteland` on every bead you create (single via gt_sling, or multi via gt_sling_batch).'
+          : 'Claim succeeded but the wanted-item details lookup failed (network or container cold start). The `planning` fields below are still valid; consider re-running gt_wasteland_browse to fetch the title/description before slinging the work.';
+        return `${preamble}\n${JSON.stringify(result, null, 2)}`;
       },
     }),
 

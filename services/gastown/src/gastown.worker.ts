@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { cors } from 'hono/cors';
+import { z } from 'zod';
 import { getTownContainerStub } from './dos/TownContainer.do';
 import { getTownDOStub } from './dos/Town.do';
 import { TownConfigUpdateSchema } from './types';
@@ -331,6 +332,62 @@ app.get('/debug/towns/:townId/wasteland', async c => {
   // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
   const connection = await town.getWastelandConnection();
   return c.json({ connection });
+});
+
+// List every bead in the town that carries a `metadata.wasteland` tag, plus
+// the deep-link URL the BeadPanel UI should render for it. Use this to verify
+// the wasteland → bead bridge end-to-end without going through the UI.
+app.get('/debug/towns/:townId/wasteland-beads', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const rawBeads = await town.debugListWastelandBeads();
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const rigList = await town.listRigs();
+
+  const DebugBeadRow = z.object({
+    bead_id: z.string(),
+    type: z.string(),
+    status: z.string(),
+    title: z.string(),
+    rig_id: z.string().nullable(),
+    created_by: z.string().nullable(),
+    labels: z.array(z.string()),
+    metadata: z.record(z.string(), z.unknown()),
+  });
+  const beadRows = DebugBeadRow.array().parse(rawBeads);
+
+  const RigRow = z.object({ id: z.string(), name: z.string() });
+  const rigs = RigRow.array().parse(rigList);
+  const ridToName = new Map(rigs.map(r => [r.id, r.name]));
+
+  const WastelandTag = z.object({
+    wasteland_id: z.string(),
+    item_id: z.string(),
+  });
+
+  const enriched = beadRows.map(b => {
+    const wl = WastelandTag.safeParse(b.metadata.wasteland);
+    const expectedHref = wl.success
+      ? `/wasteland/${wl.data.wasteland_id}/wanted?itemId=${encodeURIComponent(wl.data.item_id)}`
+      : null;
+    return {
+      bead_id: b.bead_id,
+      type: b.type,
+      status: b.status,
+      title: b.title,
+      rig_id: b.rig_id,
+      rig_name: b.rig_id ? (ridToName.get(b.rig_id) ?? null) : null,
+      created_by: b.created_by,
+      labels: b.labels,
+      metadata: b.metadata,
+      ui: {
+        drawer_open_url: `/gastown/${townId}#bead=${b.bead_id}&rig=${b.rig_id ?? ''}`,
+        wasteland_link_href: expectedHref,
+      },
+    };
+  });
+  return c.json({ beads: enriched, count: enriched.length });
 });
 
 app.get('/debug/towns/:townId/config', async c => {

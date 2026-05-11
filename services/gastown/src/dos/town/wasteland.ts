@@ -9,6 +9,7 @@
 
 import { z } from 'zod';
 import { query } from '../../util/query.util';
+import { beads } from '../../db/tables/beads.table';
 
 // ---------------------------------------------------------------------------
 // Table DDL
@@ -97,6 +98,57 @@ export function disconnectWasteland(sql: SqlStorage, wastelandId: string): void 
   query(sql, /* sql */ `DELETE FROM town_wasteland_connections WHERE wasteland_id = ?`, [
     wastelandId,
   ]);
+}
+
+/**
+ * Stamp `metadata.wasteland.reported_done_at` (and optionally
+ * `metadata.wasteland.reported_evidence`) onto a bead. Used by the
+ * auto-done reporter to persist the idempotency flag once the upstream
+ * `markWantedItemDone` call succeeds.
+ *
+ * Returns `false` (and writes nothing) when the target bead doesn't
+ * carry a `metadata.wasteland` object — SQLite's `json_set` won't
+ * create intermediate objects, so a silent no-op would let the
+ * reconciler retry indefinitely. Returns `true` on a successful stamp.
+ */
+export function stampWastelandReportedDone(
+  sql: SqlStorage,
+  beadId: string,
+  input: { evidence?: string }
+): boolean {
+  // Refuse to stamp when there is no wasteland tag to merge into. Without
+  // this guard, a malformed canonical-bead pick would silently no-op and
+  // the reconciler would re-fire the upstream RPC every tick.
+  const probeRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT json_extract(${beads.metadata}, '$.wasteland') AS wl
+        FROM ${beads}
+        WHERE ${beads.bead_id} = ?
+      `,
+      [beadId]
+    ),
+  ];
+  const probe = probeRows[0]?.wl;
+  if (probe === null || probe === undefined) return false;
+
+  const timestamp = new Date().toISOString();
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${beads}
+      SET ${beads.columns.metadata} = json_set(
+            COALESCE(${beads.metadata}, '{}'),
+            '$.wasteland.reported_done_at', ?,
+            '$.wasteland.reported_evidence', ?
+          ),
+          ${beads.columns.updated_at} = ?
+      WHERE ${beads.bead_id} = ?
+    `,
+    [timestamp, input.evidence ?? null, timestamp, beadId]
+  );
+  return true;
 }
 
 /**

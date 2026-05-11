@@ -88,9 +88,8 @@ export function canUpgradeTo(args: {
   // A performance CPU is strictly stronger than a shared CPU, so a shared →
   // performance move is allowed regardless of CPU count.
   const cpusOk =
-    currentCpuKind === 'shared' && targetCpuKind === 'performance'
-      ? true
-      : target.machineSize.cpus >= currentCpus;
+    (currentCpuKind === 'shared' && targetCpuKind === 'performance') ||
+    target.machineSize.cpus >= currentCpus;
   return (
     cpusOk &&
     target.machineSize.memory_mb >= currentMemoryMb &&

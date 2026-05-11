@@ -143,9 +143,41 @@ don't need to manage this manually.
 
 - **Free quick tunnel** (default): hostname changes on every restart. The
   script handles this automatically.
-- **Named tunnel**: preconfigure in the Cloudflare dashboard for a persistent
-  hostname (e.g., `yourname.devclaw.dev`). Use `--tunnel-name <name>` or set
-  `TUNNEL_NAME` and `TUNNEL_HOSTNAME` in your config file.
+- **Named tunnel**: preconfigure Cloudflare Tunnel/DNS for persistent
+  hostnames, then set `TUNNEL_NAME` or `TUNNEL_CONFIG` in your dev-start config
+  file.
+
+For a full local stack over HTTPS, prefer separate named-tunnel hostnames:
+
+```conf
+# ~/.config/kiloclaw/dev-start.conf or services/kiloclaw/scripts/.dev-start.conf
+TUNNEL_CONFIG=~/.cloudflared/accounts/kilo-local-dev.yml
+TUNNEL_APP_HOSTNAME=app-dev.yourdomain.com
+TUNNEL_KILOCLAW_HOSTNAME=claw-dev.yourdomain.com
+TUNNEL_KILOCHAT_HOSTNAME=chat-dev.yourdomain.com
+```
+
+with cloudflared ingress similar to:
+
+```yaml
+ingress:
+  - hostname: app-dev.yourdomain.com
+    service: http://localhost:3000
+  - hostname: claw-dev.yourdomain.com
+    service: http://localhost:8795
+  - hostname: chat-dev.yourdomain.com
+    service: http://localhost:8808
+  - service: http_status:404
+```
+
+When named tunnel hostnames are configured, `dev:start` writes:
+
+- `services/kiloclaw/.dev.vars`: `BACKEND_API_URL`, `KILOCODE_API_BASE_URL`,
+  `KILOCLAW_CHECKIN_URL`, `KILOCHAT_BASE_URL`, and appends the tunnel origins to
+  `OPENCLAW_ALLOWED_ORIGINS`.
+- `.env.local`: `APP_URL_OVERRIDE`, `NEXTAUTH_URL`, and `KILOCLAW_API_URL`.
+
+Set `TUNNEL_UPDATE_APP_ENV=false` to leave `.env.local` untouched.
 
 ### If the tunnel isn't working
 

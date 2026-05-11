@@ -1448,6 +1448,43 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     expect(creditTx?.description).toBe('Organization top-up via stripe');
   });
 
+  test('org-auto-topup-setup processes initial organization top-up as auto with payment intent receipt id', async () => {
+    const user = await insertTestUser();
+    const org = await createOrganization('Org Auto Setup Initial Topup', user.id);
+    const amountInCents = 1500;
+    const paymentIntentId = `pi_org_auto_setup_initial_${Math.random()}`;
+    const chargeId = `ch_org_auto_setup_initial_${Math.random()}`;
+
+    const charge = makeCharge({
+      id: chargeId,
+      amount: amountInCents,
+      customer: user.stripe_customer_id,
+    });
+    const paymentIntent = makePaymentIntent({
+      id: paymentIntentId,
+      metadata: {
+        type: 'org-auto-topup-setup',
+        kiloUserId: user.id,
+        organizationId: org.id,
+      },
+    });
+
+    const processOrgTopUpMock = processTopupForOrganization as jest.MockedFunction<
+      typeof processTopupForOrganization
+    >;
+    processOrgTopUpMock.mockResolvedValueOnce(undefined);
+
+    await handleSuccessfulChargeWithPayment(charge, paymentIntent);
+
+    expect(processOrgTopUpMock).toHaveBeenCalledWith(
+      user.id,
+      org.id,
+      amountInCents,
+      { type: 'stripe', stripe_payment_id: paymentIntentId },
+      { isAutoTopUp: true }
+    );
+  });
+
   test('kiloUserId only (no organizationId) and NOT a stripe-checkout-topup: ignored (no DB side-effects)', async () => {
     const user = await insertTestUser();
     const amountInCents = 4200;
@@ -1846,6 +1883,56 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         where: eq(auto_top_up_configs.owned_by_organization_id, org.id),
       });
       expect(orgConfig?.attempt_started_at).toBeNull();
+    } finally {
+      processOrgTopUpMock.mockRestore();
+    }
+  });
+
+  test('invoice.paid passes auto top-up option for organization auto top-ups', async () => {
+    await cleanupDbForTest();
+
+    const orgUser = await insertTestUser();
+    const org = await createOrganization('Org Auto Email Variant Test', orgUser.id);
+    const orgChargeId = `ch_org_auto_variant_${Math.random()}`;
+
+    await db.insert(auto_top_up_configs).values({
+      owned_by_organization_id: org.id,
+      stripe_payment_method_id: `pm_auto_variant_${Math.random()}`,
+      amount_cents: 2000,
+      attempt_started_at: new Date().toISOString(),
+      created_by_user_id: orgUser.id,
+    });
+
+    const processOrgTopUpMock = processTopupForOrganization as jest.MockedFunction<
+      typeof processTopupForOrganization
+    >;
+    processOrgTopUpMock.mockResolvedValueOnce(undefined);
+
+    const orgInvoiceEvent: Stripe.Event = {
+      ...baseStripeEvent(),
+      type: 'invoice.paid',
+      data: {
+        object: {
+          id: `in_org_auto_variant_${Math.random()}`,
+          object: 'invoice',
+          charge: orgChargeId,
+          amount_paid: 5000,
+          metadata: { type: 'org-auto-topup', organizationId: org.id },
+        } as unknown as Stripe.Invoice,
+        previous_attributes: {},
+      },
+    };
+
+    try {
+      await processStripePaymentEventHook(orgInvoiceEvent);
+
+      expect(processOrgTopUpMock).toHaveBeenCalledWith(
+        orgUser.id,
+        org.id,
+        5000,
+        { type: 'stripe', stripe_payment_id: orgChargeId },
+        { isAutoTopUp: true }
+      );
     } finally {
       processOrgTopUpMock.mockRestore();
     }

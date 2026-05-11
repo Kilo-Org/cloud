@@ -223,8 +223,15 @@ function resolveAnnotatedValue(
       const isOrigins = key.includes('ORIGINS');
       const isHostname = key.includes('HOSTNAME') && !key.includes('URL');
       const isWs = key.includes('_WS_');
-      // LAN IP for container services, but never for ORIGINS keys
-      const host = serviceUsesLanIp && !isOrigins && lanIp ? lanIp : 'localhost';
+      const defaultUsesDockerHost = entry.defaultValue.includes('host.docker.internal');
+      // LAN IP for container services, but never for ORIGINS keys.
+      // Preserve host.docker.internal when the example default uses it
+      // (sandbox containers need it to reach the host from inside Docker).
+      const host = defaultUsesDockerHost
+        ? 'host.docker.internal'
+        : serviceUsesLanIp && !isOrigins && lanIp
+          ? lanIp
+          : 'localhost';
       const protocol = isWs ? 'ws' : 'http';
 
       const resolvedParts: string[] = [];

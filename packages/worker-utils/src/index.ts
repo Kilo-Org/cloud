@@ -37,6 +37,11 @@ export type {
   CloudAgentUpdateSessionInput,
   CloudAgentSendMessageInput,
   CloudAgentSendMessageOutput,
+  CloudAgentSessionHealthInput,
+  CloudAgentSessionHealthOutput,
+  CloudAgentSandboxStatus,
+  CloudAgentSessionExecutionHealth,
+  CloudAgentActiveExecutionStatus,
   CloudAgentInterruptInput,
   CloudAgentInterruptOutput,
 } from './cloud-agent-next-client.js';
@@ -56,6 +61,8 @@ export type { SessionMetricsParams, SessionMetricsParamsInput } from './session-
 export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
 
 export { redactSensitiveHeaders } from './redact-headers.js';
+
+export { normalizeGitUrl } from './normalize-git-url.js';
 
 export {
   BILLING_FLOW,

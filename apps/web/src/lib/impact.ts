@@ -2,6 +2,7 @@ import 'server-only';
 
 import { createHash } from 'crypto';
 import { IMPACT_ACCOUNT_SID, IMPACT_AUTH_TOKEN, IMPACT_CAMPAIGN_ID } from '@/lib/config.server';
+import { logImpactReferralDebug, truncateForLog } from '@/lib/impact-debug';
 
 const IMPACT_REVERSAL_DISPOSITION_CODE = 'REJECTED';
 
@@ -546,11 +547,36 @@ function getNormalizedStatus(value: unknown): string | null {
 export async function sendImpactConversionPayload(
   payload: ImpactConversionPayload
 ): Promise<ImpactDispatchResult> {
+  const conversionPath = `/Advertisers/${IMPACT_ACCOUNT_SID}/Conversions`;
+  logImpactReferralDebug('Sending Impact conversion payload', {
+    actionTrackerId: payload.ActionTrackerId,
+    orderId: payload.OrderId,
+    url: buildImpactUrl(conversionPath),
+    clickIdPresent: Boolean(payload.ClickId?.trim()),
+    customerIdPresent: Boolean(payload.CustomerId?.trim()),
+    customerEmailHashPresent: Boolean(payload.CustomerEmail?.trim()),
+    amount: payload.ItemSubTotal1 ?? null,
+    currencyCode: payload.CurrencyCode ?? null,
+    itemCategory: payload.ItemCategory1 ?? null,
+    impactConfigured: isImpactConfigured(),
+  });
+
   const result = await sendImpactRequest({
     method: 'POST',
-    path: `/Advertisers/${IMPACT_ACCOUNT_SID}/Conversions`,
+    path: conversionPath,
     body: JSON.stringify(payload),
     contentType: 'application/json',
+  });
+
+  logImpactReferralDebug('Impact conversion payload result', {
+    actionTrackerId: payload.ActionTrackerId,
+    orderId: payload.OrderId,
+    ok: result.ok,
+    delivery: result.ok ? (result.skipped ?? result.delivery ?? null) : null,
+    failureKind: result.ok ? null : result.failureKind,
+    statusCode: result.ok ? null : (result.statusCode ?? null),
+    responseBody: result.ok ? null : truncateForLog(result.responseBody ?? null),
+    error: result.ok ? null : (result.error ?? null),
   });
 
   if (
@@ -560,6 +586,12 @@ export async function sendImpactConversionPayload(
     result.delivery !== 'immediate' &&
     result.delivery !== 'queued'
   ) {
+    logImpactReferralDebug('Impact sale response missing required action mapping', {
+      actionTrackerId: payload.ActionTrackerId,
+      orderId: payload.OrderId,
+      delivery: result.delivery ?? null,
+    });
+
     return {
       ok: false,
       failureKind: 'submission_failed',
@@ -574,9 +606,22 @@ export async function sendImpactConversionPayload(
 export async function resolveImpactSubmissionUri(
   submissionUri: string
 ): Promise<ImpactSubmissionResolutionResult> {
+  logImpactReferralDebug('Resolving Impact submission URI', {
+    submissionUri,
+    url: buildImpactUrl(submissionUri),
+    impactConfigured: isImpactConfigured(),
+  });
   const result = await sendImpactRequest({
     method: 'GET',
     path: submissionUri,
+  });
+  logImpactReferralDebug('Impact submission URI resolution raw result', {
+    submissionUri,
+    ok: result.ok,
+    delivery: result.ok ? (result.skipped ?? result.delivery ?? null) : null,
+    failureKind: result.ok ? null : result.failureKind,
+    statusCode: result.ok ? null : (result.statusCode ?? null),
+    responseBody: truncateForLog(result.ok ? result.responseBody : result.responseBody),
   });
 
   if (!result.ok) {
@@ -645,17 +690,33 @@ export async function resolveImpactSubmissionUri(
 export async function reverseImpactAction(params: {
   actionId: string;
 }): Promise<ImpactDispatchResult> {
+  logImpactReferralDebug('Sending Impact action reversal', {
+    actionId: params.actionId,
+    dispositionCode: IMPACT_REVERSAL_DISPOSITION_CODE,
+    impactConfigured: isImpactConfigured(),
+  });
+
   const formData = new URLSearchParams({
     ActionId: params.actionId,
     DispositionCode: IMPACT_REVERSAL_DISPOSITION_CODE,
   });
 
-  return await sendImpactRequest({
+  const result = await sendImpactRequest({
     method: 'DELETE',
     path: `/Advertisers/${IMPACT_ACCOUNT_SID}/Actions`,
     body: formData.toString(),
     contentType: 'application/x-www-form-urlencoded',
   });
+
+  logImpactReferralDebug('Impact action reversal result', {
+    actionId: params.actionId,
+    ok: result.ok,
+    delivery: result.ok ? (result.skipped ?? result.delivery ?? null) : null,
+    failureKind: result.ok ? null : result.failureKind,
+    statusCode: result.ok ? null : (result.statusCode ?? null),
+  });
+
+  return result;
 }
 
 function throwIfImpactDispatchFailed(eventName: string, result: ImpactDispatchResult): void {

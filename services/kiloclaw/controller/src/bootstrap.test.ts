@@ -25,6 +25,7 @@ import {
   LINEAR_SECTION_CONFIG,
   KILOCLAW_MITIGATIONS_SECTION_CONFIG,
   PLUGIN_INSTALL_SECTION_CONFIG,
+  PROCESS_MODEL_SECTION_CONFIG,
   buildGatewayArgs,
   bootstrapCritical,
   bootstrapNonCritical,
@@ -981,6 +982,57 @@ describe('runOnboardOrDoctor', () => {
     expect(preDoctorConfig.plugins?.entries).not.toHaveProperty('openclaw-channel-streamchat');
   });
 
+  it('back-fills hooks.allowRequestSessionKey on existing configs before doctor', () => {
+    const harness = fakeDeps();
+    harness.setConfigExists(true);
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({
+        hooks: {
+          enabled: true,
+          token: 'existing-token',
+          path: '/hooks',
+          mappings: [
+            {
+              id: 'cloudflare-email-inbound',
+              match: { path: 'email' },
+              action: 'agent',
+              wakeMode: 'now',
+              sessionKey: '{{payload.sessionKey}}',
+              messageTemplate: 'From: {{payload.from}}',
+              deliver: false,
+            },
+          ],
+        },
+      })
+    );
+
+    runOnboardOrDoctor(
+      {
+        KILOCODE_API_KEY: 'test-key',
+        OPENCLAW_GATEWAY_TOKEN: 'test-token',
+        AUTO_APPROVE_DEVICES: 'true',
+      },
+      harness.deps
+    );
+
+    const doctorCallIndex = (
+      harness.deps.execFileSync as ReturnType<typeof vi.fn>
+    ).mock.calls.findIndex(([_cmd, args]) => Array.isArray(args) && args.includes('doctor'));
+    expect(doctorCallIndex).not.toBe(-1);
+    const doctorCallOrder = (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[doctorCallIndex];
+
+    const preDoctorWriteIndex = (
+      harness.deps.writeFileSync as ReturnType<typeof vi.fn>
+    ).mock.invocationCallOrder.findIndex(order => order < doctorCallOrder);
+    expect(preDoctorWriteIndex).not.toBe(-1);
+
+    const preDoctorConfig = JSON.parse(harness.writeCalls[preDoctorWriteIndex].data) as {
+      hooks?: { allowRequestSessionKey?: boolean };
+    };
+    expect(preDoctorConfig.hooks?.allowRequestSessionKey).toBe(true);
+  });
+
   it('migrates legacy plaintext kilocode key in auth-profiles.json to a keyRef', () => {
     // Integration check: runOnboardOrDoctor must drive the auth-profiles
     // migration. On a legacy doctor boot, a plaintext key in
@@ -1563,6 +1615,7 @@ describe('TOOLS.md section configs', () => {
     LINEAR_SECTION_CONFIG,
     KILOCLAW_MITIGATIONS_SECTION_CONFIG,
     PLUGIN_INSTALL_SECTION_CONFIG,
+    PROCESS_MODEL_SECTION_CONFIG,
   ];
 
   for (const config of configs) {
@@ -1596,6 +1649,22 @@ describe('TOOLS.md section configs', () => {
     // old "OpenClaw Security Advisor" copy.
     expect(section).toContain('ShellSecurity plugin bundled with KiloClaw');
     expect(section).not.toContain('OpenClaw Security Advisor');
+  });
+
+  it('Process Model: pins systemd ban directives', () => {
+    const section = PROCESS_MODEL_SECTION_CONFIG.section;
+    // The lede must be unambiguous so an agent skimming the section
+    // does not skip past it.
+    expect(section).toContain('does NOT use systemd');
+    // Explain WHY systemctl exists on disk despite not being usable, so
+    // the agent does not treat `which systemctl` as evidence systemd works.
+    expect(section).toContain('which systemctl');
+    // The ban list — agents must not propose any of these.
+    expect(section).toContain('Do not suggest `systemctl`');
+    expect(section).toContain('`journalctl`');
+    expect(section).toContain('unit files');
+    // Tell the agent where process management actually lives.
+    expect(section).toContain('supervised by the controller');
   });
 
   it('Plugin Install: references the CLI command and plugins.allow field', () => {

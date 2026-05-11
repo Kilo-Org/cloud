@@ -1,5 +1,5 @@
 import type { PromoCreditCategoryConfig } from '@/lib/PromoCreditCategoryConfig';
-import { PROMO_CREDIT_EXPIRY_HRS } from '@/lib/constants';
+import { PROMO_CREDIT_EXPIRY_HRS, WELCOME_CREDIT_EXPIRY_HRS } from '@/lib/constants';
 
 export const promoCategoriesOld: PromoCreditCategoryConfig[] = [
   {
@@ -43,6 +43,14 @@ export const promoCategoriesOld: PromoCreditCategoryConfig[] = [
     description: 'Special multiplier promotion for the week of 2025-07-28',
     expiry_hours: PROMO_CREDIT_EXPIRY_HRS,
     is_idempotent: false,
+    obsolete: true,
+  },
+  {
+    credit_category: 'automatic-welcome-credits',
+    description: 'Free credits for new users who pass both Turnstile and Stytch validation.',
+    amount_usd: 1.25,
+    is_idempotent: true,
+    expiry_hours: WELCOME_CREDIT_EXPIRY_HRS,
     obsolete: true,
   },
 ];

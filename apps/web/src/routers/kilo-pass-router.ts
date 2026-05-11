@@ -32,11 +32,7 @@ import { KiloPassError } from '@/lib/kilo-pass/errors';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
-import {
-  KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
-  KILO_PASS_TIER_CONFIG,
-} from '@/lib/kilo-pass/constants';
+import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
 import { fromMicrodollars } from '@/lib/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
@@ -130,10 +126,6 @@ const GetStateOutputSchema = z.object({
 const GetAverageMonthlyUsageLast3MonthsOutputSchema = z.object({
   averageMonthlyUsageUsd: z.number(),
 });
-
-function isTwoMonthPromoOfferActive(): boolean {
-  return dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
-}
 
 function roundToCents(usd: number): number {
   return Math.round(usd * 100) / 100;
@@ -384,7 +376,7 @@ export const kiloPassRouter = createTRPCRouter({
   getState: baseProcedure.output(GetStateOutputSchema).query(async ({ ctx }) => {
     const subscriptionBase = await getKiloPassStateForUser(db, ctx.user.id);
     if (!subscriptionBase) {
-      return { subscription: null, isEligibleForFirstMonthPromo: isTwoMonthPromoOfferActive() };
+      return { subscription: null, isEligibleForFirstMonthPromo: true };
     }
 
     const stripeCustomerId = ctx.user.stripe_customer_id;
@@ -478,22 +470,14 @@ export const kiloPassRouter = createTRPCRouter({
       currentPeriodBonusCreditsUsd = roundToCents(usd);
     } else {
       const streakMonths = Math.max(1, subscriptionBase.currentStreakMonths);
-      const shouldShowFirstMonthPromo =
-        streakMonths === 1 && isFirstTimeSubscriberEver && isTwoMonthPromoOfferActive();
-
-      if (shouldShowFirstMonthPromo) {
-        const cents = Math.round(baseAmountUsd * KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT * 100);
-        currentPeriodBonusCreditsUsd = cents / 100;
-      } else {
-        const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
-          tier: subscriptionBase.tier,
-          streakMonths,
-          isFirstTimeSubscriberEver,
-          subscriptionStartedAtIso: subscriptionBase.startedAt,
-        });
-        const cents = Math.round(baseAmountUsd * bonusPercentApplied * 100);
-        currentPeriodBonusCreditsUsd = cents / 100;
-      }
+      const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
+        tier: subscriptionBase.tier,
+        streakMonths,
+        isFirstTimeSubscriberEver,
+        subscriptionStartedAtIso: subscriptionBase.startedAt,
+      });
+      const cents = Math.round(baseAmountUsd * bonusPercentApplied * 100);
+      currentPeriodBonusCreditsUsd = cents / 100;
     }
 
     const nowUtc = dayjs().utc();

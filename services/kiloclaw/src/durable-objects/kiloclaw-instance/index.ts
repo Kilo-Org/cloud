@@ -99,6 +99,7 @@ import * as gateway from './gateway';
 import { buildChannelConfigPatch } from './channel-config';
 import * as pairing from './pairing';
 import * as kiloCliRun from './kilo-cli-run';
+import * as doctorRun from './doctor-run';
 import {
   reconcileWithFly,
   syncStatusFromLiveCheck,
@@ -1752,6 +1753,21 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return pairing.runDoctor(this.s, this.env);
   }
 
+  async startDoctorViaController(fix: boolean) {
+    await this.loadState();
+    return doctorRun.startDoctorViaController(this.s, this.env, fix);
+  }
+
+  async getDoctorViaControllerStatus() {
+    await this.loadState();
+    return doctorRun.getDoctorViaControllerStatus(this.s, this.env);
+  }
+
+  async cancelDoctorViaController() {
+    await this.loadState();
+    return doctorRun.cancelDoctorViaController(this.s, this.env);
+  }
+
   // ── Kilo CLI Run ────────────────────────────────────────────────────
 
   async startKiloCliRun(prompt: string) {
@@ -2962,9 +2978,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       cannotPrefix: 'resize',
       beforePhrase: 'resizing machine tier',
       notSupportedSubject: 'Instance tier resize',
-      // Tier resize calls fly.extendVolume on storage growth; Fly volume
-      // extends require the machine to be stopped.
-      requireStopped: true,
+      // Fly tier resize calls fly.extendVolume on storage growth, which
+      // requires the machine to be stopped. Northflank uses deployment
+      // rollout semantics and does not require a stopped instance.
+      requireStopped: this.s.provider !== 'northflank',
+      allowNorthflank: true,
     });
 
     const targetTier = getTier(targetTierKey);
@@ -3002,6 +3020,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       );
       this.s.volumeSizeGb = targetTier.volumeSizeGb;
       await this.persist({ volumeSizeGb: targetTier.volumeSizeGb });
+    }
+
+    if (this.s.provider === 'northflank') {
+      const result = await this.provider().resizeRuntime?.({
+        env: this.env,
+        state: this.s,
+        targetTier: targetTier.key,
+      });
+      if (!result) {
+        throw new Error('Provider northflank does not support tier resize');
+      }
+      await this.persistProviderResult(result);
     }
 
     // Capture and clear any active admin override before applying the tier
@@ -3091,6 +3121,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     beforePhrase?: string;
     notSupportedSubject: string;
     requireStopped: boolean;
+    allowNorthflank?: boolean;
   }): void {
     if (!this.s.userId) {
       throw new Error('Instance is not provisioned');
@@ -3115,7 +3146,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         { status: 409 }
       );
     }
-    if (this.s.provider === 'northflank') {
+    if (this.s.provider === 'northflank' && args.allowNorthflank !== true) {
       throw new Error(`${args.notSupportedSubject} is not yet supported on Northflank instances`);
     }
   }

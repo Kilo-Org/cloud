@@ -19,10 +19,13 @@ import {
   sessionIdSchema,
   GetSessionInput,
   GetSessionOutput,
+  GetSessionHealthInput,
+  GetSessionHealthOutput,
   GetLatestAssistantMessageInput,
   GetLatestAssistantMessageOutput,
 } from '../schemas.js';
 import { computeExecutionHealth } from '../../core/execution.js';
+import type { ExecutionMetadata } from '../../session/types.js';
 
 /**
  * Creates session management handlers.
@@ -465,6 +468,100 @@ export function createSessionManagementHandlers() {
 
             timestamp: metadata.timestamp,
             version: metadata.version,
+          };
+        });
+      }),
+
+    getSessionHealth: protectedProcedure
+      .input(GetSessionHealthInput)
+      .output(GetSessionHealthOutput)
+      .mutation(async ({ input, ctx }) => {
+        return withLogTags({ source: 'getSessionHealth' }, async () => {
+          const sessionId = input.cloudAgentSessionId as SessionId;
+          const { userId, env } = ctx;
+
+          logger.setTags({ userId, sessionId });
+          logger.info('Fetching session health');
+
+          const doKey = `${userId}:${sessionId}`;
+          const getStub = () =>
+            env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
+
+          const metadata = await withDORetry<
+            ReturnType<typeof getStub>,
+            CloudAgentSessionState | null
+          >(getStub, s => s.getMetadata(), 'getMetadata');
+
+          if (!metadata) {
+            logger.info('Session not found');
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Session not found',
+            });
+          }
+
+          const sandboxId: SandboxId =
+            metadata.sandboxId ??
+            (await generateSandboxId(
+              env.PER_SESSION_SANDBOX_ORG_IDS,
+              metadata.orgId,
+              userId,
+              metadata.sessionId,
+              metadata.botId
+            ));
+
+          logger.setTags({ sandboxId, orgId: metadata.orgId ?? '(personal)' });
+
+          const activeExecutionId = await withDORetry(
+            getStub,
+            s => s.getActiveExecutionId(),
+            'getActiveExecutionId'
+          );
+
+          let activeExecution: ExecutionMetadata | null = null;
+          if (activeExecutionId) {
+            activeExecution = await withDORetry(
+              getStub,
+              s => s.getExecution(activeExecutionId),
+              'getExecution'
+            );
+          }
+
+          const executionHealth = activeExecutionId
+            ? activeExecution
+              ? (computeExecutionHealth(
+                  activeExecution.status,
+                  activeExecution.startedAt,
+                  activeExecution.lastHeartbeat
+                ) ?? 'unknown')
+              : 'unknown'
+            : 'none';
+
+          const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId);
+          let sandboxStatus: 'healthy' | 'unreachable' = 'healthy';
+          try {
+            await sandbox.listProcesses();
+          } catch (error) {
+            sandboxStatus = 'unreachable';
+            logger
+              .withFields({ error: error instanceof Error ? error.message : String(error) })
+              .warn('Sandbox health probe failed');
+          }
+
+          logger.info('Session health retrieved successfully', {
+            sandboxStatus,
+            executionHealth,
+            activeExecutionId: activeExecutionId ?? undefined,
+            activeExecutionStatus: activeExecution?.status,
+          });
+
+          return {
+            cloudAgentSessionId: sessionId,
+            sandboxId,
+            sandboxStatus,
+            executionHealth,
+            activeExecutionId: activeExecutionId ?? undefined,
+            activeExecutionStatus: activeExecution?.status,
           };
         });
       }),

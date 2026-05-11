@@ -35,6 +35,9 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import type { DoctorControllerStatus, DoctorControllerStatusResponse } from '@/lib/kiloclaw/types';
 import {
   User,
   Calendar,
@@ -1301,6 +1304,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const queryClient = useQueryClient();
   const [destroyDialogOpen, setDestroyDialogOpen] = useState(false);
   const [doctorDialogOpen, setDoctorDialogOpen] = useState(false);
+  const [doctorControllerDialogOpen, setDoctorControllerDialogOpen] = useState(false);
+  const [doctorControllerFix, setDoctorControllerFix] = useState(true);
   const [restoreConfigDialogOpen, setRestoreConfigDialogOpen] = useState(false);
   const [destroyMachineDialogOpen, setDestroyMachineDialogOpen] = useState(false);
   const [resizeMachineDialogOpen, setResizeMachineDialogOpen] = useState(false);
@@ -1421,6 +1426,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
   const provider = data?.workerStatus?.provider ?? null;
   const isFlyProvider = provider === 'fly';
+  const isNorthflankProvider = provider === 'northflank';
   const runtimeId = data?.workerStatus?.runtimeId ?? null;
   const storageId = data?.workerStatus?.storageId ?? null;
   const flyMachineId = data?.workerStatus?.flyMachineId ?? null;
@@ -1451,7 +1457,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   });
 
   const gatewayControlsEnabled =
-    data?.destroyed_at === null && !!runtimeId && data?.workerStatus?.status !== 'restoring';
+    data?.destroyed_at === null && !!runtimeId && data?.workerStatus?.status === 'running';
 
   const {
     data: gatewayStatus,
@@ -1480,6 +1486,15 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const supportsConfigRestore = calverAtLeast(
     cleanVersion(controllerVersion?.version),
     '2026.2.26'
+  );
+  // /_kilo/doctor/start|status|cancel is expected to land after 14:00 CDT on
+  // 2026-05-08 (19:00 UTC). Older same-day controllers may report only 2026.5.8,
+  // which compares as 2026.5.8.0 and must remain unsupported.
+  // controllers fall through to the catch-all proxy and return 404 —
+  // disable the button with a tooltip until they redeploy.
+  const supportsDoctorController = calverAtLeast(
+    cleanVersion(controllerVersion?.version),
+    '2026.5.8.1900'
   );
 
   // After a restart/upgrade, poll the machine status until it returns to "running",
@@ -1838,7 +1853,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
   // Poll status during resize phases
   const resizePolling =
-    resizePhase === 'stopping' || resizePhase === 'starting' || resizePhase === 'waiting';
+    resizePhase === 'stopping' ||
+    resizePhase === 'starting' ||
+    resizePhase === 'waiting' ||
+    (isNorthflankProvider && resizePhase === 'resizing');
   useQuery({
     queryKey: ['machine-resize-poll', userId, instanceId, resizePolling],
     queryFn: async () => {
@@ -1865,6 +1883,19 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     if (!data || !userId) return;
 
     try {
+      if (isNorthflankProvider) {
+        setResizePhase('resizing');
+        await resizeMachineMutation({
+          userId,
+          instanceId: data.id,
+          instanceType: selectedInstanceType,
+        });
+        invalidateMachineQueries();
+        setResizePhase('done');
+        toast.success('Northflank resize completed');
+        return;
+      }
+
       // Step 1: Stop if running — retry up to 3 times since Fly can be slow
       if (currentStatus !== 'stopped') {
         setResizePhase('stopping');
@@ -1993,6 +2024,54 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
       },
     })
   );
+
+  const startDoctorControllerMutation = useMutation(
+    trpc.admin.kiloclawInstances.startDoctorViaController.mutationOptions({
+      onSuccess: async (_result, variables) => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.doctorViaControllerStatus.queryKey({
+            userId: variables.userId,
+            instanceId: variables.instanceId,
+          }),
+        });
+        setDoctorControllerDialogOpen(true);
+      },
+      onError: (err, variables) => {
+        if (
+          err instanceof TRPCClientError &&
+          err.data?.code === 'CONFLICT' &&
+          err.message.includes('already in progress')
+        ) {
+          setDoctorControllerDialogOpen(true);
+          void queryClient.invalidateQueries({
+            queryKey: trpc.admin.kiloclawInstances.doctorViaControllerStatus.queryKey({
+              userId: variables.userId,
+              instanceId: variables.instanceId,
+            }),
+          });
+          return;
+        }
+        toast.error(`Failed to start doctor (controller): ${err.message}`);
+      },
+    })
+  );
+
+  const cancelDoctorControllerMutation = useMutation(
+    trpc.admin.kiloclawInstances.cancelDoctorViaController.mutationOptions({
+      onError: err => {
+        toast.error(`Failed to cancel doctor (controller): ${err.message}`);
+      },
+    })
+  );
+
+  const { data: doctorControllerStatus, isError: doctorControllerStatusError } = useQuery({
+    ...trpc.admin.kiloclawInstances.doctorViaControllerStatus.queryOptions({
+      userId: data?.user_id ?? '',
+      instanceId: data?.id,
+    }),
+    enabled: doctorControllerDialogOpen && supportsDoctorController && !!data?.user_id,
+    refetchInterval: query => (query.state.data?.status === 'running' ? 1000 : false),
+  });
 
   const restoreConfigMutation = useMutation(
     trpc.admin.kiloclawInstances.restoreConfig.mutationOptions({
@@ -2128,6 +2207,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     isGatewayStopping ||
     isGatewayRestarting ||
     runDoctorMutation.isPending ||
+    startDoctorControllerMutation.isPending ||
+    cancelDoctorControllerMutation.isPending ||
     restoreConfigMutation.isPending;
 
   return (
@@ -3295,7 +3376,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <div className="space-y-1">
                   <p className="text-sm font-medium">
                     {resizePhase === 'stopping' && 'Stopping machine...'}
-                    {resizePhase === 'resizing' && 'Updating machine size...'}
+                    {resizePhase === 'resizing' &&
+                      (isNorthflankProvider
+                        ? 'Resizing Northflank deployment...'
+                        : 'Updating machine size...')}
                     {resizePhase === 'starting' && 'Starting machine with new size...'}
                     {resizePhase === 'waiting' && 'Waiting for machine to be ready...'}
                   </p>
@@ -3342,9 +3426,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               <div className="flex items-center gap-3 rounded border border-green-600/30 bg-green-600/5 p-4">
                 <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
                 <div>
-                  <p className="text-sm font-medium text-green-600">Machine resize complete</p>
+                  <p className="text-sm font-medium text-green-600">Runtime resize complete</p>
                   <p className="text-muted-foreground text-xs">
-                    Machine is running with the new size.
+                    {isNorthflankProvider
+                      ? 'Northflank completed the deployment rollout.'
+                      : 'Machine is running with the new size.'}
                   </p>
                 </div>
                 <Button
@@ -3398,11 +3484,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-orange-500">
                 <AlertTriangle className="h-5 w-5" />
-                Resize Machine
+                Resize runtime
               </DialogTitle>
               <DialogDescription className="pt-3">
-                This will stop the machine, update its CPU/memory and storage spec, and restart it.
-                The user will be disconnected during the restart.
+                {isNorthflankProvider
+                  ? 'Northflank will resize this instance by rolling the deployment onto the target compute plan. The instance may restart during the rollout.'
+                  : 'This will stop the machine, update its CPU/memory and storage spec, and restart it. The user will be disconnected during the restart.'}
                 <span className="text-foreground mt-2 block font-medium">
                   User: {data?.user_email ?? data?.user_id}
                 </span>
@@ -3444,6 +3531,14 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   })}
                 </select>
               </div>
+              {isNorthflankProvider && (
+                <Alert className="border-muted-foreground/30 bg-muted/30">
+                  <AlertDescription className="text-muted-foreground">
+                    Northflank applies the compute change through a deployment rollout. The worker
+                    waits for Northflank to report completion before saving the new tier.
+                  </AlertDescription>
+                </Alert>
+              )}
               {data?.workerStatus?.provider === 'fly' &&
                 getTier(selectedInstanceType).volumeSizeGb >
                   (data?.workerStatus?.volumeSizeGb ?? 10) && (
@@ -3453,6 +3548,18 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       Fly volume will grow from {data?.workerStatus?.volumeSizeGb ?? 10} GB to{' '}
                       {getTier(selectedInstanceType).volumeSizeGb} GB. Fly volumes can grow but
                       cannot be shrunk, so you will not be able to downgrade this instance.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              {isNorthflankProvider &&
+                getTier(selectedInstanceType).volumeSizeGb >
+                  (data?.workerStatus?.volumeSizeGb ?? 10) && (
+                  <Alert className="border-orange-500/30 bg-orange-500/10">
+                    <AlertTriangle className="h-4 w-4 text-orange-500" />
+                    <AlertDescription className="text-orange-700 dark:text-orange-300">
+                      Northflank volume will grow from {data?.workerStatus?.volumeSizeGb ?? 10} GB
+                      to {getTier(selectedInstanceType).volumeSizeGb} GB. Volumes can grow but
+                      cannot be shrunk.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -4028,7 +4135,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             <CardContent className="space-y-4">
               {!gatewayControlsEnabled && (
                 <p className="text-muted-foreground text-sm">
-                  Gateway process controls are available when the instance has a runtime ID.
+                  Gateway process controls are available when the instance runtime is running.
                 </p>
               )}
 
@@ -4130,6 +4237,30 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       <Stethoscope className="mr-1 h-4 w-4" />
                       Run Doctor
                     </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!supportsDoctorController || gatewayActionPending}
+                            onClick={() => {
+                              startDoctorControllerMutation.mutate({
+                                userId: data.user_id,
+                                instanceId: data.id,
+                                fix: doctorControllerFix,
+                              });
+                            }}
+                          >
+                            <Stethoscope className="mr-1 h-4 w-4" />
+                            Run Doctor (Controller)
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {!supportsDoctorController && (
+                        <TooltipContent>Unavailable until redeploy</TooltipContent>
+                      )}
+                    </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span>
@@ -4547,6 +4678,31 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           mutation={runDoctorMutation}
         />
 
+        {/* Run Doctor (Controller) Dialog */}
+        <RunDoctorControllerDialog
+          open={doctorControllerDialogOpen && supportsDoctorController}
+          onOpenChange={setDoctorControllerDialogOpen}
+          fix={doctorControllerFix}
+          onFixChange={setDoctorControllerFix}
+          status={doctorControllerStatus}
+          statusError={doctorControllerStatusError}
+          starting={startDoctorControllerMutation.isPending}
+          cancelling={cancelDoctorControllerMutation.isPending}
+          onCancel={() => {
+            cancelDoctorControllerMutation.mutate({
+              userId: data.user_id,
+              instanceId: data.id,
+            });
+          }}
+          onRerun={() => {
+            startDoctorControllerMutation.mutate({
+              userId: data.user_id,
+              instanceId: data.id,
+              fix: doctorControllerFix,
+            });
+          }}
+        />
+
         {/* Restore Default Config Confirmation Dialog */}
         <Dialog
           open={restoreConfigDialogOpen && supportsConfigRestore}
@@ -4688,6 +4844,174 @@ function RunDoctorDialog({
             disabled={mutation.isPending}
           >
             Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function formatRunDuration(startedAt: string | null, completedAt: string | null): string {
+  if (!startedAt || !completedAt) return '–';
+  const start = new Date(startedAt).getTime();
+  const end = new Date(completedAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return '–';
+  const ms = end - start;
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function doctorStatusLabel(status: DoctorControllerStatus | null): string {
+  switch (status) {
+    case 'running':
+      return 'Running';
+    case 'completed':
+      return 'Completed successfully';
+    case 'failed':
+      return 'Completed with issues';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'timed_out':
+      return 'Timed out after 120s';
+    case null:
+      return 'No run yet';
+  }
+}
+
+function RunDoctorControllerDialog({
+  open,
+  onOpenChange,
+  fix,
+  onFixChange,
+  status,
+  statusError,
+  starting,
+  cancelling,
+  onCancel,
+  onRerun,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  fix: boolean;
+  onFixChange: (next: boolean) => void;
+  status: DoctorControllerStatusResponse | undefined;
+  statusError: boolean;
+  starting: boolean;
+  cancelling: boolean;
+  onCancel: () => void;
+  onRerun: () => void;
+}) {
+  const isRunning = status?.status === 'running' || starting;
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen);
+  };
+
+  const result = status?.hasRun ? { ...status, output: stripAnsi(status.output ?? '') } : null;
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[750px]">
+        <DialogHeader>
+          <DialogTitle>OpenClaw Doctor (via Controller)</DialogTitle>
+          <DialogDescription>
+            Runs <code>openclaw doctor</code> inside the machine via the controller HTTP API. Output
+            is persisted on the instance and can be retrieved while the run continues.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="doctor-controller-fix"
+            checked={fix}
+            onCheckedChange={onFixChange}
+            disabled={isRunning}
+          />
+          <Label htmlFor="doctor-controller-fix" className="text-sm">
+            Pass <code>--fix</code>
+          </Label>
+        </div>
+
+        {starting && !result && (
+          <div className="flex flex-col items-center justify-center gap-3 py-12">
+            <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+            <p className="text-muted-foreground text-sm">
+              Starting <code>openclaw doctor{fix ? ' --fix' : ''}</code>…
+            </p>
+          </div>
+        )}
+
+        {statusError && !result && !starting && (
+          <div className="flex flex-col items-center justify-center gap-3 py-12">
+            <XCircle className="h-8 w-8 text-red-400" />
+            <p className="text-sm text-red-400">Failed to fetch doctor status (controller)</p>
+          </div>
+        )}
+
+        {!result && !starting && !statusError && (
+          <div className="text-muted-foreground flex flex-col items-center justify-center gap-3 py-12 text-sm">
+            No controller doctor run has been recorded yet.
+          </div>
+        )}
+
+        {result && (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {result.status === 'running' ? (
+                <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+              ) : result.status === 'completed' ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <XCircle className="h-4 w-4 text-red-400" />
+              )}
+              <span className="text-sm font-medium">{doctorStatusLabel(result.status)}</span>
+              <Badge variant="outline" className="text-xs">
+                exit {result.exitCode ?? 'n/a'}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {formatRunDuration(result.startedAt, result.completedAt)}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {result.fix ? '--fix' : 'no --fix'}
+              </Badge>
+              {result.outputTruncated && (
+                <Badge variant="outline" className="border-yellow-500/30 text-xs text-yellow-400">
+                  output truncated
+                </Badge>
+              )}
+              {result.timedOut && (
+                <Badge variant="outline" className="border-yellow-500/30 text-xs text-yellow-400">
+                  timed out
+                </Badge>
+              )}
+            </div>
+            <div className="border-border bg-background max-h-[400px] overflow-auto rounded-md border">
+              {/* prettier-ignore */}
+              <pre
+                className="p-3 text-xs leading-relaxed whitespace-pre"
+                style={{ fontFamily: "'Courier New', Courier, monospace", tabSize: 8 }}
+              >{result.output}</pre>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+            Close
+          </Button>
+          {result?.status === 'running' && (
+            <Button variant="destructive" onClick={onCancel} disabled={cancelling}>
+              {cancelling ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+              Cancel
+            </Button>
+          )}
+          <Button
+            variant="default"
+            onClick={onRerun}
+            disabled={isRunning || cancelling}
+            title="Re-run with the current --fix setting"
+          >
+            <Stethoscope className="mr-1 h-4 w-4" />
+            Re-run
           </Button>
         </DialogFooter>
       </DialogContent>

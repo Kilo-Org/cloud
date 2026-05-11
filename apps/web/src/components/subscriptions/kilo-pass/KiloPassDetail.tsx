@@ -103,6 +103,18 @@ export function KiloPassDetail() {
     return promoPercent === KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
   }, [subscription]);
 
+  const showSecondMonthPromoInDialog = useMemo(() => {
+    if (!subscription || subscription.cadence !== 'monthly') return false;
+    if (subscription.currentStreakMonths > 2) return false;
+    const month2Percent = computeMonthlyCadenceBonusPercent({
+      tier: subscription.tier,
+      streakMonths: 2,
+      isFirstTimeSubscriberEver: subscription.isFirstTimeSubscriberEver,
+      subscriptionStartedAtIso: subscription.startedAt,
+    });
+    return month2Percent === KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
+  }, [subscription]);
+
   async function refreshData() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() }),
@@ -236,7 +248,7 @@ export function KiloPassDetail() {
                 <KiloPassBonusRampDialog
                   tier={subscription.tier}
                   showFirstMonthPromo={showFirstMonthPromoInDialog}
-                  showSecondMonthPromo={subscription.currentStreakMonths === 1}
+                  showSecondMonthPromo={showSecondMonthPromoInDialog}
                   streakMonths={subscription.currentStreakMonths}
                   subscriptionStartedAtIso={subscription.startedAt ?? undefined}
                 />
@@ -587,14 +599,14 @@ function BonusStreakContent({ subscription }: { subscription: KiloPassSubscripti
       {subscription.cadence === KiloPassCadence.Monthly ? (
         subscription.status === 'paused' ? (
           <div className="text-muted-foreground text-xs">
-            Unused paid credits never expire. Free bonus credits are not renewed while your
-            subscription is paused; monthly credits resume when the subscription resumes.
+            Free bonus credits are not renewed while your subscription is paused; monthly credits
+            resume when the subscription resumes.
           </div>
         ) : (
           <div className="text-muted-foreground text-xs">
-            Unused paid credits never expire and roll over every month into your total. Free bonus
-            credits are earned after using the month&apos;s paid credits. Unused free bonus credits
-            do not roll over{expiresAtLabel ? ` and will expire on ${expiresAtLabel}.` : '.'}
+            Free bonus credits are earned after using the month&apos;s paid credits. Unused free
+            bonus credits do not roll over
+            {expiresAtLabel ? ` and will expire on ${expiresAtLabel}.` : '.'}
           </div>
         )
       ) : null}

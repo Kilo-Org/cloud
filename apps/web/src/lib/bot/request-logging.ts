@@ -17,7 +17,7 @@ type CreateBotRequestParams = {
   platformIntegrationId: string;
   platform: string;
   platformThreadId: string;
-  platformMessageId: string | undefined;
+  platformMessageId: string;
   userMessage: string;
   modelUsed: string | undefined;
 };
@@ -37,7 +37,7 @@ export async function createBotRequest(params: CreateBotRequestParams): Promise<
       platform_integration_id: params.platformIntegrationId,
       platform: params.platform,
       platform_thread_id: params.platformThreadId,
-      platform_message_id: params.platformMessageId ?? null,
+      platform_message_id: params.platformMessageId,
       user_message: params.userMessage,
       model_used: params.modelUsed ?? null,
       status: 'pending',

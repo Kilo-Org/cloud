@@ -12,6 +12,12 @@ import {
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_instances,
+  kiloclaw_attribution_touches,
+  kiloclaw_referrals,
+  kiloclaw_referral_conversions,
+  kiloclaw_referral_reward_applications,
+  kiloclaw_referral_reward_decisions,
+  kiloclaw_referral_rewards,
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
@@ -116,6 +122,59 @@ let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) =>
     startedAt: number | null;
   }>;
   destroy: () => Promise<{ ok: true }>;
+  getActivePersonalBillingStatus: () => Promise<{
+    subscription: {
+      referralRewards: {
+        totalAppliedMonths: number;
+        applications: Array<{
+          role: string;
+          appliedAt: string;
+          monthsGranted: number;
+          previousRenewalBoundary: string;
+          newRenewalBoundary: string;
+        }>;
+      };
+    } | null;
+  }>;
+  getSubscriptionDetail: (input: { instanceId: string }) => Promise<{
+    referralRewards: {
+      totalAppliedMonths: number;
+      applications: Array<{
+        role: string;
+        appliedAt: string;
+        monthsGranted: number;
+        previousRenewalBoundary: string;
+        newRenewalBoundary: string;
+      }>;
+    };
+  }>;
+  getReferralRewardSummary: () => Promise<{
+    rewards: Array<{
+      role: string;
+      status: string;
+      monthsGranted: number;
+      earnedAt: string;
+      appliedAt: string | null;
+      application: {
+        previousRenewalBoundary: string;
+        newRenewalBoundary: string;
+      } | null;
+    }>;
+    totals: {
+      totalRewards: number;
+      pendingRewards: number;
+      totalAppliedMonths: number;
+    };
+    referredPeople: Array<{
+      maskedEmail: string | null;
+      state: string;
+      rewardGranted: boolean;
+    }>;
+    pendingRewardAction: {
+      showStartReactivateCta: boolean;
+      pendingRewardCount: number;
+    };
+  }>;
 };
 const kiloclawClientMock = jest.requireMock<KiloClawClientMock>(
   '@/lib/kiloclaw/kiloclaw-internal-client'
@@ -504,6 +563,390 @@ describe('kiloclawRouter start', () => {
     expect(new Date(String(updatedInstance?.inactive_trial_stopped_at)).toISOString()).toBe(
       '2026-04-20T12:00:00.000Z'
     );
+  });
+});
+
+describe('kiloclawRouter getActivePersonalBillingStatus referral rewards', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+  });
+
+  async function insertActivePersonalSubscription(userId: string) {
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: userId,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+    });
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: userId,
+        instance_id: instanceId,
+        payment_source: 'credits',
+        plan: 'standard',
+        status: 'active',
+        current_period_start: '2026-04-01T00:00:00.000Z',
+        current_period_end: '2026-06-01T00:00:00.000Z',
+        credit_renewal_at: '2026-06-01T00:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_subscriptions.id, instanceId: kiloclaw_subscriptions.instance_id });
+
+    return { subscriptionId: subscription.id, instanceId: subscription.instanceId ?? instanceId };
+  }
+
+  async function insertAppliedReferralReward(params: {
+    beneficiaryUserId: string;
+    subscriptionId: string;
+    role: 'referrer' | 'referee';
+    sourcePaymentId: string;
+  }) {
+    const referee = await insertTestUser({
+      google_user_email: `kiloclaw-reward-referee-${Math.random()}@example.com`,
+    });
+    const [conversion] = await db
+      .insert(kiloclaw_referral_conversions)
+      .values({
+        referee_user_id: referee.id,
+        referrer_user_id: params.role === 'referrer' ? params.beneficiaryUserId : null,
+        winning_touch_type: 'referral',
+        source_payment_id: params.sourcePaymentId,
+        qualified: true,
+        converted_at: '2026-04-10T00:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_referral_conversions.id });
+    const [decision] = await db
+      .insert(kiloclaw_referral_reward_decisions)
+      .values({
+        conversion_id: conversion.id,
+        beneficiary_user_id: params.beneficiaryUserId,
+        beneficiary_role: params.role,
+        outcome: 'granted',
+        months_granted: 1,
+      })
+      .returning({ id: kiloclaw_referral_reward_decisions.id });
+    const [reward] = await db
+      .insert(kiloclaw_referral_rewards)
+      .values({
+        conversion_id: conversion.id,
+        decision_id: decision.id,
+        beneficiary_user_id: params.beneficiaryUserId,
+        beneficiary_role: params.role,
+        months_granted: 1,
+        status: 'applied',
+        applies_to_subscription_id: params.subscriptionId,
+        earned_at: '2026-04-10T00:00:00.000Z',
+        applied_at: '2026-04-10T00:05:00.000Z',
+      })
+      .returning({ id: kiloclaw_referral_rewards.id });
+    await db.insert(kiloclaw_referral_reward_applications).values({
+      reward_id: reward.id,
+      beneficiary_user_id: params.beneficiaryUserId,
+      subscription_id: params.subscriptionId,
+      previous_renewal_boundary: '2026-05-01T00:00:00.000Z',
+      new_renewal_boundary: '2026-06-01T00:00:00.000Z',
+      applied_at: '2026-04-10T00:05:00.000Z',
+    });
+  }
+
+  it('returns applied referral rewards for the active personal subscription', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-reward-status-${Math.random()}@example.com`,
+    });
+    const { subscriptionId, instanceId } = await insertActivePersonalSubscription(user.id);
+    await insertAppliedReferralReward({
+      beneficiaryUserId: user.id,
+      subscriptionId,
+      role: 'referrer',
+      sourcePaymentId: `kiloclaw-subscription:${instanceId}:2026-04`,
+    });
+
+    const billing = await createCaller({ user }).getActivePersonalBillingStatus();
+
+    expect(billing.subscription?.referralRewards).toEqual({
+      totalAppliedMonths: 1,
+      applications: [
+        {
+          role: 'referrer',
+          appliedAt: '2026-04-10T00:05:00.000Z',
+          monthsGranted: 1,
+          previousRenewalBoundary: '2026-05-01T00:00:00.000Z',
+          newRenewalBoundary: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    });
+  });
+
+  it('returns an empty referral reward summary when no applications belong to the subscription owner', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-empty-reward-status-${Math.random()}@example.com`,
+    });
+    const otherUser = await insertTestUser({
+      google_user_email: `kiloclaw-other-reward-status-${Math.random()}@example.com`,
+    });
+    const { subscriptionId, instanceId } = await insertActivePersonalSubscription(user.id);
+    await insertAppliedReferralReward({
+      beneficiaryUserId: otherUser.id,
+      subscriptionId,
+      role: 'referrer',
+      sourcePaymentId: `kiloclaw-subscription:${instanceId}:other-user`,
+    });
+
+    const billing = await createCaller({ user }).getActivePersonalBillingStatus();
+
+    expect(billing.subscription?.referralRewards).toEqual({
+      totalAppliedMonths: 0,
+      applications: [],
+    });
+  });
+
+  it('returns rewards for an explicitly viewed user-owned subscription', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-detail-reward-status-${Math.random()}@example.com`,
+    });
+    const { subscriptionId, instanceId } = await insertActivePersonalSubscription(user.id);
+    await insertAppliedReferralReward({
+      beneficiaryUserId: user.id,
+      subscriptionId,
+      role: 'referee',
+      sourcePaymentId: `kiloclaw-subscription:${instanceId}:detail`,
+    });
+
+    const detail = await createCaller({ user }).getSubscriptionDetail({ instanceId });
+
+    expect(detail.referralRewards).toEqual({
+      totalAppliedMonths: 1,
+      applications: [
+        {
+          role: 'referee',
+          appliedAt: '2026-04-10T00:05:00.000Z',
+          monthsGranted: 1,
+          previousRenewalBoundary: '2026-05-01T00:00:00.000Z',
+          newRenewalBoundary: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    });
+  });
+});
+
+describe('kiloclawRouter getReferralRewardSummary', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+  });
+
+  async function insertRewardSummaryReward(params: {
+    userId: string;
+    role: 'referrer' | 'referee';
+    status: 'pending' | 'applied';
+    sourcePaymentId: string;
+  }) {
+    const otherUser = await insertTestUser({
+      google_user_email: `kiloclaw-summary-other-${Math.random()}@example.com`,
+    });
+    const [conversion] = await db
+      .insert(kiloclaw_referral_conversions)
+      .values({
+        referee_user_id: params.role === 'referee' ? params.userId : otherUser.id,
+        referrer_user_id: params.role === 'referrer' ? params.userId : otherUser.id,
+        winning_touch_type: 'referral',
+        source_payment_id: params.sourcePaymentId,
+        qualified: true,
+        converted_at: '2026-04-10T00:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_referral_conversions.id });
+    const [decision] = await db
+      .insert(kiloclaw_referral_reward_decisions)
+      .values({
+        conversion_id: conversion.id,
+        beneficiary_user_id: params.userId,
+        beneficiary_role: params.role,
+        outcome: 'granted',
+        months_granted: 1,
+      })
+      .returning({ id: kiloclaw_referral_reward_decisions.id });
+    const [reward] = await db
+      .insert(kiloclaw_referral_rewards)
+      .values({
+        conversion_id: conversion.id,
+        decision_id: decision.id,
+        beneficiary_user_id: params.userId,
+        beneficiary_role: params.role,
+        months_granted: 1,
+        status: params.status,
+        earned_at: '2026-04-10T00:00:00.000Z',
+        applied_at: params.status === 'applied' ? '2026-04-10T00:05:00.000Z' : null,
+      })
+      .returning({ id: kiloclaw_referral_rewards.id });
+
+    if (params.status === 'applied') {
+      await db.insert(kiloclaw_referral_reward_applications).values({
+        reward_id: reward.id,
+        beneficiary_user_id: params.userId,
+        subscription_id: crypto.randomUUID(),
+        previous_renewal_boundary: '2026-05-01T00:00:00.000Z',
+        new_renewal_boundary: '2026-06-01T00:00:00.000Z',
+        applied_at: '2026-04-10T00:05:00.000Z',
+      });
+    }
+  }
+
+  async function insertReferralRelationship(params: {
+    referrerId: string;
+    refereeEmail: string;
+    sourcePaymentId?: string;
+    qualified?: boolean;
+    disqualificationReason?: string | null;
+  }) {
+    const referee = await insertTestUser({
+      google_user_email: params.refereeEmail,
+      normalized_email: params.refereeEmail,
+    });
+    const [touch] = await db
+      .insert(kiloclaw_attribution_touches)
+      .values({
+        dedupe_key: `summary-relationship-touch-${params.refereeEmail}`,
+        user_id: referee.id,
+        touch_type: 'referral',
+        provider: 'impact_advocate',
+        opaque_tracking_value: 'private-cookie-value',
+        tracking_value_length: 20,
+        is_tracking_value_accepted: true,
+        rs_code: 'RS-CUSTOMER',
+        im_ref: 'private-impact-click',
+        touched_at: '2026-04-01T00:00:00.000Z',
+        expires_at: '2026-05-01T00:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_attribution_touches.id });
+    await db.insert(kiloclaw_referrals).values({
+      referee_user_id: referee.id,
+      referrer_user_id: params.referrerId,
+      source_touch_id: touch.id,
+      impact_referral_id: 'RS-CUSTOMER',
+    });
+
+    if (params.sourcePaymentId) {
+      await db.insert(kiloclaw_referral_conversions).values({
+        referee_user_id: referee.id,
+        referrer_user_id: params.referrerId,
+        source_touch_id: touch.id,
+        winning_touch_type: 'referral',
+        source_payment_id: params.sourcePaymentId,
+        qualified: params.qualified ?? true,
+        disqualification_reason: params.disqualificationReason ?? null,
+        converted_at: '2026-04-10T00:00:00.000Z',
+      });
+    }
+  }
+
+  it('lists current-user rewards with status and application details', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-summary-${Math.random()}@example.com`,
+    });
+    const otherUser = await insertTestUser({
+      google_user_email: `kiloclaw-summary-hidden-${Math.random()}@example.com`,
+    });
+    await insertRewardSummaryReward({
+      userId: user.id,
+      role: 'referrer',
+      status: 'applied',
+      sourcePaymentId: 'summary-applied',
+    });
+    await insertRewardSummaryReward({
+      userId: user.id,
+      role: 'referee',
+      status: 'pending',
+      sourcePaymentId: 'summary-pending',
+    });
+    await insertRewardSummaryReward({
+      userId: otherUser.id,
+      role: 'referrer',
+      status: 'applied',
+      sourcePaymentId: 'summary-other',
+    });
+
+    const summary = await createCaller({ user }).getReferralRewardSummary();
+
+    expect(summary.totals).toEqual({
+      totalRewards: 2,
+      pendingRewards: 1,
+      totalAppliedMonths: 1,
+    });
+    expect(summary.rewards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'referrer',
+          status: 'applied',
+          monthsGranted: 1,
+          earnedAt: '2026-04-10T00:00:00.000Z',
+          appliedAt: '2026-04-10T00:05:00.000Z',
+          application: expect.objectContaining({
+            previousRenewalBoundary: '2026-05-01T00:00:00.000Z',
+            newRenewalBoundary: '2026-06-01T00:00:00.000Z',
+          }),
+        }),
+        expect.objectContaining({
+          role: 'referee',
+          status: 'pending',
+          monthsGranted: 1,
+          application: null,
+        }),
+      ])
+    );
+  });
+
+  it('returns customer-safe referred people and pending reward CTA state', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-summary-referrer-${Math.random()}@example.com`,
+    });
+    await insertRewardSummaryReward({
+      userId: user.id,
+      role: 'referrer',
+      status: 'pending',
+      sourcePaymentId: 'summary-pending-cta',
+    });
+    await insertReferralRelationship({
+      referrerId: user.id,
+      refereeEmail: 'qualified-referee@example.com',
+      sourcePaymentId: 'summary-qualified-referee',
+      qualified: true,
+    });
+    await insertReferralRelationship({
+      referrerId: user.id,
+      refereeEmail: 'signed-up-referee@example.com',
+    });
+    await insertReferralRelationship({
+      referrerId: user.id,
+      refereeEmail: 'disqualified-referee@example.com',
+      sourcePaymentId: 'summary-disqualified-referee',
+      qualified: false,
+      disqualificationReason: 'referral_self_referral',
+    });
+
+    const summary = await createCaller({ user }).getReferralRewardSummary();
+
+    expect(summary.pendingRewardAction).toEqual({
+      showStartReactivateCta: true,
+      pendingRewardCount: 1,
+    });
+    expect(summary.referredPeople).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          maskedEmail: 'q***@example.com',
+          state: 'reward_granted',
+          rewardGranted: true,
+        }),
+        expect.objectContaining({
+          maskedEmail: 's***@example.com',
+          state: 'waiting_for_paid_conversion',
+          rewardGranted: false,
+        }),
+      ])
+    );
+    expect(summary.referredPeople).toHaveLength(2);
+    expect(JSON.stringify(summary.referredPeople)).not.toContain('qualified-referee@example.com');
+    expect(JSON.stringify(summary.referredPeople)).not.toContain('private-cookie-value');
+    expect(JSON.stringify(summary.referredPeople)).not.toContain('private-impact-click');
+    expect(JSON.stringify(summary.referredPeople)).not.toContain('referral_self_referral');
   });
 });
 

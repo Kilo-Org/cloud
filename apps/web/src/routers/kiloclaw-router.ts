@@ -27,6 +27,10 @@ import {
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
   kiloclaw_instances,
+  kiloclaw_referrals,
+  kiloclaw_referral_conversions,
+  kiloclaw_referral_reward_applications,
+  kiloclaw_referral_rewards,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
   kiloclaw_scheduled_actions,
@@ -38,7 +42,7 @@ import {
   credit_transactions,
   organizations,
 } from '@kilocode/db/schema';
-import { and, eq, ne, asc, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
+import { and, asc, eq, ne, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
@@ -1017,6 +1021,31 @@ function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDash
   } satisfies KiloClawDashboardStatus;
 }
 
+function isFakeSeedInstance(instance: ActiveKiloClawInstance): boolean {
+  return instance.sandboxId.startsWith('ki_fake_');
+}
+
+function createFakeSeedInstanceStatus(
+  instance: ActiveKiloClawInstance,
+  workerUrl: string
+): KiloClawDashboardStatus {
+  return {
+    ...createNoInstanceStatus(instance.userId, workerUrl),
+    sandboxId: instance.sandboxId,
+    provider: 'docker-local',
+    runtimeId: instance.sandboxId,
+    storageId: instance.sandboxId,
+    region: 'local',
+    status: 'stopped',
+    provisionedAt: Date.now(),
+    trackedImageTag: 'fake-local-instance',
+    workerUrl,
+    name: instance.name ?? null,
+    instanceId: instance.id,
+    inboundEmailEnabled: instance.inboundEmailEnabled,
+  } satisfies KiloClawDashboardStatus;
+}
+
 function sanitizeKiloCodeConfigResponse(
   response: KiloCodeConfigResponse
 ): KiloCodeConfigPublicResponse {
@@ -1376,6 +1405,28 @@ const KiloclawInstanceSwitchPlanInputSchema = z.object({
   toPlan: z.enum(['commit', 'standard']),
 });
 const KiloclawActivationStateSchema = z.enum(['pending_settlement', 'activated']);
+const KiloclawReferralRewardRoleSchema = z.enum(['referrer', 'referee']);
+const KiloclawReferralRewardStatusSchema = z.enum([
+  'pending',
+  'earned',
+  'applied',
+  'expired',
+  'canceled',
+  'reversed',
+  'review_required',
+]);
+const KiloclawSubscriptionReferralRewardsSchema = z.object({
+  totalAppliedMonths: z.number(),
+  applications: z.array(
+    z.object({
+      role: KiloclawReferralRewardRoleSchema,
+      appliedAt: z.string(),
+      monthsGranted: z.number(),
+      previousRenewalBoundary: z.string(),
+      newRenewalBoundary: z.string(),
+    })
+  ),
+});
 
 const KiloclawPersonalSubscriptionSchema = z.object({
   instanceId: z.string().uuid(),
@@ -1401,9 +1452,48 @@ const KiloclawPersonalSubscriptionSchema = z.object({
   hasStripeFunding: z.boolean(),
   renewalCostMicrodollars: z.number().nullable(),
   showConversionPrompt: z.boolean(),
+  referralRewards: KiloclawSubscriptionReferralRewardsSchema,
 });
 const KiloclawPersonalSubscriptionsOutputSchema = z.object({
   subscriptions: z.array(KiloclawPersonalSubscriptionSchema),
+});
+const KiloclawReferredPersonStateSchema = z.enum(['reward_granted', 'waiting_for_paid_conversion']);
+const KiloclawReferralRewardSummarySchema = z.object({
+  totals: z.object({
+    totalRewards: z.number(),
+    pendingRewards: z.number(),
+    totalAppliedMonths: z.number(),
+  }),
+  pendingRewardAction: z.object({
+    showStartReactivateCta: z.boolean(),
+    pendingRewardCount: z.number(),
+  }),
+  referredPeople: z.array(
+    z.object({
+      maskedEmail: z.string().nullable(),
+      state: KiloclawReferredPersonStateSchema,
+      rewardGranted: z.boolean(),
+    })
+  ),
+  rewards: z.array(
+    z.object({
+      role: KiloclawReferralRewardRoleSchema,
+      status: KiloclawReferralRewardStatusSchema,
+      monthsGranted: z.number(),
+      earnedAt: z.string(),
+      appliedAt: z.string().nullable(),
+      expiresAt: z.string().nullable(),
+      reviewReason: z.string().nullable(),
+      application: z
+        .object({
+          appliedAt: z.string(),
+          subscriptionId: z.string().uuid().nullable(),
+          previousRenewalBoundary: z.string(),
+          newRenewalBoundary: z.string(),
+        })
+        .nullable(),
+    })
+  ),
 });
 
 const KiloclawBillingHistoryInputSchema = KiloclawInstanceInputSchema.extend({
@@ -1414,6 +1504,11 @@ const KiloclawCustomerPortalInputSchema = KiloclawInstanceInputSchema.extend({
   returnUrl: z.url().optional(),
 });
 const KiloclawMutationResultSchema = z.object({ success: z.boolean() });
+
+type KiloclawSubscriptionReferralRewards = z.infer<
+  typeof KiloclawSubscriptionReferralRewardsSchema
+>;
+type KiloclawReferralRewardSummary = z.infer<typeof KiloclawReferralRewardSummarySchema>;
 
 type KiloclawPersonalSubscriptionRow = {
   subscription: typeof kiloclaw_subscriptions.$inferSelect;
@@ -1494,6 +1589,12 @@ async function getPersonalBillingStatus(user: {
     hasPaidSubscription && (sub.plan === 'standard' || sub.plan === 'commit')
       ? KILOCLAW_PLAN_COST_MICRODOLLARS[sub.plan]
       : null;
+  const referralRewards = hasPaidSubscription
+    ? await getAppliedReferralRewardsForSubscription({
+        userId: user.id,
+        subscriptionId: sub.id,
+      })
+    : null;
 
   const subscriptionData = hasPaidSubscription
     ? {
@@ -1511,6 +1612,7 @@ async function getPersonalBillingStatus(user: {
         renewalCostMicrodollars,
         showConversionPrompt,
         pendingConversion: sub.pending_conversion ?? false,
+        referralRewards: referralRewards ?? { totalAppliedMonths: 0, applications: [] },
       }
     : null;
 
@@ -1607,6 +1709,19 @@ async function getPersonalBillingStatus(user: {
   } satisfies ClawBillingStatus;
 }
 
+function maskCustomerEmail(email: string | null): string | null {
+  if (!email) return null;
+  const [localPart, domain] = email.toLowerCase().split('@');
+  if (!localPart || !domain) return null;
+  return `${localPart.slice(0, 1)}***@${domain}`;
+}
+
+function referredPersonState(
+  qualified: boolean | null
+): 'reward_granted' | 'waiting_for_paid_conversion' {
+  return qualified === true ? 'reward_granted' : 'waiting_for_paid_conversion';
+}
+
 function summarizePersonalBillingStatus(billing: ClawBillingStatus) {
   const hasActiveInstance = billing.instance?.exists ?? false;
   const activeInstanceId = hasActiveInstance ? (billing.instance?.id ?? null) : null;
@@ -1622,12 +1737,170 @@ function summarizePersonalBillingStatus(billing: ClawBillingStatus) {
   };
 }
 
-function serializeKiloclawPersonalSubscription(
+async function hasEligiblePersonalSubscriptionForReferralReward(userId: string): Promise<boolean> {
+  let currentRow: Awaited<ReturnType<typeof resolveCurrentPersonalSubscriptionRow>>;
+  try {
+    currentRow = await resolveCurrentPersonalSubscriptionRow({ userId, dbOrTx: db });
+  } catch (error) {
+    mapCurrentSubscriptionResolutionError(error);
+  }
+  const subscription = currentRow?.subscription;
+  if (!subscription) return false;
+
+  return (
+    subscription.plan !== 'trial' &&
+    subscription.status === 'active' &&
+    !subscription.cancel_at_period_end &&
+    subscription.suspended_at === null &&
+    subscription.past_due_since === null
+  );
+}
+
+async function getCustomerReferralRewardSummary(
+  userId: string
+): Promise<KiloclawReferralRewardSummary> {
+  const rows = await db
+    .select({
+      role: kiloclaw_referral_rewards.beneficiary_role,
+      status: kiloclaw_referral_rewards.status,
+      monthsGranted: kiloclaw_referral_rewards.months_granted,
+      earnedAt: kiloclaw_referral_rewards.earned_at,
+      appliedAt: kiloclaw_referral_rewards.applied_at,
+      expiresAt: kiloclaw_referral_rewards.expires_at,
+      reviewReason: kiloclaw_referral_rewards.review_reason,
+      applicationAppliedAt: kiloclaw_referral_reward_applications.applied_at,
+      applicationSubscriptionId: kiloclaw_referral_reward_applications.subscription_id,
+      previousRenewalBoundary: kiloclaw_referral_reward_applications.previous_renewal_boundary,
+      newRenewalBoundary: kiloclaw_referral_reward_applications.new_renewal_boundary,
+    })
+    .from(kiloclaw_referral_rewards)
+    .leftJoin(
+      kiloclaw_referral_reward_applications,
+      eq(kiloclaw_referral_reward_applications.reward_id, kiloclaw_referral_rewards.id)
+    )
+    .where(eq(kiloclaw_referral_rewards.beneficiary_user_id, userId))
+    .orderBy(desc(kiloclaw_referral_rewards.earned_at), desc(kiloclaw_referral_rewards.created_at));
+
+  const rewards = rows.map(row => ({
+    role: row.role,
+    status: row.status,
+    monthsGranted: row.monthsGranted,
+    earnedAt: normalizeTimestamp(row.earnedAt) ?? row.earnedAt,
+    appliedAt: normalizeTimestamp(row.appliedAt),
+    expiresAt: normalizeTimestamp(row.expiresAt),
+    reviewReason: row.reviewReason,
+    application:
+      row.applicationAppliedAt && row.previousRenewalBoundary && row.newRenewalBoundary
+        ? {
+            appliedAt: normalizeTimestamp(row.applicationAppliedAt) ?? row.applicationAppliedAt,
+            subscriptionId: row.applicationSubscriptionId,
+            previousRenewalBoundary:
+              normalizeTimestamp(row.previousRenewalBoundary) ?? row.previousRenewalBoundary,
+            newRenewalBoundary:
+              normalizeTimestamp(row.newRenewalBoundary) ?? row.newRenewalBoundary,
+          }
+        : null,
+  }));
+
+  const referredRows = await db
+    .select({
+      refereeEmail: kilocode_users.google_user_email,
+      qualified: kiloclaw_referral_conversions.qualified,
+    })
+    .from(kiloclaw_referrals)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, kiloclaw_referrals.referee_user_id))
+    .leftJoin(
+      kiloclaw_referral_conversions,
+      and(
+        eq(kiloclaw_referral_conversions.referee_user_id, kiloclaw_referrals.referee_user_id),
+        eq(kiloclaw_referral_conversions.referrer_user_id, userId)
+      )
+    )
+    .where(eq(kiloclaw_referrals.referrer_user_id, userId))
+    .orderBy(desc(kiloclaw_referrals.created_at));
+  const referredPeople = referredRows
+    .filter(row => row.qualified !== false)
+    .map(row => ({
+      maskedEmail: maskCustomerEmail(row.refereeEmail),
+      state: referredPersonState(row.qualified),
+      rewardGranted: row.qualified === true,
+    }));
+  const pendingRewardCount = rewards.filter(
+    reward => reward.role === 'referrer' && reward.status === 'pending'
+  ).length;
+  const hasEligibleSubscription = await hasEligiblePersonalSubscriptionForReferralReward(userId);
+
+  return {
+    totals: {
+      totalRewards: rewards.length,
+      pendingRewards: rewards.filter(reward => reward.status === 'pending').length,
+      totalAppliedMonths: rewards
+        .filter(reward => reward.status === 'applied')
+        .reduce((total, reward) => total + reward.monthsGranted, 0),
+    },
+    pendingRewardAction: {
+      showStartReactivateCta: pendingRewardCount > 0 && !hasEligibleSubscription,
+      pendingRewardCount,
+    },
+    referredPeople,
+    rewards,
+  };
+}
+
+async function getAppliedReferralRewardsForSubscription(params: {
+  userId: string;
+  subscriptionId: string;
+}): Promise<KiloclawSubscriptionReferralRewards> {
+  const rows = await db
+    .select({
+      role: kiloclaw_referral_rewards.beneficiary_role,
+      appliedAt: kiloclaw_referral_reward_applications.applied_at,
+      monthsGranted: kiloclaw_referral_rewards.months_granted,
+      previousRenewalBoundary: kiloclaw_referral_reward_applications.previous_renewal_boundary,
+      newRenewalBoundary: kiloclaw_referral_reward_applications.new_renewal_boundary,
+    })
+    .from(kiloclaw_referral_reward_applications)
+    .innerJoin(
+      kiloclaw_referral_rewards,
+      eq(kiloclaw_referral_rewards.id, kiloclaw_referral_reward_applications.reward_id)
+    )
+    .where(
+      and(
+        eq(kiloclaw_referral_reward_applications.subscription_id, params.subscriptionId),
+        eq(kiloclaw_referral_reward_applications.beneficiary_user_id, params.userId),
+        eq(kiloclaw_referral_rewards.applies_to_subscription_id, params.subscriptionId),
+        eq(kiloclaw_referral_rewards.beneficiary_user_id, params.userId),
+        eq(kiloclaw_referral_rewards.status, 'applied')
+      )
+    )
+    .orderBy(
+      asc(kiloclaw_referral_reward_applications.applied_at),
+      asc(kiloclaw_referral_reward_applications.created_at)
+    );
+
+  return {
+    totalAppliedMonths: rows.reduce((total, row) => total + row.monthsGranted, 0),
+    applications: rows.map(row => ({
+      role: row.role,
+      appliedAt: normalizeTimestamp(row.appliedAt) ?? row.appliedAt,
+      monthsGranted: row.monthsGranted,
+      previousRenewalBoundary:
+        normalizeTimestamp(row.previousRenewalBoundary) ?? row.previousRenewalBoundary,
+      newRenewalBoundary: normalizeTimestamp(row.newRenewalBoundary) ?? row.newRenewalBoundary,
+    })),
+  };
+}
+
+async function serializeKiloclawPersonalSubscription(
   row: KiloclawPersonalSubscriptionRow,
   hasActiveKiloPass: boolean
 ) {
   const hasStripeFunding = Boolean(row.subscription.stripe_subscription_id);
   const activationState = getKiloClawSubscriptionActivationState(row.subscription);
+  const referralRewards = await getAppliedReferralRewardsForSubscription({
+    userId: row.subscription.user_id,
+    subscriptionId: row.subscription.id,
+  });
 
   return {
     instanceId: row.instance.id,
@@ -1653,6 +1926,7 @@ function serializeKiloclawPersonalSubscription(
     hasStripeFunding,
     renewalCostMicrodollars: getKiloclawRenewalCostMicrodollars(row.subscription.plan),
     showConversionPrompt: hasStripeFunding && hasActiveKiloPass,
+    referralRewards,
   };
 }
 
@@ -2454,6 +2728,10 @@ export const kiloclawRouter = createTRPCRouter({
       // minted. Serve the legacy host; the real host kicks in once the
       // dashboard provisions and re-fetches status.
       return createNoInstanceStatus(ctx.user.id, legacyWorkerUrl);
+    }
+
+    if (isFakeSeedInstance(instance)) {
+      return createFakeSeedInstanceStatus(instance, legacyWorkerUrl);
     }
 
     const client = new KiloClawInternalClient();
@@ -3735,6 +4013,12 @@ export const kiloclawRouter = createTRPCRouter({
     return summarizePersonalBillingStatus(billing);
   }),
 
+  getReferralRewardSummary: baseProcedure
+    .output(KiloclawReferralRewardSummarySchema)
+    .query(async ({ ctx }) => {
+      return await getCustomerReferralRewardSummary(ctx.user.id);
+    }),
+
   // ── Personal subscription management ─────────────────────────────────
 
   listPersonalSubscriptions: baseProcedure
@@ -3746,8 +4030,8 @@ export const kiloclawRouter = createTRPCRouter({
       ]);
 
       return {
-        subscriptions: rows.map(row =>
-          serializeKiloclawPersonalSubscription(row, hasActiveKiloPass)
+        subscriptions: await Promise.all(
+          rows.map(row => serializeKiloclawPersonalSubscription(row, hasActiveKiloPass))
         ),
       };
     }),
@@ -3761,7 +4045,7 @@ export const kiloclawRouter = createTRPCRouter({
         getHasActiveKiloPassForUser(ctx.user.id),
       ]);
 
-      return serializeKiloclawPersonalSubscription(row, hasActiveKiloPass);
+      return await serializeKiloclawPersonalSubscription(row, hasActiveKiloPass);
     }),
 
   getBillingHistory: baseProcedure

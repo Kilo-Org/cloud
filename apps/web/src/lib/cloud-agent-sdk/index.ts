@@ -10,6 +10,7 @@ export type {
   StandaloneSuggestion,
   StoredMessage,
   FetchedSessionData,
+  AssociatedPrData,
   PrepareInput,
 } from './session-manager';
 

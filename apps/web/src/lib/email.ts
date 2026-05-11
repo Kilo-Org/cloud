@@ -396,29 +396,61 @@ export async function sendAccountDeletionSupportNotification(
 
 const CREDITS_TOPUP_COPY = {
   manual: {
-    subject: 'Your Kilo credit top-up',
+    subject: subjects.creditsTopUp,
     heading: 'Thanks for your top-up',
-    intro:
+    intro: () =>
       'Your Kilo credit top-up has been processed and the credits are now available on your account.',
   },
   auto: {
     subject: 'Kilo auto top-up successful',
     heading: 'Your auto top-up was successful',
-    intro:
+    intro: () =>
       'Your account was automatically topped up so you can keep using Kilo without interruption. The new credits are available now.',
+  },
+  org_manual: {
+    subject: 'Your Kilo org credit top-up',
+    heading: 'Team credits added',
+    intro: (organizationName: string) =>
+      `A Kilo credit top-up has been processed for ${organizationName}. The credits are now available to the organization.`,
+  },
+  org_auto: {
+    subject: 'Kilo team auto top-up successful',
+    heading: 'Team auto top-up was successful',
+    intro: (organizationName: string) =>
+      `${organizationName} was automatically topped up so your team can keep using Kilo without interruption. The new credits are available now.`,
   },
 } as const;
 
 export type CreditsTopUpVariant = keyof typeof CREDITS_TOPUP_COPY;
 
-type SendCreditsTopUpEmailProps = {
+type BaseSendCreditsTopUpEmailProps = {
   to: string;
-  variant: CreditsTopUpVariant;
   amountCents: number;
   creditsCents: number;
   purchaseDate: Date;
   receiptUrl?: string | null;
 };
+
+type PersonalCreditsTopUpEmailProps = BaseSendCreditsTopUpEmailProps & {
+  variant: 'manual' | 'auto';
+};
+
+type OrganizationCreditsTopUpEmailProps = BaseSendCreditsTopUpEmailProps & {
+  variant: 'org_manual' | 'org_auto';
+  creditsUrl?: string;
+  organizationId?: Organization['id'];
+  organizationName?: Organization['name'];
+} & ({ creditsUrl: string } | { organizationId: Organization['id'] });
+
+type SendCreditsTopUpEmailProps =
+  | PersonalCreditsTopUpEmailProps
+  | OrganizationCreditsTopUpEmailProps;
+
+function isOrganizationCreditsTopUpEmail(
+  props: SendCreditsTopUpEmailProps
+): props is OrganizationCreditsTopUpEmailProps {
+  return props.variant === 'org_manual' || props.variant === 'org_auto';
+}
 
 export function buildCreditsTopUpReceiptSection(receiptUrl: string | null | undefined): RawHtml {
   if (!receiptUrl) return new RawHtml('');
@@ -447,14 +479,23 @@ export async function sendCreditsTopUpEmail(
   props: SendCreditsTopUpEmailProps
 ): Promise<SendResult> {
   const copy = CREDITS_TOPUP_COPY[props.variant];
-  const credits_url = `${NEXTAUTH_URL}/credits`;
+  const isOrgVariant = isOrganizationCreditsTopUpEmail(props);
+
+  if (isOrgVariant && !props.creditsUrl && !props.organizationId) {
+    throw new Error('Organization top-up emails require creditsUrl or organizationId');
+  }
+
+  const organizationName = isOrgVariant ? (props.organizationName ?? 'your organization') : '';
+  const credits_url = isOrgVariant
+    ? props.creditsUrl || `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`
+    : `${NEXTAUTH_URL}/credits`;
   return send({
     to: props.to,
     templateName: 'creditsTopUp',
     subjectOverride: copy.subject,
     templateVars: {
       heading: copy.heading,
-      intro: copy.intro,
+      intro: copy.intro(organizationName),
       amount_usd: formatUsd(props.amountCents),
       credits_usd: formatUsd(props.creditsCents),
       purchase_date: formatDate(props.purchaseDate),

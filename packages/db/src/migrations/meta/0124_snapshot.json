@@ -1,5 +1,5 @@
 {
-  "id": "822040a5-2e5d-4ea6-a2fc-3621013e7aa2",
+  "id": "4bd27397-cee3-462e-b478-d65c24f07a3b",
   "prevId": "01479a6c-dedf-4e9d-ab2b-b3af700c5cc2",
   "version": "7",
   "dialect": "postgresql",
@@ -9931,12 +9931,35 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "cascade"
+        },
+        "FK_kilo_pass_store_purchases_subscription_owner_provider": {
+          "name": "FK_kilo_pass_store_purchases_subscription_owner_provider",
+          "tableFrom": "kilo_pass_store_purchases",
+          "tableTo": "kilo_pass_subscriptions",
+          "columnsFrom": [
+            "kilo_pass_subscription_id",
+            "kilo_user_id",
+            "payment_provider",
+            "provider_subscription_id"
+          ],
+          "columnsTo": [
+            "id",
+            "kilo_user_id",
+            "payment_provider",
+            "provider_subscription_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
+        "kilo_pass_store_purchases_store_provider_check": {
+          "name": "kilo_pass_store_purchases_store_provider_check",
+          "value": "\"kilo_pass_store_purchases\".\"payment_provider\" IN ('app_store', 'google_play')"
+        },
         "kilo_pass_store_purchases_payment_provider_check": {
           "name": "kilo_pass_store_purchases_payment_provider_check",
           "value": "\"kilo_pass_store_purchases\".\"payment_provider\" IN ('stripe', 'app_store', 'google_play')"
@@ -10127,6 +10150,39 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "UQ_kilo_pass_subscriptions_store_purchase_reference": {
+          "name": "UQ_kilo_pass_subscriptions_store_purchase_reference",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "payment_provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "provider_subscription_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -10160,9 +10216,9 @@
           "name": "kilo_pass_subscriptions_current_streak_months_non_negative_check",
           "value": "\"kilo_pass_subscriptions\".\"current_streak_months\" >= 0"
         },
-        "kilo_pass_subscriptions_provider_subscription_required_check": {
-          "name": "kilo_pass_subscriptions_provider_subscription_required_check",
-          "value": "\"kilo_pass_subscriptions\".\"provider_subscription_id\" IS NOT NULL OR \"kilo_pass_subscriptions\".\"payment_provider\" = 'stripe'"
+        "kilo_pass_subscriptions_provider_ids_check": {
+          "name": "kilo_pass_subscriptions_provider_ids_check",
+          "value": "(\n        \"kilo_pass_subscriptions\".\"payment_provider\" = 'stripe'\n        AND \"kilo_pass_subscriptions\".\"provider_subscription_id\" IS NOT NULL\n        AND \"kilo_pass_subscriptions\".\"stripe_subscription_id\" IS NOT NULL\n        AND \"kilo_pass_subscriptions\".\"provider_subscription_id\" = \"kilo_pass_subscriptions\".\"stripe_subscription_id\"\n      ) OR (\n        \"kilo_pass_subscriptions\".\"payment_provider\" IN ('app_store', 'google_play')\n        AND \"kilo_pass_subscriptions\".\"provider_subscription_id\" IS NOT NULL\n        AND \"kilo_pass_subscriptions\".\"stripe_subscription_id\" IS NULL\n      )"
         },
         "kilo_pass_subscriptions_payment_provider_check": {
           "name": "kilo_pass_subscriptions_payment_provider_check",

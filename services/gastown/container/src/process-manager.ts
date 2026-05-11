@@ -78,7 +78,6 @@ export function isDraining(): boolean {
 // the promise immediately so non-hydrating containers (tests, dev)
 // don't block; bootHydration replaces it on entry and resolves it on exit.
 let _hydrationComplete: Promise<void> = Promise.resolve();
-let _resolveHydration: () => void = () => {};
 
 export function awaitHydration(): Promise<void> {
   return _hydrationComplete;
@@ -2818,14 +2817,12 @@ async function prewarmMayorSDK(townId: string, apiUrl: string, token: string): P
  * contending for it themselves.
  */
 export async function bootHydration(): Promise<void> {
-  const LOG = '[boot-hydration]';
-  _hydrationComplete = new Promise<void>(resolve => {
-    _resolveHydration = resolve;
-  });
+  let resolve!: () => void;
+  _hydrationComplete = new Promise<void>(r => { resolve = r; });
   try {
-    await bootHydrationImpl(LOG);
+    await bootHydrationImpl('[boot-hydration]');
   } finally {
-    _resolveHydration();
+    resolve();
   }
 }
 

@@ -50,14 +50,14 @@ function ignoreDeferredResolution(_value: unknown) {
 
 const product: AppStoreKiloPassProduct = {
   appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
-  appleProductId: 'kilopass.tier19.monthly.v1',
+  appleProductId: 'com.kilo.pass.tier19.monthly',
   cadence: 'monthly',
   description: 'Kilo Pass',
   displayPrice: '$24.99',
   googleBasePlanId: 'monthly-v1',
   googleProductId: 'kilopass_tier19',
   storeProduct: {
-    id: 'kilopass.tier19.monthly.v1',
+    id: 'com.kilo.pass.tier19.monthly',
     displayPrice: '$24.99',
     title: 'Kilo Pass',
     description: 'Kilo Pass',
@@ -73,6 +73,7 @@ function createActions(
 ) {
   return createAppStoreKiloPassPurchaseActions({
     completeAppStorePurchase: vi.fn(),
+    enabledAppleProductIds: [product.appleProductId],
     finishTransaction: vi.fn(),
     invalidateAfterCompletion: vi.fn(),
     requestPurchase: vi.fn(),
@@ -322,7 +323,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
       {
         ...purchase,
         id: 'other-purchase',
-        productId: 'not-kilopass',
+        productId: 'other.product',
         transactionId: 'other-tx',
       },
       {
@@ -373,6 +374,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     const purchase = createPurchase();
     const recoveryActions = createAppStoreKiloPassPurchaseActions({
       completeAppStorePurchase: completeFromRecovery,
+      enabledAppleProductIds: [product.appleProductId],
       finishTransaction: finishFromRecovery,
       invalidateAfterCompletion: vi.fn(),
       requestPurchase: vi.fn(),
@@ -380,6 +382,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     });
     const sheetActions = createAppStoreKiloPassPurchaseActions({
       completeAppStorePurchase: completeFromSheet,
+      enabledAppleProductIds: [product.appleProductId],
       finishTransaction: finishFromSheet,
       invalidateAfterCompletion: vi.fn(),
       onPurchaseCompleted: () => {

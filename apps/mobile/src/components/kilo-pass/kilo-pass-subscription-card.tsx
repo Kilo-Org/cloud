@@ -63,6 +63,9 @@ export function KiloPassSubscriptionCard() {
         ? 'checking'
         : getAppStoreKiloPassOwnership({
             appAccountToken: mobileStoreProductsQuery.data.appAccountToken,
+            enabledAppleProductIds: mobileStoreProductsQuery.data.products.map(
+              product => product.appleProductId
+            ),
             purchases: availablePurchases,
           });
   const cardState = getKiloPassSubscriptionCardState(subscription, { appStoreOwnership });
@@ -75,7 +78,10 @@ export function KiloPassSubscriptionCard() {
     return null;
   }
 
-  const devRefundAppleProductId = getDevStoreKitRefundAppleProductId({ subscription });
+  const devRefundAppleProductId = getDevStoreKitRefundAppleProductId({
+    products: mobileStoreProductsQuery.data?.products ?? [],
+    subscription,
+  });
   const invalidateKiloPassState = async () => {
     await Promise.all([
       queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter()),

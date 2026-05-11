@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ErrorCode, type Purchase, useIAP } from 'expo-iap';
 import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
@@ -43,6 +43,7 @@ type AppStoreKiloPassPurchaseActionsDeps = {
   }) => Promise<unknown>;
   completeAppStorePurchase: (input: { signedTransactionJws: string }) => Promise<unknown>;
   finishTransaction: (params: { purchase: Purchase; isConsumable: false }) => Promise<void>;
+  enabledAppleProductIds: readonly string[];
   invalidateAfterCompletion: () => Promise<void> | void;
   onPurchaseCompleted?: () => void;
   setPendingPurchaseCompletedCallback?: (callback: (() => void) | null) => void;
@@ -65,14 +66,17 @@ const StoreKiloPassPurchaseContext = createContext<StoreKiloPassPurchaseContextV
 const sharedPurchaseCompletions = new Map<string, Promise<boolean>>();
 let lastPurchaseErrorToast: { message: string; shownAt: number } | null = null;
 
-function isRecoverableKiloPassPurchase(purchase: Purchase): boolean {
+function isRecoverableKiloPassPurchase(
+  purchase: Purchase,
+  enabledAppleProductIds: readonly string[]
+): boolean {
   if (purchase.purchaseState === 'pending') {
     return false;
   }
   if (purchase.store !== 'apple') {
     return false;
   }
-  return purchase.productId.startsWith('kilopass.');
+  return enabledAppleProductIds.includes(purchase.productId);
 }
 
 function getPurchaseToken(purchase: Purchase): string {
@@ -207,7 +211,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     recoverPurchases: async (purchases: Purchase[]) => {
       await Promise.all(
         purchases
-          .filter(purchase => isRecoverableKiloPassPurchase(purchase))
+          .filter(purchase => isRecoverableKiloPassPurchase(purchase, deps.enabledAppleProductIds))
           .map(async purchase => {
             await handlePurchaseSuccess(purchase, { notifyCompletion: false, notifyErrors: false });
           })
@@ -225,6 +229,14 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
   const pendingPurchaseCompletedCallbackRef = useRef<(() => void) | null>(null);
   const completeAppStorePurchase = useMutation(
     trpc.kiloPass.completeAppStorePurchase.mutationOptions()
+  );
+  const mobileStoreProductsQuery = useQuery({
+    ...trpc.kiloPass.getMobileStoreProducts.queryOptions(),
+    enabled: Platform.OS === 'ios',
+  });
+  const enabledAppleProductIds = useMemo(
+    () => mobileStoreProductsQuery.data?.products.map(product => product.appleProductId) ?? [],
+    [mobileStoreProductsQuery.data]
   );
 
   const invalidateAfterCompletion = useCallback(async () => {
@@ -261,6 +273,7 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
       createAppStoreKiloPassPurchaseActions({
         requestPurchase,
         completeAppStorePurchase: completeAppStorePurchase.mutateAsync,
+        enabledAppleProductIds,
         finishTransaction,
         invalidateAfterCompletion,
         onPurchaseCompleted: () => {
@@ -277,6 +290,7 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
       }),
     [
       completeAppStorePurchase.mutateAsync,
+      enabledAppleProductIds,
       finishTransaction,
       invalidateAfterCompletion,
       requestPurchase,
@@ -310,7 +324,11 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
   }, [connected, getAvailablePurchases]);
 
   useEffect(() => {
-    if (Platform.OS !== 'ios' || availablePurchases.length === 0) {
+    if (
+      Platform.OS !== 'ios' ||
+      availablePurchases.length === 0 ||
+      enabledAppleProductIds.length === 0
+    ) {
       return;
     }
 
@@ -326,7 +344,7 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
     if (unrecoveredPurchases.length > 0) {
       void actions.recoverPurchases(unrecoveredPurchases);
     }
-  }, [actions, availablePurchases]);
+  }, [actions, availablePurchases, enabledAppleProductIds.length]);
 
   const value = useMemo(
     () => ({

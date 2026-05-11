@@ -4,14 +4,15 @@ type DevStoreKitRefundSubscription = {
   tier: string;
 };
 
-const APPLE_MONTHLY_PRODUCT_ID_BY_TIER: Record<string, string> = {
-  tier_19: 'kilopass.tier19.monthly.v1',
-  tier_49: 'kilopass.tier49.monthly.v1',
-  tier_199: 'kilopass.tier199.monthly.v1',
+type DevStoreKitRefundProduct = {
+  appleProductId: string;
+  cadence: string;
+  tier: string;
 };
 
 export function getDevStoreKitRefundAppleProductId(params: {
   isDev?: boolean;
+  products: readonly DevStoreKitRefundProduct[];
   subscription: DevStoreKitRefundSubscription | null | undefined;
 }): string | null {
   const isDev = params.isDev ?? __DEV__;
@@ -22,7 +23,11 @@ export function getDevStoreKitRefundAppleProductId(params: {
   if (subscription.paymentProvider !== 'app_store' || subscription.cadence !== 'monthly') {
     return null;
   }
-  return APPLE_MONTHLY_PRODUCT_ID_BY_TIER[subscription.tier] ?? null;
+  return (
+    params.products.find(
+      product => product.tier === subscription.tier && product.cadence === subscription.cadence
+    )?.appleProductId ?? null
+  );
 }
 
 export async function requestDevStoreKitRefund(params: {

@@ -10,19 +10,33 @@ describe('getDevStoreKitRefundAppleProductId', () => {
     expect(
       getDevStoreKitRefundAppleProductId({
         isDev: true,
+        products: [
+          {
+            appleProductId: 'com.kilo.pass.tier19.monthly',
+            cadence: 'monthly',
+            tier: 'tier_19',
+          },
+        ],
         subscription: {
           cadence: 'monthly',
           paymentProvider: 'app_store',
           tier: 'tier_19',
         },
       })
-    ).toBe('kilopass.tier19.monthly.v1');
+    ).toBe('com.kilo.pass.tier19.monthly');
   });
 
   it('is disabled outside dev and for non-App Store subscriptions', () => {
     expect(
       getDevStoreKitRefundAppleProductId({
         isDev: false,
+        products: [
+          {
+            appleProductId: 'com.kilo.pass.tier19.monthly',
+            cadence: 'monthly',
+            tier: 'tier_19',
+          },
+        ],
         subscription: {
           cadence: 'monthly',
           paymentProvider: 'app_store',
@@ -34,6 +48,13 @@ describe('getDevStoreKitRefundAppleProductId', () => {
     expect(
       getDevStoreKitRefundAppleProductId({
         isDev: true,
+        products: [
+          {
+            appleProductId: 'com.kilo.pass.tier19.monthly',
+            cadence: 'monthly',
+            tier: 'tier_19',
+          },
+        ],
         subscription: {
           cadence: 'monthly',
           paymentProvider: 'stripe',

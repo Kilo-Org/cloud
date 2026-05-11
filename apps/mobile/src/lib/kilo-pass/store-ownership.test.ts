@@ -21,12 +21,15 @@ function purchase(overrides: Partial<Purchase> = {}): Purchase {
   };
 }
 
+const enabledAppleProductIds = ['com.kilo.pass.tier19.monthly'];
+
 describe('getAppStoreKiloPassOwnership', () => {
   it('detects a Kilo Pass subscription owned by the current account', () => {
     expect(
       getAppStoreKiloPassOwnership({
         appAccountToken: 'account-a',
-        purchases: [purchase()],
+        enabledAppleProductIds,
+        purchases: [purchase({ productId: 'com.kilo.pass.tier19.monthly' })],
       })
     ).toBe('current-account');
   });
@@ -35,7 +38,8 @@ describe('getAppStoreKiloPassOwnership', () => {
     expect(
       getAppStoreKiloPassOwnership({
         appAccountToken: 'account-b',
-        purchases: [purchase()],
+        enabledAppleProductIds,
+        purchases: [purchase({ productId: 'com.kilo.pass.tier19.monthly' })],
       })
     ).toBe('another-account');
   });
@@ -44,6 +48,7 @@ describe('getAppStoreKiloPassOwnership', () => {
     expect(
       getAppStoreKiloPassOwnership({
         appAccountToken: 'account-b',
+        enabledAppleProductIds,
         purchases: [
           purchase({ productId: 'other.product' }),
           purchase({ id: 'pending', purchaseState: 'pending', transactionId: 'tx-pending' }),

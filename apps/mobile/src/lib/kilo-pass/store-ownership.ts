@@ -4,18 +4,22 @@ type AppStoreKiloPassOwnership = 'checking' | 'current-account' | 'another-accou
 
 type AppStorePurchase = Purchase & { appAccountToken?: string | null };
 
-function isKiloPassAppStorePurchase(purchase: Purchase): purchase is AppStorePurchase {
+function isKiloPassAppStorePurchase(
+  purchase: Purchase,
+  enabledAppleProductIds: readonly string[]
+): purchase is AppStorePurchase {
   if (purchase.purchaseState === 'pending') {
     return false;
   }
   if (purchase.store !== 'apple') {
     return false;
   }
-  return purchase.productId.startsWith('kilopass.');
+  return enabledAppleProductIds.includes(purchase.productId);
 }
 
 export function getAppStoreKiloPassOwnership(params: {
   appAccountToken: string | null | undefined;
+  enabledAppleProductIds: readonly string[];
   purchases: readonly Purchase[];
 }): AppStoreKiloPassOwnership {
   if (!params.appAccountToken) {
@@ -23,7 +27,7 @@ export function getAppStoreKiloPassOwnership(params: {
   }
 
   const kiloPassPurchases = params.purchases.filter(purchase =>
-    isKiloPassAppStorePurchase(purchase)
+    isKiloPassAppStorePurchase(purchase, params.enabledAppleProductIds)
   );
   if (kiloPassPurchases.length === 0) {
     return 'none';

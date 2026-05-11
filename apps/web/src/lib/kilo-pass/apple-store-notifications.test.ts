@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import {
   DeliveryStatus,
   NotificationTypeV2,
@@ -152,6 +152,71 @@ describe('processAppStoreKiloPassNotification', () => {
     const replay = await processAppStoreKiloPassNotification(params);
 
     expect(replay).toEqual({ processed: false });
+  });
+
+  it('does not process concurrent duplicate notification deliveries twice', async () => {
+    const decodedNotification = notification({
+      notificationUUID: 'concurrent-consumption-request',
+      notificationType: NotificationTypeV2.CONSUMPTION_REQUEST,
+    });
+    const decodedTransaction = transaction();
+    const sendConsumptionInformation = jest.fn(async () => {
+      await new Promise(resolve => setTimeout(resolve, 25));
+    });
+    const params = {
+      signedPayload: 'concurrent-consumption-request',
+      decodeNotification: async () => decodedNotification,
+      decodeTransaction: async () => decodedTransaction,
+      sendConsumptionInformation,
+    };
+
+    const results = await Promise.all([
+      processAppStoreKiloPassNotification(params),
+      processAppStoreKiloPassNotification(params),
+    ]);
+
+    expect(results.filter(result => result.processed)).toHaveLength(1);
+    expect(sendConsumptionInformation).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a stale unprocessed notification claim', async () => {
+    const decodedNotification = notification({
+      notificationUUID: 'stale-consumption-request',
+      notificationType: NotificationTypeV2.CONSUMPTION_REQUEST,
+    });
+    const decodedTransaction = transaction();
+    await db.insert(kilo_pass_store_events).values({
+      payment_provider: KiloPassPaymentProvider.AppStore,
+      event_id: decodedNotification.notificationUUID,
+      provider_subscription_id: decodedTransaction.originalTransactionId,
+      provider_transaction_id: decodedTransaction.transactionId,
+      product_id: decodedTransaction.productId,
+      environment: 'Sandbox',
+      payload_json: {
+        notificationType: decodedNotification.notificationType,
+      },
+      processing_started_at: '2026-01-01T00:00:00.000Z',
+      processed_at: null,
+    });
+
+    const sendConsumptionInformation = jest.fn(async () => {});
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: 'stale-consumption-request',
+      decodeNotification: async () => decodedNotification,
+      decodeTransaction: async () => decodedTransaction,
+      sendConsumptionInformation,
+    });
+
+    expect(result).toEqual({ processed: true });
+    expect(sendConsumptionInformation).toHaveBeenCalledTimes(1);
+
+    const event = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, decodedNotification.notificationUUID),
+    });
+    expect(event?.processed_at).not.toBeNull();
+    expect(new Date(event?.processing_started_at ?? '').getTime()).toBeGreaterThan(
+      new Date('2026-01-01T00:00:00.000Z').getTime()
+    );
   });
 
   it('records initial buy notifications before the app attaches a user', async () => {
@@ -585,7 +650,7 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(subscription?.ended_at).toBeNull();
 
     const auditRow = await db.query.kilo_pass_audit_log.findFirst({
-      where: eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.StoreNotificationReceived),
+      where: sql`${kilo_pass_audit_log.action} = ${KiloPassAuditLogAction.StoreNotificationReceived} AND ${kilo_pass_audit_log.payload_json}->>'notificationUUID' = 'failed-renewal'`,
     });
     expect(auditRow?.payload_json).toMatchObject({
       notificationUUID: 'failed-renewal',

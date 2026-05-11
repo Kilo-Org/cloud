@@ -1021,6 +1021,7 @@ export const kilo_pass_store_events = pgTable(
     product_id: text().notNull(),
     environment: text().notNull(),
     payload_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    processing_started_at: timestamp({ withTimezone: true, mode: 'string' }),
     processed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },

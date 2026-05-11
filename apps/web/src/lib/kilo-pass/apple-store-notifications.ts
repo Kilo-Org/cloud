@@ -58,6 +58,8 @@ const RENEWAL_TYPES = new Set<string>([
 ]);
 const EXPIRED_TYPES = new Set<string>([NotificationTypeV2.EXPIRED]);
 const REFUND_TYPES = new Set<string>([NotificationTypeV2.REFUND, NotificationTypeV2.REVOKE]);
+const STORE_EVENT_CLAIM_STALE_AFTER_MS = 5 * 60 * 1000;
+
 function isImmediateStorePurchaseNotification(
   notification: AppleStoreDecodedNotification
 ): boolean {
@@ -251,6 +253,54 @@ function getStoreEventPayload(params: {
   });
 }
 
+async function claimStoreEventForProcessing(params: {
+  notification: AppleStoreDecodedNotification;
+  purchase: ReturnType<typeof mapAppleKiloPassTransaction> | null;
+  transaction: AppleStoreDecodedTransaction | null;
+}): Promise<boolean> {
+  const processingStartedAtIso = new Date().toISOString();
+  const staleBeforeIso = new Date(Date.now() - STORE_EVENT_CLAIM_STALE_AFTER_MS).toISOString();
+
+  const providerSubscriptionId =
+    params.purchase?.providerSubscriptionId ?? params.transaction?.originalTransactionId ?? null;
+  const providerTransactionId =
+    params.purchase?.providerTransactionId ?? params.transaction?.transactionId ?? null;
+  const appAccountToken =
+    params.purchase?.appAccountToken ?? params.transaction?.appAccountToken ?? null;
+  const productId = params.purchase?.productId ?? params.transaction?.productId ?? 'unknown';
+  const payloadJson = getStoreEventPayload(params);
+
+  const claimedRows = await db
+    .insert(kilo_pass_store_events)
+    .values({
+      payment_provider: KiloPassPaymentProvider.AppStore,
+      event_id: params.notification.notificationUUID,
+      provider_subscription_id: providerSubscriptionId,
+      provider_transaction_id: providerTransactionId,
+      app_account_token: appAccountToken,
+      product_id: productId,
+      environment: params.notification.environment,
+      payload_json: payloadJson,
+      processing_started_at: processingStartedAtIso,
+    })
+    .onConflictDoUpdate({
+      target: [kilo_pass_store_events.payment_provider, kilo_pass_store_events.event_id],
+      set: {
+        provider_subscription_id: providerSubscriptionId,
+        provider_transaction_id: providerTransactionId,
+        app_account_token: appAccountToken,
+        product_id: productId,
+        environment: params.notification.environment,
+        payload_json: payloadJson,
+        processing_started_at: processingStartedAtIso,
+      },
+      setWhere: sql`${kilo_pass_store_events.processed_at} IS NULL AND (${kilo_pass_store_events.processing_started_at} IS NULL OR ${kilo_pass_store_events.processing_started_at} < ${staleBeforeIso})`,
+    })
+    .returning({ id: kilo_pass_store_events.id });
+
+  return claimedRows.length > 0;
+}
+
 type CreditReversalResult = {
   storePurchaseFound: boolean;
   creditTransactionIds: string[];
@@ -442,37 +492,9 @@ export async function processAppStoreKiloPassNotification(params: {
   const purchase =
     transaction && !isRefundNotification ? mapAppleKiloPassTransaction(transaction) : null;
 
-  const insertResult = await db
-    .insert(kilo_pass_store_events)
-    .values({
-      payment_provider: KiloPassPaymentProvider.AppStore,
-      event_id: notification.notificationUUID,
-      provider_subscription_id:
-        purchase?.providerSubscriptionId ?? transaction?.originalTransactionId ?? null,
-      provider_transaction_id:
-        purchase?.providerTransactionId ?? transaction?.transactionId ?? null,
-      app_account_token: purchase?.appAccountToken ?? transaction?.appAccountToken ?? null,
-      product_id: purchase?.productId ?? transaction?.productId ?? 'unknown',
-      environment: notification.environment,
-      payload_json: getStoreEventPayload({ notification, purchase, transaction }),
-    })
-    .onConflictDoNothing();
-
-  if ((insertResult.rowCount ?? 0) === 0) {
-    const existingEvents = await db
-      .select({ processedAt: kilo_pass_store_events.processed_at })
-      .from(kilo_pass_store_events)
-      .where(
-        and(
-          eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.AppStore),
-          eq(kilo_pass_store_events.event_id, notification.notificationUUID)
-        )
-      )
-      .limit(1);
-
-    if (existingEvents[0]?.processedAt) {
-      return { processed: false };
-    }
+  const claimedEvent = await claimStoreEventForProcessing({ notification, purchase, transaction });
+  if (!claimedEvent) {
+    return { processed: false };
   }
 
   if (purchase && isImmediateStorePurchaseNotification(notification)) {

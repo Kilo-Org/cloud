@@ -122,7 +122,7 @@ export class UserGitHubTokenService {
     try {
       await db
         .update(user_github_app_tokens)
-        .set({ last_used_at: new Date() })
+        .set({ last_used_at: new Date().toISOString() })
         .where(eq(user_github_app_tokens.id, row.id));
     } catch {
       // Ignore update failures

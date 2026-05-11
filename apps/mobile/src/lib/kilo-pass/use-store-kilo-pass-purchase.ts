@@ -280,6 +280,7 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
 
   const releasePurchaseRequest = useCallback(() => {
     activePurchaseRequestRef.current = null;
+    pendingPurchaseCompletedCallbackRef.current = null;
     setIsRequestingPurchase(false);
   }, []);
 
@@ -293,6 +294,15 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
       }
     },
     onPurchaseSuccess: purchase => {
+      if (!isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds)) {
+        releasePurchaseRequest();
+        return;
+      }
+
+      if (activePurchaseRequestRef.current?.sku !== purchase.productId) {
+        return;
+      }
+
       void (async () => {
         try {
           await actions.handlePurchaseSuccess(purchase);

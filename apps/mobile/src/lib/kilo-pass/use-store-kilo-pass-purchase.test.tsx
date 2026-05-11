@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { type Purchase } from 'expo-iap';
+import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createAppStoreKiloPassPurchaseActions,
@@ -25,6 +26,10 @@ const mockedReactQuery = vi.hoisted(() => ({
   completeAppStorePurchase: vi.fn(),
   completeAppStorePurchaseIsPending: false,
   invalidateQueries: vi.fn(),
+  mobileStoreProductsData: {
+    appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+    products: [{ appleProductId: 'com.kilo.pass.tier19.monthly' }],
+  },
 }));
 
 vi.mock('expo-iap', () => ({
@@ -58,10 +63,7 @@ vi.mock('@tanstack/react-query', () => ({
     mutateAsync: mockedReactQuery.completeAppStorePurchase,
   }),
   useQuery: () => ({
-    data: {
-      appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
-      products: [{ appleProductId: 'com.kilo.pass.tier19.monthly' }],
-    },
+    data: mockedReactQuery.mobileStoreProductsData,
   }),
   useQueryClient: () => ({ invalidateQueries: mockedReactQuery.invalidateQueries }),
 }));
@@ -256,6 +258,10 @@ beforeEach(() => {
   mockedReactQuery.completeAppStorePurchase.mockResolvedValue({ alreadyProcessed: false });
   mockedReactQuery.completeAppStorePurchaseIsPending = false;
   mockedReactQuery.invalidateQueries.mockResolvedValue(undefined);
+  mockedReactQuery.mobileStoreProductsData = {
+    appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+    products: [{ appleProductId: product.appleProductId }],
+  };
 });
 
 describe('createAppStoreKiloPassPurchaseActions', () => {
@@ -649,6 +655,85 @@ describe('StoreKiloPassPurchaseProvider', () => {
     expect(releasedValue.isPending).toBe(false);
     await releasedValue.purchase(product);
     expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores live StoreKit success for an unknown product', async () => {
+    const onCompleted = vi.fn();
+    const provider = renderStoreKiloPassPurchaseProvider();
+
+    const initialValue = provider.render();
+    await initialValue.purchase(product, {
+      onCompleted: () => {
+        onCompleted();
+      },
+    });
+
+    mockedIap.handlers?.onPurchaseSuccess(
+      createPurchase({
+        id: 'other-purchase',
+        productId: 'other.product',
+        purchaseToken: 'other-signed-jws',
+        transactionId: 'other-tx',
+      })
+    );
+    await flushPromises();
+    const releasedValue = provider.render();
+
+    expect(mockedReactQuery.completeAppStorePurchase).not.toHaveBeenCalled();
+    expect(mockedIap.finishTransaction).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(onCompleted).not.toHaveBeenCalled();
+    expect(releasedValue.isPending).toBe(false);
+  });
+
+  it('ignores live StoreKit success for a stale Kilo Pass product without releasing the active request', async () => {
+    mockedReactQuery.mobileStoreProductsData = {
+      appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+      products: [
+        { appleProductId: product.appleProductId },
+        { appleProductId: 'com.kilo.pass.tier49.monthly' },
+      ],
+    };
+    const onCompleted = vi.fn();
+    const provider = renderStoreKiloPassPurchaseProvider();
+
+    const initialValue = provider.render();
+    await initialValue.purchase(product, {
+      onCompleted: () => {
+        onCompleted();
+      },
+    });
+
+    mockedIap.handlers?.onPurchaseSuccess(
+      createPurchase({
+        id: 'stale-purchase',
+        productId: 'com.kilo.pass.tier49.monthly',
+        purchaseToken: 'stale-signed-jws',
+        transactionId: 'stale-tx',
+      })
+    );
+    await flushPromises();
+    const stillPendingValue = provider.render();
+
+    expect(mockedReactQuery.completeAppStorePurchase).not.toHaveBeenCalled();
+    expect(mockedIap.finishTransaction).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(onCompleted).not.toHaveBeenCalled();
+    expect(stillPendingValue.isPending).toBe(true);
+
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+    const releasedValue = provider.render();
+
+    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledWith({
+      signedTransactionJws: 'signed-jws',
+    });
+    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
+      purchase: createPurchase(),
+      isConsumable: false,
+    });
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+    expect(releasedValue.isPending).toBe(false);
   });
 
   it('retries automatic recovery after backend completion fails', async () => {

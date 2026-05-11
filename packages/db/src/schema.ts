@@ -1084,6 +1084,11 @@ export const kilo_pass_store_purchases = pgTable(
     index('IDX_kilo_pass_store_purchases_subscription_id').on(table.kilo_pass_subscription_id),
     index('IDX_kilo_pass_store_purchases_user_id').on(table.kilo_user_id),
     index('IDX_kilo_pass_store_purchases_app_account_token').on(table.app_account_token),
+    index('IDX_kilo_pass_store_purchases_latest_subscription_purchase').on(
+      table.payment_provider,
+      table.provider_subscription_id,
+      table.purchased_at.desc()
+    ),
     enumCheck(
       'kilo_pass_store_purchases_payment_provider_check',
       table.payment_provider,

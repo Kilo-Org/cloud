@@ -883,6 +883,13 @@
       "when": 1778505271116,
       "tag": "0125_absent_mister_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1778507294085,
+      "tag": "0126_glossy_shotgun",
+      "breakpoints": true
     }
   ]
 }

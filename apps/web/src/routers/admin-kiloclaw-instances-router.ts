@@ -732,9 +732,9 @@ async function getFleetUpgradePlan(input: z.infer<typeof FleetUpgradeFilterSchem
   ].join('|');
   const actionableRows = preConflictRows
     .filter(row => !conflictIdSet.has(row.instance.id))
-    .sort((a, b) =>
-      fleetSortKey(seed, a.instance.id).localeCompare(fleetSortKey(seed, b.instance.id))
-    );
+    .map(row => ({ row, sortKey: fleetSortKey(seed, row.instance.id) }))
+    .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+    .map(({ row }) => row);
   const stages = buildFleetStagePlan({
     targetCount: actionableRows.length,
     startsAt: input.startsAt,

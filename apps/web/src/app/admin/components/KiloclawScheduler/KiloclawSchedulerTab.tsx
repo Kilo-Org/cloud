@@ -206,8 +206,6 @@ export function KiloclawSchedulerTab() {
         startsAt: fleetStartsAt,
         tranchePercent: fleetTranchePercent,
         intervalDays: fleetIntervalDays,
-        reason: fleetReason.trim(),
-        notify: fleetNotify,
       }),
     [
       fleetVersionBelow,
@@ -216,8 +214,6 @@ export function KiloclawSchedulerTab() {
       fleetStartsAt,
       fleetTranchePercent,
       fleetIntervalDays,
-      fleetReason,
-      fleetNotify,
     ]
   );
 

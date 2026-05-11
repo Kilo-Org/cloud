@@ -1702,23 +1702,26 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return;
     }
 
-    const executions = await this.executionQueries.getAll();
-    const latestExecution = executions[executions.length - 1];
-    if (!latestExecution) {
+    const metadata = await this.getMetadata();
+    if (!metadata) {
       return;
     }
 
-    const lastActivity =
-      latestExecution.lastHeartbeat ?? latestExecution.completedAt ?? latestExecution.startedAt;
+    const executions = await this.executionQueries.getAll();
+    const latestExecution = executions[executions.length - 1];
+
+    const lastActivity = latestExecution
+      ? (latestExecution.lastHeartbeat ?? latestExecution.completedAt ?? latestExecution.startedAt)
+      : (metadata.preparedAt ?? metadata.timestamp);
+
+    if (!lastActivity) {
+      return;
+    }
+
     const idleMs = now - lastActivity;
     const idleTimeoutMs = this.getKiloServerIdleTimeoutMs();
 
     if (idleMs < idleTimeoutMs) {
-      return;
-    }
-
-    const metadata = await this.getMetadata();
-    if (!metadata) {
       return;
     }
 

@@ -27,6 +27,7 @@ export function KiloPassSubscriptionScreen() {
   const router = useRouter();
   const productsQuery = useStoreKiloPassProducts();
   const purchase = useStoreKiloPassPurchase();
+  const isRetryDisabled = purchase.isPending || productsQuery.isRefetching;
   const handleProductPress = (product: AppStoreKiloPassProduct) => {
     void Haptics.selectionAsync();
     void purchase.purchase(product, {
@@ -52,9 +53,14 @@ export function KiloPassSubscriptionScreen() {
 
           {!productsQuery.isLoading && productsQuery.products.length === 0 && (
             <Pressable
+              accessibilityLabel="Try loading Kilo Pass products again"
               accessibilityRole="button"
+              accessibilityState={{
+                busy: productsQuery.isRefetching,
+                disabled: isRetryDisabled,
+              }}
               className="rounded-xl border border-border bg-card p-5 active:opacity-80"
-              disabled={purchase.isPending}
+              disabled={isRetryDisabled}
               onPress={() => {
                 void productsQuery.refetch();
               }}
@@ -64,7 +70,9 @@ export function KiloPassSubscriptionScreen() {
                 {productsQuery.errorMessage ??
                   'Kilo Pass products could not be loaded from App Store.'}
               </Text>
-              <Text className="mt-3 text-sm font-medium text-primary">Try again</Text>
+              <Text className="mt-3 text-sm font-medium text-primary">
+                {productsQuery.isRefetching ? 'Trying again...' : 'Try again'}
+              </Text>
             </Pressable>
           )}
 
@@ -72,7 +80,9 @@ export function KiloPassSubscriptionScreen() {
             productsQuery.products.map(product => (
               <Pressable
                 key={product.appleProductId}
+                accessibilityLabel={`${formatTier(product)}, ${formatStorePrice(product)}`}
                 accessibilityRole="button"
+                accessibilityState={{ busy: purchase.isPending, disabled: purchase.isPending }}
                 className="rounded-xl border border-border bg-card p-5 active:opacity-80"
                 disabled={purchase.isPending}
                 onPress={() => {
@@ -96,8 +106,14 @@ export function KiloPassSubscriptionScreen() {
 
         {purchase.isPending && (
           <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
-            <Button className="mt-4" disabled>
+            <Button
+              accessibilityLabel="Completing Kilo Pass purchase"
+              accessibilityState={{ busy: true, disabled: true }}
+              className="mt-4"
+              disabled
+            >
               <ActivityIndicator size="small" color={colors.primaryForeground} />
+              <Text>Completing purchase</Text>
             </Button>
           </View>
         )}

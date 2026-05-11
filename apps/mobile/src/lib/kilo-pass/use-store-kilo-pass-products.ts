@@ -97,6 +97,7 @@ export function useStoreKiloPassProducts() {
     isLoading:
       storeErrorMessage === null &&
       (productsQuery.isLoading || (Platform.OS === 'ios' && !connected)),
+    isRefetching: productsQuery.isRefetching,
     isError: storeErrorMessage !== null || productsQuery.isError,
     errorMessage: storeErrorMessage ?? queryErrorMessage,
     refetch,

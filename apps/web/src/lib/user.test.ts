@@ -1551,7 +1551,7 @@ describe('User', () => {
       await db.insert(user_github_app_tokens).values([
         {
           kilo_user_id: user.id,
-          app_type: 'standard',
+          github_app_type: 'standard',
           github_user_id: '123',
           github_login: 'testuser',
           github_email: 'test@example.com',
@@ -1560,7 +1560,7 @@ describe('User', () => {
         },
         {
           kilo_user_id: otherUser.id,
-          app_type: 'standard',
+          github_app_type: 'standard',
           github_user_id: '456',
           github_login: 'otheruser',
           github_email: 'other@example.com',

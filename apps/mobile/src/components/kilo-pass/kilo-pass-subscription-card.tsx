@@ -1,7 +1,6 @@
-import { beginRefundRequestIOS, showManageSubscriptionsIOS, useIAP } from 'expo-iap';
+import { beginRefundRequestIOS, showManageSubscriptionsIOS } from 'expo-iap';
 import { type Href, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
 import { Linking, Platform, Pressable, View } from 'react-native';
 import { ShieldCheck } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,7 +18,6 @@ import {
   getKiloPassSubscriptionCardState,
   shouldRenderKiloPassSubscriptionCard,
 } from '@/lib/kilo-pass/subscription-card-state';
-import { getAppStoreKiloPassOwnership } from '@/lib/kilo-pass/store-ownership';
 
 const KILO_PASS_MANAGE_URL = `${WEB_BASE_URL}/subscriptions/kilo-pass`;
 
@@ -31,44 +29,10 @@ export function KiloPassSubscriptionCard() {
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
   const mobileStoreProductsQuery = useQuery({
     ...trpc.kiloPass.getMobileStoreProducts.queryOptions(),
-    enabled: Platform.OS === 'ios',
+    enabled: Platform.OS === 'ios' && __DEV__,
   });
-  const [checkedAvailablePurchases, setCheckedAvailablePurchases] = useState(false);
-  const { availablePurchases, connected, getAvailablePurchases } = useIAP({});
-
-  useEffect(() => {
-    if (Platform.OS !== 'ios' || !connected) {
-      return;
-    }
-
-    const checkAvailablePurchases = async () => {
-      setCheckedAvailablePurchases(false);
-      try {
-        await getAvailablePurchases();
-      } catch {
-        // Keep this profile-card probe quiet; purchase flows surface actionable errors.
-      } finally {
-        setCheckedAvailablePurchases(true);
-      }
-    };
-
-    void checkAvailablePurchases();
-  }, [connected, getAvailablePurchases]);
-
   const subscription = stateQuery.data?.subscription;
-  const appStoreOwnership =
-    Platform.OS !== 'ios'
-      ? 'none'
-      : !connected || !checkedAvailablePurchases || !mobileStoreProductsQuery.data
-        ? 'checking'
-        : getAppStoreKiloPassOwnership({
-            appAccountToken: mobileStoreProductsQuery.data.appAccountToken,
-            enabledAppleProductIds: mobileStoreProductsQuery.data.products.map(
-              product => product.appleProductId
-            ),
-            purchases: availablePurchases,
-          });
-  const cardState = getKiloPassSubscriptionCardState(subscription, { appStoreOwnership });
+  const cardState = getKiloPassSubscriptionCardState(subscription);
   if (
     !shouldRenderKiloPassSubscriptionCard({
       action: cardState.action,

@@ -13,10 +13,6 @@ export type KiloPassSubscriptionCardState = {
   title: string;
 };
 
-type KiloPassSubscriptionCardOptions = {
-  appStoreOwnership?: 'checking' | 'current-account' | 'another-account' | 'none';
-};
-
 export function shouldRenderKiloPassSubscriptionCard(params: {
   action: KiloPassSubscriptionCardState['action'];
   platformOS: string;
@@ -46,37 +42,9 @@ function isEndedSubscriptionStatus(status: string): boolean {
 }
 
 export function getKiloPassSubscriptionCardState(
-  subscription: KiloPassSubscriptionCardSubscription | null | undefined,
-  options: KiloPassSubscriptionCardOptions = {}
+  subscription: KiloPassSubscriptionCardSubscription | null | undefined
 ): KiloPassSubscriptionCardState {
   if (!subscription || isEndedSubscriptionStatus(subscription.status)) {
-    if (options.appStoreOwnership === 'checking') {
-      return {
-        action: 'none',
-        actionLabel: null,
-        description: 'Checking App Store subscription',
-        title: 'Kilo Pass',
-      };
-    }
-
-    if (options.appStoreOwnership === 'another-account') {
-      return {
-        action: 'none',
-        actionLabel: null,
-        description: 'Kilo Pass subscription is owned by another account',
-        title: 'Kilo Pass',
-      };
-    }
-
-    if (options.appStoreOwnership === 'current-account') {
-      return {
-        action: 'none',
-        actionLabel: null,
-        description: 'Restoring App Store subscription',
-        title: 'Kilo Pass',
-      };
-    }
-
     return {
       action: 'open-store-sheet',
       actionLabel: 'Subscribe',

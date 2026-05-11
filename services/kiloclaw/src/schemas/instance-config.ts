@@ -350,6 +350,8 @@ export const PersistedStateSchema = z.object({
   // Two-phase destroy: IDs pending deletion on Fly. Cleared once Fly confirms.
   pendingDestroyMachineId: z.string().nullable().default(null),
   pendingDestroyVolumeId: z.string().nullable().default(null),
+  destroyStartedAt: z.number().nullable().default(null),
+  lastDestroyPendingEventAt: z.number().nullable().default(null),
   // For stale auto-destroy only: defer DO state wipe until Postgres row is marked destroyed.
   pendingPostgresMarkOnFinalize: z.boolean().default(false),
   // Cooldown: last time we attempted metadata-based machine recovery from Fly.

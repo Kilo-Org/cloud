@@ -11,6 +11,8 @@ import {
   RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
   WORKER_CONTROLLER_CAPABILITIES_VERSION,
+  DESTROY_STUCK_THRESHOLD_MS,
+  DESTROY_STUCK_TELEMETRY_INTERVAL_MS,
   getProactiveRefreshThresholdMs,
 } from '../../config';
 import { resolveInstanceTypeLabel } from '@kilocode/kiloclaw-instance-tiers';
@@ -60,6 +62,84 @@ export type ReconcileWithFlyResult = {
     durationMs?: number;
   };
 };
+
+function pendingDestroyLabel(state: InstanceMutableState): string {
+  if (state.pendingDestroyMachineId && state.pendingDestroyVolumeId) return 'machine+volume';
+  if (state.pendingDestroyMachineId) return 'machine';
+  if (state.pendingDestroyVolumeId) return 'volume';
+  return 'none';
+}
+
+function destroyPendingDetails(
+  state: InstanceMutableState,
+  now = Date.now()
+): Record<string, unknown> {
+  const ageMs = state.destroyStartedAt ? now - state.destroyStartedAt : 0;
+  return {
+    label: pendingDestroyLabel(state),
+    value: ageMs,
+    pendingMachineId: state.pendingDestroyMachineId,
+    pendingVolumeId: state.pendingDestroyVolumeId,
+    destroyStartedAt: state.destroyStartedAt,
+    ageMs,
+    lastDestroyErrorOp: state.lastDestroyErrorOp,
+    lastDestroyErrorStatus: state.lastDestroyErrorStatus,
+    lastDestroyErrorAt: state.lastDestroyErrorAt,
+  };
+}
+
+export function destroyResultFromState(
+  state: InstanceMutableState,
+  result: Pick<DestroyResult, 'finalized' | 'destroyedUserId' | 'destroyedSandboxId'>
+): DestroyResult {
+  return {
+    ...result,
+    pendingMachineId: state.pendingDestroyMachineId,
+    pendingVolumeId: state.pendingDestroyVolumeId,
+    lastDestroyErrorOp: state.lastDestroyErrorOp,
+    lastDestroyErrorStatus: state.lastDestroyErrorStatus,
+    lastDestroyErrorAt: state.lastDestroyErrorAt,
+  };
+}
+
+export function emitDestroyPendingTelemetry(
+  state: InstanceMutableState,
+  rctx: ReconcileContext
+): void {
+  const details = destroyPendingDetails(state);
+  rctx.log('destroy_pending', details);
+  doWarn(state, 'Destroy incomplete, alarm will retry', details);
+}
+
+async function maybeEmitDestroyStuckTelemetry(
+  ctx: DurableObjectState,
+  state: InstanceMutableState,
+  rctx: ReconcileContext
+): Promise<void> {
+  if (!state.pendingDestroyMachineId && !state.pendingDestroyVolumeId) return;
+
+  const now = Date.now();
+  if (!state.destroyStartedAt) {
+    state.destroyStartedAt = state.lastDestroyErrorAt ?? now;
+    await ctx.storage.put(storageUpdate({ destroyStartedAt: state.destroyStartedAt }));
+  }
+
+  const ageMs = now - state.destroyStartedAt;
+  if (ageMs < DESTROY_STUCK_THRESHOLD_MS) return;
+  if (
+    state.lastDestroyPendingEventAt &&
+    now - state.lastDestroyPendingEventAt < DESTROY_STUCK_TELEMETRY_INTERVAL_MS
+  ) {
+    return;
+  }
+
+  const details = destroyPendingDetails(state, now);
+  rctx.log('destroy_stuck', details);
+  doWarn(state, 'Destroy still pending after repeated retries', details);
+
+  state.lastDestroyPendingEventAt = now;
+  await ctx.storage.put(storageUpdate({ lastDestroyPendingEventAt: now }));
+}
 
 /**
  * Record a start-attempt failure: write the analytics event and dispatch the
@@ -1318,7 +1398,10 @@ async function retryPendingDestroy(
   await recoverBoundMachineForDestroy(flyConfig, ctx, state, rctx);
   await tryDeleteMachine(flyConfig, ctx, state, rctx);
   await tryDeleteVolume(flyConfig, ctx, state, rctx);
-  await finalizeDestroyIfComplete(ctx, state, rctx, markDestroyedInPostgres);
+  const result = await finalizeDestroyIfComplete(ctx, state, rctx, markDestroyedInPostgres);
+  if (!result.finalized) {
+    await maybeEmitDestroyStuckTelemetry(ctx, state, rctx);
+  }
 }
 
 async function recoverBoundMachineForDestroy(
@@ -1427,7 +1510,9 @@ export async function tryDeleteMachine(
       syncProviderStateForStorage(state, { pendingDestroyMachineId: null, flyMachineId: null })
     )
   );
-  await clearDestroyError(ctx, state);
+  if (!state.pendingDestroyVolumeId) {
+    await clearDestroyError(ctx, state);
+  }
 }
 
 export async function tryDeleteVolume(
@@ -1467,7 +1552,9 @@ export async function tryDeleteVolume(
       syncProviderStateForStorage(state, { pendingDestroyVolumeId: null, flyVolumeId: null })
     )
   );
-  await clearDestroyError(ctx, state);
+  if (!state.pendingDestroyMachineId) {
+    await clearDestroyError(ctx, state);
+  }
 }
 
 async function persistDestroyError(
@@ -1520,19 +1607,19 @@ export async function finalizeDestroyIfComplete(
   markDestroyedInPostgres?: (userId: string, sandboxId: string) => Promise<boolean>
 ): Promise<DestroyResult> {
   if (state.pendingDestroyMachineId || state.pendingDestroyVolumeId) {
-    return {
+    return destroyResultFromState(state, {
       finalized: false,
       destroyedUserId: null,
       destroyedSandboxId: null,
-    };
+    });
   }
 
   if (!state.userId || !state.sandboxId) {
-    return {
+    return destroyResultFromState(state, {
       finalized: false,
       destroyedUserId: null,
       destroyedSandboxId: null,
-    };
+    });
   }
 
   const destroyedUserId = state.userId;
@@ -1541,7 +1628,11 @@ export async function finalizeDestroyIfComplete(
   if (state.pendingPostgresMarkOnFinalize && markDestroyedInPostgres) {
     const marked = await markDestroyedInPostgres(destroyedUserId, destroyedSandboxId);
     if (!marked) {
-      return { finalized: false, destroyedUserId, destroyedSandboxId };
+      return destroyResultFromState(state, {
+        finalized: false,
+        destroyedUserId,
+        destroyedSandboxId,
+      });
     }
   }
 
@@ -1555,5 +1646,5 @@ export async function finalizeDestroyIfComplete(
   await ctx.storage.deleteAll();
   resetMutableState(state);
 
-  return { finalized: true, destroyedUserId, destroyedSandboxId };
+  return destroyResultFromState(state, { finalized: true, destroyedUserId, destroyedSandboxId });
 }

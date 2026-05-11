@@ -561,14 +561,43 @@ describe('two-phase destroy', () => {
     );
     (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
 
-    await instance.destroy();
+    const result = await instance.destroy();
 
     // Storage NOT cleared — pending machine ID preserved
+    expect(result).toEqual(
+      expect.objectContaining({
+        finalized: false,
+        pendingMachineId: 'machine-1',
+        pendingVolumeId: null,
+        lastDestroyErrorOp: 'machine',
+        lastDestroyErrorStatus: 500,
+        lastDestroyErrorAt: expect.any(Number),
+      })
+    );
     expect(storage._store.get('pendingDestroyMachineId')).toBe('machine-1');
     expect(storage._store.get('pendingDestroyVolumeId')).toBeNull();
+    expect(storage._store.get('destroyStartedAt')).toBeTypeOf('number');
     expect(storage._store.get('status')).toBe('destroying');
     // Alarm scheduled for retry
     expect(storage._getAlarm()).not.toBeNull();
+  });
+
+  it('emits destroy_pending telemetry when inline destroy does not finalize', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage);
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockRejectedValue(
+      new FlyApiError('server error', 500, 'fail')
+    );
+
+    await instance.destroy();
+
+    const pendingEvents = analyticsEventsByName(env, 'reconcile.destroy_pending');
+    expect(pendingEvents).toHaveLength(1);
+    expect(pendingEvents[0]?.blobs).toEqual(expect.arrayContaining(['volume']));
+    expect(pendingEvents[0]?.doubles).toEqual(expect.arrayContaining([expect.any(Number)]));
   });
 
   it('keeps pendingDestroyVolumeId when volume delete fails', async () => {
@@ -1055,6 +1084,39 @@ describe('destroy error tracking', () => {
     expect(storage._store.get('lastDestroyErrorStatus')).toBe(412);
     expect(storage._store.get('lastDestroyErrorMessage')).toContain('failed_precondition');
     expect(storage._store.get('lastDestroyErrorAt')).toBeTypeOf('number');
+  });
+
+  it('emits throttled destroy_stuck telemetry for aged pending destroys', async () => {
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+      destroyStartedAt: Date.now() - 16 * 60 * 1000,
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-1',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    (flyClient.deleteVolume as Mock).mockRejectedValue(new FlyApiError('server error', 500, '{}'));
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    const stuckEvents = analyticsEventsByName(env, 'reconcile.destroy_stuck');
+    expect(stuckEvents).toHaveLength(1);
+    expect(stuckEvents[0]?.blobs).toEqual(expect.arrayContaining(['volume']));
+    expect(storage._store.get('lastDestroyPendingEventAt')).toBeTypeOf('number');
+
+    const { instance: retryInstance } = createInstance(storage, env);
+    await retryInstance.alarm();
+
+    expect(analyticsEventsByName(env, 'reconcile.destroy_stuck')).toHaveLength(1);
   });
 
   it('clears destroy error on successful delete', async () => {

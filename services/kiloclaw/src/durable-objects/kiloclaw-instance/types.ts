@@ -27,6 +27,11 @@ export type DestroyResult = {
   finalized: boolean;
   destroyedUserId: string | null;
   destroyedSandboxId: string | null;
+  pendingMachineId: string | null;
+  pendingVolumeId: string | null;
+  lastDestroyErrorOp: 'machine' | 'volume' | 'recover' | null;
+  lastDestroyErrorStatus: number | null;
+  lastDestroyErrorAt: number | null;
 };
 
 /**
@@ -101,6 +106,8 @@ export type InstanceMutableState = {
   healthCheckFailCount: number;
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
+  destroyStartedAt: number | null;
+  lastDestroyPendingEventAt: number | null;
   pendingPostgresMarkOnFinalize: boolean;
   lastMetadataRecoveryAt: number | null;
   openclawVersion: string | null;

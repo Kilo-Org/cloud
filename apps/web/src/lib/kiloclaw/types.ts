@@ -271,6 +271,8 @@ export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   adminMachineSizeOverrideMetadata: AdminMachineSizeOverrideMetadata | null;
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
+  destroyStartedAt: number | null;
+  lastDestroyPendingEventAt: number | null;
   pendingPostgresMarkOnFinalize: boolean;
   lastMetadataRecoveryAt: number | null;
   lastLiveCheckAt: number | null;

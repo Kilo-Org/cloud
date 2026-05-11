@@ -71,6 +71,8 @@ export type KiloClawEventName =
   | 'reconcile.repair_mount'
   | 'reconcile.recover_bound_machine_for_destroy'
   | 'reconcile.restart_self_healed'
+  | 'reconcile.destroy_pending'
+  | 'reconcile.destroy_stuck'
   | 'reconcile.destroy_complete'
   // Region capacity management
   | 'region.capacity_eviction'

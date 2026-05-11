@@ -297,6 +297,8 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.healthCheckFailCount = d.healthCheckFailCount;
     s.pendingDestroyMachineId = d.pendingDestroyMachineId;
     s.pendingDestroyVolumeId = d.pendingDestroyVolumeId;
+    s.destroyStartedAt = d.destroyStartedAt;
+    s.lastDestroyPendingEventAt = d.lastDestroyPendingEventAt;
     s.pendingPostgresMarkOnFinalize = d.pendingPostgresMarkOnFinalize;
     s.lastMetadataRecoveryAt = d.lastMetadataRecoveryAt;
     s.openclawVersion = d.openclawVersion;
@@ -405,6 +407,8 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.healthCheckFailCount = 0;
   s.pendingDestroyMachineId = null;
   s.pendingDestroyVolumeId = null;
+  s.destroyStartedAt = null;
+  s.lastDestroyPendingEventAt = null;
   s.pendingPostgresMarkOnFinalize = false;
   s.lastMetadataRecoveryAt = null;
   s.openclawVersion = null;
@@ -499,6 +503,8 @@ export function createMutableState(): InstanceMutableState {
     healthCheckFailCount: 0,
     pendingDestroyMachineId: null,
     pendingDestroyVolumeId: null,
+    destroyStartedAt: null,
+    lastDestroyPendingEventAt: null,
     pendingPostgresMarkOnFinalize: false,
     lastMetadataRecoveryAt: null,
     openclawVersion: null,

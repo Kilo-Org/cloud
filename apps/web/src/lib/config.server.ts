@@ -96,6 +96,12 @@ export const USER_DEPLOYMENTS_GIT_TOKEN_ENCRYPTION_KEY = getEnvVariable(
   'USER_DEPLOYMENTS_GIT_TOKEN_ENCRYPTION_KEY'
 );
 
+// Dedicated encryption key for GitHub App user-to-server tokens.
+// Do NOT reuse USER_DEPLOYMENTS_GIT_TOKEN_ENCRYPTION_KEY.
+export const USER_GH_APP_TOKEN_ENCRYPTION_KEY = getEnvVariable(
+  'USER_GH_APP_TOKEN_ENCRYPTION_KEY'
+);
+
 /**
  * AES-256 encryption key for BYOK API keys.
  * Must be a base64-encoded 32-byte (256-bit) key.

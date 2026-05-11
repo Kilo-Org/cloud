@@ -66,6 +66,7 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  user_github_app_tokens,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import {
@@ -159,6 +160,7 @@ describe('User', () => {
     await db.delete(agent_environment_profile_mcp_servers);
     await db.delete(agent_environment_profiles);
     await db.delete(github_branch_pull_requests);
+    await db.delete(user_github_app_tokens);
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
@@ -1697,6 +1699,46 @@ describe('User', () => {
         .from(github_branch_pull_requests)
         .where(eq(github_branch_pull_requests.owned_by_user_id, user.id));
       expect(rows).toHaveLength(0);
+    });
+
+    it('should delete user_github_app_tokens for the user', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      await db.insert(user_github_app_tokens).values([
+        {
+          kilo_user_id: user.id,
+          github_app_type: 'standard',
+          github_user_id: '123',
+          github_login: 'testuser',
+          github_email: 'test@example.com',
+          access_token_encrypted: 'enc-token-1',
+          access_token_expires_at: new Date(Date.now() + 3600_000),
+        },
+        {
+          kilo_user_id: otherUser.id,
+          github_app_type: 'standard',
+          github_user_id: '456',
+          github_login: 'otheruser',
+          github_email: 'other@example.com',
+          access_token_encrypted: 'enc-token-2',
+          access_token_expires_at: new Date(Date.now() + 3600_000),
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const userTokens = await db
+        .select()
+        .from(user_github_app_tokens)
+        .where(eq(user_github_app_tokens.kilo_user_id, user.id));
+      expect(userTokens).toHaveLength(0);
+
+      const otherTokens = await db
+        .select()
+        .from(user_github_app_tokens)
+        .where(eq(user_github_app_tokens.kilo_user_id, otherUser.id));
+      expect(otherTokens).toHaveLength(1);
     });
 
     it('should nullify free_model_usage FK', async () => {

@@ -1,6 +1,7 @@
 import {
   pgTable,
   pgView,
+  pgEnum,
   bigint,
   index,
   uuid,
@@ -2463,6 +2464,48 @@ export const platform_integrations = pgTable(
 );
 
 export type PlatformIntegration = typeof platform_integrations.$inferSelect;
+
+export const githubAppTypeEnum = pgEnum('github_app_type', ['standard', 'lite']);
+
+export const revocationReasonEnum = pgEnum('revocation_reason', [
+  'user_revoked',
+  'refresh_failed',
+  'admin',
+]);
+
+export const user_github_app_tokens = pgTable(
+  'user_github_app_tokens',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    github_app_type: githubAppTypeEnum().notNull().default('standard'),
+    github_user_id: text().notNull(),
+    github_login: text().notNull(),
+    github_email: text(),
+    access_token_encrypted: text().notNull(),
+    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revocation_reason: revocationReasonEnum(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    uniqueIndex('user_github_app_tokens_user_app_uidx').on(
+      table.kilo_user_id,
+      table.github_app_type
+    ),
+    index('user_github_app_tokens_github_user_id_idx').on(table.github_user_id),
+  ]
+);
+
+export type UserGitHubAppToken = typeof user_github_app_tokens.$inferSelect;
+export type NewUserGitHubAppToken = typeof user_github_app_tokens.$inferInsert;
 
 // User Deployments
 

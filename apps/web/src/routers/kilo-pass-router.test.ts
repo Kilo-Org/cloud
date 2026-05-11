@@ -802,6 +802,112 @@ describe('kiloPassRouter', () => {
       );
     });
 
+    it('treats an active App Store subscription as ended when the latest purchase is expired', async () => {
+      freezeKiloPassClock('2026-03-01T00:00:00.000Z');
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-app-store-expired@example.com',
+      });
+      const providerSubscriptionId = 'orig_get_state_app_store_expired';
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: null,
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerSubscriptionId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        currentStreakMonths: 1,
+        startedAt: '2026-01-01T00:00:00.000Z',
+      });
+
+      await db.insert(kilo_pass_store_purchases).values({
+        kilo_pass_subscription_id: subscriptionId,
+        kilo_user_id: user.id,
+        payment_provider: KiloPassPaymentProvider.AppStore,
+        product_id: 'kilo_pass_tier_19_monthly',
+        provider_subscription_id: providerSubscriptionId,
+        provider_transaction_id: 'tx_get_state_app_store_expired',
+        provider_original_transaction_id: providerSubscriptionId,
+        app_account_token: user.app_store_account_token,
+        environment: 'Sandbox',
+        purchased_at: '2026-01-31T00:00:00.000Z',
+        expires_at: '2026-02-28T00:00:00.000Z',
+        raw_payload_json: {},
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      expect(result.subscription).toEqual(
+        expect.objectContaining({
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          status: 'canceled',
+          nextBillingAt: null,
+          refillAt: null,
+        })
+      );
+
+      const subscriptionRow = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.id, subscriptionId),
+      });
+
+      expect(subscriptionRow).toEqual(
+        expect.objectContaining({
+          status: 'canceled',
+        })
+      );
+      expect(new Date(subscriptionRow!.ended_at!).toISOString()).toBe('2026-03-01T00:00:00.000Z');
+    });
+
+    it('keeps an App Store subscription active when the latest purchase expires in the future', async () => {
+      freezeKiloPassClock('2026-02-15T00:00:00.000Z');
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-app-store-future-expiry@example.com',
+      });
+      const providerSubscriptionId = 'orig_get_state_app_store_future_expiry';
+      const expiresAt = '2026-03-01T00:00:00.000Z';
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: null,
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerSubscriptionId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        currentStreakMonths: 1,
+        startedAt: '2026-01-01T00:00:00.000Z',
+      });
+
+      await db.insert(kilo_pass_store_purchases).values({
+        kilo_pass_subscription_id: subscriptionId,
+        kilo_user_id: user.id,
+        payment_provider: KiloPassPaymentProvider.AppStore,
+        product_id: 'kilo_pass_tier_19_monthly',
+        provider_subscription_id: providerSubscriptionId,
+        provider_transaction_id: 'tx_get_state_app_store_future_expiry',
+        provider_original_transaction_id: providerSubscriptionId,
+        app_account_token: user.app_store_account_token,
+        environment: 'Sandbox',
+        purchased_at: '2026-02-01T00:00:00.000Z',
+        expires_at: expiresAt,
+        raw_payload_json: {},
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      expect(result.subscription).toEqual(
+        expect.objectContaining({
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          status: 'active',
+          nextBillingAt: expiresAt,
+          refillAt: expiresAt,
+        })
+      );
+    });
+
     it('predicts monthly nextBonusCreditsUsd as 50% for promo month 2 (streak=1 -> predicted=2)', async () => {
       const stripeMock = getStripeMock();
       const currentPeriodEndSeconds = 1_700_123_456;

@@ -698,6 +698,17 @@ export const kiloPassRouter = createTRPCRouter({
     }
 
     if (subscriptionBase.paymentProvider !== KiloPassPaymentProvider.Stripe) {
+      if (isStripeSubscriptionEnded(subscriptionBase.status)) {
+        return {
+          subscription: await buildEndedKiloPassSubscriptionState({
+            kiloUserId: ctx.user.id,
+            subscription: subscriptionBase,
+            status: subscriptionBase.status,
+          }),
+          isEligibleForFirstMonthPromo: false,
+        };
+      }
+
       const latestStorePurchase = await db.query.kilo_pass_store_purchases.findFirst({
         where: and(
           eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscriptionBase.subscriptionId),

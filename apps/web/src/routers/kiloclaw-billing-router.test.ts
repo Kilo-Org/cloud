@@ -21,6 +21,7 @@ import {
   kiloclaw_subscription_change_log,
   kilocode_users,
   credit_transactions,
+  kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   user_affiliate_attributions,
   user_affiliate_events,
@@ -31,7 +32,7 @@ import { createOrganization } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import type Stripe from 'stripe';
-import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { KiloPassTier, KiloPassCadence, KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 import { differenceInCalendarMonths } from 'date-fns';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -5428,19 +5429,36 @@ describe('getBillingStatus with credits', () => {
     status: Stripe.Subscription.Status;
     cancelAtPeriodEnd?: boolean;
     endedAt?: string | null;
+    paymentProvider?: KiloPassPaymentProvider;
+    providerSubscriptionId?: string | null;
   }) {
-    await db.insert(kilo_pass_subscriptions).values({
-      kilo_user_id: params.userId,
-      stripe_subscription_id: `kp-stripe-sub-${crypto.randomUUID()}`,
-      tier: KiloPassTier.Tier19,
-      cadence: KiloPassCadence.Monthly,
-      status: params.status,
-      cancel_at_period_end: params.cancelAtPeriodEnd ?? false,
-      started_at: new Date().toISOString(),
-      ended_at: params.endedAt ?? null,
-      current_streak_months: 1,
-      next_yearly_issue_at: null,
-    });
+    const paymentProvider = params.paymentProvider ?? KiloPassPaymentProvider.Stripe;
+    const [subscription] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: params.userId,
+        payment_provider: paymentProvider,
+        provider_subscription_id: params.providerSubscriptionId ?? null,
+        stripe_subscription_id:
+          paymentProvider === KiloPassPaymentProvider.Stripe
+            ? `kp-stripe-sub-${crypto.randomUUID()}`
+            : null,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: params.status,
+        cancel_at_period_end: params.cancelAtPeriodEnd ?? false,
+        started_at: new Date().toISOString(),
+        ended_at: params.endedAt ?? null,
+        current_streak_months: 1,
+        next_yearly_issue_at: null,
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+
+    if (!subscription) {
+      throw new Error('Failed to create Kilo Pass subscription');
+    }
+
+    return subscription;
   }
 
   it('includes hasStripeFunding=true for Stripe-funded subscription', async () => {
@@ -5590,6 +5608,66 @@ describe('getBillingStatus with credits', () => {
     const result = await caller.kiloclaw.getBillingStatus();
 
     expect(result.hasActiveKiloPass).toBe(false);
+  });
+
+  it('reports hasActiveKiloPass=false for an active App Store subscription whose latest purchase expired', async () => {
+    const providerSubscriptionId = 'orig_kiloclaw_app_store_expired';
+    const subscription = await createKiloPassSubscription({
+      userId: user.id,
+      status: 'active',
+      paymentProvider: KiloPassPaymentProvider.AppStore,
+      providerSubscriptionId,
+    });
+
+    await db.insert(kilo_pass_store_purchases).values({
+      kilo_pass_subscription_id: subscription.id,
+      kilo_user_id: user.id,
+      payment_provider: KiloPassPaymentProvider.AppStore,
+      product_id: 'kilo_pass_tier_19_monthly',
+      provider_subscription_id: providerSubscriptionId,
+      provider_transaction_id: 'tx_kiloclaw_app_store_expired',
+      provider_original_transaction_id: providerSubscriptionId,
+      app_account_token: user.app_store_account_token,
+      environment: 'Sandbox',
+      purchased_at: '2020-01-31T00:00:00.000Z',
+      expires_at: '2020-02-28T00:00:00.000Z',
+      raw_payload_json: {},
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingStatus();
+
+    expect(result.hasActiveKiloPass).toBe(false);
+  });
+
+  it('reports hasActiveKiloPass=true for an active App Store subscription whose latest purchase has not expired', async () => {
+    const providerSubscriptionId = 'orig_kiloclaw_app_store_future_expiry';
+    const subscription = await createKiloPassSubscription({
+      userId: user.id,
+      status: 'active',
+      paymentProvider: KiloPassPaymentProvider.AppStore,
+      providerSubscriptionId,
+    });
+
+    await db.insert(kilo_pass_store_purchases).values({
+      kilo_pass_subscription_id: subscription.id,
+      kilo_user_id: user.id,
+      payment_provider: KiloPassPaymentProvider.AppStore,
+      product_id: 'kilo_pass_tier_19_monthly',
+      provider_subscription_id: providerSubscriptionId,
+      provider_transaction_id: 'tx_kiloclaw_app_store_future_expiry',
+      provider_original_transaction_id: providerSubscriptionId,
+      app_account_token: user.app_store_account_token,
+      environment: 'Sandbox',
+      purchased_at: '2099-02-01T00:00:00.000Z',
+      expires_at: '2099-03-01T00:00:00.000Z',
+      raw_payload_json: {},
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingStatus();
+
+    expect(result.hasActiveKiloPass).toBe(true);
   });
 
   it('includes plan-specific effective balance previews with projected Kilo Pass bonus', async () => {

@@ -30,6 +30,8 @@ export function KiloPassSubscriptionCard() {
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
   const mobileStoreProductsQuery = useQuery({
     ...trpc.kiloPass.getMobileStoreProducts.queryOptions(),
+    // Dev-only: the profile card needs App Store product IDs only to expose the
+    // StoreKit refund sheet while testing sandbox refund/revocation flows.
     enabled: Platform.OS === 'ios' && __DEV__,
   });
   const subscription = stateQuery.data?.subscription;

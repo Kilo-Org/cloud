@@ -41,7 +41,6 @@ import {
   setupWorkspace,
 } from '../../workspace.js';
 import { WrapperClient } from '../../kilo/wrapper-client.js';
-import { withDORetry } from '../../utils/do-retry.js';
 import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
 import { SANDBOX_SLEEP_AFTER_SECONDS } from '../../core/lease.js';
 import {

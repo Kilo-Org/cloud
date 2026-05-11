@@ -22,7 +22,6 @@ import { logger } from '../logger.js';
 import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
 import { updateGitRemoteToken } from '../workspace.js';
 import { WrapperClient, type WrapperPromptOptions } from '../kilo/wrapper-client.js';
-import { withDORetry } from '../utils/do-retry.js';
 import { normalizeAgentMode } from '../schema.js';
 import { buildImagePromptParts, downloadImagePromptParts } from './image-prompt-parts.js';
 import { withTimeout } from '@kilocode/worker-utils';

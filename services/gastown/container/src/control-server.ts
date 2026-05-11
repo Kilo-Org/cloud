@@ -263,13 +263,19 @@ app.post('/refresh-token', async c => {
   if (!body || typeof body !== 'object' || !('token' in body) || typeof body.token !== 'string') {
     return c.json({ error: 'Missing or invalid token field' }, 400);
   }
-  process.env.GASTOWN_CONTAINER_TOKEN = body.token;
+  // Capture the new token into a local so it survives the await below.
+  const newToken = body.token;
 
   // Wait for boot hydration to release the global sdkServerLock before
-  // we serialise N agent restarts through it. Without this, agent k
-  // queues behind every in-flight hydration ensureSDKServer and easily
-  // blows past REFRESH_AGENT_TIMEOUT_MS (6s) on warm-restart containers.
+  // we mutate process.env or serialise N agent restarts through it.
+  // Without this gate, a mid-hydration token refresh can cause
+  // buildPrewarmEnv to pick up a different token than the one hydration
+  // captured locally — matching the PATCH /agents/:id/model handler
+  // which also gates first.
   await awaitHydration();
+
+  // Now safe to assign: hydration is done, no concurrent env readers.
+  process.env.GASTOWN_CONTAINER_TOKEN = newToken;
 
   const activeAgents = listAgents().filter(a => a.status === 'running' || a.status === 'starting');
   log.info('refresh_token.received', {

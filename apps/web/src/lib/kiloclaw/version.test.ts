@@ -8,10 +8,14 @@ describe('cleanVersion', () => {
 
   // Plain calver (new controller output)
   it('passes through a bare calver', () => expect(cleanVersion('2026.3.8')).toBe('2026.3.8'));
+  it('passes through a bare date+time calver', () =>
+    expect(cleanVersion('2026.3.8.1430')).toBe('2026.3.8.1430'));
 
   // Surrounding quotes (bun build --define)
   it('strips double quotes', () => expect(cleanVersion('"2026.3.8"')).toBe('2026.3.8'));
   it('strips single quotes', () => expect(cleanVersion("'2026.3.8'")).toBe('2026.3.8'));
+  it('strips quotes around date+time calver', () =>
+    expect(cleanVersion('"2026.3.8.1430"')).toBe('2026.3.8.1430'));
 
   // Full openclaw --version output (older controllers)
   it('extracts calver from "OpenClaw 2026.3.8 (3caab92)"', () =>
@@ -20,6 +24,8 @@ describe('cleanVersion', () => {
     expect(cleanVersion('OpenClaw 2026.3.8')).toBe('2026.3.8'));
   it('extracts calver from quoted full string', () =>
     expect(cleanVersion('"OpenClaw 2026.3.8 (abc1234)"')).toBe('2026.3.8'));
+  it('extracts date+time calver from prefixed strings', () =>
+    expect(cleanVersion('Controller 2026.3.8.1430 (abc1234)')).toBe('2026.3.8.1430'));
 
   // No calver found — returns raw string as fallback
   it('returns raw string when no calver pattern matches', () =>
@@ -37,8 +43,14 @@ describe('calverAtLeast', () => {
   it('returns false for empty string', () => expect(calverAtLeast('', '2026.1.1')).toBe(false));
 
   it('returns true when equal', () => expect(calverAtLeast('2026.2.26', '2026.2.26')).toBe(true));
+  it('returns true when date+time calver is equal', () =>
+    expect(calverAtLeast('2026.2.26.1430', '2026.2.26.1430')).toBe(true));
   it('returns true when greater (patch)', () =>
     expect(calverAtLeast('2026.2.27', '2026.2.26')).toBe(true));
+  it('returns true when greater (time)', () =>
+    expect(calverAtLeast('2026.2.26.1431', '2026.2.26.1430')).toBe(true));
+  it('treats missing time segment as 0', () =>
+    expect(calverAtLeast('2026.2.26.0001', '2026.2.26')).toBe(true));
   it('returns true when greater (minor)', () =>
     expect(calverAtLeast('2026.3.1', '2026.2.26')).toBe(true));
   it('returns true when greater (major)', () =>
@@ -46,6 +58,10 @@ describe('calverAtLeast', () => {
 
   it('returns false when less (patch)', () =>
     expect(calverAtLeast('2026.2.25', '2026.2.26')).toBe(false));
+  it('returns false when less (time)', () =>
+    expect(calverAtLeast('2026.2.26.1429', '2026.2.26.1430')).toBe(false));
+  it('treats missing version time segment as 0', () =>
+    expect(calverAtLeast('2026.2.26', '2026.2.26.0001')).toBe(false));
   it('returns false when less (minor)', () =>
     expect(calverAtLeast('2026.1.30', '2026.2.26')).toBe(false));
   it('returns false when less (major)', () =>

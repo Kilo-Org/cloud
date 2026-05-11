@@ -963,6 +963,7 @@ export const OpenCodePromptSchema = z.enum([
   'anthropic',
   'trinity',
   'anthropic_without_todo',
+  'ling',
   'gpt55',
 ]);
 

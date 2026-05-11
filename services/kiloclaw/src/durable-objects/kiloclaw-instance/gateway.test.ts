@@ -36,6 +36,7 @@ describe('gateway controller routing', () => {
   it('routes controller RPCs through provider transport headers', async () => {
     const state = createMutableState();
     state.provider = 'fly';
+    state.status = 'running';
     state.sandboxId = 'sandbox-1';
     state.flyAppName = 'test-app';
     state.flyMachineId = 'machine-1';
@@ -82,6 +83,7 @@ describe('gateway controller routing', () => {
   it('uses provider routing for health probes', async () => {
     const state = createMutableState();
     state.provider = 'fly';
+    state.status = 'running';
     state.sandboxId = 'sandbox-1';
     state.flyAppName = 'test-app';
     state.flyMachineId = 'machine-1';
@@ -122,6 +124,7 @@ describe('gateway controller routing', () => {
   it('returns warm-up payload for morning-briefing status when gateway is warming up', async () => {
     const state = createMutableState();
     state.provider = 'fly';
+    state.status = 'running';
     state.sandboxId = 'sandbox-1';
     state.flyAppName = 'test-app';
     state.flyMachineId = 'machine-1';
@@ -151,6 +154,7 @@ describe('gateway controller routing', () => {
   it('does not mask 401 auth failures as warm-up for morning-briefing status', async () => {
     const state = createMutableState();
     state.provider = 'fly';
+    state.status = 'running';
     state.sandboxId = 'sandbox-1';
     state.flyAppName = 'test-app';
     state.flyMachineId = 'machine-1';
@@ -174,6 +178,7 @@ describe('gateway controller routing', () => {
   it('accepts run response with delivery metadata', async () => {
     const state = createMutableState();
     state.provider = 'fly';
+    state.status = 'running';
     state.sandboxId = 'sandbox-1';
     state.flyAppName = 'test-app';
     state.flyMachineId = 'machine-1';
@@ -213,5 +218,51 @@ describe('gateway controller routing', () => {
       ],
     });
     expect(timeoutSpy).toHaveBeenCalledWith(120_000);
+  });
+
+  it('fails controller RPCs before fetching when instance state is not running', async () => {
+    const state = createMutableState();
+    state.provider = 'fly';
+    state.status = 'stopped';
+    state.sandboxId = 'sandbox-1';
+    state.flyAppName = 'test-app';
+    state.flyMachineId = 'machine-1';
+
+    const fetchMock: FetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      getGatewayProcessStatus(state, {
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        FLY_APP_NAME: 'fallback-app',
+      } as never)
+    ).rejects.toMatchObject({ status: 409, message: 'Instance is not running' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns warm-up payload for morning-briefing status when instance is stopped', async () => {
+    const state = createMutableState();
+    state.provider = 'fly';
+    state.status = 'stopped';
+    state.sandboxId = 'sandbox-1';
+    state.flyAppName = 'test-app';
+    state.flyMachineId = 'machine-1';
+
+    const fetchMock: FetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await getMorningBriefingStatus(state, {
+      GATEWAY_TOKEN_SECRET: 'gateway-secret',
+      FLY_APP_NAME: 'fallback-app',
+    } as never);
+
+    expect(result).toEqual({
+      ok: true,
+      reconcileState: 'in_progress',
+      error: 'Gateway warming up, retrying shortly.',
+      code: 'gateway_warming_up',
+      retryAfterSec: 2,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

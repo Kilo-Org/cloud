@@ -116,6 +116,17 @@ const KiloCliRunConflictSchema = z.object({
   }),
 });
 
+const DoctorRunConflictSchema = z.object({
+  conflict: z.object({
+    code: z.enum([
+      'openclaw_doctor_instance_not_running',
+      'openclaw_doctor_already_active',
+      'openclaw_doctor_no_active_run',
+    ]),
+    error: z.string().min(1),
+  }),
+});
+
 const platform = new Hono<AppEnv>();
 type KiloClawInstanceStub = ReturnType<AppEnv['Bindings']['KILOCLAW_INSTANCE']['get']>;
 
@@ -707,6 +718,20 @@ function kiloCliRunConflictResponse(response: unknown): Response | undefined {
 
   if (isRecord(response) && 'conflict' in response) {
     return jsonError('Invalid Kilo CLI conflict response', 502, 'upstream_invalid_response');
+  }
+
+  return undefined;
+}
+
+function doctorRunConflictResponse(response: unknown): Response | undefined {
+  const result = DoctorRunConflictSchema.safeParse(response);
+  if (result.success) {
+    const { code, error } = result.data.conflict;
+    return jsonError(error, 409, code);
+  }
+
+  if (isRecord(response) && 'conflict' in response) {
+    return jsonError('Invalid doctor conflict response', 502, 'upstream_invalid_response');
   }
 
   return undefined;
@@ -1962,6 +1987,7 @@ function isMorningBriefingWarmupError(
   const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
   if (
     normalized.includes('Gateway not running') ||
+    normalized.includes('Instance is not running') ||
     normalized.includes('Failed to reach gateway')
   ) {
     return true;
@@ -2393,6 +2419,120 @@ platform.post('/doctor', async c => {
     return c.json(doctor, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'doctor');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/doctor-controller/start
+//
+// Starts `openclaw doctor` via the machine's controller HTTP API (NOT the Fly
+// Machines exec API). The run is async and status/output is polled separately.
+// Intended to replace /api/platform/doctor once validated; both paths are live
+// in parallel during the migration.
+const DoctorControllerRunSchema = z.object({
+  userId: z.string().min(1),
+  fix: z.boolean().optional(),
+});
+
+platform.post('/doctor-controller/start', async c => {
+  const result = await parseBody(c, DoctorControllerRunSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    // The DO returns a discriminated union: success | { conflict } | null.
+    // `.then(r => r)` collapses CF Workers' RPC Promise wrapping back to a
+    // plain Promise union (same pattern as startKiloCliRun).
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      // Default is `true` to match the Fly-exec flow (which always passed
+      // --fix) and the admin UI checkbox default. Explicit `false` opts into
+      // read-only diagnostics.
+      stub => stub.startDoctorViaController(result.data.fix ?? true).then(r => r),
+      'startDoctorViaController'
+    );
+    if (!response) {
+      return jsonError(
+        'Doctor runner not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    const conflictResponse = doctorRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'doctor-controller/start');
+    return jsonError(message, status);
+  }
+});
+
+// GET /api/platform/doctor-controller/status?userId=...
+platform.get('/doctor-controller/status', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.getDoctorViaControllerStatus().then(r => r),
+      'getDoctorViaControllerStatus'
+    );
+    if (!response) {
+      return jsonError(
+        'Doctor runner not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    const conflictResponse = doctorRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'doctor-controller/status');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/doctor-controller/cancel
+platform.post('/doctor-controller/cancel', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub => stub.cancelDoctorViaController().then(r => r),
+      'cancelDoctorViaController'
+    );
+    if (!response) {
+      return jsonError(
+        'Doctor runner not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    const conflictResponse = doctorRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'doctor-controller/cancel');
     return jsonError(message, status);
   }
 });
@@ -3034,12 +3174,23 @@ platform.post('/inbound-email', async c => {
     }
 
     const error = await response.text().catch(() => '');
+    let controllerErrorMessage: string | undefined;
+    try {
+      const parsed: unknown = JSON.parse(error);
+      if (parsed && typeof parsed === 'object' && 'error' in parsed) {
+        const candidate = (parsed as { error: unknown }).error;
+        if (typeof candidate === 'string') controllerErrorMessage = candidate;
+      }
+    } catch {
+      // body wasn't JSON; the raw `error` field below preserves it
+    }
     const controllerFailure = {
       ...logContext,
       userId: instance.userId,
       doKey,
       status: response.status,
-      error: error.slice(0, 500),
+      error: error.slice(0, 2000),
+      controllerErrorMessage,
       durationMs: performance.now() - startedAt,
     };
     if (response.status >= 500) {

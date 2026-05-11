@@ -47,8 +47,10 @@ export function KiloPassSubscribeCard(props: {
     KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString()
   );
   const monthlyPromoDescription =
-    cadence === KiloPassCadence.Monthly && showSecondMonthPromo
-      ? `First-time subscribers receive 50% free bonus credits for the first two months. Offer expires ${promoCutoffLabel}.`
+    cadence === KiloPassCadence.Monthly && showFirstMonthPromo
+      ? showSecondMonthPromo
+        ? `First-time subscribers receive 50% free bonus credits for the first two months when they start before ${promoCutoffLabel}.`
+        : 'First-time subscribers receive 50% free bonus credits for the first month.'
       : null;
   const cadenceOptions = [
     { value: KiloPassCadence.Monthly, label: 'Monthly' },

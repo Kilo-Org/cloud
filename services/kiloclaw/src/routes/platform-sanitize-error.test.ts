@@ -2,6 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { KiloClawEnv } from '../types';
 import type { InstanceMutableState } from '../durable-objects/kiloclaw-instance/types';
 import {
+  cancelDoctorViaController,
+  getDoctorViaControllerStatus,
+  startDoctorViaController,
+} from '../durable-objects/kiloclaw-instance/doctor-run';
+import {
   cancelKiloCliRun,
   startKiloCliRun,
 } from '../durable-objects/kiloclaw-instance/kilo-cli-run';
@@ -347,6 +352,322 @@ describe('kilo-cli-run/cancel: conflict response handling', () => {
       code: 'upstream_invalid_response',
       error: 'Invalid Kilo CLI conflict response',
     });
+  });
+});
+
+describe('doctor-controller: response handling', () => {
+  function envWithDoctorStub(stub: Record<string, () => Promise<unknown>>) {
+    return {
+      KILOCLAW_INSTANCE: {
+        idFromName: (id: string) => id,
+        get: () => stub,
+      },
+      KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      KV_CLAW_CACHE: {
+        get: vi.fn().mockResolvedValue(null),
+        put: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        list: vi.fn().mockResolvedValue({ keys: [], list_complete: true }),
+        getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+      },
+    } as never;
+  }
+
+  it('returns 200 when the controller doctor start succeeds', async () => {
+    const env = envWithDoctorStub({
+      startDoctorViaController: () =>
+        Promise.resolve({
+          ok: true,
+          runId: 'run-1',
+          startedAt: '2026-05-08T00:00:00.000Z',
+        }),
+    });
+
+    const resp = await platform.request(
+      '/doctor-controller/start?instanceId=11111111-1111-4111-8111-111111111111',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1', fix: false }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(200);
+    const body = await jsonBody(resp);
+    expect(body).toMatchObject({ ok: true, runId: 'run-1' });
+  });
+
+  it('returns 200 when fetching controller doctor status succeeds', async () => {
+    const env = envWithDoctorStub({
+      getDoctorViaControllerStatus: () =>
+        Promise.resolve({
+          hasRun: true,
+          runId: 'run-1',
+          status: 'completed',
+          fix: false,
+          output: 'doctor output',
+          outputBytes: 13,
+          outputTruncated: false,
+          exitCode: 0,
+          startedAt: '2026-05-08T00:00:00.000Z',
+          completedAt: '2026-05-08T00:00:01.000Z',
+          timedOut: false,
+        }),
+    });
+
+    const resp = await platform.request(
+      '/doctor-controller/status?userId=user-1&instanceId=11111111-1111-4111-8111-111111111111',
+      {},
+      env
+    );
+
+    expect(resp.status).toBe(200);
+    const body = await jsonBody(resp);
+    expect(body).toMatchObject({
+      hasRun: true,
+      runId: 'run-1',
+      status: 'completed',
+      output: 'doctor output',
+    });
+  });
+
+  it('returns 200 when cancelling controller doctor succeeds', async () => {
+    const env = envWithDoctorStub({
+      cancelDoctorViaController: () => Promise.resolve({ ok: true }),
+    });
+
+    const resp = await platform.request(
+      '/doctor-controller/cancel',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(200);
+    expect(await jsonBody(resp)).toMatchObject({ ok: true });
+  });
+
+  it('returns 404 when the controller route is unavailable', async () => {
+    const env = envWithDoctorStub({ startDoctorViaController: () => Promise.resolve(null) });
+
+    const resp = await platform.request(
+      '/doctor-controller/start',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(404);
+    const body = await jsonBody(resp);
+    expect(body).toMatchObject({
+      code: 'controller_route_unavailable',
+      error: 'Doctor runner not available (controller too old)',
+    });
+  });
+
+  it('returns 409 when the DO helper converts not-running into a conflict', async () => {
+    const state = { ...runningFlyState(), status: 'stopped' };
+    const envForController = controllerEnv();
+    const env = envWithDoctorStub({
+      startDoctorViaController: () =>
+        startDoctorViaController(
+          state as InstanceMutableState,
+          envForController as KiloClawEnv,
+          true
+        ).then(response => response),
+    });
+
+    const resp = await platform.request(
+      '/doctor-controller/start',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(409);
+    const body = await jsonBody(resp);
+    expect(body).toMatchObject({
+      code: 'openclaw_doctor_instance_not_running',
+      error: 'Instance is not running',
+    });
+  });
+
+  it('returns 409 when the controller reports a doctor run is already active', async () => {
+    const state = runningFlyState();
+    const envForController = controllerEnv();
+    const env = envWithDoctorStub({
+      startDoctorViaController: () =>
+        startDoctorViaController(
+          state as InstanceMutableState,
+          envForController as KiloClawEnv,
+          true
+        ).then(response => response),
+    });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'openclaw_doctor_already_active',
+          error: 'An openclaw doctor run is already in progress',
+        }),
+        {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    const resp = await platform.request(
+      '/doctor-controller/start',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(409);
+    const body = await jsonBody(resp);
+    expect(body).toMatchObject({
+      code: 'openclaw_doctor_already_active',
+      error: 'An openclaw doctor run is already in progress',
+    });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://app-1.fly.dev/_kilo/doctor/start',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ fix: true }),
+      })
+    );
+  });
+
+  it('returns 409 when the controller reports no active run to cancel', async () => {
+    const state = runningFlyState();
+    const envForController = controllerEnv();
+    const env = envWithDoctorStub({
+      cancelDoctorViaController: () =>
+        cancelDoctorViaController(
+          state as InstanceMutableState,
+          envForController as KiloClawEnv
+        ).then(response => response),
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'openclaw_doctor_no_active_run',
+          error: 'No active doctor run to cancel',
+        }),
+        {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    const resp = await platform.request(
+      '/doctor-controller/cancel',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(409);
+    expect(await jsonBody(resp)).toMatchObject({
+      code: 'openclaw_doctor_no_active_run',
+      error: 'No active doctor run to cancel',
+    });
+  });
+
+  it('calls the controller status endpoint through the DO helper', async () => {
+    const state = runningFlyState();
+    const envForController = controllerEnv();
+    const env = envWithDoctorStub({
+      getDoctorViaControllerStatus: () =>
+        getDoctorViaControllerStatus(
+          state as InstanceMutableState,
+          envForController as KiloClawEnv
+        ).then(response => response),
+    });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          hasRun: false,
+          runId: null,
+          status: null,
+          fix: null,
+          output: null,
+          outputBytes: 0,
+          outputTruncated: false,
+          exitCode: null,
+          startedAt: null,
+          completedAt: null,
+          timedOut: false,
+        }),
+        { headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const resp = await platform.request('/doctor-controller/status?userId=user-1', {}, env);
+
+    expect(resp.status).toBe(200);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://app-1.fly.dev/_kilo/doctor/status',
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it('returns 502 when the DO returns a malformed doctor conflict', async () => {
+    const env = envWithDoctorStub({
+      startDoctorViaController: () => Promise.resolve({ conflict: { error: 'Conflict' } }),
+    });
+
+    const resp = await platform.request(
+      '/doctor-controller/start',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(502);
+    const body = await jsonBody(resp);
+    expect(body).toMatchObject({
+      code: 'upstream_invalid_response',
+      error: 'Invalid doctor conflict response',
+    });
+  });
+});
+
+describe('doctor-controller: legacy route removed', () => {
+  it('does not serve the old synchronous doctor-controller route', async () => {
+    const env = envWithDOError(new Error('should not be called'));
+
+    const resp = await platform.request(
+      '/doctor-controller',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1', fix: false }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(404);
   });
 });
 

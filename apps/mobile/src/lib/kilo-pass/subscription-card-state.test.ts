@@ -76,6 +76,40 @@ describe('getKiloPassSubscriptionCardState', () => {
     });
   });
 
+  it('keeps active Google Play-managed subscriptions inert', () => {
+    expect(
+      getKiloPassSubscriptionCardState({
+        cancelAtPeriodEnd: false,
+        currentPeriodBaseCreditsUsd: 49,
+        paymentProvider: 'google_play',
+        refillAt: '2026-06-08T15:21:05.000Z',
+        status: 'active',
+      })
+    ).toEqual({
+      action: 'none',
+      actionLabel: null,
+      description: '$49 monthly credits · Managed on Google Play',
+      title: 'Kilo Pass active',
+    });
+  });
+
+  it('keeps canceling Google Play-managed subscriptions inert', () => {
+    expect(
+      getKiloPassSubscriptionCardState({
+        cancelAtPeriodEnd: true,
+        currentPeriodBaseCreditsUsd: 49,
+        paymentProvider: 'google_play',
+        refillAt: '2026-06-08T15:21:05.000Z',
+        status: 'active',
+      })
+    ).toEqual({
+      action: 'none',
+      actionLabel: null,
+      description: '$49 monthly credits · Ends June 8, 2026 · Managed on Google Play',
+      title: 'Kilo Pass canceling',
+    });
+  });
+
   it('formats backend PostgreSQL timestamps for pending cancellation', () => {
     expect(
       getKiloPassSubscriptionCardState({
@@ -129,6 +163,15 @@ describe('shouldRenderKiloPassSubscriptionCard', () => {
         platformOS: 'android',
       })
     ).toBe(false);
+  });
+
+  it('renders inert Android cards', () => {
+    expect(
+      shouldRenderKiloPassSubscriptionCard({
+        action: 'none',
+        platformOS: 'android',
+      })
+    ).toBe(true);
   });
 
   it('keeps iOS store actions visible', () => {

@@ -26,14 +26,14 @@ export function getKiloPassSubscriptionCardAccessibility(
   const accessibilityLabel = [cardState.title, cardState.description, cardState.actionLabel]
     .filter(Boolean)
     .join('. ');
-  const accessibilityHint =
-    cardState.action === 'open-web-management'
-      ? 'Opens Kilo Pass management on web.'
-      : cardState.action === 'open-store-management'
-        ? 'Opens App Store subscription management.'
-        : cardState.action === 'open-store-sheet'
-          ? 'Opens Kilo Pass plans.'
-          : undefined;
+  let accessibilityHint: string | undefined = undefined;
+  if (cardState.action === 'open-web-management') {
+    accessibilityHint = 'Opens Kilo Pass management on web.';
+  } else if (cardState.action === 'open-store-management') {
+    accessibilityHint = 'Opens App Store subscription management.';
+  } else if (cardState.action === 'open-store-sheet') {
+    accessibilityHint = 'Opens Kilo Pass plans.';
+  }
 
   return { accessibilityHint, accessibilityLabel };
 }
@@ -42,7 +42,11 @@ export function shouldRenderKiloPassSubscriptionCard(params: {
   action: KiloPassSubscriptionCardState['action'];
   platformOS: string;
 }): boolean {
-  return params.platformOS === 'ios' || params.action === 'open-web-management';
+  return (
+    params.platformOS === 'ios' ||
+    params.action === 'open-web-management' ||
+    params.action === 'none'
+  );
 }
 
 function formatSubscriptionEndDate(iso: string | null): string {
@@ -79,6 +83,17 @@ export function getKiloPassSubscriptionCardState(
   }
 
   const credits = `$${subscription.currentPeriodBaseCreditsUsd.toFixed(0)} monthly credits`;
+  if (subscription.paymentProvider === 'google_play') {
+    return {
+      action: 'none',
+      actionLabel: null,
+      description: subscription.cancelAtPeriodEnd
+        ? `${credits} · Ends ${formatSubscriptionEndDate(subscription.refillAt)} · Managed on Google Play`
+        : `${credits} · Managed on Google Play`,
+      title: subscription.cancelAtPeriodEnd ? 'Kilo Pass canceling' : 'Kilo Pass active',
+    };
+  }
+
   if (subscription.cancelAtPeriodEnd) {
     return {
       action:
@@ -98,19 +113,10 @@ export function getKiloPassSubscriptionCardState(
     };
   }
 
-  if (subscription.paymentProvider === 'stripe') {
-    return {
-      action: 'open-web-management',
-      actionLabel: 'Manage',
-      description: `${credits} · Managed on web`,
-      title: 'Kilo Pass active',
-    };
-  }
-
   return {
-    action: 'open-store-sheet',
+    action: 'open-web-management',
     actionLabel: 'Manage',
-    description: credits,
+    description: `${credits} · Managed on web`,
     title: 'Kilo Pass active',
   };
 }

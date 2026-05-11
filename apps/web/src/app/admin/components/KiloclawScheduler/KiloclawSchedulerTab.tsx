@@ -973,7 +973,7 @@ export function KiloclawSchedulerTab() {
           if (!open) setViewingActionId(null);
         }}
       >
-        <DialogContent className="max-h-[80vh] sm:max-w-3xl">
+        <DialogContent className="grid max-h-[calc(100vh-3rem)] w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-6xl">
           <DialogHeader>
             <DialogTitle>Scheduled action detail</DialogTitle>
             <DialogDescription>
@@ -990,7 +990,7 @@ export function KiloclawSchedulerTab() {
           )}
 
           {detail.data && (
-            <div className="space-y-4 overflow-y-auto">
+            <div className="min-h-0 space-y-4 overflow-y-auto pr-1">
               <div className="bg-muted/30 rounded-md border p-3 text-sm">
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1">
                   <div>
@@ -1051,9 +1051,9 @@ export function KiloclawSchedulerTab() {
               )}
 
               <div className="text-sm font-medium">Targets ({detail.data.targets.length})</div>
-              <div className="rounded-lg border">
-                <Table>
-                  <TableHeader>
+              <div className="max-h-[42vh] overflow-auto rounded-lg border">
+                <Table className="min-w-[920px]">
+                  <TableHeader className="bg-card sticky top-0 z-10">
                     <TableRow>
                       <TableHead>Tranche</TableHead>
                       <TableHead>Instance</TableHead>

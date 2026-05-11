@@ -10,7 +10,7 @@ import { buildMayorSystemPrompt } from '../../prompts/mayor-system.prompt';
 import type { TownConfig, RigOverrideConfig } from '../../types';
 import { buildContainerConfig, resolveModel, resolveSmallModel, resolveRigConfig } from './config';
 import { writeEvent } from '../../util/analytics.util';
-import { resolveGitHubToken } from './town-scm';
+import { resolveGitHubTokenString } from './town-scm';
 
 const TOWN_LOG = '[Town.do]';
 
@@ -410,13 +410,13 @@ export async function startAgentInContainer(
     // Build env vars from town config
     const envVars: Record<string, string> = { ...(params.townConfig.env_vars ?? {}) };
 
-    // Map git_auth tokens. Resolve GitHub token through resolveGitHubToken so
+    // Map git_auth tokens. Resolve GitHub token through resolveGitHubTokenString so
     // we mint a fresh installation token when a platform integration is
     // configured; otherwise we'd hand the agent a `git_auth.github_token`
     // value that may have been written hours ago and is well past its 1h
     // installation-token TTL. The resolved value is also what the agent's
     // `gh` CLI sees as `GH_TOKEN`.
-    const githubToken = await resolveGitHubToken({
+    const githubToken = await resolveGitHubTokenString({
       env,
       townId: params.townId,
       getTownConfig: () => Promise.resolve(params.townConfig),
@@ -625,10 +625,10 @@ export async function startMergeInContainer(
     }
 
     const envVars: Record<string, string> = { ...(params.townConfig.env_vars ?? {}) };
-    // Resolve GitHub token through resolveGitHubToken so a configured
+    // Resolve GitHub token through resolveGitHubTokenString so a configured
     // platform integration mints a fresh installation token for the
     // merge process. See startAgentInContainer for the rationale.
-    const mergeGithubToken = await resolveGitHubToken({
+    const mergeGithubToken = await resolveGitHubTokenString({
       env,
       townId: params.townId,
       getTownConfig: () => Promise.resolve(params.townConfig),

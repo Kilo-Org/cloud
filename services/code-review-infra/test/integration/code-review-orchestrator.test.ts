@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-base-to-string, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from 'cloudflare:test';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { CodeReviewOrchestrator } from '../../src/code-review-orchestrator';

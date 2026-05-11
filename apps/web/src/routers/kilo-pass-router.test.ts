@@ -325,6 +325,16 @@ function appStorePurchaseFixture(
   };
 }
 
+function expectNoStripeManagementCalls(stripeMock: StripeMock): void {
+  expect(stripeMock.billingPortal.sessions.create).not.toHaveBeenCalled();
+  expect(stripeMock.subscriptions.retrieve).not.toHaveBeenCalled();
+  expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
+  expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
+  expect(stripeMock.subscriptionSchedules.update).not.toHaveBeenCalled();
+  expect(stripeMock.subscriptionSchedules.release).not.toHaveBeenCalled();
+  expect(stripeMock.invoices.list).not.toHaveBeenCalled();
+}
+
 async function insertBaseCreditsIssuance(params: {
   subscriptionId: string;
   kiloUserId: string;
@@ -1503,6 +1513,29 @@ describe('kiloPassRouter', () => {
       );
       expect(stripeMock.billingPortal.sessions.create).not.toHaveBeenCalled();
     });
+
+    it('rejects active Google Play subscriptions without opening the Stripe portal', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-portal-google-play@example.com',
+        stripe_customer_id: 'cus_google_play_portal',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerSubscriptionId: 'google-play-original-portal',
+        stripeSubscriptionId: null,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.getCustomerPortalUrl({})).rejects.toThrow(
+        'Manage this Kilo Pass subscription through the mobile app store.'
+      );
+      expectNoStripeManagementCalls(stripeMock);
+    });
   });
 
   describe('getChurnkeyAuthHash', () => {
@@ -1564,6 +1597,30 @@ describe('kiloPassRouter', () => {
       await expect(caller.kiloPass.getChurnkeyAuthHash()).rejects.toThrow(
         'CHURNKEY_API_SECRET is not configured'
       );
+    });
+
+    it('rejects active Google Play subscriptions without creating Churnkey Stripe auth', async () => {
+      const stripeMock = getStripeMock();
+      process.env.CHURNKEY_API_SECRET = 'test_churnkey_secret';
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-churnkey-google-play@example.com',
+        stripe_customer_id: 'cus_google_play_churnkey',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerSubscriptionId: 'google-play-original-churnkey',
+        stripeSubscriptionId: null,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.getChurnkeyAuthHash()).rejects.toThrow(
+        'Manage this Kilo Pass subscription through the mobile app store.'
+      );
+      expectNoStripeManagementCalls(stripeMock);
     });
   });
 
@@ -1629,6 +1686,29 @@ describe('kiloPassRouter', () => {
       expect(updated?.status).toBe('active');
       expect(updated?.cancel_at_period_end).toBe(true);
     });
+
+    it('rejects active Google Play subscriptions without canceling in Stripe', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-cancel-google-play@example.com',
+        stripe_customer_id: 'cus_google_play_cancel',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerSubscriptionId: 'google-play-original-cancel',
+        stripeSubscriptionId: null,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.cancelSubscription()).rejects.toThrow(
+        'Manage this Kilo Pass subscription through the mobile app store.'
+      );
+      expectNoStripeManagementCalls(stripeMock);
+    });
   });
 
   describe('resumeCancelledSubscription', () => {
@@ -1688,6 +1768,30 @@ describe('kiloPassRouter', () => {
       expect(updated?.status).toBe('active');
       expect(updated?.cancel_at_period_end).toBe(false);
       expect(updated?.ended_at).toBeNull();
+    });
+
+    it('rejects pending-cancel Google Play subscriptions without resuming in Stripe', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-resume-google-play@example.com',
+        stripe_customer_id: 'cus_google_play_resume',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerSubscriptionId: 'google-play-original-resume',
+        stripeSubscriptionId: null,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        cancelAtPeriodEnd: true,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.resumeCancelledSubscription()).rejects.toThrow(
+        'Manage this Kilo Pass subscription through the mobile app store.'
+      );
+      expectNoStripeManagementCalls(stripeMock);
     });
   });
 
@@ -1762,6 +1866,29 @@ describe('kiloPassRouter', () => {
       await expect(caller.kiloPass.resumePausedSubscription()).rejects.toThrow(
         'No Kilo Pass subscription found.'
       );
+    });
+
+    it('rejects paused Google Play subscriptions without resuming in Stripe', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-resume-paused-google-play@example.com',
+        stripe_customer_id: 'cus_google_play_resume_paused',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerSubscriptionId: 'google-play-original-resume-paused',
+        stripeSubscriptionId: null,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'paused',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.resumePausedSubscription()).rejects.toThrow(
+        'Manage this Kilo Pass subscription through the mobile app store.'
+      );
+      expectNoStripeManagementCalls(stripeMock);
     });
   });
 
@@ -2155,6 +2282,32 @@ describe('kiloPassRouter', () => {
         billing_cycle_anchor: 'phase_start',
       });
     });
+
+    it('rejects active Google Play subscriptions without creating a Stripe schedule', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-schedule-change-google-play@example.com',
+        stripe_customer_id: 'cus_google_play_schedule',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerSubscriptionId: 'google-play-original-schedule',
+        stripeSubscriptionId: null,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.scheduleChange({
+          targetTier: KiloPassTier.Tier49,
+          targetCadence: KiloPassCadence.Monthly,
+        })
+      ).rejects.toThrow('Manage this Kilo Pass subscription through the mobile app store.');
+      expectNoStripeManagementCalls(stripeMock);
+    });
   });
 
   describe('cancelScheduledChange', () => {
@@ -2215,6 +2368,29 @@ describe('kiloPassRouter', () => {
       // `subscription_schedule.updated` webhook when it transitions to released/canceled/completed.
       expect(updated).toBeTruthy();
     });
+
+    it('rejects active Google Play subscriptions without releasing a Stripe schedule', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-cancel-scheduled-google-play@example.com',
+        stripe_customer_id: 'cus_google_play_cancel_schedule',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerSubscriptionId: 'google-play-original-cancel-schedule',
+        stripeSubscriptionId: null,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.cancelScheduledChange()).rejects.toThrow(
+        'Manage this Kilo Pass subscription through the mobile app store.'
+      );
+      expectNoStripeManagementCalls(stripeMock);
+    });
   });
 
   describe('getBillingHistory', () => {
@@ -2227,6 +2403,29 @@ describe('kiloPassRouter', () => {
       const result = await caller.kiloPass.getBillingHistory({});
 
       expect(result).toEqual({ entries: [], hasMore: false, cursor: null });
+    });
+
+    it('rejects active Google Play subscriptions without listing Stripe invoices', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-billing-history-google-play@example.com',
+        stripe_customer_id: 'cus_google_play_billing_history',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerSubscriptionId: 'google-play-original-billing-history',
+        stripeSubscriptionId: null,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.getBillingHistory({})).rejects.toThrow(
+        'Manage this Kilo Pass subscription through the mobile app store.'
+      );
+      expectNoStripeManagementCalls(stripeMock);
     });
 
     it('returns mapped invoices scoped to the kilo pass subscription', async () => {

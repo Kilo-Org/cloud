@@ -1,6 +1,6 @@
 export {
-  getKiloPassExternalManagementAction,
-  type KiloPassExternalManagementAction,
+  getKiloPassProviderManagementModel,
+  type KiloPassProviderManagementModel,
 } from '@/components/profile/kilo-pass/kiloPassManagementAction';
 
 export type KiloPassSubscriptionDisplayModel = {

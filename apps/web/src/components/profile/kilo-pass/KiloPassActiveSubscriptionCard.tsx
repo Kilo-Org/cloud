@@ -27,7 +27,7 @@ import {
   computeRenewInfoRowModel,
   computeUsageProgressModel,
 } from './KiloPassActiveSubscriptionCard.logic';
-import { getKiloPassExternalManagementAction } from './kiloPassManagementAction';
+import { getKiloPassProviderManagementModel } from './kiloPassManagementAction';
 
 export function KiloPassActiveSubscriptionCard(props: { subscription: KiloPassSubscription }) {
   return (
@@ -52,7 +52,11 @@ export function KiloPassActiveSubscriptionCard(props: { subscription: KiloPassSu
 function RenewInfoRow() {
   const { subscription, view } = useKiloPassSubscriptionInfo();
   const trpc = useTRPC();
-  const scheduledChangeQuery = useQuery(trpc.kiloPass.getScheduledChange.queryOptions());
+  const providerManagement = getKiloPassProviderManagementModel(subscription.paymentProvider);
+  const scheduledChangeQuery = useQuery({
+    ...trpc.kiloPass.getScheduledChange.queryOptions(),
+    enabled: providerManagement.canUseScheduledChanges,
+  });
   const scheduledChange = scheduledChangeQuery.data?.scheduledChange;
 
   const rows = computeRenewInfoRowModel({
@@ -127,9 +131,7 @@ function RenewInfoRow() {
 function HeaderRow() {
   const { subscription, view } = useKiloPassSubscriptionInfo();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const externalManagementAction = getKiloPassExternalManagementAction(
-    subscription.paymentProvider
-  );
+  const providerManagement = getKiloPassProviderManagementModel(subscription.paymentProvider);
 
   return (
     <div className="flex items-start justify-between gap-3">
@@ -147,18 +149,18 @@ function HeaderRow() {
 
       <div className="flex items-center gap-2">
         <Badge variant={view.status.badgeVariant}>{view.status.label}</Badge>
-        {externalManagementAction ? (
+        {providerManagement.externalManagementAction ? (
           <Button asChild variant="outline" size="icon" className="h-9 w-9">
             <a
-              href={externalManagementAction.url}
+              href={providerManagement.externalManagementAction.url}
               target="_blank"
               rel="noreferrer"
-              aria-label={externalManagementAction.label}
+              aria-label={providerManagement.externalManagementAction.label}
             >
               <ExternalLink className="h-4 w-4" />
             </a>
           </Button>
-        ) : (
+        ) : providerManagement.canUseWebControls ? (
           <Button
             variant="outline"
             size="icon"
@@ -168,15 +170,19 @@ function HeaderRow() {
           >
             <Settings className="h-4 w-4" />
           </Button>
-        )}
+        ) : providerManagement.providerManagedCopy ? (
+          <span className="text-muted-foreground hidden text-xs sm:inline">
+            {providerManagement.providerManagedCopy}
+          </span>
+        ) : null}
       </div>
 
-      {externalManagementAction ? null : (
+      {providerManagement.canUseWebControls ? (
         <KiloPassSubscriptionSettingsModal
           isOpen={settingsOpen}
           onClose={() => setSettingsOpen(false)}
         />
-      )}
+      ) : null}
     </div>
   );
 }
@@ -289,7 +295,11 @@ function UsageProgressOrBonusUnlocked() {
 function NextBillingDateRow() {
   const { subscription, view } = useKiloPassSubscriptionInfo();
   const trpc = useTRPC();
-  const scheduledChangeQuery = useQuery(trpc.kiloPass.getScheduledChange.queryOptions());
+  const providerManagement = getKiloPassProviderManagementModel(subscription.paymentProvider);
+  const scheduledChangeQuery = useQuery({
+    ...trpc.kiloPass.getScheduledChange.queryOptions(),
+    enabled: providerManagement.canUseScheduledChanges,
+  });
   const scheduledChange = scheduledChangeQuery.data?.scheduledChange;
   const nextBillingDateLabel = view.dates.nextBillingDateLabel;
 

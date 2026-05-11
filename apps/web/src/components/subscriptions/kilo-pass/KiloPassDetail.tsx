@@ -33,12 +33,12 @@ import { KiloPassSubscriptionSettingsModal } from '@/components/profile/kilo-pas
 import { KiloPassBonusRampDialog } from '@/components/profile/kilo-pass/KiloPassBonusRampDialog';
 import { computeMonthlyCadenceBonusPercent } from '@/lib/kilo-pass/bonus';
 import { KiloPassCadence } from '@/lib/kilo-pass/enums';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 import { KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT } from '@/lib/kilo-pass/constants';
 import {
   computeUsageProgressModel,
   computeRenewInfoRowModel,
 } from '@/components/profile/kilo-pass/KiloPassActiveSubscriptionCard.logic';
+import type { KiloPassScheduledChange } from '@/components/profile/kilo-pass/KiloPassActiveSubscriptionCard.logic';
 import {
   formatKiloPassCadenceLabel,
   formatKiloPassPrice,
@@ -51,12 +51,12 @@ import {
   getKiloPassSubscriptionDisplayModel,
   getKiloPassInlineActionModel,
   getKiloPassInlineConfirmationDetails,
-  getKiloPassExternalManagementAction,
+  getKiloPassProviderManagementModel,
 } from './KiloPassDetail.logic';
 import type {
-  KiloPassExternalManagementAction,
   KiloPassInlineConfirmationAction,
   KiloPassInlinePrimaryAction,
+  KiloPassProviderManagementModel,
 } from './KiloPassDetail.logic';
 
 export function KiloPassDetail() {
@@ -67,15 +67,16 @@ export function KiloPassDetail() {
 
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
   const subscription = stateQuery.data?.subscription ?? null;
-  const isStripeManagedSubscription =
-    subscription?.paymentProvider === KiloPassPaymentProvider.Stripe;
+  const providerManagement = subscription
+    ? getKiloPassProviderManagementModel(subscription.paymentProvider)
+    : null;
   const scheduledChangeQuery = useQuery({
     ...trpc.kiloPass.getScheduledChange.queryOptions(),
-    enabled: isStripeManagedSubscription,
+    enabled: providerManagement?.canUseScheduledChanges ?? false,
   });
   const billingQuery = useQuery({
     ...trpc.kiloPass.getBillingHistory.queryOptions({}),
-    enabled: isStripeManagedSubscription,
+    enabled: providerManagement?.canViewBillingHistory ?? false,
   });
   const creditHistoryQuery = useQuery(trpc.kiloPass.getCreditHistory.queryOptions({}));
 
@@ -177,9 +178,8 @@ export function KiloPassDetail() {
     nextBillingLabel: nextBillingDateLabel,
     resumesAtLabel,
   });
-  const externalManagementAction = getKiloPassExternalManagementAction(
-    subscription.paymentProvider
-  );
+  const providerManagementModel =
+    providerManagement ?? getKiloPassProviderManagementModel(subscription.paymentProvider);
 
   return (
     <KiloPassSubscriptionInfoProvider subscription={subscription}>
@@ -269,7 +269,7 @@ export function KiloPassDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <BonusStreakContent subscription={subscription} />
+              <BonusStreakContent subscription={subscription} scheduledChange={scheduledChange} />
             </CardContent>
           </Card>
         </div>
@@ -280,7 +280,7 @@ export function KiloPassDetail() {
             onResume={handleResume}
             onResumePaused={handleResumePaused}
             hasScheduledChange={Boolean(scheduledChange)}
-            externalManagementAction={externalManagementAction}
+            providerManagement={providerManagementModel}
           />
         )}
 
@@ -298,7 +298,7 @@ export function KiloPassDetail() {
           </CardContent>
         </Card>
 
-        {isStripeManagedSubscription ? (
+        {providerManagementModel.canViewBillingHistory ? (
           <Card>
             <CardHeader className="pb-4">
               <CardTitle>Billing history</CardTitle>
@@ -315,12 +315,12 @@ export function KiloPassDetail() {
           </Card>
         ) : null}
 
-        {externalManagementAction ? null : (
+        {providerManagementModel.canUseWebControls ? (
           <KiloPassSubscriptionSettingsModal
             isOpen={settingsOpen}
             onClose={() => setSettingsOpen(false)}
           />
-        )}
+        ) : null}
       </div>
     </KiloPassSubscriptionInfoProvider>
   );
@@ -331,13 +331,13 @@ function KiloPassInlineActions({
   onResume,
   onResumePaused,
   hasScheduledChange,
-  externalManagementAction,
+  providerManagement,
 }: {
   onOpenSettings: () => void;
   onResume: () => Promise<void>;
   onResumePaused: () => Promise<void>;
   hasScheduledChange: boolean;
-  externalManagementAction: KiloPassExternalManagementAction | null;
+  providerManagement: KiloPassProviderManagementModel;
 }) {
   const { subscription, view, actions } = useKiloPassSubscriptionInfo();
   const { openCancelFlow, isOpeningCancelFlow } = useKiloPassChurnkeyCancelFlow({
@@ -383,23 +383,27 @@ function KiloPassInlineActions({
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        {externalManagementAction ? (
+        {providerManagement.externalManagementAction ? (
           <Button asChild variant="outline">
-            <a href={externalManagementAction.url} target="_blank" rel="noreferrer">
+            <a
+              href={providerManagement.externalManagementAction.url}
+              target="_blank"
+              rel="noreferrer"
+            >
               <ExternalLink className="h-4 w-4" />
-              {externalManagementAction.label}
+              {providerManagement.externalManagementAction.label}
             </a>
           </Button>
-        ) : (
+        ) : providerManagement.canUseWebControls ? (
           <>
             <Button
               variant="outline"
               onClick={onOpenSettings}
-              disabled={inlineActionModel.changePlanDisabled}
+              disabled={!providerManagement.canChangePlan || inlineActionModel.changePlanDisabled}
             >
               Change Plan
             </Button>
-            {inlineActionModel.resumePaused ? (
+            {providerManagement.canResumeInWeb && inlineActionModel.resumePaused ? (
               <Button
                 variant="outline"
                 onClick={() => setConfirmationAction('resumePaused')}
@@ -407,7 +411,7 @@ function KiloPassInlineActions({
               >
                 Resume Subscription
               </Button>
-            ) : inlineActionModel.resume ? (
+            ) : providerManagement.canResumeInWeb && inlineActionModel.resume ? (
               <Button
                 variant="outline"
                 onClick={() => setConfirmationAction('resume')}
@@ -415,7 +419,7 @@ function KiloPassInlineActions({
               >
                 Resume Subscription
               </Button>
-            ) : inlineActionModel.cancel ? (
+            ) : providerManagement.canUseChurnkeyCancel && inlineActionModel.cancel ? (
               <Button
                 variant="outline"
                 className="text-destructive hover:bg-destructive/10 hover:text-destructive gap-2"
@@ -431,12 +435,14 @@ function KiloPassInlineActions({
             <Button
               variant="outline"
               onClick={actions.openCustomerPortal}
-              disabled={actions.isOpeningCustomerPortal}
+              disabled={!providerManagement.canUseStripePortal || actions.isOpeningCustomerPortal}
             >
               <ExternalLink className="h-4 w-4" />
               {actions.isOpeningCustomerPortal ? 'Opening...' : 'Manage Payment Method'}
             </Button>
           </>
+        ) : (
+          <p className="text-muted-foreground text-sm">{providerManagement.providerManagedCopy}</p>
         )}
       </div>
 
@@ -471,10 +477,13 @@ function KiloPassInlineActions({
   );
 }
 
-function BonusStreakContent({ subscription }: { subscription: KiloPassSubscription }) {
-  const trpc = useTRPC();
-  const scheduledChangeQuery = useQuery(trpc.kiloPass.getScheduledChange.queryOptions());
-  const scheduledChange = scheduledChangeQuery.data?.scheduledChange ?? null;
+function BonusStreakContent({
+  subscription,
+  scheduledChange,
+}: {
+  subscription: KiloPassSubscription;
+  scheduledChange: KiloPassScheduledChange;
+}) {
   const { view } = useKiloPassSubscriptionInfo();
 
   const model = computeUsageProgressModel({

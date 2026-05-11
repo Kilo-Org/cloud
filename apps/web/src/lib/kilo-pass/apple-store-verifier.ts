@@ -39,7 +39,7 @@ const AppleStoreTransactionPayloadSchema = z
   })
   .passthrough();
 
-function normalizeEnvironment(environment: string | undefined): AppleStoreEnvironment {
+export function normalizeEnvironment(environment: string | undefined): AppleStoreEnvironment {
   if (environment === 'Production') return 'Production';
   return 'Sandbox';
 }

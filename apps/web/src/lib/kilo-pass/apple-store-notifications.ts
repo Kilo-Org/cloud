@@ -25,6 +25,7 @@ import { appendKiloPassAuditLog } from './issuance';
 import {
   decodeAppleStoreTransactionJws,
   mapAppleKiloPassTransaction,
+  normalizeEnvironment,
   type AppleStoreDecodedTransaction,
   type AppleStoreEnvironment,
 } from './apple-store-verifier';
@@ -82,11 +83,6 @@ const AppleStoreNotificationPayloadSchema = z
       .optional(),
   })
   .passthrough();
-
-function normalizeEnvironment(environment: string | undefined): AppleStoreEnvironment {
-  if (environment === 'Production') return 'Production';
-  return 'Sandbox';
-}
 
 async function sendAppleStoreConsumptionInformation(
   transactionId: string,

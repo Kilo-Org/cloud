@@ -408,6 +408,66 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(appStorePurchases).toHaveLength(1);
   });
 
+  it('rejects renewal notifications whose account token does not match the App Store owner', async () => {
+    const owner = await insertTestUser();
+    const otherUser = await insertTestUser();
+    const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'mismatch-initial-buy',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'mismatch-initial-buy',
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          appAccountToken: owner.app_store_account_token,
+        }),
+    });
+
+    const ownerCreditTransactionsBefore = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, owner.id));
+
+    await expect(
+      processAppStoreKiloPassNotification({
+        signedPayload: 'mismatch-renewal',
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: 'mismatch-renewal',
+            notificationType: NotificationTypeV2.DID_RENEW,
+            signedTransactionInfo: 'mismatch-renewal-transaction',
+          }),
+        decodeTransaction: async () =>
+          transaction({
+            originalTransactionId: providerSubscriptionId,
+            transactionId: `tx-${crypto.randomUUID()}`,
+            appAccountToken: otherUser.app_store_account_token,
+          }),
+      })
+    ).rejects.toThrow('App Store renewal account token does not match subscription owner');
+
+    const mismatchEvent = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, 'mismatch-renewal'),
+    });
+    expect(mismatchEvent?.processed_at).toBeNull();
+
+    const otherUserPurchases = await db
+      .select()
+      .from(kilo_pass_store_purchases)
+      .where(eq(kilo_pass_store_purchases.kilo_user_id, otherUser.id));
+    expect(otherUserPurchases).toHaveLength(0);
+
+    const ownerCreditTransactionsAfter = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, owner.id));
+    expect(ownerCreditTransactionsAfter).toHaveLength(ownerCreditTransactionsBefore.length);
+  });
+
   it('applies App Store upgrade renewal preference notifications immediately', async () => {
     const user = await insertTestUser();
     const providerSubscriptionId = `orig-${crypto.randomUUID()}`;

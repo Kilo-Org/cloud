@@ -164,8 +164,6 @@ async function getUserForStoreRenewal(params: {
   appAccountToken: string | null;
   fallbackUser?: User;
 }): Promise<User | null> {
-  if (params.fallbackUser) return params.fallbackUser;
-
   const row = await db
     .select({ user: kilocode_users })
     .from(kilo_pass_subscriptions)
@@ -178,7 +176,14 @@ async function getUserForStoreRenewal(params: {
     )
     .limit(1);
 
-  if (row[0]?.user) return row[0].user;
+  if (row[0]?.user) {
+    if (row[0].user.app_store_account_token !== params.appAccountToken) {
+      throw new Error('App Store renewal account token does not match subscription owner');
+    }
+    return row[0].user;
+  }
+
+  if (params.fallbackUser) return params.fallbackUser;
 
   if (!params.appAccountToken) return null;
 

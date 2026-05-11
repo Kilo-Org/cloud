@@ -571,9 +571,9 @@ describe('two-phase destroy', () => {
         pendingVolumeId: null,
         lastDestroyErrorOp: 'machine',
         lastDestroyErrorStatus: 500,
-        lastDestroyErrorAt: expect.any(Number),
       })
     );
+    expect(result.lastDestroyErrorAt).toEqual(expect.any(Number));
     expect(storage._store.get('pendingDestroyMachineId')).toBe('machine-1');
     expect(storage._store.get('pendingDestroyVolumeId')).toBeNull();
     expect(storage._store.get('destroyStartedAt')).toBeTypeOf('number');

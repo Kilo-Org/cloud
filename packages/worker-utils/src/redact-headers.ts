@@ -9,6 +9,12 @@ const SENSITIVE_HEADERS = new Set([
 ]);
 
 /**
+ * GitHub user-to-server (`ghu_`) and refresh (`ghr_`) token prefixes.
+ * These must never appear in logs or URLs.
+ */
+const GITHUB_TOKEN_RE = /gh[ur]_[A-Za-z0-9_-]+/g;
+
+/**
  * Returns a shallow copy of the headers record with auth-bearing header
  * values replaced by `"[REDACTED]"`. Matching is case-insensitive.
  *
@@ -27,4 +33,12 @@ export function redactSensitiveHeaders(
     result[key] = sensitive.has(key.toLowerCase()) ? '[REDACTED]' : value;
   }
   return result;
+}
+
+/**
+ * Redact GitHub user-to-server (`ghu_`) and refresh (`ghr_`) tokens
+ * from an arbitrary string. Safe for use in logs and error messages.
+ */
+export function redactGitHubTokens(value: string): string {
+  return value.replace(GITHUB_TOKEN_RE, '[REDACTED]');
 }

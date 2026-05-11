@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { redactSensitiveHeaders } from './redact-headers.js';
+import { redactSensitiveHeaders, redactGitHubTokens } from './redact-headers.js';
 
 describe('redactSensitiveHeaders', () => {
   it('redacts known sensitive headers (lowercase)', () => {
@@ -80,5 +80,32 @@ describe('redactSensitiveHeaders', () => {
     const result = redactSensitiveHeaders(input, []);
     expect(result.authorization).toBe('[REDACTED]');
     expect(result['x-foo']).toBe('bar');
+  });
+});
+
+describe('redactGitHubTokens', () => {
+  it('redacts ghu_ tokens', () => {
+    const input = 'token ghu_abc123def456 and more';
+    expect(redactGitHubTokens(input)).toBe('token [REDACTED] and more');
+  });
+
+  it('redacts ghr_ tokens', () => {
+    const input = 'refresh ghr_xyz789-uvw_123 and more';
+    expect(redactGitHubTokens(input)).toBe('refresh [REDACTED] and more');
+  });
+
+  it('redacts multiple tokens in one string', () => {
+    const input = 'user=ghu_a&refresh=ghr_b';
+    expect(redactGitHubTokens(input)).toBe('user=[REDACTED]&refresh=[REDACTED]');
+  });
+
+  it('leaves unrelated strings untouched', () => {
+    const input = 'ghp_abc123 github_pat_123';
+    expect(redactGitHubTokens(input)).toBe('ghp_abc123 github_pat_123');
+  });
+
+  it('returns the input unchanged when no tokens are present', () => {
+    const input = 'no tokens here';
+    expect(redactGitHubTokens(input)).toBe('no tokens here');
   });
 });

@@ -1,3 +1,5 @@
+/* eslint-disable max-lines */
+
 import {
   createContext,
   createElement,
@@ -65,6 +67,15 @@ type StoreKiloPassPurchaseContextValue = {
 const StoreKiloPassPurchaseContext = createContext<StoreKiloPassPurchaseContextValue | null>(null);
 const sharedPurchaseCompletions = new Map<string, Promise<boolean>>();
 let lastPurchaseErrorToast: { message: string; shownAt: number } | null = null;
+
+type PurchaseCompletionOptions = {
+  invalidateAfterCompletion?: boolean;
+  notifyErrors?: boolean;
+};
+
+type PurchaseSuccessOptions = PurchaseCompletionOptions & {
+  notifyCompletion?: boolean;
+};
 
 function isRecoverableKiloPassPurchase(
   purchase: Purchase,
@@ -137,12 +148,14 @@ function getPurchaseCompletionId(purchase: Purchase): string {
 export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurchaseActionsDeps) {
   async function completePurchase(
     purchase: Purchase,
-    options: { notifyErrors?: boolean } = {}
+    options: PurchaseCompletionOptions = {}
   ): Promise<boolean> {
     try {
       const signedTransactionJws = getPurchaseToken(purchase);
       await deps.completeAppStorePurchase({ signedTransactionJws });
-      await deps.invalidateAfterCompletion();
+      if (options.invalidateAfterCompletion ?? true) {
+        await deps.invalidateAfterCompletion();
+      }
       await deps.finishTransaction({ purchase, isConsumable: false });
       return true;
     } catch (error) {
@@ -156,7 +169,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
 
   async function completePurchaseOnce(
     purchase: Purchase,
-    options: { notifyErrors?: boolean } = {}
+    options: PurchaseCompletionOptions = {}
   ): Promise<boolean> {
     const purchaseId = getPurchaseCompletionId(purchase);
     const existingCompletion = sharedPurchaseCompletions.get(purchaseId);
@@ -171,16 +184,14 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     return completed;
   }
 
-  async function handlePurchaseSuccess(
-    purchase: Purchase,
-    options: { notifyCompletion?: boolean; notifyErrors?: boolean } = {}
-  ) {
+  async function handlePurchaseSuccess(purchase: Purchase, options: PurchaseSuccessOptions = {}) {
     const completed = await completePurchaseOnce(purchase, options);
     if (completed && (options.notifyCompletion ?? true)) {
       deps.onPurchaseCompleted?.();
     } else if (!completed && (options.notifyCompletion ?? true)) {
       deps.setPendingPurchaseCompletedCallback?.(null);
     }
+    return completed;
   }
 
   return {
@@ -209,13 +220,21 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     },
     handlePurchaseSuccess,
     recoverPurchases: async (purchases: Purchase[]) => {
-      await Promise.all(
+      const recoveryResults = await Promise.all(
         purchases
           .filter(purchase => isRecoverableKiloPassPurchase(purchase, deps.enabledAppleProductIds))
           .map(async purchase => {
-            await handlePurchaseSuccess(purchase, { notifyCompletion: false, notifyErrors: false });
+            const completed = await handlePurchaseSuccess(purchase, {
+              invalidateAfterCompletion: false,
+              notifyCompletion: false,
+              notifyErrors: false,
+            });
+            return completed;
           })
       );
+      if (recoveryResults.some(Boolean)) {
+        await deps.invalidateAfterCompletion();
+      }
     },
   };
 }
@@ -281,8 +300,8 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
           pendingPurchaseCompletedCallbackRef.current = null;
           onCompleted?.();
         },
-        setPendingPurchaseCompletedCallback: callback => {
-          pendingPurchaseCompletedCallbackRef.current = callback;
+        setPendingPurchaseCompletedCallback: onCompleted => {
+          pendingPurchaseCompletedCallbackRef.current = onCompleted;
         },
         showError: message => {
           showDedupedPurchaseError(message);

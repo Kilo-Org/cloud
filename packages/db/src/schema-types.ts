@@ -349,6 +349,7 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.orphan.destroy',
   'kiloclaw.instances.bulk_change_version',
   'kiloclaw.scheduled_action.created',
+  'kiloclaw.fleet_upgrade.created',
   'kiloclaw.scheduled_action.cancelled',
 ]);
 

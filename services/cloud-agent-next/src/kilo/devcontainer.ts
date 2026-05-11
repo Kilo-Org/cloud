@@ -393,12 +393,12 @@ export function mergeDevContainerConfig(
     // `remoteUser` from override wins over base — see buildOverrideConfig for why.
     ...(typeof override.remoteUser === 'string' ? { remoteUser: override.remoteUser } : {}),
     mounts: [
-      ...(Array.isArray(baseConfig.mounts) ? baseConfig.mounts : []),
-      ...(Array.isArray(override.mounts) ? override.mounts : []),
+      ...(Array.isArray(baseConfig.mounts) ? (baseConfig.mounts as string[]) : []),
+      ...(Array.isArray(override.mounts) ? (override.mounts as string[]) : []),
     ],
     runArgs: [
-      ...(Array.isArray(baseConfig.runArgs) ? baseConfig.runArgs : []),
-      ...(Array.isArray(override.runArgs) ? override.runArgs : []),
+      ...(Array.isArray(baseConfig.runArgs) ? (baseConfig.runArgs as string[]) : []),
+      ...(Array.isArray(override.runArgs) ? (override.runArgs as string[]) : []),
     ],
     remoteEnv: {
       ...(isRecord(baseConfig.remoteEnv) ? baseConfig.remoteEnv : {}),

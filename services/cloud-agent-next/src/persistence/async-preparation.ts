@@ -381,7 +381,7 @@ export async function executePreparationSteps(
             workspacePath: devContainerHandle.workspacePath,
             innerWorkspaceFolder: devContainerHandle.innerWorkspaceFolder,
             wrapperPort,
-            configPath: detected!.configPath,
+            configPath: detected?.configPath ?? '',
           }
         : undefined,
     kiloSessionId: input.kiloSessionId ?? wrapperSessionId,

@@ -3,7 +3,7 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { GitBranch, Plus, Loader2, Trash2, Lock, Unlock, Check } from 'lucide-react';
+import { GitBranch, Plus, Loader2, Trash2, Lock, Unlock, Check, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -229,17 +229,24 @@ export function RepoProfileBindingsDialog({
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
+                          size="sm"
                           role="combobox"
                           aria-expanded={repoPopoverOpen}
-                          className="min-w-0 flex-1 justify-between"
+                          className="min-w-0 flex-1 justify-between font-normal"
                           disabled={isLoadingRepos}
                         >
                           <span className="truncate">
-                            {selectedRepo ? selectedRepo.split(':')[1] : 'Select repository...'}
+                            {selectedRepo ? (
+                              selectedRepo.split(':')[1]
+                            ) : (
+                              <span className="text-muted-foreground">Select repository…</span>
+                            )}
                           </span>
                           {isLoadingRepos ? (
-                            <Loader2 className="ml-2 h-4 w-4 shrink-0 animate-spin" />
-                          ) : null}
+                            <Loader2 className="ml-2 h-3.5 w-3.5 shrink-0 animate-spin" />
+                          ) : (
+                            <ChevronDown className="text-muted-foreground ml-2 h-3.5 w-3.5 shrink-0" />
+                          )}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
@@ -320,6 +327,9 @@ export function RepoProfileBindingsDialog({
                   </div>
 
                   <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={handleCancel}>
+                      Cancel
+                    </Button>
                     <Button
                       size="sm"
                       disabled={!selectedRepo || !selectedProfileId || bindRepo.isPending}
@@ -329,9 +339,6 @@ export function RepoProfileBindingsDialog({
                         <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                       ) : null}
                       Add
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleCancel}>
-                      Cancel
                     </Button>
                   </div>
                 </div>

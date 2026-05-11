@@ -31,6 +31,7 @@ import {
   CreditCard,
   MessageSquare,
   Sparkles,
+  Gift,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -84,6 +85,8 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     title: string;
     icon: React.ElementType;
     url: string;
+    subtitle?: string;
+    badge?: string;
     className?: string;
   }> = [
     {
@@ -105,6 +108,13 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       title: "What's New",
       icon: Sparkles,
       url: '/claw/changelog',
+    },
+    {
+      title: 'Refer & Earn',
+      subtitle: 'Get 1 Month Free',
+      badge: 'NEW',
+      icon: Gift,
+      url: '/claw/refer',
     },
   ];
 
@@ -149,13 +159,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Shield,
       url: '/security-agent',
     },
-    {
-      title: 'Auto Triage',
-      icon: ListChecks,
-      url: '/auto-triage',
-    },
     ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [{ title: 'Auto Fix', icon: Wrench, url: '/auto-fix' }]
+      ? [
+          { title: 'Auto Triage', icon: ListChecks, url: '/auto-triage' },
+          { title: 'Auto Fix', icon: Wrench, url: '/auto-fix' },
+        ]
       : []),
     ...(ENABLE_DEPLOY_FEATURE
       ? [

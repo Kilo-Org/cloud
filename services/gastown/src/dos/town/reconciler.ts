@@ -289,6 +289,17 @@ export function applyEvent(
         console.warn(`${LOG} applyEvent: bead_cancelled missing bead_id`);
         return;
       }
+      // Tolerate the bead having been deleted after the event was enqueued.
+      // Without this guard updateBeadStatus throws `Bead <id> not found`,
+      // the drain loop can't mark the event processed, and the error
+      // recurs on every alarm tick forever.
+      const existing = beadOps.getBead(sql, event.bead_id);
+      if (!existing) {
+        console.warn(
+          `${LOG} applyEvent: bead_cancelled target bead ${event.bead_id} no longer exists — skipping`
+        );
+        return;
+      }
       const cancelStatus =
         payload.cancel_status === 'closed' || payload.cancel_status === 'failed'
           ? payload.cancel_status
@@ -1456,6 +1467,10 @@ export function reconcileReviewQueue(
       mr.pr_url &&
       staleMs(mr.updated_at, ORPHANED_PR_REVIEW_TIMEOUT_MS)
     ) {
+      const mrMeta: Record<string, unknown> = mr.metadata ?? {};
+      if (mrMeta.awaiting_approval === 1 || mrMeta.awaiting_approval === true) {
+        continue;
+      }
       const workingAgent = hasWorkingAgentHooked(sql, mr.bead_id);
       if (!workingAgent) {
         actions.push({
@@ -1798,6 +1813,7 @@ export function reconcileReviewQueue(
           rig_id: z.string().nullable(),
           dispatch_attempts: z.number(),
           last_dispatch_attempt_at: z.string().nullable(),
+          metadata: z.string(),
         })
         .array()
         .parse([
@@ -1805,7 +1821,8 @@ export function reconcileReviewQueue(
             sql,
             /* sql */ `
           SELECT ${beads.status}, ${beads.type}, ${beads.rig_id},
-                 ${beads.dispatch_attempts}, ${beads.last_dispatch_attempt_at}
+                 ${beads.dispatch_attempts}, ${beads.last_dispatch_attempt_at},
+                 ${beads.columns.metadata}
           FROM ${beads}
           WHERE ${beads.bead_id} = ?
         `,
@@ -1816,6 +1833,16 @@ export function reconcileReviewQueue(
       if (mrRows.length === 0) continue;
       const mr = mrRows[0];
       if (mr.type !== 'merge_request' || mr.status !== 'in_progress') continue;
+
+      let mrMeta: Record<string, unknown> = {};
+      try {
+        mrMeta = JSON.parse(mr.metadata ?? '{}') as Record<string, unknown>;
+      } catch {
+        /* ignore */
+      }
+      if (mrMeta.awaiting_approval === 1 || mrMeta.awaiting_approval === true) {
+        continue;
+      }
 
       if (draining) {
         console.log(
@@ -2032,13 +2059,13 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
       if (parsedMeta.ready_to_land) {
         // Check if a landing MR already exists (any status)
         const landingMrs = z
-          .object({ status: z.string() })
+          .object({ status: z.string(), metadata: z.string() })
           .array()
           .parse([
             ...query(
               sql,
               /* sql */ `
-                SELECT mr.${beads.columns.status}
+                SELECT mr.${beads.columns.status}, mr.${beads.columns.metadata}
                 FROM ${bead_dependencies} bd
                 INNER JOIN ${beads} mr ON mr.${beads.columns.bead_id} = bd.${bead_dependencies.columns.bead_id}
                 WHERE bd.${bead_dependencies.columns.depends_on_bead_id} = ?
@@ -2064,6 +2091,27 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
           mr => mr.status === 'open' || mr.status === 'in_progress'
         );
         if (hasActiveLanding) continue;
+
+        const hasPendingExternalReview = landingMrs.some(mr => {
+          if (mr.status !== 'failed') return false;
+          try {
+            const meta = JSON.parse(mr.metadata ?? '{}') as Record<string, unknown>;
+            return meta.awaiting_approval === 1 || meta.awaiting_approval === true;
+          } catch {
+            return false;
+          }
+        });
+        if (hasPendingExternalReview) {
+          actions.push({
+            type: 'emit_event',
+            event_name: 'reconciler.respawn_suppressed',
+            data: {
+              convoyId: convoy.bead_id,
+              suppressedAttempt: landingMrAttempts + 1,
+            },
+          });
+          continue;
+        }
 
         // Fix 2 (#2260): If max landing MR attempts exceeded and no landing MR is
         // active or merged, fail the convoy. Checked after landing MR status lookup

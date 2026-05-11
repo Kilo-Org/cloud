@@ -18,7 +18,7 @@ export function KiloCardLayout({
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="mb-8">
-        <HeaderLogo />
+        <HeaderLogo className="w-auto self-auto pr-0" />
       </div>
       <div className={`mx-auto w-full ${className}`}>
         <Card className="rounded-none shadow">

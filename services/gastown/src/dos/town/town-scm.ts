@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { TownConfig } from '../../types';
-import type { PRFeedbackCheckResult } from './actions';
+import type { PRFeedbackCheckResult, ReviewDecision, MergeStateStatus } from './actions';
 import {
   GitHubPRStatusSchema,
   GitLabMRStatusSchema,
@@ -271,6 +271,9 @@ export async function checkPRFeedback(
   };
 
   let hasUnresolvedComments = false;
+  let reviewDecision: ReviewDecision = null;
+  let mergeStateStatus: MergeStateStatus = null;
+  let isDraft = false;
   try {
     const graphqlRes = await fetch('https://api.github.com/graphql', {
       method: 'POST',
@@ -279,6 +282,9 @@ export async function checkPRFeedback(
         query: `query($owner: String!, $repo: String!, $number: Int!) {
           repository(owner: $owner, name: $repo) {
             pullRequest(number: $number) {
+              reviewDecision
+              mergeStateStatus
+              isDraft
               reviewThreads(first: 100) {
                 pageInfo { hasNextPage }
                 nodes {
@@ -307,6 +313,15 @@ export async function checkPRFeedback(
                 .object({
                   pullRequest: z
                     .object({
+                      reviewDecision: z
+                        .enum(['APPROVED', 'CHANGES_REQUESTED', 'REVIEW_REQUIRED'])
+                        .nullable()
+                        .optional(),
+                      mergeStateStatus: z
+                        .enum(['CLEAN', 'BLOCKED', 'BEHIND', 'DIRTY', 'HAS_HOOKS', 'UNKNOWN'])
+                        .nullable()
+                        .optional(),
+                      isDraft: z.boolean().optional(),
                       reviewThreads: z
                         .object({
                           pageInfo: z.object({ hasNextPage: z.boolean() }).optional(),
@@ -335,9 +350,11 @@ export async function checkPRFeedback(
             .optional(),
         })
         .safeParse(gqlRaw);
-      const reviewThreads = gql.success
-        ? gql.data.data?.repository?.pullRequest?.reviewThreads
-        : undefined;
+      const pullRequest = gql.success ? gql.data.data?.repository?.pullRequest : undefined;
+      reviewDecision = (pullRequest?.reviewDecision ?? null) as ReviewDecision;
+      mergeStateStatus = (pullRequest?.mergeStateStatus ?? null) as MergeStateStatus;
+      isDraft = pullRequest?.isDraft ?? false;
+      const reviewThreads = pullRequest?.reviewThreads;
       const threads = reviewThreads?.nodes ?? [];
       const hasMorePages = reviewThreads?.pageInfo?.hasNextPage === true;
 
@@ -436,7 +453,20 @@ export async function checkPRFeedback(
     console.warn(`${TOWN_LOG} checkPRFeedback: check-runs failed for ${prUrl}`, err);
   }
 
-  return { hasUnresolvedComments, hasFailingChecks, allChecksPass, hasUncheckedRuns };
+  const awaitingApproval = reviewDecision === 'REVIEW_REQUIRED' || mergeStateStatus === 'BLOCKED';
+  const changesRequested = reviewDecision === 'CHANGES_REQUESTED';
+
+  return {
+    hasUnresolvedComments,
+    hasFailingChecks,
+    allChecksPass,
+    hasUncheckedRuns,
+    awaitingApproval,
+    changesRequested,
+    reviewDecision,
+    mergeStateStatus,
+    isDraft,
+  };
 }
 
 /**

@@ -6,10 +6,17 @@ export type PopulatedClawStatus = KiloClawDashboardStatus & {
 
 export type ClawOnboardingMode = 'create-first' | 'post-provisioning';
 
-export type OnboardingStep = 'identity' | 'channels' | 'provisioning' | 'pairing' | 'done';
+export type OnboardingStep =
+  | 'identity'
+  | 'calendar'
+  | 'channels'
+  | 'provisioning'
+  | 'pairing'
+  | 'done';
 
 export const CLAW_ONBOARDING_WIZARD_STEPS = [
   'identity',
+  'calendar',
   'channels',
   'provisioning',
   'pairing',
@@ -19,6 +26,7 @@ export type ClawOnboardingWizardStep = (typeof CLAW_ONBOARDING_WIZARD_STEPS)[num
 
 export type ClawOnboardingRenderStep =
   | 'identity'
+  | 'calendar'
   | 'channels'
   | 'provisioning'
   | 'pairing'
@@ -31,6 +39,7 @@ export const FAKE_ONBOARDING_STEP_PARAM = 'fakeOnboardingStep';
 
 export const CLAW_ONBOARDING_FAKE_STEPS = [
   'identity',
+  'calendar',
   'channels',
   'provisioning',
   'pairing',
@@ -65,6 +74,14 @@ export type ClawOnboardingFlowStateInput = {
   hasBotIdentity: boolean;
   selectedChannelId: string | null;
   gatewayState?: GatewayProcessStatusResponse['state'] | null;
+  /**
+   * Whether the calendar step is available in the wizard. Calendar OAuth is
+   * gated to Kilo Code admins (the `/api/integrations/google/connect` and
+   * `/disconnect` routes both require `adminOnly: true`), so non-admins skip
+   * the step entirely. When false, the wizard advances identity → channels
+   * and `'calendar'` is mapped to `'channels'` in the render decision.
+   */
+  hasCalendarStep?: boolean;
   debugLogSource?: string;
 };
 
@@ -76,6 +93,7 @@ export type ClawOnboardingFlowState = {
   instanceRunning: boolean;
   createSetupActive: boolean;
   postProvisioningReady: boolean;
+  hasCalendarStep: boolean;
   hasPairingStep: boolean;
   currentStep: number;
   totalSteps: number;
@@ -98,18 +116,31 @@ export function isClawOnboardingErrorStatus(status: PopulatedClawStatus['status'
   return false;
 }
 
+function getActiveWizardSteps(hasPairingStep: boolean, hasCalendarStep: boolean): OnboardingStep[] {
+  const steps: OnboardingStep[] = ['identity'];
+  if (hasCalendarStep) steps.push('calendar');
+  steps.push('channels', 'provisioning');
+  if (hasPairingStep) steps.push('pairing');
+  return steps;
+}
+
 export function getClawOnboardingStepProgress(
   step: OnboardingStep,
-  hasPairingStep: boolean
+  hasPairingStep: boolean,
+  hasCalendarStep: boolean = true
 ): { currentStep: number; totalSteps: number } {
-  const wizardSteps: readonly OnboardingStep[] = CLAW_ONBOARDING_WIZARD_STEPS;
-  const totalSteps = hasPairingStep ? wizardSteps.length : wizardSteps.length - 1;
+  const wizardSteps = getActiveWizardSteps(hasPairingStep, hasCalendarStep);
+  const totalSteps = wizardSteps.length;
 
   if (step === 'done') {
     return { currentStep: totalSteps, totalSteps };
   }
 
-  const index = wizardSteps.indexOf(step);
+  // A non-admin sitting briefly on `onboardingStep === 'calendar'` (e.g. via
+  // a stale `?step=calendar` URL) gets normalized to channels for progress
+  // display, matching the renderStep redirect in getRenderStepDecision.
+  const lookupStep: OnboardingStep = step === 'calendar' && !hasCalendarStep ? 'channels' : step;
+  const index = wizardSteps.indexOf(lookupStep);
   const currentStep = index === -1 ? 0 : index + 1;
 
   return { currentStep, totalSteps };
@@ -124,6 +155,7 @@ export function getClawOnboardingFlowState({
   hasBotIdentity,
   selectedChannelId,
   gatewayState,
+  hasCalendarStep = true,
   debugLogSource = 'default',
 }: ClawOnboardingFlowStateInput): ClawOnboardingFlowState {
   const instanceStatus = hasPopulatedStatus(status) ? status : null;
@@ -134,7 +166,11 @@ export function getClawOnboardingFlowState({
   const createSetupActive =
     mode === 'create-first' && (createSetupStarted || instanceStatus !== null);
   const hasPairingStep = isPairingChannel(selectedChannelId);
-  const { currentStep, totalSteps } = getClawOnboardingStepProgress(onboardingStep, hasPairingStep);
+  const { currentStep, totalSteps } = getClawOnboardingStepProgress(
+    onboardingStep,
+    hasPairingStep,
+    hasCalendarStep
+  );
   const renderStepDecision = getRenderStepDecision({
     mode,
     createSetupStarted,
@@ -143,6 +179,7 @@ export function getClawOnboardingFlowState({
     postProvisioningReady,
     onboardingStep,
     hasBotIdentity,
+    hasCalendarStep,
     hasPairingStep,
   });
   const flowState = {
@@ -153,6 +190,7 @@ export function getClawOnboardingFlowState({
     instanceRunning,
     createSetupActive,
     postProvisioningReady,
+    hasCalendarStep,
     hasPairingStep,
     currentStep,
     totalSteps,
@@ -167,6 +205,7 @@ export function getClawOnboardingFlowState({
     hasBotIdentity,
     selectedChannelId,
     gatewayState,
+    hasCalendarStep,
     debugLogSource,
     instanceStatus,
     isRunning,
@@ -189,6 +228,7 @@ type RenderStepInput = Pick<
 > & {
   instanceStatus: PopulatedClawStatus | null;
   postProvisioningReady: boolean;
+  hasCalendarStep: boolean;
   hasPairingStep: boolean;
 };
 
@@ -199,6 +239,7 @@ type RenderStepDecision = {
 
 type ClawOnboardingFlowDebugLogInput = ClawOnboardingFlowStateInput & {
   debugLogSource: string;
+  hasCalendarStep: boolean;
   instanceStatus: PopulatedClawStatus | null;
   isRunning: boolean;
   gatewayReady: boolean;
@@ -228,6 +269,7 @@ function getRenderStepDecision({
   postProvisioningReady,
   onboardingStep,
   hasBotIdentity,
+  hasCalendarStep,
   hasPairingStep,
 }: RenderStepInput): RenderStepDecision {
   if (instanceStatus && isClawOnboardingErrorStatus(instanceStatus.status)) {
@@ -245,6 +287,44 @@ function getRenderStepDecision({
   }
 
   if (mode === 'post-provisioning') {
+    // After a full-page reload (e.g. the Google OAuth round-trip), the
+    // wizard often remounts in post-provisioning mode because the instance
+    // row is now visible — but the user is still mid-wizard. Honor any
+    // explicit wizard step rather than auto-routing them past it. Without
+    // this, advancing from calendar → channels → provisioning would fall
+    // through to the default post-prov branch and skip channels, pairing,
+    // and the provisioning UX entirely.
+    if (onboardingStep === 'calendar') {
+      if (!hasCalendarStep) {
+        return {
+          renderStep: 'channels',
+          reason:
+            'calendar step is admin-only and the current user is not an admin; advance to channels',
+        };
+      }
+      return {
+        renderStep: 'calendar',
+        reason: 'calendar resume requested; honor it even in post-provisioning mode',
+      };
+    }
+    if (onboardingStep === 'channels') {
+      return {
+        renderStep: 'channels',
+        reason: 'wizard resume on channels; honor it even in post-provisioning mode',
+      };
+    }
+    if (onboardingStep === 'provisioning') {
+      return {
+        renderStep: 'provisioning',
+        reason: 'wizard resume on provisioning; honor it even in post-provisioning mode',
+      };
+    }
+    if (onboardingStep === 'pairing' && hasPairingStep) {
+      return {
+        renderStep: 'pairing',
+        reason: 'wizard resume on pairing; honor it even in post-provisioning mode',
+      };
+    }
     if (postProvisioningReady) {
       return {
         renderStep: 'complete',
@@ -277,6 +357,20 @@ function getRenderStepDecision({
       reason: !hasBotIdentity
         ? 'bot identity is missing, so identity is the earliest safe step'
         : 'stored onboarding step is identity',
+    };
+  }
+
+  if (onboardingStep === 'calendar') {
+    if (!hasCalendarStep) {
+      return {
+        renderStep: 'channels',
+        reason:
+          'calendar step is admin-only and the current user is not an admin; advance to channels',
+      };
+    }
+    return {
+      renderStep: 'calendar',
+      reason: 'stored onboarding step is calendar',
     };
   }
 
@@ -316,6 +410,7 @@ function logClawOnboardingFlowStateDecision({
   hasBotIdentity,
   selectedChannelId,
   gatewayState,
+  hasCalendarStep,
   debugLogSource,
   instanceStatus,
   isRunning,
@@ -339,6 +434,7 @@ function logClawOnboardingFlowStateDecision({
       hasBotIdentity,
       selectedChannelId,
       gatewayState: gatewayState ?? null,
+      hasCalendarStep,
       status: status?.status ?? null,
       hasStatusResponse: status !== undefined,
     },

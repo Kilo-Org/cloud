@@ -1,18 +1,18 @@
 /**
- * Normalise a version string to a bare calver (e.g. "2026.3.8").
+ * Normalise a version string to a bare calver (e.g. "2026.3.8" or "2026.3.8.1430").
  *
  * Handles:
- *  - Surrounding quotes from bun build --define: `"2026.3.8"` → `2026.3.8`
+ *  - Surrounding quotes from bun build --define: `"2026.3.8.1430"` → `2026.3.8.1430`
  *  - Full `openclaw --version` output from older controllers:
  *    `OpenClaw 2026.3.8 (3caab92)` → `2026.3.8`
- *  - Plain calver (new controllers already strip): `2026.3.8` → `2026.3.8`
+ *  - Plain calver (new controllers already strip): `2026.3.8.1430` → `2026.3.8.1430`
  */
 export function cleanVersion(version: string | null | undefined): string | null {
   if (!version) return null;
   // Strip surrounding quotes
   const v = version.replace(/^["']|["']$/g, '');
   // Extract bare calver if the string contains one (handles prefixed/suffixed formats)
-  const match = v.match(/(\d{4}\.\d{1,2}\.\d{1,2})/);
+  const match = v.match(/(\d{4}\.\d{1,2}\.\d{1,2}(?:\.\d{1,4})?)/);
   if (match) return match[1];
   return v || null;
 }
@@ -32,7 +32,7 @@ export function getRunningVersionBadge(
   return 'modified';
 }
 
-/** Returns true if calver `version` is >= `minVersion` (e.g. "2026.2.26"). Fails closed on malformed input. */
+/** Returns true if calver `version` is >= `minVersion` (e.g. "2026.2.26" or "2026.2.26.1430"). Fails closed on malformed input. */
 export function calverAtLeast(version: string | null | undefined, minVersion: string): boolean {
   const parts = parseCalver(version);
   const minParts = parseCalver(minVersion);
@@ -48,19 +48,20 @@ export function calverAtLeast(version: string | null | undefined, minVersion: st
   return true;
 }
 
-function parseCalver(version: string | null | undefined): [number, number, number] | null {
+function parseCalver(version: string | null | undefined): [number, number, number, number] | null {
   const cleaned = cleanVersion(version);
   if (!cleaned) return null;
 
-  const match = cleaned.match(/(\d+)\.(\d+)\.(\d+)/);
+  const match = cleaned.match(/^(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?$/);
   if (!match) return null;
 
   const major = Number(match[1]);
   const minor = Number(match[2]);
   const patch = Number(match[3]);
-  if (Number.isNaN(major) || Number.isNaN(minor) || Number.isNaN(patch)) {
+  const time = match[4] === undefined ? 0 : Number(match[4]);
+  if (Number.isNaN(major) || Number.isNaN(minor) || Number.isNaN(patch) || Number.isNaN(time)) {
     return null;
   }
 
-  return [major, minor, patch];
+  return [major, minor, patch, time];
 }

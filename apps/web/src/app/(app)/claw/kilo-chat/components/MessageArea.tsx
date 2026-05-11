@@ -41,6 +41,7 @@ import { toast } from 'sonner';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
 import { TypingIndicator } from './TypingIndicator';
+import { WelcomeBubble } from './WelcomeBubble';
 import { BotStatus, computeBotDisplay, useNowTicker } from './BotStatus';
 import { ContextUsageRing } from './ContextUsageRing';
 import { useBotStatus } from '../hooks/useBotStatus';
@@ -67,7 +68,7 @@ import {
   capturePrependScrollAnchor,
   type PrependScrollAnchorSnapshot,
 } from './message-scroll-anchor';
-import { MessageCircle, ArrowDown } from 'lucide-react';
+import { ArrowDown } from 'lucide-react';
 
 type MessageAreaProps = {
   conversationId: string;
@@ -87,8 +88,15 @@ function toEditableContent(content: ContentBlock[]): EditMessageRequest['content
 }
 
 export function MessageArea({ conversationId }: MessageAreaProps) {
-  const { currentUserId, instanceStatus, assistantName, sandboxId, eventService, kiloChatClient } =
-    useKiloChatContext();
+  const {
+    currentUserId,
+    instanceStatus,
+    assistantName,
+    assistantEmoji,
+    sandboxId,
+    eventService,
+    kiloChatClient,
+  } = useKiloChatContext();
   const botStatus = useBotStatus();
   const presence = botStatus ? { online: botStatus.online, lastAt: botStatus.at } : undefined;
   const ctxUsage = useConversationStatus(conversationId);
@@ -459,7 +467,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
 
   const messageMap = useMemo(() => new Map(messages.map(m => [m.id, m])), [messages]);
 
-  const title = conversationDetail.data?.title ?? 'Untitled';
+  const title = conversationDetail.data?.title ?? 'New chat';
 
   function handleTitleClick() {
     setRenameText(title);
@@ -547,16 +555,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
               </div>
             )}
             {messages.length === 0 && !isFetchingNextPage && (
-              <div className="flex flex-1 flex-col items-center justify-center px-6">
-                <div className="border-border bg-muted/50 flex flex-col items-center gap-3 rounded-lg border px-8 py-6">
-                  <MessageCircle className="text-muted-foreground/60 h-8 w-8" />
-                  <p className="text-muted-foreground text-sm">
-                    Ask {assistantName ?? 'KiloClaw'} to draft a message, make a checklist,
-                    <br />
-                    or help you think through a decision.
-                  </p>
-                </div>
-              </div>
+              <WelcomeBubble assistantName={assistantName} assistantEmoji={assistantEmoji} />
             )}
             {messages.map(msg => (
               <MessageBubble

@@ -7,7 +7,6 @@ import { EventServiceProvider } from '@/contexts/EventServiceContext';
 import { AdminOmnibox } from '@/components/admin-omnibox';
 import { PrefetchedOrganizations } from './components/PrefetchedOrganizations';
 import { PlatformPresenceMount } from './components/PlatformPresenceMount';
-import { ImpactIdentify } from '@/components/ImpactIdentify';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,7 +15,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <EventServiceProvider>
           <PlatformPresenceMount />
           <SidebarProvider>
-            <ImpactIdentify />
             <PrefetchedOrganizations>
               <div className="flex min-h-screen w-full">
                 <AppSidebar />

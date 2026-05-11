@@ -10,7 +10,9 @@ import { DurableObject } from 'cloudflare:workers';
 import {
   createCloudAgentNextFetchClient,
   CloudAgentNextBillingError,
+  CloudAgentNextError,
   type CloudAgentNextFetchClient,
+  type CloudAgentSessionHealthOutput,
   type CloudAgentTerminalReason,
 } from '@kilocode/worker-utils';
 import type {
@@ -25,6 +27,14 @@ import type {
 import { InternalStatusResponseSchema } from './types';
 
 type UpdateStatusResult = 'updated' | 'db-terminal';
+
+function canContinueCloudAgentNextSession(health: CloudAgentSessionHealthOutput): boolean {
+  return (
+    health.sandboxStatus === 'healthy' &&
+    health.executionHealth === 'none' &&
+    health.activeExecutionId === undefined
+  );
+}
 
 /** Shape of an SSE event parsed from the cloud agent stream */
 type SseEventPayload = {
@@ -64,6 +74,67 @@ function findRiskyPattern(command: string): string | null {
   const normalized = command.toLowerCase();
   const match = RISKY_COMMAND_PATTERNS.find(pattern => normalized.includes(pattern));
   return match ?? null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function hasRetryableSandboxMarker(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  if (value.error === 'sandbox_internal_server_error' && value.retryable === true) {
+    return true;
+  }
+
+  return Object.values(value).some(nested => hasRetryableSandboxMarker(nested));
+}
+
+function parseJsonBody(body: string): unknown {
+  try {
+    return JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+}
+
+function isPrepareSessionSandboxInternalServerError(error: unknown): boolean {
+  if (error instanceof CloudAgentNextBillingError) {
+    return false;
+  }
+
+  if (!(error instanceof CloudAgentNextError)) {
+    return false;
+  }
+
+  if (error.procedure !== 'prepareSession' || error.status !== 500) {
+    return false;
+  }
+
+  if (/\b(cancelled|canceled)\b/i.test(error.body)) {
+    return false;
+  }
+
+  const parsedBody = parseJsonBody(error.body);
+  if (hasRetryableSandboxMarker(parsedBody)) {
+    return true;
+  }
+
+  const body = error.body.toLowerCase();
+  const hasSandboxSignal =
+    body.includes('sandboxerror') ||
+    body.includes('sandbox') ||
+    body.includes('container') ||
+    body.includes('cloudflare');
+  const hasInternalServerSignal =
+    body.includes('internal server error') ||
+    /http\s+error!\s+status:\s*500\b/i.test(error.body) ||
+    /\bstatus:\s*500\b/i.test(error.body) ||
+    /\bhttp\s*500\b/i.test(error.body);
+
+  return hasSandboxSignal && hasInternalServerSignal;
 }
 
 /**
@@ -108,6 +179,23 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   private getCloudAgentNextClient(): CloudAgentNextFetchClient {
     this.cloudAgentNextClient ??= createCloudAgentNextFetchClient(this.env.CLOUD_AGENT_NEXT_URL);
     return this.cloudAgentNextClient;
+  }
+
+  private async runFreshCloudAgentNextFallback(previousSessionId: string): Promise<void> {
+    this.state.previousCloudAgentSessionId = undefined;
+
+    try {
+      await this.runWithCloudAgentNext();
+    } catch (freshError) {
+      // runWithCloudAgentNext handles its own error/status updates, so this catch
+      // is only for unexpected throws that bypass its internal error handling.
+      const freshErrorMessage = freshError instanceof Error ? freshError.message : 'Unknown error';
+      console.error('[CodeReviewOrchestrator] Fresh session fallback also failed', {
+        reviewId: this.state.reviewId,
+        previousCloudAgentSessionId: previousSessionId,
+        error: freshErrorMessage,
+      });
+    }
   }
 
   /**
@@ -786,6 +874,29 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         note: 'Callback will update final status',
       });
     } catch (error) {
+      if (
+        isPrepareSessionSandboxInternalServerError(error) &&
+        this.state.sandboxRetryAttempted !== true &&
+        !this.cancelled &&
+        this.state.status !== 'cancelled'
+      ) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+        this.state.sandboxRetryAttempted = true;
+        this.state.previousCloudAgentSessionId = undefined;
+        this.state.updatedAt = new Date().toISOString();
+        await this.saveState();
+
+        console.warn('[CodeReviewOrchestrator] Retrying prepareSession after sandbox 500', {
+          reviewId: this.state.reviewId,
+          error: errorMessage,
+          sandboxRetryAttempted: true,
+        });
+
+        await this.runWithCloudAgentNext();
+        return;
+      }
+
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const terminalReason = this.getTerminalReason(error);
 
@@ -838,6 +949,45 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       const statusUpdateResult = await this.updateStatus('running');
       if (statusUpdateResult === 'db-terminal') return;
 
+      const userHeaders: Record<string, string> = {
+        Authorization: `Bearer ${this.state.authToken}`,
+      };
+      if (this.state.skipBalanceCheck) {
+        userHeaders['x-skip-balance-check'] = 'true';
+      }
+
+      let health: CloudAgentSessionHealthOutput;
+      try {
+        health = await client.getSessionHealth(userHeaders, {
+          cloudAgentSessionId: previousSessionId,
+        });
+      } catch (error) {
+        if (error instanceof CloudAgentNextBillingError) {
+          throw error;
+        }
+
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.warn('[CodeReviewOrchestrator] Session health preflight failed', {
+          reviewId: this.state.reviewId,
+          previousCloudAgentSessionId: previousSessionId,
+          error: errorMessage,
+        });
+        await this.runFreshCloudAgentNextFallback(previousSessionId);
+        return;
+      }
+
+      if (!canContinueCloudAgentNextSession(health)) {
+        console.warn('[CodeReviewOrchestrator] Previous cloud-agent-next session is unhealthy', {
+          reviewId: this.state.reviewId,
+          previousCloudAgentSessionId: previousSessionId,
+          sandboxStatus: health.sandboxStatus,
+          executionHealth: health.executionHealth,
+          activeExecutionId: health.activeExecutionId,
+        });
+        await this.runFreshCloudAgentNextFallback(previousSessionId);
+        return;
+      }
+
       // Build internal headers (internalApiProtectedProcedure — API key + Bearer token)
       const internalHeaders: Record<string, string> = {
         Authorization: `Bearer ${this.state.authToken}`,
@@ -863,13 +1013,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       });
 
       // Step 2: Send follow-up message (user-facing, no callbackTarget)
-      const userHeaders: Record<string, string> = {
-        Authorization: `Bearer ${this.state.authToken}`,
-      };
-      if (this.state.skipBalanceCheck) {
-        userHeaders['x-skip-balance-check'] = 'true';
-      }
-
       console.log('[CodeReviewOrchestrator] Calling sendMessageV2', {
         reviewId: this.state.reviewId,
         cloudAgentSessionId: previousSessionId,
@@ -908,7 +1051,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         });
 
         console.warn(
-          '[CodeReviewOrchestrator] sendMessageV2 billing failure, skipping fresh session fallback',
+          '[CodeReviewOrchestrator] cloud-agent-next billing failure, skipping fresh session fallback',
           {
             reviewId: this.state.reviewId,
             previousCloudAgentSessionId: previousSessionId,
@@ -928,20 +1071,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
       // Reset status to running (it may have been set to running already, but ensure clean state)
       // Clear previousCloudAgentSessionId so the fresh session path doesn't try followup again
-      this.state.previousCloudAgentSessionId = undefined;
-
-      try {
-        await this.runWithCloudAgentNext();
-      } catch (freshError) {
-        // runWithCloudAgentNext handles its own error/status updates, so this catch
-        // is only for unexpected throws that bypass its internal error handling
-        const freshErrorMessage =
-          freshError instanceof Error ? freshError.message : 'Unknown error';
-        console.error('[CodeReviewOrchestrator] Fresh session fallback also failed', {
-          reviewId: this.state.reviewId,
-          error: freshErrorMessage,
-        });
-      }
+      await this.runFreshCloudAgentNextFallback(previousSessionId);
     }
   }
 

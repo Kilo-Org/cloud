@@ -870,6 +870,9 @@ export const ManyVariables: Story = {
         updatedAt: '2025-01-01T00:00:00Z',
       })),
       commands: [],
+      mcpServers: [],
+      skills: [],
+      agents: [],
     };
     return <ProfileVarEditorWrapper profile={manyVarsProfile} initialTab="vars" />;
   },
@@ -892,6 +895,9 @@ export const ManyCommands: Story = {
         sequence: i,
         command: `command-${i + 1} --option=${i} --verbose`,
       })),
+      mcpServers: [],
+      skills: [],
+      agents: [],
     };
     return <ProfileVarEditorWrapper profile={manyCommandsProfile} initialTab="commands" />;
   },

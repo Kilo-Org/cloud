@@ -75,6 +75,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
 export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'anthropic',
   'bedrock',
+  'deepseek',
   'fireworks',
   'google', // Google AI Studio
   'inception',
@@ -83,6 +84,7 @@ export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'mistral',
   'moonshotai',
   'novita',
+  'perplexity',
   'xai',
   'xiaomi',
   'zai',
@@ -115,6 +117,7 @@ export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',
+  [VercelUserByokInferenceProviderIdSchema.enum.deepseek]: 'deepseek/deepseek-v3.2',
   [VercelUserByokInferenceProviderIdSchema.enum.fireworks]: 'openai/gpt-oss-20b',
   [VercelUserByokInferenceProviderIdSchema.enum.inception]: 'inception/mercury-2',
   [VercelUserByokInferenceProviderIdSchema.enum.moonshotai]: 'moonshotai/kimi-k2.5',
@@ -123,6 +126,7 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.minimax]: 'minimax/minimax-m2.5',
   [VercelUserByokInferenceProviderIdSchema.enum.mistral]: 'mistral/devstral-2',
   [VercelUserByokInferenceProviderIdSchema.enum.openai]: 'openai/gpt-5-nano',
+  [VercelUserByokInferenceProviderIdSchema.enum.perplexity]: 'perplexity/sonar',
   [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'xai/grok-4.1-fast-non-reasoning',
   [VercelUserByokInferenceProviderIdSchema.enum.xiaomi]: 'xiaomi/mimo-v2-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
@@ -146,7 +150,6 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'chutes',
   'cohere',
   'deepinfra',
-  'deepseek',
   'groq',
   'interfaze',
   'klingai',
@@ -154,7 +157,6 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'morph',
   'nebius',
   'parasail',
-  'perplexity',
   'prodia',
   'recraft',
   'sambanova',

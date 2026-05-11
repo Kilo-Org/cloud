@@ -22,7 +22,10 @@ import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { resolveBotSessionProfile } from '@/lib/bot/tools/resolve-bot-session-profile';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { Owner } from '@/lib/integrations/core/types';
-import type { MergeProfileConfigurationResult } from '@/lib/agent/profile-session-config';
+import {
+  profileMcpServersToClientRecord,
+  type MergeProfileConfigurationResult,
+} from '@kilocode/cloud-agent-profile';
 import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
@@ -93,24 +96,32 @@ export default async function spawnCloudAgentSession(
   platformIntegration: PlatformIntegration,
   authToken: string,
   ticketUserId: string,
-  botRequestId: string | undefined,
+  botRequestId: string,
   onSessionReady?: RunSessionInput['onSessionReady'],
   options?: { prSignature?: string; chatPlatform?: string; currentStep?: number; images?: Images }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
+
+  if (!INTERNAL_API_SECRET) {
+    const error = new Error(
+      'INTERNAL_API_SECRET missing — bot callbacks would be silently dropped'
+    );
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'spawn-cloud-agent-session' },
+      extra: { botRequestId },
+    });
+    throw error;
+  }
 
   // Build platform-specific prepareInput and initiateInput
   let prepareInput: PrepareSessionInput;
   let initiateInput: { githubToken?: string; kilocodeOrganizationId?: string };
   const mode: AgentMode = args.mode;
   const chatPlatform = options?.chatPlatform ?? 'slack';
-  const callbackTarget =
-    botRequestId && INTERNAL_API_SECRET
-      ? {
-          url: buildBotCallbackUrl(botRequestId, options?.currentStep),
-          headers: { 'X-Bot-Callback-Token': deriveBotCallbackToken(botRequestId) },
-        }
-      : undefined;
+  const callbackTarget = {
+    url: buildBotCallbackUrl(botRequestId, options?.currentStep),
+    headers: { 'X-Bot-Callback-Token': deriveBotCallbackToken(botRequestId) },
+  };
 
   if (!args.githubRepo && !args.gitlabProject) {
     return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
@@ -177,6 +188,9 @@ export default async function spawnCloudAgentSession(
       envVars: profileConfig.envVars,
       encryptedSecrets: profileConfig.encryptedSecrets,
       setupCommands: profileConfig.setupCommands,
+      mcpServers: profileMcpServersToClientRecord(profileConfig.mcpServers),
+      runtimeSkills: profileConfig.skills,
+      runtimeAgents: profileConfig.agents,
     };
     initiateInput = { kilocodeOrganizationId };
   } else {
@@ -206,6 +220,9 @@ export default async function spawnCloudAgentSession(
       envVars: profileConfig.envVars,
       encryptedSecrets: profileConfig.encryptedSecrets,
       setupCommands: profileConfig.setupCommands,
+      mcpServers: profileMcpServersToClientRecord(profileConfig.mcpServers),
+      runtimeSkills: profileConfig.skills,
+      runtimeAgents: profileConfig.agents,
     };
     initiateInput = { githubToken, kilocodeOrganizationId };
   }

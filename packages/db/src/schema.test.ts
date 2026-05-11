@@ -122,6 +122,24 @@ describe('database schema', () => {
       AffiliateProvider: ['impact'],
       AffiliateEventType: ['signup', 'trial_start', 'trial_end', 'sale', 'sale_reversal'],
       AffiliateEventDeliveryState: ['queued', 'blocked', 'sending', 'delivered', 'failed'],
+      KiloClawAttributionTouchType: ['affiliate', 'referral'],
+      KiloClawAttributionTouchProvider: ['impact_advocate', 'impact_performance'],
+      ImpactAdvocateRegistrationState: ['pending', 'retrying', 'registered', 'failed'],
+      ImpactAdvocateAttemptDeliveryState: ['queued', 'sending', 'succeeded', 'failed'],
+      KiloClawReferralBeneficiaryRole: ['referrer', 'referee'],
+      KiloClawReferralWinningTouchType: ['referral', 'affiliate', 'none'],
+      KiloClawReferralDecisionOutcome: ['granted', 'cap_limited', 'disqualified'],
+      KiloClawReferralRewardStatus: [
+        'pending',
+        'earned',
+        'applied',
+        'reversed',
+        'expired',
+        'canceled',
+        'review_required',
+      ],
+      ImpactConversionReportState: ['queued', 'retrying', 'delivered', 'failed'],
+      ImpactAdvocateRewardRedemptionState: ['queued', 'retrying', 'redeemed', 'failed'],
     };
 
     const actualEnumValues: Record<string, string[]> = {};

@@ -515,6 +515,105 @@ describe('sendCreditsTopUpEmail payload', () => {
     expect(params.html).not.toContain('View your Stripe receipt');
   });
 
+  test('org_manual variant emits org copy and organization payment details URL', async () => {
+    await sendCreditsTopUpEmail({
+      to: 'billing@example.com',
+      variant: 'org_manual',
+      amountCents: 2500,
+      creditsCents: 2500,
+      purchaseDate: new Date('2026-04-01T00:00:00Z'),
+      receiptUrl: 'https://pay.stripe.com/receipts/org-manual',
+      organizationId: 'org_123',
+      organizationName: 'Acme Labs',
+    });
+
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.subject).toBe('Your Kilo org credit top-up');
+    expect(params.html).toContain('Team credits added');
+    expect(params.html).toContain(
+      'A Kilo credit top-up has been processed for Acme Labs. The credits are now available to the organization.'
+    );
+    expect(params.html).toContain(
+      'href="http://localhost:3000/organizations/org_123/payment-details"'
+    );
+    expect(params.html).toContain('https://pay.stripe.com/receipts/org-manual');
+  });
+
+  test('org_auto variant emits team auto-top-up copy and organization payment details URL', async () => {
+    await sendCreditsTopUpEmail({
+      to: 'billing@example.com',
+      variant: 'org_auto',
+      amountCents: 4000,
+      creditsCents: 4000,
+      purchaseDate: new Date('2026-05-01T00:00:00Z'),
+      receiptUrl: null,
+      organizationId: 'org_456',
+      organizationName: 'Globex',
+    });
+
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.subject).toBe('Kilo team auto top-up successful');
+    expect(params.html).toContain('Team auto top-up was successful');
+    expect(params.html).toContain(
+      'Globex was automatically topped up so your team can keep using Kilo without interruption. The new credits are available now.'
+    );
+    expect(params.html).toContain(
+      'href="http://localhost:3000/organizations/org_456/payment-details"'
+    );
+    expect(params.html).not.toContain('/credits');
+  });
+
+  // @ts-expect-error org top-up emails need organizationId or creditsUrl.
+  const invalidOrganizationTopUpEmailParams: Parameters<typeof sendCreditsTopUpEmail>[0] = {
+    to: 'billing@example.com',
+    variant: 'org_manual',
+    amountCents: 2500,
+    creditsCents: 2500,
+    purchaseDate: new Date('2026-04-01T00:00:00Z'),
+    receiptUrl: null,
+    organizationName: 'Acme Labs',
+  };
+
+  test('org variants require an organization destination at the type boundary', () => {
+    expect(invalidOrganizationTopUpEmailParams).toBeDefined();
+  });
+
+  test('org variants reject missing organization destination at runtime', async () => {
+    await expect(
+      sendCreditsTopUpEmail({
+        to: 'billing@example.com',
+        variant: 'org_manual',
+        amountCents: 2500,
+        creditsCents: 2500,
+        purchaseDate: new Date('2026-04-01T00:00:00Z'),
+        receiptUrl: null,
+        organizationName: 'Acme Labs',
+      } as Parameters<typeof sendCreditsTopUpEmail>[0])
+    ).rejects.toThrow('Organization top-up emails require creditsUrl or organizationId');
+
+    expect(sendViaMailgunMock).not.toHaveBeenCalled();
+  });
+
+  test('org variants ignore empty URL overrides when an organization ID is available', async () => {
+    await sendCreditsTopUpEmail({
+      to: 'billing@example.com',
+      variant: 'org_manual',
+      amountCents: 2500,
+      creditsCents: 2500,
+      purchaseDate: new Date('2026-04-01T00:00:00Z'),
+      receiptUrl: null,
+      creditsUrl: '',
+      organizationId: 'org_123',
+      organizationName: 'Acme Labs',
+    });
+
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.html).toContain(
+      'href="http://localhost:3000/organizations/org_123/payment-details"'
+    );
+    expect(params.html).not.toContain('href=""');
+  });
+
   test('null receipt URL renders an empty receipt section without breaking the template', async () => {
     await sendCreditsTopUpEmail({
       to: 'recipient@example.com',

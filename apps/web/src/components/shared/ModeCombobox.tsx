@@ -1,11 +1,17 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
+import {
+  Command,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command';
 import { ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -56,6 +62,12 @@ export type ModeComboboxProps<T extends string = string> = {
   className?: string;
   /** Mode options to display. Defaults to LEGACY_MODE_OPTIONS for backward compatibility. */
   options?: ModeOption<T>[];
+  /**
+   * Additional custom mode options rendered below the built-ins under a
+   * "Custom modes" group. Used to surface a selected profile's modes in the
+   * session picker / chat input.
+   */
+  customOptions?: ModeOption<T>[];
 };
 
 export function ModeCombobox<T extends string = string>({
@@ -69,11 +81,21 @@ export function ModeCombobox<T extends string = string>({
   variant = 'full',
   className,
   options = LEGACY_MODE_OPTIONS as unknown as ModeOption<T>[],
+  customOptions,
 }: ModeComboboxProps<T>) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const selectedMode = options.find(mode => mode.value === value);
+  // Deduplicate custom options that collide with a built-in slug — the
+  // built-in wins (custom-mode slugs are rejected server-side for those).
+  const dedupedCustom = useMemo(() => {
+    if (!customOptions || customOptions.length === 0) return [];
+    const builtinSet = new Set(options.map(o => o.value));
+    return customOptions.filter(o => !builtinSet.has(o.value));
+  }, [options, customOptions]);
+
+  const allOptions = useMemo(() => [...options, ...dedupedCustom], [options, dedupedCustom]);
+  const selectedMode = allOptions.find(mode => mode.value === value);
   const isCompact = variant === 'compact';
   const showLabel = !isCompact && label;
 
@@ -111,33 +133,16 @@ export function ModeCombobox<T extends string = string>({
         </PopoverTrigger>
         <PopoverContent className="w-52 p-0" align="start">
           <Command>
-            <CommandList className="max-h-64 overflow-auto">
-              <CommandGroup>
-                {options.map(mode => (
-                  <CommandItem
-                    key={mode.value}
-                    value={mode.value}
-                    onSelect={() => {
-                      onValueChange(mode.value);
-                      setOpen(false);
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <div className="flex flex-col truncate">
-                      <span className="truncate">{mode.label}</span>
-                      <span className="text-muted-foreground truncate text-xs">
-                        {mode.description}
-                      </span>
-                    </div>
-                    <Check
-                      className={cn(
-                        'ml-auto h-4 w-4 shrink-0',
-                        mode.value === value ? 'opacity-100' : 'opacity-0'
-                      )}
-                    />
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+            <CommandList className="max-h-64 overflow-x-hidden overflow-y-auto">
+              <ModeComboboxGroups
+                options={options}
+                customOptions={dedupedCustom}
+                value={value}
+                onSelect={v => {
+                  onValueChange(v);
+                  setOpen(false);
+                }}
+              />
             </CommandList>
           </Command>
         </PopoverContent>
@@ -171,38 +176,67 @@ export function ModeCombobox<T extends string = string>({
           style={{ width: triggerRef.current?.offsetWidth }}
         >
           <Command>
-            <CommandList className="max-h-64 overflow-auto">
-              <CommandGroup>
-                {options.map(mode => (
-                  <CommandItem
-                    key={mode.value}
-                    value={mode.value}
-                    onSelect={() => {
-                      onValueChange(mode.value);
-                      setOpen(false);
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <div className="flex flex-col truncate">
-                      <span className="truncate">{mode.label}</span>
-                      <span className="text-muted-foreground truncate text-xs">
-                        {mode.description}
-                      </span>
-                    </div>
-                    <Check
-                      className={cn(
-                        'ml-auto h-4 w-4 shrink-0',
-                        mode.value === value ? 'opacity-100' : 'opacity-0'
-                      )}
-                    />
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+            <CommandList className="max-h-64 overflow-x-hidden overflow-y-auto">
+              <ModeComboboxGroups
+                options={options}
+                customOptions={dedupedCustom}
+                value={value}
+                onSelect={v => {
+                  onValueChange(v);
+                  setOpen(false);
+                }}
+              />
             </CommandList>
           </Command>
         </PopoverContent>
       </Popover>
       {!isCompact && helperText && <p className="text-muted-foreground text-xs">{helperText}</p>}
     </div>
+  );
+}
+
+function ModeComboboxGroups<T extends string>({
+  options,
+  customOptions,
+  value,
+  onSelect,
+}: {
+  options: ModeOption<T>[];
+  customOptions: ModeOption<T>[];
+  value: T | undefined;
+  onSelect: (value: T) => void;
+}) {
+  const renderItem = (mode: ModeOption<T>) => (
+    <CommandItem
+      key={mode.value}
+      value={mode.value}
+      onSelect={() => onSelect(mode.value)}
+      className="flex items-center gap-2"
+    >
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate">{mode.label}</span>
+        {mode.description && (
+          <span className="text-muted-foreground truncate text-xs">{mode.description}</span>
+        )}
+      </div>
+      <Check
+        className={cn(
+          'ml-auto h-4 w-4 shrink-0',
+          mode.value === value ? 'opacity-100' : 'opacity-0'
+        )}
+      />
+    </CommandItem>
+  );
+
+  return (
+    <>
+      <CommandGroup>{options.map(renderItem)}</CommandGroup>
+      {customOptions.length > 0 && (
+        <>
+          <CommandSeparator />
+          <CommandGroup heading="Custom modes">{customOptions.map(renderItem)}</CommandGroup>
+        </>
+      )}
+    </>
   );
 }

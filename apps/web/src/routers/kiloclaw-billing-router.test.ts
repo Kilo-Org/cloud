@@ -306,14 +306,38 @@ async function insertPersonalSubscriptionFixture(params: PersonalSubscriptionFix
   });
 }
 
-async function seedDeliveredImpactSignupEvent(userId: string, email: string) {
+async function seedDeliveredImpactSignupEvent(
+  userId: string,
+  email: string,
+  conversionDate = new Date()
+) {
   const { recordAffiliateAttributionAndQueueParentEvent } = await import('@/lib/affiliate-events');
+  const { recordImpactAffiliateTouch } = await import('@/lib/impact-referral');
+  const eventDate = new Date(conversionDate.getTime() - 10 * 60_000);
+
   const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
     userId,
     provider: 'impact',
     trackingId: 'impact-click-123',
     customerEmail: email,
-    eventDate: new Date('2026-04-09T10:00:00.000Z'),
+    eventDate,
+  });
+
+  await recordImpactAffiliateTouch({
+    userId,
+    touch: {
+      trackingId: 'impact-click-123',
+      trackingValueLength: 'impact-click-123'.length,
+      isTrackingValueAccepted: true,
+      landingPath: '/pricing?im_ref=impact-click-123',
+      utmSource: null,
+      utmMedium: null,
+      utmCampaign: null,
+      utmTerm: null,
+      utmContent: null,
+      touchedAt: eventDate,
+      expiresAt: new Date(conversionDate.getTime() + 30 * 86_400_000),
+    },
   });
 
   expect(parentEvent).not.toBeNull();
@@ -2775,7 +2799,8 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
   });
 
   it('enqueues sale affiliate events for delivered attributed users', async () => {
-    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+    const paidAt = new Date('2026-04-09T10:00:00.000Z');
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email, paidAt);
 
     const [instance] = await db
       .insert(kiloclaw_instances)
@@ -2832,7 +2857,7 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
           ],
         },
         status_transitions: {
-          paid_at: Math.floor(new Date('2026-04-09T10:00:00.000Z').getTime() / 1000),
+          paid_at: Math.floor(paidAt.getTime() / 1000),
         },
       } as unknown as Stripe.Invoice,
     });

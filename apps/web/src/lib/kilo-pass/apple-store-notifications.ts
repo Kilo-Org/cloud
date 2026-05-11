@@ -178,7 +178,6 @@ async function markStoreSubscriptionRenewing(
 async function getUserForStoreRenewal(params: {
   providerSubscriptionId: string;
   appAccountToken: string | null;
-  fallbackUser?: User;
 }): Promise<User | null> {
   const row = await db
     .select({ user: kilocode_users })
@@ -198,8 +197,6 @@ async function getUserForStoreRenewal(params: {
     }
     return row[0].user;
   }
-
-  if (params.fallbackUser) return params.fallbackUser;
 
   if (!params.appAccountToken) return null;
 
@@ -473,7 +470,6 @@ async function reverseAppStoreRefundCredits(
 
 export async function processAppStoreKiloPassNotification(params: {
   signedPayload: string;
-  userForRenewal?: User;
   decodeNotification?: DecodeNotification;
   decodeTransaction?: DecodeTransaction;
   sendConsumptionInformation?: SendConsumptionInformation;
@@ -501,7 +497,6 @@ export async function processAppStoreKiloPassNotification(params: {
     const user = await getUserForStoreRenewal({
       providerSubscriptionId: purchase.providerSubscriptionId,
       appAccountToken: purchase.appAccountToken,
-      fallbackUser: params.userForRenewal,
     });
     if (!user) {
       if (notification.notificationType !== NotificationTypeV2.SUBSCRIBED) {

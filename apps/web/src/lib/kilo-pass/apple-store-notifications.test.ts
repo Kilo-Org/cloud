@@ -101,7 +101,6 @@ describe('processAppStoreKiloPassNotification', () => {
 
     const result = await processAppStoreKiloPassNotification({
       signedPayload: 'payload',
-      userForRenewal: user,
       decodeNotification: async () => decodedNotification,
       decodeTransaction: async () => decodedTransaction,
     });
@@ -140,10 +139,9 @@ describe('processAppStoreKiloPassNotification', () => {
   it('deduplicates notification UUIDs', async () => {
     const user = await insertTestUser();
     const decodedNotification = notification();
-    const decodedTransaction = transaction();
+    const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
     const params = {
       signedPayload: 'payload',
-      userForRenewal: user,
       decodeNotification: async () => decodedNotification,
       decodeTransaction: async () => decodedTransaction,
     };
@@ -314,10 +312,9 @@ describe('processAppStoreKiloPassNotification', () => {
 
   it('marks a subscription ended for expiration notifications', async () => {
     const user = await insertTestUser();
-    const decodedTransaction = transaction();
+    const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
     await processAppStoreKiloPassNotification({
       signedPayload: 'renewal',
-      userForRenewal: user,
       decodeNotification: async () => notification({ notificationUUID: 'renewal' }),
       decodeTransaction: async () => decodedTransaction,
     });

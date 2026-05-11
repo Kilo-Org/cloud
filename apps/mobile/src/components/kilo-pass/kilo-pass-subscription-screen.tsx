@@ -26,14 +26,14 @@ export function KiloPassSubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const productsQuery = useStoreKiloPassProducts();
-  const purchase = useStoreKiloPassPurchase({
-    onPurchaseCompleted: () => {
-      ensureProfileAfterKiloPassPurchase(router);
-    },
-  });
+  const purchase = useStoreKiloPassPurchase();
   const handleProductPress = (product: AppStoreKiloPassProduct) => {
     void Haptics.selectionAsync();
-    void purchase.purchase(product);
+    void purchase.purchase(product, {
+      onCompleted: () => {
+        ensureProfileAfterKiloPassPurchase(router);
+      },
+    });
   };
 
   return (

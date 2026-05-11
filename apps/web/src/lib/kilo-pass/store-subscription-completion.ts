@@ -509,7 +509,6 @@ export async function completeStoreKiloPassPurchase(params: {
           cadence: purchase.cadence,
           status: 'active',
           cancel_at_period_end: false,
-          started_at: purchase.purchasedAtIso,
           ended_at: null,
           next_yearly_issue_at: nextYearlyIssueAt,
         },

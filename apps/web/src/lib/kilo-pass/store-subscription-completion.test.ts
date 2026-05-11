@@ -286,6 +286,52 @@ describe('completeStoreKiloPassPurchase', () => {
     expect(subscription?.current_streak_months).toBe(2);
   });
 
+  it('preserves the original subscription start date across App Store renewals', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+    const firstTransactionId = `tx-${crypto.randomUUID()}`;
+    const renewalTransactionId = `tx-${crypto.randomUUID()}`;
+
+    const first = await completeStoreKiloPassPurchase({
+      user,
+      purchase: applePurchase({
+        providerSubscriptionId,
+        providerOriginalTransactionId: providerSubscriptionId,
+        providerTransactionId: firstTransactionId,
+        purchasedAtIso: '2026-05-01T00:00:00.000Z',
+        expiresAtIso: '2026-06-01T00:00:00.000Z',
+      }),
+    });
+    await completeStoreKiloPassPurchase({
+      user,
+      purchase: applePurchase({
+        providerSubscriptionId,
+        providerOriginalTransactionId: providerSubscriptionId,
+        providerTransactionId: renewalTransactionId,
+        purchasedAtIso: '2026-06-01T00:00:00.000Z',
+        expiresAtIso: '2026-07-01T00:00:00.000Z',
+      }),
+    });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.id, first.subscriptionId),
+    });
+    expect(subscription?.started_at ? new Date(subscription.started_at).toISOString() : null).toBe(
+      '2026-05-01T00:00:00.000Z'
+    );
+    expect(subscription?.current_streak_months).toBe(2);
+
+    const renewalPurchase = await db.query.kilo_pass_store_purchases.findFirst({
+      where: eq(kilo_pass_store_purchases.provider_transaction_id, renewalTransactionId),
+    });
+    expect(
+      renewalPurchase?.purchased_at ? new Date(renewalPurchase.purchased_at).toISOString() : null
+    ).toBe('2026-06-01T00:00:00.000Z');
+    expect(
+      renewalPurchase?.expires_at ? new Date(renewalPurchase.expires_at).toISOString() : null
+    ).toBe('2026-07-01T00:00:00.000Z');
+  });
+
   it('claws back prorated old tier credits and issues full new tier credits for App Store upgrades', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
@@ -321,7 +367,7 @@ describe('completeStoreKiloPassPurchase', () => {
     });
     expect(subscription?.tier).toBe(KiloPassTier.Tier49);
     expect(subscription?.started_at ? new Date(subscription.started_at).toISOString() : null).toBe(
-      '2026-05-16T00:00:00.000Z'
+      '2026-05-01T00:00:00.000Z'
     );
 
     const creditRows = await db

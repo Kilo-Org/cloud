@@ -490,7 +490,9 @@ export async function processAppStoreKiloPassNotification(params: {
     : null;
   const isRefundNotification = REFUND_TYPES.has(notification.notificationType);
   const purchase =
-    transaction && !isRefundNotification ? mapAppleKiloPassTransaction(transaction) : null;
+    transaction && !isRefundNotification && isImmediateStorePurchaseNotification(notification)
+      ? mapAppleKiloPassTransaction(transaction)
+      : null;
 
   const claimedEvent = await claimStoreEventForProcessing({ notification, purchase, transaction });
   if (!claimedEvent) {

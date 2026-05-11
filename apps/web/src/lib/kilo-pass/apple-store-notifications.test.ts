@@ -343,6 +343,45 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(subscription?.ended_at).not.toBeNull();
   });
 
+  it('marks a subscription ended when the expiration notification transaction is expired', async () => {
+    const user = await insertTestUser();
+    const renewalTransaction = transaction({ appAccountToken: user.app_store_account_token });
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'expired-transaction-initial-buy',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'expired-transaction-initial-buy',
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+        }),
+      decodeTransaction: async () => renewalTransaction,
+    });
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'expired-transaction-expired',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'expired-transaction-expired',
+          notificationType: NotificationTypeV2.EXPIRED,
+          signedTransactionInfo: 'expired-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: renewalTransaction.originalTransactionId,
+          expiresDate: 1_700_000_000_000,
+        }),
+    });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(
+        kilo_pass_subscriptions.provider_subscription_id,
+        renewalTransaction.originalTransactionId
+      ),
+    });
+    expect(subscription?.status).toBe('canceled');
+    expect(subscription?.ended_at).not.toBeNull();
+  });
+
   it('only ends App Store rows for expiration notifications', async () => {
     const providerSubscriptionId = `shared-${crypto.randomUUID()}`;
     await insertProviderScopedSubscriptionRows(providerSubscriptionId);

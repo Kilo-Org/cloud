@@ -148,6 +148,14 @@ const CompleteStorePurchaseOutputSchema = z.object({
 
 type KiloPassSubscriptionStateResponse = z.infer<typeof KiloPassSubscriptionStateSchema>;
 
+type KiloPassCreditHistoryRow = {
+  id: string;
+  kind: KiloPassIssuanceItemKind;
+  amountUsd: number;
+  createdAt: string;
+  description: string | null;
+};
+
 type StripeManagedKiloPassSubscription = KiloPassSubscriptionState & {
   paymentProvider: typeof KiloPassPaymentProvider.Stripe;
   stripeSubscriptionId: string;
@@ -385,11 +393,15 @@ async function getBaseCreditsIssuedAtForSubscription(
   subscriptionId: string
 ): Promise<string | null> {
   const rows = await db
-    .select({ createdAt: kilo_pass_issuance_items.created_at })
+    .select({ createdAt: credit_transactions.created_at })
     .from(kilo_pass_issuance_items)
     .innerJoin(
       kilo_pass_issuances,
       eq(kilo_pass_issuance_items.kilo_pass_issuance_id, kilo_pass_issuances.id)
+    )
+    .innerJoin(
+      credit_transactions,
+      eq(kilo_pass_issuance_items.credit_transaction_id, credit_transactions.id)
     )
     .where(
       and(
@@ -405,6 +417,112 @@ async function getBaseCreditsIssuedAtForSubscription(
 
   const parsed = dayjs(row.createdAt).utc();
   return parsed.isValid() ? parsed.toISOString() : null;
+}
+
+async function getKiloPassIssuanceCreditHistoryRows(
+  subscriptionId: string
+): Promise<KiloPassCreditHistoryRow[]> {
+  return db
+    .select({
+      id: kilo_pass_issuance_items.id,
+      kind: kilo_pass_issuance_items.kind,
+      amountUsd: kilo_pass_issuance_items.amount_usd,
+      createdAt: credit_transactions.created_at,
+      description: credit_transactions.description,
+    })
+    .from(kilo_pass_issuance_items)
+    .innerJoin(
+      kilo_pass_issuances,
+      eq(kilo_pass_issuance_items.kilo_pass_issuance_id, kilo_pass_issuances.id)
+    )
+    .innerJoin(
+      credit_transactions,
+      eq(kilo_pass_issuance_items.credit_transaction_id, credit_transactions.id)
+    )
+    .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, subscriptionId));
+}
+
+async function getStoreUpgradeCreditHistoryRows(params: {
+  kiloUserId: string;
+  subscriptionId: string;
+  paymentProvider: KiloPassPaymentProvider;
+}): Promise<KiloPassCreditHistoryRow[]> {
+  const providerTransactionCreditPrefix = sql<string>`('kilo-pass:' || ${kilo_pass_store_purchases.payment_provider} || ':' || ${kilo_pass_store_purchases.provider_transaction_id})`;
+  const upgradeRefundCategory = sql<string>`('kilo-pass-upgrade-refund:' || ${kilo_pass_store_purchases.payment_provider} || ':' || ${kilo_pass_store_purchases.provider_transaction_id})`;
+  const upgradeBonusCategoryPrefix = sql<string>`('kilo-pass-upgrade-bonus-reversal:' || ${kilo_pass_store_purchases.payment_provider} || ':' || ${kilo_pass_store_purchases.provider_transaction_id} || ':%')`;
+  const upgradePromoCategoryPrefix = sql<string>`('kilo-pass-upgrade-bonus-reversal:' || ${kilo_pass_store_purchases.payment_provider} || ':' || ${kilo_pass_store_purchases.provider_transaction_id} || ':' || ${KiloPassIssuanceItemKind.PromoFirstMonth50Pct} || ':%')`;
+
+  const [displacedBaseRows, adjustmentRows] = await Promise.all([
+    db
+      .select({
+        id: credit_transactions.id,
+        kind: sql<KiloPassIssuanceItemKind>`${KiloPassIssuanceItemKind.Base}`,
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        createdAt: credit_transactions.created_at,
+        description: credit_transactions.description,
+      })
+      .from(credit_transactions)
+      .innerJoin(
+        kilo_pass_store_purchases,
+        and(
+          eq(kilo_pass_store_purchases.kilo_pass_subscription_id, params.subscriptionId),
+          eq(kilo_pass_store_purchases.kilo_user_id, params.kiloUserId),
+          eq(kilo_pass_store_purchases.payment_provider, params.paymentProvider),
+          sql`${credit_transactions.stripe_payment_id} = ${providerTransactionCreditPrefix}`
+        )
+      )
+      .where(
+        and(
+          eq(credit_transactions.kilo_user_id, params.kiloUserId),
+          isNull(credit_transactions.organization_id),
+          sql`${credit_transactions.amount_microdollars} > 0`,
+          sql`NOT EXISTS (
+            SELECT 1
+            FROM kilo_pass_issuance_items
+            WHERE kilo_pass_issuance_items.credit_transaction_id = ${credit_transactions.id}
+          )`
+        )
+      ),
+    db
+      .select({
+        id: credit_transactions.id,
+        kind: sql<KiloPassIssuanceItemKind>`CASE
+          WHEN ${credit_transactions.credit_category} LIKE ${upgradePromoCategoryPrefix}
+            THEN ${KiloPassIssuanceItemKind.PromoFirstMonth50Pct}
+          WHEN ${credit_transactions.credit_category} LIKE ${upgradeBonusCategoryPrefix}
+            THEN ${KiloPassIssuanceItemKind.Bonus}
+          ELSE ${KiloPassIssuanceItemKind.Base}
+        END`,
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        createdAt: credit_transactions.created_at,
+        description: credit_transactions.description,
+      })
+      .from(credit_transactions)
+      .innerJoin(
+        kilo_pass_store_purchases,
+        and(
+          eq(kilo_pass_store_purchases.kilo_pass_subscription_id, params.subscriptionId),
+          eq(kilo_pass_store_purchases.kilo_user_id, params.kiloUserId),
+          eq(kilo_pass_store_purchases.payment_provider, params.paymentProvider),
+          sql`(${credit_transactions.credit_category} = ${upgradeRefundCategory}
+            OR ${credit_transactions.credit_category} LIKE ${upgradeBonusCategoryPrefix})`
+        )
+      )
+      .where(
+        and(
+          eq(credit_transactions.kilo_user_id, params.kiloUserId),
+          isNull(credit_transactions.organization_id)
+        )
+      ),
+  ]);
+
+  return [...displacedBaseRows, ...adjustmentRows].map(row => ({
+    id: row.id,
+    kind: row.kind,
+    amountUsd: roundToCents(fromMicrodollars(row.amountMicrodollars)),
+    createdAt: row.createdAt,
+    description: row.description,
+  }));
 }
 
 async function getCurrentPeriodUsageUsd(params: {
@@ -1332,29 +1450,23 @@ export const kiloPassRouter = createTRPCRouter({
       }
 
       const offset = parseOffsetCursor(input.cursor);
-      const rows = await db
-        .select({
-          id: kilo_pass_issuance_items.id,
-          kind: kilo_pass_issuance_items.kind,
-          amountUsd: kilo_pass_issuance_items.amount_usd,
-          createdAt: credit_transactions.created_at,
-          description: credit_transactions.description,
-        })
-        .from(kilo_pass_issuance_items)
-        .innerJoin(
-          kilo_pass_issuances,
-          eq(kilo_pass_issuance_items.kilo_pass_issuance_id, kilo_pass_issuances.id)
-        )
-        .innerJoin(
-          credit_transactions,
-          eq(kilo_pass_issuance_items.credit_transaction_id, credit_transactions.id)
-        )
-        .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, subscription.subscriptionId))
-        .orderBy(desc(credit_transactions.created_at), desc(kilo_pass_issuance_items.id))
-        .limit(26)
-        .offset(offset);
+      const issuanceRows = await getKiloPassIssuanceCreditHistoryRows(subscription.subscriptionId);
+      const storeUpgradeRows =
+        subscription.paymentProvider === KiloPassPaymentProvider.Stripe
+          ? []
+          : await getStoreUpgradeCreditHistoryRows({
+              kiloUserId: ctx.user.id,
+              subscriptionId: subscription.subscriptionId,
+              paymentProvider: subscription.paymentProvider,
+            });
+      const rows = [...issuanceRows, ...storeUpgradeRows].sort((a, b) => {
+        const createdAtDiff = dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf();
+        if (createdAtDiff !== 0) return createdAtDiff;
+        return b.id.localeCompare(a.id);
+      });
 
-      const entries = rows.slice(0, 25).map(row => ({
+      const pageRows = rows.slice(offset, offset + 26);
+      const entries = pageRows.slice(0, 25).map(row => ({
         id: row.id,
         date: dayjs(row.createdAt).utc().toISOString(),
         amountUsd: row.amountUsd,
@@ -1364,8 +1476,8 @@ export const kiloPassRouter = createTRPCRouter({
 
       return {
         entries,
-        hasMore: rows.length > 25,
-        cursor: rows.length > 25 ? String(offset + 25) : null,
+        hasMore: pageRows.length > 25,
+        cursor: pageRows.length > 25 ? String(offset + 25) : null,
       };
     }),
 

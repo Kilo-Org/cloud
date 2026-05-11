@@ -192,13 +192,11 @@ export async function getEnhancedOpenRouterModels(): Promise<OpenRouterModelsRes
   return { data: enhancedModelList(rawResponse.data) };
 }
 
-/**
- * Fetch embedding models from the OpenRouter API.
- * Mirrors `getRawOpenRouterModels` but filters to models that emit embeddings.
- */
-export async function getOpenRouterEmbeddingModels(): Promise<OpenRouterModelsResponse> {
+async function getOpenRouterModelsByOutput(
+  output: 'embeddings' | 'transcription'
+): Promise<OpenRouterModelsResponse> {
   const response = await fetch(
-    `${PROVIDERS.OPENROUTER.apiUrl}/models?output_modalities=embeddings`,
+    `${PROVIDERS.OPENROUTER.apiUrl}/models?output_modalities=${output}`,
     {
       method: 'GET',
       headers: {
@@ -210,15 +208,15 @@ export async function getOpenRouterEmbeddingModels(): Promise<OpenRouterModelsRe
   );
 
   if (!response.ok) {
-    const errorMessage = `Failed to fetch OpenRouter embedding models: ${response.status} ${response.statusText}`;
+    const errorMessage = `Failed to fetch OpenRouter ${output} models: ${response.status} ${response.statusText}`;
     captureException(new Error(errorMessage), {
-      tags: { endpoint: 'openrouter/embedding-models', source: 'openrouter_api' },
+      tags: { endpoint: `openrouter/${output}-models`, source: 'openrouter_api' },
       extra: {
         status: response.status,
         statusText: response.statusText,
       },
     });
-    throw new Error('Failed to fetch embedding models from OpenRouter API');
+    throw new Error(`Failed to fetch ${output} models from OpenRouter API`);
   }
 
   const data = await response.json();
@@ -227,11 +225,11 @@ export async function getOpenRouterEmbeddingModels(): Promise<OpenRouterModelsRe
 
   if (!parseResult.success) {
     errorExceptInTest(
-      'OpenRouter embedding models response not in expected format:',
+      `OpenRouter ${output} models response not in expected format:`,
       parseResult.error
     );
 
-    captureMessage('openrouter embedding models not in expected format!', {
+    captureMessage(`openrouter ${output} models not in expected format!`, {
       level: 'error',
       extra: {
         data,
@@ -245,51 +243,16 @@ export async function getOpenRouterEmbeddingModels(): Promise<OpenRouterModelsRe
 }
 
 /**
+ * Fetch embedding models from the OpenRouter API.
+ * Mirrors `getRawOpenRouterModels` but filters to models that emit embeddings.
+ */
+export async function getOpenRouterEmbeddingModels(): Promise<OpenRouterModelsResponse> {
+  return getOpenRouterModelsByOutput('embeddings');
+}
+
+/**
  * Fetch speech-to-text models from the OpenRouter API.
  */
 export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterModelsResponse> {
-  const response = await fetch(
-    `${PROVIDERS.OPENROUTER.apiUrl}/models?output_modalities=transcription`,
-    {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${PROVIDERS.OPENROUTER.apiKey}`,
-        ...ATTRIBUTION_HEADERS,
-      },
-      next: { revalidate: 60 },
-    }
-  );
-
-  if (!response.ok) {
-    const errorMessage = `Failed to fetch OpenRouter transcription models: ${response.status} ${response.statusText}`;
-    captureException(new Error(errorMessage), {
-      tags: { endpoint: 'openrouter/transcription-models', source: 'openrouter_api' },
-      extra: {
-        status: response.status,
-        statusText: response.statusText,
-      },
-    });
-    throw new Error('Failed to fetch transcription models from OpenRouter API');
-  }
-
-  const data = await response.json();
-  const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
-
-  if (!parseResult.success) {
-    errorExceptInTest(
-      'OpenRouter transcription models response not in expected format:',
-      parseResult.error
-    );
-
-    captureMessage('openrouter transcription models not in expected format!', {
-      level: 'error',
-      extra: {
-        data,
-        zodError: parseResult.error.issues,
-      },
-    });
-    return data as OpenRouterModelsResponse;
-  }
-
-  return parseResult.data;
+  return getOpenRouterModelsByOutput('transcription');
 }

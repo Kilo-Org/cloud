@@ -32,22 +32,3 @@ export function extractTranscriptionPromptInfo(body: TranscriptionRequest) {
     user_prompt_prefix: `audio/${format}${language}`.slice(0, 100),
   };
 }
-
-const TRANSCRIPTION_PROVIDER_SLUGS: Record<string, readonly string[]> = {
-  'google/chirp-3': ['google-vertex'],
-  'openai/gpt-4o-mini-transcribe': ['openai'],
-  'openai/gpt-4o-transcribe': ['openai'],
-  'openai/whisper-1': ['openai'],
-  'openai/whisper-large-v3': ['groq'],
-  'openai/whisper-large-v3-turbo': ['groq'],
-};
-
-export function isTranscriptionProviderAllowed(
-  model: string,
-  allow: readonly string[] | undefined
-) {
-  if (!allow) return true;
-  const slugs = TRANSCRIPTION_PROVIDER_SLUGS[model];
-  if (!slugs) return false;
-  return slugs.some(slug => allow.includes(slug));
-}

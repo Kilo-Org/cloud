@@ -2,7 +2,6 @@ import { describe, it, expect } from '@jest/globals';
 import {
   buildUpstreamBody,
   extractTranscriptionPromptInfo,
-  isTranscriptionProviderAllowed,
   TranscriptionRequestSchema,
 } from './transcription-request';
 
@@ -61,19 +60,5 @@ describe('extractTranscriptionPromptInfo', () => {
       system_prompt_length: 0,
       user_prompt_prefix: 'audio/wav language=en',
     });
-  });
-});
-
-describe('isTranscriptionProviderAllowed', () => {
-  it('allows models routed through an allowed provider slug', () => {
-    expect(isTranscriptionProviderAllowed('openai/whisper-large-v3-turbo', ['groq'])).toBe(true);
-  });
-
-  it('rejects known models without an allowed provider slug', () => {
-    expect(isTranscriptionProviderAllowed('openai/whisper-large-v3-turbo', ['openai'])).toBe(false);
-  });
-
-  it('rejects unknown models when provider restrictions are active', () => {
-    expect(isTranscriptionProviderAllowed('custom/stt-model', ['openai'])).toBe(false);
   });
 });

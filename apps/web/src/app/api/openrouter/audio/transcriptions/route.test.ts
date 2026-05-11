@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import type { User } from '@kilocode/db/schema';
+import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
+import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 
 jest.mock('next/server', () => {
   return {
@@ -25,6 +27,7 @@ jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
+const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
@@ -113,6 +116,37 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(upstream.input_audio).toEqual({ data: 'UklGRiQA', format: 'wav' });
     expect(upstream.safety_identifier).toBeTruthy();
     expect(upstream.user).toBe(upstream.safety_identifier);
+    expect(mockedEmitApiMetricsForResponse.mock.calls[0]?.[0]).not.toMatchObject({
+      feature: 'vscode-extension',
+    });
+  });
+
+  it('forwards organization provider policy through the OpenRouter provider field', async () => {
+    setUserAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {
+        provider_allow_list: ['openai'],
+        model_deny_list: [],
+        data_collection: 'deny',
+      } satisfies OrganizationSettings,
+      plan: 'enterprise',
+    });
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const upstream = JSON.parse(init?.body as string);
+    expect(upstream.provider).toEqual({ only: ['openai'], data_collection: 'deny' });
   });
 
   it('rejects malformed transcription bodies before proxying', async () => {

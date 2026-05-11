@@ -17,7 +17,6 @@ import {
   invalidRequestResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
-  modelNotAllowedResponse,
   wrapInSafeNextResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -28,7 +27,6 @@ import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
   extractTranscriptionPromptInfo,
-  isTranscriptionProviderAllowed,
   TranscriptionRequestSchema,
 } from '@/lib/ai-gateway/transcriptions/transcription-request';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
@@ -47,10 +45,8 @@ async function transcriptionProxyRequest(params: {
   headers.set('Content-Type', 'application/json');
   headers.set('Authorization', `Bearer ${provider.apiKey}`);
 
-  if (provider.id === 'openrouter') {
-    for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
-      headers.set(key, value);
-    }
+  for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
+    headers.set(key, value);
   }
 
   const timeout = AbortSignal.timeout(10 * 60 * 1000);
@@ -138,7 +134,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
   const { provider, userByok } = await getTranscriptionProvider();
-  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || 'vscode-extension');
+  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
   const promptInfo = extractTranscriptionPromptInfo(body);
 
   const usageContext: MicrodollarUsageContext = {
@@ -184,15 +180,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
   if (modelRestrictionError) return modelRestrictionError;
 
-  if (
-    providerConfig?.only &&
-    !isTranscriptionProviderAllowed(requestedModelLowerCased, providerConfig.only)
-  ) {
-    return modelNotAllowedResponse();
-  }
-
-  if (providerConfig?.data_collection) {
-    body.provider = { ...body.provider, data_collection: providerConfig.data_collection };
+  if (providerConfig) {
+    body.provider = { ...body.provider, ...providerConfig };
   }
 
   sentryRootSpan()?.setAttribute(

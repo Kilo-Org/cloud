@@ -1,13 +1,12 @@
 import {
   credit_transactions,
   kilo_pass_issuance_items,
-  kilo_pass_issuances,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   kilocode_users,
   type User,
 } from '@kilocode/db/schema';
-import { and, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
 import type { DrizzleTransaction } from '@/lib/drizzle';
@@ -29,10 +28,12 @@ import {
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
 } from './issuance';
-import { getPausedMonthSet } from './pause-events';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
+import {
+  computeMonthlyKiloPassStreak,
+  updateKiloPassThresholdAfterBaseCredits,
+} from './subscription-accounting';
 import { isStripeSubscriptionEnded } from './stripe-subscription-status';
-import { getPreviousIssueMonth } from './stripe-handlers-utils';
 
 export type ValidatedStoreKiloPassPurchase = {
   paymentProvider: KiloPassPaymentProvider.AppStore | KiloPassPaymentProvider.GooglePlay;
@@ -376,12 +377,10 @@ async function applyStoreUpgradeCreditAdjustments(
   });
 
   if (issueResult.wasInserted) {
-    await tx
-      .update(kilocode_users)
-      .set({
-        kilo_pass_threshold: sql`${kilocode_users.microdollars_used} + ${newTierMicrodollars}`,
-      })
-      .where(eq(kilocode_users.id, params.user.id));
+    await updateKiloPassThresholdAfterBaseCredits(tx, {
+      kiloUserId: params.user.id,
+      baseAmountUsd: newTierAmountUsd,
+    });
   }
 
   await appendKiloPassAuditLog(tx, {
@@ -415,51 +414,6 @@ async function applyStoreUpgradeCreditAdjustments(
     upgradedBaseAmountUsd: newTierAmountUsd,
     originalBaselineMicrodollarsUsed: freshUser.microdollarsUsed,
   });
-}
-
-async function computeMonthlyStoreStreak(
-  tx: DrizzleTransaction,
-  params: {
-    subscriptionId: string;
-    issueMonth: string;
-  }
-): Promise<number> {
-  const monthlyIssuanceMonths = await tx
-    .select({ issueMonth: kilo_pass_issuances.issue_month })
-    .from(kilo_pass_issuances)
-    .where(
-      and(
-        eq(kilo_pass_issuances.kilo_pass_subscription_id, params.subscriptionId),
-        lte(kilo_pass_issuances.issue_month, params.issueMonth)
-      )
-    )
-    .orderBy(desc(kilo_pass_issuances.issue_month))
-    .limit(36);
-
-  const issueMonthSet = new Set(monthlyIssuanceMonths.map(row => row.issueMonth));
-  const pausedMonthSet = await getPausedMonthSet(tx, {
-    kiloPassSubscriptionId: params.subscriptionId,
-    fromIssueMonth: params.issueMonth,
-    maxMonthsBack: 36,
-  });
-
-  let computedStreak = 0;
-  let cursor = params.issueMonth;
-  const maxIterations = 36;
-  let iterations = 0;
-  while (iterations < maxIterations) {
-    if (issueMonthSet.has(cursor)) {
-      computedStreak += 1;
-      cursor = getPreviousIssueMonth(cursor);
-    } else if (pausedMonthSet.has(cursor)) {
-      cursor = getPreviousIssueMonth(cursor);
-    } else {
-      break;
-    }
-    iterations += 1;
-  }
-
-  return Math.max(1, computedStreak);
 }
 
 export async function completeStoreKiloPassPurchase(params: {
@@ -650,18 +604,14 @@ export async function completeStoreKiloPassPurchase(params: {
         oldExpiresAtIso: previousStorePurchase.expires_at,
       });
     } else if (baseCreditsResult.wasIssued) {
-      await tx
-        .update(kilocode_users)
-        .set({
-          kilo_pass_threshold: sql`${kilocode_users.microdollars_used} + ${toMicrodollars(
-            baseAmountUsd
-          )}`,
-        })
-        .where(eq(kilocode_users.id, user.id));
+      await updateKiloPassThresholdAfterBaseCredits(tx, {
+        kiloUserId: user.id,
+        baseAmountUsd,
+      });
     }
 
     if (purchase.cadence === KiloPassCadence.Monthly) {
-      const currentStreakMonths = await computeMonthlyStoreStreak(tx, {
+      const currentStreakMonths = await computeMonthlyKiloPassStreak(tx, {
         subscriptionId,
         issueMonth,
       });

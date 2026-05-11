@@ -801,7 +801,7 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(subscription?.ended_at).toBeNull();
   });
 
-  it('reverses the issued base, bonus, and promo credits for the refunded issuance', async () => {
+  it('reverses the Apple paid base amount plus issued bonus and promo credits for the refunded issuance', async () => {
     const user = await insertTestUser();
     const decodedTransaction = transaction({
       appAccountToken: user.app_store_account_token,
@@ -929,7 +929,7 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(creditTransactions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          amountMicrodollars: -toMicrodollars(19),
+          amountMicrodollars: -toMicrodollars(24.7),
           description: 'App Store Kilo Pass refund clawback',
         }),
         expect.objectContaining({
@@ -945,7 +945,7 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(creditTransactions).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          amountMicrodollars: -toMicrodollars(24.7),
+          amountMicrodollars: -toMicrodollars(19),
         }),
       ])
     );
@@ -953,6 +953,79 @@ describe('processAppStoreKiloPassNotification', () => {
     const updatedUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
-    expect(updatedUser?.total_microdollars_acquired).toBe(0);
+    expect(updatedUser?.total_microdollars_acquired).toBe(-toMicrodollars(5.7));
+  });
+
+  it.each([
+    {
+      name: 'missing price',
+      refundTransaction: { currency: 'USD', price: undefined },
+      error: 'App Store refund transaction is missing a valid price',
+    },
+    {
+      name: 'non-finite price',
+      refundTransaction: { currency: 'USD', price: Number.POSITIVE_INFINITY },
+      error: 'App Store refund transaction is missing a valid price',
+    },
+    {
+      name: 'non-positive price',
+      refundTransaction: { currency: 'USD', price: 0 },
+      error: 'App Store refund transaction is missing a valid price',
+    },
+    {
+      name: 'missing currency',
+      refundTransaction: { currency: undefined, price: 24700 },
+      error: 'App Store refund transaction has unsupported currency',
+    },
+    {
+      name: 'unsupported currency',
+      refundTransaction: { currency: 'EUR', price: 24700 },
+      error: 'App Store refund transaction has unsupported currency',
+    },
+  ])('fails refund processing for $name', async ({ name, refundTransaction, error }) => {
+    const user = await insertTestUser();
+    const decodedTransaction = transaction({
+      appAccountToken: user.app_store_account_token,
+    });
+    await processAppStoreKiloPassNotification({
+      signedPayload: `invalid-refund-initial-buy-${name}`,
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: `invalid-refund-initial-buy-${name}`,
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+        }),
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    const refundNotificationUUID = `invalid-refund-${name}`;
+    await expect(
+      processAppStoreKiloPassNotification({
+        signedPayload: refundNotificationUUID,
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: refundNotificationUUID,
+            notificationType: NotificationTypeV2.REFUND,
+            signedTransactionInfo: 'invalid-refund-transaction',
+          }),
+        decodeTransaction: async () =>
+          transaction({
+            ...decodedTransaction,
+            revocationDate: 1_777_700_000_000,
+            ...refundTransaction,
+          }),
+      })
+    ).rejects.toThrow(error);
+
+    const negativeCreditTransactions = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(negativeCreditTransactions.filter(row => row.amount_microdollars < 0)).toHaveLength(0);
+
+    const refundEvent = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, refundNotificationUUID),
+    });
+    expect(refundEvent?.processed_at).toBeNull();
   });
 });

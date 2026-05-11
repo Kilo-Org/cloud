@@ -8,6 +8,7 @@ import {
   kiloclaw_access_codes,
   kiloclaw_google_oauth_connections,
   kiloclaw_instances,
+  kiloclaw_morning_briefing_configs,
   kiloclaw_scheduled_actions,
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
@@ -691,4 +692,94 @@ export async function deleteVersionPinWithCAS(
     )
     .returning({ id: kiloclaw_version_pins.id });
   return { deleted: result.length > 0 };
+}
+
+// ─── Morning Briefing configs ────────────────────────────────────────
+//
+// Denormalized desired-state mirror for "is briefing enabled?
+// cron/timezone/interests?" The plugin's local config.json on the
+// instance is the source of truth; this is a queryable cache the worker
+// writes to alongside the plugin push. Plugin runtime state (cronJobId,
+// lastGeneratedAt, reconcileState) stays in the plugin and is NOT
+// mirrored here.
+
+export type MorningBriefingConfigRow = {
+  instance_id: string;
+  enabled: boolean;
+  cron: string;
+  timezone: string;
+  interest_topics: string[];
+};
+
+export async function getMorningBriefingConfig(
+  db: WorkerDb,
+  instanceId: string
+): Promise<MorningBriefingConfigRow | null> {
+  const row = await db
+    .select({
+      instance_id: kiloclaw_morning_briefing_configs.instance_id,
+      enabled: kiloclaw_morning_briefing_configs.enabled,
+      cron: kiloclaw_morning_briefing_configs.cron,
+      timezone: kiloclaw_morning_briefing_configs.timezone,
+      interest_topics: kiloclaw_morning_briefing_configs.interest_topics,
+    })
+    .from(kiloclaw_morning_briefing_configs)
+    .where(eq(kiloclaw_morning_briefing_configs.instance_id, instanceId))
+    .limit(1)
+    .then(rows => rows[0] ?? null);
+  return row;
+}
+
+export type MorningBriefingConfigUpsertInput = {
+  instanceId: string;
+  enabled: boolean;
+  // On INSERT, omitted fields take the column default (cron = plugin
+  // default, timezone = 'UTC', interest_topics = '{}'). On UPDATE, omitted
+  // fields are preserved — pass through the call site only what the user
+  // is actually changing.
+  cron?: string;
+  timezone?: string;
+  interestTopics?: string[];
+};
+
+/**
+ * Upsert the desired-state row for an instance's morning briefing.
+ *
+ * Update semantics: only fields explicitly provided in `input` are
+ * overwritten on conflict. The enable/disable flows pass cron+timezone
+ * (the values just resolved by the plugin); the interests flow (PR-4b)
+ * passes only `interestTopics`. Anything not passed retains its prior
+ * value.
+ */
+export async function upsertMorningBriefingConfig(
+  db: WorkerDb,
+  input: MorningBriefingConfigUpsertInput
+): Promise<void> {
+  const setOnConflict: Record<string, unknown> = {
+    enabled: input.enabled,
+    updated_at: sql`now()`,
+  };
+  if (input.cron !== undefined) setOnConflict.cron = input.cron;
+  if (input.timezone !== undefined) setOnConflict.timezone = input.timezone;
+  if (input.interestTopics !== undefined) {
+    setOnConflict.interest_topics = input.interestTopics;
+  }
+
+  // INSERT values: undefined fields fall through to the column DEFAULT.
+  // Typed declaration so the conditional assignments below stay type-checked
+  // without an `as` cast.
+  const insertValues: typeof kiloclaw_morning_briefing_configs.$inferInsert = {
+    instance_id: input.instanceId,
+    enabled: input.enabled,
+  };
+  if (input.cron !== undefined) insertValues.cron = input.cron;
+  if (input.timezone !== undefined) insertValues.timezone = input.timezone;
+  if (input.interestTopics !== undefined) {
+    insertValues.interest_topics = input.interestTopics;
+  }
+
+  await db.insert(kiloclaw_morning_briefing_configs).values(insertValues).onConflictDoUpdate({
+    target: kiloclaw_morning_briefing_configs.instance_id,
+    set: setOnConflict,
+  });
 }

@@ -112,8 +112,10 @@ import {
 import {
   restoreFromPostgres,
   markDestroyedInPostgresHelper,
+  readMorningBriefingConfigFromPostgresHelper,
   syncAdminSizeOverrideToPostgresHelper,
   syncInstanceTypeToPostgresHelper,
+  syncMorningBriefingConfigToPostgresHelper,
   syncTrackedImageTagToPostgresHelper,
 } from './postgres';
 import {
@@ -3640,17 +3642,98 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   async getMorningBriefingStatus() {
     await this.loadState();
-    return gateway.getMorningBriefingStatus(this.s, this.env);
+    // Plugin remains the source of truth for runtime state (reconcileState,
+    // lastGeneratedAt, observedEnabled). Postgres mirrors desired-state
+    // (enabled / cron / timezone / interest_topics). Read both, surface
+    // interest_topics from Postgres (the plugin response has no such field
+    // in PR-4a), and keep the plugin's own enabled/cron/timezone for the
+    // response — those agree under steady state, and the plugin is what
+    // actually drives the cron.
+    const [pg, pluginStatus] = await Promise.all([
+      readMorningBriefingConfigFromPostgresHelper(this.env, this.s),
+      gateway.getMorningBriefingStatus(this.s, this.env),
+    ]);
+
+    // Plugin not reachable (gateway warming, route missing, etc.) → return
+    // null to preserve the existing controller_route_unavailable behavior
+    // the route handler relies on. We could synthesize a response from
+    // Postgres here, but doing so would mask the warming state from
+    // callers that branch on it.
+    if (!pluginStatus) return null;
+
+    // Lazy backfill: plugin reports a configured briefing for an instance
+    // that has no Postgres row yet (legacy instance pre-dating PR-4a).
+    // Schedule the write via `waitUntil` so it doesn't add latency to the
+    // status response. The current request still returns without
+    // `interestTopics` (Postgres row was null at read time); the next
+    // call after the backfill lands sees the row. Best-effort: matches
+    // the enable/disable paths.
+    //
+    // `pg.instanceId` was just resolved by the parallel Postgres read;
+    // pass it through so the helper skips the redundant
+    // `getInstanceBySandboxId` lookup.
+    if (
+      pg &&
+      pg.row === null &&
+      typeof pluginStatus.enabled === 'boolean' &&
+      typeof pluginStatus.cron === 'string'
+    ) {
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(
+          this.env,
+          this.s,
+          {
+            enabled: pluginStatus.enabled,
+            cron: pluginStatus.cron,
+            timezone: pluginStatus.timezone,
+          },
+          pg.instanceId
+        )
+      );
+    }
+
+    // Augment the plugin response with interest_topics from Postgres.
+    // Other fields (enabled/cron/timezone) come from the plugin so a
+    // running-state mismatch (e.g. operator-edited config.json) surfaces.
+    if (pg?.row) {
+      return { ...pluginStatus, interestTopics: pg.row.interest_topics };
+    }
+    return pluginStatus;
   }
 
   async enableMorningBriefing(input: { cron?: string; timezone?: string }) {
     await this.loadState();
-    return gateway.enableMorningBriefing(this.s, this.env, input);
+    const response = await gateway.enableMorningBriefing(this.s, this.env, input);
+    if (response && response.ok !== false) {
+      // Mirror to Postgres after the plugin accepted. Best-effort via
+      // waitUntil — the user-facing success is gated on the plugin write,
+      // not the Postgres mirror. Pass through whichever cron/timezone
+      // the plugin resolved (it echoes them on success); fall back to the
+      // request input.
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(this.env, this.s, {
+          enabled: true,
+          cron: response.cron ?? input.cron,
+          timezone: response.timezone ?? input.timezone,
+        })
+      );
+    }
+    return response;
   }
 
   async disableMorningBriefing() {
     await this.loadState();
-    return gateway.disableMorningBriefing(this.s, this.env);
+    const response = await gateway.disableMorningBriefing(this.s, this.env);
+    if (response && response.ok !== false) {
+      // Only flip `enabled`; preserve the user's last cron/timezone so a
+      // future re-enable defaults to the same schedule.
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(this.env, this.s, {
+          enabled: false,
+        })
+      );
+    }
+    return response;
   }
 
   async runMorningBriefing() {

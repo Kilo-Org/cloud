@@ -510,6 +510,11 @@ export type MorningBriefingStatusResponse = {
     web: MorningBriefingSourceReadiness;
   };
   lastDelivery?: MorningBriefingDeliveryResult[];
+  // Selected morning-briefing interest topics, sourced from the
+  // `kiloclaw_morning_briefing_configs` Postgres row. Empty array when no
+  // topics are selected; omitted when the instance pre-dates the table or
+  // Postgres was unavailable for this request.
+  interestTopics?: string[];
   code?: string;
   retryAfterSec?: number;
   error?: string;

@@ -2126,6 +2126,93 @@ describe('kiloPassRouter', () => {
       expect(entry.kind).toBe('base');
       expect(entry.amountUsd).toBe(10);
     });
+
+    it('returns the rewritten current base issuance after an App Store upgrade', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-credit-history-app-store-upgrade@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: null,
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerSubscriptionId: 'orig_credit_history_current_upgrade',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      await db.insert(credit_transactions).values([
+        {
+          id: crypto.randomUUID(),
+          kilo_user_id: user.id,
+          amount_microdollars: 19_000_000,
+          is_free: false,
+          description: 'Kilo Pass base credits (tier_19, monthly)',
+          credit_category: 'kilo-pass-store-test-old-base',
+          created_at: '2026-05-01T00:00:00.000Z',
+        },
+        {
+          id: crypto.randomUUID(),
+          kilo_user_id: user.id,
+          amount_microdollars: -9_500_000,
+          is_free: false,
+          description: 'Kilo Pass upgrade refund clawback (tier_19)',
+          credit_category: 'kilo-pass-upgrade-refund:app_store:tx_history_upgrade_current',
+          created_at: '2026-05-16T00:00:00.000Z',
+        },
+      ]);
+
+      const [upgradedBaseCredit] = await db
+        .insert(credit_transactions)
+        .values({
+          id: crypto.randomUUID(),
+          kilo_user_id: user.id,
+          amount_microdollars: 49_000_000,
+          is_free: false,
+          description: 'Kilo Pass upgrade base credits (tier_49, monthly)',
+          credit_category: 'kilo-pass-upgrade-base:app_store:tx_history_upgrade_current',
+          created_at: '2026-05-16T00:00:01.000Z',
+        })
+        .returning({ id: credit_transactions.id });
+
+      if (!upgradedBaseCredit) {
+        throw new Error('Expected upgraded base credit transaction');
+      }
+
+      const [issuance] = await db
+        .insert(kilo_pass_issuances)
+        .values({
+          kilo_pass_subscription_id: subscriptionId,
+          issue_month: '2026-05-01',
+          source: KiloPassIssuanceSource.AppStoreTransaction,
+          created_at: '2026-05-01T00:00:00.000Z',
+        })
+        .returning({ id: kilo_pass_issuances.id });
+
+      if (!issuance) {
+        throw new Error('Expected issuance row');
+      }
+
+      await db.insert(kilo_pass_issuance_items).values({
+        kilo_pass_issuance_id: issuance.id,
+        kind: KiloPassIssuanceItemKind.Base,
+        credit_transaction_id: upgradedBaseCredit.id,
+        amount_usd: 49,
+        bonus_percent_applied: null,
+        created_at: '2026-05-16T00:00:01.000Z',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getCreditHistory({});
+
+      expect(result.entries).toEqual([
+        expect.objectContaining({
+          amountUsd: 49,
+          kind: KiloPassIssuanceItemKind.Base,
+          description: 'Kilo Pass upgrade base credits (tier_49, monthly)',
+        }),
+      ]);
+    });
   });
 
   describe('createCheckoutSession', () => {

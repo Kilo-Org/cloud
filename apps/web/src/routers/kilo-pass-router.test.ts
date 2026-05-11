@@ -3,6 +3,7 @@ import { describe, expect, it, beforeAll, beforeEach, afterEach, jest } from '@j
 import { db } from '@/lib/drizzle';
 import {
   credit_transactions,
+  kilo_pass_audit_log,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
   kilo_pass_pause_events,
@@ -13,6 +14,8 @@ import {
 } from '@kilocode/db/schema';
 import {
   KiloPassCadence,
+  KiloPassAuditLogAction,
+  KiloPassAuditLogResult,
   KiloPassIssuanceItemKind,
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
@@ -171,7 +174,7 @@ type KiloPassCaller = {
       id: string;
       date: string;
       amountUsd: number;
-      kind: KiloPassIssuanceItemKind;
+      kind: KiloPassIssuanceItemKind | 'upgrade_adjustment';
       description: string;
     }>;
     hasMore: boolean;
@@ -2125,6 +2128,81 @@ describe('kiloPassRouter', () => {
       if (!entry) throw new Error('Expected at least one credit history entry');
       expect(entry.kind).toBe('base');
       expect(entry.amountUsd).toBe(10);
+    });
+
+    it('returns App Store upgrade adjustment credit transactions for the current subscription', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-credit-history-upgrade@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: null,
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerSubscriptionId: 'orig_credit_history_upgrade',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+      const refundId = crypto.randomUUID();
+      const baseId = crypto.randomUUID();
+      await db.insert(credit_transactions).values([
+        {
+          id: refundId,
+          kilo_user_id: user.id,
+          amount_microdollars: -9_500_000,
+          is_free: false,
+          description: 'Kilo Pass upgrade refund clawback (tier_19)',
+          credit_category: 'kilo-pass-upgrade-refund:app_store:tx_history_upgrade',
+          created_at: '2026-05-01T00:00:00.000Z',
+        },
+        {
+          id: baseId,
+          kilo_user_id: user.id,
+          amount_microdollars: 49_000_000,
+          is_free: false,
+          description: 'Kilo Pass upgrade base credits (tier_49, monthly)',
+          credit_category: 'kilo-pass-upgrade-base:app_store:tx_history_upgrade',
+          created_at: '2026-05-01T00:00:01.000Z',
+        },
+      ]);
+      await db.insert(kilo_pass_audit_log).values([
+        {
+          kilo_user_id: user.id,
+          kilo_pass_subscription_id: subscriptionId,
+          action: KiloPassAuditLogAction.BaseCreditsIssued,
+          result: KiloPassAuditLogResult.Success,
+          related_credit_transaction_id: refundId,
+          payload_json: {},
+        },
+        {
+          kilo_user_id: user.id,
+          kilo_pass_subscription_id: subscriptionId,
+          action: KiloPassAuditLogAction.BaseCreditsIssued,
+          result: KiloPassAuditLogResult.Success,
+          related_credit_transaction_id: baseId,
+          payload_json: {},
+        },
+      ]);
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getCreditHistory({});
+
+      expect(result.entries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: refundId,
+            amountUsd: -9.5,
+            kind: 'upgrade_adjustment',
+            description: 'Kilo Pass upgrade refund clawback (tier_19)',
+          }),
+          expect.objectContaining({
+            id: baseId,
+            amountUsd: 49,
+            kind: 'upgrade_adjustment',
+            description: 'Kilo Pass upgrade base credits (tier_49, monthly)',
+          }),
+        ])
+      );
     });
   });
 

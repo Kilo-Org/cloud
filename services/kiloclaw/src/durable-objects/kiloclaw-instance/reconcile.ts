@@ -81,7 +81,6 @@ function destroyPendingDetails(
     pendingMachineId: state.pendingDestroyMachineId,
     pendingVolumeId: state.pendingDestroyVolumeId,
     destroyStartedAt: state.destroyStartedAt,
-    ageMs,
     lastDestroyErrorOp: state.lastDestroyErrorOp,
     lastDestroyErrorStatus: state.lastDestroyErrorStatus,
     lastDestroyErrorAt: state.lastDestroyErrorAt,

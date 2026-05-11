@@ -404,6 +404,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
   }
 
+  private providerErrorStatus(err: unknown): number | null {
+    if (typeof err !== 'object' || err === null || !('status' in err)) return null;
+    const status = err.status;
+    return typeof status === 'number' ? status : null;
+  }
+
   private async retryNonFlyDestroy(): Promise<void> {
     if (this.s.provider === 'fly') {
       throw new Error('retryNonFlyDestroy should not be used for Fly providers');
@@ -431,12 +437,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         });
       } catch (err) {
         this.s.lastDestroyErrorOp = 'machine';
-        this.s.lastDestroyErrorStatus = null;
+        this.s.lastDestroyErrorStatus = this.providerErrorStatus(err);
         this.s.lastDestroyErrorMessage = err instanceof Error ? err.message : String(err);
         this.s.lastDestroyErrorAt = Date.now();
         await this.persist({
           lastDestroyErrorOp: 'machine',
-          lastDestroyErrorStatus: null,
+          lastDestroyErrorStatus: this.s.lastDestroyErrorStatus,
           lastDestroyErrorMessage: this.s.lastDestroyErrorMessage,
           lastDestroyErrorAt: this.s.lastDestroyErrorAt,
         });
@@ -470,12 +476,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         });
       } catch (err) {
         this.s.lastDestroyErrorOp = 'volume';
-        this.s.lastDestroyErrorStatus = null;
+        this.s.lastDestroyErrorStatus = this.providerErrorStatus(err);
         this.s.lastDestroyErrorMessage = err instanceof Error ? err.message : String(err);
         this.s.lastDestroyErrorAt = Date.now();
         await this.persist({
           lastDestroyErrorOp: 'volume',
-          lastDestroyErrorStatus: null,
+          lastDestroyErrorStatus: this.s.lastDestroyErrorStatus,
           lastDestroyErrorMessage: this.s.lastDestroyErrorMessage,
           lastDestroyErrorAt: this.s.lastDestroyErrorAt,
         });

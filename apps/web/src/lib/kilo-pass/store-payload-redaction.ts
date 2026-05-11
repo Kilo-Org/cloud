@@ -1,3 +1,5 @@
+import * as z from 'zod';
+
 const STORE_JSON_TOKEN_KEYS = new Set([
   'appAccountToken',
   'purchaseToken',
@@ -7,16 +9,20 @@ const STORE_JSON_TOKEN_KEYS = new Set([
   'signedTransactionJws',
 ]);
 
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
+const StorePayloadJsonObjectSchema = z.record(z.string(), z.unknown());
+
+function parseStorePayloadJsonObject(value: unknown): Record<string, unknown> | null {
+  const parsed = StorePayloadJsonObjectSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 export function redactStoreAccountLinkedJson(value: unknown): Record<string, unknown> {
-  if (!isJsonObject(value)) {
+  const payload = parseStorePayloadJsonObject(value);
+  if (!payload) {
     return {};
   }
 
-  return redactJsonObject(value);
+  return redactJsonObject(payload);
 }
 
 function redactJsonValue(value: unknown): unknown {
@@ -24,8 +30,9 @@ function redactJsonValue(value: unknown): unknown {
     return value.map(item => redactJsonValue(item));
   }
 
-  if (isJsonObject(value)) {
-    return redactJsonObject(value);
+  const payload = parseStorePayloadJsonObject(value);
+  if (payload) {
+    return redactJsonObject(payload);
   }
 
   return value;

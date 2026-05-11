@@ -100,6 +100,28 @@ function findLatestStorePurchaseForSubscription(
   });
 }
 
+async function findStoreSubscriptionByProviderSubscriptionForUpdate(
+  tx: DrizzleTransaction,
+  purchase: ValidatedStoreKiloPassPurchase
+) {
+  const rows = await tx
+    .select({
+      id: kilo_pass_subscriptions.id,
+      kiloUserId: kilo_pass_subscriptions.kilo_user_id,
+    })
+    .from(kilo_pass_subscriptions)
+    .where(
+      and(
+        eq(kilo_pass_subscriptions.payment_provider, purchase.paymentProvider),
+        eq(kilo_pass_subscriptions.provider_subscription_id, purchase.providerSubscriptionId)
+      )
+    )
+    .for('update')
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
 function computeProratedRefundMicrodollars(params: {
   oldTier: KiloPassTier;
   oldPurchasedAtIso: string;
@@ -326,6 +348,15 @@ export async function completeStoreKiloPassPurchase(params: {
       };
     }
 
+    const existingProviderSubscription = await findStoreSubscriptionByProviderSubscriptionForUpdate(
+      tx,
+      purchase
+    );
+
+    if (existingProviderSubscription && existingProviderSubscription.kiloUserId !== user.id) {
+      throw new Error('Store subscription already belongs to another user');
+    }
+
     const activeSubscription = await tx.query.kilo_pass_subscriptions.findFirst({
       where: and(
         eq(kilo_pass_subscriptions.kilo_user_id, user.id),
@@ -382,7 +413,6 @@ export async function completeStoreKiloPassPurchase(params: {
         ],
         targetWhere: sql`${kilo_pass_subscriptions.provider_subscription_id} IS NOT NULL`,
         set: {
-          kilo_user_id: user.id,
           tier: purchase.tier,
           cadence: purchase.cadence,
           status: 'active',
@@ -391,6 +421,7 @@ export async function completeStoreKiloPassPurchase(params: {
           ended_at: null,
           next_yearly_issue_at: nextYearlyIssueAt,
         },
+        setWhere: eq(kilo_pass_subscriptions.kilo_user_id, user.id),
       })
       .returning({ id: kilo_pass_subscriptions.id });
 

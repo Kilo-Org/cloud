@@ -380,6 +380,53 @@ describe('completeStoreKiloPassPurchase', () => {
     );
   });
 
+  it('rejects when another user completes a different transaction for an owned provider subscription', async () => {
+    const firstUser = await insertTestUser({ total_microdollars_acquired: 0 });
+    const secondUser = await insertTestUser({ total_microdollars_acquired: 0 });
+    const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+
+    const firstPurchase = applePurchase({
+      providerSubscriptionId,
+      providerOriginalTransactionId: providerSubscriptionId,
+      providerTransactionId: `tx-${crypto.randomUUID()}`,
+      purchasedAtIso: '2026-05-01T00:00:00.000Z',
+      expiresAtIso: '2026-06-01T00:00:00.000Z',
+    });
+
+    await completeStoreKiloPassPurchase({ user: firstUser, purchase: firstPurchase });
+
+    const secondPurchase = applePurchase({
+      providerSubscriptionId,
+      providerOriginalTransactionId: providerSubscriptionId,
+      providerTransactionId: `tx-${crypto.randomUUID()}`,
+      purchasedAtIso: '2026-06-01T00:00:00.000Z',
+      expiresAtIso: '2026-07-01T00:00:00.000Z',
+    });
+
+    await expect(
+      completeStoreKiloPassPurchase({ user: secondUser, purchase: secondPurchase })
+    ).rejects.toThrow('Store subscription already belongs to another user');
+
+    const subscriptions = await db
+      .select()
+      .from(kilo_pass_subscriptions)
+      .where(eq(kilo_pass_subscriptions.provider_subscription_id, providerSubscriptionId));
+    expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0]?.kilo_user_id).toBe(firstUser.id);
+
+    const secondUserStorePurchases = await db
+      .select()
+      .from(kilo_pass_store_purchases)
+      .where(eq(kilo_pass_store_purchases.kilo_user_id, secondUser.id));
+    expect(secondUserStorePurchases).toHaveLength(0);
+
+    const secondUserCreditTransactions = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, secondUser.id));
+    expect(secondUserCreditTransactions).toHaveLength(0);
+  });
+
   it('rejects when the user already has an active non-ended Kilo Pass subscription', async () => {
     const user = await insertTestUser();
     await completeStoreKiloPassPurchase({ user, purchase: applePurchase() });

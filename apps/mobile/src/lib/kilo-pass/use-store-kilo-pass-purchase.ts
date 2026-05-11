@@ -198,7 +198,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     purchase: async (
       product: AppStoreKiloPassProduct,
       options: StoreKiloPassPurchaseOptions = {}
-    ) => {
+    ): Promise<boolean> => {
       try {
         deps.setPendingPurchaseCompletedCallback?.(options.onCompleted ?? null);
         await deps.requestPurchase({
@@ -207,6 +207,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
           },
           type: 'subs',
         });
+        return true;
       } catch (error) {
         const message = getKiloPassPurchaseErrorMessage(
           error,
@@ -216,6 +217,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
           deps.showError(message);
         }
         deps.setPendingPurchaseCompletedCallback?.(null);
+        return false;
       }
     },
     handlePurchaseSuccess,
@@ -244,7 +246,7 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
   const queryClient = useQueryClient();
   const [isRequestingPurchase, setIsRequestingPurchase] = useState(false);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
-  const requestInFlightRef = useRef(false);
+  const activePurchaseRequestRef = useRef<{ sku: string } | null>(null);
   const pendingPurchaseCompletedCallbackRef = useRef<(() => void) | null>(null);
   const completeAppStorePurchase = useMutation(
     trpc.kiloPass.completeAppStorePurchase.mutationOptions()
@@ -267,16 +269,28 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
     ]);
   }, [queryClient, trpc]);
 
+  const releasePurchaseRequest = useCallback(() => {
+    activePurchaseRequestRef.current = null;
+    setIsRequestingPurchase(false);
+  }, []);
+
   const actionsRef = useIAP({
     onPurchaseError: error => {
       pendingPurchaseCompletedCallbackRef.current = null;
+      releasePurchaseRequest();
       const message = getKiloPassPurchaseErrorMessage(error, error.message);
       if (message) {
         showDedupedPurchaseError(message);
       }
     },
     onPurchaseSuccess: purchase => {
-      void actions.handlePurchaseSuccess(purchase);
+      void (async () => {
+        try {
+          await actions.handlePurchaseSuccess(purchase);
+        } finally {
+          releasePurchaseRequest();
+        }
+      })();
     },
   });
   const {
@@ -318,20 +332,23 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
 
   const startPurchase = useCallback(
     async (product: AppStoreKiloPassProduct, options: StoreKiloPassPurchaseOptions = {}) => {
-      if (requestInFlightRef.current || completeAppStorePurchase.isPending) {
+      if (activePurchaseRequestRef.current || completeAppStorePurchase.isPending) {
         return;
       }
 
-      requestInFlightRef.current = true;
+      activePurchaseRequestRef.current = { sku: product.appleProductId };
       setIsRequestingPurchase(true);
       try {
-        await actions.purchase(product, options);
-      } finally {
-        requestInFlightRef.current = false;
-        setIsRequestingPurchase(false);
+        const requestStarted = await actions.purchase(product, options);
+        if (!requestStarted) {
+          releasePurchaseRequest();
+        }
+      } catch (error) {
+        releasePurchaseRequest();
+        throw error;
       }
     },
-    [actions, completeAppStorePurchase.isPending]
+    [actions, completeAppStorePurchase.isPending, releasePurchaseRequest]
   );
 
   useEffect(() => {

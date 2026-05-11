@@ -1,21 +1,50 @@
 /* eslint-disable max-lines */
 
+import * as React from 'react';
 import { type Purchase } from 'expo-iap';
-import { describe, expect, it, vi } from 'vitest';
-import { createAppStoreKiloPassPurchaseActions } from './use-store-kilo-pass-purchase';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  createAppStoreKiloPassPurchaseActions,
+  StoreKiloPassPurchaseProvider,
+} from './use-store-kilo-pass-purchase';
 import { type AppStoreKiloPassProduct } from './store-products';
+
+const mockedIap = vi.hoisted(() => ({
+  availablePurchases: [] as Purchase[],
+  connected: false,
+  finishTransaction: vi.fn(),
+  getAvailablePurchases: vi.fn(),
+  handlers: null as {
+    onPurchaseError: (error: Error) => void;
+    onPurchaseSuccess: (purchase: Purchase) => void;
+  } | null,
+  requestPurchase: vi.fn(),
+}));
+
+const mockedReactQuery = vi.hoisted(() => ({
+  completeAppStorePurchase: vi.fn(),
+  completeAppStorePurchaseIsPending: false,
+  invalidateQueries: vi.fn(),
+}));
 
 vi.mock('expo-iap', () => ({
   ErrorCode: {
     AlreadyOwned: 'already-owned',
     UserCancelled: 'user-cancelled',
   },
-  useIAP: () => ({
-    availablePurchases: [],
-    connected: false,
-    finishTransaction: vi.fn(),
-    getAvailablePurchases: vi.fn(),
-    requestPurchase: vi.fn(),
+  useIAP: (handlers: {
+    onPurchaseError: (error: Error) => void;
+    onPurchaseSuccess: (purchase: Purchase) => void;
+  }) => ({
+    availablePurchases: mockedIap.availablePurchases,
+    connected: mockedIap.connected,
+    finishTransaction: mockedIap.finishTransaction,
+    getAvailablePurchases: mockedIap.getAvailablePurchases,
+    requestPurchase: mockedIap.requestPurchase,
+    ...(() => {
+      mockedIap.handlers = handlers;
+      return {};
+    })(),
   }),
 }));
 
@@ -24,8 +53,14 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  useMutation: () => ({ isPending: false, mutateAsync: vi.fn() }),
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useMutation: () => ({
+    isPending: mockedReactQuery.completeAppStorePurchaseIsPending,
+    mutateAsync: mockedReactQuery.completeAppStorePurchase,
+  }),
+  useQuery: () => ({
+    data: { products: [{ appleProductId: 'com.kilo.pass.tier19.monthly' }] },
+  }),
+  useQueryClient: () => ({ invalidateQueries: mockedReactQuery.invalidateQueries }),
 }));
 
 vi.mock('sonner-native', () => ({
@@ -37,6 +72,7 @@ vi.mock('@/lib/trpc', () => ({
     kiloPass: {
       completeAppStorePurchase: { mutationOptions: () => ({}) },
       getCreditHistory: { pathFilter: () => ({ queryKey: ['credit-history'] }) },
+      getMobileStoreProducts: { queryOptions: () => ({ queryKey: ['mobile-products'] }) },
       getState: { pathFilter: () => ({ queryKey: ['state'] }) },
     },
     user: {
@@ -45,6 +81,98 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
+
+type StoreKiloPassPurchaseContextValue = {
+  purchase: (
+    product: AppStoreKiloPassProduct,
+    options?: { onCompleted?: () => void }
+  ) => Promise<void>;
+  isPending: boolean;
+};
+
+type ReactInternals = {
+  __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: {
+    H: unknown;
+  };
+};
+
+type HookDispatcher = {
+  useCallback: <T>(callback: T) => T;
+  useEffect: (effect: () => unknown) => void;
+  useMemo: <T>(factory: () => T) => T;
+  useRef: <T>(initialValue: T) => { current: T };
+  useState: <T>(initialValue: T) => [T, (value: T | ((previous: T) => T)) => void];
+};
+
+async function flushPromises() {
+  await new Promise(resolve => {
+    setImmediate(resolve);
+  });
+}
+
+function renderStoreKiloPassPurchaseProvider() {
+  const reactInternals = React as typeof React & ReactInternals;
+  const hookState: unknown[] = [];
+  let hookIndex = 0;
+
+  const dispatcher: HookDispatcher = {
+    useCallback: hookCallback => {
+      hookIndex += 1;
+      return hookCallback;
+    },
+    useEffect: effect => {
+      hookIndex += 1;
+      effect();
+    },
+    useMemo: factory => {
+      hookIndex += 1;
+      return factory();
+    },
+    useRef: initialValue => {
+      const stateIndex = hookIndex;
+      hookIndex += 1;
+      if (hookState[stateIndex] === undefined) {
+        hookState[stateIndex] = { current: initialValue };
+      }
+      return hookState[stateIndex] as { current: typeof initialValue };
+    },
+    useState: initialValue => {
+      const stateIndex = hookIndex;
+      hookIndex += 1;
+      if (hookState[stateIndex] === undefined) {
+        hookState[stateIndex] = initialValue;
+      }
+      const setState = (
+        value: typeof initialValue | ((previous: typeof initialValue) => typeof initialValue)
+      ) => {
+        hookState[stateIndex] =
+          typeof value === 'function'
+            ? (value as (previous: typeof initialValue) => typeof initialValue)(
+                hookState[stateIndex] as typeof initialValue
+              )
+            : value;
+      };
+      return [hookState[stateIndex] as typeof initialValue, setState];
+    },
+  };
+
+  function render() {
+    const previousDispatcher =
+      reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H;
+    hookIndex = 0;
+    reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H = dispatcher;
+    try {
+      const renderProviderElement = StoreKiloPassPurchaseProvider;
+      const providerElement = renderProviderElement({ children: null });
+      return providerElement.props.value as StoreKiloPassPurchaseContextValue;
+    } finally {
+      reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
+        previousDispatcher;
+    }
+  }
+
+  return { render };
+}
 
 function ignoreDeferredResolution(_value: unknown) {
   return undefined;
@@ -112,6 +240,19 @@ function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
     ...overrides,
   };
 }
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockedIap.availablePurchases = [];
+  mockedIap.connected = false;
+  mockedIap.finishTransaction.mockResolvedValue(undefined);
+  mockedIap.getAvailablePurchases.mockResolvedValue(undefined);
+  mockedIap.handlers = null;
+  mockedIap.requestPurchase.mockResolvedValue(null);
+  mockedReactQuery.completeAppStorePurchase.mockResolvedValue({ alreadyProcessed: false });
+  mockedReactQuery.completeAppStorePurchaseIsPending = false;
+  mockedReactQuery.invalidateQueries.mockResolvedValue(undefined);
+});
 
 describe('createAppStoreKiloPassPurchaseActions', () => {
   it('requests an App Store subscription purchase', async () => {
@@ -442,5 +583,56 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(finishFromRecovery).toHaveBeenCalledTimes(1);
     expect(finishFromSheet).not.toHaveBeenCalled();
     expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('StoreKiloPassPurchaseProvider', () => {
+  it('keeps the purchase locked after requestPurchase resolves until purchase success arrives', async () => {
+    const firstCompletion = vi.fn();
+    const secondCompletion = vi.fn();
+    const provider = renderStoreKiloPassPurchaseProvider();
+
+    const initialValue = provider.render();
+    await initialValue.purchase(product, {
+      onCompleted: () => {
+        firstCompletion();
+      },
+    });
+    const lockedValue = provider.render();
+
+    expect(lockedValue.isPending).toBe(true);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+
+    await lockedValue.purchase(product, {
+      onCompleted: () => {
+        secondCompletion();
+      },
+    });
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(1);
+
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+    const releasedValue = provider.render();
+
+    expect(releasedValue.isPending).toBe(false);
+    expect(firstCompletion).toHaveBeenCalledTimes(1);
+    expect(secondCompletion).not.toHaveBeenCalled();
+  });
+
+  it('releases the purchase lock when StoreKit reports a purchase error', async () => {
+    const provider = renderStoreKiloPassPurchaseProvider();
+
+    const initialValue = provider.render();
+    await initialValue.purchase(product, { onCompleted: noop });
+    const lockedValue = provider.render();
+
+    expect(lockedValue.isPending).toBe(true);
+
+    mockedIap.handlers?.onPurchaseError(new Error('StoreKit failed'));
+    const releasedValue = provider.render();
+
+    expect(releasedValue.isPending).toBe(false);
+    await releasedValue.purchase(product);
+    expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
   });
 });

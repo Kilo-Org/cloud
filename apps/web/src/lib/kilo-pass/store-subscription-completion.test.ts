@@ -432,6 +432,110 @@ describe('completeStoreKiloPassPurchase', () => {
     expect(creditRows.reduce((sum, row) => sum + row.amountMicrodollars, 0)).toBe(58_500_000);
   });
 
+  it('rewrites the original period issuance when an App Store upgrade crosses a calendar month boundary', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+
+    const first = await completeStoreKiloPassPurchase({
+      user,
+      purchase: applePurchase({
+        productId: 'kilopass.tier19.monthly.v1',
+        providerSubscriptionId,
+        providerOriginalTransactionId: providerSubscriptionId,
+        providerTransactionId: `tx-${crypto.randomUUID()}`,
+        purchasedAtIso: '2026-01-31T00:00:00.000Z',
+        expiresAtIso: '2026-02-28T00:00:00.000Z',
+        tier: KiloPassTier.Tier19,
+      }),
+    });
+
+    await completeStoreKiloPassPurchase({
+      user,
+      purchase: applePurchase({
+        productId: 'kilopass.tier49.monthly.v1',
+        providerSubscriptionId,
+        providerOriginalTransactionId: providerSubscriptionId,
+        providerTransactionId: `tx-${crypto.randomUUID()}`,
+        purchasedAtIso: '2026-02-01T00:00:00.000Z',
+        expiresAtIso: '2026-03-01T00:00:00.000Z',
+        tier: KiloPassTier.Tier49,
+      }),
+    });
+
+    const creditRows = await db
+      .select({
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        description: credit_transactions.description,
+      })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id))
+      .orderBy(credit_transactions.created_at);
+
+    expect(creditRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          amountMicrodollars: -18_321_429,
+          description: 'Kilo Pass upgrade refund clawback (tier_19)',
+        }),
+        expect.objectContaining({
+          amountMicrodollars: 49_000_000,
+          description: 'Kilo Pass upgrade base credits (tier_49, monthly)',
+        }),
+      ])
+    );
+
+    const issuances = await db
+      .select({
+        id: kilo_pass_issuances.id,
+        issueMonth: kilo_pass_issuances.issue_month,
+      })
+      .from(kilo_pass_issuances)
+      .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, first.subscriptionId))
+      .orderBy(kilo_pass_issuances.issue_month);
+
+    expect(issuances).toEqual([
+      {
+        id: expect.any(String),
+        issueMonth: '2026-01-01',
+      },
+    ]);
+
+    const baseItems = await db
+      .select({
+        amountUsd: kilo_pass_issuance_items.amount_usd,
+        description: credit_transactions.description,
+        issueMonth: kilo_pass_issuances.issue_month,
+      })
+      .from(kilo_pass_issuance_items)
+      .innerJoin(
+        kilo_pass_issuances,
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, kilo_pass_issuances.id)
+      )
+      .innerJoin(
+        credit_transactions,
+        eq(kilo_pass_issuance_items.credit_transaction_id, credit_transactions.id)
+      )
+      .where(
+        and(
+          eq(kilo_pass_issuances.kilo_pass_subscription_id, first.subscriptionId),
+          eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
+        )
+      );
+
+    expect(baseItems).toEqual([
+      {
+        amountUsd: 49,
+        description: 'Kilo Pass upgrade base credits (tier_49, monthly)',
+        issueMonth: '2026-01-01',
+      },
+    ]);
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.id, first.subscriptionId),
+    });
+    expect(subscription?.current_streak_months).toBe(1);
+  });
+
   it('reverses existing bonus state when an App Store upgrade replaces the base item', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const providerSubscriptionId = `orig-${crypto.randomUUID()}`;

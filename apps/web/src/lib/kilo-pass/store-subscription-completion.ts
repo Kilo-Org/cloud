@@ -117,6 +117,18 @@ function findLatestStorePurchaseForSubscription(
   });
 }
 
+function isStorePurchaseWithinPreviousPeriod(params: {
+  previousPurchasedAtIso: string;
+  previousExpiresAtIso: string;
+  purchasedAtIso: string;
+}): boolean {
+  const previousPurchasedAt = dayjs(params.previousPurchasedAtIso).valueOf();
+  const previousExpiresAt = dayjs(params.previousExpiresAtIso).valueOf();
+  const purchasedAt = dayjs(params.purchasedAtIso).valueOf();
+
+  return purchasedAt >= previousPurchasedAt && purchasedAt < previousExpiresAt;
+}
+
 async function findStoreSubscriptionByProviderSubscriptionForUpdate(
   tx: DrizzleTransaction,
   purchase: ValidatedStoreKiloPassPurchase
@@ -468,14 +480,16 @@ export async function completeStoreKiloPassPurchase(params: {
       activeSubscription?.provider_subscription_id === purchase.providerSubscriptionId
         ? await findLatestStorePurchaseForSubscription(tx, purchase)
         : null;
-    const isAppStoreUpgrade =
+    const isAppStoreSamePeriodUpgrade =
       purchase.paymentProvider === KiloPassPaymentProvider.AppStore &&
       activeSubscription?.provider_subscription_id === purchase.providerSubscriptionId &&
-      getMonthlyPriceUsd(purchase.tier) > getMonthlyPriceUsd(activeSubscription.tier);
-
-    if (isAppStoreUpgrade && !previousStorePurchase?.expires_at) {
-      throw new Error('App Store upgrade cannot be processed without previous period expiration');
-    }
+      getMonthlyPriceUsd(purchase.tier) > getMonthlyPriceUsd(activeSubscription.tier) &&
+      previousStorePurchase?.expires_at != null &&
+      isStorePurchaseWithinPreviousPeriod({
+        previousPurchasedAtIso: previousStorePurchase.purchased_at,
+        previousExpiresAtIso: previousStorePurchase.expires_at,
+        purchasedAtIso: purchase.purchasedAtIso,
+      });
 
     const nextYearlyIssueAt = getNextYearlyIssueAt({
       cadence: purchase.cadence,
@@ -570,7 +584,13 @@ export async function completeStoreKiloPassPurchase(params: {
       };
     }
 
-    const issueMonth = computeIssueMonth(dayjs(purchase.purchasedAtIso));
+    const issueMonth = computeIssueMonth(
+      dayjs(
+        isAppStoreSamePeriodUpgrade && previousStorePurchase
+          ? previousStorePurchase.purchased_at
+          : purchase.purchasedAtIso
+      )
+    );
     const issuanceHeader = await createOrGetIssuanceHeader(tx, {
       subscriptionId,
       issueMonth,
@@ -578,7 +598,7 @@ export async function completeStoreKiloPassPurchase(params: {
     });
 
     const baseAmountUsd = getMonthlyPriceUsd(purchase.tier);
-    const baseCreditsResult = isAppStoreUpgrade
+    const baseCreditsResult = isAppStoreSamePeriodUpgrade
       ? {
           wasIssued: false,
           amountUsd: baseAmountUsd,
@@ -592,7 +612,7 @@ export async function completeStoreKiloPassPurchase(params: {
           description: `Kilo Pass base credits (${purchase.tier}, ${purchase.cadence})`,
         });
 
-    if (isAppStoreUpgrade && previousStorePurchase?.expires_at) {
+    if (isAppStoreSamePeriodUpgrade && previousStorePurchase?.expires_at) {
       await applyStoreUpgradeCreditAdjustments(tx, {
         issuanceId: issuanceHeader.issuanceId,
         subscriptionId,
@@ -635,7 +655,7 @@ export async function completeStoreKiloPassPurchase(params: {
         issueMonth,
         issuanceHeaderWasCreated: issuanceHeader.wasCreated,
         baseCreditsIssued: baseCreditsResult.wasIssued,
-        appStoreUpgradeApplied: isAppStoreUpgrade,
+        appStoreUpgradeApplied: isAppStoreSamePeriodUpgrade,
       },
     });
 

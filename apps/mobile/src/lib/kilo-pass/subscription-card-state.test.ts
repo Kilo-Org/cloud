@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { getKiloPassSubscriptionCardState } from './subscription-card-state';
+import {
+  getKiloPassSubscriptionCardState,
+  shouldRenderKiloPassSubscriptionCard,
+} from './subscription-card-state';
 
 describe('getKiloPassSubscriptionCardState', () => {
   it('sends Stripe-managed Kilo Pass users to web management', () => {
@@ -109,5 +112,46 @@ describe('getKiloPassSubscriptionCardState', () => {
       description: 'Monthly credits with bonus progress',
       title: 'Kilo Pass',
     });
+  });
+});
+
+describe('shouldRenderKiloPassSubscriptionCard', () => {
+  it('renders Android cards that can be managed on web', () => {
+    expect(
+      shouldRenderKiloPassSubscriptionCard({
+        action: 'open-web-management',
+        platformOS: 'android',
+      })
+    ).toBe(true);
+  });
+
+  it('does not render Android cards that require store purchase or App Store management', () => {
+    expect(
+      shouldRenderKiloPassSubscriptionCard({
+        action: 'open-store-sheet',
+        platformOS: 'android',
+      })
+    ).toBe(false);
+    expect(
+      shouldRenderKiloPassSubscriptionCard({
+        action: 'open-store-management',
+        platformOS: 'android',
+      })
+    ).toBe(false);
+  });
+
+  it('keeps iOS store actions visible', () => {
+    expect(
+      shouldRenderKiloPassSubscriptionCard({
+        action: 'open-store-sheet',
+        platformOS: 'ios',
+      })
+    ).toBe(true);
+    expect(
+      shouldRenderKiloPassSubscriptionCard({
+        action: 'open-store-management',
+        platformOS: 'ios',
+      })
+    ).toBe(true);
   });
 });

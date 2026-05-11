@@ -15,7 +15,10 @@ import {
   getDevStoreKitRefundAppleProductId,
   requestDevStoreKitRefund,
 } from '@/lib/kilo-pass/dev-storekit-refund';
-import { getKiloPassSubscriptionCardState } from '@/lib/kilo-pass/subscription-card-state';
+import {
+  getKiloPassSubscriptionCardState,
+  shouldRenderKiloPassSubscriptionCard,
+} from '@/lib/kilo-pass/subscription-card-state';
 import { getAppStoreKiloPassOwnership } from '@/lib/kilo-pass/store-ownership';
 
 const KILO_PASS_MANAGE_URL = `${WEB_BASE_URL}/subscriptions/kilo-pass`;
@@ -52,19 +55,26 @@ export function KiloPassSubscriptionCard() {
     void checkAvailablePurchases();
   }, [connected, getAvailablePurchases]);
 
-  if (Platform.OS !== 'ios') {
+  const subscription = stateQuery.data?.subscription;
+  const appStoreOwnership =
+    Platform.OS !== 'ios'
+      ? 'none'
+      : !connected || !checkedAvailablePurchases || !mobileStoreProductsQuery.data
+        ? 'checking'
+        : getAppStoreKiloPassOwnership({
+            appAccountToken: mobileStoreProductsQuery.data.appAccountToken,
+            purchases: availablePurchases,
+          });
+  const cardState = getKiloPassSubscriptionCardState(subscription, { appStoreOwnership });
+  if (
+    !shouldRenderKiloPassSubscriptionCard({
+      action: cardState.action,
+      platformOS: Platform.OS,
+    })
+  ) {
     return null;
   }
 
-  const subscription = stateQuery.data?.subscription;
-  const appStoreOwnership =
-    !connected || !checkedAvailablePurchases || !mobileStoreProductsQuery.data
-      ? 'checking'
-      : getAppStoreKiloPassOwnership({
-          appAccountToken: mobileStoreProductsQuery.data.appAccountToken,
-          purchases: availablePurchases,
-        });
-  const cardState = getKiloPassSubscriptionCardState(subscription, { appStoreOwnership });
   const devRefundAppleProductId = getDevStoreKitRefundAppleProductId({ subscription });
   const invalidateKiloPassState = async () => {
     await Promise.all([
@@ -98,6 +108,9 @@ export function KiloPassSubscriptionCard() {
       return;
     }
     if (cardState.action === 'open-store-management') {
+      if (Platform.OS !== 'ios') {
+        return;
+      }
       void openAppStoreManagement();
       return;
     }

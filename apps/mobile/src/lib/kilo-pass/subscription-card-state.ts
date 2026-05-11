@@ -6,7 +6,7 @@ type KiloPassSubscriptionCardSubscription = {
   status: string;
 };
 
-type KiloPassSubscriptionCardState = {
+export type KiloPassSubscriptionCardState = {
   action: 'none' | 'open-store-management' | 'open-store-sheet' | 'open-web-management';
   actionLabel: string | null;
   description: string;
@@ -16,6 +16,13 @@ type KiloPassSubscriptionCardState = {
 type KiloPassSubscriptionCardOptions = {
   appStoreOwnership?: 'checking' | 'current-account' | 'another-account' | 'none';
 };
+
+export function shouldRenderKiloPassSubscriptionCard(params: {
+  action: KiloPassSubscriptionCardState['action'];
+  platformOS: string;
+}): boolean {
+  return params.platformOS === 'ios' || params.action === 'open-web-management';
+}
 
 function formatSubscriptionEndDate(iso: string | null): string {
   if (!iso) {

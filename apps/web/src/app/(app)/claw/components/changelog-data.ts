@@ -13,7 +13,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: '2026-05-11',
     description:
-      'Optimized the Docker image build cleaning npm and bun package caches to help reduce disk usage.',
+      'Optimized the Docker image build by cleaning npm and Bun package caches to reduce deployed image size. KiloClaw also runs npm cache cleanup during startup to reduce package-cache growth on persistent instance storage.',
     category: 'feature',
     deployHint: 'redeploy_suggested',
   },

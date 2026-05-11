@@ -367,6 +367,9 @@ export const MetadataSchema = z.object({
   // Image attachments
   images: ImagesSchema.optional(),
 
+  // Kilo server lifecycle tracking
+  kiloServerLastActivity: z.number().optional(),
+
   // Workspace metadata (set during prepareSession)
   workspacePath: z.string().optional(),
   sessionHome: z.string().optional(),

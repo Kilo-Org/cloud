@@ -24,6 +24,9 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
+  "vars": {
+    "USER_GH_APP_TOKEN_ENCRYPTION_KEY": "",
+  },
   "dev": {
     "port": 8802,
   },

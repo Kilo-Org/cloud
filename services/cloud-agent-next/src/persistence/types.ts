@@ -135,6 +135,13 @@ export type CloudAgentSessionState = {
   branchName?: string;
   /** Sandbox ID where the session runs */
   sandboxId?: SandboxId;
+  /** Devcontainer metadata needed to re-enter the same runtime on follow-up executions. */
+  devcontainer?: {
+    workspacePath: string;
+    innerWorkspaceFolder: string;
+    wrapperPort: number;
+    configPath: string;
+  };
 
   // Initial message ID for correlation
   initialMessageId?: string;

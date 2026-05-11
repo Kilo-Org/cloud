@@ -8,8 +8,16 @@ import { restoreSession, extractDiffs } from './restore-session';
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Real session-ingest exports always carry a top-level `info` block with at
+// least `id`. The orchestrator's malformed-snapshot guardrail keys off that
+// field, so test fixtures must match real shape.
+function snapshotInfo(): { id: string; version: string } {
+  return { id: 'ses_test_fixture', version: '2' };
+}
+
 function makeSnapshot(diffs: Array<{ file: string; after: string; status: string }>): string {
   return JSON.stringify({
+    info: snapshotInfo(),
     messages: [{ info: { summary: { diffs } } }],
   });
 }
@@ -18,6 +26,7 @@ function makeMultiMessageSnapshot(
   ...messageDiffs: Array<Array<{ file: string; after: string; status: string }>>
 ): string {
   return JSON.stringify({
+    info: snapshotInfo(),
     messages: messageDiffs.map(diffs => ({ info: { summary: { diffs } } })),
   });
 }
@@ -225,7 +234,7 @@ describe('restoreSession', () => {
   });
 
   it('succeeds with zero diffs when messages array is empty', async () => {
-    mockFetchOk(JSON.stringify({ messages: [] }));
+    mockFetchOk(JSON.stringify({ info: snapshotInfo(), messages: [] }));
 
     const result = await restoreSession(SESSION_ID, workspace);
 
@@ -238,7 +247,7 @@ describe('restoreSession', () => {
   });
 
   it('succeeds with zero diffs when messages have no diffs field', async () => {
-    mockFetchOk(JSON.stringify({ messages: [{ info: {} }] }));
+    mockFetchOk(JSON.stringify({ info: snapshotInfo(), messages: [{ info: {} }] }));
 
     const result = await restoreSession(SESSION_ID, workspace);
 

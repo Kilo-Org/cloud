@@ -15,12 +15,14 @@ import type {
 } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { ExecutionPlan, ExecutionResult } from './types.js';
+import type { DevContainerHandle } from '../kilo/devcontainer.js';
 import { ExecutionError } from './errors.js';
 import { SessionService, type PreparedSession } from '../session-service.js';
 import { logger } from '../logger.js';
 import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
 import { updateGitRemoteToken } from '../workspace.js';
 import { WrapperClient, type WrapperPromptOptions } from '../kilo/wrapper-client.js';
+import { bringUpDevContainer, KILO_CLI_VERSION } from '../kilo/devcontainer.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { normalizeAgentMode } from '../schema.js';
 import { buildImagePromptParts, downloadImagePromptParts } from './image-prompt-parts.js';
@@ -128,11 +130,15 @@ export class ExecutionOrchestrator {
     let wrapperClient: WrapperClient;
     let kiloSessionId: string;
     try {
+      const devcontainer = await this.ensureDevContainerHandleIfNeeded(prepared, plan);
+      const fixedPort = plan.workspace.existingMetadata?.devcontainer?.wrapperPort;
       const result = await WrapperClient.ensureWrapper(sandbox, prepared.session, {
         agentSessionId: sessionId,
         userId,
         workspacePath: prepared.context.workspacePath,
         sessionId: wrapper.kiloSessionId,
+        devcontainer,
+        fixedPort: devcontainer ? fixedPort : undefined,
       });
       wrapperClient = result.client;
       kiloSessionId = result.sessionId;
@@ -218,6 +224,23 @@ export class ExecutionOrchestrator {
   // ---------------------------------------------------------------------------
   // Private Helpers
   // ---------------------------------------------------------------------------
+
+  private async ensureDevContainerHandleIfNeeded(
+    prepared: PreparedSession,
+    plan: ExecutionPlan
+  ): Promise<DevContainerHandle | undefined> {
+    const devcontainer = plan.workspace.existingMetadata?.devcontainer;
+    if (!devcontainer) return undefined;
+
+    return bringUpDevContainer(prepared.session, {
+      workspacePath: devcontainer.workspacePath,
+      sessionHome: prepared.context.sessionHome,
+      agentSessionId: plan.sessionId,
+      wrapperPort: devcontainer.wrapperPort,
+      kiloCliVersion: KILO_CLI_VERSION,
+      configPath: devcontainer.configPath,
+    });
+  }
 
   /**
    * Prepare workspace based on the workspace plan.

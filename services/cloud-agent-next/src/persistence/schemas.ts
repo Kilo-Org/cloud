@@ -198,6 +198,14 @@ export const MetadataSchema = z.object({
     )
     .transform(s => s as SandboxId)
     .optional(),
+  devcontainer: z
+    .object({
+      workspacePath: z.string(),
+      innerWorkspaceFolder: z.string(),
+      wrapperPort: z.number().int().min(1).max(65535),
+      configPath: z.string(),
+    })
+    .optional(),
 
   // Initial message ID for correlation
   initialMessageId: z.string().startsWith('msg_').length(30).optional(),

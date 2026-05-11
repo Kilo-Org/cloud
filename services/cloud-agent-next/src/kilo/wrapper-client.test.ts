@@ -910,10 +910,46 @@ describe('WrapperClient', () => {
 
       expect(session.startProcess).toHaveBeenCalledWith(
         expect.stringMatching(
-          /^WRAPPER_PORT=5000 WORKSPACE_PATH=\/workspace\/test WRAPPER_LOG_PATH=\/tmp\/kilocode-wrapper-test-session-\d+\.log KILO_SESSION_RETRY_LIMIT=5 KILO_CLOUD_AGENT=1 bun run '\.\/wrapper'\\''s folder\/wrapper\.js; touch \/tmp\/pwned' --agent-session test-session --user-id 'test-user'$/
+          /^WRAPPER_PORT=5000 WORKSPACE_PATH=\/workspace\/test WRAPPER_LOG_PATH=\/tmp\/kilocode-wrapper-test-session-\d+\.log KILO_SESSION_RETRY_LIMIT=5 KILO_CLOUD_AGENT=1 DOCKER_HOST=unix:\/\/\/var\/run\/docker\.sock bun run '\.\/wrapper'\\''s folder\/wrapper\.js; touch \/tmp\/pwned' --agent-session test-session --user-id 'test-user'$/
         ),
         expect.objectContaining({ cwd: '/workspace' })
       );
+    });
+
+    it('does not expose Docker socket env when starting inside a devcontainer', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'mock-process-id',
+        waitForPort: vi.fn().mockResolvedValue(undefined),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await client.ensureRunning({
+        agentSessionId: 'test-session',
+        userId: 'test-user',
+        workspacePath: '/workspace/test',
+        devcontainer: {
+          containerId: 'container-id',
+          innerWorkspaceFolder: '/workspaces/test',
+          workspacePath: '/workspace/test',
+          agentSessionId: 'test-session',
+          overrideConfigPath: '/tmp/devcontainer-override-test-session/devcontainer.json',
+          teardown: vi.fn(),
+        },
+      });
+
+      const startProcessCall = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0];
+      const command = startProcessCall[0] as string;
+      expect(command).toContain('devcontainer exec');
+      expect(command).toContain(
+        "--config '/tmp/devcontainer-override-test-session/devcontainer.json'"
+      );
+      expect(command).toContain('WORKSPACE_PATH=/workspaces/test');
+      expect(command).toContain('/opt/kilo-cloud/kilocode-wrapper.js');
+      expect(command).not.toContain('DOCKER_HOST=');
+      expect(command).not.toContain('XDG_RUNTIME_DIR=');
     });
   });
 

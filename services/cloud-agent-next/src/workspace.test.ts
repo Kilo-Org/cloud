@@ -655,6 +655,14 @@ describe('disk space checking', () => {
     let mockSandboxExec: ReturnType<typeof vi.fn>;
     let mockListProcesses: ReturnType<typeof vi.fn>;
 
+    /**
+     * `cleanupStaleWorkspaces` issues a single `docker ps` (via
+     * `listWrapperContainers`) right after `ls -1 sessions/`. Tests that
+     * enumerate exec calls in order need to inject a docker-ps response in
+     * the second slot — empty stdout means "no wrapper containers running".
+     */
+    const dockerPsEmpty = { exitCode: 0, stdout: '', stderr: '' };
+
     beforeEach(() => {
       mockSandboxExec = vi.fn();
       mockListProcesses = vi.fn();
@@ -672,6 +680,7 @@ describe('disk space checking', () => {
           stdout: 'agent_stale-1111\nagent_current-aaaa\n',
           stderr: '',
         }) // ls sessions/
+        .mockResolvedValueOnce(dockerPsEmpty) // docker ps (listWrapperContainers)
         .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }) // stat agent_stale-1111
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // rm -rf workspace for stale session
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // rm -rf home for stale session
@@ -684,24 +693,27 @@ describe('disk space checking', () => {
       expect(mockListProcesses).toHaveBeenCalledTimes(1);
 
       const execCalls = mockSandboxExec.mock.calls.map((c: string[]) => c[0]);
-      expect(execCalls[1]).toContain('stat');
-      expect(execCalls[2]).toContain("rm -rf '/workspace/org/user/sessions/agent_stale-1111'");
-      expect(execCalls[3]).toContain("rm -rf '/home/agent_stale-1111'");
+      expect(execCalls[1]).toContain('docker ps');
+      expect(execCalls[2]).toContain('stat');
+      expect(execCalls[3]).toContain("rm -rf '/workspace/org/user/sessions/agent_stale-1111'");
+      expect(execCalls[4]).toContain("rm -rf '/home/agent_stale-1111'");
     });
 
     it('skips the current session directory', async () => {
-      mockSandboxExec.mockResolvedValueOnce({
-        exitCode: 0,
-        stdout: 'agent_current-aaaa\n',
-        stderr: '',
-      });
+      mockSandboxExec
+        .mockResolvedValueOnce({
+          exitCode: 0,
+          stdout: 'agent_current-aaaa\n',
+          stderr: '',
+        }) // ls sessions/
+        .mockResolvedValueOnce(dockerPsEmpty); // docker ps
 
       mockListProcesses.mockResolvedValue([]);
 
       await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa');
 
-      // Only the ls call — no rm calls
-      expect(mockSandboxExec).toHaveBeenCalledTimes(1);
+      // ls + docker ps — no rm calls
+      expect(mockSandboxExec).toHaveBeenCalledTimes(2);
     });
 
     it('skips sessions that have a running wrapper', async () => {
@@ -712,6 +724,7 @@ describe('disk space checking', () => {
           stdout: 'agent_active-bbbb\n',
           stderr: '',
         }) // ls sessions/
+        .mockResolvedValueOnce(dockerPsEmpty) // docker ps
         .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }); // stat agent_active-bbbb
 
       mockListProcesses.mockResolvedValue([
@@ -724,8 +737,8 @@ describe('disk space checking', () => {
 
       await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa');
 
-      // ls + stat — no rm calls
-      expect(mockSandboxExec).toHaveBeenCalledTimes(2);
+      // ls + docker ps + stat — no rm calls
+      expect(mockSandboxExec).toHaveBeenCalledTimes(3);
     });
 
     it('returns early when sessions directory does not exist', async () => {
@@ -758,6 +771,7 @@ describe('disk space checking', () => {
           stdout: 'agent_stale-aaaa\nagent_stale-bbbb\n',
           stderr: '',
         }) // ls
+        .mockResolvedValueOnce(dockerPsEmpty) // docker ps
         .mockRejectedValueOnce(new Error('exec threw during agent_stale-aaaa stat')) // stat throws for first session
         .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }) // stat agent_stale-bbbb
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // rm workspace agent_stale-bbbb
@@ -811,6 +825,7 @@ describe('disk space checking', () => {
           stdout: 'unexpected-dir\n.hidden\nlost+found\nagent_valid-1234\n',
           stderr: '',
         }) // ls
+        .mockResolvedValueOnce(dockerPsEmpty) // docker ps
         .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }) // stat agent_valid-1234
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // rm workspace agent_valid-1234
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // rm home agent_valid-1234
@@ -836,14 +851,15 @@ describe('disk space checking', () => {
           stdout: 'agent_recent-1111\n',
           stderr: '',
         }) // ls sessions/
+        .mockResolvedValueOnce(dockerPsEmpty) // docker ps
         .mockResolvedValueOnce({ exitCode: 0, stdout: `${recentMtime}\n`, stderr: '' }); // stat
 
       mockListProcesses.mockResolvedValue([]);
 
       await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa');
 
-      // ls + stat only — no rm calls
-      expect(mockSandboxExec).toHaveBeenCalledTimes(2);
+      // ls + docker ps + stat only — no rm calls
+      expect(mockSandboxExec).toHaveBeenCalledTimes(3);
     });
 
     it('cleans old directories but skips recent ones in the same run', async () => {
@@ -855,6 +871,7 @@ describe('disk space checking', () => {
           stdout: 'agent_old-1111\nagent_recent-2222\n',
           stderr: '',
         }) // ls
+        .mockResolvedValueOnce(dockerPsEmpty) // docker ps
         .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }) // stat agent_old-1111
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // rm workspace agent_old-1111
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // rm home agent_old-1111
@@ -884,14 +901,15 @@ describe('disk space checking', () => {
           stdout: 'agent_stale-1111\n',
           stderr: '',
         }) // ls
+        .mockResolvedValueOnce(dockerPsEmpty) // docker ps
         .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'stat: cannot stat' }); // stat fails
 
       mockListProcesses.mockResolvedValue([]);
 
       await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa');
 
-      // ls + stat only — no rm calls (directory was skipped)
-      expect(mockSandboxExec).toHaveBeenCalledTimes(2);
+      // ls + docker ps + stat only — no rm calls (directory was skipped)
+      expect(mockSandboxExec).toHaveBeenCalledTimes(3);
     });
 
     it('skips cleanup when stat returns unparseable output', async () => {
@@ -901,14 +919,40 @@ describe('disk space checking', () => {
           stdout: 'agent_stale-1111\n',
           stderr: '',
         }) // ls
+        .mockResolvedValueOnce(dockerPsEmpty) // docker ps
         .mockResolvedValueOnce({ exitCode: 0, stdout: 'not-a-number\n', stderr: '' }); // stat returns garbage
 
       mockListProcesses.mockResolvedValue([]);
 
       await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa');
 
-      // ls + stat only — no rm calls (directory was skipped)
-      expect(mockSandboxExec).toHaveBeenCalledTimes(2);
+      // ls + docker ps + stat only — no rm calls (directory was skipped)
+      expect(mockSandboxExec).toHaveBeenCalledTimes(3);
+    });
+
+    it('skips sessions with a wrapper running inside a dev container', async () => {
+      const oldMtime = String(Math.floor(Date.now() / 1000) - STALE_DIR_MIN_AGE_SECONDS - 60);
+      mockSandboxExec
+        .mockResolvedValueOnce({
+          exitCode: 0,
+          stdout: 'agent_devc-cccc\n',
+          stderr: '',
+        }) // ls sessions/
+        .mockResolvedValueOnce({
+          exitCode: 0,
+          stdout:
+            // <id>\t<ports>\t<labels>
+            'cont-id\t0.0.0.0:5050->5050/tcp\tkilo.agentSession=agent_devc-cccc\n',
+          stderr: '',
+        }) // docker ps — wrapper container is alive
+        .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }); // stat
+
+      mockListProcesses.mockResolvedValue([]);
+
+      await cleanupStaleWorkspaces(fakeSandbox, '/workspace/org/user', 'agent_current-aaaa');
+
+      // ls + docker ps + stat only — no rm calls (live devcontainer wrapper)
+      expect(mockSandboxExec).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -940,6 +984,7 @@ describe('disk space checking', () => {
           stdout: 'agent_stale-1111\nagent_current-aaaa\n',
           stderr: '',
         }) // ls sessions/ (cleanupStaleWorkspaces)
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // docker ps (listWrapperContainers)
         .mockResolvedValueOnce({ exitCode: 0, stdout: `${oldMtime}\n`, stderr: '' }) // stat agent_stale-1111
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // rm workspace
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // rm home
@@ -952,10 +997,12 @@ describe('disk space checking', () => {
       expect(mockSandboxExec.mock.calls[0][0]).toContain('df -B1');
       // ls was called to find sessions
       expect(mockSandboxExec.mock.calls[1][0]).toContain('ls -1');
+      // docker ps was called to find devcontainer-launched wrappers
+      expect(mockSandboxExec.mock.calls[2][0]).toContain('docker ps');
       // stat was called for the stale session
-      expect(mockSandboxExec.mock.calls[2][0]).toContain('stat');
+      expect(mockSandboxExec.mock.calls[3][0]).toContain('stat');
       // stale session was cleaned
-      expect(mockSandboxExec.mock.calls[3][0]).toContain('agent_stale-1111');
+      expect(mockSandboxExec.mock.calls[4][0]).toContain('agent_stale-1111');
     });
 
     it('skips cleanup when disk space is adequate', async () => {

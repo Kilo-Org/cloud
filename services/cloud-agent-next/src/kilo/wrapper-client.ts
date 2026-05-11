@@ -10,7 +10,14 @@ import type { ExecutionSession, SandboxInstance } from '../types.js';
 import { logger } from '../logger.js';
 import { findWrapperForSession, getWrapperSessionMarker } from './wrapper-manager.js';
 import { randomPort } from './ports.js';
+import {
+  dockerSocketEnv,
+  dockerSocketEnvParts,
+  resolveDockerSocketPath,
+} from './sandbox-runtime.js';
+import { KILO_AGENT_SESSION_LABEL, type DevContainerHandle } from './devcontainer.js';
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
+import { shellQuote } from './utils.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,6 +45,13 @@ export type EnsureRunningOptions = {
   maxWaitMs?: number;
   workspacePath: string;
   sessionId?: string;
+  /**
+   * When set, launch the wrapper *inside* the dev container via `devcontainer
+   * exec` instead of `session.startProcess` on the outer sandbox. The wrapper
+   * runs from the bind-mounted bundle at `/opt/kilo-cloud/kilocode-wrapper.js`
+   * and its HTTP port is reached via the publish set up by `devcontainer up`.
+   */
+  devcontainer?: DevContainerHandle;
 };
 
 export type EnsureWrapperOptions = {
@@ -45,6 +59,15 @@ export type EnsureWrapperOptions = {
   userId: string;
   workspacePath: string;
   sessionId?: string;
+  /** See {@link EnsureRunningOptions.devcontainer}. */
+  devcontainer?: DevContainerHandle;
+  /**
+   * Force the wrapper to listen on this exact port instead of a random one.
+   * Used by the devcontainer flow because the port has to be chosen *before*
+   * `devcontainer up` (the publish mapping is fixed at container create time).
+   * When set, the per-attempt port-retry loop is skipped.
+   */
+  fixedPort?: number;
 };
 
 export type WrapperPromptOptions = {
@@ -151,8 +174,30 @@ export class WrapperClient {
   private readonly port: number;
   private readonly baseUrl: string;
 
-  private shellQuote(value: string): string {
-    return `'${value.replace(/'/g, "'\\''")}'`;
+  /**
+   * Wrap a wrapper-start command line so it runs inside the dev container via
+   * `devcontainer exec --workspace-folder ... --id-label kilo.agentSession=...`.
+   *
+   * The inner string (env vars + `bun run …`) is passed to `sh -c` so the
+   * env-var prefix syntax keeps working unchanged. Double-shell escaping is
+   * handled by `shellQuote`.
+   */
+  private buildDevContainerExecCommand(
+    devcontainer: DevContainerHandle,
+    innerCommand: string
+  ): string {
+    return [
+      'devcontainer exec',
+      `--workspace-folder ${shellQuote(devcontainer.workspacePath)}`,
+      // --config is required: without it the CLI re-reads the user's
+      // on-disk devcontainer.json and loses our remoteUser/remoteEnv
+      // overrides (see DevContainerHandle.overrideConfigPath).
+      `--config ${shellQuote(devcontainer.overrideConfigPath)}`,
+      `--id-label ${shellQuote(`${KILO_AGENT_SESSION_LABEL}=${devcontainer.agentSessionId}`)}`,
+      '--',
+      'sh -c',
+      shellQuote(innerCommand),
+    ].join(' ');
   }
 
   private async runPreflightChecks(options: {
@@ -160,7 +205,7 @@ export class WrapperClient {
     workspacePath: string;
   }): Promise<void> {
     const { wrapperPath, workspacePath } = options;
-    const quotedWrapperPath = this.shellQuote(wrapperPath);
+    const quotedWrapperPath = shellQuote(wrapperPath);
 
     // Verify bun runtime and wrapper binary before the full start+waitForPort loop.
     // A fast `bun --version` catches SIGILL (exit 132) on hosts whose CPU lacks
@@ -251,11 +296,11 @@ export class WrapperClient {
 
     if (body) {
       // Escape single quotes in JSON
-      const json = this.shellQuote(JSON.stringify(body));
+      const json = shellQuote(JSON.stringify(body));
       command += ` -d ${json}`;
     }
 
-    command += ` ${this.shellQuote(url)}`;
+    command += ` ${shellQuote(url)}`;
 
     // Execute curl in the container
     const result = await this.session.exec(command);
@@ -314,6 +359,7 @@ export class WrapperClient {
       maxWaitMs = 30_000,
       workspacePath,
       sessionId,
+      devcontainer,
     } = options;
 
     // First, try to check health
@@ -326,36 +372,66 @@ export class WrapperClient {
       logger.debug('WrapperClient: wrapper not running, starting...');
     }
 
-    await this.runPreflightChecks({ wrapperPath, workspacePath });
+    if (!devcontainer) {
+      // Outer-sandbox preflight: bun + wrapper bundle at /usr/local/bin/.
+      // For the devcontainer flow these checks would have to run inside the
+      // container (skip for now — failure surfaces clearly via waitForPort).
+      await this.runPreflightChecks({ wrapperPath, workspacePath });
+    }
 
     // Start the wrapper process using startProcess so it's trackable via listProcesses()
     // The command includes a session marker so we can find this wrapper later
     const sessionMarker = getWrapperSessionMarker(agentSessionId);
     const wrapperLogPath = `/tmp/kilocode-wrapper-${agentSessionId}-${Date.now()}.log`;
+    // DOCKER_HOST lets the outer-sandbox wrapper (and anything kilo spawns)
+    // talk to the sandbox dockerd. Devcontainer sessions intentionally do not
+    // mount or expose that socket inside the user container.
+    const dockerSocketPath = await resolveDockerSocketPath(this.session);
+    const dockerEnvParts = devcontainer ? [] : dockerSocketEnvParts(dockerSocketPath);
+    const devContainerEnv = devcontainer ? dockerSocketEnv(dockerSocketPath) : undefined;
+    // When running inside a dev container, the wrapper sees the *inner*
+    // workspace path (set by `devcontainer up`'s remoteWorkspaceFolder).
+    const innerWorkspacePath = devcontainer?.innerWorkspaceFolder ?? workspacePath;
     const envParts = [
       `WRAPPER_PORT=${this.port}`,
-      `WORKSPACE_PATH=${workspacePath}`,
+      `WORKSPACE_PATH=${innerWorkspacePath}`,
       `WRAPPER_LOG_PATH=${wrapperLogPath}`,
       `KILO_SESSION_RETRY_LIMIT=5`,
       `KILO_CLOUD_AGENT=1`,
+      ...dockerEnvParts,
     ];
-    const argParts = [`--user-id ${this.shellQuote(userId)}`];
+    const argParts = [`--user-id ${shellQuote(userId)}`];
     if (sessionId) {
-      argParts.push(`--session-id ${this.shellQuote(sessionId)}`);
+      argParts.push(`--session-id ${shellQuote(sessionId)}`);
     }
 
-    const command = `${envParts.join(' ')} bun run ${this.shellQuote(wrapperPath)} ${sessionMarker} ${argParts.join(' ')}`;
+    // The wrapper bundle lives at `/opt/kilo-cloud/kilocode-wrapper.js` inside
+    // the dev container (bind-mounted read-only); on the outer sandbox we use
+    // the caller-provided `wrapperPath` (default `/usr/local/bin/...`).
+    const effectiveWrapperPath = devcontainer ? '/opt/kilo-cloud/kilocode-wrapper.js' : wrapperPath;
+
+    const innerCommand = `${envParts.join(' ')} bun run ${shellQuote(effectiveWrapperPath)} ${sessionMarker} ${argParts.join(' ')}`;
+    const command = devcontainer
+      ? this.buildDevContainerExecCommand(devcontainer, innerCommand)
+      : innerCommand;
+    // The outer process cwd just needs to exist — `bun run` immediately
+    // re-chdirs to WORKSPACE_PATH in main.ts. Use the parent of the workspace
+    // path either way (the workspace itself may not exist outside the
+    // devcontainer if the user's `workspaceMount` differs).
+    const cwd = dirname(workspacePath);
 
     logger.debug('WrapperClient: starting wrapper process', {
       command,
       port: this.port,
+      devcontainer: devcontainer ? { containerId: devcontainer.containerId } : undefined,
     });
 
     let proc: Awaited<ReturnType<ExecutionSession['startProcess']>> | undefined;
 
     try {
       proc = await this.session.startProcess(command, {
-        cwd: dirname(workspacePath),
+        cwd,
+        env: devContainerEnv,
       });
 
       // Wait for wrapper to become healthy via port check.
@@ -497,7 +573,29 @@ export class WrapperClient {
           .warn('Existing wrapper version mismatch, restarting');
 
         try {
-          await sandbox.exec(`pkill -f -- '${getWrapperSessionMarker(agentSessionId)}'`);
+          // The wrapper might be running in a dev container (different PID
+          // namespace — outer pkill can't see it). For that case kill only
+          // the inner wrapper process via `devcontainer exec ... -- pkill`
+          // so the dev container stays alive and the next attempt reuses it
+          // via its `--id-label`.
+          const sessionMarker = getWrapperSessionMarker(agentSessionId);
+          if (options.devcontainer) {
+            const dc = options.devcontainer;
+            const innerPkill = `pkill -f -- ${shellQuote(sessionMarker)}`;
+            await sandbox.exec(
+              [
+                'devcontainer exec',
+                `--workspace-folder ${shellQuote(dc.workspacePath)}`,
+                `--config ${shellQuote(dc.overrideConfigPath)}`,
+                `--id-label ${shellQuote(`${KILO_AGENT_SESSION_LABEL}=${dc.agentSessionId}`)}`,
+                '--',
+                'sh -c',
+                shellQuote(innerPkill),
+              ].join(' ')
+            );
+          } else {
+            await sandbox.exec(`pkill -f -- ${shellQuote(sessionMarker)}`);
+          }
         } catch (error) {
           logger
             .withFields({
@@ -514,11 +612,15 @@ export class WrapperClient {
       }
     }
 
-    // 2. Try starting a new wrapper, retrying with a new random port on failure
+    // 2. Try starting a new wrapper, retrying with a new random port on failure.
+    //    Port retry only applies when the caller hasn't pinned a port — the
+    //    devcontainer flow has to commit to a port at `devcontainer up` time
+    //    because the publish mapping is fixed at container create.
     let lastError: Error | undefined;
+    const maxAttempts = options.fixedPort !== undefined ? 1 : MAX_PORT_ATTEMPTS;
 
-    for (let attempt = 0; attempt < MAX_PORT_ATTEMPTS; attempt++) {
-      const port = randomPort();
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const port = options.fixedPort ?? randomPort();
       logger
         .withFields({ agentSessionId, port, attempt: attempt + 1 })
         .info('Starting new wrapper');
@@ -538,7 +640,7 @@ export class WrapperClient {
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
-        if (attempt + 1 < MAX_PORT_ATTEMPTS) {
+        if (attempt + 1 < maxAttempts) {
           logger
             .withFields({ agentSessionId, port, attempt: attempt + 1, error: lastError.message })
             .warn('Wrapper startup failed, retrying with different port');

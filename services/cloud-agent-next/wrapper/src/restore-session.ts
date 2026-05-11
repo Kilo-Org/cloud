@@ -54,27 +54,67 @@ const JQ_EXTRACT_DIFFS_FILTER =
   'reduce (.messages[]?.info.summary | objects | .diffs[]? // empty) as $d ({}; .[$d.file] = $d) | [.[]]';
 
 /**
- * Extract last-write-wins diffs from a snapshot file via a jq subprocess so the
- * full snapshot JSON is never loaded into the main process's heap.
+ * Extract last-write-wins diffs from a snapshot file. Prefers a jq subprocess
+ * (memory-efficient — the parsed snapshot stays in C-native heap) and falls
+ * back to bun-native parsing when jq isn't on PATH. The fallback matters for
+ * the devcontainer flow: the user's image is only required to ship `node` +
+ * `bun`, so `jq` may be missing.
  */
 export async function extractDiffs(snapshotPath: string): Promise<SnapshotDiff[] | null> {
-  const proc = Bun.spawn(['jq', '-c', JQ_EXTRACT_DIFFS_FILTER, snapshotPath], {
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
-    const stderr = await new Response(proc.stderr).text();
-    log(`jq failed exitCode=${exitCode} stderr=${stderr.trim()}`);
-    return null;
-  }
-  const stdout = await new Response(proc.stdout).text();
   try {
-    return JSON.parse(stdout) as SnapshotDiff[];
+    const proc = Bun.spawn(['jq', '-c', JQ_EXTRACT_DIFFS_FILTER, snapshotPath], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const exitCode = await proc.exited;
+    if (exitCode === 0) {
+      const stdout = await new Response(proc.stdout).text();
+      try {
+        return JSON.parse(stdout) as SnapshotDiff[];
+      } catch (err) {
+        log(`jq output parse failed: ${err instanceof Error ? err.message : String(err)}`);
+        return null;
+      }
+    }
+    const stderr = await new Response(proc.stderr).text();
+    log(`jq failed exitCode=${exitCode} stderr=${stderr.trim()}; falling back to bun parser`);
   } catch (err) {
-    log(`jq output parse failed: ${err instanceof Error ? err.message : String(err)}`);
+    // `Bun.spawn` rejects with ENOENT when jq isn't installed.
+    log(`jq not available (${err instanceof Error ? err.message : String(err)}); using bun parser`);
+  }
+
+  return extractDiffsWithBun(snapshotPath);
+}
+
+/**
+ * In-process fallback for environments without `jq`. Loads the whole snapshot
+ * into the V8 heap and applies the same last-write-wins dedup the jq filter
+ * does. Higher peak memory than jq but avoids a hard dependency.
+ */
+async function extractDiffsWithBun(snapshotPath: string): Promise<SnapshotDiff[] | null> {
+  type SnapshotShape = {
+    messages?: Array<{
+      info?: {
+        summary?: { diffs?: SnapshotDiff[] };
+      };
+    }>;
+  };
+  let parsed: SnapshotShape;
+  try {
+    parsed = (await Bun.file(snapshotPath).json()) as SnapshotShape;
+  } catch (err) {
+    log(`bun snapshot parse failed: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
+  const dedup = new Map<string, SnapshotDiff>();
+  for (const message of parsed.messages ?? []) {
+    const summary = message?.info?.summary;
+    if (!summary || typeof summary !== 'object') continue;
+    for (const diff of summary.diffs ?? []) {
+      if (diff && typeof diff.file === 'string') dedup.set(diff.file, diff);
+    }
+  }
+  return Array.from(dedup.values());
 }
 
 // ---------------------------------------------------------------------------
@@ -124,6 +164,28 @@ export async function restoreSession(
 
       const bytesWritten = await Bun.write(tmpPath, res);
       log(`snapshot downloaded bytes=${bytesWritten}`);
+
+      // Validate before handing off to `kilo import`: an upstream error
+      // surface (e.g. a JSON `{"detail":"..."}` body served as 200) crashes
+      // kilo with a cryptic `undefined is not an object (evaluating 'info2.id')`
+      // and exit 1. Catch the obvious malformed cases here so the failure
+      // points at session-ingest instead.
+      let snapshotInfo: { info?: { id?: unknown } };
+      try {
+        snapshotInfo = (await Bun.file(tmpPath).json()) as { info?: { id?: unknown } };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log(`snapshot is not valid JSON: ${message}`);
+        return fail(`snapshot is not valid JSON (${bytesWritten} bytes)`, null, 'download');
+      }
+      if (typeof snapshotInfo.info?.id !== 'string') {
+        log('snapshot missing info.id — likely an error response');
+        return fail(
+          `snapshot missing info.id (${bytesWritten} bytes); session-ingest may have returned an error body`,
+          null,
+          'download'
+        );
+      }
     } catch (err) {
       tryUnlink(tmpPath);
       const message = err instanceof Error ? err.message : String(err);

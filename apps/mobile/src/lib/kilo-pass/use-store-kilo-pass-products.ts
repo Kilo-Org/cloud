@@ -73,6 +73,7 @@ export function useStoreKiloPassProducts() {
 
   const { refetch: refetchProducts } = productsQuery;
   const refetch = useCallback(async () => {
+    setStoreErrorMessage(null);
     await refetchProducts();
   }, [refetchProducts]);
 
@@ -84,6 +85,12 @@ export function useStoreKiloPassProducts() {
       toast.error(queryErrorMessage);
     }
   }, [queryErrorMessage]);
+
+  useEffect(() => {
+    if (productsQuery.isSuccess) {
+      setStoreErrorMessage(null);
+    }
+  }, [productsQuery.isSuccess]);
 
   return {
     products: productsQuery.data ?? [],

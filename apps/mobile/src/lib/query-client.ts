@@ -1,11 +1,20 @@
-import { QueryCache, QueryClient } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 
 import { handleTrpcQueryError } from '@/lib/auth/trpc-unauthorized';
 
-export const queryClient = new QueryClient({
-  queryCache: new QueryCache({
-    onError: error => {
-      handleTrpcQueryError(error);
-    },
-  }),
-});
+export function createKiloAppQueryClient(): QueryClient {
+  return new QueryClient({
+    queryCache: new QueryCache({
+      onError: error => {
+        handleTrpcQueryError(error);
+      },
+    }),
+    mutationCache: new MutationCache({
+      onError: error => {
+        handleTrpcQueryError(error);
+      },
+    }),
+  });
+}
+
+export const queryClient = createKiloAppQueryClient();

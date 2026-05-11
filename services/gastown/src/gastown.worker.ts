@@ -366,6 +366,49 @@ app.patch('/debug/towns/:townId/config', async c => {
   return c.json(result);
 });
 
+app.get('/debug/towns/:townId/rigs', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const rigs = await town.listRigs();
+  return c.json({ rigs });
+});
+
+app.post('/debug/towns/:townId/sling-convoy', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const body: {
+    rigId: string;
+    convoyTitle: string;
+    tasks: Array<{ title: string; body?: string; depends_on?: number[] }>;
+    merge_mode?: 'review-then-land' | 'review-and-merge';
+    staged?: boolean;
+  } = await c.req.json();
+  if (!body.rigId || !body.convoyTitle || !Array.isArray(body.tasks)) {
+    return c.json({ error: 'Missing required fields: rigId, convoyTitle, tasks' }, 400);
+  }
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const result = await town.slingConvoy({
+    rigId: body.rigId,
+    convoyTitle: body.convoyTitle,
+    tasks: body.tasks,
+    merge_mode: body.merge_mode,
+    staged: body.staged,
+  });
+  return c.json(result);
+});
+
+app.get('/debug/towns/:townId/convoys', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const convoys = await town.listConvoys();
+  return c.json({ convoys });
+});
+
 // ── Town ID + Auth ──────────────────────────────────────────────────────
 // All rig routes live under /api/towns/:townId/rigs/:rigId so the townId
 // is always available from the URL path.

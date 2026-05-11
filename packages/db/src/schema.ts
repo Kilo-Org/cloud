@@ -985,6 +985,12 @@ export const kilo_pass_subscriptions = pgTable(
     uniqueIndex('UQ_kilo_pass_subscriptions_provider_subscription')
       .on(table.payment_provider, table.provider_subscription_id)
       .where(sql`${table.provider_subscription_id} IS NOT NULL`),
+    uniqueIndex('UQ_kilo_pass_subscriptions_store_purchase_reference').on(
+      table.id,
+      table.kilo_user_id,
+      table.payment_provider,
+      table.provider_subscription_id
+    ),
     check(
       'kilo_pass_subscriptions_current_streak_months_non_negative_check',
       sql`${table.current_streak_months} >= 0`
@@ -1097,6 +1103,27 @@ export const kilo_pass_store_purchases = pgTable(
       table.payment_provider,
       table.provider_subscription_id,
       table.purchased_at.desc()
+    ),
+    foreignKey({
+      columns: [
+        table.kilo_pass_subscription_id,
+        table.kilo_user_id,
+        table.payment_provider,
+        table.provider_subscription_id,
+      ],
+      foreignColumns: [
+        kilo_pass_subscriptions.id,
+        kilo_pass_subscriptions.kilo_user_id,
+        kilo_pass_subscriptions.payment_provider,
+        kilo_pass_subscriptions.provider_subscription_id,
+      ],
+      name: 'FK_kilo_pass_store_purchases_subscription_owner_provider',
+    })
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    check(
+      'kilo_pass_store_purchases_store_provider_check',
+      sql`${table.payment_provider} IN ('app_store', 'google_play')`
     ),
     enumCheck(
       'kilo_pass_store_purchases_payment_provider_check',

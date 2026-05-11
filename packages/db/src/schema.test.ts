@@ -43,22 +43,61 @@ async function insertKiloPassSubscription(values: {
   paymentProvider: KiloPassPaymentProvider;
   providerSubscriptionId: string | null;
   stripeSubscriptionId: string | null;
+}): Promise<string> {
+  const [subscription] = await schemaTestDb.db
+    .insert(schema.kilo_pass_subscriptions)
+    .values({
+      kilo_user_id: values.userId,
+      payment_provider: values.paymentProvider,
+      provider_subscription_id: values.providerSubscriptionId,
+      stripe_subscription_id: values.stripeSubscriptionId,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      status: 'active',
+    })
+    .returning({ id: schema.kilo_pass_subscriptions.id });
+
+  if (!subscription) {
+    throw new Error('Failed to insert Kilo Pass subscription');
+  }
+
+  return subscription.id;
+}
+
+async function insertKiloPassStorePurchase(values: {
+  subscriptionId: string;
+  userId: string;
+  paymentProvider: KiloPassPaymentProvider;
+  providerSubscriptionId: string;
+  providerTransactionId?: string;
 }): Promise<void> {
-  await schemaTestDb.db.insert(schema.kilo_pass_subscriptions).values({
+  await schemaTestDb.db.insert(schema.kilo_pass_store_purchases).values({
+    kilo_pass_subscription_id: values.subscriptionId,
     kilo_user_id: values.userId,
     payment_provider: values.paymentProvider,
+    product_id: 'kilopass.tier19.monthly.v1',
     provider_subscription_id: values.providerSubscriptionId,
-    stripe_subscription_id: values.stripeSubscriptionId,
-    tier: KiloPassTier.Tier19,
-    cadence: KiloPassCadence.Monthly,
-    status: 'active',
+    provider_transaction_id: values.providerTransactionId ?? `tx-${crypto.randomUUID()}`,
+    environment: 'Sandbox',
+    purchased_at: '2026-05-01T00:00:00.000Z',
   });
 }
 
-async function expectProviderIdsCheckViolation(insertPromise: Promise<void>): Promise<void> {
+async function expectProviderIdsCheckViolation(insertPromise: Promise<unknown>): Promise<void> {
   await expect(insertPromise).rejects.toMatchObject({
     cause: {
       constraint: 'kilo_pass_subscriptions_provider_ids_check',
+    },
+  });
+}
+
+async function expectStorePurchaseConstraintViolation(
+  insertPromise: Promise<unknown>,
+  constraint: string
+): Promise<void> {
+  await expect(insertPromise).rejects.toMatchObject({
+    cause: {
+      constraint,
     },
   });
 }
@@ -322,6 +361,130 @@ describe('database schema', () => {
           providerSubscriptionId: '2000000000000002',
           stripeSubscriptionId: null,
         });
+      });
+    });
+  });
+
+  describe('Kilo Pass store purchases', () => {
+    it('allows valid App Store purchases for their referenced subscription owner', async () => {
+      await withKiloPassTestUser(async ({ userId }) => {
+        const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+        const subscriptionId = await insertKiloPassSubscription({
+          userId,
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerSubscriptionId,
+          stripeSubscriptionId: null,
+        });
+
+        await insertKiloPassStorePurchase({
+          subscriptionId,
+          userId,
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerSubscriptionId,
+        });
+      });
+    });
+
+    it('rejects store purchases whose user does not own the referenced subscription', async () => {
+      await withKiloPassTestUser(async ({ userId }) => {
+        const otherUserId = `schema-kilo-pass-${crypto.randomUUID()}`;
+        await schemaTestDb.db.insert(schema.kilocode_users).values({
+          id: otherUserId,
+          google_user_email: `${otherUserId}@example.com`,
+          google_user_name: 'Schema Test Other User',
+          google_user_image_url: 'https://example.com/avatar.png',
+          stripe_customer_id: `cus_${crypto.randomUUID()}`,
+        });
+
+        try {
+          const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+          const subscriptionId = await insertKiloPassSubscription({
+            userId,
+            paymentProvider: KiloPassPaymentProvider.AppStore,
+            providerSubscriptionId,
+            stripeSubscriptionId: null,
+          });
+
+          await expectStorePurchaseConstraintViolation(
+            insertKiloPassStorePurchase({
+              subscriptionId,
+              userId: otherUserId,
+              paymentProvider: KiloPassPaymentProvider.AppStore,
+              providerSubscriptionId,
+            }),
+            'FK_kilo_pass_store_purchases_subscription_owner_provider'
+          );
+        } finally {
+          await schemaTestDb.db
+            .delete(schema.kilocode_users)
+            .where(eq(schema.kilocode_users.id, otherUserId));
+        }
+      });
+    });
+
+    it('rejects store purchases whose provider does not match the referenced subscription', async () => {
+      await withKiloPassTestUser(async ({ userId }) => {
+        const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+        const subscriptionId = await insertKiloPassSubscription({
+          userId,
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerSubscriptionId,
+          stripeSubscriptionId: null,
+        });
+
+        await expectStorePurchaseConstraintViolation(
+          insertKiloPassStorePurchase({
+            subscriptionId,
+            userId,
+            paymentProvider: KiloPassPaymentProvider.GooglePlay,
+            providerSubscriptionId,
+          }),
+          'FK_kilo_pass_store_purchases_subscription_owner_provider'
+        );
+      });
+    });
+
+    it('rejects store purchases whose provider subscription ID does not match the referenced subscription', async () => {
+      await withKiloPassTestUser(async ({ userId }) => {
+        const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+        const subscriptionId = await insertKiloPassSubscription({
+          userId,
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerSubscriptionId,
+          stripeSubscriptionId: null,
+        });
+
+        await expectStorePurchaseConstraintViolation(
+          insertKiloPassStorePurchase({
+            subscriptionId,
+            userId,
+            paymentProvider: KiloPassPaymentProvider.AppStore,
+            providerSubscriptionId: `orig-${crypto.randomUUID()}`,
+          }),
+          'FK_kilo_pass_store_purchases_subscription_owner_provider'
+        );
+      });
+    });
+
+    it('rejects Stripe store purchase rows', async () => {
+      await withKiloPassTestUser(async ({ userId }) => {
+        const providerSubscriptionId = `sub_${crypto.randomUUID()}`;
+        const subscriptionId = await insertKiloPassSubscription({
+          userId,
+          paymentProvider: KiloPassPaymentProvider.Stripe,
+          providerSubscriptionId,
+          stripeSubscriptionId: providerSubscriptionId,
+        });
+
+        await expectStorePurchaseConstraintViolation(
+          insertKiloPassStorePurchase({
+            subscriptionId,
+            userId,
+            paymentProvider: KiloPassPaymentProvider.Stripe,
+            providerSubscriptionId,
+          }),
+          'kilo_pass_store_purchases_store_provider_check'
+        );
       });
     });
   });

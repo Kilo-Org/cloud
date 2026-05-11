@@ -102,6 +102,12 @@ export const USER_GH_APP_TOKEN_ENCRYPTION_KEY = getEnvVariable(
   'USER_GH_APP_TOKEN_ENCRYPTION_KEY'
 );
 
+// HMAC secret for signing GitHub OAuth user-connect state parameters.
+export const GITHUB_OAUTH_STATE_SECRET = getEnvVariable('GITHUB_OAUTH_STATE_SECRET');
+
+// Gate for the GitHub user-token connect flow.
+export const ENABLE_GITHUB_USER_TOKENS = getEnvVariable('ENABLE_GITHUB_USER_TOKENS') === 'true';
+
 /**
  * AES-256 encryption key for BYOK API keys.
  * Must be a base64-encoded 32-byte (256-bit) key.

@@ -749,7 +749,7 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(subscription?.ended_at).toBeNull();
   });
 
-  it('asks Apple to decline refund requests when Kilo Pass credits were consumed', async () => {
+  it('asks Apple to decline refund requests regardless of credit usage', async () => {
     const user = await insertTestUser();
     const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
     const consumptionRequests: Array<{ transactionId: string; request: unknown }> = [];

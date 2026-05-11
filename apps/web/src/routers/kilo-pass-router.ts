@@ -815,6 +815,11 @@ export const kiloPassRouter = createTRPCRouter({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
       }
 
+      const subscription = await getKiloPassStateForUser(db, ctx.user.id);
+      if (subscription) {
+        assertStripeManagedSubscription(subscription);
+      }
+
       const session = await stripe.billingPortal.sessions.create({
         customer: stripeCustomerId,
         return_url: input.returnUrl ?? `${APP_URL}/profile`,

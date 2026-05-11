@@ -1178,6 +1178,28 @@ describe('kiloPassRouter', () => {
         return_url: returnUrl,
       });
     });
+
+    it('rejects active App Store subscriptions without opening the Stripe portal', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-portal-app-store@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerSubscriptionId: 'app-store-original-portal',
+        stripeSubscriptionId: null,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.getCustomerPortalUrl({})).rejects.toThrow(
+        'Manage this Kilo Pass subscription through the mobile app store.'
+      );
+      expect(stripeMock.billingPortal.sessions.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('getChurnkeyAuthHash', () => {

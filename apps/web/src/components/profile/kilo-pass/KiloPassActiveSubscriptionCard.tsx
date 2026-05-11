@@ -337,17 +337,18 @@ function BottomClarification() {
   if (subscription.status === 'paused') {
     return (
       <div className="text-muted-foreground text-xs">
-        Unused paid credits never expire. Free bonus credits are not renewed while your subscription
-        is paused; monthly credits resume when the subscription resumes.
+        Your payment converts 1:1 into credits that are added to your balance. Free bonus credits
+        are not renewed while your subscription is paused; monthly credits resume when the
+        subscription resumes.
       </div>
     );
   }
 
   return (
     <div className="text-muted-foreground text-xs">
-      Unused paid credits never expire and roll over every month into your total. Free bonus credits
-      are earned after using the month&apos;s paid credits. Unused free bonus credits do not roll
-      over and will expire{expiresAtLabel ? ` on ${expiresAtLabel}.` : '.'}
+      Your payment converts 1:1 into credits that are added to your balance. Free bonus credits are
+      earned after using the month&apos;s paid credits. Unused free bonus credits do not roll over
+      and will expire{expiresAtLabel ? ` on ${expiresAtLabel}.` : '.'}
     </div>
   );
 }

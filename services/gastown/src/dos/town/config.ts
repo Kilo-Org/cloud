@@ -9,7 +9,7 @@ import {
   type MergeStrategy,
   type RigOverrideConfig,
 } from '../../types';
-import { resolveGitHubToken } from './town-scm';
+import { resolveGitHubTokenString } from './town-scm';
 
 const CONFIG_KEY = 'town:config';
 const NEW_TOWN_DEFAULTS_SEEDED_KEY = 'town:config:newDefaultsSeeded';
@@ -316,7 +316,7 @@ export async function buildContainerConfig(
 
   let resolvedGithubToken = config.git_auth?.github_token;
   try {
-    const fresh = await resolveGitHubToken({
+    const fresh = await resolveGitHubTokenString({
       env,
       townId,
       getTownConfig: () => Promise.resolve(config),
@@ -324,7 +324,7 @@ export async function buildContainerConfig(
     if (fresh) resolvedGithubToken = fresh;
   } catch (err) {
     console.warn(
-      `${TOWN_LOG} buildContainerConfig: resolveGitHubToken failed; falling back to stored token`,
+      `${TOWN_LOG} buildContainerConfig: resolveGitHubTokenString failed; falling back to stored token`,
       err
     );
   }

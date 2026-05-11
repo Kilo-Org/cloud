@@ -29,9 +29,9 @@ describe('resolveGitHubToken', () => {
     }
   });
 
-  it('returns ok:true with source when github_cli_pat is configured', async () => {
+  it('prefers github_cli_pat over stored github_token', async () => {
     const ctx = mockSCMContext({
-      getTownConfig: async () => ({ github_cli_pat: 'ghp_pat123' }) as TownConfig,
+      getTownConfig: async () => ({ git_auth: { github_token: 'ghp_stored' }, github_cli_pat: 'ghp_pat123' }) as TownConfig,
     });
     const result = await resolveGitHubToken(ctx);
     expect(result.ok).toBe(true);

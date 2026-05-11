@@ -793,7 +793,7 @@ export class TownDO extends DurableObject<Env> {
     // syncTownConfigToProcessEnv path reads `git_auth.github_token`
     // from the X-Town-Config header on every request, so the in-process
     // GIT_TOKEN follows the same source-of-truth as the persisted one.
-    const githubToken = await scm.resolveGitHubToken({
+    const githubToken = await scm.resolveGitHubTokenString({
       env: this.env,
       townId,
       getTownConfig: () => Promise.resolve(townConfig),
@@ -1002,12 +1002,12 @@ export class TownDO extends DurableObject<Env> {
     logger.setTags({ rigId: rigConfig.rigId });
     const townConfig = await this.getTownConfig();
     const envVars: Record<string, string> = {};
-    // Resolve GitHub token through scm.resolveGitHubToken so the rig
+    // Resolve GitHub token through scm.resolveGitHubTokenString so the rig
     // setup uses a fresh installation token when a platform integration
     // is configured. The rig's own integration ID takes precedence over
     // the town-level one (this rig may be wired to a different repo
     // installation than the rest of the town).
-    const githubToken = await scm.resolveGitHubToken({
+    const githubToken = await scm.resolveGitHubTokenString({
       env: this.env,
       townId: this.townId,
       getTownConfig: () => Promise.resolve(townConfig),

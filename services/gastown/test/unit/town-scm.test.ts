@@ -44,12 +44,12 @@ describe('resolveGitHubToken priority chain', () => {
       github_token: STORED_GITHUB_TOKEN,
       platform_integration_id: INTEGRATION_ID,
     });
-    const token = await resolveGitHubToken({
+    const result = await resolveGitHubToken({
       env: fakeEnv({}),
       townId: 'town-1',
       getTownConfig: () => Promise.resolve(cfg),
     });
-    expect(token).toBe(USER_PAT);
+    expect(result).toEqual({ ok: true, token: USER_PAT, source: 'town.github_cli_pat' });
   });
 
   it('returns a fresh integration token when an integration is configured, ignoring the stale stored token', async () => {
@@ -57,22 +57,22 @@ describe('resolveGitHubToken priority chain', () => {
       github_token: STORED_GITHUB_TOKEN,
       platform_integration_id: INTEGRATION_ID,
     });
-    const token = await resolveGitHubToken({
+    const result = await resolveGitHubToken({
       env: fakeEnv({ tokenServiceResponse: FRESH_INSTALLATION_TOKEN }),
       townId: 'town-1',
       getTownConfig: () => Promise.resolve(cfg),
     });
-    expect(token).toBe(FRESH_INSTALLATION_TOKEN);
+    expect(result).toEqual({ ok: true, token: FRESH_INSTALLATION_TOKEN, source: 'town platform integration' });
   });
 
   it('falls back to stored github_token when no integration is configured', async () => {
     const cfg = buildConfig({ github_token: STORED_GITHUB_TOKEN });
-    const token = await resolveGitHubToken({
+    const result = await resolveGitHubToken({
       env: fakeEnv({}),
       townId: 'town-1',
       getTownConfig: () => Promise.resolve(cfg),
     });
-    expect(token).toBe(STORED_GITHUB_TOKEN);
+    expect(result).toEqual({ ok: true, token: STORED_GITHUB_TOKEN, source: 'town.git_auth.github_token' });
   });
 
   it('falls back to stored github_token when integration lookup throws', async () => {
@@ -80,32 +80,48 @@ describe('resolveGitHubToken priority chain', () => {
       github_token: STORED_GITHUB_TOKEN,
       platform_integration_id: INTEGRATION_ID,
     });
-    const token = await resolveGitHubToken({
+    const result = await resolveGitHubToken({
       env: fakeEnv({ tokenServiceShouldThrow: true }),
       townId: 'town-1',
       getTownConfig: () => Promise.resolve(cfg),
     });
-    expect(token).toBe(STORED_GITHUB_TOKEN);
+    expect(result).toEqual({ ok: true, token: STORED_GITHUB_TOKEN, source: 'town.git_auth.github_token' });
   });
 
   it('uses the rig-level platformIntegrationId when town config does not carry one', async () => {
     const cfg = buildConfig({});
-    const token = await resolveGitHubToken({
+    const result = await resolveGitHubToken({
       env: fakeEnv({ tokenServiceResponse: FRESH_INSTALLATION_TOKEN }),
       townId: 'town-1',
       getTownConfig: () => Promise.resolve(cfg),
       platformIntegrationId: INTEGRATION_ID,
     });
-    expect(token).toBe(FRESH_INSTALLATION_TOKEN);
+    expect(result).toEqual({ ok: true, token: FRESH_INSTALLATION_TOKEN, source: 'rig platform integration' });
   });
 
-  it('returns null when nothing is configured', async () => {
+  it('returns ok:false with tried chain when nothing is configured', async () => {
     const cfg = buildConfig({});
-    const token = await resolveGitHubToken({
+    const result = await resolveGitHubToken({
       env: fakeEnv({}),
       townId: 'town-1',
       getTownConfig: () => Promise.resolve(cfg),
     });
-    expect(token).toBeNull();
+    expect(result).toEqual({
+      ok: false,
+      tried: ['town.github_cli_pat', 'platform integration (none configured)', 'town.git_auth.github_token'],
+    });
+  });
+
+  it('falls back to stored github_token when integration returns empty string', async () => {
+    const cfg = buildConfig({
+      github_token: STORED_GITHUB_TOKEN,
+      platform_integration_id: INTEGRATION_ID,
+    });
+    const result = await resolveGitHubToken({
+      env: fakeEnv({ tokenServiceResponse: '' }),
+      townId: 'town-1',
+      getTownConfig: () => Promise.resolve(cfg),
+    });
+    expect(result).toEqual({ ok: true, token: STORED_GITHUB_TOKEN, source: 'town.git_auth.github_token' });
   });
 });

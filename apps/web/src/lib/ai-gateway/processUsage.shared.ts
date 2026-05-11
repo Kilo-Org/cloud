@@ -24,13 +24,23 @@ export function computeOpenRouterCostFields(
 ): { cost_mUsd: number; is_byok: boolean | null } {
   const is_byok = usage.is_byok ?? null;
   const openrouterCost_USD = usage.cost ?? 0;
-  const upstream_inference_cost_USD = usage.cost_details?.upstream_inference_cost ?? 0;
-  const cost_mUsd = toMicrodollars(is_byok ? upstream_inference_cost_USD : openrouterCost_USD);
+  const upstream_inference_cost_USD = usage.cost_details?.upstream_inference_cost;
   const inferredUpstream_USD = openrouterCost_USD * OPENROUTER_BYOK_COST_MULTIPLIER;
-  const microdollar_error = (inferredUpstream_USD - upstream_inference_cost_USD) * 1000000;
+  // For BYOK requests, OpenRouter charges us 5% of the upstream inference cost,
+  // so we multiply `cost` by OPENROUTER_BYOK_COST_MULTIPLIER (20) to recover the
+  // true upstream cost when `upstream_inference_cost` is missing. This fallback
+  // applies regardless of api kind (chat_completions, messages, responses).
+  const cost_mUsd = toMicrodollars(
+    is_byok ? (upstream_inference_cost_USD ?? inferredUpstream_USD) : openrouterCost_USD
+  );
+  const microdollar_error =
+    (inferredUpstream_USD - (upstream_inference_cost_USD ?? 0)) * 1000000;
   if (
     (is_byok == null && (openrouterCost_USD || upstream_inference_cost_USD)) || // unknown byok status but known non-zero costs? We're borked!
-    (is_byok && usage.cost !== 0 && 1.1 < Math.abs(microdollar_error)) // byok and cost is not 5% of upstream? Weird, EXCEPT sometimes cost is 0 due to openrouter promo.
+    (is_byok &&
+      usage.cost !== 0 &&
+      upstream_inference_cost_USD != null &&
+      1.1 < Math.abs(microdollar_error)) // byok and cost is not 5% of upstream? Weird, EXCEPT sometimes cost is 0 due to openrouter promo.
   ) {
     const { responseContent: _ignore, ...corePropsCopy } = coreProps;
     captureMessage("SUSPICIOUS: openrouters cost accounting doesn't make sense", {

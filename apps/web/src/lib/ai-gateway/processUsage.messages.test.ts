@@ -69,6 +69,25 @@ describe('processMessagesApiUsage', () => {
     expect(result.is_byok).toBe(true);
   });
 
+  test('falls back to BYOK multiplier when upstream_inference_cost is missing', () => {
+    const usage = {
+      input_tokens: 50,
+      output_tokens: 100,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      server_tool_use: { input_tokens: 0, web_fetch_requests: 0, web_search_requests: 0 },
+      cost: 0.001,
+      is_byok: true,
+      // cost_details omitted
+    };
+
+    const result = processMessagesApiUsage(usage, null, coreProps);
+
+    // 0.001 USD * 20 = 0.02 USD = 20000 microdollars
+    expect(result.cost_mUsd).toBe(20000);
+    expect(result.is_byok).toBe(true);
+  });
+
   test('correctly processes Vercel usage with marketCost', () => {
     const usage = {
       input_tokens: 25,

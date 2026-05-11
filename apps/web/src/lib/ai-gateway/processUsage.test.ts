@@ -81,6 +81,25 @@ describe('processOpenRouterUsage', () => {
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
   });
+
+  test('falls back to BYOK multiplier when upstream_inference_cost is missing', () => {
+    const usage = {
+      is_byok: true,
+      cost: 0.001,
+      // cost_details omitted entirely (OpenRouter occasionally drops this field)
+      completion_tokens: 100,
+      completion_tokens_details: { reasoning_tokens: 0 },
+      prompt_tokens: 50,
+      prompt_tokens_details: { cached_tokens: 0 },
+      total_tokens: 150,
+    };
+
+    const result = processOpenRouterUsage(usage, coreProps);
+
+    // 0.001 USD * 20 = 0.02 USD = 20000 microdollars
+    expect(result.cost_mUsd).toBe(20000);
+    expect(result.is_byok).toBe(true);
+  });
 });
 
 const sampleDir = join(process.cwd(), 'src/tests/sample');

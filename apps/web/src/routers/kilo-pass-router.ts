@@ -146,6 +146,8 @@ const CompleteStorePurchaseOutputSchema = z.object({
   alreadyProcessed: z.boolean(),
 });
 
+type KiloPassSubscriptionStateResponse = z.infer<typeof KiloPassSubscriptionStateSchema>;
+
 type StripeManagedKiloPassSubscription = KiloPassSubscriptionState & {
   paymentProvider: typeof KiloPassPaymentProvider.Stripe;
   stripeSubscriptionId: string;
@@ -316,24 +318,6 @@ function getStripePeriodStartSeconds(subscription: Stripe.Subscription): number 
 }
 
 async function getIsFirstTimeSubscriberEver(params: {
-  kiloUserId: string;
-  stripeSubscriptionId: string;
-}): Promise<boolean> {
-  const otherSubscriptions = await db
-    .select({ id: kilo_pass_subscriptions.id })
-    .from(kilo_pass_subscriptions)
-    .where(
-      and(
-        eq(kilo_pass_subscriptions.kilo_user_id, params.kiloUserId),
-        ne(kilo_pass_subscriptions.stripe_subscription_id, params.stripeSubscriptionId)
-      )
-    )
-    .limit(1);
-
-  return otherSubscriptions.length === 0;
-}
-
-async function getIsFirstTimeSubscriberEverBySubscriptionId(params: {
   kiloUserId: string;
   subscriptionId: string;
 }): Promise<boolean> {
@@ -521,6 +505,86 @@ async function getCurrentPeriodSpendUsd(params: {
   };
 }
 
+async function buildActiveKiloPassSubscriptionState(params: {
+  kiloUserId: string;
+  subscription: KiloPassSubscriptionState;
+  periodStartIso: string;
+  spendEndExclusiveIso: string;
+  nextBillingAt: string | null;
+  nowUtc: ReturnType<typeof dayjs>;
+}): Promise<KiloPassSubscriptionStateResponse> {
+  const baseAmountUsd = getMonthlyPriceUsd(params.subscription.tier);
+  const isFirstTimeSubscriberEver = await getIsFirstTimeSubscriberEver({
+    kiloUserId: params.kiloUserId,
+    subscriptionId: params.subscription.subscriptionId,
+  });
+  const [isBonusUnlocked, baseCreditsIssuedAtIso] = await Promise.all([
+    getIsBonusUnlockedForSubscriptionId(params.subscription.subscriptionId),
+    getBaseCreditsIssuedAtForSubscription(params.subscription.subscriptionId),
+  ]);
+  const usageStartInclusiveIso = getUsageStartInclusiveIso({
+    subscription: params.subscription,
+    baseCreditsIssuedAtIso,
+    periodStartIso: params.periodStartIso,
+    nowUtc: params.nowUtc,
+  });
+  const { currentPeriodUsageUsd, currentPeriodHostingCostUsd } = await getCurrentPeriodSpendUsd({
+    kiloUserId: params.kiloUserId,
+    startInclusiveIso: usageStartInclusiveIso,
+    endExclusiveIso: params.spendEndExclusiveIso,
+  });
+
+  return {
+    ...params.subscription,
+    nextBonusCreditsUsd: getNextKiloPassBonusCreditsUsd({
+      subscription: params.subscription,
+      baseAmountUsd,
+      isFirstTimeSubscriberEver,
+    }),
+    nextBillingAt: params.nextBillingAt,
+    isFirstTimeSubscriberEver,
+    currentPeriodBaseCreditsUsd: baseAmountUsd,
+    currentPeriodUsageUsd,
+    currentPeriodHostingCostUsd,
+    currentPeriodBonusCreditsUsd: getCurrentKiloPassBonusCreditsUsd({
+      subscription: params.subscription,
+      baseAmountUsd,
+      isFirstTimeSubscriberEver,
+    }),
+    isBonusUnlocked,
+    refillAt:
+      params.subscription.cadence === KiloPassCadence.Yearly
+        ? (params.subscription.nextYearlyIssueAt ?? params.nextBillingAt)
+        : params.nextBillingAt,
+  };
+}
+
+async function buildEndedKiloPassSubscriptionState(params: {
+  kiloUserId: string;
+  subscription: KiloPassSubscriptionState;
+  status: Stripe.Subscription.Status;
+}): Promise<KiloPassSubscriptionStateResponse> {
+  const baseAmountUsd = getMonthlyPriceUsd(params.subscription.tier);
+  const isFirstTimeSubscriberEver = await getIsFirstTimeSubscriberEver({
+    kiloUserId: params.kiloUserId,
+    subscriptionId: params.subscription.subscriptionId,
+  });
+
+  return {
+    ...params.subscription,
+    status: params.status,
+    nextBonusCreditsUsd: null,
+    nextBillingAt: null,
+    isFirstTimeSubscriberEver,
+    currentPeriodBaseCreditsUsd: baseAmountUsd,
+    currentPeriodUsageUsd: 0,
+    currentPeriodHostingCostUsd: 0,
+    currentPeriodBonusCreditsUsd: null,
+    isBonusUnlocked: false,
+    refillAt: null,
+  };
+}
+
 const GetCheckoutReturnStateOutputSchema = z.object({
   subscription: KiloPassSubscriptionStateBaseSchema.nullable(),
   creditsAwarded: z.boolean(),
@@ -634,11 +698,6 @@ export const kiloPassRouter = createTRPCRouter({
     }
 
     if (subscriptionBase.paymentProvider !== KiloPassPaymentProvider.Stripe) {
-      const isFirstTimeSubscriberEver = await getIsFirstTimeSubscriberEverBySubscriptionId({
-        kiloUserId: ctx.user.id,
-        subscriptionId: subscriptionBase.subscriptionId,
-      });
-      const baseAmountUsd = getMonthlyPriceUsd(subscriptionBase.tier);
       const latestStorePurchase = await db.query.kilo_pass_store_purchases.findFirst({
         where: and(
           eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscriptionBase.subscriptionId),
@@ -649,55 +708,22 @@ export const kiloPassRouter = createTRPCRouter({
       const nextBillingAt =
         normalizeTimestampToIso(latestStorePurchase?.expires_at) ??
         getNextBillingAtFromSubscriptionStart(subscriptionBase);
-      const isBonusUnlocked = await getIsBonusUnlockedForSubscriptionId(
-        subscriptionBase.subscriptionId
-      );
       const nowUtc = dayjs().utc();
       const nowIso = nowUtc.toISOString();
-      const baseCreditsIssuedAtIso = await getBaseCreditsIssuedAtForSubscription(
-        subscriptionBase.subscriptionId
-      );
-      const usageStartInclusiveIso = getUsageStartInclusiveIso({
+      const subscription = await buildActiveKiloPassSubscriptionState({
+        kiloUserId: ctx.user.id,
         subscription: subscriptionBase,
-        baseCreditsIssuedAtIso,
         periodStartIso:
           normalizeTimestampToIso(latestStorePurchase?.purchased_at) ??
           subscriptionBase.startedAt ??
           nowIso,
+        spendEndExclusiveIso: nowIso,
+        nextBillingAt,
         nowUtc,
       });
-      const { currentPeriodUsageUsd, currentPeriodHostingCostUsd } = await getCurrentPeriodSpendUsd(
-        {
-          kiloUserId: ctx.user.id,
-          startInclusiveIso: usageStartInclusiveIso,
-          endExclusiveIso: nowIso,
-        }
-      );
 
       return {
-        subscription: {
-          ...subscriptionBase,
-          nextBonusCreditsUsd: getNextKiloPassBonusCreditsUsd({
-            subscription: subscriptionBase,
-            baseAmountUsd,
-            isFirstTimeSubscriberEver,
-          }),
-          nextBillingAt,
-          isFirstTimeSubscriberEver,
-          currentPeriodBaseCreditsUsd: baseAmountUsd,
-          currentPeriodUsageUsd,
-          currentPeriodHostingCostUsd,
-          currentPeriodBonusCreditsUsd: getCurrentKiloPassBonusCreditsUsd({
-            subscription: subscriptionBase,
-            baseAmountUsd,
-            isFirstTimeSubscriberEver,
-          }),
-          isBonusUnlocked,
-          refillAt:
-            subscriptionBase.cadence === KiloPassCadence.Yearly
-              ? (subscriptionBase.nextYearlyIssueAt ?? nextBillingAt)
-              : nextBillingAt,
-        },
+        subscription,
         isEligibleForFirstMonthPromo: false,
       };
     }
@@ -713,30 +739,13 @@ export const kiloPassRouter = createTRPCRouter({
       subscriptionBase.stripeSubscriptionId
     );
 
-    const isFirstTimeSubscriberEver = await getIsFirstTimeSubscriberEver({
-      kiloUserId: ctx.user.id,
-      stripeSubscriptionId: subscriptionBase.stripeSubscriptionId,
-    });
-
     if (isStripeSubscriptionEnded(stripeSubscription.status)) {
-      const baseAmountUsd = getMonthlyPriceUsd(subscriptionBase.tier);
-
       return {
-        subscription: {
-          ...subscriptionBase,
+        subscription: await buildEndedKiloPassSubscriptionState({
+          kiloUserId: ctx.user.id,
+          subscription: subscriptionBase,
           status: stripeSubscription.status,
-          nextBonusCreditsUsd: null,
-          nextBillingAt: null,
-
-          isFirstTimeSubscriberEver,
-
-          currentPeriodBaseCreditsUsd: baseAmountUsd,
-          currentPeriodUsageUsd: 0,
-          currentPeriodHostingCostUsd: 0,
-          currentPeriodBonusCreditsUsd: null,
-          isBonusUnlocked: false,
-          refillAt: null,
-        },
+        }),
         isEligibleForFirstMonthPromo: false,
       };
     }
@@ -764,65 +773,19 @@ export const kiloPassRouter = createTRPCRouter({
     }
 
     const nextBillingAt = secondsToIso(periodEndSeconds);
-
-    const isBonusUnlocked = await getIsBonusUnlockedForSubscriptionId(
-      subscriptionBase.subscriptionId
-    );
-
-    const baseAmountUsd = getMonthlyPriceUsd(subscriptionBase.tier);
-    const nextBonusCreditsUsd = getNextKiloPassBonusCreditsUsd({
-      subscription: subscriptionBase,
-      baseAmountUsd,
-      isFirstTimeSubscriberEver,
-    });
-    const currentPeriodBonusCreditsUsd = getCurrentKiloPassBonusCreditsUsd({
-      subscription: subscriptionBase,
-      baseAmountUsd,
-      isFirstTimeSubscriberEver,
-    });
-
     const nowUtc = dayjs().utc();
     const nowIso = nowUtc.toISOString();
-
-    // Usage window starts from when base credits were actually issued (credit transaction
-    // created_at), not from Stripe's current_period_start. There is a delay between when Stripe
-    // advances the billing period and when the invoice.paid webhook fires to issue credits.
-    // Usage during that gap is served from pre-existing credits, not pass credits.
-    const baseCreditsIssuedAtIso = await getBaseCreditsIssuedAtForSubscription(
-      subscriptionBase.subscriptionId
-    );
-    const usageStartInclusiveIso = getUsageStartInclusiveIso({
+    const subscription = await buildActiveKiloPassSubscriptionState({
+      kiloUserId: ctx.user.id,
       subscription: subscriptionBase,
-      baseCreditsIssuedAtIso,
       periodStartIso: secondsToIso(periodStartSeconds),
+      spendEndExclusiveIso: nowIso,
+      nextBillingAt,
       nowUtc,
     });
-    const { currentPeriodUsageUsd, currentPeriodHostingCostUsd } = await getCurrentPeriodSpendUsd({
-      kiloUserId: ctx.user.id,
-      startInclusiveIso: usageStartInclusiveIso,
-      endExclusiveIso: nowIso,
-    });
-
-    const refillAt =
-      subscriptionBase.cadence === KiloPassCadence.Yearly
-        ? (subscriptionBase.nextYearlyIssueAt ?? nextBillingAt)
-        : nextBillingAt;
 
     return {
-      subscription: {
-        ...subscriptionBase,
-        nextBonusCreditsUsd,
-        nextBillingAt,
-
-        isFirstTimeSubscriberEver,
-
-        currentPeriodBaseCreditsUsd: baseAmountUsd,
-        currentPeriodUsageUsd,
-        currentPeriodHostingCostUsd,
-        currentPeriodBonusCreditsUsd,
-        isBonusUnlocked,
-        refillAt,
-      },
+      subscription,
       isEligibleForFirstMonthPromo: false,
     };
   }),

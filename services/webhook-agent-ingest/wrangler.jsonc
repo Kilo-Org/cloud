@@ -40,6 +40,11 @@
       "binding": "CLOUD_AGENT",
       "service": "cloud-agent-next",
     },
+    {
+      "binding": "KILO_CHAT",
+      "service": "kilo-chat",
+      "entrypoint": "KiloChatService",
+    },
   ],
   // PRODUCTION Queue for webhook delivery
   "queues": {
@@ -132,6 +137,12 @@
         {
           "binding": "CLOUD_AGENT",
           "service": "cloud-agent-next-dev",
+        },
+        {
+          // kilo-chat has no separate dev deployment; kiloclaw does the same.
+          "binding": "KILO_CHAT",
+          "service": "kilo-chat",
+          "entrypoint": "KiloChatService",
         },
       ],
       // DEV Queue (separate from production)

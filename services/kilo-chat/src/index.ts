@@ -5,7 +5,7 @@ import { withDORetry } from '@kilocode/worker-utils';
 import { cors } from 'hono/cors';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
-import { logger } from './util/logger';
+import { logger, withLogTags } from './util/logger';
 import { formatError } from '@kilocode/worker-utils';
 import { authMiddleware } from './auth';
 import { botAuthMiddleware } from './auth-bot';
@@ -25,6 +25,11 @@ import {
 } from './routes/handler';
 import { registerBotRoutes } from './routes/bot-messages';
 import { registerSandboxReadRoutes } from './routes/sandbox-reads';
+import {
+  postMessageAsUser,
+  type PostMessageAsUserParams,
+  type PostMessageAsUserResult,
+} from './services/post-message-as-user';
 export { MembershipDO } from './do/membership-do';
 export { ConversationDO } from './do/conversation-do';
 export { SandboxStatusDO } from './do/sandbox-status-do';
@@ -99,7 +104,33 @@ export class KiloChatService extends WorkerEntrypoint<Env> {
     return app.fetch(request, this.env, this.ctx);
   }
 
+  /**
+   * Internal RPC: post a message into the user-bot conversation on behalf
+   * of the user. Used by webhook-agent-ingest for webhook-to-chat delivery
+   * and reusable for other internal flows (e.g. onboarding warmup).
+   *
+   * Auto-creates the conversation by default if the user has never opened
+   * one. Pass `autoCreateConversation: false` to fail when none exists.
+   */
+  async postMessageAsUser(params: PostMessageAsUserParams): Promise<PostMessageAsUserResult> {
+    // Wrap in withLogTags so logger.setTags inside the helper actually
+    // propagates. Without an active context (HTTP middleware or wrap),
+    // setTags is a silent no-op for AsyncLocalStorage-backed loggers.
+    return await withLogTags({ source: 'kilo-chat-rpc:postMessageAsUser' }, () =>
+      postMessageAsUser(this.env, { waitUntil: p => this.ctx.waitUntil(p) }, params)
+    );
+  }
+
   async destroySandboxData(
+    sandboxId: string
+  ): Promise<{ ok: boolean; conversationsDeleted: number; failedConversations: string[] }> {
+    return await withLogTags({ source: 'kilo-chat-rpc:destroySandboxData' }, () => {
+      logger.setTags({ sandboxId });
+      return this.destroySandboxDataImpl(sandboxId);
+    });
+  }
+
+  private async destroySandboxDataImpl(
     sandboxId: string
   ): Promise<{ ok: boolean; conversationsDeleted: number; failedConversations: string[] }> {
     const botId = `bot:kiloclaw:${sandboxId}`;

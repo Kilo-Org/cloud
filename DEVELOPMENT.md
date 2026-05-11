@@ -84,6 +84,8 @@ pnpm add -g vercel
 
 ### Stripe CLI (optional, for payment testing)
 
+Install it to enable local Stripe webhook forwarding. `pnpm dev:start` skips the Stripe forwarder when the CLI is not installed.
+
 ```bash
 brew install stripe/stripe-cli/stripe
 ```
@@ -182,7 +184,7 @@ pnpm drizzle:verify-bootstrap
 pnpm dev:start
 ```
 
-This launches a tmux dashboard with the Next.js app and related services. The web app will be available at http://localhost:3000.
+This launches a tmux dashboard with the Next.js app and local infrastructure. When the Stripe CLI is installed, it also starts the Stripe webhook forwarder. The web app will be available at http://localhost:3000.
 
 To stop all services:
 
@@ -229,13 +231,11 @@ All tests should pass against the local PostgreSQL database.
 
 To test Stripe integration locally:
 
-1. Log in to Stripe CLI: `stripe login`
-2. Start the webhook forwarder: `pnpm stripe`
-3. Copy the webhook signing secret from the CLI output
-4. Add it to `.env.development.local`:
-   ```
-   STRIPE_WEBHOOK_SECRET="whsec_..."
-   ```
+1. Install and log in to Stripe CLI: `stripe login`
+2. Start local development: `pnpm dev:start`
+3. The dev launcher starts the webhook forwarder and writes `STRIPE_WEBHOOK_SECRET` to `apps/web/.env.development.local`.
+
+If the Stripe CLI is not installed, `pnpm dev:start` skips webhook forwarding. To run only the webhook forwarder manually, use `pnpm --filter web stripe`.
 
 ## Database Schema Changes
 

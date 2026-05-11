@@ -74,6 +74,14 @@ export type ClawOnboardingFlowStateInput = {
   hasBotIdentity: boolean;
   selectedChannelId: string | null;
   gatewayState?: GatewayProcessStatusResponse['state'] | null;
+  /**
+   * Whether the calendar step is available in the wizard. Calendar OAuth is
+   * gated to Kilo Code admins (the `/api/integrations/google/connect` and
+   * `/disconnect` routes both require `adminOnly: true`), so non-admins skip
+   * the step entirely. When false, the wizard advances identity → channels
+   * and `'calendar'` is mapped to `'channels'` in the render decision.
+   */
+  hasCalendarStep?: boolean;
   debugLogSource?: string;
 };
 
@@ -85,6 +93,7 @@ export type ClawOnboardingFlowState = {
   instanceRunning: boolean;
   createSetupActive: boolean;
   postProvisioningReady: boolean;
+  hasCalendarStep: boolean;
   hasPairingStep: boolean;
   currentStep: number;
   totalSteps: number;
@@ -107,18 +116,31 @@ export function isClawOnboardingErrorStatus(status: PopulatedClawStatus['status'
   return false;
 }
 
+function getActiveWizardSteps(hasPairingStep: boolean, hasCalendarStep: boolean): OnboardingStep[] {
+  const steps: OnboardingStep[] = ['identity'];
+  if (hasCalendarStep) steps.push('calendar');
+  steps.push('channels', 'provisioning');
+  if (hasPairingStep) steps.push('pairing');
+  return steps;
+}
+
 export function getClawOnboardingStepProgress(
   step: OnboardingStep,
-  hasPairingStep: boolean
+  hasPairingStep: boolean,
+  hasCalendarStep: boolean = true
 ): { currentStep: number; totalSteps: number } {
-  const wizardSteps: readonly OnboardingStep[] = CLAW_ONBOARDING_WIZARD_STEPS;
-  const totalSteps = hasPairingStep ? wizardSteps.length : wizardSteps.length - 1;
+  const wizardSteps = getActiveWizardSteps(hasPairingStep, hasCalendarStep);
+  const totalSteps = wizardSteps.length;
 
   if (step === 'done') {
     return { currentStep: totalSteps, totalSteps };
   }
 
-  const index = wizardSteps.indexOf(step);
+  // A non-admin sitting briefly on `onboardingStep === 'calendar'` (e.g. via
+  // a stale `?step=calendar` URL) gets normalized to channels for progress
+  // display, matching the renderStep redirect in getRenderStepDecision.
+  const lookupStep: OnboardingStep = step === 'calendar' && !hasCalendarStep ? 'channels' : step;
+  const index = wizardSteps.indexOf(lookupStep);
   const currentStep = index === -1 ? 0 : index + 1;
 
   return { currentStep, totalSteps };
@@ -133,6 +155,7 @@ export function getClawOnboardingFlowState({
   hasBotIdentity,
   selectedChannelId,
   gatewayState,
+  hasCalendarStep = true,
   debugLogSource = 'default',
 }: ClawOnboardingFlowStateInput): ClawOnboardingFlowState {
   const instanceStatus = hasPopulatedStatus(status) ? status : null;
@@ -143,7 +166,11 @@ export function getClawOnboardingFlowState({
   const createSetupActive =
     mode === 'create-first' && (createSetupStarted || instanceStatus !== null);
   const hasPairingStep = isPairingChannel(selectedChannelId);
-  const { currentStep, totalSteps } = getClawOnboardingStepProgress(onboardingStep, hasPairingStep);
+  const { currentStep, totalSteps } = getClawOnboardingStepProgress(
+    onboardingStep,
+    hasPairingStep,
+    hasCalendarStep
+  );
   const renderStepDecision = getRenderStepDecision({
     mode,
     createSetupStarted,
@@ -152,6 +179,7 @@ export function getClawOnboardingFlowState({
     postProvisioningReady,
     onboardingStep,
     hasBotIdentity,
+    hasCalendarStep,
     hasPairingStep,
   });
   const flowState = {
@@ -162,6 +190,7 @@ export function getClawOnboardingFlowState({
     instanceRunning,
     createSetupActive,
     postProvisioningReady,
+    hasCalendarStep,
     hasPairingStep,
     currentStep,
     totalSteps,
@@ -176,6 +205,7 @@ export function getClawOnboardingFlowState({
     hasBotIdentity,
     selectedChannelId,
     gatewayState,
+    hasCalendarStep,
     debugLogSource,
     instanceStatus,
     isRunning,
@@ -198,6 +228,7 @@ type RenderStepInput = Pick<
 > & {
   instanceStatus: PopulatedClawStatus | null;
   postProvisioningReady: boolean;
+  hasCalendarStep: boolean;
   hasPairingStep: boolean;
 };
 
@@ -208,6 +239,7 @@ type RenderStepDecision = {
 
 type ClawOnboardingFlowDebugLogInput = ClawOnboardingFlowStateInput & {
   debugLogSource: string;
+  hasCalendarStep: boolean;
   instanceStatus: PopulatedClawStatus | null;
   isRunning: boolean;
   gatewayReady: boolean;
@@ -237,6 +269,7 @@ function getRenderStepDecision({
   postProvisioningReady,
   onboardingStep,
   hasBotIdentity,
+  hasCalendarStep,
   hasPairingStep,
 }: RenderStepInput): RenderStepDecision {
   if (instanceStatus && isClawOnboardingErrorStatus(instanceStatus.status)) {
@@ -262,6 +295,13 @@ function getRenderStepDecision({
     // through to the default post-prov branch and skip channels, pairing,
     // and the provisioning UX entirely.
     if (onboardingStep === 'calendar') {
+      if (!hasCalendarStep) {
+        return {
+          renderStep: 'channels',
+          reason:
+            'calendar step is admin-only and the current user is not an admin; advance to channels',
+        };
+      }
       return {
         renderStep: 'calendar',
         reason: 'calendar resume requested; honor it even in post-provisioning mode',
@@ -321,6 +361,13 @@ function getRenderStepDecision({
   }
 
   if (onboardingStep === 'calendar') {
+    if (!hasCalendarStep) {
+      return {
+        renderStep: 'channels',
+        reason:
+          'calendar step is admin-only and the current user is not an admin; advance to channels',
+      };
+    }
     return {
       renderStep: 'calendar',
       reason: 'stored onboarding step is calendar',
@@ -363,6 +410,7 @@ function logClawOnboardingFlowStateDecision({
   hasBotIdentity,
   selectedChannelId,
   gatewayState,
+  hasCalendarStep,
   debugLogSource,
   instanceStatus,
   isRunning,
@@ -386,6 +434,7 @@ function logClawOnboardingFlowStateDecision({
       hasBotIdentity,
       selectedChannelId,
       gatewayState: gatewayState ?? null,
+      hasCalendarStep,
       status: status?.status ?? null,
       hasStatusResponse: status !== undefined,
     },

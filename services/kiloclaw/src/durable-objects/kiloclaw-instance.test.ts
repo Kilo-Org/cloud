@@ -2386,7 +2386,7 @@ describe('createNewMachine: persist ID before waitForState', () => {
 });
 
 describe('gateway process control via controller', () => {
-  it('allows gateway status calls when machine ID exists even if DO status is stale', async () => {
+  it('rejects gateway status calls when DO status is stopped even if machine ID exists', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
       status: 'stopped',
@@ -2394,22 +2394,18 @@ describe('gateway process control via controller', () => {
       flyAppName: 'acct-test',
     });
 
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          state: 'running',
-          pid: 123,
-          uptime: 42,
-          restarts: 1,
-          lastExit: null,
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
-    const status = await instance.getGatewayProcessStatus();
-    expect(status.state).toBe('running');
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    await expect(instance.getGatewayProcessStatus()).rejects.toSatisfy((err: unknown) => {
+      if (typeof err !== 'object' || err === null) return false;
+      return (
+        'status' in err &&
+        (err as { status: number }).status === 409 &&
+        'message' in err &&
+        (err as { message: string }).message.includes('Instance is not running')
+      );
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
 

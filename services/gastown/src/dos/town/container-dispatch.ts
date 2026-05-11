@@ -669,7 +669,7 @@ export async function checkAgentContainerStatus(
   env: Env,
   townId: string,
   agentId: string
-): Promise<{ status: string; exitReason?: string }> {
+): Promise<{ status: string; exitReason?: string; serverPort?: number; sessionId?: string }> {
   try {
     const container = getTownContainerStub(env, townId);
     const response = await container.fetch(`http://container/agents/${agentId}/status`, {
@@ -689,9 +689,15 @@ export async function checkAgentContainerStatus(
       const status = (data as { status: unknown }).status;
       const exitReason =
         'exitReason' in data ? (data as { exitReason: unknown }).exitReason : undefined;
+      const serverPort =
+        'serverPort' in data ? (data as { serverPort: unknown }).serverPort : undefined;
+      const sessionId =
+        'sessionId' in data ? (data as { sessionId: unknown }).sessionId : undefined;
       return {
         status: typeof status === 'string' ? status : 'unknown',
         exitReason: typeof exitReason === 'string' ? exitReason : undefined,
+        serverPort: typeof serverPort === 'number' ? serverPort : undefined,
+        sessionId: typeof sessionId === 'string' && sessionId.length > 0 ? sessionId : undefined,
       };
     }
     return { status: 'unknown' };

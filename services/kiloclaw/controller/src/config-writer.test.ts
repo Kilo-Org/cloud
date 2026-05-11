@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   backupConfigFile,
+  ensureInboundEmailHookFlags,
   generateBaseConfig,
   setNestedValue,
   writeBaseConfig,
@@ -974,6 +975,7 @@ describe('generateBaseConfig', () => {
     expect(config.hooks.enabled).toBe(true);
     expect(config.hooks.token).toBe('test-hooks-token');
     expect(config.hooks.path).toBe('/hooks');
+    expect(config.hooks.allowRequestSessionKey).toBe(true);
     expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'inbound-email:']);
     expect(config.hooks.presets).toBeUndefined();
     expect(config.hooks.mappings).toContainEqual({
@@ -1286,6 +1288,39 @@ describe('generateBaseConfig', () => {
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
     expect(config.plugins.entries['memory-core'].config.dreaming).toBeUndefined();
     expect(config.plugins.entries['memory-core'].config.extra).toBe('keep-me');
+  });
+});
+
+describe('ensureInboundEmailHookFlags', () => {
+  it('sets allowRequestSessionKey on a hooks object that lacks it', () => {
+    const config = { hooks: { enabled: true, token: 'tok' } };
+    ensureInboundEmailHookFlags(config);
+    expect(config.hooks).toMatchObject({
+      enabled: true,
+      token: 'tok',
+      allowRequestSessionKey: true,
+    });
+  });
+
+  it('is a no-op when hooks block is absent (instance has no inbound hooks)', () => {
+    const config: Record<string, unknown> = { gateway: {} };
+    ensureInboundEmailHookFlags(config);
+    expect(config.hooks).toBeUndefined();
+  });
+
+  it('is idempotent when allowRequestSessionKey is already true', () => {
+    const config = { hooks: { allowRequestSessionKey: true } };
+    ensureInboundEmailHookFlags(config);
+    expect(config.hooks.allowRequestSessionKey).toBe(true);
+  });
+
+  it('overrides allowRequestSessionKey: false back to true', () => {
+    // Canonical-config policy: the inbound-email mapping is force-installed
+    // on every run, so the flag it requires must converge to true alongside
+    // it. An explicit `false` is treated as drift, not as admin intent.
+    const config = { hooks: { allowRequestSessionKey: false } };
+    ensureInboundEmailHookFlags(config);
+    expect(config.hooks.allowRequestSessionKey).toBe(true);
   });
 });
 

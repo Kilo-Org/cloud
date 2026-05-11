@@ -16,6 +16,7 @@ declare namespace Cloudflare {
     INTERNAL_API_SECRET: SecretsStoreSecret;
     NEXTAUTH_SECRET: SecretsStoreSecret;
     CLOUD_AGENT: Fetcher /* cloud-agent */;
+    KILO_CHAT: Service /* entrypoint KiloChatService from kilo-chat */;
     WEBHOOK_DELIVERY_QUEUE: Queue;
     HYPERDRIVE: Hyperdrive;
     CF_VERSION_METADATA: WorkerVersionMetadata;

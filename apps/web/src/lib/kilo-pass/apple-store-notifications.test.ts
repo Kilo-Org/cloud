@@ -318,7 +318,7 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(appStoreSubscription?.ended_at).not.toBeNull();
   });
 
-  it('marks auto-renew-disabled notifications as canceling at period end', async () => {
+  it('marks auto-renew-disabled notifications as canceling at period end and enabled as resumed', async () => {
     const user = await insertTestUser();
     const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
     await processAppStoreKiloPassNotification({
@@ -352,6 +352,27 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(subscription?.status).toBe('active');
     expect(subscription?.cancel_at_period_end).toBe(true);
     expect(subscription?.ended_at).toBeNull();
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'auto-renew-enabled',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'auto-renew-enabled',
+          notificationType: NotificationTypeV2.DID_CHANGE_RENEWAL_STATUS,
+          subtype: Subtype.AUTO_RENEW_ENABLED,
+        }),
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    const resumedSubscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(
+        kilo_pass_subscriptions.provider_subscription_id,
+        decodedTransaction.originalTransactionId
+      ),
+    });
+    expect(resumedSubscription?.status).toBe('active');
+    expect(resumedSubscription?.cancel_at_period_end).toBe(false);
+    expect(resumedSubscription?.ended_at).toBeNull();
   });
 
   it('only marks App Store rows canceling at period end', async () => {

@@ -33,13 +33,10 @@ describe('getKiloPassSubscriptionCardState', () => {
     });
   });
 
-  it('keeps unsubscribed users on the App Store purchase path without ownership preflight state', () => {
-    expect(getKiloPassSubscriptionCardState(undefined)).toEqual({
-      action: 'open-store-sheet',
-      actionLabel: 'Subscribe',
-      description: 'Monthly credits with bonus progress',
-      title: 'Kilo Pass',
-    });
+  it('rejects unresolved subscription data instead of treating it as unsubscribed', () => {
+    expect(() => getKiloPassSubscriptionCardState(undefined)).toThrow(
+      'Kilo Pass subscription card state requires resolved subscription data.'
+    );
   });
 
   it('sends App Store-managed Kilo Pass users to App Store management', () => {

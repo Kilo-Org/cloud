@@ -15,6 +15,21 @@ type KiloPassSubscriptionCardState = {
   title: string;
 };
 
+type KiloPassSubscriptionCardContentState =
+  | {
+      kind: 'card';
+      state: KiloPassSubscriptionCardState;
+    }
+  | {
+      actionLabel: 'Retry';
+      description: string;
+      kind: 'error';
+      title: string;
+    }
+  | {
+      kind: 'hidden' | 'loading';
+    };
+
 type KiloPassSubscriptionCardAccessibility = {
   accessibilityHint: string | undefined;
   accessibilityLabel: string;
@@ -49,6 +64,38 @@ export function shouldRenderKiloPassSubscriptionCard(params: {
   );
 }
 
+export function getKiloPassSubscriptionCardContentState(params: {
+  data: { subscription: KiloPassSubscriptionCardSubscription | null } | undefined;
+  isError: boolean;
+  isPending: boolean;
+  platformOS: string;
+}): KiloPassSubscriptionCardContentState {
+  if (!params.data) {
+    if (params.isError) {
+      return {
+        actionLabel: 'Retry',
+        description: 'Try again from Profile.',
+        kind: 'error',
+        title: 'Kilo Pass unavailable',
+      };
+    }
+
+    return { kind: 'loading' };
+  }
+
+  const state = getKiloPassSubscriptionCardState(params.data.subscription);
+  if (
+    !shouldRenderKiloPassSubscriptionCard({
+      action: state.action,
+      platformOS: params.platformOS,
+    })
+  ) {
+    return { kind: 'hidden' };
+  }
+
+  return { kind: 'card', state };
+}
+
 function formatSubscriptionEndDate(iso: string | null): string {
   if (!iso) {
     return 'period end';
@@ -73,7 +120,11 @@ function isEndedSubscriptionStatus(status: string): boolean {
 export function getKiloPassSubscriptionCardState(
   subscription: KiloPassSubscriptionCardSubscription | null | undefined
 ): KiloPassSubscriptionCardState {
-  if (!subscription || isEndedSubscriptionStatus(subscription.status)) {
+  if (subscription === undefined) {
+    throw new Error('Kilo Pass subscription card state requires resolved subscription data.');
+  }
+
+  if (subscription === null || isEndedSubscriptionStatus(subscription.status)) {
     return {
       action: 'open-store-sheet',
       actionLabel: 'Subscribe',

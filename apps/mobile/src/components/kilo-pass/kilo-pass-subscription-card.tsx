@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { Text } from '@/components/ui/text';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useTRPC } from '@/lib/trpc';
@@ -16,8 +17,7 @@ import {
 } from '@/lib/kilo-pass/dev-storekit-refund';
 import {
   getKiloPassSubscriptionCardAccessibility,
-  getKiloPassSubscriptionCardState,
-  shouldRenderKiloPassSubscriptionCard,
+  getKiloPassSubscriptionCardContentState,
 } from '@/lib/kilo-pass/subscription-card-state';
 
 const KILO_PASS_MANAGE_URL = `${WEB_BASE_URL}/subscriptions/kilo-pass`;
@@ -35,16 +35,15 @@ export function KiloPassSubscriptionCard() {
     enabled: Platform.OS === 'ios' && __DEV__,
   });
   const subscription = stateQuery.data?.subscription;
-  const cardState = getKiloPassSubscriptionCardState(subscription);
-  if (
-    !shouldRenderKiloPassSubscriptionCard({
-      action: cardState.action,
-      platformOS: Platform.OS,
-    })
-  ) {
+  const contentState = getKiloPassSubscriptionCardContentState({
+    data: stateQuery.data,
+    isError: stateQuery.isError,
+    isPending: stateQuery.isPending,
+    platformOS: Platform.OS,
+  });
+  if (contentState.kind === 'hidden') {
     return null;
   }
-  const cardAccessibility = getKiloPassSubscriptionCardAccessibility(cardState);
 
   const devRefundAppleProductId = getDevStoreKitRefundAppleProductId({
     products: mobileStoreProductsQuery.data?.products ?? [],
@@ -72,6 +71,11 @@ export function KiloPassSubscriptionCard() {
     }
   };
   const handlePress = () => {
+    if (contentState.kind !== 'card') {
+      return;
+    }
+
+    const cardState = contentState.state;
     if (cardState.action === 'none') {
       return;
     }
@@ -89,6 +93,10 @@ export function KiloPassSubscriptionCard() {
       return;
     }
     router.push('/(app)/kilo-pass' as Href);
+  };
+  const handleRetryPress = () => {
+    void Haptics.selectionAsync();
+    void stateQuery.refetch();
   };
   const handleDevRefundPress = () => {
     if (!devRefundAppleProductId) {
@@ -111,22 +119,67 @@ export function KiloPassSubscriptionCard() {
 
   return (
     <View className="gap-2">
-      {cardState.action === 'none' ? (
+      {contentState.kind === 'loading' ? (
+        <View
+          accessibilityLabel="Kilo Pass subscription loading"
+          accessibilityState={{ busy: true }}
+          className="rounded-lg border border-border bg-card p-3"
+        >
+          <View className="flex-row items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-md" />
+            <View className="flex-1 gap-1.5">
+              <Skeleton className="h-4 w-28 rounded" />
+              <Skeleton className="h-3 w-48 rounded" />
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {contentState.kind === 'error' ? (
+        <Pressable
+          accessibilityHint="Retries Kilo Pass state."
+          accessibilityLabel={`${contentState.title}. ${contentState.description}. ${contentState.actionLabel}`}
+          accessibilityRole="button"
+          className="rounded-lg border border-border bg-card p-3 active:opacity-80"
+          onPress={handleRetryPress}
+        >
+          <View className="flex-row items-center gap-3">
+            <View className="h-10 w-10 items-center justify-center rounded-md bg-secondary">
+              <ShieldCheck size={19} color={colors.primary} />
+            </View>
+            <View className="flex-1">
+              <Text className="font-semibold">{contentState.title}</Text>
+              <Text className="text-xs text-muted-foreground">{contentState.description}</Text>
+            </View>
+            <Text className="text-xs font-medium text-primary">{contentState.actionLabel}</Text>
+          </View>
+        </Pressable>
+      ) : null}
+
+      {contentState.kind === 'card' && contentState.state.action === 'none' ? (
         <View className="rounded-lg border border-border bg-card p-3">
           <View className="flex-row items-center gap-3">
             <View className="h-10 w-10 items-center justify-center rounded-md bg-secondary">
               <ShieldCheck size={19} color={colors.primary} />
             </View>
             <View className="flex-1">
-              <Text className="font-semibold">{cardState.title}</Text>
-              <Text className="text-xs text-muted-foreground">{cardState.description}</Text>
+              <Text className="font-semibold">{contentState.state.title}</Text>
+              <Text className="text-xs text-muted-foreground">
+                {contentState.state.description}
+              </Text>
             </View>
           </View>
         </View>
-      ) : (
+      ) : null}
+
+      {contentState.kind === 'card' && contentState.state.action !== 'none' ? (
         <Pressable
-          accessibilityHint={cardAccessibility.accessibilityHint}
-          accessibilityLabel={cardAccessibility.accessibilityLabel}
+          accessibilityHint={
+            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityHint
+          }
+          accessibilityLabel={
+            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityLabel
+          }
           accessibilityRole="button"
           className="rounded-lg border border-border bg-card p-3 active:opacity-80"
           onPress={handlePress}
@@ -136,15 +189,19 @@ export function KiloPassSubscriptionCard() {
               <ShieldCheck size={19} color={colors.primary} />
             </View>
             <View className="flex-1">
-              <Text className="font-semibold">{cardState.title}</Text>
-              <Text className="text-xs text-muted-foreground">{cardState.description}</Text>
+              <Text className="font-semibold">{contentState.state.title}</Text>
+              <Text className="text-xs text-muted-foreground">
+                {contentState.state.description}
+              </Text>
             </View>
-            {cardState.actionLabel ? (
-              <Text className="text-xs font-medium text-primary">{cardState.actionLabel}</Text>
+            {contentState.state.actionLabel ? (
+              <Text className="text-xs font-medium text-primary">
+                {contentState.state.actionLabel}
+              </Text>
             ) : null}
           </View>
         </Pressable>
-      )}
+      ) : null}
 
       {devRefundAppleProductId ? (
         <Pressable

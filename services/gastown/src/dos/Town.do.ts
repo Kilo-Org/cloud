@@ -2697,22 +2697,25 @@ export class TownDO extends DurableObject<Env> {
    * use — so the prewarm cache hit is real instead of triggering the
    * "config mismatch, evicting prewarmed server" eviction path.
    *
-   * Returns null when there's no mayor yet, or when the kilocode token
-   * isn't available (in which case prewarm should skip — the next
-   * /agents/start will defer too).
+   * Returns null only when there's no mayor at all. When the mayor
+   * exists but the kilocode token isn't available, returns a partial
+   * shape with just { agentId } so callers can derive the fallback
+   * agentId without a second RPC hop.
    */
   async getMayorPrewarmContext(): Promise<{
     agentId: string;
-    model: string;
-    smallModel: string;
-    kilocodeToken: string;
-    organizationId: string | null;
+    model?: string;
+    smallModel?: string;
+    kilocodeToken?: string;
+    organizationId?: string | null;
   } | null> {
     const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
     if (!mayor) return null;
 
     const kilocodeToken = await this.resolveKilocodeToken();
-    if (!kilocodeToken) return null;
+    if (!kilocodeToken) {
+      return { agentId: mayor.id };
+    }
 
     const townConfig = await this.getTownConfig();
     // _ensureMayor dispatches the mayor without a per-rig override

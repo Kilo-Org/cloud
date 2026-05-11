@@ -752,11 +752,10 @@ app.get('/api/towns/:townId/mayor-id', async c => {
   // - When there is no mayor at all, return { agentId: null } — the
   //   container treats missing/null agentId as "no mayor, skip prewarm".
   const ctx = await town.getMayorPrewarmContext();
-  if (ctx) {
-    return c.json({ success: true, ...ctx });
+  if (!ctx) {
+    return c.json({ success: true, agentId: null });
   }
-  const agentId = await town.getMayorAgentId();
-  return c.json({ success: true, agentId });
+  return c.json({ success: true, ...ctx });
 });
 
 // ── Container Events ─────────────────────────────────────────────────────

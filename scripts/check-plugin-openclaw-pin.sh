@@ -13,9 +13,9 @@ if [ ! -f "$DOCKERFILE" ] || [ ! -f "$PLUGIN_PKG" ]; then
   exit 1
 fi
 
-DOCKERFILE_VERSION=$(grep -Eo 'npm install -g openclaw@[0-9][^[:space:]]*' "$DOCKERFILE" \
+DOCKERFILE_VERSION=$(grep -Eo 'openclaw@[0-9][^[:space:]]*' "$DOCKERFILE" \
   | head -n1 \
-  | sed -E 's/.*openclaw@//')
+  | sed -E 's/openclaw@//')
 
 if [ -z "$DOCKERFILE_VERSION" ]; then
   echo "check-plugin-openclaw-pin: could not parse openclaw@VERSION from $DOCKERFILE" >&2

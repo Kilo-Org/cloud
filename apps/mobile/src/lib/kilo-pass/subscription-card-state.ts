@@ -15,6 +15,10 @@ type KiloPassSubscriptionCardState = {
   title: string;
 };
 
+type KiloPassSubscriptionCardStateOptions = {
+  platformOS?: string;
+};
+
 type KiloPassSubscriptionCardContentState =
   | {
       kind: 'card';
@@ -83,7 +87,9 @@ export function getKiloPassSubscriptionCardContentState(params: {
     return { kind: 'loading' };
   }
 
-  const state = getKiloPassSubscriptionCardState(params.data.subscription);
+  const state = getKiloPassSubscriptionCardState(params.data.subscription, {
+    platformOS: params.platformOS,
+  });
   if (
     !shouldRenderKiloPassSubscriptionCard({
       action: state.action,
@@ -117,8 +123,37 @@ function isEndedSubscriptionStatus(status: string): boolean {
   return status === 'canceled' || status === 'incomplete_expired';
 }
 
+function getAppStoreSubscriptionCardState(params: {
+  cancelAtPeriodEnd: boolean;
+  credits: string;
+  platformOS: string | undefined;
+  refillAt: string | null;
+}): KiloPassSubscriptionCardState {
+  const title = params.cancelAtPeriodEnd ? 'Kilo Pass canceling' : 'Kilo Pass active';
+  if (params.platformOS === 'android') {
+    return {
+      action: 'none',
+      actionLabel: null,
+      description: params.cancelAtPeriodEnd
+        ? `${params.credits} · Ends ${formatSubscriptionEndDate(params.refillAt)} · Managed in App Store`
+        : `${params.credits} · Managed in App Store`,
+      title,
+    };
+  }
+
+  return {
+    action: 'open-store-management',
+    actionLabel: 'Manage',
+    description: params.cancelAtPeriodEnd
+      ? `${params.credits} · Ends ${formatSubscriptionEndDate(params.refillAt)}`
+      : `${params.credits} · Managed in App Store`,
+    title,
+  };
+}
+
 export function getKiloPassSubscriptionCardState(
-  subscription: KiloPassSubscriptionCardSubscription | null | undefined
+  subscription: KiloPassSubscriptionCardSubscription | null | undefined,
+  options: KiloPassSubscriptionCardStateOptions = {}
 ): KiloPassSubscriptionCardState {
   if (subscription === undefined) {
     throw new Error('Kilo Pass subscription card state requires resolved subscription data.');
@@ -145,22 +180,21 @@ export function getKiloPassSubscriptionCardState(
     };
   }
 
+  if (subscription.paymentProvider === 'app_store') {
+    return getAppStoreSubscriptionCardState({
+      cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+      credits,
+      platformOS: options.platformOS,
+      refillAt: subscription.refillAt,
+    });
+  }
+
   if (subscription.cancelAtPeriodEnd) {
     return {
-      action:
-        subscription.paymentProvider === 'stripe' ? 'open-web-management' : 'open-store-management',
+      action: 'open-web-management',
       actionLabel: 'Manage',
       description: `${credits} · Ends ${formatSubscriptionEndDate(subscription.refillAt)}`,
       title: 'Kilo Pass canceling',
-    };
-  }
-
-  if (subscription.paymentProvider === 'app_store') {
-    return {
-      action: 'open-store-management',
-      actionLabel: 'Manage',
-      description: `${credits} · Managed in App Store`,
-      title: 'Kilo Pass active',
     };
   }
 

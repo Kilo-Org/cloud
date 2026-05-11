@@ -134,4 +134,47 @@ describe('getKiloPassSubscriptionCardContentState', () => {
       },
     });
   });
+
+  it('renders active App Store subscriptions as inert status cards on Android', () => {
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        data: { subscription: activeAppStoreSubscription },
+        isError: false,
+        isPending: false,
+        platformOS: 'android',
+      })
+    ).toEqual({
+      kind: 'card',
+      state: {
+        action: 'none',
+        actionLabel: null,
+        description: '$19 monthly credits · Managed in App Store',
+        title: 'Kilo Pass active',
+      },
+    });
+  });
+
+  it('renders canceling App Store subscriptions as inert status cards on Android', () => {
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        data: {
+          subscription: {
+            ...activeAppStoreSubscription,
+            cancelAtPeriodEnd: true,
+          },
+        },
+        isError: false,
+        isPending: false,
+        platformOS: 'android',
+      })
+    ).toEqual({
+      kind: 'card',
+      state: {
+        action: 'none',
+        actionLabel: null,
+        description: '$19 monthly credits · Ends June 8, 2026 · Managed in App Store',
+        title: 'Kilo Pass canceling',
+      },
+    });
+  });
 });

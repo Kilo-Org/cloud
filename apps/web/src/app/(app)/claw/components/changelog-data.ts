@@ -13,7 +13,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: '2026-05-11',
     description:
-      'Optimized the Docker image build by consolidating npm install steps and cleaning npm and bun package caches. This reduces the final image size and lowers disk usage on your instance.',
+      'Optimized the Docker image build cleaning npm and bun package caches to help reduce disk usage.',
     category: 'feature',
     deployHint: 'redeploy_suggested',
   },

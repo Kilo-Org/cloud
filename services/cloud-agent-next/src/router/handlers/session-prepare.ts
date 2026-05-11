@@ -41,7 +41,6 @@ import {
   setupWorkspace,
 } from '../../workspace.js';
 import { WrapperClient } from '../../kilo/wrapper-client.js';
-import { withDORetry } from '../../utils/do-retry.js';
 import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
 import { SANDBOX_SLEEP_AFTER_SECONDS } from '../../core/lease.js';
 import {
@@ -700,20 +699,6 @@ const prepareSessionHandler = internalApiProtectedProcedure
           code: 'BAD_REQUEST',
           message: prepareResult.error ?? 'Failed to prepare session',
         });
-      }
-
-      // 15. Record kilo server activity for idle timeout tracking
-      try {
-        await withDORetry(
-          () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
-          s => s.recordKiloServerActivity(),
-          'recordKiloServerActivity'
-        );
-      } catch (error) {
-        // Non-fatal - log but continue
-        logger
-          .withFields({ error: error instanceof Error ? error.message : String(error) })
-          .warn('Failed to record kilo server activity');
       }
 
       logger.info('Session prepared successfully');

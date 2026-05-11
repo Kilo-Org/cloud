@@ -779,26 +779,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     await this.updateMetadata(updated);
   }
 
-  /**
-   * Record kilo server activity for idle timeout tracking.
-   * Called by the queue consumer after each successful execution.
-   * Resets the idle timeout clock.
-   */
-  async recordKiloServerActivity(): Promise<void> {
-    const metadata = await this.getMetadata();
-    if (!metadata) {
-      throw new Error('Cannot record kilo server activity: session metadata not found');
-    }
-
-    const updated = {
-      ...metadata,
-      kiloServerLastActivity: Date.now(),
-      version: Date.now(),
-    };
-
-    await this.updateMetadata(updated);
-  }
-
   // ---------------------------------------------------------------------------
   // Wrapper Communication Methods
   // ---------------------------------------------------------------------------
@@ -1161,8 +1141,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         await cleanupCliSession();
         return;
       }
-
-      await this.recordKiloServerActivity();
 
       // 11. Auto-initiate if requested, then emit ready only on success.
       // Emitting 'ready' before startExecutionV2 would let the client
@@ -1719,39 +1697,31 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Called by the alarm handler to free up sandbox resources.
    */
   private async cleanupIdleKiloServer(now: number): Promise<void> {
+    const activeExecutionId = await this.executionQueries.getActiveExecutionId();
+    if (activeExecutionId !== null) {
+      return;
+    }
+
+    const executions = await this.executionQueries.getAll();
+    const latestExecution = executions[executions.length - 1];
+    if (!latestExecution) {
+      return;
+    }
+
+    const lastActivity =
+      latestExecution.lastHeartbeat ?? latestExecution.completedAt ?? latestExecution.startedAt;
+    const idleMs = now - lastActivity;
+    const idleTimeoutMs = this.getKiloServerIdleTimeoutMs();
+
+    if (idleMs < idleTimeoutMs) {
+      return;
+    }
+
     const metadata = await this.getMetadata();
     if (!metadata) {
       return;
     }
 
-    const lastActivity = metadata.kiloServerLastActivity;
-    if (!lastActivity) {
-      // No kilo server activity recorded, nothing to clean up
-      return;
-    }
-
-    const idleMs = now - lastActivity;
-    const idleTimeoutMs = this.getKiloServerIdleTimeoutMs();
-
-    if (idleMs < idleTimeoutMs) {
-      // Server is still within idle threshold
-      return;
-    }
-
-    // Check if there's an active execution - don't stop the server mid-run
-    const activeExecutionId = await this.executionQueries.getActiveExecutionId();
-    if (activeExecutionId !== null) {
-      logger
-        .withFields({
-          sessionId: this.sessionId,
-          executionId: activeExecutionId,
-          idleMs,
-        })
-        .debug('Skipping idle kilo server cleanup - execution is active');
-      return;
-    }
-
-    // Server has been idle too long and no active execution, stop it
     logger
       .withFields({
         sessionId: this.sessionId,
@@ -1782,15 +1752,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       logger
         .withFields({ sessionId: this.sessionId, sandboxId, rpcElapsedMs: Date.now() - rpcStart })
         .debug('stopKiloServer RPC completed');
-
-      // Clear the activity timestamp since server is stopped
-      // Must merge with existing metadata since updateMetadata validates the full schema
-      const updated = {
-        ...metadata,
-        kiloServerLastActivity: undefined,
-        version: Date.now(),
-      };
-      await this.updateMetadata(updated);
 
       logger
         .withFields({ sessionId: this.sessionId, sandboxId })

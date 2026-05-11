@@ -1,1 +1,0 @@
-ALTER TABLE "kilo_pass_store_events" ADD COLUMN "processing_started_at" timestamp with time zone;

@@ -1,5 +1,5 @@
 {
-  "id": "92b40ff1-18f8-458f-aa65-64a68aa47808",
+  "id": "822040a5-2e5d-4ea6-a2fc-3621013e7aa2",
   "prevId": "01479a6c-dedf-4e9d-ab2b-b3af700c5cc2",
   "version": "7",
   "dialect": "postgresql",
@@ -9614,6 +9614,12 @@
           "notNull": true,
           "default": "'{}'::jsonb"
         },
+        "processing_started_at": {
+          "name": "processing_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "processed_at": {
           "name": "processed_at",
           "type": "timestamp with time zone",
@@ -9863,6 +9869,33 @@
               "expression": "app_account_token",
               "isExpression": false,
               "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kilo_pass_store_purchases_latest_subscription_purchase": {
+          "name": "IDX_kilo_pass_store_purchases_latest_subscription_purchase",
+          "columns": [
+            {
+              "expression": "payment_provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "provider_subscription_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "purchased_at",
+              "isExpression": false,
+              "asc": false,
               "nulls": "last"
             }
           ],

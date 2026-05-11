@@ -1,1 +1,0 @@
-CREATE INDEX "IDX_kilo_pass_store_purchases_latest_subscription_purchase" ON "kilo_pass_store_purchases" USING btree ("payment_provider","provider_subscription_id","purchased_at" DESC NULLS LAST);

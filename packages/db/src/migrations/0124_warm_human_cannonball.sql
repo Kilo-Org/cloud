@@ -8,6 +8,7 @@ CREATE TABLE "kilo_pass_store_events" (
 	"product_id" text NOT NULL,
 	"environment" text NOT NULL,
 	"payload_json" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"processing_started_at" timestamp with time zone,
 	"processed_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "kilo_pass_store_events_payment_provider_check" CHECK ("kilo_pass_store_events"."payment_provider" IN ('stripe', 'app_store', 'google_play'))
@@ -48,6 +49,7 @@ CREATE UNIQUE INDEX "UQ_kilo_pass_store_purchases_provider_transaction" ON "kilo
 CREATE INDEX "IDX_kilo_pass_store_purchases_subscription_id" ON "kilo_pass_store_purchases" USING btree ("kilo_pass_subscription_id");--> statement-breakpoint
 CREATE INDEX "IDX_kilo_pass_store_purchases_user_id" ON "kilo_pass_store_purchases" USING btree ("kilo_user_id");--> statement-breakpoint
 CREATE INDEX "IDX_kilo_pass_store_purchases_app_account_token" ON "kilo_pass_store_purchases" USING btree ("app_account_token");--> statement-breakpoint
+CREATE INDEX "IDX_kilo_pass_store_purchases_latest_subscription_purchase" ON "kilo_pass_store_purchases" USING btree ("payment_provider","provider_subscription_id","purchased_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "IDX_kilo_pass_subscriptions_payment_provider" ON "kilo_pass_subscriptions" USING btree ("payment_provider");--> statement-breakpoint
 CREATE UNIQUE INDEX "UQ_kilo_pass_subscriptions_provider_subscription" ON "kilo_pass_subscriptions" USING btree ("payment_provider","provider_subscription_id") WHERE "kilo_pass_subscriptions"."provider_subscription_id" IS NOT NULL;--> statement-breakpoint
 ALTER TABLE "kilocode_users" ADD CONSTRAINT "kilocode_users_app_store_account_token_unique" UNIQUE("app_store_account_token");--> statement-breakpoint

@@ -6,6 +6,8 @@ const mockFetchGitHubRootTextFileAtRef = jest.fn();
 const mockFindPreviousCompletedReview = jest.fn();
 const mockGenerateReviewPrompt = jest.fn();
 
+import type * as CodeReviewsDb from '@/lib/code-reviews/db/code-reviews';
+
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   generateGitHubInstallationToken: (...args: unknown[]) =>
     mockGenerateGitHubInstallationToken(...args),
@@ -20,9 +22,7 @@ jest.mock('@/lib/code-reviews/prompts/generate-prompt', () => ({
 }));
 
 jest.mock('@/lib/code-reviews/db/code-reviews', () => {
-  const actual = jest.requireActual<typeof import('@/lib/code-reviews/db/code-reviews')>(
-    '@/lib/code-reviews/db/code-reviews'
-  );
+  const actual = jest.requireActual<typeof CodeReviewsDb>('@/lib/code-reviews/db/code-reviews');
   return {
     ...actual,
     findPreviousCompletedReview: (...args: unknown[]) => mockFindPreviousCompletedReview(...args),

@@ -16,7 +16,9 @@ export function normalizeRepositoryReviewInstructions(
   const content = rawContent
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .split('')
+    .filter(character => !isUnsafeControlCharacter(character))
+    .join('')
     .trim();
 
   if (content.trim().length === 0) return null;
@@ -29,6 +31,18 @@ export function normalizeRepositoryReviewInstructions(
     content: content.slice(0, MAX_REVIEW_INSTRUCTIONS_CHARS) + TRUNCATION_NOTE,
     truncated: true,
   };
+}
+
+function isUnsafeControlCharacter(character: string): boolean {
+  const codePoint = character.codePointAt(0);
+  if (codePoint === undefined) return false;
+  return (
+    (codePoint >= 0 && codePoint <= 8) ||
+    codePoint === 11 ||
+    codePoint === 12 ||
+    (codePoint >= 14 && codePoint <= 31) ||
+    codePoint === 127
+  );
 }
 
 export function formatRepositoryReviewInstructions(content: string): string {

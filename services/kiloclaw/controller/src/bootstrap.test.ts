@@ -4,6 +4,7 @@ import {
   decryptEnvVars,
   setupDirectories,
   applyFeatureFlags,
+  cleanNpmCache,
   generateHooksToken,
   configureGitHub,
   configureLinear,
@@ -414,6 +415,49 @@ describe('applyFeatureFlags', () => {
 
     expect(env.NPM_CONFIG_PREFIX).toBeUndefined();
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('failed to create npm-global'));
+    warnSpy.mockRestore();
+  });
+});
+
+// ---- cleanNpmCache ----
+
+describe('cleanNpmCache', () => {
+  it('runs npm cache clean with the runtime env', () => {
+    const { deps, execCalls } = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      NPM_CONFIG_PREFIX: '/root/.npm-global',
+    };
+
+    cleanNpmCache(env, deps);
+
+    expect(execCalls).toContainEqual({
+      cmd: 'npm',
+      args: ['cache', 'clean', '--force'],
+      input: undefined,
+    });
+    expect(deps.execFileSync).toHaveBeenCalledWith(
+      'npm',
+      ['cache', 'clean', '--force'],
+      expect.objectContaining({
+        env: expect.objectContaining({ NPM_CONFIG_PREFIX: '/root/.npm-global' }),
+        stdio: 'pipe',
+      })
+    );
+  });
+
+  it('logs and continues when npm cache clean fails', () => {
+    const { deps } = fakeDeps();
+    (deps.execFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('npm failed');
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() => cleanNpmCache({}, deps)).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[controller] npm cache clean failed, continuing:',
+      'npm failed'
+    );
+
     warnSpy.mockRestore();
   });
 });

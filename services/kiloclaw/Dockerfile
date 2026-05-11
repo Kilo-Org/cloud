@@ -185,8 +185,8 @@ RUN cd /tmp/controller-build \
     && bun build src/index.ts --outfile=/usr/local/bin/kiloclaw-controller.js --target=node --minify \
        --define "KILOCLAW_CONTROLLER_VERSION=\"${CONTROLLER_VERSION}\"" \
        --define "KILOCLAW_CONTROLLER_COMMIT=\"${CONTROLLER_COMMIT}\"" \
-    && rm -rf /tmp/controller-build \
-    && bun pm cache rm
+    && bun pm cache rm \
+    && rm -rf /tmp/controller-build
 
 # ── Final stage: runtime image ────────────────────────────────────────
 FROM runtime AS final

@@ -554,6 +554,53 @@ async function reverseAppStoreRefundCredits(
   });
 }
 
+type TerminalStoreEvent = {
+  eventId: string;
+  notificationType: string | null;
+  terminalTimestampMs: number | null;
+};
+
+async function findProcessedTerminalStoreEventForPurchase(
+  purchase: ReturnType<typeof mapAppleKiloPassTransaction>
+): Promise<TerminalStoreEvent | null> {
+  const terminalNotificationTypeFilter = sql`(${kilo_pass_store_events.payload_json}->>'notificationType') IN (${sql.join(
+    Array.from(REFUND_TYPES).map(type => sql`${type}`),
+    sql`, `
+  )})`;
+  const terminalTimestampMs = sql<number | null>`COALESCE(
+    (${kilo_pass_store_events.payload_json}->'rawTransaction'->>'revocationDate')::double precision,
+    (${kilo_pass_store_events.payload_json}->'rawTransaction'->>'purchaseDate')::double precision
+  )`;
+  const purchaseTimestampMs = Date.parse(purchase.purchasedAtIso);
+
+  const terminalEvents = await db
+    .select({
+      eventId: kilo_pass_store_events.event_id,
+      notificationType: sql<
+        string | null
+      >`${kilo_pass_store_events.payload_json}->>'notificationType'`,
+      terminalTimestampMs,
+    })
+    .from(kilo_pass_store_events)
+    .where(
+      and(
+        eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.AppStore),
+        sql`${kilo_pass_store_events.processed_at} IS NOT NULL`,
+        terminalNotificationTypeFilter,
+        or(
+          eq(kilo_pass_store_events.provider_transaction_id, purchase.providerTransactionId),
+          and(
+            eq(kilo_pass_store_events.provider_subscription_id, purchase.providerSubscriptionId),
+            sql`${terminalTimestampMs} >= ${purchaseTimestampMs}`
+          )
+        )
+      )
+    )
+    .limit(1);
+
+  return terminalEvents[0] ?? null;
+}
+
 export async function processAppStoreKiloPassNotification(params: {
   signedPayload: string;
   decodeNotification?: DecodeNotification;
@@ -580,27 +627,45 @@ export async function processAppStoreKiloPassNotification(params: {
   }
 
   if (purchase && isImmediateStorePurchaseNotification(notification)) {
-    const user = await getUserForStoreRenewal({
-      providerSubscriptionId: purchase.providerSubscriptionId,
-      appAccountToken: purchase.appAccountToken,
-    });
-    if (!user) {
-      if (notification.notificationType !== NotificationTypeV2.SUBSCRIBED) {
-        throw new Error(
-          'App Store renewal notification cannot create a subscription without a user'
-        );
-      }
-    } else {
-      await completeStoreKiloPassPurchase({ user, purchase });
+    const terminalEvent = await findProcessedTerminalStoreEventForPurchase(purchase);
+    if (terminalEvent) {
       await appendKiloPassAuditLog(db, {
-        action: KiloPassAuditLogAction.StoreSubscriptionRenewed,
+        action: KiloPassAuditLogAction.StoreNotificationReceived,
         result: KiloPassAuditLogResult.Success,
-        kiloUserId: user.id,
         payload: {
           notificationUUID: notification.notificationUUID,
+          notificationType: notification.notificationType,
           providerSubscriptionId: purchase.providerSubscriptionId,
+          providerTransactionId: purchase.providerTransactionId,
+          skippedStorePurchaseCompletion: true,
+          terminalEventId: terminalEvent.eventId,
+          terminalNotificationType: terminalEvent.notificationType,
+          terminalTimestampMs: terminalEvent.terminalTimestampMs,
         },
       });
+    } else {
+      const user = await getUserForStoreRenewal({
+        providerSubscriptionId: purchase.providerSubscriptionId,
+        appAccountToken: purchase.appAccountToken,
+      });
+      if (!user) {
+        if (notification.notificationType !== NotificationTypeV2.SUBSCRIBED) {
+          throw new Error(
+            'App Store renewal notification cannot create a subscription without a user'
+          );
+        }
+      } else {
+        await completeStoreKiloPassPurchase({ user, purchase });
+        await appendKiloPassAuditLog(db, {
+          action: KiloPassAuditLogAction.StoreSubscriptionRenewed,
+          result: KiloPassAuditLogResult.Success,
+          kiloUserId: user.id,
+          payload: {
+            notificationUUID: notification.notificationUUID,
+            providerSubscriptionId: purchase.providerSubscriptionId,
+          },
+        });
+      }
     }
   }
 

@@ -801,6 +801,170 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(subscription?.ended_at).toBeNull();
   });
 
+  it('does not activate or issue credits when a refund is processed before the purchase notification', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0 });
+    const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+    const providerTransactionId = `tx-${crypto.randomUUID()}`;
+
+    const refundResult = await processAppStoreKiloPassNotification({
+      signedPayload: 'refund-before-subscribe',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'refund-before-subscribe',
+          notificationType: NotificationTypeV2.REFUND,
+          signedTransactionInfo: 'refund-before-subscribe-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          transactionId: providerTransactionId,
+          appAccountToken: user.app_store_account_token,
+          purchaseDate: Date.parse('2026-05-01T00:00:00.000Z'),
+          revocationDate: Date.parse('2026-05-02T00:00:00.000Z'),
+        }),
+    });
+    expect(refundResult).toEqual({ processed: true });
+
+    const subscribeResult = await processAppStoreKiloPassNotification({
+      signedPayload: 'subscribe-after-refund',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'subscribe-after-refund',
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+          signedTransactionInfo: 'subscribe-after-refund-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          transactionId: providerTransactionId,
+          appAccountToken: user.app_store_account_token,
+          purchaseDate: Date.parse('2026-05-01T00:00:00.000Z'),
+          expiresDate: Date.parse('2026-06-01T00:00:00.000Z'),
+        }),
+    });
+    expect(subscribeResult).toEqual({ processed: true });
+
+    const subscriptions = await db
+      .select()
+      .from(kilo_pass_subscriptions)
+      .where(eq(kilo_pass_subscriptions.provider_subscription_id, providerSubscriptionId));
+    expect(
+      subscriptions.filter(row => row.status === 'active' && row.ended_at === null)
+    ).toHaveLength(0);
+
+    const storePurchases = await db
+      .select()
+      .from(kilo_pass_store_purchases)
+      .where(eq(kilo_pass_store_purchases.provider_transaction_id, providerTransactionId));
+    expect(storePurchases).toHaveLength(0);
+
+    const userCreditTransactions = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(userCreditTransactions).toHaveLength(0);
+
+    const stalePurchaseAudit = await db.query.kilo_pass_audit_log.findFirst({
+      where: sql`${kilo_pass_audit_log.action} = ${KiloPassAuditLogAction.StoreNotificationReceived} AND ${kilo_pass_audit_log.payload_json}->>'notificationUUID' = 'subscribe-after-refund'`,
+    });
+    expect(stalePurchaseAudit?.payload_json).toMatchObject({
+      notificationUUID: 'subscribe-after-refund',
+      notificationType: NotificationTypeV2.SUBSCRIBED,
+      providerSubscriptionId,
+      providerTransactionId,
+      skippedStorePurchaseCompletion: true,
+    });
+  });
+
+  it('does not reactivate a subscription for a delayed renewal predating a terminal event', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0 });
+    const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+    const initialTransactionId = `tx-${crypto.randomUUID()}`;
+    const delayedRenewalTransactionId = `tx-${crypto.randomUUID()}`;
+    const terminalTransactionId = `tx-${crypto.randomUUID()}`;
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'delayed-terminal-initial-buy',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'delayed-terminal-initial-buy',
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          transactionId: initialTransactionId,
+          appAccountToken: user.app_store_account_token,
+          purchaseDate: Date.parse('2026-05-01T00:00:00.000Z'),
+          expiresDate: Date.parse('2026-06-01T00:00:00.000Z'),
+        }),
+    });
+
+    const creditTransactionsBeforeTerminal = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'terminal-before-delayed-renewal',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'terminal-before-delayed-renewal',
+          notificationType: NotificationTypeV2.REVOKE,
+          signedTransactionInfo: 'terminal-before-delayed-renewal-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          transactionId: terminalTransactionId,
+          appAccountToken: user.app_store_account_token,
+          purchaseDate: Date.parse('2026-06-10T00:00:00.000Z'),
+          revocationDate: Date.parse('2026-06-15T00:00:00.000Z'),
+        }),
+    });
+
+    const delayedRenewalResult = await processAppStoreKiloPassNotification({
+      signedPayload: 'delayed-renewal-after-terminal',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'delayed-renewal-after-terminal',
+          notificationType: NotificationTypeV2.DID_RENEW,
+          signedTransactionInfo: 'delayed-renewal-after-terminal-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          transactionId: delayedRenewalTransactionId,
+          appAccountToken: user.app_store_account_token,
+          purchaseDate: Date.parse('2026-06-01T00:00:00.000Z'),
+          expiresDate: Date.parse('2026-07-01T00:00:00.000Z'),
+        }),
+    });
+    expect(delayedRenewalResult).toEqual({ processed: true });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.provider_subscription_id, providerSubscriptionId),
+    });
+    expect(subscription?.status).toBe('canceled');
+    expect(subscription?.ended_at).not.toBeNull();
+
+    const delayedStorePurchases = await db
+      .select()
+      .from(kilo_pass_store_purchases)
+      .where(eq(kilo_pass_store_purchases.provider_transaction_id, delayedRenewalTransactionId));
+    expect(delayedStorePurchases).toHaveLength(0);
+
+    const creditTransactionsAfterDelayedRenewal = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(creditTransactionsAfterDelayedRenewal).toHaveLength(
+      creditTransactionsBeforeTerminal.length
+    );
+  });
+
   it('reverses the Apple paid base amount plus issued bonus and promo credits for the refunded issuance', async () => {
     const user = await insertTestUser();
     const decodedTransaction = transaction({

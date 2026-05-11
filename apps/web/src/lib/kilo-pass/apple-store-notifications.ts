@@ -2,7 +2,6 @@ import {
   DeliveryStatus,
   NotificationTypeV2,
   RefundPreference,
-  type ResponseBodyV2DecodedPayload,
   Subtype,
   type ConsumptionRequest,
 } from '@apple/app-store-server-library';
@@ -108,9 +107,8 @@ function getAppStoreKiloPassRefundConsumptionRequest(): ConsumptionRequest {
 export async function decodeAppleStoreNotificationJws(
   signedPayload: string
 ): Promise<AppleStoreDecodedNotification> {
-  const decoded = (await createAppleStoreSignedDataVerifier().verifyAndDecodeNotification(
-    signedPayload
-  )) as ResponseBodyV2DecodedPayload;
+  const decoded =
+    await createAppleStoreSignedDataVerifier().verifyAndDecodeNotification(signedPayload);
 
   const parsed = AppleStoreNotificationPayloadSchema.safeParse(decoded);
   if (!parsed.success) {

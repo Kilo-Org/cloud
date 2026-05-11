@@ -32,6 +32,14 @@ import {
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { BillingHistoryEntry } from '@/lib/subscriptions/subscription-center';
 import type Stripe from 'stripe';
+import type dayjsType from 'dayjs';
+import type utcType from 'dayjs/plugin/utc';
+import type * as Sentry from '@sentry/nextjs';
+
+const PROMO_OFFER_ACTIVE_TEST_TIME = '2026-05-06T12:00:00.000Z';
+const PROMO_OFFER_EXPIRED_TEST_TIME = '2026-05-07T00:00:00.000Z';
+
+let mockKiloPassNowIso: string | null = null;
 
 type StripeMock = {
   subscriptions: {
@@ -139,6 +147,28 @@ type Caller = { kiloPass: KiloPassCaller };
 
 let createCallerForUser: (userId: string) => Promise<Caller>;
 
+function freezeKiloPassClock(nowIso: string): void {
+  mockKiloPassNowIso = nowIso;
+}
+
+jest.mock('@/lib/kilo-pass/dayjs', () => {
+  const realDayjs = jest.requireActual<typeof dayjsType>('dayjs');
+  const utc = jest.requireActual<typeof utcType>('dayjs/plugin/utc');
+
+  realDayjs.extend(utc);
+
+  const controlledDayjs = ((...args: Parameters<typeof realDayjs>) => {
+    if (args.length === 0 && mockKiloPassNowIso) {
+      return realDayjs(mockKiloPassNowIso);
+    }
+    return realDayjs(...args);
+  }) as typeof realDayjs;
+
+  Object.assign(controlledDayjs, realDayjs);
+
+  return { dayjs: controlledDayjs };
+});
+
 jest.mock('@/lib/stripe-client', () => {
   const stripeMock = {
     subscriptions: {
@@ -177,6 +207,19 @@ jest.mock('@/lib/kilo-pass/stripe-price-ids.server', () => {
     getStripePriceIdForKiloPass: getStripePriceIdForKiloPassMock,
   };
 });
+
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<typeof Sentry>('@sentry/nextjs'),
+  captureException: jest.fn(),
+}));
+
+jest.mock('@/lib/kilo-pass/apple-store-verifier', () => ({
+  verifyAppleKiloPassTransactionJws: jest.fn(),
+}));
+
+jest.mock('@/lib/kilo-pass/store-subscription-completion', () => ({
+  completeStoreKiloPassPurchase: jest.fn(),
+}));
 
 async function insertSubscription(params: {
   kiloUserId: string;
@@ -292,6 +335,10 @@ describe('kiloPassRouter', () => {
     stripeMock.invoices.list.mockReset();
   });
 
+  afterEach(() => {
+    mockKiloPassNowIso = null;
+  });
+
   describe('getMobileStoreProducts', () => {
     it('returns the App Store account token for the signed-in user', async () => {
       const user = await insertTestUser();
@@ -306,6 +353,8 @@ describe('kiloPassRouter', () => {
 
   describe('getState', () => {
     it('returns null subscription when user has no Kilo Pass subscription', async () => {
+      freezeKiloPassClock(PROMO_OFFER_ACTIVE_TEST_TIME);
+
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-get-state-empty@example.com',
       });
@@ -754,6 +803,8 @@ describe('kiloPassRouter', () => {
 
   describe('isEligibleForFirstMonthPromo in getState', () => {
     it('returns isEligibleForFirstMonthPromo=true when user has no subscriptions', async () => {
+      freezeKiloPassClock(PROMO_OFFER_ACTIVE_TEST_TIME);
+
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-promo-eligible-no-sub@example.com',
       });
@@ -765,7 +816,23 @@ describe('kiloPassRouter', () => {
       expect(result.subscription).toBeNull();
     });
 
+    it('returns isEligibleForFirstMonthPromo=false after the promo cutoff', async () => {
+      freezeKiloPassClock(PROMO_OFFER_EXPIRED_TEST_TIME);
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-promo-expired-no-sub@example.com',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      expect(result.isEligibleForFirstMonthPromo).toBe(false);
+      expect(result.subscription).toBeNull();
+    });
+
     it('keeps isEligibleForFirstMonthPromo=true for a never-subscribed user', async () => {
+      freezeKiloPassClock(PROMO_OFFER_ACTIVE_TEST_TIME);
+
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-promo-cutoff-still-eligible@example.com',
       });

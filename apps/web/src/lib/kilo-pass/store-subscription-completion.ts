@@ -1,12 +1,13 @@
 import {
   credit_transactions,
+  kilo_pass_issuance_items,
   kilo_pass_issuances,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   kilocode_users,
   type User,
 } from '@kilocode/db/schema';
-import { and, desc, eq, isNull, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
 import type { DrizzleTransaction } from '@/lib/drizzle';
@@ -17,6 +18,7 @@ import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassCadence,
+  KiloPassIssuanceItemKind,
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
   type KiloPassTier,
@@ -160,6 +162,7 @@ async function insertCreditTransactionAdjustment(
     description: string;
     creditCategory: string;
     originalBaselineMicrodollarsUsed: number;
+    isFree?: boolean;
   }
 ): Promise<{ wasInserted: boolean; creditTransactionId: string | null }> {
   const creditTransactionId = crypto.randomUUID();
@@ -169,7 +172,7 @@ async function insertCreditTransactionAdjustment(
       id: creditTransactionId,
       kilo_user_id: params.kiloUserId,
       amount_microdollars: params.amountMicrodollars,
-      is_free: false,
+      is_free: params.isFree ?? false,
       description: params.description,
       credit_category: params.creditCategory,
       check_category_uniqueness: true,
@@ -201,9 +204,114 @@ async function insertCreditTransactionAdjustment(
   return { wasInserted: true, creditTransactionId };
 }
 
+function getUpgradeBonusReversalDescription(kind: KiloPassIssuanceItemKind): string {
+  if (kind === KiloPassIssuanceItemKind.Bonus) {
+    return 'Kilo Pass upgrade bonus clawback';
+  }
+  return 'Kilo Pass upgrade promo clawback';
+}
+
+async function resetIssuanceItemsForStoreUpgrade(
+  tx: DrizzleTransaction,
+  params: {
+    issuanceId: string;
+    subscriptionId: string;
+    user: User;
+    purchase: ValidatedStoreKiloPassPurchase;
+    upgradedBaseCreditTransactionId: string;
+    upgradedBaseAmountUsd: number;
+    originalBaselineMicrodollarsUsed: number;
+  }
+): Promise<void> {
+  const bonusItems = await tx
+    .select({
+      itemId: kilo_pass_issuance_items.id,
+      kind: kilo_pass_issuance_items.kind,
+      amountMicrodollars: credit_transactions.amount_microdollars,
+    })
+    .from(kilo_pass_issuance_items)
+    .innerJoin(
+      credit_transactions,
+      eq(kilo_pass_issuance_items.credit_transaction_id, credit_transactions.id)
+    )
+    .where(
+      and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, params.issuanceId),
+        inArray(kilo_pass_issuance_items.kind, [
+          KiloPassIssuanceItemKind.Bonus,
+          KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+        ])
+      )
+    );
+
+  const reversedBonusCreditTransactionIds: string[] = [];
+  for (const item of bonusItems) {
+    if (item.amountMicrodollars <= 0) {
+      continue;
+    }
+
+    const reversal = await insertCreditTransactionAdjustment(tx, {
+      kiloUserId: params.user.id,
+      amountMicrodollars: -item.amountMicrodollars,
+      description: getUpgradeBonusReversalDescription(item.kind),
+      creditCategory: `kilo-pass-upgrade-bonus-reversal:${params.purchase.paymentProvider}:${params.purchase.providerTransactionId}:${item.kind}:${item.itemId}`,
+      originalBaselineMicrodollarsUsed: params.originalBaselineMicrodollarsUsed,
+      isFree: true,
+    });
+    if (reversal.creditTransactionId) {
+      reversedBonusCreditTransactionIds.push(reversal.creditTransactionId);
+    }
+  }
+
+  if (bonusItems.length > 0) {
+    await tx.delete(kilo_pass_issuance_items).where(
+      inArray(
+        kilo_pass_issuance_items.id,
+        bonusItems.map(item => item.itemId)
+      )
+    );
+  }
+
+  const baseUpdate = await tx
+    .update(kilo_pass_issuance_items)
+    .set({
+      credit_transaction_id: params.upgradedBaseCreditTransactionId,
+      amount_usd: params.upgradedBaseAmountUsd,
+      bonus_percent_applied: null,
+    })
+    .where(
+      and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, params.issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
+      )
+    );
+
+  if ((baseUpdate.rowCount ?? 0) !== 1) {
+    throw new Error('App Store upgrade could not update the current base issuance item');
+  }
+
+  await appendKiloPassAuditLog(tx, {
+    action: KiloPassAuditLogAction.BaseCreditsIssued,
+    result: KiloPassAuditLogResult.Success,
+    kiloUserId: params.user.id,
+    kiloPassSubscriptionId: params.subscriptionId,
+    relatedCreditTransactionId: params.upgradedBaseCreditTransactionId,
+    relatedMonthlyIssuanceId: params.issuanceId,
+    payload: {
+      kind: 'store_upgrade_current_issuance_rewritten',
+      providerSubscriptionId: params.purchase.providerSubscriptionId,
+      providerTransactionId: params.purchase.providerTransactionId,
+      upgradedBaseAmountUsd: params.upgradedBaseAmountUsd,
+      removedIssuanceItemIds: bonusItems.map(item => item.itemId),
+      reversedBonusCreditTransactionIds,
+    },
+  });
+}
+
 async function applyStoreUpgradeCreditAdjustments(
   tx: DrizzleTransaction,
   params: {
+    issuanceId: string;
     subscriptionId: string;
     user: User;
     purchase: ValidatedStoreKiloPassPurchase;
@@ -291,6 +399,20 @@ async function applyStoreUpgradeCreditAdjustments(
       providerTransactionId: params.purchase.providerTransactionId,
       amountUsd: newTierAmountUsd,
     },
+  });
+
+  if (!issueResult.creditTransactionId) {
+    throw new Error('App Store upgrade base credit transaction was not persisted');
+  }
+
+  await resetIssuanceItemsForStoreUpgrade(tx, {
+    issuanceId: params.issuanceId,
+    subscriptionId: params.subscriptionId,
+    user: params.user,
+    purchase: params.purchase,
+    upgradedBaseCreditTransactionId: issueResult.creditTransactionId,
+    upgradedBaseAmountUsd: newTierAmountUsd,
+    originalBaselineMicrodollarsUsed: freshUser.microdollarsUsed,
   });
 }
 
@@ -515,6 +637,7 @@ export async function completeStoreKiloPassPurchase(params: {
 
     if (isAppStoreUpgrade && previousStorePurchase?.expires_at) {
       await applyStoreUpgradeCreditAdjustments(tx, {
+        issuanceId: issuanceHeader.issuanceId,
         subscriptionId,
         user,
         purchase,

@@ -231,12 +231,16 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
               notifyCompletion: false,
               notifyErrors: false,
             });
-            return completed;
+            return { completed, purchase };
           })
       );
-      if (recoveryResults.some(Boolean)) {
+      const completedPurchases = recoveryResults
+        .filter(result => result.completed)
+        .map(result => result.purchase);
+      if (completedPurchases.length > 0) {
         await deps.invalidateAfterCompletion();
       }
+      return completedPurchases;
     },
   };
 }
@@ -246,6 +250,7 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
   const queryClient = useQueryClient();
   const [isRequestingPurchase, setIsRequestingPurchase] = useState(false);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
+  const recoveryInFlightPurchaseIdsRef = useRef(new Set<string>());
   const activePurchaseRequestRef = useRef<{ sku: string } | null>(null);
   const pendingPurchaseCompletedCallbackRef = useRef<(() => void) | null>(null);
   const completeAppStorePurchase = useMutation(
@@ -369,16 +374,32 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
     }
 
     const unrecoveredPurchases = availablePurchases.filter(availablePurchase => {
-      const id = availablePurchase.transactionId ?? availablePurchase.id;
-      if (recoveredPurchaseIdsRef.current.has(id)) {
+      const id = getPurchaseCompletionId(availablePurchase);
+      if (
+        recoveredPurchaseIdsRef.current.has(id) ||
+        recoveryInFlightPurchaseIdsRef.current.has(id)
+      ) {
         return false;
       }
-      recoveredPurchaseIdsRef.current.add(id);
+      recoveryInFlightPurchaseIdsRef.current.add(id);
       return true;
     });
 
     if (unrecoveredPurchases.length > 0) {
-      void actions.recoverPurchases(unrecoveredPurchases);
+      void (async () => {
+        try {
+          const recoveredPurchases = await actions.recoverPurchases(unrecoveredPurchases);
+          for (const recoveredPurchase of recoveredPurchases) {
+            recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(recoveredPurchase));
+          }
+        } finally {
+          for (const unrecoveredPurchase of unrecoveredPurchases) {
+            recoveryInFlightPurchaseIdsRef.current.delete(
+              getPurchaseCompletionId(unrecoveredPurchase)
+            );
+          }
+        }
+      })();
     }
   }, [actions, availablePurchases, enabledAppleProductIds.length]);
 

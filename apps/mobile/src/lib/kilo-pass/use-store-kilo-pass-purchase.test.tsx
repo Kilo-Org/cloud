@@ -635,4 +635,28 @@ describe('StoreKiloPassPurchaseProvider', () => {
     await releasedValue.purchase(product);
     expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
   });
+
+  it('retries automatic recovery after backend completion fails', async () => {
+    const purchase = createPurchase();
+    mockedIap.availablePurchases = [purchase];
+    mockedReactQuery.completeAppStorePurchase
+      .mockRejectedValueOnce(new Error('backend failed'))
+      .mockResolvedValueOnce({ alreadyProcessed: false });
+    const provider = renderStoreKiloPassPurchaseProvider();
+
+    provider.render();
+    await flushPromises();
+
+    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledTimes(1);
+    expect(mockedIap.finishTransaction).not.toHaveBeenCalled();
+    expect(mockedReactQuery.invalidateQueries).not.toHaveBeenCalled();
+
+    mockedIap.availablePurchases = [{ ...purchase }];
+    provider.render();
+    await flushPromises();
+
+    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledTimes(2);
+    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
+    expect(mockedReactQuery.invalidateQueries).toHaveBeenCalled();
+  });
 });

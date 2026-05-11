@@ -1023,6 +1023,7 @@ export class KiloClawInternalClient {
   async resizeMachine(
     userId: string,
     instanceType: InstanceTierKey,
+    actor: { actorId: string; actorEmail: string },
     instanceId?: string
   ): Promise<ResizeMachineResponse> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
@@ -1030,7 +1031,7 @@ export class KiloClawInternalClient {
       `/api/platform/resize-machine${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, instanceType }),
+        body: JSON.stringify({ userId, instanceType, ...actor }),
       },
       { userId }
     );

@@ -3434,6 +3434,8 @@ platform.post('/reassociate-volume', async c => {
 const ResizeMachineSchema = z.object({
   userId: z.string().min(1),
   instanceType: InstanceTierKeySchema,
+  actorId: z.string().min(1),
+  actorEmail: z.string().email(),
 });
 
 platform.post('/resize-machine', async c => {
@@ -3448,7 +3450,12 @@ platform.post('/resize-machine', async c => {
       c.env,
       result.data.userId,
       iidResult.instanceId,
-      stub => stub.resizeMachine(result.data.instanceType),
+      stub =>
+        stub.resizeMachine({
+          targetTierKey: result.data.instanceType,
+          actorId: result.data.actorId,
+          actorEmail: result.data.actorEmail,
+        }),
       'resizeMachine'
     );
     return c.json(response);

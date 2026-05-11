@@ -9012,34 +9012,52 @@ describe('getDebugState live-check dispatch', () => {
 describe('resizeMachine', () => {
   it('rejects when instance is not provisioned', async () => {
     const { instance } = createInstance();
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow('Instance is not provisioned');
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Instance is not provisioned');
   });
 
   it('rejects when instance is being destroyed', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'destroying' });
 
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
-      'Cannot resize: instance is being destroyed'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Cannot resize: instance is being destroyed');
   });
 
   it('rejects when instance is restoring', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'restoring' });
 
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
-      'Cannot resize: instance is restoring from snapshot'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Cannot resize: instance is restoring from snapshot');
   });
 
   it('rejects when instance is recovering', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'recovering' });
 
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
-      'Cannot resize: instance is recovering'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Cannot resize: instance is recovering');
   });
 
   it('persists new tier and returns previous tier', async () => {
@@ -9051,7 +9069,11 @@ describe('resizeMachine', () => {
       status: 'stopped',
     });
 
-    const result = await instance.resizeMachine('perf-4-8');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
 
     expect(result.previousTier).toBe('shared-2-3');
     expect(result.newTier).toBe('perf-4-8');
@@ -9064,7 +9086,11 @@ describe('resizeMachine', () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'stopped' });
 
-    const result = await instance.resizeMachine('perf-4-8');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
 
     expect(result.previousTier).toBeNull();
     expect(result.machineSize).toEqual({ cpus: 4, memory_mb: 8192, cpu_kind: 'performance' });
@@ -9077,9 +9103,13 @@ describe('resizeMachine', () => {
       machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
     });
 
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
-      'Instance must be stopped before resizing machine tier'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Instance must be stopped before resizing machine tier');
   });
 
   it('allows resize when instance is stopped', async () => {
@@ -9091,7 +9121,11 @@ describe('resizeMachine', () => {
       volumeSizeGb: 10,
     });
 
-    const result = await instance.resizeMachine('perf-4-8');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
 
     expect(result.newTier).toBe('perf-4-8');
     expect(result.machineSize).toEqual({ cpus: 4, memory_mb: 8192, cpu_kind: 'performance' });
@@ -9106,9 +9140,13 @@ describe('resizeMachine', () => {
       volumeSizeGb: 20,
     });
 
-    await expect(instance.resizeMachine('perf-1-3')).rejects.toThrow(
-      'downgrades and sidegrades are not allowed'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-1-3',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('downgrades and sidegrades are not allowed');
   });
 
   it('rejects offered-tier sidegrades', async () => {
@@ -9120,18 +9158,26 @@ describe('resizeMachine', () => {
       volumeSizeGb: 10,
     });
 
-    await expect(instance.resizeMachine('perf-1-3')).rejects.toThrow(
-      'downgrades and sidegrades are not allowed'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-1-3',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('downgrades and sidegrades are not allowed');
   });
 
   it('rejects legacy tiers as resize targets', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'stopped' });
 
-    await expect(instance.resizeMachine('shared-2-3')).rejects.toThrow(
-      'is not an offerable resize target'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'shared-2-3',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('is not an offerable resize target');
   });
 
   it('extends volume and persists volume size before tier state', async () => {
@@ -9144,7 +9190,11 @@ describe('resizeMachine', () => {
       flyVolumeId: 'vol-1',
     });
 
-    const result = await instance.resizeMachine('perf-4-16');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-16',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
 
     expect(flyClient.extendVolume).toHaveBeenCalledWith(
       { apiToken: 'test-token', appName: 'test-app' },
@@ -9167,7 +9217,13 @@ describe('resizeMachine', () => {
     });
     (flyClient.extendVolume as Mock).mockRejectedValueOnce(new Error('extend failed'));
 
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow('extend failed');
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('extend failed');
 
     expect(storage._store.get('volumeSizeGb')).toBe(10);
     expect(storage._store.get('instanceType')).toBe('perf-1-3');
@@ -9190,7 +9246,11 @@ describe('resizeMachine', () => {
     const db = await import('../db');
     (db.syncInstanceType as Mock).mockRejectedValueOnce(new Error('postgres down'));
 
-    await instance.resizeMachine('perf-4-8');
+    await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
     await Promise.allSettled(waitUntilPromises);
 
     expect(storage._store.get('instanceType')).toBe('perf-4-8');
@@ -9214,7 +9274,11 @@ describe('resizeMachine', () => {
       flyMachineId: null,
     });
 
-    const result = await instance.resizeMachine('perf-4-8');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
 
     expect(result.newTier).toBe('perf-4-8');
     expect(flyClient.extendVolume).not.toHaveBeenCalled();
@@ -9248,7 +9312,11 @@ describe('resizeMachine', () => {
       throw new Error(`Unhandled Northflank API request: ${url}`);
     });
 
-    const result = await instance.resizeMachine('perf-4-8');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
 
     expect(result.newTier).toBe('perf-4-8');
     expect(storage._store.get('instanceType')).toBe('perf-4-8');
@@ -9288,9 +9356,13 @@ describe('resizeMachine', () => {
       throw new Error(`Unhandled Northflank API request: ${url}`);
     });
 
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
-      'Northflank API patchDeploymentService failed (500)'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Northflank API patchDeploymentService failed (500)');
 
     expect(storage._store.get('instanceType')).toBe('perf-1-3');
     expect(storage._store.get('machineSize')).toEqual({
@@ -9320,7 +9392,11 @@ describe('resizeMachine', () => {
     const dbModule = await import('../db');
     (dbModule.syncAdminSizeOverride as Mock).mockClear();
 
-    const result = await instance.resizeMachine('perf-4-8');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
     await Promise.allSettled(waitUntilPromises);
 
     expect(result.clearedOverride).toEqual({

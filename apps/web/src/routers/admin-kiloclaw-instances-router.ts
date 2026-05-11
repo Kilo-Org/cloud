@@ -3440,6 +3440,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         const result = await client.resizeMachine(
           input.userId,
           input.instanceType,
+          { actorId: ctx.user.id, actorEmail: ctx.user.google_user_email },
           workerInstanceId(instance)
         );
 

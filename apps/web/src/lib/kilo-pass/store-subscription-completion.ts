@@ -87,6 +87,19 @@ function findStorePurchaseByProviderTransaction(
   });
 }
 
+async function lockUserForStoreCompletion(tx: DrizzleTransaction, userId: string): Promise<void> {
+  const rows = await tx
+    .select({ id: kilocode_users.id })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, userId))
+    .for('update')
+    .limit(1);
+
+  if (!rows[0]) {
+    throw new Error('Failed to lock user for store Kilo Pass completion');
+  }
+}
+
 function findLatestStorePurchaseForSubscription(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   purchase: ValidatedStoreKiloPassPurchase
@@ -333,6 +346,8 @@ export async function completeStoreKiloPassPurchase(params: {
   const { user, purchase } = params;
 
   return db.transaction(async tx => {
+    await lockUserForStoreCompletion(tx, user.id);
+
     const existingPurchase = await findStorePurchaseByProviderTransaction(tx, purchase);
 
     if (existingPurchase) {

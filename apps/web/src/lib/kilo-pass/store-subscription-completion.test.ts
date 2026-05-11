@@ -168,6 +168,40 @@ describe('completeStoreKiloPassPurchase', () => {
     expect(items).toHaveLength(1);
   });
 
+  it('rejects concurrent different provider subscriptions for the same user', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const purchases = Array.from({ length: 4 }, () => applePurchase());
+
+    const results = await Promise.allSettled(
+      purchases.map(purchase => completeStoreKiloPassPurchase({ user, purchase }))
+    );
+
+    const fulfilled = results.filter(result => result.status === 'fulfilled');
+    const rejected = results.filter(result => result.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(3);
+    for (const result of rejected) {
+      expect(result.reason).toEqual(new Error('You already have an active Kilo Pass subscription'));
+    }
+
+    const liveSubscriptions = await db
+      .select()
+      .from(kilo_pass_subscriptions)
+      .where(
+        and(
+          eq(kilo_pass_subscriptions.kilo_user_id, user.id),
+          eq(kilo_pass_subscriptions.status, 'active')
+        )
+      );
+    expect(liveSubscriptions).toHaveLength(1);
+
+    const storePurchases = await db
+      .select()
+      .from(kilo_pass_store_purchases)
+      .where(eq(kilo_pass_store_purchases.kilo_user_id, user.id));
+    expect(storePurchases).toHaveLength(1);
+  });
+
   it('increments the streak for consecutive App Store monthly renewals', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const providerSubscriptionId = `orig-${crypto.randomUUID()}`;

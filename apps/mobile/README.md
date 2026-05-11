@@ -26,24 +26,27 @@ Generally speaking, you only need a new dev build if making dependency/native ch
 4. `pnpm start`
 5. open installed app on your phone
 
-## Apple In-App Credit Purchases
+## App Store Kilo Pass Subscriptions
 
-iOS credit purchases require an EAS development build or TestFlight build with
-the in-app purchase capability enabled. Expo Go is not supported for this
-feature.
+App Store Kilo Pass subscriptions require an EAS development build or TestFlight
+build with the in-app purchase capability enabled. Expo Go is not supported for
+this feature.
 
-Configured consumable product IDs:
+Configured auto-renewable subscription product IDs:
 
-- `com.kilocode.kiloapp.credits.small.999`
-- `com.kilocode.kiloapp.credits.medium.1999`
-- `com.kilocode.kiloapp.credits.large.4999`
+- `kilopass.tier19.monthly.v1`
+- `kilopass.tier49.monthly.v1`
+- `kilopass.tier199.monthly.v1`
 
 Use App Store Connect sandbox tester accounts for local and TestFlight sandbox
 verification. Configure App Store Server Notifications V2 to post to
-`/api/apple/iap/notifications`.
+`/api/kilo-pass/apple/notifications`.
 
 Backend environment variables:
 
 - `APPLE_IAP_ENVIRONMENT`
 - `APPLE_APP_APPLE_ID`
 - `APPLE_ROOT_CERTIFICATES_PEM`
+- `APPLE_IAP_KEY_ID`
+- `APPLE_IAP_ISSUER_ID`
+- `APPLE_IAP_PRIVATE_KEY`

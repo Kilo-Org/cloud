@@ -1,3 +1,5 @@
+import { parseTimestamp } from '@/lib/utils';
+
 type KiloPassSubscriptionCardSubscription = {
   cancelAtPeriodEnd: boolean;
   currentPeriodBaseCreditsUsd: number;
@@ -25,7 +27,7 @@ function formatSubscriptionEndDate(iso: string | null): string {
     return 'period end';
   }
 
-  const date = new Date(iso);
+  const date = parseTimestamp(iso);
   if (Number.isNaN(date.getTime())) {
     return 'period end';
   }

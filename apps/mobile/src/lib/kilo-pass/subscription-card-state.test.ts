@@ -75,6 +75,18 @@ describe('getKiloPassSubscriptionCardState', () => {
     });
   });
 
+  it('formats backend PostgreSQL timestamps for pending cancellation', () => {
+    expect(
+      getKiloPassSubscriptionCardState({
+        cancelAtPeriodEnd: true,
+        currentPeriodBaseCreditsUsd: 19,
+        paymentProvider: 'app_store',
+        refillAt: '2026-06-08 15:21:05+00',
+        status: 'active',
+      }).description
+    ).toContain('June 8, 2026');
+  });
+
   it('treats canceled App Store-managed subscriptions as unsubscribed', () => {
     expect(
       getKiloPassSubscriptionCardState({

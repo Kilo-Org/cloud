@@ -208,9 +208,10 @@ export type SignupSource =
   | null;
 
 /**
- * Handles signup promotion logic: grants credits for users who pass
- * both Turnstile and Stytch validation. When signupSource is set, layers
- * an additional product-specific bonus on top of the base welcome credit.
+ * Handles signup promotion logic for users who pass both Turnstile and
+ * Stytch validation. The automatic welcome credit was removed; this
+ * function now only grants product-specific signup bonuses based on
+ * `signupSource`.
  */
 export async function handleSignupPromotion(
   user: User,
@@ -218,23 +219,6 @@ export async function handleSignupPromotion(
   signupSource: SignupSource = null
 ): Promise<void> {
   if (!passedValidations) return;
-
-  try {
-    // Grant automatic-welcome-credits for passing both Turnstile and Stytch validation
-    await grantCreditForCategory(user, {
-      credit_category: 'automatic-welcome-credits',
-      counts_as_selfservice: false,
-    });
-  } catch (error) {
-    // Don't fail the entire process if credit granting fails
-    captureException(error, {
-      tags: {
-        source: 'signup_promotion_credit_grant',
-        credit_category: 'automatic-welcome-credits',
-      },
-      extra: { userId: user.id, email: user.google_user_email, signupSource },
-    });
-  }
 
   if (signupSource?.kind === 'openclaw-security-advisor') {
     try {

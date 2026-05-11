@@ -1,13 +1,71 @@
-import { describe, it } from '@jest/globals';
+import { afterAll, describe, expect, it } from '@jest/globals';
+import { eq } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateDrizzleJson, generateMigration } from 'drizzle-kit/api';
 import * as schema from './schema';
 import { SCHEMA_CHECK_ENUMS } from './schema';
+import { createDrizzleClient } from './client';
+import { computeDatabaseUrl } from './database-url';
+import { KiloPassCadence, KiloPassPaymentProvider, KiloPassTier } from './schema-types';
+
+const schemaTestDb = createDrizzleClient({
+  connectionString: computeDatabaseUrl(),
+  poolConfig: { application_name: 'db-schema-test', max: 1 },
+});
+
+afterAll(async () => {
+  await schemaTestDb.pool.end();
+});
+
+async function withKiloPassTestUser(
+  testFn: (params: { userId: string }) => Promise<void>
+): Promise<void> {
+  const userId = `schema-kilo-pass-${crypto.randomUUID()}`;
+
+  await schemaTestDb.db.insert(schema.kilocode_users).values({
+    id: userId,
+    google_user_email: `${userId}@example.com`,
+    google_user_name: 'Schema Test User',
+    google_user_image_url: 'https://example.com/avatar.png',
+    stripe_customer_id: `cus_${crypto.randomUUID()}`,
+  });
+
+  try {
+    await testFn({ userId });
+  } finally {
+    await schemaTestDb.db.delete(schema.kilocode_users).where(eq(schema.kilocode_users.id, userId));
+  }
+}
+
+async function insertKiloPassSubscription(values: {
+  userId: string;
+  paymentProvider: KiloPassPaymentProvider;
+  providerSubscriptionId: string | null;
+  stripeSubscriptionId: string | null;
+}): Promise<void> {
+  await schemaTestDb.db.insert(schema.kilo_pass_subscriptions).values({
+    kilo_user_id: values.userId,
+    payment_provider: values.paymentProvider,
+    provider_subscription_id: values.providerSubscriptionId,
+    stripe_subscription_id: values.stripeSubscriptionId,
+    tier: KiloPassTier.Tier19,
+    cadence: KiloPassCadence.Monthly,
+    status: 'active',
+  });
+}
+
+async function expectProviderIdsCheckViolation(insertPromise: Promise<void>): Promise<void> {
+  await expect(insertPromise).rejects.toMatchObject({
+    cause: {
+      constraint: 'kilo_pass_subscriptions_provider_ids_check',
+    },
+  });
+}
 
 describe('database schema', () => {
   it("should be up to date with migrations (run 'pnpm drizzle generate' if this fails)", async () => {
-    const migrationsDir = './packages/db/src/migrations';
+    const migrationsDir = path.join(__dirname, 'migrations');
 
     // Get the latest snapshot from the migrations folder
     const journalPath = path.join(migrationsDir, 'meta', '_journal.json');
@@ -203,5 +261,68 @@ describe('database schema', () => {
   it('exposes provider-aware Kilo Pass store tables', () => {
     expect(Object.hasOwn(schema, 'kilo_pass_store_events')).toBe(true);
     expect(Object.hasOwn(schema, 'kilo_pass_store_purchases')).toBe(true);
+  });
+
+  describe('Kilo Pass subscription provider IDs', () => {
+    it('rejects Stripe subscriptions with null provider IDs', async () => {
+      await withKiloPassTestUser(async ({ userId }) => {
+        await expectProviderIdsCheckViolation(
+          insertKiloPassSubscription({
+            userId,
+            paymentProvider: KiloPassPaymentProvider.Stripe,
+            providerSubscriptionId: null,
+            stripeSubscriptionId: null,
+          })
+        );
+      });
+    });
+
+    it('rejects Stripe subscriptions with mismatched provider and Stripe IDs', async () => {
+      await withKiloPassTestUser(async ({ userId }) => {
+        await expectProviderIdsCheckViolation(
+          insertKiloPassSubscription({
+            userId,
+            paymentProvider: KiloPassPaymentProvider.Stripe,
+            providerSubscriptionId: 'sub_provider',
+            stripeSubscriptionId: 'sub_stripe',
+          })
+        );
+      });
+    });
+
+    it('rejects store provider subscriptions with a Stripe ID', async () => {
+      await withKiloPassTestUser(async ({ userId }) => {
+        await expectProviderIdsCheckViolation(
+          insertKiloPassSubscription({
+            userId,
+            paymentProvider: KiloPassPaymentProvider.AppStore,
+            providerSubscriptionId: '2000000000000001',
+            stripeSubscriptionId: 'sub_store_invalid',
+          })
+        );
+      });
+    });
+
+    it('allows valid Stripe subscriptions with matching provider and Stripe IDs', async () => {
+      await withKiloPassTestUser(async ({ userId }) => {
+        await insertKiloPassSubscription({
+          userId,
+          paymentProvider: KiloPassPaymentProvider.Stripe,
+          providerSubscriptionId: 'sub_valid_stripe',
+          stripeSubscriptionId: 'sub_valid_stripe',
+        });
+      });
+    });
+
+    it('allows valid App Store subscriptions with provider ID and null Stripe ID', async () => {
+      await withKiloPassTestUser(async ({ userId }) => {
+        await insertKiloPassSubscription({
+          userId,
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerSubscriptionId: '2000000000000002',
+          stripeSubscriptionId: null,
+        });
+      });
+    });
   });
 });

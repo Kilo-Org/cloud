@@ -277,14 +277,19 @@ async function insertSubscription(params: {
     params.status === 'incomplete_expired';
 
   const startedAt = params.startedAt ?? now;
+  const paymentProvider = params.paymentProvider ?? KiloPassPaymentProvider.Stripe;
+  const stripeSubscriptionId = params.stripeSubscriptionId ?? null;
+  const providerSubscriptionId =
+    params.providerSubscriptionId ??
+    (paymentProvider === KiloPassPaymentProvider.Stripe ? stripeSubscriptionId : null);
 
   const inserted = await db
     .insert(kilo_pass_subscriptions)
     .values({
       kilo_user_id: params.kiloUserId,
-      payment_provider: params.paymentProvider ?? KiloPassPaymentProvider.Stripe,
-      provider_subscription_id: params.providerSubscriptionId ?? null,
-      stripe_subscription_id: params.stripeSubscriptionId ?? null,
+      payment_provider: paymentProvider,
+      provider_subscription_id: providerSubscriptionId,
+      stripe_subscription_id: stripeSubscriptionId,
       tier: params.tier,
       cadence: params.cadence,
       status: params.status,
@@ -1923,6 +1928,7 @@ describe('kiloPassRouter', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: user.id,
+        provider_subscription_id: 'sub_test_schedule_change_monthly',
         stripe_subscription_id: 'sub_test_schedule_change_monthly',
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
@@ -2007,6 +2013,7 @@ describe('kiloPassRouter', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: user.id,
+        provider_subscription_id: 'sub_test_schedule_change_yearly_downtier',
         stripe_subscription_id: 'sub_test_schedule_change_yearly_downtier',
         tier: KiloPassTier.Tier199,
         cadence: KiloPassCadence.Yearly,
@@ -2052,6 +2059,7 @@ describe('kiloPassRouter', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: user.id,
+        provider_subscription_id: 'sub_test_schedule_change_yearly_uptier',
         stripe_subscription_id: 'sub_test_schedule_change_yearly_uptier',
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Yearly,
@@ -2106,6 +2114,7 @@ describe('kiloPassRouter', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: user.id,
+        provider_subscription_id: 'sub_test_schedule_change_replace',
         stripe_subscription_id: 'sub_test_schedule_change_replace',
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
@@ -2190,6 +2199,7 @@ describe('kiloPassRouter', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: user.id,
+        provider_subscription_id: 'sub_test_schedule_change_yearly_upgrade',
         stripe_subscription_id: 'sub_test_schedule_change_yearly_upgrade',
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Yearly,
@@ -2252,6 +2262,7 @@ describe('kiloPassRouter', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: user.id,
+        provider_subscription_id: 'sub_test_schedule_change_monthly_to_yearly',
         stripe_subscription_id: 'sub_test_schedule_change_monthly_to_yearly',
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
@@ -2324,6 +2335,7 @@ describe('kiloPassRouter', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,

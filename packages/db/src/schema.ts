@@ -990,8 +990,17 @@ export const kilo_pass_subscriptions = pgTable(
       sql`${table.current_streak_months} >= 0`
     ),
     check(
-      'kilo_pass_subscriptions_provider_subscription_required_check',
-      sql`${table.provider_subscription_id} IS NOT NULL OR ${table.payment_provider} = 'stripe'`
+      'kilo_pass_subscriptions_provider_ids_check',
+      sql`(
+        ${table.payment_provider} = 'stripe'
+        AND ${table.provider_subscription_id} IS NOT NULL
+        AND ${table.stripe_subscription_id} IS NOT NULL
+        AND ${table.provider_subscription_id} = ${table.stripe_subscription_id}
+      ) OR (
+        ${table.payment_provider} IN ('app_store', 'google_play')
+        AND ${table.provider_subscription_id} IS NOT NULL
+        AND ${table.stripe_subscription_id} IS NULL
+      )`
     ),
     enumCheck(
       'kilo_pass_subscriptions_payment_provider_check',

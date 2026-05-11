@@ -63,12 +63,13 @@ function transaction(
 async function insertProviderScopedSubscriptionRows(providerSubscriptionId: string) {
   const stripeUser = await insertTestUser();
   const appStoreUser = await insertTestUser();
+  const stripeSubscriptionId = `sub_${crypto.randomUUID()}`;
 
   await db.insert(kilo_pass_subscriptions).values({
     kilo_user_id: stripeUser.id,
     payment_provider: KiloPassPaymentProvider.Stripe,
-    provider_subscription_id: providerSubscriptionId,
-    stripe_subscription_id: `sub_${crypto.randomUUID()}`,
+    provider_subscription_id: stripeSubscriptionId,
+    stripe_subscription_id: stripeSubscriptionId,
     tier: KiloPassTier.Tier19,
     cadence: KiloPassCadence.Monthly,
     status: 'active',
@@ -90,7 +91,7 @@ async function insertProviderScopedSubscriptionRows(providerSubscriptionId: stri
     ended_at: null,
   });
 
-  return { stripeUser, appStoreUser };
+  return { stripeUser, appStoreUser, stripeSubscriptionId };
 }
 
 describe('processAppStoreKiloPassNotification', () => {
@@ -382,7 +383,8 @@ describe('processAppStoreKiloPassNotification', () => {
 
   it('only ends App Store rows for expiration notifications', async () => {
     const providerSubscriptionId = `shared-${crypto.randomUUID()}`;
-    await insertProviderScopedSubscriptionRows(providerSubscriptionId);
+    const { stripeSubscriptionId } =
+      await insertProviderScopedSubscriptionRows(providerSubscriptionId);
 
     await processAppStoreKiloPassNotification({
       signedPayload: 'expired-provider-scoped',
@@ -398,16 +400,14 @@ describe('processAppStoreKiloPassNotification', () => {
         }),
     });
 
-    const subscriptions = await db
+    const [stripeSubscription] = await db
+      .select()
+      .from(kilo_pass_subscriptions)
+      .where(eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId));
+    const [appStoreSubscription] = await db
       .select()
       .from(kilo_pass_subscriptions)
       .where(eq(kilo_pass_subscriptions.provider_subscription_id, providerSubscriptionId));
-    const stripeSubscription = subscriptions.find(
-      row => row.payment_provider === KiloPassPaymentProvider.Stripe
-    );
-    const appStoreSubscription = subscriptions.find(
-      row => row.payment_provider === KiloPassPaymentProvider.AppStore
-    );
 
     expect(stripeSubscription).toMatchObject({
       status: 'active',
@@ -479,7 +479,8 @@ describe('processAppStoreKiloPassNotification', () => {
 
   it('only marks App Store rows canceling at period end', async () => {
     const providerSubscriptionId = `shared-${crypto.randomUUID()}`;
-    await insertProviderScopedSubscriptionRows(providerSubscriptionId);
+    const { stripeSubscriptionId } =
+      await insertProviderScopedSubscriptionRows(providerSubscriptionId);
 
     await processAppStoreKiloPassNotification({
       signedPayload: 'auto-renew-disabled-provider-scoped',
@@ -496,16 +497,14 @@ describe('processAppStoreKiloPassNotification', () => {
         }),
     });
 
-    const subscriptions = await db
+    const [stripeSubscription] = await db
+      .select()
+      .from(kilo_pass_subscriptions)
+      .where(eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId));
+    const [appStoreSubscription] = await db
       .select()
       .from(kilo_pass_subscriptions)
       .where(eq(kilo_pass_subscriptions.provider_subscription_id, providerSubscriptionId));
-    const stripeSubscription = subscriptions.find(
-      row => row.payment_provider === KiloPassPaymentProvider.Stripe
-    );
-    const appStoreSubscription = subscriptions.find(
-      row => row.payment_provider === KiloPassPaymentProvider.AppStore
-    );
 
     expect(stripeSubscription?.cancel_at_period_end).toBe(false);
     expect(appStoreSubscription?.cancel_at_period_end).toBe(true);

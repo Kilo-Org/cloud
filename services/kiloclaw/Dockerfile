@@ -54,7 +54,8 @@ RUN echo "apt cache bust: ${APT_CACHE_BUST}" \
 RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.com/"
 
 # Install pnpm globally
-RUN npm install -g pnpm
+RUN npm install -g pnpm \
+    && npm cache clean --force
 
 # Install OpenClaw
 # Pin to specific version for reproducible builds
@@ -78,7 +79,8 @@ RUN npm install -g openclaw@2026.4.23 \
     && sed -i 's/MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"/\(MESSAGE_ACTION_TARGET_MODE[action] ?? "none"\) !== "none"/' "$CT_FILE" \
     && if grep -q 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$CT_FILE"; then echo "ERROR: actionRequiresTarget patch failed" >&2; exit 1; fi \
     && echo "OK: patched actionRequiresTarget in $(basename "$CT_FILE")" \
-    && openclaw --version
+    && openclaw --version \
+    && npm cache clean --force
 
 # Bake bundled plugin runtime deps into the image so first boot is pure
 # startup — no npm install from `openclaw doctor` on shared-cpu Fly machines.
@@ -98,16 +100,20 @@ RUN cd /usr/local/lib/node_modules/openclaw \
     && rm -rf /root/.npm
 
 # Install ClawHub CLI
-RUN npm install -g clawhub
+RUN npm install -g clawhub \
+    && npm cache clean --force
 
 # Install mcporter (MCP server tooling)
-RUN npm install -g mcporter@0.7.3
+RUN npm install -g mcporter@0.7.3 \
+    && npm cache clean --force
 
 # Install summarize (web page summarization CLI)
-RUN npm install -g @steipete/summarize@0.12.0
+RUN npm install -g @steipete/summarize@0.12.0 \
+    && npm cache clean --force
 
 # Install Kilo CLI (agentic coding assistant for the terminal)
-RUN npm install -g @kilocode/cli@7.2.31
+RUN npm install -g @kilocode/cli@7.2.31 \
+    && npm cache clean --force
 
 # Install Go (available at runtime for users to `go install` additional tools)
 ENV GO_VERSION=1.26.2
@@ -198,7 +204,8 @@ RUN cd /tmp/controller-build \
     && bun build src/index.ts --outfile=/usr/local/bin/kiloclaw-controller.js --target=node --minify \
        --define "KILOCLAW_CONTROLLER_VERSION=\"${CONTROLLER_VERSION}\"" \
        --define "KILOCLAW_CONTROLLER_COMMIT=\"${CONTROLLER_COMMIT}\"" \
-    && rm -rf /tmp/controller-build
+    && rm -rf /tmp/controller-build \
+    && bun pm cache rm
 
 # ── Final stage: runtime image ────────────────────────────────────────
 FROM runtime AS final

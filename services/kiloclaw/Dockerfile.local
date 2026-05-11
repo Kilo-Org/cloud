@@ -38,25 +38,31 @@ RUN apt-get update \
     && npm --version
 
 # Install pnpm globally
-RUN npm install -g pnpm
+RUN npm install -g pnpm \
+    && npm cache clean --force
 
 # Install OpenClaw from local tarball (see openclaw-build/README)
 COPY openclaw-build/openclaw-*.tgz /tmp/openclaw.tgz
 RUN npm install -g /tmp/openclaw.tgz \
     && rm /tmp/openclaw.tgz \
-    && openclaw --version
+    && openclaw --version \
+    && npm cache clean --force
 
 # Install ClawHub CLI
-RUN npm install -g clawhub
+RUN npm install -g clawhub \
+    && npm cache clean --force
 
 # Install mcporter (MCP server tooling)
-RUN npm install -g mcporter@0.7.3
+RUN npm install -g mcporter@0.7.3 \
+    && npm cache clean --force
 
 # Install summarize (web page summarization CLI)
-RUN npm install -g @steipete/summarize@0.12.0
+RUN npm install -g @steipete/summarize@0.12.0 \
+    && npm cache clean --force
 
 # Install Kilo CLI (agentic coding assistant for the terminal)
-RUN npm install -g @kilocode/cli@7.2.31
+RUN npm install -g @kilocode/cli@7.2.31 \
+    && npm cache clean --force
 
 # Install Go (available at runtime for users to `go install` additional tools)
 ENV GO_VERSION=1.26.2
@@ -104,7 +110,8 @@ RUN cd /tmp/controller-build \
     && bun build src/index.ts --outfile=/usr/local/bin/kiloclaw-controller.js --target=node --minify \
        --define "KILOCLAW_CONTROLLER_VERSION=\"${CONTROLLER_VERSION}\"" \
        --define "KILOCLAW_CONTROLLER_COMMIT=\"${CONTROLLER_COMMIT}\"" \
-    && rm -rf /tmp/controller-build
+    && rm -rf /tmp/controller-build \
+    && bun pm cache rm
 
 # Create OpenClaw directories
 # When a Fly Volume is mounted at /root, these dirs persist across restarts.

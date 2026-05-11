@@ -163,6 +163,7 @@ function HeaderRow() {
             variant="outline"
             size="icon"
             className="h-9 w-9"
+            aria-label="Manage Kilo Pass subscription"
             onClick={() => setSettingsOpen(true)}
           >
             <Settings className="h-4 w-4" />

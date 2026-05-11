@@ -5,7 +5,7 @@ import {
   RefundPreference,
   Subtype,
 } from '@apple/app-store-server-library';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import {
   credit_transactions,
@@ -954,6 +954,261 @@ describe('processAppStoreKiloPassNotification', () => {
       where: eq(kilocode_users.id, user.id),
     });
     expect(updatedUser?.total_microdollars_acquired).toBe(-toMicrodollars(5.7));
+  });
+
+  it('scopes App Store refund reversals to the refunded transaction after a same-month upgrade', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+    const tx1 = `tx-${crypto.randomUUID()}`;
+    const tx2 = `tx-${crypto.randomUUID()}`;
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'scoped-refund-initial-buy',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'scoped-refund-initial-buy',
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          transactionId: tx1,
+          productId: 'kilopass.tier19.monthly.v1',
+          appAccountToken: user.app_store_account_token,
+          purchaseDate: Date.parse('2026-05-01T00:00:00.000Z'),
+          expiresDate: Date.parse('2026-05-31T00:00:00.000Z'),
+          currency: 'USD',
+          price: 19000,
+        }),
+    });
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'scoped-refund-upgrade',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'scoped-refund-upgrade',
+          notificationType: NotificationTypeV2.DID_CHANGE_RENEWAL_PREF,
+          subtype: Subtype.UPGRADE,
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          transactionId: tx2,
+          productId: 'kilopass.tier49.monthly.v1',
+          appAccountToken: user.app_store_account_token,
+          purchaseDate: Date.parse('2026-05-16T00:00:00.000Z'),
+          expiresDate: Date.parse('2026-06-16T00:00:00.000Z'),
+          currency: 'USD',
+          price: 49000,
+        }),
+    });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.provider_subscription_id, providerSubscriptionId),
+    });
+    expect(subscription).toBeDefined();
+
+    const issuance = await db.query.kilo_pass_issuances.findFirst({
+      where: and(
+        eq(kilo_pass_issuances.kilo_pass_subscription_id, subscription?.id ?? ''),
+        eq(kilo_pass_issuances.issue_month, '2026-05-01')
+      ),
+    });
+    expect(issuance).toBeDefined();
+
+    const [bonusTransaction, promoTransaction] = await Promise.all([
+      db
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: user.id,
+          amount_microdollars: toMicrodollars(24.5),
+          is_free: true,
+          description: 'test tx2 Kilo Pass bonus credits',
+          credit_category: `test-kilo-pass-bonus-${crypto.randomUUID()}`,
+        })
+        .returning({ id: credit_transactions.id }),
+      db
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: user.id,
+          amount_microdollars: toMicrodollars(12.25),
+          is_free: true,
+          description: 'test tx2 Kilo Pass promo credits',
+          credit_category: `test-kilo-pass-promo-${crypto.randomUUID()}`,
+        })
+        .returning({ id: credit_transactions.id }),
+    ]);
+
+    await db
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${toMicrodollars(
+          36.75
+        )}`,
+      })
+      .where(eq(kilocode_users.id, user.id));
+
+    await db.insert(kilo_pass_issuance_items).values([
+      {
+        kilo_pass_issuance_id: issuance?.id ?? '',
+        kind: KiloPassIssuanceItemKind.Bonus,
+        credit_transaction_id: bonusTransaction[0]?.id ?? '',
+        amount_usd: 24.5,
+        bonus_percent_applied: 0.5,
+      },
+      {
+        kilo_pass_issuance_id: issuance?.id ?? '',
+        kind: KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+        credit_transaction_id: promoTransaction[0]?.id ?? '',
+        amount_usd: 12.25,
+        bonus_percent_applied: 0.25,
+      },
+    ]);
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'scoped-refund-tx1',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'scoped-refund-tx1',
+          notificationType: NotificationTypeV2.REFUND,
+          signedTransactionInfo: 'scoped-refund-tx1-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          transactionId: tx1,
+          productId: 'kilopass.tier19.monthly.v1',
+          appAccountToken: user.app_store_account_token,
+          revocationDate: Date.parse('2026-05-20T00:00:00.000Z'),
+          currency: 'USD',
+          price: 19000,
+        }),
+    });
+
+    let negativeCreditTransactions = await db
+      .select({
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        description: credit_transactions.description,
+      })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(negativeCreditTransactions.filter(row => row.amountMicrodollars < 0)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(19),
+          description: 'App Store Kilo Pass refund clawback',
+        }),
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(9.5),
+          description: 'Kilo Pass upgrade refund clawback (tier_19)',
+        }),
+      ])
+    );
+    expect(negativeCreditTransactions).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(49),
+          description: 'App Store Kilo Pass refund clawback',
+        }),
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(24.5),
+          description: 'App Store Kilo Pass bonus refund clawback',
+        }),
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(12.25),
+          description: 'App Store Kilo Pass promo refund clawback',
+        }),
+      ])
+    );
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'scoped-refund-tx2',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'scoped-refund-tx2',
+          notificationType: NotificationTypeV2.REFUND,
+          signedTransactionInfo: 'scoped-refund-tx2-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          transactionId: tx2,
+          productId: 'kilopass.tier49.monthly.v1',
+          appAccountToken: user.app_store_account_token,
+          revocationDate: Date.parse('2026-05-21T00:00:00.000Z'),
+          currency: 'USD',
+          price: 49000,
+        }),
+    });
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'scoped-revoke-tx2',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'scoped-revoke-tx2',
+          notificationType: NotificationTypeV2.REVOKE,
+          signedTransactionInfo: 'scoped-revoke-tx2-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          transactionId: tx2,
+          productId: 'kilopass.tier49.monthly.v1',
+          appAccountToken: user.app_store_account_token,
+          revocationDate: Date.parse('2026-05-21T00:00:00.000Z'),
+          currency: 'USD',
+          price: 49000,
+        }),
+    });
+
+    negativeCreditTransactions = await db
+      .select({
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        description: credit_transactions.description,
+      })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(negativeCreditTransactions.filter(row => row.amountMicrodollars < 0)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(19),
+          description: 'App Store Kilo Pass refund clawback',
+        }),
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(49),
+          description: 'App Store Kilo Pass refund clawback',
+        }),
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(24.5),
+          description: 'App Store Kilo Pass bonus refund clawback',
+        }),
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(12.25),
+          description: 'App Store Kilo Pass promo refund clawback',
+        }),
+      ])
+    );
+    expect(
+      negativeCreditTransactions.filter(
+        row =>
+          row.amountMicrodollars === -toMicrodollars(49) &&
+          row.description === 'App Store Kilo Pass refund clawback'
+      )
+    ).toHaveLength(1);
+    expect(
+      negativeCreditTransactions.filter(
+        row =>
+          row.amountMicrodollars === -toMicrodollars(24.5) &&
+          row.description === 'App Store Kilo Pass bonus refund clawback'
+      )
+    ).toHaveLength(1);
+    expect(
+      negativeCreditTransactions.filter(
+        row =>
+          row.amountMicrodollars === -toMicrodollars(12.25) &&
+          row.description === 'App Store Kilo Pass promo refund clawback'
+      )
+    ).toHaveLength(1);
   });
 
   it.each([

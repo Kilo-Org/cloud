@@ -5,7 +5,7 @@ import {
   Subtype,
   type ConsumptionRequest,
 } from '@apple/app-store-server-library';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 import {
@@ -374,6 +374,14 @@ function getAppleTransactionPriceMicrodollars(transaction: AppleStoreDecodedTran
   return transaction.price * 1_000;
 }
 
+function getAppStoreProviderPaymentId(providerTransactionId: string): string {
+  return `kilo-pass:${KiloPassPaymentProvider.AppStore}:${providerTransactionId}`;
+}
+
+function getAppStoreUpgradeBaseCreditCategory(providerTransactionId: string): string {
+  return `kilo-pass-upgrade-base:${KiloPassPaymentProvider.AppStore}:${providerTransactionId}`;
+}
+
 async function reverseAppStoreRefundCredits(
   transaction: AppleStoreDecodedTransaction
 ): Promise<CreditReversalResult> {
@@ -406,6 +414,30 @@ async function reverseAppStoreRefundCredits(
     }
 
     const baseReversalMicrodollars = getAppleTransactionPriceMicrodollars(transaction);
+    const ownedBaseCreditRows = await tx
+      .select({
+        creditTransactionId: credit_transactions.id,
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        isFree: credit_transactions.is_free,
+      })
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.kilo_user_id, storePurchase.kilo_user_id),
+          or(
+            eq(
+              credit_transactions.stripe_payment_id,
+              getAppStoreProviderPaymentId(transaction.transactionId)
+            ),
+            eq(
+              credit_transactions.credit_category,
+              getAppStoreUpgradeBaseCreditCategory(transaction.transactionId)
+            )
+          )
+        )
+      )
+      .limit(1);
+
     const issueMonth = dayjs(storePurchase.purchased_at).utc().format('YYYY-MM-01');
     const issuance = await tx.query.kilo_pass_issuances.findFirst({
       where: and(
@@ -414,37 +446,74 @@ async function reverseAppStoreRefundCredits(
       ),
     });
 
-    if (!issuance) {
-      return {
-        storePurchaseFound: true,
-        creditTransactionIds: [],
-        totalReversalMicrodollars: 0,
-        reversedItemKinds: [],
-      };
+    const ownedBaseCredit = ownedBaseCreditRows[0] ?? null;
+    const issuedItems: {
+      itemId: string;
+      kind: KiloPassIssuanceItemKind;
+      amountMicrodollars: number;
+      isFree: boolean;
+    }[] = [];
+
+    if (ownedBaseCredit) {
+      issuedItems.push({
+        itemId: ownedBaseCredit.creditTransactionId,
+        kind: KiloPassIssuanceItemKind.Base,
+        amountMicrodollars: ownedBaseCredit.amountMicrodollars,
+        isFree: ownedBaseCredit.isFree,
+      });
     }
 
-    const issuedItems = await tx
-      .select({
-        itemId: kilo_pass_issuance_items.id,
-        kind: kilo_pass_issuance_items.kind,
-        amountMicrodollars: credit_transactions.amount_microdollars,
-        isFree: credit_transactions.is_free,
-      })
-      .from(kilo_pass_issuance_items)
-      .innerJoin(
-        credit_transactions,
-        eq(kilo_pass_issuance_items.credit_transaction_id, credit_transactions.id)
-      )
-      .where(
-        and(
-          eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.id),
-          inArray(kilo_pass_issuance_items.kind, [
-            KiloPassIssuanceItemKind.Base,
-            KiloPassIssuanceItemKind.Bonus,
-            KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
-          ])
+    if (issuance) {
+      const currentBaseItemRows = await tx
+        .select({ itemId: kilo_pass_issuance_items.id })
+        .from(kilo_pass_issuance_items)
+        .innerJoin(
+          credit_transactions,
+          eq(kilo_pass_issuance_items.credit_transaction_id, credit_transactions.id)
         )
-      );
+        .where(
+          and(
+            eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.id),
+            eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base),
+            or(
+              eq(
+                credit_transactions.stripe_payment_id,
+                getAppStoreProviderPaymentId(transaction.transactionId)
+              ),
+              eq(
+                credit_transactions.credit_category,
+                getAppStoreUpgradeBaseCreditCategory(transaction.transactionId)
+              )
+            )
+          )
+        )
+        .limit(1);
+
+      if (currentBaseItemRows[0]) {
+        const bonusItems = await tx
+          .select({
+            itemId: kilo_pass_issuance_items.id,
+            kind: kilo_pass_issuance_items.kind,
+            amountMicrodollars: credit_transactions.amount_microdollars,
+            isFree: credit_transactions.is_free,
+          })
+          .from(kilo_pass_issuance_items)
+          .innerJoin(
+            credit_transactions,
+            eq(kilo_pass_issuance_items.credit_transaction_id, credit_transactions.id)
+          )
+          .where(
+            and(
+              eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.id),
+              inArray(kilo_pass_issuance_items.kind, [
+                KiloPassIssuanceItemKind.Bonus,
+                KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+              ])
+            )
+          );
+        issuedItems.push(...bonusItems);
+      }
+    }
 
     const creditTransactionIds: string[] = [];
     const reversedItemKinds: KiloPassIssuanceItemKind[] = [];

@@ -151,28 +151,7 @@ jobs:
       - name: Deploy Project Artifacts to Vercel
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
-  check-kiloclaw-changes:
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    outputs:
-      changed: ${{ steps.changes.outputs.kiloclaw }}
-    steps:
-      - name: Checkout code
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          fetch-depth: 0
-
-      - name: Check for kiloclaw changes
-        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
-        id: changes
-        with:
-          filters: |
-            kiloclaw:
-              - 'services/kiloclaw/**'
-
   deploy-kiloclaw:
-    needs: [check-kiloclaw-changes]
-    if: needs.check-kiloclaw-changes.outputs.changed == 'true'
     permissions:
       contents: read
       packages: write

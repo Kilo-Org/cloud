@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { KeyRound, LogOut, Trash2 } from 'lucide-react-native';
-import { Alert, Platform, Pressable, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -78,7 +78,14 @@ export function ProfileScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Profile" modal />
-      <View className="flex-1 px-6 pt-4">
+      <ScrollView
+        className="flex-1 px-6"
+        contentContainerClassName="pt-4"
+        contentContainerStyle={{
+          paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
+        }}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Credits */}
         <CreditsCard orgs={orgs} />
 
@@ -133,10 +140,7 @@ export function ProfileScreen() {
         </View>
 
         {/* Actions */}
-        <View
-          className="mt-auto gap-3"
-          style={{ paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0) }}
-        >
+        <View className="mt-6 gap-3">
           <Button
             variant="ghost"
             className="flex-row gap-2"
@@ -162,7 +166,7 @@ export function ProfileScreen() {
             v{Application.nativeApplicationVersion} ({Application.nativeBuildVersion})
           </Text>
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }

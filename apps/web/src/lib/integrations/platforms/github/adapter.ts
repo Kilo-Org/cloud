@@ -635,6 +635,56 @@ export async function getPRHeadCommit(
   return pr.head.sha;
 }
 
+type GitHubRepositoryContent = {
+  type?: string;
+  content?: string;
+  encoding?: string;
+};
+
+export function decodeGitHubBase64Content(content: string): string {
+  return Buffer.from(content.replace(/\n/g, ''), 'base64').toString('utf8');
+}
+
+/**
+ * Fetches a root text file from a repository at a specific ref.
+ * Returns null for missing files, directories, or unsupported content responses.
+ */
+export async function fetchGitHubRootTextFileAtRef(params: {
+  installationId: string;
+  owner: string;
+  repo: string;
+  path: string;
+  ref: string;
+  appType?: GitHubAppType;
+}): Promise<string | null> {
+  const { installationId, owner, repo, path, ref, appType = 'standard' } = params;
+  const tokenData = await generateGitHubInstallationToken(installationId, appType);
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  try {
+    const { data } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path,
+      ref,
+    });
+
+    if (Array.isArray(data)) return null;
+
+    const content = data as GitHubRepositoryContent;
+    if (content.type !== 'file' || content.encoding !== 'base64' || !content.content) {
+      return null;
+    }
+
+    return decodeGitHubBase64Content(content.content);
+  } catch (error) {
+    if (isHttpError(error) && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 /**
  * Type guard to check if an error is an HTTP error from Octokit
  */

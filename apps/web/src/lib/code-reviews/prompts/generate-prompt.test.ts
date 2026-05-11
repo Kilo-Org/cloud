@@ -1,6 +1,10 @@
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { resolveTemplate, generateReviewPrompt } from './generate-prompt';
 import type { PromptTemplate, ExistingReviewState } from './generate-prompt';
+import {
+  REVIEW_INSTRUCTIONS_FILE,
+  normalizeRepositoryReviewInstructions,
+} from './repository-review-instructions';
 
 // --- Fixtures ---
 
@@ -135,6 +139,53 @@ const baseConfig = {
 } satisfies CodeReviewAgentConfig;
 
 describe('generateReviewPrompt', () => {
+  it('keeps built-in review guidance when repository instructions are absent', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 1);
+
+    expect(prompt).toContain('# WHAT TO REVIEW');
+    expect(prompt).toContain('Security vulnerabilities (injection, XSS, auth bypass)');
+    expect(prompt).not.toContain(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`);
+  });
+
+  it('replaces built-in review guidance with REVIEW.md instructions at the same prompt point', async () => {
+    const repositoryReviewInstructions = [
+      'Only flag regressions with direct evidence.',
+      '',
+      '```ts',
+      'const markdown = true;',
+      '```',
+    ].join('\n');
+    const customConfig = {
+      ...baseConfig,
+      custom_instructions: 'Also consider account-level policy.',
+      focus_areas: ['security'],
+    } satisfies CodeReviewAgentConfig;
+
+    const { prompt } = await generateReviewPrompt(customConfig, 'owner/repo', 1, {
+      repositoryReviewInstructions,
+    });
+
+    expect(prompt).toContain('# CUSTOM INSTRUCTIONS');
+    expect(prompt).toContain('Also consider account-level policy.');
+    expect(prompt).toContain(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`);
+    expect(prompt).toContain('Only flag regressions with direct evidence.');
+    expect(prompt).toContain('```ts\nconst markdown = true;\n```');
+    expect(prompt).not.toContain('# WHAT TO REVIEW');
+    expect(prompt).not.toContain('Security vulnerabilities (injection, XSS, auth bypass)');
+    expect(prompt).toContain('# HARD CONSTRAINTS (READ FIRST)');
+    expect(prompt).toContain('# WORKFLOW');
+    expect(prompt).toContain('# FOCUS AREAS');
+    expect(prompt).toContain('# COMMENT FORMAT');
+    expect(prompt).toContain('## Inline Comments API Call');
+
+    expect(prompt.indexOf('# CUSTOM INSTRUCTIONS')).toBeLessThan(
+      prompt.indexOf(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`)
+    );
+    expect(prompt.indexOf(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`)).toBeLessThan(
+      prompt.indexOf('# FOCUS AREAS')
+    );
+  });
+
   it('includes roast style guidance when review_style is "roast"', async () => {
     const roastConfig = { ...baseConfig, review_style: 'roast' as const };
     const { prompt } = await generateReviewPrompt(roastConfig, 'owner/repo', 1);
@@ -202,6 +253,41 @@ describe('generateReviewPrompt', () => {
 
     expect(prompt).not.toContain('STRICT REVIEW MODE');
     expect(prompt).not.toContain('ROAST MODE ACTIVATED');
+  });
+});
+
+describe('normalizeRepositoryReviewInstructions', () => {
+  it('preserves markdown line breaks while trimming and removing control hazards', () => {
+    const instructions = [
+      ' ',
+      '# Policy',
+      String.fromCharCode(0, 1) + '```ts',
+      'const ok = true;',
+      '```',
+      ' ',
+    ].join('\r\n');
+    const normalized = normalizeRepositoryReviewInstructions(instructions);
+
+    expect(normalized).toEqual({
+      content: '# Policy\n```ts\nconst ok = true;\n```',
+      truncated: false,
+    });
+  });
+
+  it('treats empty markdown as absent', () => {
+    expect(normalizeRepositoryReviewInstructions(' \n\t\n ')).toBeNull();
+  });
+
+  it('caps very large instructions and appends a truncation note', () => {
+    const normalized = normalizeRepositoryReviewInstructions('a'.repeat(10_005));
+
+    expect(normalized?.content).toHaveLength(
+      10_000 + `\n\n[${REVIEW_INSTRUCTIONS_FILE} truncated after 10000 characters.]`.length
+    );
+    expect(normalized?.content).toContain(
+      `[${REVIEW_INSTRUCTIONS_FILE} truncated after 10000 characters.]`
+    );
+    expect(normalized?.truncated).toBe(true);
   });
 });
 

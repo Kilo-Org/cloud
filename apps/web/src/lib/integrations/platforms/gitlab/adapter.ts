@@ -501,6 +501,46 @@ export async function fetchGitLabBranches(
 }
 
 /**
+ * Fetches a repository root text file at a specific ref.
+ * Returns null for missing files and throws for non-404 API failures.
+ */
+export async function fetchGitLabRootTextFileAtRef(
+  accessToken: string,
+  projectPath: string,
+  filePath: string,
+  ref: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<string | null> {
+  const encodedProjectPath = encodeURIComponent(projectPath);
+  const encodedFilePath = encodeURIComponent(filePath);
+  const baseUrl = instanceUrl.replace(/\/$/, '');
+  const response = await fetch(
+    `${baseUrl}/api/v4/projects/${encodedProjectPath}/repository/files/${encodedFilePath}/raw?ref=${encodeURIComponent(ref)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    logExceptInTest('GitLab repository file fetch failed:', {
+      status: response.status,
+      projectPath,
+      filePath,
+      ref,
+    });
+    throw new Error(`GitLab repository file fetch failed: ${response.status}`);
+  }
+
+  return await response.text();
+}
+
+/**
  * Calculates the expiration timestamp from GitLab OAuth response
  *
  * @param createdAt - Unix timestamp when token was created

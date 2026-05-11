@@ -23,6 +23,7 @@ import type { CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';
 import { getPromptTemplateFeatureFlag, getPlatformConfig } from './platform-helpers';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { sanitizeUserInput } from './prompt-utils';
+import { formatRepositoryReviewInstructions } from './repository-review-instructions';
 
 /**
  * Inline comment info for duplicate detection
@@ -189,6 +190,8 @@ export type GenerateReviewPromptOptions = {
   gitlabContext?: GitLabDiffContext;
   /** HEAD SHA from a previous completed review (enables incremental mode) */
   previousHeadSha?: string | null;
+  /** Root REVIEW.md instructions from the base branch, replacing built-in review policy */
+  repositoryReviewInstructions?: string | null;
 };
 
 /**
@@ -211,6 +214,7 @@ export async function generateReviewPrompt(
     platform = 'github',
     gitlabContext,
     previousHeadSha,
+    repositoryReviewInstructions,
   } = options;
   // Load template from PostHog (remote) or local fallback
   const { template, source } = await loadPromptTemplate(platform);
@@ -292,7 +296,10 @@ export async function generateReviewPrompt(
   }
 
   // 6. What to review
-  prompt += template.whatToReview + '\n\n';
+  prompt +=
+    (repositoryReviewInstructions
+      ? formatRepositoryReviewInstructions(repositoryReviewInstructions)
+      : template.whatToReview) + '\n\n';
 
   // 7. Focus areas (if any selected)
   if (config.focus_areas.length > 0) {

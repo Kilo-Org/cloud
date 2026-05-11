@@ -24,25 +24,52 @@ export type SCMContext = {
 
 /**
  * Resolve a GitHub API token from the town config.
- * Fallback chain: github_token → github_cli_pat → town platform integration → rig platform integration.
+ *
+ * Priority chain (most to least preferred):
+ *   1. `github_cli_pat` — user-supplied long-lived PAT, never expires.
+ *   2. Platform integration (GitHub App installation) — minted fresh by
+ *      git-token-service with KV-backed caching that auto-invalidates
+ *      before each token's 1h TTL elapses. This is the authoritative
+ *      live source whenever an integration is configured.
+ *   3. `git_auth.github_token` — stored installation token from a past
+ *      `refreshGitCredentials()` write. Kept as a fallback for towns that
+ *      never had an integration wired up. NOT used when an integration is
+ *      configured because the stored value is typically stale (1h TTL,
+ *      never updated by anything in the request path).
+ *
+ * Historically this preferred the stored token over the integration,
+ * which made every consumer (PR poller, /refresh-git-token, agent
+ * dispatch's `GIT_TOKEN`) hand out an expired token whenever the rig
+ * had been registered more than ~1 hour ago. That broke the polecat's
+ * `gh` CLI ("Failed to log in to github.com using token (GH_TOKEN)"),
+ * the worker-side PR poller (401 from api.github.com), and the
+ * container's git refresh fallback (refreshed itself to the same
+ * expired token).
  */
 export async function resolveGitHubToken(ctx: SCMContext): Promise<string | null> {
   const townConfig = await ctx.getTownConfig();
-  let token = townConfig.git_auth?.github_token ?? townConfig.github_cli_pat;
-  if (!token) {
-    const integrationId = townConfig.git_auth?.platform_integration_id ?? ctx.platformIntegrationId;
-    if (integrationId && ctx.env.GIT_TOKEN_SERVICE) {
-      try {
-        token = await ctx.env.GIT_TOKEN_SERVICE.getToken(integrationId);
-      } catch (err) {
-        console.warn(
-          `${TOWN_LOG} resolveGitHubToken: platform integration token lookup failed for ${integrationId}`,
-          err
-        );
-      }
+
+  if (townConfig.github_cli_pat) {
+    return townConfig.github_cli_pat;
+  }
+
+  const integrationId = townConfig.git_auth?.platform_integration_id ?? ctx.platformIntegrationId;
+  if (integrationId && ctx.env.GIT_TOKEN_SERVICE) {
+    try {
+      const fresh = await ctx.env.GIT_TOKEN_SERVICE.getToken(integrationId);
+      if (typeof fresh === 'string' && fresh.length > 0) return fresh;
+      console.warn(
+        `${TOWN_LOG} resolveGitHubToken: platform integration ${integrationId} returned empty token; falling back to stored github_token`
+      );
+    } catch (err) {
+      console.warn(
+        `${TOWN_LOG} resolveGitHubToken: platform integration token lookup failed for ${integrationId}; falling back to stored github_token`,
+        err
+      );
     }
   }
-  return token ?? null;
+
+  return townConfig.git_auth?.github_token ?? null;
 }
 
 export type PRStatusResult = {

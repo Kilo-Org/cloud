@@ -786,9 +786,22 @@ export class TownDO extends DurableObject<Env> {
     const townConfig = await this.getTownConfig();
     const container = getTownContainerStub(this.env, townId);
 
+    // Resolve a fresh GitHub token here too — this method runs both at
+    // initial config push and on every config change, so the persisted
+    // GIT_TOKEN must be live rather than the stale value stored in
+    // git_auth.github_token from rig creation. The container's
+    // syncTownConfigToProcessEnv path reads `git_auth.github_token`
+    // from the X-Town-Config header on every request, so the in-process
+    // GIT_TOKEN follows the same source-of-truth as the persisted one.
+    const githubToken = await scm.resolveGitHubToken({
+      env: this.env,
+      townId,
+      getTownConfig: () => Promise.resolve(townConfig),
+    });
+
     // Phase 1: Persist to DO storage for next boot.
     const envMapping: Array<[string, string | undefined]> = [
-      ['GIT_TOKEN', townConfig.git_auth?.github_token],
+      ['GIT_TOKEN', githubToken ?? undefined],
       ['GITLAB_TOKEN', townConfig.git_auth?.gitlab_token],
       ['GITLAB_INSTANCE_URL', townConfig.git_auth?.gitlab_instance_url],
       ['GITHUB_CLI_PAT', townConfig.github_cli_pat],
@@ -861,7 +874,11 @@ export class TownDO extends DurableObject<Env> {
     // /sync-config endpoint. The X-Town-Config header delivers the
     // full config; the endpoint applies CONFIG_ENV_MAP to process.env.
     try {
-      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+      const containerConfig = await config.buildContainerConfig(
+        this.ctx.storage,
+        this.env,
+        this.townId
+      );
       await container.fetch('http://container/sync-config', {
         method: 'POST',
         headers: {
@@ -985,8 +1002,19 @@ export class TownDO extends DurableObject<Env> {
     logger.setTags({ rigId: rigConfig.rigId });
     const townConfig = await this.getTownConfig();
     const envVars: Record<string, string> = {};
-    if (townConfig.git_auth?.github_token) {
-      envVars.GIT_TOKEN = townConfig.git_auth.github_token;
+    // Resolve GitHub token through scm.resolveGitHubToken so the rig
+    // setup uses a fresh installation token when a platform integration
+    // is configured. The rig's own integration ID takes precedence over
+    // the town-level one (this rig may be wired to a different repo
+    // installation than the rest of the town).
+    const githubToken = await scm.resolveGitHubToken({
+      env: this.env,
+      townId: this.townId,
+      getTownConfig: () => Promise.resolve(townConfig),
+      platformIntegrationId: rigConfig.platformIntegrationId,
+    });
+    if (githubToken) {
+      envVars.GIT_TOKEN = githubToken;
     }
     if (townConfig.git_auth?.gitlab_token) {
       envVars.GITLAB_TOKEN = townConfig.git_auth.gitlab_token;
@@ -1001,7 +1029,11 @@ export class TownDO extends DurableObject<Env> {
       envVars.KILOCODE_TOKEN = kilocodeToken;
     }
 
-    const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+    const containerConfig = await config.buildContainerConfig(
+      this.ctx.storage,
+      this.env,
+      this.townId
+    );
     const container = getTownContainerStub(this.env, this.townId);
     const response = await container.fetch('http://container/repos/setup', {
       method: 'POST',
@@ -2851,7 +2883,11 @@ export class TownDO extends DurableObject<Env> {
     if (isAlive) {
       // Attach fresh town config so the container can update process.env
       // before restarting the SDK server (tokens, git identity, etc.).
-      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+      const containerConfig = await config.buildContainerConfig(
+        this.ctx.storage,
+        this.env,
+        this.townId
+      );
 
       // Resolve townConfig to thread the organization_id into the request body
       // (belt-and-suspenders: ensures org billing survives even if X-Town-Config
@@ -4677,7 +4713,11 @@ export class TownDO extends DurableObject<Env> {
       // This ensures org context and credentials are available immediately
       // after a container restart when the first request is a model update
       // (PATCH /model) rather than a new agent start.
-      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+      const containerConfig = await config.buildContainerConfig(
+        this.ctx.storage,
+        this.env,
+        this.townId
+      );
       const headers: Record<string, string> = {
         'X-Town-Config': JSON.stringify(containerConfig),
       };

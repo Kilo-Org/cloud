@@ -90,6 +90,12 @@ export function mapAppleKiloPassTransaction(
   if (transaction.revocationDate) {
     throw new Error('Apple transaction has been revoked');
   }
+  if (transaction.expiresDate == null) {
+    throw new Error('Apple subscription transaction is missing an expiration date');
+  }
+  if (transaction.expiresDate <= Date.now()) {
+    throw new Error('Apple subscription transaction has expired');
+  }
 
   const product = getMobileStoreKiloPassProductByAppleProductId(transaction.productId);
   if (!product) {

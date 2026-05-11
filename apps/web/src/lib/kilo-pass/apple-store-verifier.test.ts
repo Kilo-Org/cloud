@@ -13,7 +13,7 @@ function transaction(
     bundleId: 'com.kilocode.kiloapp',
     productId: 'kilopass.tier19.monthly.v1',
     purchaseDate: 1_777_626_000_000,
-    expiresDate: 1_780_218_000_000,
+    expiresDate: 4_102_444_800_000,
     appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
     environment: 'Sandbox',
     rawPayload: { transactionId: 'tx-1' },
@@ -30,7 +30,7 @@ describe('mapAppleKiloPassTransaction', () => {
       providerSubscriptionId: 'orig-1',
       providerOriginalTransactionId: 'orig-1',
       appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
-      expiresAtIso: '2026-05-31T09:00:00.000Z',
+      expiresAtIso: '2100-01-01T00:00:00.000Z',
       environment: 'Sandbox',
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,
@@ -47,6 +47,18 @@ describe('mapAppleKiloPassTransaction', () => {
     expect(() => mapAppleKiloPassTransaction(transaction({ revocationDate: 1 }))).toThrow(
       'Apple transaction has been revoked'
     );
+  });
+
+  it('rejects transactions without an expiration date', () => {
+    expect(() => mapAppleKiloPassTransaction(transaction({ expiresDate: undefined }))).toThrow(
+      'Apple subscription transaction is missing an expiration date'
+    );
+  });
+
+  it('rejects expired transactions', () => {
+    expect(() =>
+      mapAppleKiloPassTransaction(transaction({ expiresDate: Date.now() - 1_000 }))
+    ).toThrow('Apple subscription transaction has expired');
   });
 
   it('rejects unknown products', () => {

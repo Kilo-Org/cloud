@@ -135,7 +135,12 @@ async function markStoreSubscriptionEnded(
       cancel_at_period_end: false,
       ended_at: new Date().toISOString(),
     })
-    .where(eq(kilo_pass_subscriptions.provider_subscription_id, transaction.originalTransactionId));
+    .where(
+      and(
+        eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.AppStore),
+        eq(kilo_pass_subscriptions.provider_subscription_id, transaction.originalTransactionId)
+      )
+    );
 }
 
 async function markStoreSubscriptionCancelingAtPeriodEnd(
@@ -146,7 +151,12 @@ async function markStoreSubscriptionCancelingAtPeriodEnd(
     .set({
       cancel_at_period_end: true,
     })
-    .where(eq(kilo_pass_subscriptions.provider_subscription_id, transaction.originalTransactionId));
+    .where(
+      and(
+        eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.AppStore),
+        eq(kilo_pass_subscriptions.provider_subscription_id, transaction.originalTransactionId)
+      )
+    );
 }
 
 async function getUserForStoreRenewal(params: {
@@ -160,7 +170,12 @@ async function getUserForStoreRenewal(params: {
     .select({ user: kilocode_users })
     .from(kilo_pass_subscriptions)
     .innerJoin(kilocode_users, eq(kilo_pass_subscriptions.kilo_user_id, kilocode_users.id))
-    .where(eq(kilo_pass_subscriptions.provider_subscription_id, params.providerSubscriptionId))
+    .where(
+      and(
+        eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.AppStore),
+        eq(kilo_pass_subscriptions.provider_subscription_id, params.providerSubscriptionId)
+      )
+    )
     .limit(1);
 
   if (row[0]?.user) return row[0].user;

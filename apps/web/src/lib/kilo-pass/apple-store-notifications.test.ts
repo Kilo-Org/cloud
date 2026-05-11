@@ -14,6 +14,7 @@ import {
   kilocode_users,
   kilo_pass_audit_log,
   kilo_pass_store_events,
+  kilo_pass_store_purchases,
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
@@ -21,6 +22,7 @@ import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   KiloPassAuditLogAction,
+  KiloPassCadence,
   KiloPassIssuanceItemKind,
   KiloPassPaymentProvider,
   KiloPassTier,
@@ -56,6 +58,39 @@ function transaction(
     rawPayload: { test: true },
     ...overrides,
   };
+}
+
+async function insertProviderScopedSubscriptionRows(providerSubscriptionId: string) {
+  const stripeUser = await insertTestUser();
+  const appStoreUser = await insertTestUser();
+
+  await db.insert(kilo_pass_subscriptions).values({
+    kilo_user_id: stripeUser.id,
+    payment_provider: KiloPassPaymentProvider.Stripe,
+    provider_subscription_id: providerSubscriptionId,
+    stripe_subscription_id: `sub_${crypto.randomUUID()}`,
+    tier: KiloPassTier.Tier19,
+    cadence: KiloPassCadence.Monthly,
+    status: 'active',
+    cancel_at_period_end: false,
+    started_at: '2026-05-01T00:00:00.000Z',
+    ended_at: null,
+  });
+
+  await db.insert(kilo_pass_subscriptions).values({
+    kilo_user_id: appStoreUser.id,
+    payment_provider: KiloPassPaymentProvider.AppStore,
+    provider_subscription_id: providerSubscriptionId,
+    stripe_subscription_id: null,
+    tier: KiloPassTier.Tier19,
+    cadence: KiloPassCadence.Monthly,
+    status: 'active',
+    cancel_at_period_end: false,
+    started_at: '2026-05-01T00:00:00.000Z',
+    ended_at: null,
+  });
+
+  return { stripeUser, appStoreUser };
 }
 
 describe('processAppStoreKiloPassNotification', () => {
@@ -228,6 +263,46 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(subscription?.ended_at).not.toBeNull();
   });
 
+  it('only ends App Store rows for expiration notifications', async () => {
+    const providerSubscriptionId = `shared-${crypto.randomUUID()}`;
+    await insertProviderScopedSubscriptionRows(providerSubscriptionId);
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'expired-provider-scoped',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'expired-provider-scoped',
+          notificationType: NotificationTypeV2.EXPIRED,
+          signedTransactionInfo: 'expired-provider-scoped-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+        }),
+    });
+
+    const subscriptions = await db
+      .select()
+      .from(kilo_pass_subscriptions)
+      .where(eq(kilo_pass_subscriptions.provider_subscription_id, providerSubscriptionId));
+    const stripeSubscription = subscriptions.find(
+      row => row.payment_provider === KiloPassPaymentProvider.Stripe
+    );
+    const appStoreSubscription = subscriptions.find(
+      row => row.payment_provider === KiloPassPaymentProvider.AppStore
+    );
+
+    expect(stripeSubscription).toMatchObject({
+      status: 'active',
+      ended_at: null,
+    });
+    expect(appStoreSubscription).toMatchObject({
+      status: 'canceled',
+      cancel_at_period_end: false,
+    });
+    expect(appStoreSubscription?.ended_at).not.toBeNull();
+  });
+
   it('marks auto-renew-disabled notifications as canceling at period end', async () => {
     const user = await insertTestUser();
     const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
@@ -262,6 +337,75 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(subscription?.status).toBe('active');
     expect(subscription?.cancel_at_period_end).toBe(true);
     expect(subscription?.ended_at).toBeNull();
+  });
+
+  it('only marks App Store rows canceling at period end', async () => {
+    const providerSubscriptionId = `shared-${crypto.randomUUID()}`;
+    await insertProviderScopedSubscriptionRows(providerSubscriptionId);
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'auto-renew-disabled-provider-scoped',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'auto-renew-disabled-provider-scoped',
+          notificationType: NotificationTypeV2.DID_CHANGE_RENEWAL_STATUS,
+          subtype: Subtype.AUTO_RENEW_DISABLED,
+          signedTransactionInfo: 'auto-renew-disabled-provider-scoped-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+        }),
+    });
+
+    const subscriptions = await db
+      .select()
+      .from(kilo_pass_subscriptions)
+      .where(eq(kilo_pass_subscriptions.provider_subscription_id, providerSubscriptionId));
+    const stripeSubscription = subscriptions.find(
+      row => row.payment_provider === KiloPassPaymentProvider.Stripe
+    );
+    const appStoreSubscription = subscriptions.find(
+      row => row.payment_provider === KiloPassPaymentProvider.AppStore
+    );
+
+    expect(stripeSubscription?.cancel_at_period_end).toBe(false);
+    expect(appStoreSubscription?.cancel_at_period_end).toBe(true);
+  });
+
+  it('uses the App Store row when resolving renewal users', async () => {
+    const providerSubscriptionId = `shared-${crypto.randomUUID()}`;
+    const { stripeUser, appStoreUser } =
+      await insertProviderScopedSubscriptionRows(providerSubscriptionId);
+
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: 'renewal-provider-scoped',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'renewal-provider-scoped',
+          notificationType: NotificationTypeV2.DID_RENEW,
+          signedTransactionInfo: 'renewal-provider-scoped-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          appAccountToken: appStoreUser.app_store_account_token,
+        }),
+    });
+
+    expect(result).toEqual({ processed: true });
+
+    const stripeStorePurchases = await db
+      .select()
+      .from(kilo_pass_store_purchases)
+      .where(eq(kilo_pass_store_purchases.kilo_user_id, stripeUser.id));
+    expect(stripeStorePurchases).toHaveLength(0);
+
+    const appStorePurchases = await db
+      .select()
+      .from(kilo_pass_store_purchases)
+      .where(eq(kilo_pass_store_purchases.kilo_user_id, appStoreUser.id));
+    expect(appStorePurchases).toHaveLength(1);
   });
 
   it('applies App Store upgrade renewal preference notifications immediately', async () => {

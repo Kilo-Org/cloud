@@ -6,6 +6,7 @@ import { toast } from 'sonner-native';
 
 import { useTRPC } from '@/lib/trpc';
 import { type StoreKiloPassProduct } from './store-products';
+import { getStoreKiloPassProductsState } from './store-products-state';
 import {
   loadAppStoreKiloPassProducts,
   NO_MATCHING_KILO_PASS_PRODUCTS_MESSAGE,
@@ -95,14 +96,21 @@ export function useStoreKiloPassProducts() {
     }
   }, [productsQuery.isSuccess]);
 
+  const productsState = getStoreKiloPassProductsState({
+    data: productsQuery.data,
+    isError: productsQuery.isError,
+    storeErrorMessage,
+    queryErrorMessage,
+  });
+
   return {
-    products: productsQuery.data ?? [],
+    products: productsState.products,
     isLoading:
       storeErrorMessage === null &&
       (productsQuery.isLoading || (Platform.OS === 'ios' && !connected)),
     isRefetching: productsQuery.isRefetching,
-    isError: storeErrorMessage !== null || productsQuery.isError,
-    errorMessage: storeErrorMessage ?? queryErrorMessage,
+    isError: productsState.isError,
+    errorMessage: productsState.errorMessage,
     refetch,
   };
 }

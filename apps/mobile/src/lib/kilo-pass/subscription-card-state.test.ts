@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getKiloPassSubscriptionCardAccessibility,
   getKiloPassSubscriptionCardState,
   shouldRenderKiloPassSubscriptionCard,
 } from './subscription-card-state';
@@ -143,5 +144,49 @@ describe('shouldRenderKiloPassSubscriptionCard', () => {
         platformOS: 'ios',
       })
     ).toBe(true);
+  });
+});
+
+describe('getKiloPassSubscriptionCardAccessibility', () => {
+  it('describes the subscribe action', () => {
+    expect(
+      getKiloPassSubscriptionCardAccessibility({
+        action: 'open-store-sheet',
+        actionLabel: 'Subscribe',
+        description: 'Monthly credits with bonus progress',
+        title: 'Kilo Pass',
+      })
+    ).toEqual({
+      accessibilityHint: 'Opens Kilo Pass plans.',
+      accessibilityLabel: 'Kilo Pass. Monthly credits with bonus progress. Subscribe',
+    });
+  });
+
+  it('describes App Store management', () => {
+    expect(
+      getKiloPassSubscriptionCardAccessibility({
+        action: 'open-store-management',
+        actionLabel: 'Manage',
+        description: '$19 monthly credits · Managed in App Store',
+        title: 'Kilo Pass active',
+      })
+    ).toEqual({
+      accessibilityHint: 'Opens App Store subscription management.',
+      accessibilityLabel: 'Kilo Pass active. $19 monthly credits · Managed in App Store. Manage',
+    });
+  });
+
+  it('describes web management', () => {
+    expect(
+      getKiloPassSubscriptionCardAccessibility({
+        action: 'open-web-management',
+        actionLabel: 'Manage',
+        description: '$49 monthly credits · Managed on web',
+        title: 'Kilo Pass active',
+      })
+    ).toEqual({
+      accessibilityHint: 'Opens Kilo Pass management on web.',
+      accessibilityLabel: 'Kilo Pass active. $49 monthly credits · Managed on web. Manage',
+    });
   });
 });

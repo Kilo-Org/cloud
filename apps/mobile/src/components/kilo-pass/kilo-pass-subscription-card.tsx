@@ -15,6 +15,7 @@ import {
   requestDevStoreKitRefund,
 } from '@/lib/kilo-pass/dev-storekit-refund';
 import {
+  getKiloPassSubscriptionCardAccessibility,
   getKiloPassSubscriptionCardState,
   shouldRenderKiloPassSubscriptionCard,
 } from '@/lib/kilo-pass/subscription-card-state';
@@ -41,6 +42,7 @@ export function KiloPassSubscriptionCard() {
   ) {
     return null;
   }
+  const cardAccessibility = getKiloPassSubscriptionCardAccessibility(cardState);
 
   const devRefundAppleProductId = getDevStoreKitRefundAppleProductId({
     products: mobileStoreProductsQuery.data?.products ?? [],
@@ -121,6 +123,9 @@ export function KiloPassSubscriptionCard() {
         </View>
       ) : (
         <Pressable
+          accessibilityHint={cardAccessibility.accessibilityHint}
+          accessibilityLabel={cardAccessibility.accessibilityLabel}
+          accessibilityRole="button"
           className="rounded-lg border border-border bg-card p-3 active:opacity-80"
           onPress={handlePress}
         >

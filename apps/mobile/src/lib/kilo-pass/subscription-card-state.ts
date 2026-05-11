@@ -15,6 +15,29 @@ export type KiloPassSubscriptionCardState = {
   title: string;
 };
 
+export type KiloPassSubscriptionCardAccessibility = {
+  accessibilityHint: string | undefined;
+  accessibilityLabel: string;
+};
+
+export function getKiloPassSubscriptionCardAccessibility(
+  cardState: KiloPassSubscriptionCardState
+): KiloPassSubscriptionCardAccessibility {
+  const accessibilityLabel = [cardState.title, cardState.description, cardState.actionLabel]
+    .filter(Boolean)
+    .join('. ');
+  const accessibilityHint =
+    cardState.action === 'open-web-management'
+      ? 'Opens Kilo Pass management on web.'
+      : cardState.action === 'open-store-management'
+        ? 'Opens App Store subscription management.'
+        : cardState.action === 'open-store-sheet'
+          ? 'Opens Kilo Pass plans.'
+          : undefined;
+
+  return { accessibilityHint, accessibilityLabel };
+}
+
 export function shouldRenderKiloPassSubscriptionCard(params: {
   action: KiloPassSubscriptionCardState['action'];
   platformOS: string;

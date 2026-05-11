@@ -134,7 +134,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   // Always start core (always-on) groups; additional targets are merged in
   const coreServices = resolveGroups(getAlwaysOnGroupIds());
   const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
-  const serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
+  let serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
 
   // --- Check for socat when kiloclaw-docker-tcp is requested ---
   if (serviceNames.includes('kiloclaw-docker-tcp')) {
@@ -143,6 +143,17 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     } catch {
       console.error('socat is not installed. Install it with: brew install socat');
       process.exit(1);
+    }
+  }
+
+  // --- Skip Stripe webhook forwarding when the optional Stripe CLI is absent ---
+  if (serviceNames.includes('stripe')) {
+    try {
+      execSync('stripe --version', { stdio: 'ignore' });
+    } catch {
+      console.warn('⚠ stripe CLI not found on PATH — skipping Stripe webhook forwarder.');
+      console.warn('  Install it with: brew install stripe/stripe-cli/stripe');
+      serviceNames = serviceNames.filter(name => name !== 'stripe');
     }
   }
 
@@ -177,11 +188,15 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   }
 
   // --- Create tmux session ---
-  // Pass KILO_PORT_OFFSET into the session environment so panes see it even
-  // when an existing tmux server (from a sibling worktree) is running with a
-  // different offset. Without this, new windows inherit the server env, not
-  // ours, and services bind to base ports — causing conflicts.
-  createSession(sessionName, { KILO_PORT_OFFSET: String(portOffset) });
+  // Pass critical port env into the session so panes see it even when an
+  // existing tmux server (from a sibling worktree) is running with different
+  // values. Without this, new windows inherit the server env, not ours, and
+  // services can bind to the wrong ports.
+  const sessionEnv: Record<string, string> = { KILO_PORT_OFFSET: String(portOffset) };
+  if (process.env.PORT !== undefined && process.env.PORT !== '') {
+    sessionEnv.PORT = String(getService('nextjs').port);
+  }
+  createSession(sessionName, sessionEnv);
 
   // --- Start each service in its own tmux window ---
   const SIDEBAR_WIDTH = 40;

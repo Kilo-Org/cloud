@@ -78,7 +78,10 @@ async function main(): Promise<void> {
 
   console.log(`Starting Stripe webhook listener for http://localhost:${forwardPort}...`);
 
-  let secretPattern: RegExp | null = /whsec_[a-zA-Z0-9]+/;
+  const secretPattern = /whsec_[a-zA-Z0-9]+/;
+  const secretRedactionPattern = /whsec_[a-zA-Z0-9]+/g;
+  let secretCaptured = false;
+  let outputBuffer = '';
 
   const child = spawn('pnpm', ['--filter', 'web', 'run', 'stripe'], {
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -86,19 +89,37 @@ async function main(): Promise<void> {
     env: { ...process.env, STRIPE_FORWARD_PORT: String(forwardPort) },
   });
 
-  function handleOutput(data: Buffer) {
-    process.stdout.write(data);
+  function processOutput(text: string): void {
+    const match = secretCaptured ? null : text.match(secretPattern);
+    if (match) {
+      const secret = match[0];
+      updateEnvValue(envFilePath, 'STRIPE_WEBHOOK_SECRET', `"${secret}"`);
+      secretCaptured = true;
+    }
 
-    if (!secretPattern) return;
-    const match = data.toString().match(secretPattern);
-    if (!match) return;
+    process.stdout.write(text.replace(secretRedactionPattern, '[redacted]'));
 
-    const secret = match[0];
-    updateEnvValue(envFilePath, 'STRIPE_WEBHOOK_SECRET', `"${secret}"`);
+    if (match) {
+      console.log('\nSet STRIPE_WEBHOOK_SECRET in apps/web/.env.development.local');
+    }
+  }
 
-    console.log('\nSet STRIPE_WEBHOOK_SECRET in apps/web/.env.development.local');
+  function flushOutputBuffer(): void {
+    if (outputBuffer === '') return;
+    processOutput(outputBuffer);
+    outputBuffer = '';
+  }
 
-    secretPattern = null;
+  function handleOutput(data: Buffer): void {
+    outputBuffer += data.toString();
+
+    let newlineIndex = outputBuffer.indexOf('\n');
+    while (newlineIndex !== -1) {
+      const line = outputBuffer.slice(0, newlineIndex + 1);
+      outputBuffer = outputBuffer.slice(newlineIndex + 1);
+      processOutput(line);
+      newlineIndex = outputBuffer.indexOf('\n');
+    }
   }
 
   child.stdout.on('data', handleOutput);
@@ -109,6 +130,7 @@ async function main(): Promise<void> {
   }
 
   child.on('close', code => {
+    flushOutputBuffer();
     process.exit(code ?? 1);
   });
 }

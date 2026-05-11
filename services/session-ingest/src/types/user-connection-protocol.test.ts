@@ -4,6 +4,7 @@ import {
   CLIInboundMessageSchema,
   WebOutboundMessageSchema,
   WebInboundMessageSchema,
+  SessionEventPayloadSchema,
 } from './user-connection-protocol';
 
 const validSessionId = 'ses_12345678901234567890123456';
@@ -278,6 +279,127 @@ describe('WebInboundMessageSchema', () => {
   it('rejects unknown type', () => {
     const msg = { type: 'unknown', data: {} };
     const result = WebInboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('SessionEventPayloadSchema', () => {
+  const session = {
+    source: 'v2',
+    sessionId: validSessionId,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:01.000Z',
+    title: 'Test',
+    createdOnPlatform: 'web',
+    organizationId: null,
+    gitUrl: null,
+    gitBranch: null,
+    parentSessionId: null,
+    status: 'idle',
+    statusUpdatedAt: null,
+  };
+
+  it('parses semantic v2 session events', () => {
+    const events = [
+      { type: 'session.created', data: { source: 'v2', session, changedAt: session.updatedAt } },
+      { type: 'session.updated', data: { source: 'v2', session, changedAt: session.updatedAt } },
+      {
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          session,
+          previousStatus: null,
+          status: 'idle',
+          statusUpdatedAt: null,
+          changedAt: session.updatedAt,
+        },
+      },
+      {
+        type: 'session.deleted',
+        data: {
+          source: 'v2',
+          sessionId: validSessionId,
+          parentSessionId: null,
+          organizationId: null,
+          gitUrl: null,
+          gitBranch: null,
+          createdOnPlatform: 'web',
+          deletedAt: '2026-01-01T00:00:02.000Z',
+        },
+      },
+    ];
+
+    for (const event of events) {
+      expect(SessionEventPayloadSchema.safeParse(event).success).toBe(true);
+    }
+  });
+
+  it('parses lightweight status update payloads during rollout compatibility', () => {
+    const result = SessionEventPayloadSchema.safeParse({
+      type: 'session.status.updated',
+      data: {
+        source: 'v2',
+        sessionId: validSessionId,
+        previousStatus: 'idle',
+        status: 'busy',
+        statusUpdatedAt: '2026-01-01T00:00:02.000Z',
+        updatedAt: '2026-01-01T00:00:02.000Z',
+        changedAt: '2026-01-01T00:00:02.000Z',
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects invalid v2 session statuses', () => {
+    const events = [
+      {
+        type: 'session.updated',
+        data: {
+          source: 'v2',
+          session: { ...session, status: 'unknown' },
+          changedAt: session.updatedAt,
+        },
+      },
+      {
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          session,
+          previousStatus: 'active',
+          status: 'idle',
+          statusUpdatedAt: null,
+          changedAt: session.updatedAt,
+        },
+      },
+      {
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          session,
+          previousStatus: null,
+          status: 'active',
+          statusUpdatedAt: null,
+          changedAt: session.updatedAt,
+        },
+      },
+    ];
+
+    for (const event of events) {
+      expect(SessionEventPayloadSchema.safeParse(event).success).toBe(false);
+    }
+  });
+
+  it('rejects non-v2 source and legacy identity fields', () => {
+    const result = SessionEventPayloadSchema.safeParse({
+      type: 'session.created',
+      data: {
+        source: 'v1',
+        session: { ...session, kiloUserId: 'usr_1', projectId: 'proj_1', platform: 'web' },
+        changedAt: session.updatedAt,
+      },
+    });
+
     expect(result.success).toBe(false);
   });
 });

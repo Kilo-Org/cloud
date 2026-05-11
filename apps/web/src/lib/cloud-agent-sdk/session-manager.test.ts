@@ -84,6 +84,7 @@ jest.mock('./session', () => ({
         messageId: string,
         state: Extract<MessageDeliveryState, { status: 'failed' }>
       ) => void;
+      transport?: { sharedUserWebConnection?: unknown };
     }) => {
       latestStorage = sessionConfig.storage;
       mockSession.storage = sessionConfig.storage;
@@ -399,6 +400,19 @@ describe('createSessionManager', () => {
         variant?: string | null;
       }>(config.store, mgr.atoms.sessionConfig);
       expect(sessionConfig?.variant).toBe('high');
+    });
+
+    it('forwards shared user web connection to session creation', async () => {
+      const sharedUserWebConnection = { marker: 'shared' } as never;
+      const config = createMockConfig({ sharedUserWebConnection });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+      expect(mockedCreate.mock.calls[0][0].transport.sharedUserWebConnection).toBe(
+        sharedUserWebConnection
+      );
     });
 
     it('defaults variant to null when fetched data has no variant', async () => {

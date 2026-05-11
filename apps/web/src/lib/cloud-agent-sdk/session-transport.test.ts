@@ -265,6 +265,40 @@ describe('session transport missing command methods (read-only session)', () => 
 describe('remote session send via typed transport methods', () => {
   const cliKiloSessionId = kiloId('ses_cli-live-session');
 
+  it('can use a shared user web connection without websocketUrl/getAuthToken', async () => {
+    const sharedUserWebConnection = {
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      destroy: jest.fn(),
+      subscribeToCliSession: jest.fn(() => jest.fn()),
+      sendCommand: jest.fn(() => Promise.resolve({ ok: true })),
+      onCliEvent: jest.fn(() => jest.fn()),
+      onSystemEvent: jest.fn(() => jest.fn()),
+      onReconnect: jest.fn(() => jest.fn()),
+      onSessionEvent: jest.fn(() => jest.fn()),
+    };
+    const session = createCloudAgentSession({
+      kiloSessionId: cliKiloSessionId,
+      resolveSession: async () => ({ type: 'remote' as const, kiloSessionId: cliKiloSessionId }),
+      transport: { sharedUserWebConnection },
+    });
+
+    session.connect();
+    await new Promise(r => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
+
+    await session.send({ payload: { type: 'prompt', prompt: 'Hello shared' } });
+
+    expect(sharedUserWebConnection.subscribeToCliSession).toHaveBeenCalledWith(cliKiloSessionId);
+    expect(sharedUserWebConnection.sendCommand).toHaveBeenCalledWith(
+      cliKiloSessionId,
+      'send_message',
+      expect.objectContaining({ sessionID: cliKiloSessionId })
+    );
+    expect(jest.mocked(global.WebSocket)).not.toHaveBeenCalled();
+    session.destroy();
+  });
+
   it('session.send() uses kiloSessionId for remote sessions', async () => {
     const session = createCloudAgentSession({
       kiloSessionId: cliKiloSessionId,

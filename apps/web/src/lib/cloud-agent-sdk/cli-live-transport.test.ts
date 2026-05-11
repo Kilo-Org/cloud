@@ -96,6 +96,198 @@ function createTransportWithSinks(opts?: {
 // Tests
 // ---------------------------------------------------------------------------
 
+describe('CliLiveTransport shared client mode', () => {
+  function createSharedClient() {
+    const cliListeners: Array<
+      (event: { sessionId: string; parentSessionId?: string; event: string; data: unknown }) => void
+    > = [];
+    const systemListeners: Array<(event: { event: string; data: unknown }) => void> = [];
+    const reconnectListeners: Array<() => void> = [];
+    return {
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      destroy: jest.fn(),
+      subscribeToCliSession: jest.fn(() => jest.fn()),
+      sendCommand: jest.fn(() => Promise.resolve({ ok: true })),
+      onCliEvent: jest.fn(
+        (
+          _sessionId: string,
+          listener: (event: {
+            sessionId: string;
+            parentSessionId?: string;
+            event: string;
+            data: unknown;
+          }) => void
+        ) => {
+          cliListeners.push(listener);
+          return jest.fn();
+        }
+      ),
+      onSystemEvent: jest.fn((listener: (event: { event: string; data: unknown }) => void) => {
+        systemListeners.push(listener);
+        return jest.fn();
+      }),
+      onSessionEvent: jest.fn(() => jest.fn()),
+      onReconnect: jest.fn((listener: () => void) => {
+        reconnectListeners.push(listener);
+        return jest.fn();
+      }),
+      emitCli: (event: {
+        sessionId: string;
+        parentSessionId?: string;
+        event: string;
+        data: unknown;
+      }) => cliListeners.forEach(listener => listener(event)),
+      emitSystem: (event: { event: string; data: unknown }) =>
+        systemListeners.forEach(listener => listener(event)),
+      emitReconnect: () => reconnectListeners.forEach(listener => listener()),
+    };
+  }
+
+  it('creates no WebSocket, subscribes/releases, delegates commands, and routes events', async () => {
+    const shared = createSharedClient();
+    const chatEvents: ChatEvent[] = [];
+    const serviceEvents: ServiceEvent[] = [];
+    const transport = createCliLiveTransport({
+      kiloSessionId: KILO_SESSION_ID,
+      sharedUserWebConnection: shared,
+      fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: KILO_SESSION_ID })),
+    })({ onChatEvent: e => chatEvents.push(e), onServiceEvent: e => serviceEvents.push(e) });
+
+    transport.connect();
+    await Promise.resolve();
+
+    expect(webSocketConstructor).not.toHaveBeenCalled();
+    const subscribeOrder = shared.subscribeToCliSession.mock.invocationCallOrder[0];
+    expect(shared.onCliEvent.mock.invocationCallOrder[0]).toBeLessThan(subscribeOrder);
+    expect(shared.onSystemEvent.mock.invocationCallOrder[0]).toBeLessThan(subscribeOrder);
+    expect(shared.connect.mock.invocationCallOrder[0]).toBeLessThan(subscribeOrder);
+    expect(shared.subscribeToCliSession).toHaveBeenCalledWith(KILO_SESSION_ID);
+    expect(serviceEvents).toContainEqual(expect.objectContaining({ type: 'session.created' }));
+
+    shared.emitCli({
+      sessionId: KILO_SESSION_ID,
+      event: 'message.updated',
+      data: {
+        info: { id: 'msg-1', sessionID: KILO_SESSION_ID, role: 'assistant', time: { created: 1 } },
+      },
+    });
+    expect(chatEvents).toContainEqual(expect.objectContaining({ type: 'message.updated' }));
+
+    await expect(
+      transport.send!({ payload: { type: 'prompt', prompt: 'hello' } })
+    ).resolves.toEqual({ ok: true });
+    expect(shared.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'send_message',
+      expect.objectContaining({ sessionID: KILO_SESSION_ID })
+    );
+
+    transport.destroy();
+    const release = shared.subscribeToCliSession.mock.results[0].value;
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(shared.destroy).not.toHaveBeenCalled();
+  });
+
+  it('replays a fresh snapshot after the shared client reconnects', async () => {
+    const shared = createSharedClient();
+    const snapshot = makeSnapshot({ id: KILO_SESSION_ID }, [
+      {
+        info: stubUserMessage({ id: 'msg-1', sessionID: KILO_SESSION_ID }),
+        parts: [stubTextPart({ id: 'part-1', sessionID: KILO_SESSION_ID, messageID: 'msg-1' })],
+      },
+    ]);
+    const fetchSnapshot = jest.fn(() => Promise.resolve(snapshot));
+    const chatEvents: ChatEvent[] = [];
+    const serviceEvents: ServiceEvent[] = [];
+    const transport = createCliLiveTransport({
+      kiloSessionId: KILO_SESSION_ID,
+      sharedUserWebConnection: shared,
+      fetchSnapshot,
+    })({ onChatEvent: e => chatEvents.push(e), onServiceEvent: e => serviceEvents.push(e) });
+
+    transport.connect();
+    await Promise.resolve();
+    expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+
+    shared.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+    expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(2);
+    expect(chatEvents.filter(event => event.type === 'message.updated')).toHaveLength(2);
+    expect(chatEvents.filter(event => event.type === 'message.part.updated')).toHaveLength(2);
+    transport.destroy();
+  });
+
+  it('acceptSuggestion delegates to shared sendCommand', async () => {
+    const shared = createSharedClient();
+    const transport = createCliLiveTransport({
+      kiloSessionId: KILO_SESSION_ID,
+      sharedUserWebConnection: shared,
+    })({ onChatEvent: jest.fn(), onServiceEvent: jest.fn() });
+
+    transport.connect();
+    await transport.acceptSuggestion!({ requestId: 'sug-1', index: 2 });
+
+    expect(shared.sendCommand).toHaveBeenCalledWith(KILO_SESSION_ID, 'suggestion_accept', {
+      requestID: 'sug-1',
+      index: 2,
+    });
+    transport.destroy();
+  });
+
+  it('dismissSuggestion delegates to shared sendCommand', async () => {
+    const shared = createSharedClient();
+    const transport = createCliLiveTransport({
+      kiloSessionId: KILO_SESSION_ID,
+      sharedUserWebConnection: shared,
+    })({ onChatEvent: jest.fn(), onServiceEvent: jest.fn() });
+
+    transport.connect();
+    await transport.dismissSuggestion!({ requestId: 'sug-2' });
+
+    expect(shared.sendCommand).toHaveBeenCalledWith(KILO_SESSION_ID, 'suggestion_dismiss', {
+      requestID: 'sug-2',
+    });
+    transport.destroy();
+  });
+
+  it('reports shared snapshot preload failures while keeping live routing connected', async () => {
+    const shared = createSharedClient();
+    const onError = jest.fn();
+    const serviceEvents: ServiceEvent[] = [];
+    const transport = createCliLiveTransport({
+      kiloSessionId: KILO_SESSION_ID,
+      sharedUserWebConnection: shared,
+      fetchSnapshot: () => Promise.reject(new Error('snapshot unavailable')),
+      onError,
+    })({ onChatEvent: jest.fn(), onServiceEvent: e => serviceEvents.push(e) });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onError).toHaveBeenCalledWith('snapshot unavailable');
+    expect(shared.connect).toHaveBeenCalledTimes(1);
+    expect(shared.subscribeToCliSession).toHaveBeenCalledWith(KILO_SESSION_ID);
+
+    shared.emitSystem({
+      event: 'sessions.list',
+      data: {
+        sessions: [
+          { id: KILO_SESSION_ID, status: 'busy', title: 'My Session', connectionId: 'owner-1' },
+        ],
+      },
+    });
+    shared.emitSystem({ event: 'cli.disconnected', data: { connectionId: 'owner-1' } });
+
+    expect(serviceEvents).toContainEqual({ type: 'stopped', reason: 'disconnected' });
+    transport.destroy();
+  });
+});
+
 describe('CliLiveTransport subscribe/unsubscribe', () => {
   it('sends subscribe message on connect', () => {
     const { transport } = createTransportWithSinks();
@@ -302,11 +494,21 @@ describe('CliLiveTransport event routing', () => {
 });
 
 describe('CliLiveTransport system events', () => {
-  it('cli.disconnected fires stopped event', () => {
+  it('cli.disconnected fires stopped event for the known owner', () => {
     const { transport, serviceEvents } = createTransportWithSinks();
 
     transport.connect();
     openConnection();
+
+    sendInbound({
+      type: 'system',
+      event: 'sessions.list',
+      data: {
+        sessions: [
+          { id: KILO_SESSION_ID, status: 'active', title: 'My Session', connectionId: 'conn-1' },
+        ],
+      },
+    });
 
     sendInbound({
       type: 'system',
@@ -323,11 +525,20 @@ describe('CliLiveTransport system events', () => {
     transport.destroy();
   });
 
-  it('session disappearing from heartbeat fires stopped event', () => {
+  it('session disappearing from owner heartbeat fires stopped event', () => {
     const { transport, serviceEvents } = createTransportWithSinks();
 
     transport.connect();
     openConnection();
+
+    sendInbound({
+      type: 'system',
+      event: 'sessions.heartbeat',
+      data: {
+        connectionId: 'c1',
+        sessions: [{ id: KILO_SESSION_ID, status: 'active', title: 'My Session' }],
+      },
+    });
 
     sendInbound({
       type: 'system',
@@ -377,7 +588,6 @@ describe('CliLiveTransport system events', () => {
       type: 'system',
       event: 'sessions.list',
       data: {
-        connectionId: 'c1',
         sessions: [],
       },
     });
@@ -387,6 +597,47 @@ describe('CliLiveTransport system events', () => {
       type: 'stopped',
       reason: 'disconnected',
     });
+
+    transport.destroy();
+  });
+
+  it('sessions.list establishes owner before the first heartbeat', () => {
+    const { transport, serviceEvents } = createTransportWithSinks();
+
+    transport.connect();
+    openConnection();
+
+    sendInbound({
+      type: 'system',
+      event: 'sessions.list',
+      data: {
+        sessions: [
+          {
+            id: KILO_SESSION_ID,
+            status: 'active',
+            title: 'My Session',
+            connectionId: 'owner-conn',
+          },
+        ],
+      },
+    });
+
+    sendInbound({
+      type: 'system',
+      event: 'cli.disconnected',
+      data: { connectionId: 'other-conn' },
+    });
+
+    expect(serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(0);
+
+    sendInbound({
+      type: 'system',
+      event: 'cli.disconnected',
+      data: { connectionId: 'owner-conn' },
+    });
+
+    expect(serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(1);
+    expect(serviceEvents.at(-1)).toEqual({ type: 'stopped', reason: 'disconnected' });
 
     transport.destroy();
   });
@@ -888,7 +1139,16 @@ describe('CliLiveTransport stopped event deduplication', () => {
     transport.connect();
     openConnection();
 
-    // First heartbeat without our session → stopped
+    sendInbound({
+      type: 'system',
+      event: 'sessions.heartbeat',
+      data: {
+        connectionId: 'c1',
+        sessions: [{ id: KILO_SESSION_ID, status: 'active', title: 'My Session' }],
+      },
+    });
+
+    // First owner heartbeat without our session -> stopped
     sendInbound({
       type: 'system',
       event: 'sessions.heartbeat',
@@ -898,7 +1158,7 @@ describe('CliLiveTransport stopped event deduplication', () => {
       },
     });
 
-    // Second heartbeat without our session → no second stopped
+    // Second owner heartbeat without our session -> no second stopped
     sendInbound({
       type: 'system',
       event: 'sessions.heartbeat',
@@ -920,7 +1180,16 @@ describe('CliLiveTransport stopped event deduplication', () => {
     transport.connect();
     openConnection();
 
-    // Session absent from heartbeat → stopped
+    sendInbound({
+      type: 'system',
+      event: 'sessions.heartbeat',
+      data: {
+        connectionId: 'c1',
+        sessions: [{ id: KILO_SESSION_ID, status: 'active', title: 'My Session' }],
+      },
+    });
+
+    // Session absent from owner heartbeat -> stopped
     sendInbound({
       type: 'system',
       event: 'sessions.heartbeat',
@@ -932,7 +1201,7 @@ describe('CliLiveTransport stopped event deduplication', () => {
 
     expect(serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(1);
 
-    // cli.disconnected arrives → no second stopped
+    // cli.disconnected arrives -> no second stopped
     sendInbound({
       type: 'system',
       event: 'cli.disconnected',
@@ -952,7 +1221,16 @@ describe('CliLiveTransport stopped event deduplication', () => {
       transport.connect();
       openConnection();
 
-      // Session absent from heartbeat → stopped
+      sendInbound({
+        type: 'system',
+        event: 'sessions.heartbeat',
+        data: {
+          connectionId: 'c1',
+          sessions: [{ id: KILO_SESSION_ID, status: 'active', title: 'My Session' }],
+        },
+      });
+
+      // Session absent from owner heartbeat -> stopped
       sendInbound({
         type: 'system',
         event: 'sessions.heartbeat',
@@ -975,7 +1253,18 @@ describe('CliLiveTransport stopped event deduplication', () => {
       // Open the new connection
       newMockWs.onopen?.({} as Event);
 
-      // Session absent from heartbeat again → second stopped fires (flag was reset)
+      newMockWs.onmessage?.({
+        data: JSON.stringify({
+          type: 'system',
+          event: 'sessions.heartbeat',
+          data: {
+            connectionId: 'c2',
+            sessions: [{ id: KILO_SESSION_ID, status: 'active', title: 'My Session' }],
+          },
+        }),
+      } as MessageEvent);
+
+      // Session absent from owner heartbeat again -> second stopped fires (flag was reset)
       newMockWs.onmessage?.({
         data: JSON.stringify({
           type: 'system',
@@ -1187,25 +1476,24 @@ describe('CliLiveTransport cli.disconnected filtering', () => {
     transport.destroy();
   });
 
-  it('fires stopped when no ownerConnectionId tracked yet (safe default)', () => {
+  it('ignores cli.disconnected before the session owner is known', () => {
     const { transport, serviceEvents } = createTransportWithSinks();
 
     transport.connect();
     openConnection();
 
-    // Send cli.disconnected without any prior heartbeat (ownerConnectionId is null)
     sendInbound({
       type: 'system',
       event: 'cli.disconnected',
       data: { connectionId: 'conn-X' },
     });
 
-    expect(serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(1);
+    expect(serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(0);
 
     transport.destroy();
   });
 
-  it('ownerConnectionId resets on reconnect', () => {
+  it('ownerConnectionId resets on reconnect and ignores unrelated disconnects until owner is known', () => {
     jest.useFakeTimers();
     try {
       const { transport, serviceEvents } = createTransportWithSinks();
@@ -1240,8 +1528,7 @@ describe('CliLiveTransport cli.disconnected filtering', () => {
       const newMockWs = webSocketConstructor.mock.results.at(-1)?.value as MockWebSocket;
       newMockWs.onopen?.({} as Event);
 
-      // Send cli.disconnected with a different connectionId
-      // Since ownerConnectionId was reset to null on reconnect, this should fire stopped
+      // Since ownerConnectionId was reset to null on reconnect, unrelated disconnects are ignored.
       newMockWs.onmessage?.({
         data: JSON.stringify({
           type: 'system',
@@ -1250,7 +1537,7 @@ describe('CliLiveTransport cli.disconnected filtering', () => {
         }),
       } as MessageEvent);
 
-      expect(serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(1);
+      expect(serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(0);
 
       transport.destroy();
     } finally {

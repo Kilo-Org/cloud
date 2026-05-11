@@ -30,6 +30,7 @@ import type {
 } from './types';
 import type { QuestionInfo } from '@/types/opencode.gen';
 import { splitByContiguousPrefix } from './array-utils';
+import type { UserWebConnection } from './user-web-connection';
 import { generateMessageId } from './message-id';
 
 // ---------------------------------------------------------------------------
@@ -134,6 +135,7 @@ type SessionManagerConfig = {
   getAuthToken: () => string | Promise<string>;
   cliWebsocketUrl?: string;
   websocketBaseUrl?: string;
+  sharedUserWebConnection?: UserWebConnection;
   api: CloudAgentApi;
   lifecycleHooks?: ConnectionLifecycleHooks;
   websocketHeaders?: WebSocketHeaders;
@@ -650,6 +652,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         fetchSnapshot: config.fetchSnapshot,
         getAuthToken: config.getAuthToken,
         cliWebsocketUrl: config.cliWebsocketUrl,
+        sharedUserWebConnection: config.sharedUserWebConnection,
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
       },

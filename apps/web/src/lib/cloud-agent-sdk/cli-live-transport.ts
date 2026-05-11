@@ -3,19 +3,26 @@
  * to a live CLI session, normalizes events, and routes them through TransportSink.
  * Uses createBaseConnection() for WebSocket lifecycle/reconnection.
  */
-import * as z from 'zod';
 import { createBaseConnection } from './base-connection';
 import type { Connection, ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import { normalizeCliEvent, isChatEvent } from './normalizer';
+import {
+  cliConnectionDataSchema,
+  heartbeatDataSchema,
+  sessionsListDataSchema,
+  webInboundMessageSchema,
+  type WebInboundMessage,
+} from './schemas';
 import { cloudAgentSdkRuntime } from './runtime';
-import { webInboundMessageSchema, heartbeatDataSchema, type WebInboundMessage } from './schemas';
 import type { TransportFactory, TransportSendPayload, TransportSink } from './transport';
 import type { KiloSessionId, SessionSnapshot } from './types';
+import type { UserWebConnection } from './user-web-connection';
 
 type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
-  websocketUrl: string;
-  getAuthToken: () => string | Promise<string>;
+  sharedUserWebConnection?: UserWebConnection;
+  websocketUrl?: string;
+  getAuthToken?: () => string | Promise<string>;
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
   onError?: (message: string) => void;
   lifecycleHooks?: ConnectionLifecycleHooks;
@@ -71,36 +78,49 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       }
     }
 
+    function stopForDisconnectedSession(): void {
+      if (sessionStopped) return;
+      sink.onServiceEvent({ type: 'stopped', reason: 'disconnected' });
+      sessionStopped = true;
+    }
+
     function handleSystemMessage(event: string, data: unknown): void {
       if (event === 'cli.disconnected') {
-        const parsed = z.object({ connectionId: z.string() }).safeParse(data);
-        const disconnectedId = parsed.success ? parsed.data.connectionId : undefined;
-        if (!ownerConnectionId || disconnectedId === ownerConnectionId) {
-          if (!sessionStopped) {
-            sink.onServiceEvent({ type: 'stopped', reason: 'disconnected' });
-            sessionStopped = true;
-          }
+        const parsed = cliConnectionDataSchema.safeParse(data);
+        if (parsed.success && ownerConnectionId === parsed.data.connectionId) {
+          stopForDisconnectedSession();
         }
         return;
       }
 
-      if (event === 'sessions.heartbeat' || event === 'sessions.list') {
-        const r = heartbeatDataSchema.safeParse(data);
-        if (!r.success) return;
+      if (event === 'sessions.list') {
+        const parsed = sessionsListDataSchema.safeParse(data);
+        if (!parsed.success) return;
 
-        const session = r.data.sessions.find(s => s.id === config.kiloSessionId);
+        const session = parsed.data.sessions.find(s => s.id === config.kiloSessionId);
         if (session) {
-          ownerConnectionId = r.data.connectionId;
+          ownerConnectionId = session.connectionId;
+          sessionStopped = false;
           return;
         }
 
-        // Session not in this heartbeat — only treat as stopped if this heartbeat
-        // is from the connection that owns the session (or we haven't learned the
-        // owner yet, in which case sessions.list is the authoritative source).
-        const isOwnerHeartbeat = !ownerConnectionId || r.data.connectionId === ownerConnectionId;
-        if (isOwnerHeartbeat && !sessionStopped) {
-          sink.onServiceEvent({ type: 'stopped', reason: 'disconnected' });
-          sessionStopped = true;
+        stopForDisconnectedSession();
+        return;
+      }
+
+      if (event === 'sessions.heartbeat') {
+        const parsed = heartbeatDataSchema.safeParse(data);
+        if (!parsed.success) return;
+
+        const session = parsed.data.sessions.find(s => s.id === config.kiloSessionId);
+        if (session) {
+          ownerConnectionId = parsed.data.connectionId;
+          sessionStopped = false;
+          return;
+        }
+
+        if (ownerConnectionId === parsed.data.connectionId) {
+          stopForDisconnectedSession();
         }
       }
     }
@@ -130,6 +150,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
     function openBaseConnection(expectedGeneration: number): void {
       if (expectedGeneration !== generation) return;
+      if (!config.websocketUrl) return;
 
       baseConnection = createBaseConnection({
         lifecycleHooks: config.lifecycleHooks,
@@ -173,6 +194,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         onError: config.onError,
         isAuthFailure: (event: CloseEvent) => event.code === 4001 || event.code === 1008,
         refreshAuth: async () => {
+          if (!config.getAuthToken) return;
           authToken = await config.getAuthToken();
         },
       });
@@ -205,6 +227,9 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     }
 
     function rawSendCommand(command: string, data: unknown): Promise<unknown> {
+      if (config.sharedUserWebConnection) {
+        return config.sharedUserWebConnection.sendCommand(config.kiloSessionId, command, data);
+      }
       if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
         return Promise.reject(new Error('WebSocket is not connected'));
       }
@@ -239,6 +264,60 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           baseConnection = null;
         }
         currentWs = null;
+        sessionStopped = false;
+        ownerConnectionId = null;
+
+        if (config.sharedUserWebConnection) {
+          const replaySharedSnapshot = (reportError: boolean): void => {
+            if (!config.fetchSnapshot) return;
+            void config.fetchSnapshot(config.kiloSessionId).then(
+              snapshot => {
+                if (expectedGeneration !== generation) return;
+                replaySnapshot(snapshot);
+              },
+              (error: unknown) => {
+                if (!reportError || expectedGeneration !== generation) return;
+                const message = error instanceof Error ? error.message : 'Failed to fetch snapshot';
+                config.onError?.(message);
+              }
+            );
+          };
+          replaySharedSnapshot(true);
+          const offCli = config.sharedUserWebConnection.onCliEvent(config.kiloSessionId, msg => {
+            handleEventMessage(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
+          });
+          const offSystem = config.sharedUserWebConnection.onSystemEvent(msg => {
+            handleSystemMessage(msg.event, msg.data);
+          });
+          const offReconnect = config.sharedUserWebConnection.onReconnect(() => {
+            replaySharedSnapshot(false);
+          });
+          config.sharedUserWebConnection.connect();
+          const release = config.sharedUserWebConnection.subscribeToCliSession(
+            config.kiloSessionId
+          );
+          baseConnection = {
+            connect: () => {},
+            disconnect: () => {
+              offCli();
+              offSystem();
+              offReconnect();
+              release();
+            },
+            destroy: () => {
+              offCli();
+              offSystem();
+              offReconnect();
+              release();
+            },
+          };
+          return;
+        }
+
+        if (!config.getAuthToken) {
+          config.onError?.('Failed to get auth token');
+          return;
+        }
 
         let tokenResult: string | Promise<string>;
         try {

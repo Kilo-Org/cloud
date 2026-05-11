@@ -212,6 +212,51 @@ describe('UserConnectionDO', () => {
     vi.restoreAllMocks();
   });
 
+  describe('notifySessionEvent', () => {
+    it('broadcasts semantic session events to web sockets only', async () => {
+      const { doInstance, mockCtx } = setup();
+      const webWs = addWebSocket(mockCtx);
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const session = {
+        source: 'v2' as const,
+        sessionId: 'ses_12345678901234567890123456',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:01.000Z',
+        title: 'Test',
+        createdOnPlatform: 'web',
+        organizationId: null,
+        gitUrl: null,
+        gitBranch: null,
+        parentSessionId: null,
+        status: 'idle' as const,
+        statusUpdatedAt: null,
+      };
+
+      const result = await doInstance.notifySessionEvent({
+        type: 'session.created',
+        data: { source: 'v2', session, changedAt: session.updatedAt },
+      });
+
+      expect(result).toEqual({ delivered: 1 });
+      expect(parseSent(webWs)).toEqual({
+        type: 'system',
+        event: 'session.created',
+        data: { source: 'v2', session, changedAt: session.updatedAt },
+      });
+      expect(cliWs.send).not.toHaveBeenCalled();
+    });
+
+    it('rejects invalid session event payloads without broadcasting', async () => {
+      const { doInstance, mockCtx } = setup();
+      const webWs = addWebSocket(mockCtx);
+
+      await expect(
+        doInstance.notifySessionEvent({ type: 'session.created', data: { source: 'v1' } } as never)
+      ).rejects.toThrow();
+      expect(webWs.send).not.toHaveBeenCalled();
+    });
+  });
+
   // -------------------------------------------------------------------------
   // Heartbeat processing
   // -------------------------------------------------------------------------
@@ -444,6 +489,21 @@ describe('UserConnectionDO', () => {
       // CLI should receive subscribe
       expect(cliWs.send).toHaveBeenCalledTimes(1);
       expect(parseSent(cliWs)).toEqual({ type: 'subscribe', sessionId: 's1' });
+    });
+
+    it('sends the active session list when web subscribes after the socket is open', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'busy', 'Fix bug')]);
+      sendSubscribe(doInstance, webWs, 's1');
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'system',
+        event: 'sessions.list',
+        data: { sessions: [{ id: 's1', status: 'busy', title: 'Fix bug', connectionId: 'cli-1' }] },
+      });
     });
 
     it('broadcasts subscribe to all CLIs when no owner found', () => {

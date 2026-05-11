@@ -16,6 +16,7 @@ import { createCloudAgentTransport } from './cloud-agent-transport';
 import { createCliLiveTransport } from './cli-live-transport';
 import { createCliHistoricalTransport } from './cli-historical-transport';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
+import type { UserWebConnection } from './user-web-connection';
 import type {
   CloudAgentApi,
   CloudAgentStreamTicketResult,
@@ -118,6 +119,7 @@ type CloudAgentSessionTransport = {
   // CLI live transport construction
   getAuthToken?: () => string | Promise<string>;
   cliWebsocketUrl?: string;
+  sharedUserWebConnection?: UserWebConnection;
 };
 
 type CloudAgentSession = {
@@ -196,13 +198,17 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   function pickTransportFactory(resolved: ResolvedSession): TransportFactory {
     switch (resolved.type) {
       case 'remote': {
-        if (!config.transport.cliWebsocketUrl || !config.transport.getAuthToken) {
+        if (
+          !config.transport.sharedUserWebConnection &&
+          (!config.transport.cliWebsocketUrl || !config.transport.getAuthToken)
+        ) {
           throw new Error(
             'CloudAgentSession transport.cliWebsocketUrl and getAuthToken are required for remote CLI sessions'
           );
         }
         return createCliLiveTransport({
           kiloSessionId: resolved.kiloSessionId,
+          sharedUserWebConnection: config.transport.sharedUserWebConnection,
           websocketUrl: config.transport.cliWebsocketUrl,
           getAuthToken: config.transport.getAuthToken,
           fetchSnapshot: config.transport.fetchSnapshot,

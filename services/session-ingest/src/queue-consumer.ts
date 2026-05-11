@@ -9,6 +9,8 @@ import { getItemIdentity } from './util/compaction';
 import { MAX_INGEST_ITEM_BYTES, MAX_SINGLE_ITEM_BYTES } from './util/ingest-limits';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { withDORetry, normalizeGitUrl } from '@kilocode/worker-utils';
+import { mapSessionEventRow, notifyUserSessionEvent } from './session-events';
+import { SessionStatusSchema } from './types/user-connection-protocol';
 
 export interface IngestQueueMessage {
   r2Key: string;
@@ -148,7 +150,11 @@ export function createItemExtractor(r2Key: string) {
   };
 }
 
-async function processMessage(env: Env, msg: IngestQueueMessage): Promise<void> {
+async function processMessage(
+  env: Env,
+  msg: IngestQueueMessage,
+  ctx: ExecutionContext
+): Promise<void> {
   const { r2Key, kiloUserId, sessionId, ingestVersion, ingestedAt } = msg;
 
   // Guard: skip processing if the session has been deleted since this message was queued
@@ -218,7 +224,7 @@ async function processMessage(env: Env, msg: IngestQueueMessage): Promise<void> 
   }
 
   // Update Postgres with metadata changes
-  await applyMetadataChanges(env, kiloUserId, sessionId, mergedChanges);
+  await applyMetadataChanges(env, kiloUserId, sessionId, mergedChanges, ctx);
 
   // Delete staging R2 object on success
   await env.SESSION_INGEST_R2.delete(r2Key);
@@ -324,42 +330,89 @@ async function applyMetadataChanges(
   env: Env,
   kiloUserId: string,
   sessionId: string,
-  mergedChanges: Map<string, string | null>
+  mergedChanges: Map<string, string | null>,
+  ctx: ExecutionContext
 ): Promise<void> {
   if (mergedChanges.size === 0) return;
 
   const db = getWorkerDb(env.HYPERDRIVE.connectionString);
+  const status = mergedChanges.has('status') ? (mergedChanges.get('status') ?? null) : undefined;
   const updates = computeSessionMetadataUpdates(mergedChanges);
-
-  if (Object.keys(updates).length > 0) {
-    await db
-      .update(cli_sessions_v2)
-      .set(updates)
-      .where(
-        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-      );
-  }
-
   const parentSessionId = mergedChanges.has('parentId')
     ? (mergedChanges.get('parentId') ?? null)
     : undefined;
-  if (parentSessionId !== undefined) {
-    if (parentSessionId && parentSessionId !== sessionId) {
-      const parentRows = await db
-        .select({ session_id: cli_sessions_v2.session_id })
-        .from(cli_sessions_v2)
+  const changedNonStatus =
+    mergedChanges.has('title') ||
+    mergedChanges.has('platform') ||
+    mergedChanges.has('orgId') ||
+    mergedChanges.has('gitUrl') ||
+    mergedChanges.has('gitBranch') ||
+    parentSessionId !== undefined;
+
+  const notification = await db.transaction(async tx => {
+    const statusChange =
+      status === undefined
+        ? { changed: false, previousStatus: null }
+        : await (async () => {
+            const [statusRow] = await tx
+              .select({ status: cli_sessions_v2.status })
+              .from(cli_sessions_v2)
+              .where(
+                and(
+                  eq(cli_sessions_v2.session_id, sessionId),
+                  eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+                )
+              )
+              .limit(1)
+              .for('update');
+            if (!statusRow) return null;
+            const previousStatus = SessionStatusSchema.nullable().parse(statusRow.status);
+            return { changed: status !== previousStatus, previousStatus };
+          })();
+
+    if (!statusChange) return null;
+
+    if (Object.keys(updates).length > 0) {
+      await tx
+        .update(cli_sessions_v2)
+        .set(updates)
         .where(
           and(
-            eq(cli_sessions_v2.session_id, parentSessionId),
+            eq(cli_sessions_v2.session_id, sessionId),
             eq(cli_sessions_v2.kilo_user_id, kiloUserId)
           )
-        )
-        .limit(1);
+        );
+    }
 
-      if (parentRows[0]) {
-        await db
+    if (parentSessionId !== undefined) {
+      if (parentSessionId && parentSessionId !== sessionId) {
+        const parentRows = await tx
+          .select({ session_id: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, parentSessionId),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+            )
+          )
+          .limit(1);
+
+        if (parentRows[0]) {
+          await tx
+            .update(cli_sessions_v2)
+            .set({ parent_session_id: parentSessionId })
+            .where(
+              and(
+                eq(cli_sessions_v2.session_id, sessionId),
+                eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+                sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
+              )
+            );
+        }
+      } else if (parentSessionId === null) {
+        await tx
           .update(cli_sessions_v2)
-          .set({ parent_session_id: parentSessionId })
+          .set({ parent_session_id: null })
           .where(
             and(
               eq(cli_sessions_v2.session_id, sessionId),
@@ -368,25 +421,85 @@ async function applyMetadataChanges(
             )
           );
       }
-    } else if (parentSessionId === null) {
-      await db
-        .update(cli_sessions_v2)
-        .set({ parent_session_id: null })
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, sessionId),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
-          )
-        );
     }
+
+    if (!changedNonStatus && !statusChange.changed) return null;
+
+    const [persistedRow] = await tx
+      .select({
+        session_id: cli_sessions_v2.session_id,
+        created_at: cli_sessions_v2.created_at,
+        updated_at: cli_sessions_v2.updated_at,
+        title: cli_sessions_v2.title,
+        created_on_platform: cli_sessions_v2.created_on_platform,
+        organization_id: cli_sessions_v2.organization_id,
+        git_url: cli_sessions_v2.git_url,
+        git_branch: cli_sessions_v2.git_branch,
+        parent_session_id: cli_sessions_v2.parent_session_id,
+        status: cli_sessions_v2.status,
+        status_updated_at: cli_sessions_v2.status_updated_at,
+      })
+      .from(cli_sessions_v2)
+      .where(
+        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
+      )
+      .limit(1);
+
+    if (!persistedRow) return null;
+
+    return {
+      changedNonStatus,
+      changedStatus: statusChange.changed,
+      previousStatus: statusChange.previousStatus,
+      session: mapSessionEventRow(persistedRow),
+    };
+  });
+
+  if (!notification) return;
+
+  if (notification.changedNonStatus) {
+    notifyUserSessionEvent(
+      env,
+      kiloUserId,
+      {
+        type: 'session.updated',
+        data: {
+          source: 'v2',
+          session: notification.session,
+          changedAt: notification.session.updatedAt,
+        },
+      },
+      ctx
+    );
+  }
+  if (notification.changedStatus) {
+    notifyUserSessionEvent(
+      env,
+      kiloUserId,
+      {
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          session: notification.session,
+          previousStatus: notification.previousStatus,
+          status: notification.session.status,
+          statusUpdatedAt: notification.session.statusUpdatedAt,
+          changedAt: notification.session.updatedAt,
+        },
+      },
+      ctx
+    );
   }
 }
 
-export async function queue(batch: MessageBatch<IngestQueueMessage>, env: Env): Promise<void> {
+export async function queue(
+  batch: MessageBatch<IngestQueueMessage>,
+  env: Env,
+  ctx: ExecutionContext
+): Promise<void> {
   for (const msg of batch.messages) {
     try {
-      await processMessage(env, msg.body);
+      await processMessage(env, msg.body, ctx);
       msg.ack();
     } catch (err) {
       console.error('Queue message processing failed, will retry', {

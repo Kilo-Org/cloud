@@ -4,6 +4,8 @@ import type { Env } from '../env';
 import {
   CLIOutboundMessageSchema,
   type CLIInboundMessage,
+  type SessionEventPayload,
+  SessionEventPayloadSchema,
   type WebInboundMessage,
   WebOutboundMessageSchema,
 } from '../types/user-connection-protocol';
@@ -409,6 +411,12 @@ export class UserConnectionDO extends DurableObject<Env> {
       ws.serializeAttachment(attachment);
     }
 
+    this.sendToWeb(ws, {
+      type: 'system',
+      event: 'sessions.list',
+      data: { sessions: this.aggregateSessions() },
+    });
+
     // Tell the owning CLI to start forwarding events for this session.
     // If we know the owner (from heartbeats), send to that CLI only.
     // Otherwise broadcast to all connected CLIs — the session may be idle
@@ -593,6 +601,28 @@ export class UserConnectionDO extends DurableObject<Env> {
   getActiveSessions(): Array<HeartbeatSession & { connectionId: string }> {
     this.ensureState();
     return this.aggregateSessions();
+  }
+
+  async notifySessionEvent(event: SessionEventPayload): Promise<{ delivered: number }> {
+    this.ensureState();
+    const parsed = SessionEventPayloadSchema.parse(event);
+    const msg: WebInboundMessage = {
+      type: 'system',
+      event: parsed.type,
+      data: parsed.data,
+    };
+
+    let delivered = 0;
+    const json = JSON.stringify(msg);
+    for (const ws of this.ctx.getWebSockets('web')) {
+      try {
+        ws.send(json);
+        delivered++;
+      } catch (err) {
+        console.warn('notifySessionEvent: skipping failed web socket:', err);
+      }
+    }
+    return { delivered };
   }
 
   // ---------------------------------------------------------------------------

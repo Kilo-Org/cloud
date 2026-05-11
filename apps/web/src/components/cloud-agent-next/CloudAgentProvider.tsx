@@ -6,6 +6,7 @@ import { useRawTRPCClient } from '@/lib/trpc/utils';
 import {
   createSessionManager,
   createBrowserLifecycleHooks,
+  createUserWebConnection,
   type SessionManager,
   type SessionSnapshot,
   type ResolvedSession,
@@ -13,12 +14,14 @@ import {
   type KiloSessionId,
   type CloudAgentSessionId,
   type TransportSendPayload,
+  type UserWebConnection,
 } from '@/lib/cloud-agent-sdk';
 import type { SendMessagePayload } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@/lib/constants';
 import { usePostHog } from 'posthog-js/react';
 
 const ManagerContext = createContext<SessionManager | null>(null);
+const UserWebConnectionContext = createContext<UserWebConnection | null>(null);
 
 type CloudAgentProviderProps = {
   children: ReactNode;
@@ -54,6 +57,18 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
   const posthog = usePostHog();
   const posthogRef = useRef(posthog);
   posthogRef.current = posthog;
+
+  const sharedConnectionRef = useRef<UserWebConnection | null>(null);
+  if (sharedConnectionRef.current === null && SESSION_INGEST_WS_URL) {
+    sharedConnectionRef.current = createUserWebConnection({
+      websocketUrl: `${SESSION_INGEST_WS_URL}/api/user/web`,
+      getAuthToken: async () => {
+        const result = await trpcClient.activeSessions.getToken.query();
+        return result.token;
+      },
+      lifecycleHooks: createBrowserLifecycleHooks(),
+    });
+  }
 
   // Create manager once per provider instance.
   // trpcClient is stable (from context); organizationId is stable per provider mount.
@@ -128,6 +143,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       },
 
       cliWebsocketUrl: SESSION_INGEST_WS_URL ? `${SESSION_INGEST_WS_URL}/api/user/web` : undefined,
+      sharedUserWebConnection: sharedConnectionRef.current ?? undefined,
 
       websocketBaseUrl: CLOUD_AGENT_NEXT_WS_URL,
 
@@ -327,14 +343,19 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
   // Cleanup on unmount
   useEffect(() => {
     const manager = managerRef.current;
+    const sharedConnection = sharedConnectionRef.current;
+    sharedConnection?.connect();
     return () => {
       manager?.destroy();
+      sharedConnection?.disconnect();
     };
   }, []);
 
   return (
     <JotaiProvider store={storeRef.current}>
-      <ManagerContext.Provider value={managerRef.current}>{children}</ManagerContext.Provider>
+      <UserWebConnectionContext.Provider value={sharedConnectionRef.current}>
+        <ManagerContext.Provider value={managerRef.current}>{children}</ManagerContext.Provider>
+      </UserWebConnectionContext.Provider>
     </JotaiProvider>
   );
 }
@@ -343,4 +364,8 @@ export function useManager(): SessionManager {
   const manager = useContext(ManagerContext);
   if (!manager) throw new Error('useManager must be used within CloudAgentProvider');
   return manager;
+}
+
+export function useUserWebConnection(): UserWebConnection | null {
+  return useContext(UserWebConnectionContext);
 }

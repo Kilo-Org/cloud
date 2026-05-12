@@ -440,8 +440,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     if (
       dbSyncResult === 'db-terminal' ||
+      dbSyncResult === 'db-not-found' ||
       CodeReviewOrchestrator.isTerminalStatus(this.state.status)
     ) {
+      if (dbSyncResult === 'db-not-found') {
+        await this.deleteStorage();
+      }
       return;
     }
 

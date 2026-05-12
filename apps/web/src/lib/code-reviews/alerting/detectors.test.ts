@@ -180,6 +180,25 @@ describe('code review alert detectors', () => {
     });
   });
 
+  it('still trips for reviews stuck running for more than six hours', async () => {
+    await insertReviews(
+      Array.from({ length: 5 }, () =>
+        reviewValues({
+          status: 'running',
+          created_at: minutesAgo(60 * 8),
+          updated_at: minutesAgo(60 * 7),
+          started_at: minutesAgo(60 * 7),
+          completed_at: null,
+        })
+      )
+    );
+
+    await expect(evaluateStuckReviews(db)).resolves.toMatchObject({
+      tripped: true,
+      details: { kind: 'stuck_reviews', queuedCount: 0, runningCount: 5 },
+    });
+  });
+
   it('guards no-completion alerts by minimum created count', async () => {
     await insertReviews(
       Array.from({ length: 4 }, () => reviewValues({ status: 'running', completed_at: null }))

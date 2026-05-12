@@ -156,7 +156,7 @@ export async function evaluateStuckReviews(
           AND COALESCE(started_at, updated_at, created_at) < NOW() - (${STUCK_RUNNING_MINUTES} * INTERVAL '1 minute')
       ) AS stuck_running_count
     FROM ${cloud_agent_code_reviews}
-    WHERE created_at >= NOW() - (6 * INTERVAL '1 hour')
+    WHERE status IN ('queued', 'running')
   `);
 
   const row = result.rows[0];

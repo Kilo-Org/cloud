@@ -104,7 +104,11 @@ function buildJwt(config: SnowflakeConfig): string {
 // ---------------------------------------------------------------------------
 
 const SNOWFLAKE_USER_AGENT = 'kilo-web/1.0';
-const SNOWFLAKE_MAX_POLL_ATTEMPTS = 10;
+const SNOWFLAKE_MAX_POLL_ATTEMPTS = (() => {
+  const raw = typeof process !== 'undefined' ? process.env.SNOWFLAKE_MAX_POLL_ATTEMPTS : undefined;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
+})();
 const SNOWFLAKE_POLL_BASE_DELAY_MS = 1_000;
 
 type SnowflakeApiResponse = {

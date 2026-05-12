@@ -88,7 +88,7 @@ export function exportUsageTableToCsv({
         const raw = dims[d] ?? '';
         return raw ? labelForDimensionValue(d, raw) : '';
       }),
-      (row.costMicrodollars / 1_000_000).toFixed(6),
+      Number((row.costMicrodollars / 1_000_000).toFixed(6)).toString(),
       String(row.requestCount ?? 0),
       String(row.inputTokens ?? 0),
       String(row.outputTokens ?? 0),

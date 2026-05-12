@@ -48,7 +48,7 @@ type FilterGeneratorPopoverProps = {
   /** Resolves IDs (e.g. user UUIDs) to display labels for suggestions. */
   labelForDimensionValue?: (dim: Dimension, value: string) => string;
   /** Metric used to rank breakdown suggestions (defaults to 'cost'). */
-  metric?: MetricKey;
+  metric?: 'cost' | 'requests' | 'tokens';
   /** Granularity for the breakdown query (defaults to 'day'). */
   granularity?: Granularity;
 };

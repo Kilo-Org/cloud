@@ -146,6 +146,7 @@ function isValidMetricKey(value: string): value is MetricKey {
     'tokensPerRequest',
     'errorRate',
     'avgLatencyMs',
+    'avgGenerationTimeMs',
     'cacheHitRatio',
     'outputInputRatio',
   ].includes(value);

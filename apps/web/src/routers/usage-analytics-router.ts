@@ -8,6 +8,7 @@ import {
   executeSnowflakeStatement,
   resolveSnowflakeConfig,
   type SnowflakeBinding,
+  type SnowflakeConfig,
 } from '@/lib/snowflake';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
@@ -882,6 +883,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const projectExpr = requestedDims.includes('project') ? 'project_id' : "''";
 
       // GROUP BY columns: bucket (pos 1) + each requested dimension column
+      // SAFETY: dimensionColumn() returns only hardcoded string literals from
+      // a typed enum chain — never user input.
       const dimGroupByCols = requestedDims.map(d => dimensionColumn(d)).join(', ');
       const groupByClause = dimGroupByCols ? `1, ${dimGroupByCols}` : '1';
 

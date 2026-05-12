@@ -3,30 +3,10 @@ import { useMemo } from 'react';
 
 import { deriveMobileOnboardingStateFromBilling } from '@/lib/derive-mobile-onboarding-state';
 import { resolveContext } from '@/lib/hooks/use-context-query';
+import { isInstanceNotRunningSentinel } from '@/lib/kiloclaw/instance-not-running-sentinel';
 import { useTRPC } from '@/lib/trpc';
 
 export { useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-mutations';
-
-/**
- * The worker short-circuits polling endpoints (gateway/status,
- * controller-version, morning-briefing/status) when the DO state isn't
- * `running`, returning `{ ok: false, reason: 'instance_not_running', ... }`
- * at HTTP 200. This type predicate matches that variant so callers can
- * treat the sentinel as "no data" and TypeScript narrows to the OK shape
- * on the negative branch. Must structurally match the sentinel variant on
- * the worker's response union — keep in sync with
- * `apps/web/src/lib/kiloclaw/types.ts:InstanceNotRunningSentinel`.
- */
-type InstanceNotRunningSentinel = { ok: false; reason: 'instance_not_running' };
-
-function isInstanceNotRunningSentinel(value: unknown): value is InstanceNotRunningSentinel {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'reason' in value &&
-    (value as { reason?: unknown }).reason === 'instance_not_running'
-  );
-}
 
 export type InstanceStatus = NonNullable<ReturnType<typeof useKiloClawStatus>['data']>['status'];
 export type GatewayState = NonNullable<

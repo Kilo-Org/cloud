@@ -191,6 +191,8 @@ export type Env = {
   EventsManager: DurableObjectNamespace<EventsManager>;
 
   NEXTAUTH_SECRET: SecretsStoreSecret;
+  HYPERDRIVE: Hyperdrive;
+  WORKER_ENV: string;
   DEPLOY_HOSTNAME_BASE: string;
 
   /** KV namespace tracking ephemeral HTML deployments for auto-cleanup */

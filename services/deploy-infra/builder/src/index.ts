@@ -12,8 +12,8 @@ import {
   backendAuthMiddleware,
   createErrorHandler,
   createNotFoundHandler,
-  verifyKiloToken,
 } from '@kilocode/worker-utils';
+import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 import { CloudflareAPI } from './cloudflare-api';
 import { Deployer } from './deployer';
 import { validateWorkerName } from './utils';
@@ -60,8 +60,6 @@ const DEFAULT_TTL_SECONDS = 24 * 60 * 60; // 24 hours
 const MAX_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 const KV_KEY_PREFIX = 'html-deploy:';
 
-const HTML_TAG_RE = /<!DOCTYPE\s+html|<html[\s>]/i;
-
 function generateHtmlSlug(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   const random = crypto.getRandomValues(new Uint8Array(12));
@@ -82,18 +80,16 @@ function parseTtlHeader(header: string | null): number {
 
 app.post('/deploy-html', async (c: Context<HonoEnv>) => {
   const authHeader = c.req.header('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return c.json({ error: 'Missing or invalid Authorization header' }, 401);
-  }
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
-  const secret = await c.env.NEXTAUTH_SECRET.get();
-  if (!secret) {
-    return c.json({ error: 'Server misconfiguration' }, 500);
-  }
+  const authResult = await verifyKiloBearerAgainstCurrentPepper({
+    token,
+    nextAuthSecret: c.env.NEXTAUTH_SECRET,
+    workerEnv: c.env.WORKER_ENV,
+    connectionString: c.env.HYPERDRIVE.connectionString,
+  });
 
-  try {
-    await verifyKiloToken(authHeader.slice(7), secret);
-  } catch {
+  if (!authResult) {
     return c.json({ error: 'Invalid or expired token' }, 401);
   }
 
@@ -106,16 +102,6 @@ app.post('/deploy-html', async (c: Context<HonoEnv>) => {
   if (html.length > MAX_HTML_BYTES) {
     return c.json(
       { error: `HTML body exceeds the ${MAX_HTML_BYTES / (1024 * 1024)} MB limit` },
-      400
-    );
-  }
-
-  if (!HTML_TAG_RE.test(html)) {
-    return c.json(
-      {
-        error:
-          'Content does not appear to be a valid HTML document (missing <!DOCTYPE html> or <html> tag)',
-      },
       400
     );
   }

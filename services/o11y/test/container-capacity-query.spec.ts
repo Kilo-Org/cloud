@@ -38,7 +38,7 @@ function makeListResponse(apps: unknown[], totalPages = 1, page = 1): object {
 function makeDetailResponse(app: object): object {
   return {
     success: true,
-    result: { application: app },
+    result: app,
     errors: [],
     messages: [],
   };

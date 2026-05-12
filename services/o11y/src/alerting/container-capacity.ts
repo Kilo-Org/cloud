@@ -75,12 +75,14 @@ export type ContainerListApp = z.infer<typeof ContainerListAppSchema>;
 export const ContainerListResponseSchema = z.object({
   success: z.boolean(),
   result: z.array(ContainerListAppSchema),
+  // The Cloudflare Containers list API may return a result_info object with
+  // some or all pagination fields absent, so each field is marked optional.
   result_info: z
     .object({
-      page: z.number(),
-      per_page: z.number(),
-      total_count: z.number(),
-      total_pages: z.number(),
+      page: z.number().optional(),
+      per_page: z.number().optional(),
+      total_count: z.number().optional(),
+      total_pages: z.number().optional(),
     })
     .optional(),
   errors: z.array(z.unknown()).optional(),
@@ -102,9 +104,7 @@ export const ContainerDetailAppSchema = z.object({
 
 export const ContainerDetailResponseSchema = z.object({
   success: z.boolean(),
-  result: z.object({
-    application: ContainerDetailAppSchema,
-  }),
+  result: ContainerDetailAppSchema,
   errors: z.array(z.unknown()).optional(),
   messages: z.array(z.unknown()).optional(),
 });

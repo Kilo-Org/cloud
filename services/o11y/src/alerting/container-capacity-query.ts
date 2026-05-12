@@ -77,7 +77,7 @@ async function fetchDetail(
 
   const raw = await response.json();
   const parsed = ContainerDetailResponseSchema.parse(raw);
-  const app = parsed.result.application;
+  const app = parsed.result;
 
   return {
     id: app.id,

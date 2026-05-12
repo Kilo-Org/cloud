@@ -26,7 +26,8 @@ function errorRedirect(error: GitHubConnectError, returnTo: string, requestUrl: 
 function sanitizeForLog(value: string | null): string | null {
   if (value === null) return null;
   // Truncate and strip control characters to prevent log injection
-  return value.slice(0, 200).replace(/[\x00-\x1f\x7f]/g, '');
+  // eslint-disable-next-line no-control-regex
+  return value.slice(0, 200).replace(/[\u0000-\u001f\u007f]/g, '');
 }
 
 function mapGitHubError(error: string | null, errorDescription: string | null): GitHubConnectError {

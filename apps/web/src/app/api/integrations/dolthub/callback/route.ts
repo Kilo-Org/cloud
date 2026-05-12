@@ -118,13 +118,16 @@ export async function GET(request: NextRequest) {
     const tokens = await exchangeDoltHubOAuthCode(code);
 
     const userInfo = await fetchDoltHubUser(tokens.accessToken);
-    const username = userInfo?.username ?? 'unknown';
+    const username = userInfo?.username;
 
-    if (username === 'unknown') {
+    if (!username) {
       captureMessage('DoltHub user info fetch returned no username', {
         level: 'warning',
         tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
       });
+      return NextResponse.redirect(
+        new URL(buildDoltHubRedirectPath(state, 'error=user_info_failed'), APP_URL)
+      );
     }
 
     await upsertDoltHubInstallation({

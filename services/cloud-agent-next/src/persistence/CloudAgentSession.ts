@@ -88,6 +88,7 @@ import { SessionService } from '../session-service.js';
 import { executePreparationSteps } from './async-preparation.js';
 import {
   resolveManagedGitLabToken,
+  resolveGitHubTokenForRepo,
   resolveUserGitHubTokenForRepo,
 } from '../services/git-token-service-client.js';
 
@@ -2470,6 +2471,22 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (metadata.githubInstallationId) {
       const appType = metadata.githubAppType ?? 'standard';
       return this.env.GIT_TOKEN_SERVICE.getToken(metadata.githubInstallationId, appType);
+    }
+
+    // Sessions prepared via the user-token path don't store githubInstallationId.
+    // After identity is downgraded to 'app', resolve a fresh installation token on-demand.
+    if (metadata.githubRepo) {
+      const result = await resolveGitHubTokenForRepo(this.env, {
+        githubRepo: metadata.githubRepo,
+        userId: metadata.userId,
+        orgId: metadata.orgId,
+      });
+      if (result.success) {
+        return result.value.token;
+      }
+      logger
+        .withFields({ reason: result.error.reason, sessionId: metadata.sessionId })
+        .warn('Could not resolve app installation token for session without installationId');
     }
 
     return metadata.githubToken;

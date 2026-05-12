@@ -4,6 +4,13 @@ import { eq, and } from 'drizzle-orm';
 import { Octokit } from '@octokit/rest';
 import type { GitHubAppType } from './github-token-service';
 
+function getOctokitStatus(e: unknown): number | undefined {
+  if (e != null && typeof e === 'object' && 'status' in e && typeof (e as Record<string, unknown>).status === 'number') {
+    return (e as { status: number }).status;
+  }
+  return undefined;
+}
+
 export type GetUserTokenInput = {
   kiloUserId: string;
   githubRepo: string;
@@ -105,7 +112,7 @@ export class UserGitHubTokenService {
         await octokit.rest.repos.get({ owner, repo });
         await this.cacheRepoAccess(cacheKey, true);
       } catch (error) {
-        const status = (error as { status?: number }).status;
+        const status = getOctokitStatus(error);
         if (status === 404) {
           await this.cacheRepoAccess(cacheKey, false);
           return { ok: false, reason: 'no_repo_access' };

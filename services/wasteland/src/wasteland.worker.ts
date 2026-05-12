@@ -12,6 +12,7 @@ import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
 import type { AuthVariables } from './middleware/auth.middleware';
 import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
+import { validateCfAccessRequest } from './middleware/cf-access.middleware';
 import { timingMiddleware } from './middleware/analytics.middleware';
 import { wrappedWastelandRouter } from './trpc/router';
 import { getWastelandRegistryStub } from './dos/WastelandRegistry.do';
@@ -36,6 +37,28 @@ export type WastelandEnv = {
 };
 
 const app = new Hono<WastelandEnv>();
+const LOCAL_DEV_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+async function cfAccessDebugMiddleware(c: Context<WastelandEnv>, next: () => Promise<void>) {
+  const hostname = new URL(c.req.url).hostname;
+  if (c.env.ENVIRONMENT === 'development' && LOCAL_DEV_HOSTNAMES.has(hostname)) {
+    return next();
+  }
+
+  try {
+    await validateCfAccessRequest(c.req.raw, {
+      team: c.env.CF_ACCESS_TEAM,
+      audience: c.env.CF_ACCESS_AUD,
+    });
+  } catch (e) {
+    console.warn(`CF Access validation failed ${e instanceof Error ? e.message : 'unknown'}`, {
+      error: e,
+    });
+    return c.json({ success: false, error: 'Unauthorized' }, 401);
+  }
+
+  return next();
+}
 
 // ── Timing ──────────────────────────────────────────────────────────────
 // Capture high-resolution start timestamp before any other middleware.
@@ -106,8 +129,9 @@ app.get('/health', async (c: Context<WastelandEnv>) => {
   });
 });
 
-// ── DEBUG: unauthenticated wasteland introspection ─────────────────────
-// These endpoints are unprotected in dev. In prod they are behind CF Access.
+app.use('/debug/*', cfAccessDebugMiddleware);
+
+// ── DEBUG: CF Access-protected wasteland introspection ─────────────────
 
 app.get('/debug/wastelands/:wastelandId/status', async c => {
   const wastelandId = c.req.param('wastelandId');

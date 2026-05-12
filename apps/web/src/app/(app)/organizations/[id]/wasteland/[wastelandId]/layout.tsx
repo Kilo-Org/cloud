@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { WastelandTRPCProvider, createWastelandTRPCClient } from '@/lib/wasteland/trpc';
 import { HideAppTopbar } from '@/components/gastown/HideAppTopbar';
 import { WastelandDashboardHeader } from '@/app/(app)/wasteland/[wastelandId]/WastelandDashboardHeader';
+import { WastelandPageHeaderProvider } from '@/app/(app)/wasteland/[wastelandId]/WastelandPageHeaderContext';
 
 export default function OrgWastelandLayout({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
@@ -12,11 +13,13 @@ export default function OrgWastelandLayout({ children }: { children: React.React
 
   return (
     <WastelandTRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
-      <HideAppTopbar />
-      <div className="flex h-full flex-col">
-        <WastelandDashboardHeader />
-        <div className="flex-1 overflow-hidden">{children}</div>
-      </div>
+      <WastelandPageHeaderProvider>
+        <HideAppTopbar />
+        <div className="flex h-full flex-col">
+          <WastelandDashboardHeader />
+          <div className="flex-1 overflow-hidden">{children}</div>
+        </div>
+      </WastelandPageHeaderProvider>
     </WastelandTRPCProvider>
   );
 }

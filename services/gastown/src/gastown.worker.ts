@@ -17,6 +17,7 @@ import {
   type AuthVariables,
 } from './middleware/auth.middleware';
 import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
+import { validateCfAccessRequest } from './middleware/cf-access.middleware';
 
 import { trpcServer } from '@hono/trpc-server';
 import { wrappedGastownRouter } from './trpc/router';
@@ -170,6 +171,28 @@ export type GastownEnv = {
 };
 
 const app = new Hono<GastownEnv>();
+const LOCAL_DEV_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+async function cfAccessDebugMiddleware(c: Context<GastownEnv>, next: () => Promise<void>) {
+  const hostname = new URL(c.req.url).hostname;
+  if (c.env.ENVIRONMENT === 'development' && LOCAL_DEV_HOSTNAMES.has(hostname)) {
+    return next();
+  }
+
+  try {
+    await validateCfAccessRequest(c.req.raw, {
+      team: c.env.CF_ACCESS_TEAM,
+      audience: c.env.CF_ACCESS_AUD,
+    });
+  } catch (e) {
+    console.warn(`CF Access validation failed ${e instanceof Error ? e.message : 'unknown'}`, {
+      error: e,
+    });
+    return c.json({ success: false, error: 'Unauthorized' }, 401);
+  }
+
+  return next();
+}
 
 // ── Timing ──────────────────────────────────────────────────────────────
 // Capture high-resolution start timestamp before any other middleware.
@@ -238,7 +261,9 @@ app.use('/trpc/*', corsMiddleware);
 app.get('/', c => c.json({ service: 'gastown', status: 'ok' }));
 app.get('/health', c => c.json({ status: 'ok' }));
 
-// ── DEBUG: unauthenticated town introspection — REMOVE after debugging ──
+app.use('/debug/*', cfAccessDebugMiddleware);
+
+// ── DEBUG: CF Access-protected town introspection — REMOVE after debugging ──
 app.get('/debug/towns/:townId/status', async c => {
   const townId = c.req.param('townId');
   const town = getTownDOStub(c.env, townId);

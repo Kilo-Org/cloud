@@ -53,6 +53,10 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
   const createMutation = useMutation(
     trpc.wasteland.createWasteland.mutationOptions({
       onSuccess: data => {
+        if (lockedOrgId) {
+          router.push(`/organizations/${lockedOrgId}/wasteland/${data.wasteland_id}`);
+          return;
+        }
         router.push(`/wasteland/${data.wasteland_id}`);
       },
       onError: err => {

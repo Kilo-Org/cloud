@@ -60,6 +60,8 @@
 
   "vars": {
     "ENVIRONMENT": "production",
+    "CF_ACCESS_TEAM": "engineering-e11",
+    "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
     "KILO_API_URL": "https://api.kilo.ai",
     "WASTELAND_API_URL": "https://wasteland.kiloapps.io",
   },
@@ -89,6 +91,8 @@
     "dev": {
       "vars": {
         "ENVIRONMENT": "development",
+        "CF_ACCESS_TEAM": "engineering-e11",
+        "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
         // Wrangler's workerd-network doesn't get Docker Desktop's
         // host.docker.internal → host proxy mapping. Use the Docker
         // Desktop VM host gateway IP directly so containers can reach

@@ -13,6 +13,7 @@ import type { db as defaultDb } from '@/lib/drizzle';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import { fromMicrodollars } from '@/lib/utils';
+import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 
 type Db = typeof defaultDb;
 
@@ -23,7 +24,8 @@ export type CancelAndRefundKiloPassStripeClient = Pick<
 
 export type CancelAndRefundKiloPassReason =
   | { kind: 'no_subscription' }
-  | { kind: 'already_canceled' };
+  | { kind: 'already_canceled' }
+  | { kind: 'store_managed_subscription'; paymentProvider: 'apple' };
 
 export type CancelAndRefundKiloPassResult =
   | {
@@ -85,6 +87,13 @@ export async function cancelAndRefundKiloPassForUser({
 
   if (subscription.status === 'canceled') {
     return { status: 'skipped', reason: { kind: 'already_canceled' } };
+  }
+
+  if (subscription.paymentProvider !== KiloPassPaymentProvider.Stripe) {
+    return {
+      status: 'skipped',
+      reason: { kind: 'store_managed_subscription', paymentProvider: 'apple' },
+    };
   }
 
   const stripeSubscriptionId = subscription.stripeSubscriptionId;

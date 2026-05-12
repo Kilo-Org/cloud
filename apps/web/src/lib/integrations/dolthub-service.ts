@@ -1,4 +1,5 @@
 import 'server-only';
+import { z } from 'zod';
 import { db } from '@/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
@@ -47,6 +48,7 @@ export function getDoltHubOAuthUrl(state: string): string {
 
   const params = new URLSearchParams({
     client_id: DOLTHUB_APP_DEV_CLIENT_ID,
+    response_type: 'code',
     scope: DOLTHUB_SCOPES.join(','),
     redirect_uri: DOLTHUB_REDIRECT_URI,
     state,
@@ -65,6 +67,28 @@ export type DoltHubTokenResponse = {
 export type DoltHubAccount = {
   username: string;
 };
+
+const DoltHubTokenPayloadSchema = z.object({
+  access_token: z.string().min(1),
+  refresh_token: z.string().optional(),
+  expires_in: z.number().optional(),
+  scope: z.string().optional(),
+});
+
+function parseDoltHubTokenPayload(raw: unknown, operation: 'exchange' | 'refresh'): DoltHubTokenResponse {
+  const parseResult = DoltHubTokenPayloadSchema.safeParse(raw);
+  if (!parseResult.success) {
+    const verb = operation === 'exchange' ? 'exchange' : 'refresh';
+    throw new Error(`DoltHub token ${verb} returned invalid payload`);
+  }
+  const parsed = parseResult.data;
+  return {
+    accessToken: parsed.access_token,
+    refreshToken: parsed.refresh_token ?? null,
+    expiresIn: parsed.expires_in ?? null,
+    scope: parsed.scope ?? null,
+  };
+}
 
 export async function exchangeDoltHubOAuthCode(code: string): Promise<DoltHubTokenResponse> {
   assertDevOnly();
@@ -88,23 +112,7 @@ export async function exchangeDoltHubOAuthCode(code: string): Promise<DoltHubTok
     throw new Error(`DoltHub token exchange failed: ${response.status} ${response.statusText}`);
   }
 
-  const payload = (await response.json()) as {
-    access_token?: unknown;
-    refresh_token?: unknown;
-    expires_in?: unknown;
-    scope?: unknown;
-  };
-
-  if (typeof payload.access_token !== 'string' || payload.access_token.length === 0) {
-    throw new Error('DoltHub token exchange returned no access_token');
-  }
-
-  return {
-    accessToken: payload.access_token,
-    refreshToken: typeof payload.refresh_token === 'string' ? payload.refresh_token : null,
-    expiresIn: typeof payload.expires_in === 'number' ? payload.expires_in : null,
-    scope: typeof payload.scope === 'string' ? payload.scope : null,
-  };
+  return parseDoltHubTokenPayload(await response.json(), 'exchange');
 }
 
 export async function refreshDoltHubAccessToken(refreshToken: string): Promise<DoltHubTokenResponse> {
@@ -129,23 +137,7 @@ export async function refreshDoltHubAccessToken(refreshToken: string): Promise<D
     throw new Error(`DoltHub token refresh failed: ${response.status} ${response.statusText}`);
   }
 
-  const payload = (await response.json()) as {
-    access_token?: unknown;
-    refresh_token?: unknown;
-    expires_in?: unknown;
-    scope?: unknown;
-  };
-
-  if (typeof payload.access_token !== 'string' || payload.access_token.length === 0) {
-    throw new Error('DoltHub token refresh returned no access_token');
-  }
-
-  return {
-    accessToken: payload.access_token,
-    refreshToken: typeof payload.refresh_token === 'string' ? payload.refresh_token : null,
-    expiresIn: typeof payload.expires_in === 'number' ? payload.expires_in : null,
-    scope: typeof payload.scope === 'string' ? payload.scope : null,
-  };
+  return parseDoltHubTokenPayload(await response.json(), 'refresh');
 }
 
 export async function getInstallation(owner: Owner): Promise<PlatformIntegration | null> {
@@ -195,6 +187,10 @@ export async function upsertDoltHubInstallation({
       .where(eq(platform_integrations.id, existing.id))
       .returning();
 
+    if (!updated) {
+      throw new Error('DoltHub installation update returned no rows');
+    }
+
     return updated;
   }
 
@@ -212,6 +208,10 @@ export async function upsertDoltHubInstallation({
       installed_at: new Date().toISOString(),
     })
     .returning();
+
+  if (!created) {
+    throw new Error('DoltHub installation insert returned no rows');
+  }
 
   return created;
 }
@@ -248,6 +248,8 @@ export async function getValidDoltHubToken(
     return null;
   }
 
+  // When expires_at is missing/null the token is treated as non-expiring
+  // (DoltHub issues long-lived tokens that do not include expires_in).
   if (metadata.expires_at && Date.now() >= metadata.expires_at) {
     if (!metadata.refresh_token) {
       return null;

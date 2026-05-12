@@ -1,44 +1,10 @@
-import type * as ConfigServerModule from '@/lib/config.server';
-jest.mock('@/lib/config.server', () => {
-  const actual = jest.requireActual<typeof ConfigServerModule>('@/lib/config.server');
-  return {
-    ...actual,
-    DOLTHUB_APP_DEV_CLIENT_ID: 'dhoci.v1.tdg4bfv15v24adbpc2fqeqddugotg64nd9puisim322d0p452i50',
-    DOLTHUB_APP_DEV_CLIENT_SECRET: 'dolthub-client-secret-test',
-  };
-});
-
-const mockSelectLimit = jest.fn();
-const mockUpdateSet = jest.fn();
-const mockUpdateWhere = jest.fn();
-const mockUpdateReturning = jest.fn();
-const mockDeleteWhere = jest.fn();
-const mockInsertValues = jest.fn();
-const mockInsertReturning = jest.fn();
-
-jest.mock('@/lib/drizzle', () => ({
-  db: {
-    select: jest.fn(() => ({
-      from: jest.fn(() => ({
-        where: jest.fn(() => ({
-          limit: mockSelectLimit,
-        })),
-      })),
-    })),
-    delete: jest.fn(() => ({
-      where: mockDeleteWhere,
-    })),
-    update: jest.fn(() => ({
-      set: mockUpdateSet,
-    })),
-    insert: jest.fn(() => ({
-      values: mockInsertValues,
-    })),
-  },
-}));
-
-import { describe, test, expect, beforeEach } from '@jest/globals';
-import type { PlatformIntegration } from '@kilocode/db/schema';
+import { afterEach, beforeAll, describe, expect, test } from '@jest/globals';
+import { db } from '@/lib/drizzle';
+import { platform_integrations } from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
+import type { User } from '@kilocode/db/schema';
+import { insertTestUser } from '@/tests/helpers/user.helper';
+import { PLATFORM, INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import {
   getDoltHubOAuthUrl,
   exchangeDoltHubOAuthCode,
@@ -48,7 +14,9 @@ import {
   uninstall,
   getValidDoltHubToken,
   DOLTHUB_REDIRECT_URI,
+  DOLTHUB_SCOPES,
 } from '@/lib/integrations/dolthub-service';
+import { DOLTHUB_APP_DEV_CLIENT_ID } from '@/lib/config.server';
 
 function setNodeEnv(value: string) {
   Object.defineProperty(process.env, 'NODE_ENV', {
@@ -58,70 +26,39 @@ function setNodeEnv(value: string) {
   });
 }
 
-function buildIntegration(overrides: Record<string, unknown> = {}): PlatformIntegration {
-  return {
-    id: 'integration-1',
-    platform: 'dolthub',
-    integration_type: 'oauth',
-    integration_status: 'active',
-    owned_by_user_id: 'user-1',
-    owned_by_organization_id: null,
-    platform_account_login: 'testuser',
-    metadata: {
-      access_token: 'access-token-123',
-      refresh_token: 'refresh-token-456',
-      expires_at: Date.now() + 3600 * 1000,
-      scope: 'api_read_write',
-    },
-    created_at: new Date().toISOString(),
-    created_by_user_id: null,
-    github_app_type: null,
-    installed_at: new Date().toISOString(),
-    kilo_requester_user_id: null,
-    permissions: null,
-    platform_account_id: null,
-    platform_installation_id: null,
-    platform_requester_account_id: null,
-    repositories: null,
-    repositories_synced_at: null,
-    repository_access: null,
-    scopes: null,
-    suspended_at: null,
-    suspended_by: null,
-    updated_at: new Date().toISOString(),
-    ...overrides,
-  } as PlatformIntegration;
-}
-
-const owner = { type: 'user' as const, id: 'user-1' };
-
 describe('dolthub-service', () => {
   const originalNodeEnv = process.env.NODE_ENV;
+  const originalFetch = globalThis.fetch;
+  let user: User;
 
-  beforeEach(() => {
+  beforeAll(async () => {
+    user = await insertTestUser({
+      google_user_email: 'dolthub-test@example.com',
+      google_user_name: 'DoltHub Test',
+    });
+  });
+
+  afterEach(async () => {
+    globalThis.fetch = originalFetch;
     setNodeEnv(originalNodeEnv);
-    mockSelectLimit.mockReset();
-    mockUpdateSet.mockReset();
-    mockUpdateWhere.mockReset();
-    mockUpdateReturning.mockReset();
-    mockDeleteWhere.mockReset();
-    mockInsertValues.mockReset();
-    mockInsertReturning.mockReset();
-
-    mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
-    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
-    mockInsertValues.mockReturnValue({ returning: mockInsertReturning });
+    await db
+      .delete(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.DOLTHUB),
+          eq(platform_integrations.owned_by_user_id, user.id)
+        )
+      );
   });
 
   describe('getDoltHubOAuthUrl', () => {
-    test('includes the exact registered client ID and redirect URI', () => {
+    test('includes the required OAuth parameters', () => {
       const url = getDoltHubOAuthUrl('test-state-123');
       expect(url).toMatch(/^https:\/\/www\.dolthub\.com\/oauth\/authorize/);
-      expect(url).toContain(
-        'client_id=dhoci.v1.tdg4bfv15v24adbpc2fqeqddugotg64nd9puisim322d0p452i50'
-      );
+      expect(url).toContain(`client_id=${encodeURIComponent(DOLTHUB_APP_DEV_CLIENT_ID)}`);
+      expect(url).toContain('response_type=code');
       expect(url).toContain(`redirect_uri=${encodeURIComponent(DOLTHUB_REDIRECT_URI)}`);
-      expect(url).toContain('scope=api_read_write');
+      expect(url).toContain(`scope=${encodeURIComponent(DOLTHUB_SCOPES.join(','))}`);
       expect(url).toContain('state=test-state-123');
     });
 
@@ -179,7 +116,7 @@ describe('dolthub-service', () => {
       });
 
       await expect(exchangeDoltHubOAuthCode('incomplete')).rejects.toThrow(
-        'DoltHub token exchange returned no access_token'
+        'DoltHub token exchange returned invalid payload'
       );
     });
 
@@ -228,23 +165,29 @@ describe('dolthub-service', () => {
 
   describe('getInstallation', () => {
     test('returns an integration when found', async () => {
-      const integration = buildIntegration();
-      mockSelectLimit.mockResolvedValue([integration]);
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: user.id,
+        owned_by_organization_id: null,
+        platform: PLATFORM.DOLTHUB,
+        integration_type: 'oauth',
+        platform_account_login: 'testuser',
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        metadata: { access_token: 'token' },
+      });
 
-      const result = await getInstallation(owner);
-      expect(result).toEqual(integration);
+      const result = await getInstallation({ type: 'user', id: user.id });
+      expect(result).not.toBeNull();
+      expect(result?.platform_account_login).toBe('testuser');
     });
 
     test('returns null when not found', async () => {
-      mockSelectLimit.mockResolvedValue([]);
-
-      const result = await getInstallation(owner);
+      const result = await getInstallation({ type: 'user', id: user.id });
       expect(result).toBeNull();
     });
 
     test('throws in production', async () => {
       setNodeEnv('production');
-      await expect(getInstallation(owner)).rejects.toThrow(
+      await expect(getInstallation({ type: 'user', id: user.id })).rejects.toThrow(
         'DoltHub integration is dev-only and not available in production'
       );
     });
@@ -252,12 +195,8 @@ describe('dolthub-service', () => {
 
   describe('upsertDoltHubInstallation', () => {
     test('creates a new installation when none exists', async () => {
-      mockSelectLimit.mockResolvedValue([]);
-      const created = buildIntegration({ id: 'new-id', platform_account_login: 'newuser' });
-      mockInsertReturning.mockResolvedValue([created]);
-
       const result = await upsertDoltHubInstallation({
-        owner,
+        owner: { type: 'user', id: user.id },
         account: { username: 'newuser' },
         tokens: {
           accessToken: 'token-new',
@@ -268,17 +207,35 @@ describe('dolthub-service', () => {
       });
 
       expect(result.platform_account_login).toBe('newuser');
-      expect(mockInsertReturning).toHaveBeenCalledTimes(1);
+      expect(result.platform).toBe(PLATFORM.DOLTHUB);
+      expect(result.integration_status).toBe(INTEGRATION_STATUS.ACTIVE);
+
+      const [row] = await db
+        .select()
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.DOLTHUB),
+            eq(platform_integrations.owned_by_user_id, user.id)
+          )
+        );
+      expect(row.platform_account_login).toBe('newuser');
     });
 
     test('updates an existing installation', async () => {
-      const existing = buildIntegration();
-      mockSelectLimit.mockResolvedValue([existing]);
-      const updated = buildIntegration({ platform_account_login: 'updateduser' });
-      mockUpdateReturning.mockResolvedValue([updated]);
+      await upsertDoltHubInstallation({
+        owner: { type: 'user', id: user.id },
+        account: { username: 'olduser' },
+        tokens: {
+          accessToken: 'token-old',
+          refreshToken: 'refresh-old',
+          expiresIn: 3600,
+          scope: 'api_read_write',
+        },
+      });
 
       const result = await upsertDoltHubInstallation({
-        owner,
+        owner: { type: 'user', id: user.id },
         account: { username: 'updateduser' },
         tokens: {
           accessToken: 'token-updated',
@@ -289,15 +246,24 @@ describe('dolthub-service', () => {
       });
 
       expect(result.platform_account_login).toBe('updateduser');
-      expect(mockUpdateReturning).toHaveBeenCalledTimes(1);
-      expect(mockInsertReturning).not.toHaveBeenCalled();
+
+      const [row] = await db
+        .select()
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.DOLTHUB),
+            eq(platform_integrations.owned_by_user_id, user.id)
+          )
+        );
+      expect(row.platform_account_login).toBe('updateduser');
     });
 
     test('throws in production', async () => {
       setNodeEnv('production');
       await expect(
         upsertDoltHubInstallation({
-          owner,
+          owner: { type: 'user', id: user.id },
           account: { username: 'x' },
           tokens: {
             accessToken: 't',
@@ -312,25 +278,39 @@ describe('dolthub-service', () => {
 
   describe('uninstall', () => {
     test('deletes the installation when found', async () => {
-      mockSelectLimit.mockResolvedValue([buildIntegration()]);
-      mockDeleteWhere.mockResolvedValue(undefined);
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: user.id,
+        owned_by_organization_id: null,
+        platform: PLATFORM.DOLTHUB,
+        integration_type: 'oauth',
+        platform_account_login: 'testuser',
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        metadata: { access_token: 'token' },
+      });
 
-      const result = await uninstall(owner);
+      const result = await uninstall({ type: 'user', id: user.id });
       expect(result.success).toBe(true);
-      expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+
+      const rows = await db
+        .select()
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.DOLTHUB),
+            eq(platform_integrations.owned_by_user_id, user.id)
+          )
+        );
+      expect(rows).toHaveLength(0);
     });
 
     test('succeeds when no installation exists', async () => {
-      mockSelectLimit.mockResolvedValue([]);
-
-      const result = await uninstall(owner);
+      const result = await uninstall({ type: 'user', id: user.id });
       expect(result.success).toBe(true);
-      expect(mockDeleteWhere).not.toHaveBeenCalled();
     });
 
     test('throws in production', async () => {
       setNodeEnv('production');
-      await expect(uninstall(owner)).rejects.toThrow(
+      await expect(uninstall({ type: 'user', id: user.id })).rejects.toThrow(
         'DoltHub integration is dev-only and not available in production'
       );
     });
@@ -338,28 +318,46 @@ describe('dolthub-service', () => {
 
   describe('getValidDoltHubToken', () => {
     test('returns access token when not expired', async () => {
-      const integration = buildIntegration({
-        metadata: {
-          access_token: 'current-token',
-          refresh_token: 'refresh-token',
-          expires_at: Date.now() + 3600 * 1000,
-          scope: 'api_read_write',
-        },
-      });
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: user.id,
+          owned_by_organization_id: null,
+          platform: PLATFORM.DOLTHUB,
+          integration_type: 'oauth',
+          platform_account_login: 'testuser',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata: {
+            access_token: 'current-token',
+            refresh_token: 'refresh-token',
+            expires_at: Date.now() + 3600 * 1000,
+            scope: 'api_read_write',
+          },
+        })
+        .returning();
 
       const token = await getValidDoltHubToken(integration);
       expect(token).toBe('current-token');
     });
 
-    test('refreshes and persists new refresh_token when expired', async () => {
-      const integration = buildIntegration({
-        metadata: {
-          access_token: 'expired-token',
-          refresh_token: 'old-refresh',
-          expires_at: Date.now() - 1000,
-          scope: 'api_read_write',
-        },
-      });
+    test('refreshes and persists new token when expired', async () => {
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: user.id,
+          owned_by_organization_id: null,
+          platform: PLATFORM.DOLTHUB,
+          integration_type: 'oauth',
+          platform_account_login: 'testuser',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata: {
+            access_token: 'expired-token',
+            refresh_token: 'old-refresh',
+            expires_at: Date.now() - 1000,
+            scope: 'api_read_write',
+          },
+        })
+        .returning();
 
       globalThis.fetch = jest.fn().mockResolvedValue({
         ok: true,
@@ -371,41 +369,63 @@ describe('dolthub-service', () => {
         }),
       });
 
-      mockUpdateReturning.mockResolvedValue([{ ...integration }]);
-
       const token = await getValidDoltHubToken(integration);
       expect(token).toBe('refreshed-access');
 
-      expect(mockUpdateSet).toHaveBeenCalledTimes(1);
-      const updateCall = mockUpdateSet.mock.calls[0][0];
-      expect(updateCall.metadata.access_token).toBe('refreshed-access');
-      expect(updateCall.metadata.refresh_token).toBe('refreshed-refresh');
-      expect(updateCall.metadata.expires_at).toBeGreaterThan(Date.now());
+      const [row] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id));
+      const meta = row.metadata as {
+        access_token: string;
+        refresh_token: string;
+        expires_at: number;
+      };
+      expect(meta.access_token).toBe('refreshed-access');
+      expect(meta.refresh_token).toBe('refreshed-refresh');
+      expect(meta.expires_at).toBeGreaterThan(Date.now());
     });
 
     test('returns null when expired and no refresh token exists', async () => {
-      const integration = buildIntegration({
-        metadata: {
-          access_token: 'expired-token',
-          refresh_token: null,
-          expires_at: Date.now() - 1000,
-          scope: 'api_read_write',
-        },
-      });
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: user.id,
+          owned_by_organization_id: null,
+          platform: PLATFORM.DOLTHUB,
+          integration_type: 'oauth',
+          platform_account_login: 'testuser',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata: {
+            access_token: 'expired-token',
+            refresh_token: null,
+            expires_at: Date.now() - 1000,
+            scope: 'api_read_write',
+          },
+        })
+        .returning();
 
       const token = await getValidDoltHubToken(integration);
       expect(token).toBeNull();
     });
 
     test('returns null when access token is missing', async () => {
-      const integration = buildIntegration({
-        metadata: {
-          access_token: undefined,
-          refresh_token: 'refresh-token',
-          expires_at: Date.now() + 3600 * 1000,
-          scope: 'api_read_write',
-        },
-      });
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: user.id,
+          owned_by_organization_id: null,
+          platform: PLATFORM.DOLTHUB,
+          integration_type: 'oauth',
+          platform_account_login: 'testuser',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata: {
+            refresh_token: 'refresh-token',
+            expires_at: Date.now() + 3600 * 1000,
+            scope: 'api_read_write',
+          },
+        })
+        .returning();
 
       const token = await getValidDoltHubToken(integration);
       expect(token).toBeNull();
@@ -413,7 +433,20 @@ describe('dolthub-service', () => {
 
     test('throws in production', async () => {
       setNodeEnv('production');
-      await expect(getValidDoltHubToken(buildIntegration())).rejects.toThrow(
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: user.id,
+          owned_by_organization_id: null,
+          platform: PLATFORM.DOLTHUB,
+          integration_type: 'oauth',
+          platform_account_login: 'testuser',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata: { access_token: 'token' },
+        })
+        .returning();
+
+      await expect(getValidDoltHubToken(integration)).rejects.toThrow(
         'DoltHub integration is dev-only and not available in production'
       );
     });

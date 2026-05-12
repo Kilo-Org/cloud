@@ -401,12 +401,20 @@ export function CodeReviewStreamView({ reviewId, onComplete }: CodeReviewStreamV
   return (
     <Card className="border-l-4 border-l-blue-500">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Terminal className="h-4 w-4" />
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="shrink-0 text-sm font-medium">
               {isTerminal ? 'Session Log' : 'Code Review Progress'}
             </CardTitle>
+            {isTerminal && cloudAgentSessionId && (
+              <span
+                title={cloudAgentSessionId}
+                className="bg-muted text-muted-foreground max-w-[min(20rem,50vw)] truncate rounded px-2 py-0.5 font-mono text-xs font-normal"
+              >
+                {cloudAgentSessionId}
+              </span>
+            )}
           </div>
           {isComplete ? (
             reviewStatus === 'failed' ? (

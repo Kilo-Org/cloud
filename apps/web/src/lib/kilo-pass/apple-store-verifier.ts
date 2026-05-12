@@ -93,6 +93,8 @@ export function mapAppleKiloPassTransaction(
   if (transaction.expiresDate == null) {
     throw new Error('Apple subscription transaction is missing an expiration date');
   }
+  // Called only from the tRPC purchase-completion path; renewals and refunds enter via
+  // the webhook handler in apple-store-notifications.ts, which intentionally allows expired transactions.
   if (transaction.expiresDate <= Date.now()) {
     throw new Error('Apple subscription transaction has expired');
   }

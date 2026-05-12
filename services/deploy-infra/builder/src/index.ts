@@ -100,7 +100,7 @@ async function parseMultipartFiles(c: Context<HonoEnv>): Promise<DeploymentFile[
   for (const [key, value] of formData.entries()) {
     if (!(value instanceof File)) continue;
 
-    const path = key === 'file' && value.name ? value.name : key;
+    const path = key;
     const buffer = Buffer.from(await value.arrayBuffer());
 
     totalBytes += buffer.byteLength;

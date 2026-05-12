@@ -165,6 +165,17 @@ export const MorningBriefingActionResponseSchema = z.object({
   error: z.string().optional(),
 });
 
+export const MorningBriefingInterestsRequestSchema = z.object({
+  topics: z.array(z.string()),
+});
+
+export const MorningBriefingInterestsResponseSchema = z.object({
+  ok: z.boolean(),
+  interestTopics: z.array(z.string()).optional(),
+  code: z.string().optional(),
+  error: z.string().optional(),
+});
+
 export const MorningBriefingReadResponseSchema = z.object({
   ok: z.boolean(),
   dateKey: z.string().optional(),

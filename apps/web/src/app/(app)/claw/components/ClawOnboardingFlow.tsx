@@ -14,13 +14,19 @@ import { useUser } from '@/hooks/useUser';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useClawServiceDegraded } from '../hooks/useClawHooks';
+import { useClawControllerVersion, useClawServiceDegraded } from '../hooks/useClawHooks';
 import { useOnboardingSaves } from '../hooks/useOnboardingSaves';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { BotIdentityStep } from './BotIdentityStep';
 import { CalendarConnectStepView } from './CalendarConnectStep';
 import { InboundEmailStepView } from './InboundEmailStep';
+import { InterestsStepView } from './InterestsStep';
+import {
+  INTEREST_TOPIC_PRESETS,
+  MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION,
+} from '@/lib/kiloclaw/morning-briefing-interests';
+import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
@@ -127,6 +133,28 @@ function ClawOnboardingFlowInner({
   // frame of the calendar UI before the state machine redirects to email)
   // is harmless: the connect endpoint enforces admin too.
   const hasCalendarStep = isUserPending ? true : currentUser?.is_admin === true;
+  // Morning briefing is admin-only today (canSeeMorningBriefing in
+  // SettingsTab.tsx). Mirror the admin gate so non-admins skip the
+  // Interests step entirely. Same "default to true while loading" rationale
+  // as hasCalendarStep — protects admins on full-page reloads.
+  const isAdminForInterests = isUserPending ? true : currentUser?.is_admin === true;
+  // Also gate on controller version. The plugin route that backs
+  // updateBriefingInterests is only present on images >= the minimum
+  // version below. Without this check, an admin onboarding an older
+  // image would hit a 404 on save. Default to "supports" while loading
+  // so the step doesn't briefly disappear mid-wizard. The version
+  // endpoint proxies through the gateway, so only fetch once the
+  // instance is running — before that the query stays pending and the
+  // optimistic default applies.
+  const controllerVersionQuery = useClawControllerVersion(status?.status === 'running');
+  const controllerVersion = controllerVersionQuery.data;
+  const controllerSupportsInterests =
+    controllerVersionQuery.isPending ||
+    calverAtLeast(
+      cleanVersion(controllerVersion?.version),
+      MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION
+    );
+  const hasInterestsStep = isAdminForInterests && controllerSupportsInterests;
 
   const gatewayUrl = useGatewayUrl(status);
 
@@ -142,11 +170,19 @@ function ClawOnboardingFlowInner({
   });
   const selectedPreset: ExecPreset = DEFAULT_ONBOARDING_EXEC_PRESET;
   const [botIdentity, setBotIdentity] = useState<BotIdentity | null>(null);
+  // Interest topics chosen on the Interests step are deferred until the
+  // provisioning step completes — the plugin endpoint that backs
+  // `updateBriefingInterests` isn't reachable until the instance gateway
+  // is running, and trying to save mid-wizard hits `gateway_warming_up`
+  // (503). The save fires inside `ProvisioningStep.onComplete`, which
+  // only runs after the instance is fully ready.
+  const [pendingInterests, setPendingInterests] = useState<string[] | null>(null);
   const [localCreateSetupStarted, setLocalCreateSetupStarted] = useState(false);
   const [onboardingSaveSession, setOnboardingSaveSession] = useState(0);
   const hasCapturedIdentityView = useRef(false);
   const hasCapturedCalendarView = useRef(false);
   const hasCapturedEmailView = useRef(false);
+  const hasCapturedInterestsView = useRef(false);
   const hasCapturedDoneView = useRef(false);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
 
@@ -158,6 +194,7 @@ function ClawOnboardingFlowInner({
     onboardingStep,
     hasBotIdentity: botIdentity !== null,
     hasCalendarStep,
+    hasInterestsStep,
   };
   const preGatewayFlowState = getClawOnboardingFlowState({
     ...stateInput,
@@ -225,6 +262,13 @@ function ClawOnboardingFlowInner({
     if (flowState.renderStep !== 'email' || hasCapturedEmailView.current) return;
     hasCapturedEmailView.current = true;
     posthog?.capture('claw_setup_email_viewed');
+  }, [flowState.renderStep, posthog]);
+
+  // Same pattern for the interests step.
+  useEffect(() => {
+    if (flowState.renderStep !== 'interests' || hasCapturedInterestsView.current) return;
+    hasCapturedInterestsView.current = true;
+    posthog?.capture('claw_setup_interests_viewed');
   }, [flowState.renderStep, posthog]);
 
   useEffect(() => {
@@ -525,8 +569,47 @@ function ClawOnboardingFlowInner({
         }}
         onContinue={() => {
           posthog?.capture('claw_setup_email_completed');
-          posthog?.capture('claw_setup_provisioning_viewed');
-          setOnboardingStep('provisioning');
+          if (hasInterestsStep) {
+            setOnboardingStep('interests');
+          } else {
+            posthog?.capture('claw_setup_provisioning_viewed');
+            setOnboardingStep('provisioning');
+          }
+        }}
+      />
+    );
+  }
+
+  function renderInterestsStep() {
+    function advanceToProvisioning() {
+      posthog?.capture('claw_setup_provisioning_viewed');
+      setOnboardingStep('provisioning');
+    }
+    return (
+      <InterestsStepView
+        currentStep={flowState.currentStep}
+        totalSteps={flowState.totalSteps}
+        // Save is deferred to ProvisioningStep.onComplete; the step itself
+        // never roundtrips. No "saving" state needed.
+        saving={false}
+        onContinue={topics => {
+          const hasCustom = topics.some(
+            topic =>
+              !INTEREST_TOPIC_PRESETS.some(preset => preset.toLowerCase() === topic.toLowerCase())
+          );
+          posthog?.capture('claw_setup_interests_completed', {
+            topics_count: topics.length,
+            has_custom: hasCustom,
+          });
+          // Stash topics. Empty array → null (no deferred save needed
+          // since the column default is `'{}'` anyway).
+          setPendingInterests(topics.length > 0 ? topics : null);
+          advanceToProvisioning();
+        }}
+        onSkip={() => {
+          posthog?.capture('claw_setup_interests_skipped');
+          setPendingInterests(null);
+          advanceToProvisioning();
         }}
       />
     );
@@ -554,7 +637,43 @@ function ClawOnboardingFlowInner({
         totalSteps={flowState.totalSteps}
         onboardingSavesReady={onboardingSaves.ready}
         instanceRunning={flowState.instanceRunning}
-        onComplete={() => {
+        onComplete={async () => {
+          // Flush deferred interests now that the instance + gateway are
+          // ready (ProvisioningStep only calls onComplete after
+          // `instanceRunning` is true, and `instanceRunning` already
+          // includes `gatewayReady` per state.ts). If a save fails for
+          // any reason, surface a toast but don't block — the user can
+          // re-save from Settings.
+          //
+          // If the user picked any topics during onboarding, treat that
+          // as explicit "I want daily briefings" intent and auto-enable
+          // the briefing with their browser timezone. Schedule defaults
+          // to the plugin's `'0 7 * * *'`; user can adjust both from
+          // Settings later. Empty topics / Skip => no auto-enable.
+          const topicsToPersist = pendingInterests;
+          setPendingInterests(null);
+          if (topicsToPersist !== null) {
+            try {
+              await mutations.updateBriefingInterests.mutateAsync({ topics: topicsToPersist });
+            } catch (err) {
+              toast.error(
+                `Could not save interests: ${
+                  err instanceof Error ? err.message : String(err)
+                }. You can add them later in Settings.`
+              );
+            }
+            try {
+              await mutations.enableMorningBriefing.mutateAsync({
+                timezone: getBrowserTimeZone(),
+              });
+            } catch (err) {
+              // Silent fallback — the user picked topics, not an
+              // explicit Enable button, so we don't pile a second toast
+              // on top of any interests-save error. They can flip the
+              // toggle from Settings if needed.
+              console.warn('Auto-enable morning briefing failed:', err);
+            }
+          }
           posthog?.capture('claw_setup_provisioned');
           posthog?.capture('claw_setup_done_viewed');
           setOnboardingStep('done');
@@ -581,6 +700,8 @@ function ClawOnboardingFlowInner({
         return renderCalendarStep();
       case 'email':
         return renderEmailStep();
+      case 'interests':
+        return renderInterestsStep();
       case 'provisioning':
         return renderProvisioningStep();
       case 'complete':

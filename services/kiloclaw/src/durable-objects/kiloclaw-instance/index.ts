@@ -3662,12 +3662,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (!pluginStatus) return null;
 
     // Lazy backfill: plugin reports a configured briefing for an instance
-    // that has no Postgres row yet (legacy instance pre-dating PR-4a).
-    // Schedule the write via `waitUntil` so it doesn't add latency to the
-    // status response. The current request still returns without
-    // `interestTopics` (Postgres row was null at read time); the next
-    // call after the backfill lands sees the row. Best-effort: matches
-    // the enable/disable paths.
+    // that has no Postgres row yet (legacy instance pre-dating PR-4a, or
+    // a post-PR instance whose previous best-effort waitUntil mirror
+    // write failed). Schedule the write via `waitUntil` so it doesn't
+    // add latency to the status response. Best-effort: matches the
+    // enable/disable paths.
+    //
+    // Forward `interestTopics` from the plugin response when present.
+    // Without this, an instance with valid topics in config.json but a
+    // missing Postgres row (e.g. transient Hyperdrive failure on the
+    // interests path) would have its topics silently reset to `[]` by
+    // the backfill row's column default. Falling back to "omit" when
+    // older controllers don't include the field keeps existing
+    // interests untouched via the upsert helper's patch semantics.
     //
     // `pg.instanceId` was just resolved by the parallel Postgres read;
     // pass it through so the helper skips the redundant
@@ -3686,6 +3693,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             enabled: pluginStatus.enabled,
             cron: pluginStatus.cron,
             timezone: pluginStatus.timezone,
+            ...(Array.isArray(pluginStatus.interestTopics) && {
+              interestTopics: pluginStatus.interestTopics,
+            }),
           },
           pg.instanceId
         )
@@ -3739,6 +3749,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async runMorningBriefing() {
     await this.loadState();
     return gateway.runMorningBriefing(this.s, this.env);
+  }
+
+  async updateBriefingInterests(input: { topics: string[] }) {
+    await this.loadState();
+    const response = await gateway.updateMorningBriefingInterests(this.s, this.env, input);
+    if (response && response.ok !== false) {
+      // Mirror to Postgres after the plugin accepted. Best-effort via
+      // waitUntil — the user-facing success is gated on the plugin write,
+      // not the Postgres mirror. Patch semantics: only interest_topics is
+      // touched; enabled/cron/timezone are preserved.
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(this.env, this.s, {
+          interestTopics: response.interestTopics ?? input.topics,
+        })
+      );
+    }
+    return response;
   }
 
   async readMorningBriefing(day: 'today' | 'yesterday') {

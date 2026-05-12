@@ -4700,8 +4700,20 @@ export const kiloclaw_morning_briefing_configs = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Powers "who currently has briefing enabled?" admin query. Partial
-    // so it stays small; only enabled rows occupy it.
+    // Powers the bulk admin scan "list instance_ids where briefing is
+    // enabled" — partial so it stays small (only enabled rows occupy
+    // it). `instance_id` is the PK so this index gives no lookup
+    // benefit beyond the predicate-narrowed scan; the value is purely
+    // in skipping disabled rows.
+    //
+    // If/when an admin query also needs `interest_topics` per row,
+    // consider an INCLUDE clause (e.g.
+    // `INCLUDE (interest_topics)`) so Postgres can satisfy the scan
+    // index-only without heap fetches. Drizzle 0.45's PgIndexBuilder
+    // doesn't expose `.include()` declaratively; it would need raw
+    // SQL in the migration. Skipping for now — the table is small
+    // enough that the heap fetch is cheap, and we don't have a
+    // concrete admin query that reads topics in bulk yet.
     index('IDX_kiloclaw_morning_briefing_configs_enabled')
       .on(table.instance_id)
       .where(sql`${table.enabled} = true`),

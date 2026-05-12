@@ -16,6 +16,7 @@ import {
 } from '@kilocode/db/schema';
 import type { KiloClawScheduledActionStatus } from '@kilocode/db/schema-types';
 import { eq, and, isNull, gt, lte, inArray, sql } from 'drizzle-orm';
+import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
 
 export { getWorkerDb, type WorkerDb };
 
@@ -732,11 +733,13 @@ export async function getMorningBriefingConfig(
 
 export type MorningBriefingConfigUpsertInput = {
   instanceId: string;
-  enabled: boolean;
-  // On INSERT, omitted fields take the column default (cron = plugin
-  // default, timezone = 'UTC', interest_topics = '{}'). On UPDATE, omitted
-  // fields are preserved — pass through the call site only what the user
-  // is actually changing.
+  // All fields are optional — patch semantics. On INSERT, omitted fields
+  // take the column default (enabled = false, cron = plugin default,
+  // timezone = 'UTC', interest_topics = '{}'). On UPDATE, omitted fields
+  // are preserved. Callers pass only what's actually changing:
+  // enable/disable flows pass enabled (+ cron/timezone), the interests
+  // flow passes only interestTopics.
+  enabled?: boolean;
   cron?: string;
   timezone?: string;
   interestTopics?: string[];
@@ -745,20 +748,23 @@ export type MorningBriefingConfigUpsertInput = {
 /**
  * Upsert the desired-state row for an instance's morning briefing.
  *
- * Update semantics: only fields explicitly provided in `input` are
- * overwritten on conflict. The enable/disable flows pass cron+timezone
- * (the values just resolved by the plugin); the interests flow (PR-4b)
- * passes only `interestTopics`. Anything not passed retains its prior
- * value.
+ * Patch semantics on conflict: only fields explicitly provided in `input`
+ * are overwritten. On insert, omitted fields fall through to column
+ * defaults.
  */
 export async function upsertMorningBriefingConfig(
   db: WorkerDb,
   input: MorningBriefingConfigUpsertInput
 ): Promise<void> {
-  const setOnConflict: Record<string, unknown> = {
-    enabled: input.enabled,
+  // Type the SET clause against Drizzle's UpdateSet shape so a typo
+  // (e.g. `interestTopics` instead of `interest_topics`) fails at
+  // compile time instead of silently producing a no-op UPDATE. Drizzle
+  // accepts the column type, `sql` expressions, or column refs as
+  // per-key values; `PgUpdateSetSource` captures that.
+  const setOnConflict: PgUpdateSetSource<typeof kiloclaw_morning_briefing_configs> = {
     updated_at: sql`now()`,
   };
+  if (input.enabled !== undefined) setOnConflict.enabled = input.enabled;
   if (input.cron !== undefined) setOnConflict.cron = input.cron;
   if (input.timezone !== undefined) setOnConflict.timezone = input.timezone;
   if (input.interestTopics !== undefined) {
@@ -766,12 +772,12 @@ export async function upsertMorningBriefingConfig(
   }
 
   // INSERT values: undefined fields fall through to the column DEFAULT.
-  // Typed declaration so the conditional assignments below stay type-checked
-  // without an `as` cast.
+  // Typed declaration so the conditional assignments below stay
+  // type-checked without an `as` cast.
   const insertValues: typeof kiloclaw_morning_briefing_configs.$inferInsert = {
     instance_id: input.instanceId,
-    enabled: input.enabled,
   };
+  if (input.enabled !== undefined) insertValues.enabled = input.enabled;
   if (input.cron !== undefined) insertValues.cron = input.cron;
   if (input.timezone !== undefined) insertValues.timezone = input.timezone;
   if (input.interestTopics !== undefined) {

@@ -33,6 +33,7 @@ type TestHarness = {
   commandHandler: (ctx: { args?: string }) => Promise<{ text: string }>;
   statusHttpHandler: (_req: unknown, res: FakeResponse) => Promise<void>;
   enableHttpHandler: (req: unknown, res: FakeResponse) => Promise<void>;
+  interestsHttpHandler: (req: unknown, res: FakeResponse) => Promise<void>;
   runHttpHandler: (_req: unknown, res: FakeResponse) => Promise<void>;
   cronJobs: CronJob[];
   sentMessages: Array<{
@@ -241,6 +242,7 @@ async function createHarness(options?: {
   let commandHandler: ((ctx: { args?: string }) => Promise<{ text: string }>) | null = null;
   let statusHttpHandler: ((_req: unknown, res: FakeResponse) => Promise<void>) | null = null;
   let enableHttpHandler: ((req: unknown, res: FakeResponse) => Promise<void>) | null = null;
+  let interestsHttpHandler: ((req: unknown, res: FakeResponse) => Promise<void>) | null = null;
   let runHttpHandler: ((_req: unknown, res: FakeResponse) => Promise<void>) | null = null;
   const loggerInfo = vi.fn();
   const loggerWarn = vi.fn();
@@ -270,6 +272,8 @@ async function createHarness(options?: {
         statusHttpHandler = route.handler;
       } else if (route.path.endsWith('/enable')) {
         enableHttpHandler = route.handler;
+      } else if (route.path.endsWith('/interests')) {
+        interestsHttpHandler = route.handler;
       } else if (route.path.endsWith('/run')) {
         runHttpHandler = route.handler;
       }
@@ -278,7 +282,13 @@ async function createHarness(options?: {
     on: vi.fn(),
   } as never);
 
-  if (!commandHandler || !statusHttpHandler || !enableHttpHandler || !runHttpHandler) {
+  if (
+    !commandHandler ||
+    !statusHttpHandler ||
+    !enableHttpHandler ||
+    !interestsHttpHandler ||
+    !runHttpHandler
+  ) {
     throw new Error('Failed to register command or HTTP handlers');
   }
 
@@ -287,6 +297,7 @@ async function createHarness(options?: {
     commandHandler,
     statusHttpHandler,
     enableHttpHandler,
+    interestsHttpHandler,
     runHttpHandler,
     cronJobs,
     sentMessages,
@@ -941,5 +952,235 @@ describe('morning briefing lifecycle', () => {
         )
       )
     ).toBe(true);
+  });
+
+  describe('interests HTTP route', () => {
+    it('writes topics to config.json and echoes them on the response', async () => {
+      const harness = await createHarness();
+      const response = new FakeResponse();
+
+      await harness.interestsHttpHandler(
+        createJsonRequest({ topics: ['Tech', 'AI', 'Local News'] }),
+        response
+      );
+
+      expect(response.statusCode).toBe(200);
+      const payload = JSON.parse(response.body) as Record<string, unknown>;
+      expect(payload.ok).toBe(true);
+      expect(payload.interestTopics).toEqual(['Tech', 'AI', 'Local News']);
+
+      const configPath = path.join(harness.stateDir, 'morning-briefing', 'config.json');
+      const stored = (await readJson(configPath)) as { interestTopics: unknown };
+      expect(stored.interestTopics).toEqual(['Tech', 'AI', 'Local News']);
+    });
+
+    it('preserves enabled/cron/timezone when only interests are updated', async () => {
+      const now = new Date().toISOString();
+      const harness = await createHarness({
+        preloadedConfig: {
+          enabled: true,
+          cronJobId: 'cron-1',
+          cron: '0 8 * * *',
+          timezone: 'America/Los_Angeles',
+          interestTopics: [],
+          updatedAt: now,
+        },
+      });
+
+      const response = new FakeResponse();
+      await harness.interestsHttpHandler(createJsonRequest({ topics: ['Finance'] }), response);
+
+      expect(response.statusCode).toBe(200);
+      const configPath = path.join(harness.stateDir, 'morning-briefing', 'config.json');
+      const stored = (await readJson(configPath)) as Record<string, unknown>;
+      expect(stored.enabled).toBe(true);
+      expect(stored.cron).toBe('0 8 * * *');
+      expect(stored.timezone).toBe('America/Los_Angeles');
+      expect(stored.cronJobId).toBe('cron-1');
+      expect(stored.interestTopics).toEqual(['Finance']);
+    });
+
+    it('accepts an empty array to clear interests', async () => {
+      const now = new Date().toISOString();
+      const harness = await createHarness({
+        preloadedConfig: {
+          enabled: false,
+          cronJobId: null,
+          cron: '0 7 * * *',
+          timezone: 'UTC',
+          interestTopics: ['Tech', 'AI'],
+          updatedAt: now,
+        },
+      });
+
+      const response = new FakeResponse();
+      await harness.interestsHttpHandler(createJsonRequest({ topics: [] }), response);
+
+      expect(response.statusCode).toBe(200);
+      const payload = JSON.parse(response.body) as Record<string, unknown>;
+      expect(payload.interestTopics).toEqual([]);
+
+      const configPath = path.join(harness.stateDir, 'morning-briefing', 'config.json');
+      const stored = (await readJson(configPath)) as { interestTopics: unknown };
+      expect(stored.interestTopics).toEqual([]);
+    });
+
+    it('returns 400 when topics is missing', async () => {
+      const harness = await createHarness();
+      const response = new FakeResponse();
+
+      await harness.interestsHttpHandler(createJsonRequest({}), response);
+
+      expect(response.statusCode).toBe(400);
+      const payload = JSON.parse(response.body) as Record<string, unknown>;
+      expect(payload.ok).toBe(false);
+      expect(payload.error).toBe('topics must be an array of strings');
+    });
+
+    it('returns 400 when topics contains non-strings', async () => {
+      const harness = await createHarness();
+      const response = new FakeResponse();
+
+      await harness.interestsHttpHandler(
+        createJsonRequest({ topics: ['Tech', 42, null] as unknown[] }),
+        response
+      );
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('returns 400 when topics exceeds the array cap', async () => {
+      const harness = await createHarness();
+      const response = new FakeResponse();
+
+      // 21 topics — one past the 20-cap. Defense in depth against a
+      // direct gateway call that bypasses the worker's Zod validation.
+      const topics = Array.from({ length: 21 }, (_, i) => `Topic${i}`);
+      await harness.interestsHttpHandler(createJsonRequest({ topics }), response);
+
+      expect(response.statusCode).toBe(400);
+      const payload = JSON.parse(response.body) as Record<string, unknown>;
+      expect(payload.ok).toBe(false);
+      expect(String(payload.error)).toContain('must not exceed');
+    });
+
+    it('returns 400 when a single topic exceeds the length cap', async () => {
+      const harness = await createHarness();
+      const response = new FakeResponse();
+
+      // 65 chars — one past the 64-cap.
+      const tooLong = 'x'.repeat(65);
+      await harness.interestsHttpHandler(
+        createJsonRequest({ topics: ['Tech', tooLong] }),
+        response
+      );
+
+      expect(response.statusCode).toBe(400);
+      const payload = JSON.parse(response.body) as Record<string, unknown>;
+      expect(payload.ok).toBe(false);
+      expect(String(payload.error)).toContain('characters or fewer');
+    });
+
+    it('trims whitespace around topics before persisting', async () => {
+      const harness = await createHarness();
+      const response = new FakeResponse();
+
+      await harness.interestsHttpHandler(
+        createJsonRequest({ topics: ['  Tech  ', '\tAI\n'] }),
+        response
+      );
+
+      expect(response.statusCode).toBe(200);
+      const configPath = path.join(harness.stateDir, 'morning-briefing', 'config.json');
+      const stored = (await readJson(configPath)) as { interestTopics: string[] };
+      expect(stored.interestTopics).toEqual(['Tech', 'AI']);
+    });
+
+    it('silently drops empty / whitespace-only entries', async () => {
+      const harness = await createHarness();
+      const response = new FakeResponse();
+
+      await harness.interestsHttpHandler(
+        createJsonRequest({ topics: ['Tech', '   ', '', '\t'] }),
+        response
+      );
+
+      expect(response.statusCode).toBe(200);
+      const configPath = path.join(harness.stateDir, 'morning-briefing', 'config.json');
+      const stored = (await readJson(configPath)) as { interestTopics: string[] };
+      expect(stored.interestTopics).toEqual(['Tech']);
+    });
+
+    it('serialises concurrent interest writes so neither is silently clobbered', async () => {
+      const harness = await createHarness();
+      const r1 = new FakeResponse();
+      const r2 = new FakeResponse();
+
+      // Fire both writes without awaiting between them — exercises the
+      // read-modify-write race the per-config-path queue is meant to
+      // prevent. Without serialisation, both reads see the empty initial
+      // config and the second write would clobber the first.
+      await Promise.all([
+        harness.interestsHttpHandler(createJsonRequest({ topics: ['Tech', 'AI'] }), r1),
+        harness.interestsHttpHandler(createJsonRequest({ topics: ['Finance'] }), r2),
+      ]);
+
+      expect(r1.statusCode).toBe(200);
+      expect(r2.statusCode).toBe(200);
+
+      // The second write wins (later in the queue), but crucially the
+      // result is one of the two inputs — NOT a merge or a default. If
+      // the queue regressed, the on-disk topics could revert to [] on
+      // the next reconcile write.
+      const configPath = path.join(harness.stateDir, 'morning-briefing', 'config.json');
+      const stored = (await readJson(configPath)) as { interestTopics: string[] };
+      const ordered =
+        JSON.stringify(stored.interestTopics) === JSON.stringify(['Tech', 'AI']) ||
+        JSON.stringify(stored.interestTopics) === JSON.stringify(['Finance']);
+      expect(ordered).toBe(true);
+    });
+  });
+
+  describe('status snapshot', () => {
+    it('surfaces interestTopics from stored config', async () => {
+      const now = new Date().toISOString();
+      const harness = await createHarness({
+        preloadedConfig: {
+          enabled: false,
+          cronJobId: null,
+          cron: '0 7 * * *',
+          timezone: 'UTC',
+          interestTopics: ['Tech', 'Design'],
+          updatedAt: now,
+        },
+      });
+
+      const response = new FakeResponse();
+      await harness.statusHttpHandler({}, response);
+
+      expect(response.statusCode).toBe(200);
+      const payload = JSON.parse(response.body) as Record<string, unknown>;
+      expect(payload.interestTopics).toEqual(['Tech', 'Design']);
+    });
+
+    it('defaults interestTopics to [] when config has no field (legacy file)', async () => {
+      const now = new Date().toISOString();
+      const harness = await createHarness({
+        preloadedConfig: {
+          enabled: false,
+          cronJobId: null,
+          cron: '0 7 * * *',
+          timezone: 'UTC',
+          updatedAt: now,
+        },
+      });
+
+      const response = new FakeResponse();
+      await harness.statusHttpHandler({}, response);
+
+      expect(response.statusCode).toBe(200);
+      const payload = JSON.parse(response.body) as Record<string, unknown>;
+      expect(payload.interestTopics).toEqual([]);
+    });
   });
 });

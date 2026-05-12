@@ -393,7 +393,8 @@ export async function syncAdminSizeOverrideToPostgresHelper(
 // is not mirrored.
 
 export type MorningBriefingDesiredConfig = {
-  enabled: boolean;
+  /** Omit to preserve enabled (or take `false` on insert). */
+  enabled?: boolean;
   /** Omit to preserve the existing cron (or take the column default on insert). */
   cron?: string;
   /** Omit to preserve the existing timezone (or take the column default on insert). */

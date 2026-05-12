@@ -488,6 +488,7 @@ export type MorningBriefingStatusLite = Pick<
   | 'lastGeneratedDate'
   | 'sourceReadiness'
   | 'lastDelivery'
+  | 'interestTopics'
 >;
 
 export type MorningBriefingStatusResponse = {
@@ -532,6 +533,13 @@ export type MorningBriefingActionResponse = {
   delivery?: MorningBriefingDeliveryResult[];
   code?: string;
   retryAfterSec?: number;
+  error?: string;
+};
+
+export type MorningBriefingInterestsResponse = {
+  ok: boolean;
+  interestTopics?: string[];
+  code?: string;
   error?: string;
 };
 

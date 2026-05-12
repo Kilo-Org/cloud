@@ -4298,6 +4298,57 @@ describe('start: volume region validation', () => {
     expect(storage._store.get('status')).toBe('running');
   });
 
+  it('handles volume gone during createMachine by clearing stale volume and retrying once', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyMachineId: null,
+      flyVolumeId: 'vol-stale',
+      flyRegion: 'iad',
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-stale', region: 'iad' });
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'dfw',
+    });
+    (flyClient.createMachine as Mock)
+      .mockRejectedValueOnce(
+        new FlyApiError(
+          'Fly API createMachine failed (400): {"error":"volume not found"}',
+          400,
+          '{"error":"volume not found"}'
+        )
+      )
+      .mockResolvedValueOnce({ id: 'machine-1', region: 'dfw' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(flyClient.createMachine).toHaveBeenCalledTimes(2);
+    expect(flyClient.createVolumeWithFallback).toHaveBeenCalledTimes(1);
+    expect((flyClient.createMachine as Mock).mock.calls[0][1]).toEqual(
+      expect.objectContaining({
+        mounts: [{ volume: 'vol-stale', path: '/root' }],
+      })
+    );
+    expect((flyClient.createMachine as Mock).mock.calls[1][1]).toEqual(
+      expect.objectContaining({
+        mounts: [{ volume: 'vol-new', path: '/root' }],
+      })
+    );
+    expect(storage._store.get('flyVolumeId')).toBe('vol-new');
+    expect(storage._store.get('flyRegion')).toBe('dfw');
+    expect(storage._store.get('flyMachineId')).toBe('machine-1');
+    expect(storage._store.get('status')).toBe('running');
+
+    const warnCall = (console.warn as Mock).mock.calls.find(
+      call =>
+        typeof call[0] === 'string' &&
+        call[0].includes('Volume not found during machine creation, clearing')
+    );
+    expect(warnCall).toBeDefined();
+  });
+
   it('performs region check even when machine already exists', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { status: 'stopped' });

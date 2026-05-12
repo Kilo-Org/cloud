@@ -1472,9 +1472,11 @@ describe('processAppStoreKiloPassNotification', () => {
       .from(credit_transactions)
       .where(eq(credit_transactions.kilo_user_id, user.id));
     expect(negativeCreditTransactions.filter(row => row.amountMicrodollars < 0)).toHaveLength(2);
+    const eurBaseAmountMicrodollars = toMicrodollars(19);
     expect(negativeCreditTransactions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          amountMicrodollars: -eurBaseAmountMicrodollars,
           description: 'App Store Kilo Pass refund clawback',
         }),
         expect.objectContaining({

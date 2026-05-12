@@ -29,6 +29,7 @@ import * as dispatch from './town/container-dispatch';
 import * as patrol from './town/patrol';
 import * as scheduling from './town/scheduling';
 import * as events from './town/events';
+import { stopContainerIfIdle as _stopContainerIfIdle } from './town/container-idle-stop';
 import * as scm from './town/town-scm';
 import * as reconciler from './town/reconciler';
 import { applyAction } from './town/actions';
@@ -47,7 +48,7 @@ import { agent_metadata } from '../db/tables/agent-metadata.table';
 import { escalation_metadata } from '../db/tables/escalation-metadata.table';
 import { convoy_metadata } from '../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../db/tables/bead-dependencies.table';
-import { town_events, TownEventRecord } from '../db/tables/town-events.table';
+import { town_events, TownEventRecord, type TownEventType } from '../db/tables/town-events.table';
 import {
   agent_nudges,
   AgentNudgeRecord,
@@ -2653,6 +2654,11 @@ export class TownDO extends DurableObject<Env> {
    * Called eagerly on page load so the terminal is available immediately
    * without requiring the user to send a message first.
    */
+  async getMayorAgentId(): Promise<string | null> {
+    const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
+    return mayor?.id ?? null;
+  }
+
   async ensureMayor(): Promise<{
     agentId: string;
     sessionStatus: 'idle' | 'active' | 'starting';
@@ -2681,14 +2687,46 @@ export class TownDO extends DurableObject<Env> {
 
     logger.setTags({ agentId: mayor.id });
 
-    // Check if the container is already running
+    // Check if the container is already running AND the SDK has a live
+    // session for the mayor. The SDK can be torn down (serverPort=0,
+    // sessionId='') after stream errors or drain while the agent record
+    // still says "running" — in that case we must fall through to a
+    // fresh dispatch instead of returning early.
     const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
+    const sdkAlive =
+      isAlive && (containerStatus.serverPort ?? 0) > 0 && Boolean(containerStatus.sessionId);
 
-    if (isAlive) {
+    if (sdkAlive) {
       const isActive =
         mayor.status === 'working' || mayor.status === 'stalled' || mayor.status === 'waiting';
+      writeEvent(this.env, {
+        event: 'mayor.ensure_decision',
+        townId,
+        agentId: mayor.id,
+        role: 'mayor',
+        label: isActive ? 'short_circuit_warm' : 'short_circuit_idle',
+      });
       return { agentId: mayor.id, sessionStatus: isActive ? 'active' : 'idle' };
+    }
+
+    // Container says running/starting but SDK has no port/session — the
+    // SDK was torn down (e.g. stream error, drain). Fall through to a
+    // fresh dispatch so the user doesn't have to manually refresh.
+    if (isAlive && !sdkAlive) {
+      logger.info('ensureMayor: container alive but SDK torn down, redispatching', {
+        agentId: mayor.id,
+        containerStatus: containerStatus.status,
+        serverPort: containerStatus.serverPort,
+        sessionId: containerStatus.sessionId,
+      });
+      writeEvent(this.env, {
+        event: 'mayor.ensure_decision',
+        townId,
+        agentId: mayor.id,
+        role: 'mayor',
+        label: 'sdk_dead_redispatch',
+      });
     }
 
     // Start the container with an idle mayor (no initial prompt)
@@ -2707,6 +2745,14 @@ export class TownDO extends DurableObject<Env> {
       });
       return { agentId: mayor.id, sessionStatus: 'idle' };
     }
+
+    writeEvent(this.env, {
+      event: 'mayor.ensure_decision',
+      townId,
+      agentId: mayor.id,
+      role: 'mayor',
+      label: 'fresh_dispatch',
+    });
 
     try {
       const containerStub = getTownContainerStub(this.env, townId);
@@ -3896,15 +3942,27 @@ export class TownDO extends DurableObject<Env> {
           reconciler.applyEvent(this.sql, event, { townConfig });
           events.markProcessed(this.sql, event.event_id);
         } catch (err) {
-          logger.error('reconciler: applyEvent failed', {
-            eventId: event.event_id,
-            eventType: event.event_type,
-            error: err instanceof Error ? err.message : String(err),
-          });
-          // Event stays unprocessed — will be retried on the next alarm tick.
-          // Mark it processed anyway after 3 consecutive failures to prevent
-          // a poison event from blocking the entire queue forever.
-          // For now, we skip it and let the next tick retry.
+          const message = err instanceof Error ? err.message : String(err);
+          // Terminal errors referencing a missing bead/agent can never
+          // succeed on retry — mark them processed so the drain loop
+          // stops re-running them every alarm tick.
+          const isMissingEntity =
+            err instanceof Error && /\b(Bead|Agent) [0-9a-f-]{36} not found\b/.test(err.message);
+          if (isMissingEntity) {
+            logger.warn('reconciler: applyEvent skipped (missing entity)', {
+              eventId: event.event_id,
+              eventType: event.event_type,
+              error: message,
+            });
+            events.markProcessed(this.sql, event.event_id);
+          } else {
+            logger.error('reconciler: applyEvent failed', {
+              eventId: event.event_id,
+              eventType: event.event_type,
+              error: message,
+            });
+            // Event stays unprocessed — will be retried on the next alarm tick.
+          }
         }
       }
     } catch (err) {
@@ -4092,6 +4150,12 @@ export class TownDO extends DurableObject<Env> {
       }),
     ]);
 
+    await this.stopContainerIfIdle().catch(err =>
+      logger.warn('alarm: stopContainerIfIdle failed', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    );
+
     // Re-arm: fast when active, slow when idle
     const interval = activeWork ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
     await this.ctx.storage.setAlarm(Date.now() + interval);
@@ -4150,6 +4214,27 @@ export class TownDO extends DurableObject<Env> {
     // Only mark as refreshed after success — failed refreshes should
     // be retried on the next alarm tick, not throttled for an hour.
     await this.ctx.storage.put('container:lastTokenRefreshAt', now);
+  }
+
+  /**
+   * Proactively stop the town container when the town is idle.
+   *
+   * Cloudflare's sleepAfter timer resets on any port-8080 traffic (including
+   * long-lived PTY WebSockets), so containers can stay awake for hours after
+   * all real work finishes. Delegates to container-idle-stop sub-module.
+   */
+  private async stopContainerIfIdle(): Promise<void> {
+    await _stopContainerIfIdle({
+      hasActiveWork: () => this.hasActiveWork(),
+      isDraining: () => this._draining,
+      getMayor: () => agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null,
+      getTownId: () => this.townId,
+      getLastIdleStopAt: () => this.ctx.storage.get<number>('container:lastIdleStopAt'),
+      setLastIdleStopAt: value => this.ctx.storage.put('container:lastIdleStopAt', value),
+      getContainerStub: townId => getTownContainerStub(this.env, townId),
+      writeEventFn: data => writeEvent(this.env, data),
+      now: () => Date.now(),
+    });
   }
 
   /**
@@ -5159,6 +5244,56 @@ export class TownDO extends DurableObject<Env> {
         []
       ),
     ];
+  }
+
+  async debugTownEvents(): Promise<unknown[]> {
+    return [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${town_events.event_id},
+                 ${town_events.event_type},
+                 ${town_events.agent_id},
+                 ${town_events.bead_id},
+                 ${town_events.processed_at}
+          FROM ${town_events}
+          ORDER BY ${town_events.created_at} ASC
+        `,
+        []
+      ),
+    ];
+  }
+
+  /**
+   * Test-only helper: directly insert a row into the town_events queue
+   * without going through the producer APIs. Used to reproduce orphan
+   * events (referencing deleted beads/agents) in tests.
+   */
+  async debugInsertTownEvent(input: {
+    event_type: TownEventType;
+    agent_id?: string | null;
+    bead_id?: string | null;
+    payload?: Record<string, unknown>;
+  }): Promise<string> {
+    const eventId = events.insertEvent(this.sql, input.event_type, {
+      agent_id: input.agent_id ?? null,
+      bead_id: input.bead_id ?? null,
+      payload: input.payload ?? {},
+    });
+    await this.armAlarmIfNeeded();
+    return eventId;
+  }
+
+  /**
+   * Test-only helper: insert a container_status event for a given agent.
+   * Mirrors the container observer's upsert so tests can verify that
+   * deleteBead sweeps agent-keyed events.
+   */
+  async debugRecordContainerStatus(
+    agentId: string,
+    payload: { status: string; exit_reason?: string | null }
+  ): Promise<void> {
+    events.upsertContainerStatus(this.sql, agentId, payload);
   }
 
   async destroy(): Promise<void> {

@@ -979,7 +979,9 @@ function useGenerationLookup(
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
-    isFreeModel(usageContext.requested_model) || (usageStats?.cost_mUsd ?? 0) > 0;
+    isFreeModel(usageContext.requested_model) ||
+    usageContext.user_byok ||
+    (usageStats?.cost_mUsd ?? 0) > 0;
   return isGatewayProvider && isSuccessStatusCode && (!hasOutputTokens || !hasCostWhenPaid);
 }
 

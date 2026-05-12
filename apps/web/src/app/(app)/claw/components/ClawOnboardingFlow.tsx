@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { Loader2, TriangleAlert, X } from 'lucide-react';
-import { KILO_AUTO_BALANCED_MODEL } from '@/lib/ai-gateway/kilo-auto';
+import { KILO_AUTO_BALANCED_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
@@ -20,8 +20,7 @@ import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { BotIdentityStep } from './BotIdentityStep';
 import { CalendarConnectStepView } from './CalendarConnectStep';
-import { ChannelPairingStep } from './ChannelPairingStep';
-import { ChannelSelectionStepView } from './ChannelSelectionStep';
+import { InboundEmailStepView } from './InboundEmailStep';
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
@@ -30,7 +29,6 @@ import { DEFAULT_BOT_IDENTITY, DEFAULT_ONBOARDING_EXEC_PRESET } from './claw.typ
 import type { BotIdentity, ExecPreset } from './claw.types';
 import {
   getClawOnboardingFlowState,
-  isPairingChannel,
   type ClawOnboardingMode,
   type OnboardingStep,
 } from './ClawOnboardingFlow.state';
@@ -118,7 +116,7 @@ function ClawOnboardingFlowInner({
   const { data: currentUser, isPending: isUserPending } = useUser();
   // Calendar OAuth is admin-only — both `/api/integrations/google/connect` and
   // `/disconnect` require `adminOnly: true`. Hide the calendar step from
-  // non-admins so the wizard advances identity → channels directly.
+  // non-admins so the wizard advances identity → email directly.
   //
   // While `useUser` is loading we default to `true` (admin assumption). This
   // matters most for admins returning from the OAuth round-trip on a full
@@ -126,8 +124,8 @@ function ClawOnboardingFlowInner({
   // the 3-step non-admin layout and — if they race-clicked Continue before
   // the query resolved — silently skip the calendar step entirely. The
   // theoretical inverse (a non-admin race-clicking Continue and seeing one
-  // frame of the calendar UI before the state machine redirects to
-  // channels) is harmless: the connect endpoint enforces admin too.
+  // frame of the calendar UI before the state machine redirects to email)
+  // is harmless: the connect endpoint enforces admin too.
   const hasCalendarStep = isUserPending ? true : currentUser?.is_admin === true;
 
   const gatewayUrl = useGatewayUrl(status);
@@ -144,12 +142,11 @@ function ClawOnboardingFlowInner({
   });
   const selectedPreset: ExecPreset = DEFAULT_ONBOARDING_EXEC_PRESET;
   const [botIdentity, setBotIdentity] = useState<BotIdentity | null>(null);
-  const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [localCreateSetupStarted, setLocalCreateSetupStarted] = useState(false);
   const [onboardingSaveSession, setOnboardingSaveSession] = useState(0);
   const hasCapturedIdentityView = useRef(false);
   const hasCapturedCalendarView = useRef(false);
+  const hasCapturedEmailView = useRef(false);
   const hasCapturedDoneView = useRef(false);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
 
@@ -160,7 +157,6 @@ function ClawOnboardingFlowInner({
     setupFailed,
     onboardingStep,
     hasBotIdentity: botIdentity !== null,
-    selectedChannelId,
     hasCalendarStep,
   };
   const preGatewayFlowState = getClawOnboardingFlowState({
@@ -190,15 +186,17 @@ function ClawOnboardingFlowInner({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Save bot identity, exec preset, and channel tokens as soon as the instance
-  // row exists. This closes the tab-close window where customizations entered
-  // during the provisioning spinner could otherwise be lost with the unmounted
-  // ProvisioningStep.
+  // Save bot identity and exec preset as soon as the instance row exists.
+  // This closes the tab-close window where customizations entered during the
+  // provisioning spinner could otherwise be lost with the unmounted
+  // ProvisioningStep. Channel tokens used to live here too; they're now
+  // dropped from the active flow but useOnboardingSaves still accepts the
+  // arg as null so we don't need to touch the hook.
   const onboardingSaves = useOnboardingSaves({
     hasInstance: flowState.instanceStatus !== null,
     botIdentity,
     selectedPreset,
-    channelTokens,
+    channelTokens: null,
     resetKey: `${onboardingSaveSession}:${
       flowState.instanceStatus?.instanceId ?? flowState.instanceStatus?.sandboxId ?? 'pending'
     }`,
@@ -214,12 +212,19 @@ function ClawOnboardingFlowInner({
 
   // Fire `claw_setup_calendar_viewed` when the calendar step actually
   // renders, matching the "viewed = rendered" semantic of identity above
-  // (and unlike the older advance-fire pattern still used by channels and
-  // provisioning). Ref guard so re-renders inside the step don't re-fire.
+  // (and unlike the older advance-fire pattern still used by provisioning).
+  // Ref guard so re-renders inside the step don't re-fire.
   useEffect(() => {
     if (flowState.renderStep !== 'calendar' || hasCapturedCalendarView.current) return;
     hasCapturedCalendarView.current = true;
     posthog?.capture('claw_setup_calendar_viewed');
+  }, [flowState.renderStep, posthog]);
+
+  // Same pattern for the inbound email step.
+  useEffect(() => {
+    if (flowState.renderStep !== 'email' || hasCapturedEmailView.current) return;
+    hasCapturedEmailView.current = true;
+    posthog?.capture('claw_setup_email_viewed');
   }, [flowState.renderStep, posthog]);
 
   useEffect(() => {
@@ -237,8 +242,6 @@ function ClawOnboardingFlowInner({
   const resetWizardSelections = useCallback(() => {
     setOnboardingStep('identity');
     setBotIdentity(null);
-    setChannelTokens(null);
-    setSelectedChannelId(null);
   }, []);
 
   const handleCreateFlowStarted = useCallback(() => {
@@ -456,8 +459,7 @@ function ClawOnboardingFlowInner({
           if (hasCalendarStep) {
             setOnboardingStep('calendar');
           } else {
-            posthog?.capture('claw_setup_channels_viewed');
-            setOnboardingStep('channels');
+            setOnboardingStep('email');
           }
         }}
       />
@@ -474,9 +476,8 @@ function ClawOnboardingFlowInner({
     const isConnected = Boolean(flowState.instanceStatus?.googleOAuthConnected);
     const connectedEmail = flowState.instanceStatus?.googleOAuthAccountEmail ?? null;
 
-    function advanceToChannels() {
-      posthog?.capture('claw_setup_channels_viewed');
-      setOnboardingStep('channels');
+    function advanceToEmail() {
+      setOnboardingStep('email');
     }
 
     return (
@@ -492,40 +493,39 @@ function ClawOnboardingFlowInner({
         }}
         onSkip={() => {
           posthog?.capture('claw_setup_calendar_completed', { connected: false, skipped: true });
-          advanceToChannels();
+          advanceToEmail();
         }}
         onContinue={() => {
           posthog?.capture('claw_setup_calendar_completed', { connected: true, skipped: false });
-          advanceToChannels();
+          advanceToEmail();
         }}
       />
     );
   }
 
-  function renderChannelsStep() {
+  function renderEmailStep() {
+    // Loading = platform status hasn't returned yet (instanceStatus null) OR
+    // the alias hasn't propagated despite the feature being enabled. Either
+    // way, the address can't be displayed; gate Continue so users don't
+    // skip the screen during the brief window before the alias appears.
+    const persisted = flowState.instanceStatus;
+    const inboundEmailAddress = persisted?.inboundEmailAddress ?? null;
+    const inboundEmailEnabled = persisted?.inboundEmailEnabled ?? false;
+    const loading = persisted === null || (inboundEmailEnabled && inboundEmailAddress === null);
+
     return (
-      <ChannelSelectionStepView
+      <InboundEmailStepView
         currentStep={flowState.currentStep}
         totalSteps={flowState.totalSteps}
-        instanceRunning={flowState.instanceRunning}
-        onSelect={(channelId, tokens) => {
-          posthog?.capture('claw_setup_channels_completed', {
-            channel: channelId,
-            skipped: false,
-          });
-          posthog?.capture('claw_setup_provisioning_viewed');
-          setSelectedChannelId(channelId);
-          setChannelTokens(tokens);
-          setOnboardingStep('provisioning');
+        address={inboundEmailAddress}
+        enabled={inboundEmailEnabled}
+        loading={loading}
+        onCopyClick={() => {
+          posthog?.capture('claw_setup_email_address_copied');
         }}
-        onSkip={() => {
-          posthog?.capture('claw_setup_channels_completed', {
-            channel: null,
-            skipped: true,
-          });
+        onContinue={() => {
+          posthog?.capture('claw_setup_email_completed');
           posthog?.capture('claw_setup_provisioning_viewed');
-          setSelectedChannelId(null);
-          setChannelTokens(null);
           setOnboardingStep('provisioning');
         }}
       />
@@ -539,7 +539,7 @@ function ClawOnboardingFlowInner({
     // takes over). When a wizard resume after an OAuth round-trip reaches
     // the provisioning step explicitly (onboardingStep === 'provisioning'),
     // use the full ProvisioningStep so its onComplete fires and the user
-    // actually advances to pairing/done instead of getting stuck.
+    // actually advances to done instead of getting stuck.
     if (mode === 'post-provisioning' && onboardingStep !== 'provisioning')
       return (
         <ProvisioningStepView
@@ -556,37 +556,6 @@ function ClawOnboardingFlowInner({
         instanceRunning={flowState.instanceRunning}
         onComplete={() => {
           posthog?.capture('claw_setup_provisioned');
-          posthog?.capture(
-            flowState.hasPairingStep ? 'claw_setup_pairing_viewed' : 'claw_setup_done_viewed'
-          );
-          setOnboardingStep(flowState.hasPairingStep ? 'pairing' : 'done');
-        }}
-      />
-    );
-  }
-
-  function renderPairingStep() {
-    if (!isPairingChannel(selectedChannelId)) return renderCompleteStep();
-
-    return (
-      <ChannelPairingStep
-        currentStep={flowState.currentStep}
-        totalSteps={flowState.totalSteps}
-        channelId={selectedChannelId}
-        mutations={mutations}
-        onComplete={() => {
-          posthog?.capture('claw_setup_pairing_completed', {
-            channel: selectedChannelId,
-            skipped: false,
-          });
-          posthog?.capture('claw_setup_done_viewed');
-          setOnboardingStep('done');
-        }}
-        onSkip={() => {
-          posthog?.capture('claw_setup_pairing_completed', {
-            channel: selectedChannelId,
-            skipped: true,
-          });
           posthog?.capture('claw_setup_done_viewed');
           setOnboardingStep('done');
         }}
@@ -610,12 +579,10 @@ function ClawOnboardingFlowInner({
         return renderIdentityStep();
       case 'calendar':
         return renderCalendarStep();
-      case 'channels':
-        return renderChannelsStep();
+      case 'email':
+        return renderEmailStep();
       case 'provisioning':
         return renderProvisioningStep();
-      case 'pairing':
-        return renderPairingStep();
       case 'complete':
         return renderCompleteStep();
       case 'error':

@@ -369,6 +369,25 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    it('accepts sandbox_error terminalReason', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Sandbox returned HTTP 500',
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'sandbox_error' })
+      );
+    });
+
     it('handles missing terminalReason gracefully', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 

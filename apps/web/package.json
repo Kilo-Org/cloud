@@ -7,7 +7,7 @@
     "dev:prod-db": "USE_PRODUCTION_DB=true bash ../../scripts/dev.sh",
     "build": "next build",
     "start": "next start",
-    "stripe": "stripe listen --forward-to http://localhost:$(cat ../../.dev-port 2>/dev/null || echo 3000)/api/stripe/webhook",
+    "stripe": "stripe listen --forward-to http://localhost:${STRIPE_FORWARD_PORT:-$(cat ../../.dev-port 2>/dev/null || echo 3000)}/api/stripe/webhook",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json apps/web/src",
     "format": "pnpm -w exec oxfmt .",
     "format:check": "pnpm -w exec oxfmt --list-different .",

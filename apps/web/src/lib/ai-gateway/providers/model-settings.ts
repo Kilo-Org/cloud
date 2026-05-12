@@ -9,6 +9,7 @@ import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import type {
   CustomLlmProvider,
   OpenClawModelSettings,
+  OpenCodePrompt,
   OpenCodeSettings,
 } from '@kilocode/db/schema-types';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
@@ -118,10 +119,18 @@ function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
   return undefined;
 }
 
+function getOpenCodePrompt(model: string): OpenCodePrompt | undefined {
+  if (model.includes('gpt-5.5')) {
+    return 'gpt55';
+  }
+  return undefined;
+}
+
 export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined {
   const ai_sdk_provider = getAiSdkProvider(model);
   const variants = getModelVariants(model);
-  return { ai_sdk_provider, variants };
+  const prompt = getOpenCodePrompt(model);
+  return { ai_sdk_provider, variants, prompt };
 }
 
 export function getOpenClawSettings(model: string): OpenClawModelSettings | undefined {

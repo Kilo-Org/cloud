@@ -72,6 +72,18 @@ describe('instance tier catalog', () => {
         targetTier: 'perf-1-3',
       })
     ).toBe(false);
+    // Legacy shared → performance is allowed regardless of CPU count, because
+    // a performance CPU is strictly stronger than a shared CPU.
+    expect(
+      canUpgradeTo({
+        currentType: 'shared-2-3',
+        currentSize: { cpus: 2, memory_mb: 3072, cpu_kind: 'shared' },
+        currentVolumeSizeGb: 10,
+        targetTier: 'perf-1-3',
+      })
+    ).toBe(true);
+    // But memory/volume constraints still apply: shared-2-4 has 4 GB which
+    // exceeds perf-1-3's 3 GB, so this move is blocked.
     expect(
       canUpgradeTo({
         currentType: 'shared-2-4',
@@ -80,6 +92,14 @@ describe('instance tier catalog', () => {
         targetTier: 'perf-1-3',
       })
     ).toBe(false);
+    expect(
+      canUpgradeTo({
+        currentType: 'shared-2-4',
+        currentSize: { cpus: 2, memory_mb: 4096, cpu_kind: 'shared' },
+        currentVolumeSizeGb: 10,
+        targetTier: 'perf-4-8',
+      })
+    ).toBe(true);
     expect(
       canUpgradeTo({
         currentType: 'custom',

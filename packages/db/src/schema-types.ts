@@ -363,6 +363,7 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.orphan.destroy',
   'kiloclaw.instances.bulk_change_version',
   'kiloclaw.scheduled_action.created',
+  'kiloclaw.fleet_upgrade.created',
   'kiloclaw.scheduled_action.cancelled',
 ]);
 
@@ -977,6 +978,7 @@ export const OpenCodePromptSchema = z.enum([
   'anthropic',
   'trinity',
   'anthropic_without_todo',
+  'ling',
   'gpt55',
 ]);
 
@@ -1139,6 +1141,7 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'interrupted',
   'timeout',
   'upstream_error',
+  'sandbox_error',
   'unknown',
 ] as const;
 

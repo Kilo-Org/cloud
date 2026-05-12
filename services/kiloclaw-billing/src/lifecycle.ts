@@ -2573,7 +2573,7 @@ async function runEarlybirdWarningSweep(
   }
 }
 
-const COMPLEMENTARY_INFERENCE_WINDOW_MS = 6 * 60 * 60 * 1000;
+const COMPLEMENTARY_INFERENCE_WINDOW_MS = 2 * 60 * 60 * 1000;
 const COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_ISO = '2026-04-10T00:00:00.000Z';
 const INSTANCE_READY_EMAIL_TYPE = 'claw_instance_ready';
 const COMPLEMENTARY_INFERENCE_ENDED_EMAIL_TYPE = 'claw_complementary_inference_ended';

@@ -310,10 +310,11 @@ async function insertPersonalSubscriptionFixture(params: PersonalSubscriptionFix
 async function seedDeliveredImpactSignupEvent(
   userId: string,
   email: string,
-  eventDate = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  conversionDate = new Date()
 ) {
   const { recordAffiliateAttributionAndQueueParentEvent } = await import('@/lib/affiliate-events');
   const { recordImpactAffiliateTouch } = await import('@/lib/impact-referral');
+  const eventDate = new Date(conversionDate.getTime() - 10 * 60_000);
 
   const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
     userId,
@@ -336,7 +337,7 @@ async function seedDeliveredImpactSignupEvent(
       utmTerm: null,
       utmContent: null,
       touchedAt: eventDate,
-      expiresAt: new Date(eventDate.getTime() + 90 * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(conversionDate.getTime() + 30 * 86_400_000),
     },
   });
 
@@ -2803,11 +2804,8 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
   });
 
   it('enqueues sale affiliate events for delivered attributed users', async () => {
-    await seedDeliveredImpactSignupEvent(
-      user.id,
-      user.google_user_email,
-      new Date('2026-04-09T10:00:00.000Z')
-    );
+    const paidAt = new Date('2026-04-09T10:00:00.000Z');
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email, paidAt);
 
     const [instance] = await db
       .insert(kiloclaw_instances)
@@ -2864,7 +2862,7 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
           ],
         },
         status_transitions: {
-          paid_at: Math.floor(new Date('2026-04-09T10:00:00.000Z').getTime() / 1000),
+          paid_at: Math.floor(paidAt.getTime() / 1000),
         },
       } as unknown as Stripe.Invoice,
     });

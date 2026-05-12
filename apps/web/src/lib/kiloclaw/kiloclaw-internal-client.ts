@@ -28,6 +28,9 @@ import type {
   DevicePairingApproveResponse,
   VolumeSnapshotsResponse,
   DoctorResponse,
+  DoctorControllerStartResponse,
+  DoctorControllerStatusResponse,
+  DoctorControllerCancelResponse,
   OpenclawWorkspaceImportResponse,
   KiloCliRunStartResponse,
   KiloCliRunStatusResponse,
@@ -625,6 +628,48 @@ export class KiloClawInternalClient {
     );
   }
 
+  async startDoctorViaController(
+    userId: string,
+    fix: boolean,
+    instanceId?: string
+  ): Promise<DoctorControllerStartResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/doctor-controller/start${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, fix }),
+      },
+      { userId }
+    );
+  }
+
+  async getDoctorViaControllerStatus(
+    userId: string,
+    instanceId?: string
+  ): Promise<DoctorControllerStatusResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/doctor-controller/status?${params.toString()}`, undefined, {
+      userId,
+    });
+  }
+
+  async cancelDoctorViaController(
+    userId: string,
+    instanceId?: string
+  ): Promise<DoctorControllerCancelResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/doctor-controller/cancel${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
   async startKiloCliRun(
     userId: string,
     prompt: string,
@@ -978,6 +1023,7 @@ export class KiloClawInternalClient {
   async resizeMachine(
     userId: string,
     instanceType: InstanceTierKey,
+    actor: { actorId: string; actorEmail: string },
     instanceId?: string
   ): Promise<ResizeMachineResponse> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
@@ -985,7 +1031,7 @@ export class KiloClawInternalClient {
       `/api/platform/resize-machine${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, instanceType }),
+        body: JSON.stringify({ userId, instanceType, ...actor }),
       },
       { userId }
     );

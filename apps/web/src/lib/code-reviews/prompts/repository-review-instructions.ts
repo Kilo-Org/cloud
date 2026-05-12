@@ -21,7 +21,7 @@ export function normalizeRepositoryReviewInstructions(
     .join('')
     .trim();
 
-  if (content.trim().length === 0) return null;
+  if (content.length === 0) return null;
 
   if (content.length <= MAX_REVIEW_INSTRUCTIONS_CHARS) {
     return { content, truncated: false };

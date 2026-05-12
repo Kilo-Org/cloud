@@ -1805,10 +1805,11 @@ export function SettingsTab({
   const configuredSecrets = config?.configuredSecrets ?? {};
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
   const braveSearchConfigured = configuredSecrets['brave-search'] ?? false;
+  // Mirrors controller arbitration in services/kiloclaw/controller/src/config-writer.ts.
   const exaSearchConfigured =
-    supportsExaSearchUi && (kiloExaSearchMode === 'kilo-proxy' || kiloExaSearchMode === null);
-  const exaSearchDisplayMode =
-    supportsExaSearchUi && kiloExaSearchMode === null ? 'kilo-proxy' : kiloExaSearchMode;
+    supportsExaSearchUi &&
+    (kiloExaSearchMode === 'kilo-proxy' || (kiloExaSearchMode === null && !braveSearchConfigured));
+  const exaSearchDisplayMode = exaSearchConfigured ? 'kilo-proxy' : 'disabled';
   const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;
   const toolEntries = getEntriesByCategory('tool');
   const googleCalendarConnectHref = useMemo(() => {

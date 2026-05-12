@@ -288,7 +288,7 @@ export function UsageAnalyticsSidebar({
               activeFilters={filters}
               onAdd={onAddFilter}
               labelForDimensionValue={labelForDimensionValue}
-              metric={chartMetric}
+              metric="cost"
               granularity={granularity}
             />
             {activeFilters.length === 0 ? (

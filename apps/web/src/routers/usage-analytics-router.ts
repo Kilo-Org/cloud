@@ -301,17 +301,23 @@ function buildScopeConditions(
 }
 
 function buildDimensionConditions(where: WhereBuilder, filters: UsageAnalyticsFilters): void {
-  const nonEmpty = (a?: string[]) => !!a && a.length > 0;
-  if (nonEmpty(filters.features)) where.addIn('feature', filters.features!);
-  if (nonEmpty(filters.models)) where.addIn('model', filters.models!);
-  if (nonEmpty(filters.modes)) where.addIn('mode', filters.modes!);
-  if (nonEmpty(filters.providers)) where.addIn('provider', filters.providers!);
-  if (nonEmpty(filters.projects)) where.addIn('project_id', filters.projects!);
-  if (nonEmpty(filters.excludedFeatures)) where.addNotIn('feature', filters.excludedFeatures!);
-  if (nonEmpty(filters.excludedModels)) where.addNotIn('model', filters.excludedModels!);
-  if (nonEmpty(filters.excludedModes)) where.addNotIn('mode', filters.excludedModes!);
-  if (nonEmpty(filters.excludedProviders)) where.addNotIn('provider', filters.excludedProviders!);
-  if (nonEmpty(filters.excludedProjects)) where.addNotIn('project_id', filters.excludedProjects!);
+  const addInIfNonEmpty = (column: string, values: string[] | undefined) => {
+    if (values && values.length > 0) where.addIn(column, values);
+  };
+  const addNotInIfNonEmpty = (column: string, values: string[] | undefined) => {
+    if (values && values.length > 0) where.addNotIn(column, values);
+  };
+
+  addInIfNonEmpty('feature', filters.features);
+  addInIfNonEmpty('model', filters.models);
+  addInIfNonEmpty('mode', filters.modes);
+  addInIfNonEmpty('provider', filters.providers);
+  addInIfNonEmpty('project_id', filters.projects);
+  addNotInIfNonEmpty('feature', filters.excludedFeatures);
+  addNotInIfNonEmpty('model', filters.excludedModels);
+  addNotInIfNonEmpty('mode', filters.excludedModes);
+  addNotInIfNonEmpty('provider', filters.excludedProviders);
+  addNotInIfNonEmpty('project_id', filters.excludedProjects);
 }
 
 function buildWhereClause(
@@ -446,13 +452,18 @@ async function timedSnowflakeQuery<T>(
   let rowCount = 0;
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let settled = false;
+  const timer = setTimeout(() => {
+    if (!settled) controller.abort();
+  }, timeoutMs);
 
   try {
     const result = await queryFn(controller.signal);
+    settled = true;
     rowCount = Array.isArray(result) ? result.length : 1;
     return result;
   } catch (error) {
+    settled = true;
     console.error(
       JSON.stringify({
         type: 'usage_query_error',
@@ -825,6 +836,10 @@ export const usageAnalyticsRouter = createTRPCRouter({
         LIMIT ${Number(input.limit)}
       `;
 
+      // SAFETY: LIMIT value is interpolated directly into SQL but is
+      // validated by Zod above: `z.number().int().min(1).max(10_000)`.
+      // Snowflake's SQL API v2 does not support parameter binding for LIMIT.
+
       const rows = await timedSnowflakeQuery(
         {
           route: 'usageAnalytics.getBreakdown',
@@ -845,6 +860,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
       );
 
       const values = rows.map(row => ({ key: row[0] ?? '', value: toSafeNumber(row[1]) }));
+      // Percentages are relative to the *returned* rows (limited by input.limit).
+      // They will not reflect the true share when the result set is capped.
       const totalValue = values.reduce((s, r) => s + r.value, 0);
 
       return {

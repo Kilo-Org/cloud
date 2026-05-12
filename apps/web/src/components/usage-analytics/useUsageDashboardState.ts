@@ -196,6 +196,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
 
   const isInitialized = useRef(false);
   const prevState = useRef<DashboardState | null>(null);
+  const syncDirection = useRef<'push' | 'ignore'>('push');
 
   // Mark as initialized after first render
   useEffect(() => {
@@ -203,9 +204,66 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
     prevState.current = state;
   }, []);
 
+  // Detect browser back/forward navigation and re-sync state from URL.
+  // `router.replace` triggers `popstate` on the same page; we use
+  // `syncDirection` to avoid bouncing — only apply URL changes that came
+  // from genuine navigation, not from our own `router.replace`.
+  useEffect(() => {
+    const onPopState = () => {
+      syncDirection.current = 'ignore';
+      const params = new URLSearchParams(window.location.search);
+
+      const period = VALID_PERIODS.includes(params.get('period') as PeriodOption)
+        ? (params.get('period') as PeriodOption)
+        : state.period;
+      const granularity = VALID_GRANULARITIES.includes(params.get('granularity') as Granularity)
+        ? (params.get('granularity') as Granularity)
+        : state.granularity;
+      const chartMetric = isValidMetricKey(params.get('metric') ?? '')
+        ? (params.get('metric') as MetricKey)
+        : state.chartMetric;
+      const groupByRaw = params.get('group');
+      const groupBy =
+        groupByRaw === 'none' || isValidDimension(groupByRaw ?? '')
+          ? (groupByRaw as Dimension | 'none')
+          : state.groupBy;
+      const personalView = params.get('personalView') ?? state.personalView;
+      const viewAsRaw = params.get('viewAs');
+      const viewAs = viewAsRaw === 'org-wide' ? 'org-wide' : state.viewAs;
+      const filters = deserializeFiltersFromParams(params);
+
+      setStateInternal({
+        period,
+        granularity,
+        chartMetric,
+        filters,
+        groupBy,
+        personalView,
+        viewAs,
+      });
+
+      // After the state update flushes, resume pushing to the URL.
+      // One animation frame is enough for React to commit the state.
+      requestAnimationFrame(() => {
+        syncDirection.current = 'push';
+      });
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [
+    state.period,
+    state.granularity,
+    state.chartMetric,
+    state.groupBy,
+    state.personalView,
+    state.viewAs,
+  ]);
+
   // Sync state to URL parameters when state changes
   useEffect(() => {
     if (!isInitialized.current) return;
+    if (syncDirection.current === 'ignore') return;
     if (!prevState.current) {
       prevState.current = state;
       return;
@@ -237,9 +295,10 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
     serializeFiltersToParams(params, state.filters);
 
     const queryString = params.toString();
-    const newUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}`;
+    const url = new URL(window.location.origin + window.location.pathname);
+    if (queryString) url.search = queryString;
 
-    router.replace(newUrl, { scroll: false });
+    router.replace(url.toString(), { scroll: false });
   }, [router, searchParams, state]);
 
   const setState = useCallback((updates: Partial<DashboardState>) => {

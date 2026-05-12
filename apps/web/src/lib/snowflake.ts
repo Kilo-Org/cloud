@@ -86,6 +86,31 @@ export function resolveSnowflakeConfig(): SnowflakeConfig | null {
 
 const SNOWFLAKE_JWT_LIFETIME_SECONDS = 59 * 60;
 
+// Cached JWT shared across requests for the same config. Refreshed only when
+// within 60 seconds of expiry to avoid per-request RSA signing overhead.
+let cachedJwt: { token: string; expiresAtMs: number; fingerprint: string } | null = null;
+
+function getOrBuildJwt(config: SnowflakeConfig): string {
+  const now = Date.now();
+  const refreshWindowMs = 60_000; // 1 minute before expiry
+
+  if (
+    cachedJwt &&
+    cachedJwt.fingerprint === config.publicKeyFingerprint &&
+    cachedJwt.expiresAtMs > now + refreshWindowMs
+  ) {
+    return cachedJwt.token;
+  }
+
+  const token = buildJwt(config);
+  cachedJwt = {
+    token,
+    expiresAtMs: now + SNOWFLAKE_JWT_LIFETIME_SECONDS * 1000,
+    fingerprint: config.publicKeyFingerprint,
+  };
+  return token;
+}
+
 function buildJwt(config: SnowflakeConfig): string {
   const accountId = config.jwtAccountIdentifier.trim().toUpperCase().replaceAll('.', '-');
   const username = config.username.trim().toUpperCase();
@@ -183,7 +208,7 @@ export async function executeSnowflakeStatement(params: {
   timeoutSeconds?: number;
   signal?: AbortSignal;
 }): Promise<SnowflakeRow[]> {
-  const token = buildJwt(params.config);
+  const token = getOrBuildJwt(params.config);
   const requestId = crypto.randomUUID();
 
   const url = new URL(`https://${params.config.accountHost}/api/v2/statements`);

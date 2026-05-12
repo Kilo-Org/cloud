@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
@@ -174,9 +174,14 @@ export function UsageAnalyticsDashboard({
   const isOrgWideView = canViewAllOrgUsers && effectiveViewAs === 'org-wide';
 
   // Reset viewAs to 'self' whenever the effective org changes (e.g. personal
-  // user switches org in the Scope dropdown).
+  // user switches org in the Scope dropdown). Only fires on actual org changes
+  // to avoid a redundant state update on initial mount.
+  const prevEffectiveOrgId = useRef(effectiveOrgId);
   useEffect(() => {
-    setState({ viewAs: 'self' });
+    if (prevEffectiveOrgId.current !== effectiveOrgId) {
+      setState({ viewAs: 'self' });
+      prevEffectiveOrgId.current = effectiveOrgId;
+    }
   }, [effectiveOrgId, setState]);
 
   // When the view collapses to a single user ('self'), drop any stale

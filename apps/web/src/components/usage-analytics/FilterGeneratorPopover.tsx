@@ -23,7 +23,7 @@ import { Check, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DIMENSION_LABELS, type Dimension, type FilterDirection } from './types';
 import type { DateRange, PersonalScope, UsageFilters } from './hooks';
-import type { MetricKey, Granularity } from './types';
+import type { Granularity } from './types';
 
 type FilterGeneratorPopoverProps = {
   /** Query scope (to populate value suggestions). */

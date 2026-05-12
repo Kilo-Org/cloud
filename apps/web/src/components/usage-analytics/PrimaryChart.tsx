@@ -193,7 +193,6 @@ export function PrimaryChart({
                   dataKey={key}
                   stroke={colorForIndex(i, key)}
                   fill={hasSplit ? 'none' : `url(#gradient-${i})`}
-                  fillOpacity={hasSplit ? 0 : 1}
                   strokeWidth={2}
                   isAnimationActive={false}
                   name={labelForKey(key)}

@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer';
+
 export type EmbeddingProxyRequest = {
   model: string;
   input: unknown;
@@ -29,4 +31,45 @@ export function buildUpstreamBody(
     ...upstreamBody
   } = body;
   return upstreamBody;
+}
+
+function floatEmbeddingToBase64(embedding: number[]): string {
+  return Buffer.from(new Float32Array(embedding).buffer).toString('base64');
+}
+
+export async function buildDownstreamResponse(
+  response: Response,
+  encodingFormat: EmbeddingProxyRequest['encoding_format']
+): Promise<Response> {
+  if (!response.ok || encodingFormat !== 'base64') return response;
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) return response;
+
+  const body = await response.clone().json();
+  if (!body || typeof body !== 'object' || !Array.isArray(body.data)) return response;
+
+  const data = body.data.map((item: unknown) => {
+    if (
+      !item ||
+      typeof item !== 'object' ||
+      !Array.isArray((item as { embedding?: unknown }).embedding)
+    ) {
+      return item;
+    }
+    return {
+      ...item,
+      embedding: floatEmbeddingToBase64((item as { embedding: number[] }).embedding),
+    };
+  });
+
+  const headers = new Headers(response.headers);
+  headers.set('content-type', 'application/json');
+  headers.delete('content-length');
+
+  return new Response(JSON.stringify({ ...body, data }), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }

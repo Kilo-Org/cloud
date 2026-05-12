@@ -266,7 +266,7 @@ export async function prepareReviewPayload(
         }
         const projectAccessToken = gitlabToken;
 
-        repositoryReviewInstructions = await fetchRepositoryReviewInstructions({
+        const repositoryReviewInstructionsPromise = fetchRepositoryReviewInstructions({
           platform,
           repoFullName: review.repo_full_name,
           baseRef: review.base_ref,
@@ -287,12 +287,15 @@ export async function prepareReviewPayload(
           const repoPath = review.repo_full_name;
 
           // Fetch all state in parallel for efficiency (using PrAT)
-          const [summaryNote, inlineComments, headCommitSha, diffRefs] = await Promise.all([
-            findKiloReviewNote(gitlabToken, repoPath, mrIid, instanceUrl),
-            fetchMRInlineComments(gitlabToken, repoPath, mrIid, instanceUrl),
-            getMRHeadCommit(gitlabToken, repoPath, mrIid, instanceUrl),
-            getMRDiffRefs(gitlabToken, repoPath, mrIid, instanceUrl),
-          ]);
+          const [summaryNote, inlineComments, headCommitSha, diffRefs, reviewInstructions] =
+            await Promise.all([
+              findKiloReviewNote(gitlabToken, repoPath, mrIid, instanceUrl),
+              fetchMRInlineComments(gitlabToken, repoPath, mrIid, instanceUrl),
+              getMRHeadCommit(gitlabToken, repoPath, mrIid, instanceUrl),
+              getMRDiffRefs(gitlabToken, repoPath, mrIid, instanceUrl),
+              repositoryReviewInstructionsPromise,
+            ]);
+          repositoryReviewInstructions = reviewInstructions;
 
           // Convert GitLab note format to common format
           const summaryComment = summaryNote
@@ -329,6 +332,7 @@ export async function prepareReviewPayload(
             headCommitSha: headCommitSha.substring(0, 8),
           });
         } catch (stateLookupError) {
+          repositoryReviewInstructions = await repositoryReviewInstructionsPromise;
           // Non-critical - continue without state info
           logExceptInTest('[prepareReviewPayload] Failed to build GitLab review state:', {
             reviewId,

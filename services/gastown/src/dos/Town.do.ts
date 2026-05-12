@@ -2708,6 +2708,8 @@ export class TownDO extends DurableObject<Env> {
     smallModel?: string;
     kilocodeToken?: string;
     organizationId?: string | null;
+    githubToken?: string;
+    githubCliPat?: string;
   } | null> {
     const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
     if (!mayor) return null;
@@ -2718,6 +2720,19 @@ export class TownDO extends DurableObject<Env> {
     }
 
     const townConfig = await this.getTownConfig();
+
+    // Resolve the GitHub token using the same chain as startAgentInContainer
+    // so the prewarmed mayor SDK boots with `gh` CLI auth (`GH_TOKEN`)
+    // already populated. Without this, the mayor's bash tool sees an
+    // empty environment for git/gh until the SDK is torn down and the
+    // /agents/start path's buildAgentEnv runs — which never happens
+    // while ensureMayor short-circuits on a warm session.
+    const githubToken = await scm.resolveGitHubTokenString({
+      env: this.env,
+      townId: this.townId,
+      getTownConfig: () => Promise.resolve(townConfig),
+    });
+
     // _ensureMayor dispatches the mayor without a per-rig override
     // (Town.do.ts:2766-2790). Match that resolution here so the prewarm
     // KILO_CONFIG_CONTENT is byte-identical to what /agents/start will
@@ -2728,6 +2743,8 @@ export class TownDO extends DurableObject<Env> {
       smallModel: config.resolveSmallModel(townConfig),
       kilocodeToken,
       organizationId: townConfig.organization_id ?? null,
+      ...(githubToken ? { githubToken } : {}),
+      ...(townConfig.github_cli_pat ? { githubCliPat: townConfig.github_cli_pat } : {}),
     };
   }
 
@@ -4856,7 +4873,9 @@ export class TownDO extends DurableObject<Env> {
   /**
    * Health check: verify the alarm is set and return basic town status.
    * Called by the GastownUserDO watchdog alarm to ensure each town's
-   * alarm loop is firing. Re-arms the alarm if it's missing.
+   * alarm loop is firing. Re-arms the alarm if it's missing, picking the
+   * cadence based on `hasActiveWork` so idle towns don't all wake up
+   * on the fast 5s cadence after a deploy.
    */
   async healthCheck(): Promise<{
     townId: string;
@@ -4870,10 +4889,17 @@ export class TownDO extends DurableObject<Env> {
     const currentAlarm = await this.ctx.storage.getAlarm();
     const alarmSet = currentAlarm !== null && currentAlarm > Date.now();
 
-    // Re-arm if missing — this is the whole point of the watchdog
+    // Re-arm if missing — this is the whole point of the watchdog. Pick
+    // the cadence to match observed activity: active towns recover fast,
+    // idle towns don't pay the cost of a 5s wake-up storm across the fleet.
     if (!alarmSet) {
-      console.warn(`${TOWN_LOG} healthCheck: alarm not set for town=${townId}, re-arming`);
-      await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
+      const interval = scheduling.hasActiveWork(this.sql)
+        ? ACTIVE_ALARM_INTERVAL_MS
+        : IDLE_ALARM_INTERVAL_MS;
+      console.warn(
+        `${TOWN_LOG} healthCheck: alarm not set for town=${townId}, re-arming with ${interval}ms`
+      );
+      await this.ctx.storage.setAlarm(Date.now() + interval);
     }
 
     const activeAgents = Number(

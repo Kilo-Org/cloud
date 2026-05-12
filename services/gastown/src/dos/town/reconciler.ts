@@ -883,10 +883,24 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
         agent_id: agent.bead_id,
       });
     } else if (hookedStatus === 'in_progress' || hookedStatus === 'open') {
-      // Idle agent hooked to a live bead — the dispatch started but the
-      // agent died (container failed to start, OOM, etc.) and agentCompleted
-      // set it to idle without unhooking. Reset the bead to open and unhook
-      // so the scheduling rules can re-dispatch.
+      // Idle agent hooked to a live bead — usually means the dispatch
+      // started but the agent died (container failed to start, OOM,
+      // etc.) and agentCompleted set it to idle without unhooking.
+      //
+      // Guard against the phantom-failed-dispatch case: dispatchAgent
+      // can return started=false even when the container actually
+      // accepted the agent (e.g. /refresh-token raced a token rotation),
+      // and the SDK session keeps heartbeating happily. Tearing the
+      // hook out from under a live session causes tools that need a
+      // hooked bead (gt_request_changes, gt_triage_resolve) to fail
+      // with "is not hooked to a bead" until the session exits.
+      //
+      // If we've seen a heartbeat in the last 90s, treat the agent as
+      // alive and leave the hook in place. The 90s window matches
+      // reconcileAgents' stale-heartbeat threshold, so a truly dead
+      // agent still gets reaped by the heartbeat path on a later tick.
+      if (!staleMs(agent.last_activity_at, 90_000)) continue;
+
       actions.push({
         type: 'unhook_agent',
         agent_id: agent.bead_id,

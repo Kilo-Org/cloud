@@ -603,6 +603,15 @@ const PERSIST_ENV_KEYS = new Set([
   'KILO_CONFIG_CONTENT',
   'OPENCODE_CONFIG_CONTENT',
   'GASTOWN_ORGANIZATION_ID',
+  // Git auth: token rotations need to land in process.env so that
+  // bash subprocesses spawned by the SDK's bash tool see the fresh
+  // value. Without these here, a cache-hit on /agents/start returns
+  // the prewarmed SDK with whatever GH_TOKEN/GIT_TOKEN was set at
+  // prewarm time, even after the worker rotated them.
+  'GH_TOKEN',
+  'GIT_TOKEN',
+  'GITHUB_TOKEN',
+  'GITHUB_CLI_PAT',
 ]);
 
 async function ensureSDKServer(
@@ -2632,6 +2641,8 @@ type MayorPrewarmContext = {
   smallModel?: string;
   kilocodeToken?: string;
   organizationId?: string | null;
+  githubToken?: string;
+  githubCliPat?: string;
 };
 
 // Mirrors the response contract documented at
@@ -2645,6 +2656,8 @@ const MayorPrewarmResponse = z
     smallModel: z.string().optional(),
     kilocodeToken: z.string().optional(),
     organizationId: z.string().nullable().optional(),
+    githubToken: z.string().optional(),
+    githubCliPat: z.string().optional(),
   })
   .passthrough();
 
@@ -2665,9 +2678,18 @@ async function fetchMayorPrewarmContext(
     const json: unknown = await resp.json();
     const parsed = MayorPrewarmResponse.safeParse(json);
     if (!parsed.success) return null;
-    const { agentId, model, smallModel, kilocodeToken, organizationId } = parsed.data;
+    const { agentId, model, smallModel, kilocodeToken, organizationId, githubToken, githubCliPat } =
+      parsed.data;
     if (!agentId) return null;
-    return { agentId, model, smallModel, kilocodeToken, organizationId };
+    return {
+      agentId,
+      model,
+      smallModel,
+      kilocodeToken,
+      organizationId,
+      githubToken,
+      githubCliPat,
+    };
   } catch (err) {
     console.warn(`${MANAGER_LOG} fetchMayorPrewarmContext failed:`, err);
     return null;
@@ -2719,6 +2741,27 @@ function buildPrewarmEnv(ctx: MayorPrewarmContext, townId: string): Record<strin
       ? ctx.organizationId
       : (process.env.GASTOWN_ORGANIZATION_ID ?? null);
   if (organizationId) env.GASTOWN_ORGANIZATION_ID = organizationId;
+
+  // Plumb GitHub auth into the prewarmed SDK env so `gh` CLI and `git`
+  // subprocesses spawned from the mayor's bash tool see credentials.
+  // Mirror buildAgentEnv (agent-runner.ts:180-188): GITHUB_CLI_PAT wins
+  // for `gh` (PRs/issues appear under the user's identity), else fall
+  // back to the integration-resolved GIT_TOKEN.
+  //
+  // Without this, ensureMayor's short-circuit path returns a prewarmed
+  // SDK whose process.env is missing GH_TOKEN entirely — `gh auth status`
+  // reports "not logged in" until the SDK is torn down and rebuilt.
+  if (ctx.githubToken) {
+    env.GIT_TOKEN = ctx.githubToken;
+    env.GITHUB_TOKEN = ctx.githubToken;
+  }
+  if (ctx.githubCliPat) {
+    env.GITHUB_CLI_PAT = ctx.githubCliPat;
+  }
+  const ghToken = ctx.githubCliPat ?? ctx.githubToken;
+  if (ghToken) {
+    env.GH_TOKEN = ghToken;
+  }
 
   // Without the worker-resolved model, skip prewarm: any guess we make
   // here will almost certainly differ from /agents/start's resolved

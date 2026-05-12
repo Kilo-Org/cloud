@@ -163,21 +163,24 @@ export async function prepareReviewPayload(
         githubToken = installationToken;
         const [repoOwner, repoName] = review.repo_full_name.split('/');
 
-        if (repoOwner && repoName) {
-          repositoryReviewInstructions = await fetchRepositoryReviewInstructions({
-            platform,
-            repoFullName: review.repo_full_name,
-            baseRef: review.base_ref,
-            fetchInstructions: () =>
-              fetchGitHubRootTextFileAtRef({
-                token: installationToken,
-                owner: repoOwner,
-                repo: repoName,
-                path: REVIEW_INSTRUCTIONS_FILE,
-                ref: review.base_ref,
-              }),
-          });
-        } else {
+        const repositoryReviewInstructionsPromise =
+          repoOwner && repoName
+            ? fetchRepositoryReviewInstructions({
+                platform,
+                repoFullName: review.repo_full_name,
+                baseRef: review.base_ref,
+                fetchInstructions: () =>
+                  fetchGitHubRootTextFileAtRef({
+                    token: installationToken,
+                    owner: repoOwner,
+                    repo: repoName,
+                    path: REVIEW_INSTRUCTIONS_FILE,
+                    ref: review.base_ref,
+                  }),
+              })
+            : Promise.resolve(null);
+
+        if (!repoOwner || !repoName) {
           warnExceptInTest(
             '[prepareReviewPayload] Cannot fetch REVIEW.md for invalid GitHub repo',
             {
@@ -191,11 +194,14 @@ export async function prepareReviewPayload(
         // Build complete review state for intelligent update/create decisions
         try {
           // Fetch all state in parallel for efficiency
-          const [summaryComment, inlineComments, headCommitSha] = await Promise.all([
-            findKiloReviewComment(installationId, repoOwner, repoName, review.pr_number, appType),
-            fetchPRInlineComments(installationId, repoOwner, repoName, review.pr_number, appType),
-            getPRHeadCommit(installationId, repoOwner, repoName, review.pr_number, appType),
-          ]);
+          const [summaryComment, inlineComments, headCommitSha, reviewInstructions] =
+            await Promise.all([
+              findKiloReviewComment(installationId, repoOwner, repoName, review.pr_number, appType),
+              fetchPRInlineComments(installationId, repoOwner, repoName, review.pr_number, appType),
+              getPRHeadCommit(installationId, repoOwner, repoName, review.pr_number, appType),
+              repositoryReviewInstructionsPromise,
+            ]);
+          repositoryReviewInstructions = reviewInstructions;
 
           existingReviewState = buildReviewState(summaryComment, inlineComments, headCommitSha);
 
@@ -207,6 +213,7 @@ export async function prepareReviewPayload(
             headCommitSha: headCommitSha.substring(0, 8),
           });
         } catch (stateLookupError) {
+          repositoryReviewInstructions = await repositoryReviewInstructionsPromise;
           // Non-critical - continue without state info
           logExceptInTest('[prepareReviewPayload] Failed to build GitHub review state:', {
             reviewId,

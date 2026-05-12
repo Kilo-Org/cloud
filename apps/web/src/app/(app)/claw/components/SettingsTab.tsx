@@ -529,7 +529,11 @@ function MorningBriefingInterestsEditor({
   const lastSeenStored = useRef<string | null>(null);
   useEffect(() => {
     if (storedTopics === null) return;
-    const serialized = storedTopics.join('||');
+    // JSON.stringify avoids the separator-collision case where a user-
+    // typed topic like "Tech||AI" would produce the same signature as
+    // two separate topics joined with "||". Matches the isDirty
+    // comparison just below.
+    const serialized = JSON.stringify(storedTopics);
     if (lastSeenStored.current === serialized) return;
     lastSeenStored.current = serialized;
     setDraft(storedTopics);

@@ -53,6 +53,7 @@ import * as z from 'zod';
 const VERCEL_BYOK_PROVIDER_NAMES = {
   anthropic: 'Anthropic',
   bedrock: 'AWS Bedrock',
+  deepseek: 'DeepSeek',
   openai: 'OpenAI',
   inception: 'Inception',
   fireworks: 'Fireworks',

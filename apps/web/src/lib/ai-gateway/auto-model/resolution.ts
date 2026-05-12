@@ -1,7 +1,7 @@
 import type { FeatureValue } from '@/lib/feature-detection';
 import {
   gemma_4_26b_a4b_it_free_model,
-  GEMMA_4_31B_IT_ID,
+  GEMMA_4_26B_A4B_IT_ID,
 } from '@/lib/ai-gateway/providers/google';
 import type {
   GatewayRequest,
@@ -22,7 +22,7 @@ import {
   type ResolvedAutoModel,
   KILO_AUTO_LEGACY_MODEL,
   BALANCED_MESSAGES_FALLBACK_MODEL,
-} from '@/lib/ai-gateway/kilo-auto';
+} from '@/lib/ai-gateway/auto-model';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import {
@@ -112,7 +112,9 @@ export async function resolveAutoModel(
       kind: 'ok',
       resolved: {
         model:
-          (await balancePromise) > 0 ? GEMMA_4_31B_IT_ID : gemma_4_26b_a4b_it_free_model.public_id,
+          (await balancePromise) > 0
+            ? GEMMA_4_26B_A4B_IT_ID
+            : gemma_4_26b_a4b_it_free_model.public_id,
       },
     };
   }

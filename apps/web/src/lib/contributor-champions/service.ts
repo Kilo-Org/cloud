@@ -788,6 +788,121 @@ export async function enrollContributorChampion(input: {
   };
 }
 
+type UpgradeResult = {
+  upgradedTier: ContributorTier;
+  creditDifferentialUsd: number;
+  creditGranted: boolean;
+};
+
+export async function upgradeContributorChampionTier(input: {
+  contributorId: string;
+  newTier: ContributorTier;
+}): Promise<UpgradeResult> {
+  const leaderboard = await getContributorChampionLeaderboard();
+  const row = leaderboard.find(value => value.contributorId === input.contributorId);
+  if (!row) throw new Error('Contributor not found');
+  if (!row.enrolledTier) throw new Error('Contributor is not enrolled');
+
+  // Coarse pre-check using the leaderboard snapshot. The authoritative check
+  // happens inside the transaction after the row lock is acquired.
+  const newCreditUsd = TIER_CREDIT_USD[input.newTier];
+  if (newCreditUsd <= TIER_CREDIT_USD[row.enrolledTier]) {
+    throw new Error(
+      `New tier "${input.newTier}" must be higher than current tier "${row.enrolledTier}"`
+    );
+  }
+
+  const newCreditAmountMicrodollars = toMicrodollars(newCreditUsd);
+  // Prefer the explicit membership link over the email-derived match, same as enrollContributorChampion.
+  const linkedKiloUserId = row.linkedKiloUserId ?? row.linkedUserId;
+
+  const { creditGranted, creditDifferentialUsd } = await db.transaction(async tx => {
+    // Lock the contributor row to serialize concurrent upgrade requests.
+    await tx.execute(
+      sql`SELECT id FROM contributor_champion_contributors WHERE id = ${input.contributorId} FOR UPDATE`
+    );
+
+    // Re-read the membership inside the transaction after acquiring the lock so the
+    // differential is computed from the authoritative current tier, not the
+    // leaderboard snapshot taken before the lock. Without this, two concurrent
+    // upgrade calls could both read the pre-upgrade tier, both compute the same
+    // differential, and both grant — double-granting the top-up.
+    const [membership] = await tx
+      .select({ enrolled_tier: contributor_champion_memberships.enrolled_tier })
+      .from(contributor_champion_memberships)
+      .where(eq(contributor_champion_memberships.contributor_id, input.contributorId))
+      .limit(1);
+
+    if (!membership) throw new Error('Contributor membership not found');
+    if (!membership.enrolled_tier) throw new Error('Contributor is not currently enrolled');
+
+    const lockedCurrentTier = parseContributorTier(membership.enrolled_tier);
+    if (!lockedCurrentTier)
+      throw new Error(`Invalid enrolled_tier "${membership.enrolled_tier}" in DB`);
+    const lockedCurrentCreditUsd = TIER_CREDIT_USD[lockedCurrentTier];
+    const lockedDifferentialUsd = newCreditUsd - lockedCurrentCreditUsd;
+
+    if (lockedDifferentialUsd <= 0) {
+      throw new Error(
+        `Tier is already at or above "${input.newTier}" (current: "${membership.enrolled_tier}")`
+      );
+    }
+
+    const now = new Date().toISOString();
+
+    await tx
+      .update(contributor_champion_memberships)
+      .set({
+        enrolled_tier: input.newTier,
+        credit_amount_microdollars: newCreditAmountMicrodollars,
+        updated_at: sql`now()`,
+      })
+      .where(eq(contributor_champion_memberships.contributor_id, input.contributorId));
+
+    // Grant the credit differential immediately (the top-up for the current period).
+    let granted = false;
+    if (lockedDifferentialUsd > 0 && linkedKiloUserId) {
+      const [linkedUser] = await tx
+        .select()
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, linkedKiloUserId))
+        .limit(1);
+
+      if (linkedUser) {
+        const result = await grantCreditForCategory(linkedUser, {
+          credit_category: 'contributor-champion-credits',
+          amount_usd: lockedDifferentialUsd,
+          expiry_hours: CREDIT_EXPIRY_HOURS,
+          counts_as_selfservice: false,
+          dbOrTx: tx,
+        });
+        if (!result.success) {
+          throw new Error('Failed to grant top-up credit; rolling back tier upgrade');
+        }
+        granted = true;
+      }
+    }
+
+    // Reset the renewal clock after a successful top-up grant. Without this,
+    // refreshContributorChampionCredits could see a stale credits_last_granted_at
+    // and immediately grant the full new monthly amount on top of the top-up.
+    if (granted) {
+      await tx
+        .update(contributor_champion_memberships)
+        .set({ credits_last_granted_at: now })
+        .where(eq(contributor_champion_memberships.contributor_id, input.contributorId));
+    }
+
+    return { creditGranted: granted, creditDifferentialUsd: lockedDifferentialUsd };
+  });
+
+  return {
+    upgradedTier: input.newTier,
+    creditDifferentialUsd,
+    creditGranted,
+  };
+}
+
 export async function getEnrolledContributorChampions(): Promise<LeaderboardRow[]> {
   const leaderboard = await getContributorChampionLeaderboard();
   return leaderboard.filter(row => row.enrolledTier !== null || row.enrolledAt !== null);

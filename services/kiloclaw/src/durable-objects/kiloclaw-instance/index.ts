@@ -99,6 +99,7 @@ import * as gateway from './gateway';
 import { buildChannelConfigPatch } from './channel-config';
 import * as pairing from './pairing';
 import * as kiloCliRun from './kilo-cli-run';
+import * as doctorRun from './doctor-run';
 import {
   reconcileWithFly,
   syncStatusFromLiveCheck,
@@ -1752,6 +1753,21 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return pairing.runDoctor(this.s, this.env);
   }
 
+  async startDoctorViaController(fix: boolean) {
+    await this.loadState();
+    return doctorRun.startDoctorViaController(this.s, this.env, fix);
+  }
+
+  async getDoctorViaControllerStatus() {
+    await this.loadState();
+    return doctorRun.getDoctorViaControllerStatus(this.s, this.env);
+  }
+
+  async cancelDoctorViaController() {
+    await this.loadState();
+    return doctorRun.cancelDoctorViaController(this.s, this.env);
+  }
+
   // ── Kilo CLI Run ────────────────────────────────────────────────────
 
   async startKiloCliRun(prompt: string) {
@@ -2946,7 +2962,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   // ── Machine resize (admin) ─────────────────────────────────────────
 
-  async resizeMachine(targetTierKey: InstanceTierKey): Promise<{
+  async resizeMachine(input: {
+    targetTierKey: InstanceTierKey;
+    actorId: string;
+    actorEmail: string;
+  }): Promise<{
     previousTier: InstanceType | null;
     newTier: InstanceTierKey;
     previousVolumeSizeGb: number | null;
@@ -2957,6 +2977,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       metadata: NonNullable<InstanceMutableState['adminMachineSizeOverrideMetadata']>;
     } | null;
   }> {
+    const { targetTierKey, actorId, actorEmail } = input;
     await this.loadState();
     this.assertAdminSizeChangeAllowed({
       cannotPrefix: 'resize',
@@ -3058,7 +3079,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     console.log(
-      `[admin-machine-resize] userId=${this.s.userId} ` +
+      `[admin-machine-resize] userId=${this.s.userId} actor=${actorEmail} (${actorId}) ` +
         `previousTier=${previousTier ?? 'unknown'} newTier=${targetTier.key} ` +
         `previousVolume=${previousVolumeSizeGb ?? 'unknown'} newVolume=${targetTier.volumeSizeGb}` +
         (clearedOverride

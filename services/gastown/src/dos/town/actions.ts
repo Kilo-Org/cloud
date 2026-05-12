@@ -262,6 +262,17 @@ export type EmitEvent = z.infer<typeof EmitEvent>;
 // The SQL handle is for synchronous mutations; the rest are for async
 // side effects (dispatch, stop, poll, nudge).
 
+export type ReviewDecision = 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+
+export type MergeStateStatus =
+  | 'CLEAN'
+  | 'BLOCKED'
+  | 'BEHIND'
+  | 'DIRTY'
+  | 'HAS_HOOKS'
+  | 'UNKNOWN'
+  | null;
+
 /** Result of checking PR feedback (unresolved comments + failing CI checks). */
 export type PRFeedbackCheckResult = {
   hasUnresolvedComments: boolean;
@@ -271,6 +282,15 @@ export type PRFeedbackCheckResult = {
    *  inspected. allChecksPass is already false in this case, but
    *  hasFailingChecks only reflects the runs we actually saw. */
   hasUncheckedRuns: boolean;
+  /** True when the PR requires human approval per branch protection
+   *  (reviewDecision === 'REVIEW_REQUIRED' or mergeStateStatus === 'BLOCKED'). */
+  awaitingApproval: boolean;
+  /** True when a reviewer has actively requested changes
+   *  (reviewDecision === 'CHANGES_REQUESTED'). */
+  changesRequested: boolean;
+  reviewDecision: ReviewDecision;
+  mergeStateStatus: MergeStateStatus;
+  isDraft: boolean;
 };
 
 export type ApplyActionContext = {
@@ -885,6 +905,136 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             const feedback =
               wantsAutoResolve || wantsAutoMerge ? await ctx.checkPRFeedback(action.pr_url) : null;
 
+            if (feedback) {
+              const prevAwaitingRows = z
+                .object({ awaiting_approval: z.unknown() })
+                .array()
+                .parse([
+                  ...query(
+                    sql,
+                    /* sql */ `
+                      SELECT json_extract(${beads.columns.metadata}, '$.awaiting_approval') AS awaiting_approval
+                      FROM ${beads}
+                      WHERE ${beads.bead_id} = ?
+                    `,
+                    [action.bead_id]
+                  ),
+                ]);
+              const wasAwaiting =
+                prevAwaitingRows[0]?.awaiting_approval === 1 ||
+                prevAwaitingRows[0]?.awaiting_approval === true;
+              const nowAwaiting = feedback.awaitingApproval;
+
+              query(
+                sql,
+                /* sql */ `
+                  UPDATE ${beads}
+                  SET ${beads.columns.metadata} = json_set(
+                    COALESCE(${beads.columns.metadata}, '{}'),
+                    '$.awaiting_approval', ?,
+                    '$.review_decision', ?,
+                    '$.merge_state_status', ?
+                  ),
+                  ${beads.columns.updated_at} = ?
+                  WHERE ${beads.bead_id} = ?
+                `,
+                [
+                  nowAwaiting ? 1 : 0,
+                  feedback.reviewDecision ?? null,
+                  feedback.mergeStateStatus ?? null,
+                  now(),
+                  action.bead_id,
+                ]
+              );
+
+              if (nowAwaiting && !wasAwaiting) {
+                const createdRows = z
+                  .object({ created_at: z.string() })
+                  .array()
+                  .parse([
+                    ...query(
+                      sql,
+                      /* sql */ `
+                        SELECT ${beads.columns.created_at}
+                        FROM ${beads}
+                        WHERE ${beads.bead_id} = ?
+                      `,
+                      [action.bead_id]
+                    ),
+                  ]);
+                const durationSinceCreatedMs = createdRows[0]
+                  ? Date.now() - new Date(createdRows[0].created_at).getTime()
+                  : 0;
+
+                ctx.emitEvent({
+                  event: 'pr.awaiting_approval_detected',
+                  townId,
+                  beadId: action.bead_id,
+                  prUrl: action.pr_url,
+                  label: feedback.reviewDecision ?? '',
+                  reason: feedback.mergeStateStatus ?? '',
+                  durationMs: durationSinceCreatedMs,
+                });
+              } else if (!nowAwaiting && wasAwaiting) {
+                const observedRows = z
+                  .object({ awaiting_approval_observed_at: z.string().nullable() })
+                  .array()
+                  .parse([
+                    ...query(
+                      sql,
+                      /* sql */ `
+                        SELECT json_extract(${beads.columns.metadata}, '$.awaiting_approval_observed_at') AS awaiting_approval_observed_at
+                        FROM ${beads}
+                        WHERE ${beads.bead_id} = ?
+                      `,
+                      [action.bead_id]
+                    ),
+                  ]);
+                const observedAt = observedRows[0]?.awaiting_approval_observed_at;
+                const awaitingApprovalDurationMs = observedAt
+                  ? Date.now() - new Date(observedAt).getTime()
+                  : 0;
+
+                ctx.emitEvent({
+                  event: 'pr.awaiting_approval_resolved',
+                  townId,
+                  beadId: action.bead_id,
+                  prUrl: action.pr_url,
+                  label: feedback.reviewDecision ?? '',
+                  reason: feedback.mergeStateStatus ?? '',
+                  durationMs: awaitingApprovalDurationMs,
+                });
+              }
+
+              if (nowAwaiting) {
+                query(
+                  sql,
+                  /* sql */ `
+                    UPDATE ${beads}
+                    SET ${beads.columns.metadata} = json_set(
+                      COALESCE(${beads.columns.metadata}, '{}'),
+                      '$.awaiting_approval_observed_at', ?
+                    )
+                    WHERE ${beads.bead_id} = ?
+                  `,
+                  [now(), action.bead_id]
+                );
+              } else {
+                query(
+                  sql,
+                  /* sql */ `
+                    UPDATE ${beads}
+                    SET ${beads.columns.metadata} = json_remove(
+                      COALESCE(${beads.columns.metadata}, '{}'),
+                      '$.awaiting_approval_observed_at'
+                    )
+                    WHERE ${beads.bead_id} = ?
+                  `,
+                  [action.bead_id]
+                );
+              }
+            }
+
             // Auto-resolve PR feedback: detect unresolved comments and failing CI
             if (
               wantsAutoResolve &&
@@ -957,10 +1107,12 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               const allGreen =
                 !feedback.hasUnresolvedComments &&
                 !feedback.hasFailingChecks &&
-                feedback.allChecksPass;
+                feedback.allChecksPass &&
+                !feedback.awaitingApproval &&
+                !feedback.changesRequested;
 
               console.log(
-                `${LOG} poll_pr: bead=${action.bead_id} allGreen=${allGreen} unresolved=${feedback.hasUnresolvedComments} failing=${feedback.hasFailingChecks} allPass=${feedback.allChecksPass} unchecked=${feedback.hasUncheckedRuns}`
+                `${LOG} poll_pr: bead=${action.bead_id} allGreen=${allGreen} unresolved=${feedback.hasUnresolvedComments} failing=${feedback.hasFailingChecks} allPass=${feedback.allChecksPass} unchecked=${feedback.hasUncheckedRuns} awaitingApproval=${feedback.awaitingApproval} changesRequested=${feedback.changesRequested}`
               );
 
               if (allGreen) {
@@ -1129,7 +1281,9 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             freshFeedback &&
             (freshFeedback.hasUnresolvedComments ||
               freshFeedback.hasFailingChecks ||
-              !freshFeedback.allChecksPass)
+              !freshFeedback.allChecksPass ||
+              freshFeedback.awaitingApproval ||
+              freshFeedback.changesRequested)
           ) {
             console.log(
               `${LOG} merge_pr: fresh feedback check found issues, aborting merge for bead=${action.bead_id}`

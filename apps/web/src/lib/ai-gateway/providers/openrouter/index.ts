@@ -18,7 +18,7 @@ import {
   getOpenClawSettings,
   getOpenCodeSettings,
 } from '@/lib/ai-gateway/providers/model-settings';
-import { AUTO_MODELS } from '@/lib/ai-gateway/kilo-auto';
+import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 
 // Re-export from shared module for backwards compatibility

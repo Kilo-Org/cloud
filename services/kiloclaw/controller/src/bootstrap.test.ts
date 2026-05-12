@@ -982,6 +982,57 @@ describe('runOnboardOrDoctor', () => {
     expect(preDoctorConfig.plugins?.entries).not.toHaveProperty('openclaw-channel-streamchat');
   });
 
+  it('back-fills hooks.allowRequestSessionKey on existing configs before doctor', () => {
+    const harness = fakeDeps();
+    harness.setConfigExists(true);
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({
+        hooks: {
+          enabled: true,
+          token: 'existing-token',
+          path: '/hooks',
+          mappings: [
+            {
+              id: 'cloudflare-email-inbound',
+              match: { path: 'email' },
+              action: 'agent',
+              wakeMode: 'now',
+              sessionKey: '{{payload.sessionKey}}',
+              messageTemplate: 'From: {{payload.from}}',
+              deliver: false,
+            },
+          ],
+        },
+      })
+    );
+
+    runOnboardOrDoctor(
+      {
+        KILOCODE_API_KEY: 'test-key',
+        OPENCLAW_GATEWAY_TOKEN: 'test-token',
+        AUTO_APPROVE_DEVICES: 'true',
+      },
+      harness.deps
+    );
+
+    const doctorCallIndex = (
+      harness.deps.execFileSync as ReturnType<typeof vi.fn>
+    ).mock.calls.findIndex(([_cmd, args]) => Array.isArray(args) && args.includes('doctor'));
+    expect(doctorCallIndex).not.toBe(-1);
+    const doctorCallOrder = (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[doctorCallIndex];
+
+    const preDoctorWriteIndex = (
+      harness.deps.writeFileSync as ReturnType<typeof vi.fn>
+    ).mock.invocationCallOrder.findIndex(order => order < doctorCallOrder);
+    expect(preDoctorWriteIndex).not.toBe(-1);
+
+    const preDoctorConfig = JSON.parse(harness.writeCalls[preDoctorWriteIndex].data) as {
+      hooks?: { allowRequestSessionKey?: boolean };
+    };
+    expect(preDoctorConfig.hooks?.allowRequestSessionKey).toBe(true);
+  });
+
   it('migrates legacy plaintext kilocode key in auth-profiles.json to a keyRef', () => {
     // Integration check: runOnboardOrDoctor must drive the auth-profiles
     // migration. On a legacy doctor boot, a plaintext key in

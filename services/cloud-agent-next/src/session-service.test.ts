@@ -66,7 +66,11 @@ import {
   restoreWorkspace as mockRestoreWorkspace,
   cleanupWorkspace as mockCleanupWorkspace,
 } from './workspace.js';
-import { InvalidSessionMetadataError, SessionService } from './session-service.js';
+import {
+  buildAgentEntryFromRuntimeAgent,
+  InvalidSessionMetadataError,
+  SessionService,
+} from './session-service.js';
 import type { SandboxInstance, SessionId, SessionContext, ExecutionSession } from './types.js';
 import type { PersistenceEnv, CloudAgentSessionState } from './persistence/types.js';
 
@@ -3920,5 +3924,60 @@ describe('SessionService', () => {
       // git checkout -b should NOT be called (legacy CLI manages its own branch)
       expect(fakeSession.exec).not.toHaveBeenCalledWith(expect.stringContaining('git checkout -b'));
     });
+  });
+});
+
+describe('buildAgentEntryFromRuntimeAgent', () => {
+  it('normalizes model with kilo/ prefix when not already prefixed', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: { model: 'anthropic/claude-opus-4.7', mode: 'subagent' },
+    });
+    expect(result.model).toBe('kilo/anthropic/claude-opus-4.7');
+  });
+
+  it('does not double-prefix models that already have kilo/', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: { model: 'kilo/code', mode: 'subagent' },
+    });
+    expect(result.model).toBe('kilo/code');
+  });
+
+  it('handles null model', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: { model: null, mode: 'subagent' },
+    });
+    expect(result.model).toBeUndefined();
+  });
+
+  it('handles undefined model', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: { mode: 'subagent' },
+    });
+    expect(result.model).toBeUndefined();
+  });
+
+  it('passes through other config fields unchanged', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: {
+        model: 'anthropic/claude-sonnet-4',
+        mode: 'subagent',
+        temperature: 0.7,
+        prompt: 'You are a test agent',
+      },
+    });
+    expect(result.model).toBe('kilo/anthropic/claude-sonnet-4');
+    expect(result.temperature).toBe(0.7);
+    expect(result.prompt).toBe('You are a test agent');
+    expect(result.mode).toBe('subagent');
   });
 });

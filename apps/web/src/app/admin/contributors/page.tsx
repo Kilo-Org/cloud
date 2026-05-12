@@ -37,6 +37,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { SortableButton } from '../components/SortableButton';
 import {
   AlertCircle,
+  ArrowUpCircle,
   ChevronLeft,
   Check,
   ChevronRight,
@@ -76,6 +77,13 @@ type EnrollmentState = {
   contributorId: string;
   githubLogin: string;
   tier: ContributorTier;
+};
+
+type UpgradeState = {
+  contributorId: string;
+  githubLogin: string;
+  currentTier: ContributorTier;
+  newTier: ContributorTier;
 };
 
 type SortConfig<T extends string> = {
@@ -149,6 +157,16 @@ function normalizeTier(value: string): ContributorTier | null {
     return value;
   }
   return null;
+}
+
+const TIER_ORDER: Record<ContributorTier, number> = {
+  contributor: 0,
+  ambassador: 1,
+  champion: 2,
+};
+
+function higherTiersFor(current: ContributorTier): ContributorTier[] {
+  return contributorTiers.filter(t => TIER_ORDER[t] > TIER_ORDER[current]);
 }
 
 function TierDisplay({ tier }: { tier: ContributorTier | null }) {
@@ -325,6 +343,9 @@ export default function ContributorChampionsAdminPage() {
 
   const [drillInState, setDrillInState] = useState<DrillInState | null>(null);
   const [enrollmentState, setEnrollmentState] = useState<EnrollmentState | null>(null);
+  const [upgradeState, setUpgradeState] = useState<UpgradeState | null>(null);
+  // Per-row selected upgrade tier, keyed by contributorId
+  const [upgradeSelections, setUpgradeSelections] = useState<Record<string, ContributorTier>>({});
   // Enrolled table state
   const [enrolledPage, setEnrolledPage] = useState(1);
   const [enrolledFilters, setEnrolledFilters] = useState<EnrolledFilters>({
@@ -420,6 +441,26 @@ export default function ContributorChampionsAdminPage() {
       },
       onError: (error: { message: string }) => {
         toast.error(`Failed to enroll contributor: ${error.message}`);
+      },
+    })
+  );
+
+  const upgradeMutation = useMutation(
+    trpc.admin.contributorChampions.upgradeTier.mutationOptions({
+      onSuccess: result => {
+        const creditMsg =
+          result.creditDifferentialUsd > 0
+            ? result.creditGranted
+              ? ` — $${result.creditDifferentialUsd} top-up credit granted`
+              : ` — credit pending (no linked account)`
+            : '';
+        toast.success(`Upgraded to ${result.upgradedTier}${creditMsg}`);
+        setUpgradeState(null);
+        setUpgradeSelections({});
+        refreshContributorQueries();
+      },
+      onError: (error: { message: string }) => {
+        toast.error(`Failed to upgrade tier: ${error.message}`);
       },
     })
   );
@@ -700,18 +741,19 @@ export default function ContributorChampionsAdminPage() {
                   <TableHead>Credits/mo</TableHead>
                   <TableHead>Last Grant</TableHead>
                   <TableHead>GH Integration</TableHead>
+                  <TableHead className="text-right">Upgrade</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoadingTables ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-8 text-center">
+                    <TableCell colSpan={10} className="py-8 text-center">
                       <Loader2 className="mx-auto h-4 w-4 animate-spin" />
                     </TableCell>
                   </TableRow>
                 ) : enrolledPageRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-muted-foreground py-8 text-center">
+                    <TableCell colSpan={10} className="text-muted-foreground py-8 text-center">
                       No enrolled contributors.
                     </TableCell>
                   </TableRow>
@@ -776,6 +818,63 @@ export default function ContributorChampionsAdminPage() {
                           <Check className="h-4 w-4 text-green-500" />
                         ) : (
                           <X className="text-muted-foreground h-4 w-4" />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.enrolledTier && higherTiersFor(row.enrolledTier).length > 0 ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <Select
+                              value={upgradeSelections[row.contributorId] ?? '__none__'}
+                              onValueChange={value => {
+                                const parsed = normalizeTier(value);
+                                if (!parsed) return;
+                                setUpgradeSelections(prev => ({
+                                  ...prev,
+                                  [row.contributorId]: parsed,
+                                }));
+                              }}
+                            >
+                              <SelectTrigger className="h-8 w-[130px]">
+                                <SelectValue placeholder="Upgrade to…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__" disabled>
+                                  Upgrade to…
+                                </SelectItem>
+                                {higherTiersFor(row.enrolledTier).map(tier => (
+                                  <SelectItem key={tier} value={tier}>
+                                    {tier}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              size="icon"
+                              className="h-8 w-8 bg-blue-600 hover:bg-blue-700"
+                              disabled={
+                                !upgradeSelections[row.contributorId] || upgradeMutation.isPending
+                              }
+                              onClick={() => {
+                                const newTier = upgradeSelections[row.contributorId];
+                                if (!newTier || !row.enrolledTier) return;
+                                setUpgradeState({
+                                  contributorId: row.contributorId,
+                                  githubLogin: row.githubLogin,
+                                  currentTier: row.enrolledTier,
+                                  newTier,
+                                });
+                              }}
+                              title={
+                                upgradeSelections[row.contributorId]
+                                  ? `Upgrade to ${upgradeSelections[row.contributorId]}`
+                                  : 'Select a tier to upgrade to'
+                              }
+                            >
+                              <ArrowUpCircle className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -1190,6 +1289,86 @@ export default function ContributorChampionsAdminPage() {
               }}
             >
               {enrollMutation.isPending ? 'Enrolling...' : 'Confirm enrollment'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={upgradeState !== null}
+        onOpenChange={open => {
+          if (!open) {
+            if (upgradeState) {
+              setUpgradeSelections(prev => {
+                const next = { ...prev };
+                delete next[upgradeState.contributorId];
+                return next;
+              });
+            }
+            setUpgradeState(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>Confirm tier upgrade</DialogTitle>
+            <DialogDescription>
+              Upgrade @{upgradeState?.githubLogin} from <b>{upgradeState?.currentTier}</b> to{' '}
+              <b>{upgradeState?.newTier}</b>.
+            </DialogDescription>
+          </DialogHeader>
+
+          {upgradeState ? (
+            <div className="space-y-2 text-sm">
+              <p>
+                Immediate top-up:{' '}
+                <b>
+                  $
+                  {TIER_CREDIT_USD[upgradeState.newTier] -
+                    TIER_CREDIT_USD[upgradeState.currentTier]}{' '}
+                  in Kilo Credits
+                </b>{' '}
+                (the difference between {upgradeState.currentTier} and {upgradeState.newTier} for
+                the current period).
+              </p>
+              <p>
+                Going forward: <b>${TIER_CREDIT_USD[upgradeState.newTier]}/month</b> at the next
+                renewal.
+              </p>
+              {(() => {
+                const matchedRow = (enrolledQuery.data ?? []).find(
+                  r => r.contributorId === upgradeState.contributorId
+                );
+                if (!matchedRow?.linkedUserId) {
+                  return (
+                    <p className="text-yellow-500">
+                      ⚠️ No linked Kilo account found. The top-up credit cannot be granted until the
+                      contributor has a Kilo account with a matching email.
+                    </p>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="secondary" disabled={upgradeMutation.isPending}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button
+              disabled={upgradeMutation.isPending || upgradeState === null}
+              onClick={() => {
+                if (!upgradeState) return;
+                void upgradeMutation.mutateAsync({
+                  contributorId: upgradeState.contributorId,
+                  newTier: upgradeState.newTier,
+                });
+              }}
+            >
+              {upgradeMutation.isPending ? 'Upgrading...' : 'Confirm upgrade'}
             </Button>
           </DialogFooter>
         </DialogContent>

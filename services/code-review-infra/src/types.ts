@@ -50,6 +50,7 @@ export interface CodeReview {
   status: CodeReviewStatus;
   sessionId?: string; // Cloud agent session ID (agent_xxx)
   cliSessionId?: string; // CLI session UUID (from session_created event or prepareSession)
+  sandboxId?: string;
   errorMessage?: string;
   terminalReason?: CloudAgentTerminalReason;
   startedAt?: string;
@@ -97,6 +98,19 @@ export const InternalStatusResponseSchema = z.object({
   success: z.boolean().optional(),
   message: z.string().optional(),
   currentStatus: z.enum(['completed', 'failed', 'cancelled']).optional(),
+  terminalReason: z
+    .enum([
+      'billing',
+      'user_cancelled',
+      'superseded',
+      'interrupted',
+      'timeout',
+      'upstream_error',
+      'sandbox_error',
+      'unknown',
+    ])
+    .nullable()
+    .optional(),
   error: z.string().optional(),
 });
 

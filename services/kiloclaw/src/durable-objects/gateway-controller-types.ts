@@ -249,3 +249,31 @@ export const KiloCliRunStatusResponseSchema = z.object({
   completedAt: z.string().nullable(),
   prompt: z.string().nullable(),
 });
+
+// ──────────────────────────────────────────────────────────────────────
+// OpenClaw doctor run (controller path, replacing the Fly exec route)
+// ──────────────────────────────────────────────────────────────────────
+
+export const OpenclawDoctorStartResponseSchema = z.object({
+  ok: z.boolean(),
+  runId: z.string(),
+  startedAt: z.string(),
+});
+
+export const OpenclawDoctorStatusResponseSchema = z.object({
+  hasRun: z.boolean(),
+  runId: z.string().nullable(),
+  status: z.enum(['running', 'completed', 'failed', 'cancelled', 'timed_out']).nullable(),
+  fix: z.boolean().nullable(),
+  output: z.string().nullable(),
+  outputBytes: z.number().int().min(0),
+  outputTruncated: z.boolean(),
+  exitCode: z.number().int().nullable(),
+  startedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  timedOut: z.boolean(),
+});
+
+export const OpenclawDoctorCancelResponseSchema = z.object({
+  ok: z.boolean(),
+});

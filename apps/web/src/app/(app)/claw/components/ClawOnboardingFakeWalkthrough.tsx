@@ -7,28 +7,24 @@ import {
   CLAW_ONBOARDING_FAKE_STEPS,
   type ClawOnboardingRenderStep,
   getClawOnboardingStepProgress,
-  isPairingChannel,
   type OnboardingStep,
-  type PairingChannelId,
 } from './ClawOnboardingFlow.state';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { BotIdentityStep } from './BotIdentityStep';
-import { ChannelPairingStepView } from './ChannelPairingStep';
-import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
 import { CalendarConnectStepView } from './CalendarConnectStep';
+import { InboundEmailStepView } from './InboundEmailStep';
 import { ClawSetupCompleteStep, ClawSetupErrorStep } from './ClawOnboardingFlow';
 import { ProvisioningStepView } from './ProvisioningStep';
 
 const FAKE_STEP_LABELS: Record<ClawOnboardingRenderStep, string> = {
   identity: 'Identity',
   calendar: 'Calendar',
-  channels: 'Channels',
+  email: 'Inbound Email',
   provisioning: 'Provisioning',
-  pairing: 'Pairing',
   complete: 'Complete',
   error: 'Error',
 };
@@ -87,7 +83,6 @@ export function ClawOnboardingFakeWalkthrough({
   basePath: string;
 }) {
   const [step, setStep] = useState<ClawOnboardingRenderStep>(initialStep);
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>('telegram');
 
   useEffect(() => {
     setStep(initialStep);
@@ -95,11 +90,7 @@ export function ClawOnboardingFakeWalkthrough({
 
   if (process.env.NODE_ENV === 'production') return null;
 
-  const pairingChannelId: PairingChannelId = isPairingChannel(selectedChannelId)
-    ? selectedChannelId
-    : 'telegram';
-  const hasPairingStep = isPairingChannel(selectedChannelId);
-  const stepProgress = getFakeStepProgress(step, hasPairingStep);
+  const stepProgress = getFakeStepProgress(step);
 
   return (
     <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
@@ -116,7 +107,7 @@ export function ClawOnboardingFakeWalkthrough({
         <TriangleAlert className="size-4" />
         <AlertDescription>
           Development-only fake KiloClaw onboarding. This walkthrough does not call billing,
-          provisioning, gateway, Fly, or pairing services.
+          provisioning, or gateway services.
         </AlertDescription>
       </Alert>
 
@@ -125,9 +116,6 @@ export function ClawOnboardingFakeWalkthrough({
       {renderFakeStep({
         step,
         setStep,
-        selectedChannelId,
-        setSelectedChannelId,
-        pairingChannelId,
         stepProgress,
         basePath,
       })}
@@ -174,27 +162,20 @@ type StepProgress = ReturnType<typeof getClawOnboardingStepProgress>;
 type RenderFakeStepInput = {
   step: ClawOnboardingRenderStep;
   setStep: (step: ClawOnboardingRenderStep) => void;
-  selectedChannelId: string | null;
-  setSelectedChannelId: (channelId: string | null) => void;
-  pairingChannelId: PairingChannelId;
   stepProgress: StepProgress;
   basePath: string;
 };
 
-function getFakeStepProgress(
-  step: ClawOnboardingRenderStep,
-  hasPairingStep: boolean
-): StepProgress {
-  return getClawOnboardingStepProgress(getFakeOnboardingStep(step), hasPairingStep);
+function getFakeStepProgress(step: ClawOnboardingRenderStep): StepProgress {
+  return getClawOnboardingStepProgress(getFakeOnboardingStep(step));
 }
 
 function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
   switch (step) {
     case 'identity':
     case 'calendar':
-    case 'channels':
+    case 'email':
     case 'provisioning':
-    case 'pairing':
       return step;
     case 'complete':
     case 'error':
@@ -202,15 +183,7 @@ function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
   }
 }
 
-function renderFakeStep({
-  step,
-  setStep,
-  selectedChannelId,
-  setSelectedChannelId,
-  pairingChannelId,
-  stepProgress,
-  basePath,
-}: RenderFakeStepInput) {
+function renderFakeStep({ step, setStep, stepProgress, basePath }: RenderFakeStepInput) {
   switch (step) {
     case 'identity': {
       return <BotIdentityStep {...stepProgress} onContinue={() => setStep('calendar')} />;
@@ -223,26 +196,20 @@ function renderFakeStep({
           isConnected={false}
           connectedAccountEmail={null}
           readyToConnect={true}
-          onConnectClick={() => setStep('channels')}
-          onSkip={() => setStep('channels')}
-          onContinue={() => setStep('channels')}
+          onConnectClick={() => setStep('email')}
+          onSkip={() => setStep('email')}
+          onContinue={() => setStep('email')}
         />
       );
     }
-    case 'channels': {
+    case 'email': {
       return (
-        <ChannelSelectionStepView
+        <InboundEmailStepView
           {...stepProgress}
-          instanceRunning={false}
-          defaultSelected={isPairingChannel(selectedChannelId) ? selectedChannelId : null}
-          onSelect={channelId => {
-            setSelectedChannelId(channelId);
-            setStep('provisioning');
-          }}
-          onSkip={() => {
-            setSelectedChannelId(null);
-            setStep('provisioning');
-          }}
+          address="operator@inbound.example.com"
+          enabled={true}
+          loading={false}
+          onContinue={() => setStep('provisioning')}
         />
       );
     }
@@ -255,38 +222,12 @@ function renderFakeStep({
               <p className="text-muted-foreground text-sm">
                 Fake mode keeps this spinner static so you can inspect the final provisioning state.
               </p>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    setStep(isPairingChannel(selectedChannelId) ? 'pairing' : 'complete')
-                  }
-                >
-                  Continue
-                </Button>
-                <Button type="button" onClick={() => setStep('complete')}>
-                  Complete setup
-                </Button>
-              </div>
+              <Button type="button" onClick={() => setStep('complete')}>
+                Complete setup
+              </Button>
             </CardContent>
           </Card>
         </div>
-      );
-    }
-    case 'pairing': {
-      return (
-        <ChannelPairingStepView
-          {...stepProgress}
-          channelId={pairingChannelId}
-          matchingRequest={{
-            channel: pairingChannelId,
-            code: '123456',
-            id: `fake-${pairingChannelId}-user`,
-          }}
-          onApprove={() => setStep('complete')}
-          onSkip={() => setStep('complete')}
-        />
       );
     }
     case 'complete':

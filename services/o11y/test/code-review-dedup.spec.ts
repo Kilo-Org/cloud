@@ -17,7 +17,8 @@ function makeTestEnv(): Env {
 function makeRequest(
   alertKey: string,
   action: 'check' | 'record' = 'check',
-  token = TEST_CLIENT_SECRET
+  token = TEST_CLIENT_SECRET,
+  severity: 'page' | 'ticket' = 'ticket'
 ): Request {
   return new IncomingRequest('https://example.com/alerting/code-review-dedup', {
     method: 'POST',
@@ -25,7 +26,7 @@ function makeRequest(
       'content-type': 'application/json',
       'X-O11Y-ADMIN-TOKEN': token,
     },
-    body: JSON.stringify({ action, alertKey, severity: 'ticket' }),
+    body: JSON.stringify({ action, alertKey, severity }),
   });
 }
 
@@ -70,5 +71,44 @@ describe('code review dedup route', () => {
     );
     expect(differentResponse.status).toBe(200);
     await expect(differentResponse.json()).resolves.toEqual({ suppressed: false });
+  });
+
+  it('suppresses ticket alerts when a page alert is already active', async () => {
+    const env = makeTestEnv();
+    const alertKey = `failure_rate-${crypto.randomUUID()}`;
+
+    const recordPageResponse = await workerFetch(
+      makeRequest(alertKey, 'record', TEST_CLIENT_SECRET, 'page'),
+      env
+    );
+    expect(recordPageResponse.status).toBe(200);
+    await expect(recordPageResponse.json()).resolves.toEqual({ success: true });
+
+    const ticketCheckResponse = await workerFetch(makeRequest(alertKey), env);
+    expect(ticketCheckResponse.status).toBe(200);
+    await expect(ticketCheckResponse.json()).resolves.toEqual({ suppressed: true });
+
+    const pageCheckResponse = await workerFetch(
+      makeRequest(alertKey, 'check', TEST_CLIENT_SECRET, 'page'),
+      env
+    );
+    expect(pageCheckResponse.status).toBe(200);
+    await expect(pageCheckResponse.json()).resolves.toEqual({ suppressed: true });
+  });
+
+  it('does not let a ticket alert suppress a page alert for the same key', async () => {
+    const env = makeTestEnv();
+    const alertKey = `failure_rate-${crypto.randomUUID()}`;
+
+    const recordTicketResponse = await workerFetch(makeRequest(alertKey, 'record'), env);
+    expect(recordTicketResponse.status).toBe(200);
+    await expect(recordTicketResponse.json()).resolves.toEqual({ success: true });
+
+    const pageCheckResponse = await workerFetch(
+      makeRequest(alertKey, 'check', TEST_CLIENT_SECRET, 'page'),
+      env
+    );
+    expect(pageCheckResponse.status).toBe(200);
+    await expect(pageCheckResponse.json()).resolves.toEqual({ suppressed: false });
   });
 });

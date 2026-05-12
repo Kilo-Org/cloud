@@ -29,7 +29,17 @@ export function registerCodeReviewDedupRoutes(app: Hono<{ Bindings: Env }>): voi
 
       if (action === 'check') {
         const existing = await c.env.O11Y_ALERT_STATE.get(kvKey);
-        return c.json({ suppressed: Boolean(existing) });
+        if (existing) return c.json({ suppressed: true });
+
+        // A page-level alert for the same dimension suppresses ticket-level
+        // alerts so we do not double-fire the same incident at lower severity.
+        if (severity === 'ticket') {
+          const pageKey = codeReviewAlertKey('page', alertKey);
+          const pageExisting = await c.env.O11Y_ALERT_STATE.get(pageKey);
+          if (pageExisting) return c.json({ suppressed: true });
+        }
+
+        return c.json({ suppressed: false });
       }
 
       await c.env.O11Y_ALERT_STATE.put(kvKey, new Date().toISOString(), {

@@ -1375,51 +1375,220 @@ describe('processAppStoreKiloPassNotification', () => {
     ).toHaveLength(1);
   });
 
-  it.each([
-    {
-      name: 'missing price',
-      refundTransaction: { currency: 'USD', price: undefined },
-      error: 'App Store refund transaction is missing a valid price',
-    },
-    {
-      name: 'non-finite price',
-      refundTransaction: { currency: 'USD', price: Number.POSITIVE_INFINITY },
-      error: 'App Store refund transaction is missing a valid price',
-    },
-    {
-      name: 'non-positive price',
-      refundTransaction: { currency: 'USD', price: 0 },
-      error: 'App Store refund transaction is missing a valid price',
-    },
-    {
-      name: 'missing currency',
-      refundTransaction: { currency: undefined, price: 24700 },
-      error: 'App Store refund transaction has unsupported currency',
-    },
-    {
-      name: 'unsupported currency',
-      refundTransaction: { currency: 'EUR', price: 24700 },
-      error: 'App Store refund transaction has unsupported currency',
-    },
-  ])('fails refund processing for $name', async ({ name, refundTransaction, error }) => {
+  it('processes a EUR refund without throwing and still ends the subscription', async () => {
     const user = await insertTestUser();
     const decodedTransaction = transaction({
       appAccountToken: user.app_store_account_token,
+      currency: 'EUR',
+      price: 22900,
     });
     await processAppStoreKiloPassNotification({
-      signedPayload: `invalid-refund-initial-buy-${name}`,
+      signedPayload: 'eur-refund-initial-buy',
       decodeNotification: async () =>
         notification({
-          notificationUUID: `invalid-refund-initial-buy-${name}`,
+          notificationUUID: 'eur-refund-initial-buy',
           notificationType: NotificationTypeV2.SUBSCRIBED,
           subtype: Subtype.INITIAL_BUY,
         }),
       decodeTransaction: async () => decodedTransaction,
     });
 
-    const refundNotificationUUID = `invalid-refund-${name}`;
-    await expect(
-      processAppStoreKiloPassNotification({
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(
+        kilo_pass_subscriptions.provider_subscription_id,
+        decodedTransaction.originalTransactionId
+      ),
+    });
+    expect(subscription).toBeDefined();
+
+    const issuance = await db.query.kilo_pass_issuances.findFirst({
+      where: eq(kilo_pass_issuances.kilo_pass_subscription_id, subscription?.id ?? ''),
+    });
+    expect(issuance).toBeDefined();
+
+    const [promoTransaction] = await db
+      .insert(credit_transactions)
+      .values({
+        kilo_user_id: user.id,
+        amount_microdollars: toMicrodollars(4.75),
+        is_free: true,
+        description: 'test EUR Kilo Pass promo credits',
+        credit_category: `test-kilo-pass-promo-eur-${crypto.randomUUID()}`,
+      })
+      .returning({ id: credit_transactions.id });
+
+    await db
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${toMicrodollars(4.75)}`,
+      })
+      .where(eq(kilocode_users.id, user.id));
+
+    await db.insert(kilo_pass_issuance_items).values({
+      kilo_pass_issuance_id: issuance?.id ?? '',
+      kind: KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+      credit_transaction_id: promoTransaction?.id ?? '',
+      amount_usd: 4.75,
+      bonus_percent_applied: 0.25,
+    });
+
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: 'eur-refund',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'eur-refund',
+          notificationType: NotificationTypeV2.REFUND,
+          signedTransactionInfo: 'eur-refund-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          ...decodedTransaction,
+          revocationDate: 1_777_700_000_000,
+          currency: 'EUR',
+          price: 22900,
+        }),
+    });
+
+    expect(result).toEqual({ processed: true });
+
+    const refundEvent = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, 'eur-refund'),
+    });
+    expect(refundEvent?.processed_at).not.toBeNull();
+
+    const endedSubscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(
+        kilo_pass_subscriptions.provider_subscription_id,
+        decodedTransaction.originalTransactionId
+      ),
+    });
+    expect(endedSubscription?.status).toBe('canceled');
+
+    const negativeCreditTransactions = await db
+      .select({
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        description: credit_transactions.description,
+      })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(negativeCreditTransactions.filter(row => row.amountMicrodollars < 0)).toHaveLength(2);
+    expect(negativeCreditTransactions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          description: 'App Store Kilo Pass refund clawback',
+        }),
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(4.75),
+          description: 'App Store Kilo Pass promo refund clawback',
+        }),
+      ])
+    );
+  });
+
+  it('processes a non-USD refund with no recorded purchase amount: still ends subscription and writes processed_at, skips base clawback', async () => {
+    const user = await insertTestUser();
+    const originalTransactionId = `orig-${crypto.randomUUID()}`;
+    const refundTransactionId = `tx-${crypto.randomUUID()}`;
+
+    const [subscriptionRow] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        payment_provider: KiloPassPaymentProvider.AppStore,
+        provider_subscription_id: originalTransactionId,
+        stripe_subscription_id: null,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        cancel_at_period_end: false,
+        started_at: '2026-05-01T00:00:00.000Z',
+        ended_at: null,
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+
+    await db.insert(kilo_pass_store_purchases).values({
+      kilo_pass_subscription_id: subscriptionRow?.id ?? '',
+      kilo_user_id: user.id,
+      payment_provider: KiloPassPaymentProvider.AppStore,
+      product_id: 'kilopass.tier19.monthly.v1',
+      provider_subscription_id: originalTransactionId,
+      provider_transaction_id: refundTransactionId,
+      environment: 'Sandbox',
+      purchased_at: '2026-05-01T00:00:00.000Z',
+      raw_payload_json: {},
+    });
+
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: 'gbp-no-credit-row-refund',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'gbp-no-credit-row-refund',
+          notificationType: NotificationTypeV2.REFUND,
+          signedTransactionInfo: 'gbp-no-credit-row-refund-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId,
+          transactionId: refundTransactionId,
+          appAccountToken: user.app_store_account_token,
+          revocationDate: 1_777_700_000_000,
+          currency: 'GBP',
+          price: 19900,
+        }),
+    });
+
+    expect(result).toEqual({ processed: true });
+
+    const refundEvent = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, 'gbp-no-credit-row-refund'),
+    });
+    expect(refundEvent?.processed_at).not.toBeNull();
+
+    const endedSubscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.provider_subscription_id, originalTransactionId),
+    });
+    expect(endedSubscription?.status).toBe('canceled');
+
+    const negativeCreditTransactions = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(negativeCreditTransactions.filter(row => row.amount_microdollars < 0)).toHaveLength(0);
+  });
+
+  it.each([
+    {
+      name: 'missing price',
+      refundTransaction: { currency: 'USD', price: undefined },
+    },
+    {
+      name: 'non-finite price',
+      refundTransaction: { currency: 'USD', price: Number.POSITIVE_INFINITY },
+    },
+    {
+      name: 'non-positive price',
+      refundTransaction: { currency: 'USD', price: 0 },
+    },
+  ])(
+    'ends subscription and writes processed_at even when USD refund price is invalid ($name)',
+    async ({ name, refundTransaction }) => {
+      const user = await insertTestUser();
+      const decodedTransaction = transaction({
+        appAccountToken: user.app_store_account_token,
+      });
+      await processAppStoreKiloPassNotification({
+        signedPayload: `invalid-refund-initial-buy-${name}`,
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: `invalid-refund-initial-buy-${name}`,
+            notificationType: NotificationTypeV2.SUBSCRIBED,
+            subtype: Subtype.INITIAL_BUY,
+          }),
+        decodeTransaction: async () => decodedTransaction,
+      });
+
+      const refundNotificationUUID = `invalid-refund-${name}`;
+      const result = await processAppStoreKiloPassNotification({
         signedPayload: refundNotificationUUID,
         decodeNotification: async () =>
           notification({
@@ -1433,18 +1602,28 @@ describe('processAppStoreKiloPassNotification', () => {
             revocationDate: 1_777_700_000_000,
             ...refundTransaction,
           }),
-      })
-    ).rejects.toThrow(error);
+      });
 
-    const negativeCreditTransactions = await db
-      .select()
-      .from(credit_transactions)
-      .where(eq(credit_transactions.kilo_user_id, user.id));
-    expect(negativeCreditTransactions.filter(row => row.amount_microdollars < 0)).toHaveLength(0);
+      expect(result).toEqual({ processed: true });
 
-    const refundEvent = await db.query.kilo_pass_store_events.findFirst({
-      where: eq(kilo_pass_store_events.event_id, refundNotificationUUID),
-    });
-    expect(refundEvent?.processed_at).toBeNull();
-  });
+      const negativeCreditTransactions = await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.kilo_user_id, user.id));
+      expect(negativeCreditTransactions.filter(row => row.amount_microdollars < 0)).toHaveLength(0);
+
+      const refundEvent = await db.query.kilo_pass_store_events.findFirst({
+        where: eq(kilo_pass_store_events.event_id, refundNotificationUUID),
+      });
+      expect(refundEvent?.processed_at).not.toBeNull();
+
+      const endedSubscription = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(
+          kilo_pass_subscriptions.provider_subscription_id,
+          decodedTransaction.originalTransactionId
+        ),
+      });
+      expect(endedSubscription?.status).toBe('canceled');
+    }
+  );
 });

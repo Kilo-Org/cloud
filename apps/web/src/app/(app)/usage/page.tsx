@@ -1,6 +1,10 @@
-'use client';
+import { Suspense } from 'react';
 import { UsageAnalyticsDashboard } from '@/components/usage-analytics/UsageAnalyticsDashboard';
 
 export default function UsagePage() {
-  return <UsageAnalyticsDashboard context="personal" organizationId={null} title="Usage" />;
+  return (
+    <Suspense>
+      <UsageAnalyticsDashboard context="personal" organizationId={null} title="Usage" />
+    </Suspense>
+  );
 }

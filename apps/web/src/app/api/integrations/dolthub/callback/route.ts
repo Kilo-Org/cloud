@@ -4,6 +4,7 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import type { Owner } from '@/lib/integrations/core/types';
 import { captureException, captureMessage } from '@sentry/nextjs';
+import { IS_DEVELOPMENT } from '@/lib/constants';
 import {
   exchangeDoltHubOAuthCode,
   fetchDoltHubUser,
@@ -32,6 +33,10 @@ function buildDoltHubRedirectPath(state: string | null, queryParam: string): str
  * Exchanges the authorization code for tokens and stores the integration.
  */
 export async function GET(request: NextRequest) {
+  if (!IS_DEVELOPMENT) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  }
+
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
@@ -114,6 +119,13 @@ export async function GET(request: NextRequest) {
 
     const userInfo = await fetchDoltHubUser(tokens.accessToken);
     const username = userInfo?.username ?? 'unknown';
+
+    if (username === 'unknown') {
+      captureMessage('DoltHub user info fetch returned no username', {
+        level: 'warning',
+        tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
+      });
+    }
 
     await upsertDoltHubInstallation({
       owner,

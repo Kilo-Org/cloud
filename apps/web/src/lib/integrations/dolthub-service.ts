@@ -236,6 +236,19 @@ export async function uninstall(owner: Owner): Promise<{ success: boolean }> {
   return { success: true };
 }
 
+const DoltHubUserResponseSchema = z.object({
+  data: z
+    .object({
+      currentUser: z
+        .object({
+          username: z.string().min(1),
+        })
+        .optional(),
+    })
+    .optional(),
+  errors: z.array(z.unknown()).optional(),
+});
+
 export async function fetchDoltHubUser(accessToken: string): Promise<{ username: string } | null> {
   assertDevOnly();
 
@@ -255,12 +268,13 @@ export async function fetchDoltHubUser(accessToken: string): Promise<{ username:
       return null;
     }
 
-    const data = (await response.json()) as {
-      data?: { currentUser?: { username?: string } };
-      errors?: unknown[];
-    };
+    const raw = await response.json();
+    const parseResult = DoltHubUserResponseSchema.safeParse(raw);
+    if (!parseResult.success) {
+      return null;
+    }
 
-    const username = data.data?.currentUser?.username;
+    const username = parseResult.data.data?.currentUser?.username;
     if (username) {
       return { username };
     }

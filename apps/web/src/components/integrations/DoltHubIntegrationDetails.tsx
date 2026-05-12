@@ -64,11 +64,15 @@ export function DoltHubIntegrationDetails({
 
   const handleConnect = () => {
     setIsStartingConnection(true);
-    const url = new URL('/api/integrations/dolthub/connect', window.location.origin);
-    if (organizationId) {
-      url.searchParams.set('organizationId', organizationId);
+    try {
+      const url = new URL('/api/integrations/dolthub/connect', window.location.origin);
+      if (organizationId) {
+        url.searchParams.set('organizationId', organizationId);
+      }
+      window.location.href = url.toString();
+    } catch {
+      setIsStartingConnection(false);
     }
-    window.location.href = url.toString();
   };
 
   const handleDisconnect = () => {

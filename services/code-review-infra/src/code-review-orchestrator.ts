@@ -621,8 +621,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     // Update Next.js DB via internal API
     try {
       const dbUpdateResult = await this.updateDBStatus(status, options);
-      if (dbUpdateResult === 'db-terminal') {
-        return 'db-terminal';
+      if (dbUpdateResult === 'db-terminal' || dbUpdateResult === 'db-not-found') {
+        return dbUpdateResult;
       }
     } catch (error) {
       console.error('[CodeReviewOrchestrator] Failed to update DB status:', error);

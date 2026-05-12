@@ -779,6 +779,26 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     await this.updateMetadata(updated);
   }
 
+  /**
+   * Record kilo server activity for idle timeout tracking.
+   * Called by the queue consumer after each successful execution.
+   * Resets the idle timeout clock.
+   */
+  async recordKiloServerActivity(): Promise<void> {
+    const metadata = await this.getMetadata();
+    if (!metadata) {
+      throw new Error('Cannot record kilo server activity: session metadata not found');
+    }
+
+    const updated = {
+      ...metadata,
+      kiloServerLastActivity: Date.now(),
+      version: Date.now(),
+    };
+
+    await this.updateMetadata(updated);
+  }
+
   // ---------------------------------------------------------------------------
   // Wrapper Communication Methods
   // ---------------------------------------------------------------------------
@@ -1141,6 +1161,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         await cleanupCliSession();
         return;
       }
+
+      await this.recordKiloServerActivity();
 
       // 11. Auto-initiate if requested, then emit ready only on success.
       // Emitting 'ready' before startExecutionV2 would let the client
@@ -1697,31 +1719,39 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Called by the alarm handler to free up sandbox resources.
    */
   private async cleanupIdleKiloServer(now: number): Promise<void> {
-    const activeExecutionId = await this.executionQueries.getActiveExecutionId();
-    if (activeExecutionId !== null) {
-      return;
-    }
-
-    const executions = await this.executionQueries.getAll();
-    const latestExecution = executions[executions.length - 1];
-    if (!latestExecution) {
-      return;
-    }
-
-    const lastActivity =
-      latestExecution.lastHeartbeat ?? latestExecution.completedAt ?? latestExecution.startedAt;
-    const idleMs = now - lastActivity;
-    const idleTimeoutMs = this.getKiloServerIdleTimeoutMs();
-
-    if (idleMs < idleTimeoutMs) {
-      return;
-    }
-
     const metadata = await this.getMetadata();
     if (!metadata) {
       return;
     }
 
+    const lastActivity = metadata.kiloServerLastActivity;
+    if (!lastActivity) {
+      // No kilo server activity recorded, nothing to clean up
+      return;
+    }
+
+    const idleMs = now - lastActivity;
+    const idleTimeoutMs = this.getKiloServerIdleTimeoutMs();
+
+    if (idleMs < idleTimeoutMs) {
+      // Server is still within idle threshold
+      return;
+    }
+
+    // Check if there's an active execution - don't stop the server mid-run
+    const activeExecutionId = await this.executionQueries.getActiveExecutionId();
+    if (activeExecutionId !== null) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          executionId: activeExecutionId,
+          idleMs,
+        })
+        .debug('Skipping idle kilo server cleanup - execution is active');
+      return;
+    }
+
+    // Server has been idle too long and no active execution, stop it
     logger
       .withFields({
         sessionId: this.sessionId,
@@ -1753,6 +1783,15 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         .withFields({ sessionId: this.sessionId, sandboxId, rpcElapsedMs: Date.now() - rpcStart })
         .debug('stopKiloServer RPC completed');
 
+      // Clear the activity timestamp since server is stopped
+      // Must merge with existing metadata since updateMetadata validates the full schema
+      const updated = {
+        ...metadata,
+        kiloServerLastActivity: undefined,
+        version: Date.now(),
+      };
+      await this.updateMetadata(updated);
+
       logger
         .withFields({ sessionId: this.sessionId, sandboxId })
         .info('Idle kilo server stopped successfully');
@@ -1768,13 +1807,22 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   /**
-   * Reset the sandbox container's sleep timer so it stays alive during an
-   * active execution.
+   * Reset the sandbox container's inactivity timer so it stays alive during
+   * an active execution.
    *
-   * The wrapper heartbeat travels over an outbound WebSocket that bypasses
-   * `containerFetch()`, so it never calls `renewActivityTimeout()`.  Calling
-   * `setSleepAfter()` with the same value is a lightweight RPC that resets
-   * the timer without changing the configuration.
+   * The @cloudflare/containers runtime expires the container after
+   * `sleepAfter` of inactivity and refreshes that window from
+   * `containerFetch()` only.  The wrapper communicates with the worker over
+   * an outbound WebSocket to `/ingest` that bypasses `containerFetch()`, so
+   * the activity timer is never refreshed by wrapper traffic and the
+   * container is SIGTERM-ed at the 15-minute mark even mid-execution.
+   *
+   * `setSleepAfter()` cannot be used to refresh the timer because the
+   * Sandbox implementation is idempotent — when called with the same value
+   * it returns early without resetting `sleepAfterMs`.  Call
+   * `renewActivityTimeout()` (inherited from the base Container class)
+   * directly instead; it is a synchronous in-memory update of
+   * `sleepAfterMs = Date.now() + sleepAfter*1000`.
    *
    * Called from the DO context's `updateHeartbeat` callback (debounced
    * to every 30 s by the ingest handler) while an execution is running.
@@ -1794,7 +1842,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           metadata.botId
         ));
       const sandbox = getSandbox(getSandboxNamespace(this.env, sandboxId), sandboxId);
-      await sandbox.setSleepAfter(SANDBOX_SLEEP_AFTER_SECONDS);
+      // `renewActivityTimeout` is declared as synchronous `void` on the
+      // base Container class, but `sandbox` is a DO RPC stub so the call
+      // is actually async.  `Promise.resolve` wraps the call without
+      // hiding rejection — failures still propagate to the catch below.
+      await Promise.resolve(sandbox.renewActivityTimeout());
     } catch (error) {
       logger
         .withFields({

@@ -14,7 +14,7 @@ import {
   createAllowPredicateFromRestrictions,
   hasActiveModelRestrictions,
 } from '@/lib/model-allow.server';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
+import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
 // Default model for Discord integrations - mirrors the Slack default

@@ -123,6 +123,7 @@ export type CloudAgentTerminalReason =
   | 'interrupted'
   | 'timeout'
   | 'upstream_error'
+  | 'sandbox_error'
   | 'unknown';
 
 export class CloudAgentNextError extends Error {

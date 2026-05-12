@@ -2962,7 +2962,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   // ── Machine resize (admin) ─────────────────────────────────────────
 
-  async resizeMachine(targetTierKey: InstanceTierKey): Promise<{
+  async resizeMachine(input: {
+    targetTierKey: InstanceTierKey;
+    actorId: string;
+    actorEmail: string;
+  }): Promise<{
     previousTier: InstanceType | null;
     newTier: InstanceTierKey;
     previousVolumeSizeGb: number | null;
@@ -2973,6 +2977,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       metadata: NonNullable<InstanceMutableState['adminMachineSizeOverrideMetadata']>;
     } | null;
   }> {
+    const { targetTierKey, actorId, actorEmail } = input;
     await this.loadState();
     this.assertAdminSizeChangeAllowed({
       cannotPrefix: 'resize',
@@ -3074,7 +3079,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     console.log(
-      `[admin-machine-resize] userId=${this.s.userId} ` +
+      `[admin-machine-resize] userId=${this.s.userId} actor=${actorEmail} (${actorId}) ` +
         `previousTier=${previousTier ?? 'unknown'} newTier=${targetTier.key} ` +
         `previousVolume=${previousVolumeSizeGb ?? 'unknown'} newVolume=${targetTier.volumeSizeGb}` +
         (clearedOverride

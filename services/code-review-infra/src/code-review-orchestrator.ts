@@ -100,7 +100,11 @@ function parseJsonBody(body: string): unknown {
   }
 }
 
-function isPrepareSessionSandboxInternalServerError(error: unknown): boolean {
+function isTerminalStatus(status: CodeReviewStatus): boolean {
+  return status === 'completed' || status === 'failed' || status === 'cancelled';
+}
+
+function isCloudAgentNextSandboxInternalServerError(error: unknown): boolean {
   if (error instanceof CloudAgentNextBillingError) {
     return false;
   }
@@ -109,7 +113,7 @@ function isPrepareSessionSandboxInternalServerError(error: unknown): boolean {
     return false;
   }
 
-  if (error.procedure !== 'prepareSession' || error.status !== 500) {
+  if (error.status < 500 || error.status >= 600) {
     return false;
   }
 
@@ -130,9 +134,11 @@ function isPrepareSessionSandboxInternalServerError(error: unknown): boolean {
     body.includes('cloudflare');
   const hasInternalServerSignal =
     body.includes('internal server error') ||
+    body.includes('internal_server_error') ||
     /http\s+error!\s+status:\s*500\b/i.test(error.body) ||
     /\bstatus:\s*500\b/i.test(error.body) ||
-    /\bhttp\s*500\b/i.test(error.body);
+    /\bhttp\s*500\b/i.test(error.body) ||
+    /\b500\b/.test(error.body);
 
   return hasSandboxSignal && hasInternalServerSignal;
 }
@@ -179,6 +185,47 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   private getCloudAgentNextClient(): CloudAgentNextFetchClient {
     this.cloudAgentNextClient ??= createCloudAgentNextFetchClient(this.env.CLOUD_AGENT_NEXT_URL);
     return this.cloudAgentNextClient;
+  }
+
+  private async tryRetryFreshSessionAfterSandboxError(
+    source: string,
+    error: unknown
+  ): Promise<boolean> {
+    if (
+      this.state.sandboxRetryAttempted === true ||
+      this.cancelled ||
+      isTerminalStatus(this.state.status)
+    ) {
+      return false;
+    }
+
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const previousCloudAgentSessionId = this.state.previousCloudAgentSessionId;
+    const previousSessionId = this.state.sessionId;
+    const previousCliSessionId = this.state.cliSessionId;
+    const previousSandboxId = this.state.sandboxId;
+
+    this.state.sandboxRetryAttempted = true;
+    this.state.previousCloudAgentSessionId = undefined;
+    this.state.sessionId = undefined;
+    this.state.cliSessionId = undefined;
+    this.state.sandboxId = undefined;
+    this.state.updatedAt = new Date().toISOString();
+    await this.saveState();
+
+    console.warn('[CodeReviewOrchestrator] Retrying with a fresh session after sandbox 500', {
+      reviewId: this.state.reviewId,
+      source,
+      error: errorMessage,
+      previousCloudAgentSessionId,
+      previousSessionId,
+      previousCliSessionId,
+      previousSandboxId,
+      sandboxRetryAttempted: true,
+    });
+
+    await this.runWithCloudAgentNext();
+    return true;
   }
 
   private async runFreshCloudAgentNextFallback(previousSessionId: string): Promise<void> {
@@ -404,9 +451,13 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   }
 
   private async setLocalTerminalStateFromDB(
-    status: Extract<CodeReviewStatus, 'completed' | 'failed' | 'cancelled'>
+    status: Extract<CodeReviewStatus, 'completed' | 'failed' | 'cancelled'>,
+    terminalReason?: CloudAgentTerminalReason | null
   ): Promise<void> {
     this.state.status = status;
+    if (terminalReason !== undefined) {
+      this.state.terminalReason = terminalReason ?? undefined;
+    }
     this.state.completedAt = this.state.completedAt ?? new Date().toISOString();
     this.state.events = [];
     this.state.updatedAt = new Date().toISOString();
@@ -458,7 +509,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     const body = InternalStatusResponseSchema.parse(await response.json());
     if (body.message === 'Review already in terminal state' && body.currentStatus) {
-      await this.setLocalTerminalStateFromDB(body.currentStatus);
+      await this.setLocalTerminalStateFromDB(body.currentStatus, body.terminalReason);
       return 'db-terminal';
     }
 
@@ -641,6 +692,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       totalTokensOut: this.state.totalTokensOut,
       totalCost: this.state.totalCost,
       errorMessage: this.state.errorMessage,
+      terminalReason: this.state.terminalReason,
     };
   }
 
@@ -874,30 +926,29 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         note: 'Callback will update final status',
       });
     } catch (error) {
-      if (
-        isPrepareSessionSandboxInternalServerError(error) &&
-        this.state.sandboxRetryAttempted !== true &&
-        !this.cancelled &&
-        this.state.status !== 'cancelled'
-      ) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-        this.state.sandboxRetryAttempted = true;
-        this.state.previousCloudAgentSessionId = undefined;
-        this.state.updatedAt = new Date().toISOString();
-        await this.saveState();
+      if (isCloudAgentNextSandboxInternalServerError(error)) {
+        if (await this.tryRetryFreshSessionAfterSandboxError('cloud-agent-next-fresh', error)) {
+          return;
+        }
 
-        console.warn('[CodeReviewOrchestrator] Retrying prepareSession after sandbox 500', {
-          reviewId: this.state.reviewId,
-          error: errorMessage,
-          sandboxRetryAttempted: true,
+        if (this.cancelled || isTerminalStatus(this.state.status)) {
+          return;
+        }
+
+        await this.updateStatus('failed', {
+          errorMessage,
+          terminalReason: 'sandbox_error',
         });
 
-        await this.runWithCloudAgentNext();
+        console.error('[CodeReviewOrchestrator] Review failed after sandbox retry:', {
+          reviewId: this.state.reviewId,
+          error: errorMessage,
+        });
         return;
       }
 
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const terminalReason = this.getTerminalReason(error);
 
       await this.updateStatus('failed', { errorMessage, terminalReason });
@@ -1062,6 +1113,28 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       }
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      if (isCloudAgentNextSandboxInternalServerError(error)) {
+        if (await this.tryRetryFreshSessionAfterSandboxError('cloud-agent-next-followup', error)) {
+          return;
+        }
+
+        if (this.cancelled || isTerminalStatus(this.state.status)) {
+          return;
+        }
+
+        await this.updateStatus('failed', {
+          errorMessage,
+          terminalReason: 'sandbox_error',
+        });
+
+        console.warn('[CodeReviewOrchestrator] sendMessageV2 sandbox failure after retry', {
+          reviewId: this.state.reviewId,
+          previousCloudAgentSessionId: previousSessionId,
+          error: errorMessage,
+        });
+        return;
+      }
 
       console.warn('[CodeReviewOrchestrator] sendMessageV2 failed, falling back to fresh session', {
         reviewId: this.state.reviewId,

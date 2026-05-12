@@ -250,8 +250,9 @@ async function generateByokProvidersNotification(
 
     const names = {
       anthropic: 'Claude API Key',
-      bedrock: 'Amazon Bedrock',
+      bedrock: 'Amazon Bedrock API Key',
       chutes: 'Chutes API Key',
+      deepseek: 'DeepSeek API Key',
       fireworks: 'Fireworks API Key',
       gemini: 'Google AI API Key',
       'openai-native': 'OpenAI API Key',

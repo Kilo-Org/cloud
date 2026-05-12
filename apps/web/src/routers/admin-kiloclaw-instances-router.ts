@@ -1,6 +1,7 @@
 import { adminProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import { createHash } from 'crypto';
 import {
   kiloclaw_instances,
   kiloclaw_subscriptions,
@@ -74,6 +75,7 @@ import {
 
 const initiatingAdminUsers = alias(kilocode_users, 'initiating_admin_users');
 const pinnedByUsers = alias(kilocode_users, 'pinned_by_users');
+const fleetSourceCatalog = alias(kiloclaw_image_catalog, 'fleet_source_catalog');
 
 /**
  * Validate the JSONB `admin_size_override` column via the shared Zod
@@ -151,6 +153,37 @@ const GatewayProcessSchema = z.object({
 
 const StatsSchema = z.object({
   days: z.number().min(1).max(365).default(30),
+});
+
+const NoticeConfigSchema = z.object({
+  notify: z.boolean().default(true),
+  noticeLeadHours: z.number().int().min(0).max(168).default(24),
+  noticeSubject: z.string().max(120).default(''),
+  noticeBody: z.string().max(2000).default(''),
+  noticeChannels: z
+    .array(z.enum(['email', 'webapp', 'mobile_push']))
+    .min(1)
+    .default(['email', 'webapp', 'mobile_push']),
+});
+
+const ImageTagSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/);
+
+const CalVerSchema = z
+  .string()
+  .regex(/^\d{4}\.\d{1,2}\.\d{1,2}$/, 'Version must use YYYY.M.D format');
+
+const FleetUpgradeFilterSchema = NoticeConfigSchema.extend({
+  versionBelow: CalVerSchema,
+  targetImageTag: ImageTagSchema,
+  overridePins: z.boolean().default(false),
+  startsAt: z.string().datetime(),
+  tranchePercent: z.number().int().min(1).max(100),
+  intervalDays: z.number().int().min(1).max(30),
+  reason: z.string().max(256).optional(),
 });
 
 type KiloclawTrpcCode =
@@ -404,6 +437,331 @@ export type AdminKiloclawInstanceDetail = AdminKiloclawInstance & {
   workerStatus: PlatformDebugStatusResponse | null;
   workerStatusError: string | null;
 };
+
+type NoticeChannel = z.infer<typeof NoticeConfigSchema>['noticeChannels'][number];
+type ScheduledActionType = 'scheduled_restart' | 'version_change';
+type ScheduledActionInstanceRow = {
+  instance: typeof kiloclaw_instances.$inferSelect;
+  owner_id: string;
+};
+type ScheduledActionTargetRow = ScheduledActionInstanceRow & {
+  stageIndex: number;
+};
+type ScheduledActionStageInput = {
+  stageIndex: number;
+  scheduledAt: string;
+};
+
+function assertScheduledTimeInFuture(value: string, fieldName: string) {
+  const scheduledAtMs = new Date(value).getTime();
+  if (Number.isNaN(scheduledAtMs) || scheduledAtMs - Date.now() < 60_000) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `${fieldName} must be at least 1 minute in the future`,
+    });
+  }
+}
+
+async function validateAvailableImageTag(imageTag: string) {
+  const [catalogEntry] = await db
+    .select({
+      image_tag: kiloclaw_image_catalog.image_tag,
+      status: kiloclaw_image_catalog.status,
+    })
+    .from(kiloclaw_image_catalog)
+    .where(eq(kiloclaw_image_catalog.image_tag, imageTag))
+    .limit(1);
+
+  if (!catalogEntry) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Target image tag not found in catalog: ${imageTag}`,
+    });
+  }
+  if (catalogEntry.status === 'disabled') {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Target image tag is disabled: ${imageTag}`,
+    });
+  }
+}
+
+async function findPendingScheduledActionConflicts(instanceIds: string[]) {
+  if (instanceIds.length === 0) return [];
+  const existingPending = await db
+    .select({
+      instance_id: kiloclaw_scheduled_action_targets.instance_id,
+      scheduled_action_id: kiloclaw_scheduled_action_targets.scheduled_action_id,
+    })
+    .from(kiloclaw_scheduled_action_targets)
+    .innerJoin(
+      kiloclaw_scheduled_actions,
+      eq(kiloclaw_scheduled_actions.id, kiloclaw_scheduled_action_targets.scheduled_action_id)
+    )
+    .where(
+      and(
+        inArray(kiloclaw_scheduled_action_targets.instance_id, instanceIds),
+        inArray(kiloclaw_scheduled_action_targets.status, ['pending', 'running']),
+        inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
+      )
+    );
+  return Array.from(new Set(existingPending.map(e => e.instance_id)));
+}
+
+async function createScheduledActionRows(params: {
+  actionType: ScheduledActionType;
+  targetImageTag: string | null;
+  overridePins: boolean;
+  noticeLeadHours: number;
+  noticeSubject: string;
+  noticeBody: string;
+  reason: string | null;
+  createdBy: string;
+  stages: ScheduledActionStageInput[];
+  targets: ScheduledActionTargetRow[];
+  notify: boolean;
+  noticeChannels: NoticeChannel[];
+}) {
+  const liveInstanceIds = Array.from(new Set(params.targets.map(row => row.instance.id)));
+  if (liveInstanceIds.length === 0) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'No target instances to schedule',
+    });
+  }
+
+  return db.transaction(
+    async tx => {
+      const existingPending = await tx
+        .select({
+          instance_id: kiloclaw_scheduled_action_targets.instance_id,
+          scheduled_action_id: kiloclaw_scheduled_action_targets.scheduled_action_id,
+        })
+        .from(kiloclaw_scheduled_action_targets)
+        .innerJoin(
+          kiloclaw_scheduled_actions,
+          eq(kiloclaw_scheduled_actions.id, kiloclaw_scheduled_action_targets.scheduled_action_id)
+        )
+        .where(
+          and(
+            inArray(kiloclaw_scheduled_action_targets.instance_id, liveInstanceIds),
+            inArray(kiloclaw_scheduled_action_targets.status, ['pending', 'running']),
+            inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
+          )
+        );
+
+      if (existingPending.length > 0) {
+        const conflictIds = Array.from(new Set(existingPending.map(e => e.instance_id)));
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            conflictIds.length === 1
+              ? `Instance ${conflictIds[0]} already has a pending or in-flight scheduled action; cancel it first`
+              : `${conflictIds.length} instances already have pending or in-flight scheduled actions; cancel those first: ${conflictIds.join(', ')}`,
+        });
+      }
+
+      const [parentRow] = await tx
+        .insert(kiloclaw_scheduled_actions)
+        .values({
+          action_type: params.actionType,
+          target_image_tag: params.targetImageTag,
+          override_pins: params.overridePins,
+          notice_lead_hours: params.noticeLeadHours,
+          notice_subject: params.noticeSubject,
+          notice_body: params.noticeBody,
+          reason: params.reason,
+          status: 'scheduled',
+          created_by: params.createdBy,
+          total_count: liveInstanceIds.length,
+        })
+        .returning({ id: kiloclaw_scheduled_actions.id });
+
+      const stageRows = await tx
+        .insert(kiloclaw_scheduled_action_stages)
+        .values(
+          params.stages.map(stage => ({
+            scheduled_action_id: parentRow.id,
+            stage_index: stage.stageIndex,
+            scheduled_at: stage.scheduledAt,
+            status: 'pending' as const,
+          }))
+        )
+        .returning({
+          id: kiloclaw_scheduled_action_stages.id,
+          stage_index: kiloclaw_scheduled_action_stages.stage_index,
+        });
+
+      const stageIdByIndex = new Map(stageRows.map(stage => [stage.stage_index, stage.id]));
+
+      const insertedTargets = await tx
+        .insert(kiloclaw_scheduled_action_targets)
+        .values(
+          params.targets.map(row => {
+            const stageId = stageIdByIndex.get(row.stageIndex);
+            if (!stageId) throw new Error(`Missing stage id for stage ${row.stageIndex}`);
+            return {
+              scheduled_action_id: parentRow.id,
+              stage_id: stageId,
+              instance_id: row.instance.id,
+              source_image_tag: row.instance.tracked_image_tag,
+              target_image_tag: params.targetImageTag,
+              user_id: row.owner_id,
+              status: 'pending' as const,
+            };
+          })
+        )
+        .returning({
+          id: kiloclaw_scheduled_action_targets.id,
+          instance_id: kiloclaw_scheduled_action_targets.instance_id,
+        });
+
+      if (params.notify && params.noticeChannels.length > 0) {
+        const notificationRows: NewKiloClawScheduledActionNotification[] = [];
+        for (const target of insertedTargets) {
+          for (const channel of params.noticeChannels) {
+            notificationRows.push({
+              target_id: target.id,
+              channel,
+              kind: 'notice',
+              status: 'pending',
+            });
+          }
+        }
+        await tx.insert(kiloclaw_scheduled_action_notifications).values(notificationRows);
+      }
+
+      return {
+        id: parentRow.id,
+        stageIds: stageRows.sort((a, b) => a.stage_index - b.stage_index).map(stage => stage.id),
+        insertedTargets,
+      };
+    },
+    { isolationLevel: 'serializable' }
+  );
+}
+
+function buildFleetStagePlan(params: {
+  targetCount: number;
+  startsAt: string;
+  tranchePercent: number;
+  intervalDays: number;
+}) {
+  if (params.targetCount === 0) return [];
+  const trancheSize = Math.max(1, Math.ceil((params.targetCount * params.tranchePercent) / 100));
+  const startsAtMs = new Date(params.startsAt).getTime();
+  const stages: Array<{ stageIndex: number; scheduledAt: string; targetCount: number }> = [];
+  let remaining = params.targetCount;
+  let stageIndex = 0;
+  while (remaining > 0) {
+    const targetCount = Math.min(trancheSize, remaining);
+    stages.push({
+      stageIndex,
+      scheduledAt: new Date(
+        startsAtMs + stageIndex * params.intervalDays * 86_400_000
+      ).toISOString(),
+      targetCount,
+    });
+    remaining -= targetCount;
+    stageIndex += 1;
+  }
+  return stages;
+}
+
+function fleetSortKey(seed: string, instanceId: string) {
+  return createHash('sha256').update(`${seed}:${instanceId}`).digest('hex');
+}
+
+async function getFleetUpgradePlan(input: z.infer<typeof FleetUpgradeFilterSchema>) {
+  await validateAvailableImageTag(input.targetImageTag);
+
+  const rows = await db
+    .select({
+      instance: kiloclaw_instances,
+      owner_id: kilocode_users.id,
+      source_openclaw_version: fleetSourceCatalog.openclaw_version,
+      source_is_below_cutoff: sql<boolean | null>`
+        string_to_array(${fleetSourceCatalog.openclaw_version}, '.')::int[]
+        < string_to_array(${input.versionBelow}, '.')::int[]
+      `,
+      pin_id: kiloclaw_version_pins.id,
+    })
+    .from(kiloclaw_instances)
+    .innerJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+    .innerJoin(
+      kiloclaw_subscriptions,
+      eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
+    )
+    .leftJoin(
+      fleetSourceCatalog,
+      eq(kiloclaw_instances.tracked_image_tag, fleetSourceCatalog.image_tag)
+    )
+    .leftJoin(kiloclaw_version_pins, eq(kiloclaw_version_pins.instance_id, kiloclaw_instances.id))
+    .where(
+      and(
+        isNull(kiloclaw_instances.destroyed_at),
+        isNull(kiloclaw_instances.inactive_trial_stopped_at),
+        isNull(kiloclaw_subscriptions.suspended_at)
+      )
+    );
+
+  const unknownVersionRows = rows.filter(
+    row => !row.instance.tracked_image_tag || !row.source_openclaw_version
+  );
+  const alreadyOnTargetRows = rows.filter(
+    row => row.instance.tracked_image_tag === input.targetImageTag
+  );
+  const eligibleRows = rows.filter(
+    row =>
+      row.source_openclaw_version &&
+      row.source_is_below_cutoff === true &&
+      row.instance.tracked_image_tag !== input.targetImageTag
+  );
+  const pinnedRows = eligibleRows.filter(row => row.pin_id !== null);
+  const preConflictRows = eligibleRows.filter(row => input.overridePins || row.pin_id === null);
+  const conflictInstanceIds = await findPendingScheduledActionConflicts(
+    preConflictRows.map(row => row.instance.id)
+  );
+  const conflictIdSet = new Set(conflictInstanceIds);
+  const seed = [
+    input.versionBelow,
+    input.targetImageTag,
+    input.startsAt,
+    input.tranchePercent,
+    input.intervalDays,
+  ].join('|');
+  const actionableRows = preConflictRows
+    .filter(row => !conflictIdSet.has(row.instance.id))
+    .map(row => ({ row, sortKey: fleetSortKey(seed, row.instance.id) }))
+    .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+    .map(({ row }) => row);
+  const stages = buildFleetStagePlan({
+    targetCount: actionableRows.length,
+    startsAt: input.startsAt,
+    tranchePercent: input.tranchePercent,
+    intervalDays: input.intervalDays,
+  });
+
+  return {
+    counts: {
+      eligible: eligibleRows.length,
+      actionable: actionableRows.length,
+      pinned: pinnedRows.length,
+      conflicts: conflictInstanceIds.length,
+      alreadyOnTarget: alreadyOnTargetRows.length,
+      unknownVersion: unknownVersionRows.length,
+    },
+    stages,
+    actionableRows,
+    actionableInstanceIds: actionableRows.map(row => row.instance.id),
+    excluded: {
+      pinnedInstanceIds: pinnedRows.map(row => row.instance.id),
+      conflictInstanceIds,
+      alreadyOnTargetInstanceIds: alreadyOnTargetRows.map(row => row.instance.id),
+      unknownVersionInstanceIds: unknownVersionRows.map(row => row.instance.id),
+    },
+  };
+}
 
 export const adminKiloclawInstancesRouter = createTRPCRouter({
   get: adminProcedure.input(GetInstanceSchema).query(async ({ input }) => {
@@ -1822,39 +2180,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       // Validate scheduledAt > now() + 1 minute so admins can't
       // accidentally schedule something that fires immediately.
-      const scheduledAtMs = new Date(input.scheduledAt).getTime();
-      if (scheduledAtMs - Date.now() < 60_000) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'scheduledAt must be at least 1 minute in the future',
-        });
-      }
+      assertScheduledTimeInFuture(input.scheduledAt, 'scheduledAt');
 
       // For version_change, validate the target image tag matches the
       // catalog rules bulkChangeVersion uses (must exist + status='available').
       // We do this BEFORE inserting any rows so a bad tag fails fast.
       if (input.actionType === 'version_change') {
-        const [catalogEntry] = await db
-          .select({
-            image_tag: kiloclaw_image_catalog.image_tag,
-            status: kiloclaw_image_catalog.status,
-          })
-          .from(kiloclaw_image_catalog)
-          .where(eq(kiloclaw_image_catalog.image_tag, input.imageTag))
-          .limit(1);
-
-        if (!catalogEntry) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `Target image tag not found in catalog: ${input.imageTag}`,
-          });
-        }
-        if (catalogEntry.status === 'disabled') {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `Target image tag is disabled: ${input.imageTag}`,
-          });
-        }
+        await validateAvailableImageTag(input.imageTag);
       }
 
       // Dedupe instance ids — duplicate target rows would violate
@@ -1907,129 +2239,21 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       // schedule requests on the same instance can both observe "no
       // pending" outside any transaction and then both insert separate
       // scheduled actions, violating the one-pending-action-per-instance
-      // invariant. SSI in Postgres detects the conflict and aborts the
-      // losing tx with 40001; the admin retries (the click) and the
-      // second attempt sees the now-committed pending row and rejects
-      // with the normal CONFLICT message. We don't add an in-procedure
-      // retry loop — admin-initiated path, low contention, retry-by-
-      // clicking is fine.
-      const result = await db.transaction(
-        async tx => {
-          // Filter must include 'running' as well as 'pending'. The DO
-          // apply path flips the target to 'running' via
-          // claimScheduledActionTarget right before invoking the side
-          // effect; if a second schedule request lands during that
-          // window and we filter on 'pending' alone, we'd miss the
-          // in-flight target and create a duplicate parent action.
-          const existingPending = await tx
-            .select({
-              instance_id: kiloclaw_scheduled_action_targets.instance_id,
-              scheduled_action_id: kiloclaw_scheduled_action_targets.scheduled_action_id,
-            })
-            .from(kiloclaw_scheduled_action_targets)
-            .innerJoin(
-              kiloclaw_scheduled_actions,
-              eq(
-                kiloclaw_scheduled_actions.id,
-                kiloclaw_scheduled_action_targets.scheduled_action_id
-              )
-            )
-            .where(
-              and(
-                inArray(kiloclaw_scheduled_action_targets.instance_id, liveInstanceIds),
-                inArray(kiloclaw_scheduled_action_targets.status, ['pending', 'running']),
-                inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
-              )
-            );
-
-          if (existingPending.length > 0) {
-            const conflictIds = Array.from(new Set(existingPending.map(e => e.instance_id)));
-            throw new TRPCError({
-              code: 'CONFLICT',
-              message:
-                conflictIds.length === 1
-                  ? `Instance ${conflictIds[0]} already has a pending or in-flight scheduled action; cancel it first`
-                  : `${conflictIds.length} instances already have pending or in-flight scheduled actions; cancel those first: ${conflictIds.join(', ')}`,
-            });
-          }
-
-          const [parentRow] = await tx
-            .insert(kiloclaw_scheduled_actions)
-            .values({
-              action_type: input.actionType,
-              target_image_tag: parentTargetImageTag,
-              override_pins: parentOverridePins,
-              notice_lead_hours: input.noticeLeadHours,
-              notice_subject: input.noticeSubject,
-              notice_body: input.noticeBody,
-              reason: input.reason ?? null,
-              status: 'scheduled',
-              created_by: ctx.user.id,
-              total_count: liveInstanceIds.length,
-            })
-            .returning({ id: kiloclaw_scheduled_actions.id });
-
-          const [stageRow] = await tx
-            .insert(kiloclaw_scheduled_action_stages)
-            .values({
-              scheduled_action_id: parentRow.id,
-              stage_index: 0,
-              scheduled_at: input.scheduledAt,
-              status: 'pending',
-            })
-            .returning({ id: kiloclaw_scheduled_action_stages.id });
-
-          const insertedTargets = await tx
-            .insert(kiloclaw_scheduled_action_targets)
-            .values(
-              liveInstanceIds.map(id => {
-                const row = liveResolvedById.get(id);
-                // liveResolvedById is built from liveInstanceRows (filtered
-                // above), so every id resolves.
-                if (!row) throw new Error(`unresolved instance ${id}`);
-                return {
-                  scheduled_action_id: parentRow.id,
-                  stage_id: stageRow.id,
-                  instance_id: row.instance.id,
-                  source_image_tag: row.instance.tracked_image_tag,
-                  // For version_change targets we stamp the target tag so the
-                  // DO apply path can read it from the target row directly
-                  // without having to join back to the parent.
-                  target_image_tag: parentTargetImageTag,
-                  user_id: row.owner_id,
-                  status: 'pending' as const,
-                };
-              })
-            )
-            .returning({
-              id: kiloclaw_scheduled_action_targets.id,
-              instance_id: kiloclaw_scheduled_action_targets.instance_id,
-            });
-
-          // Fan out one notification row per (target, channel) when
-          // notify=true. The sweep selects pending rows whose stage's
-          // (scheduled_at - notice_lead_hours) is in the past. Channels
-          // dispatch independently; one failed channel doesn't poison
-          // the others.
-          if (input.notify && input.noticeChannels.length > 0) {
-            const notificationRows: NewKiloClawScheduledActionNotification[] = [];
-            for (const target of insertedTargets) {
-              for (const channel of input.noticeChannels) {
-                notificationRows.push({
-                  target_id: target.id,
-                  channel,
-                  kind: 'notice',
-                  status: 'pending',
-                });
-              }
-            }
-            await tx.insert(kiloclaw_scheduled_action_notifications).values(notificationRows);
-          }
-
-          return { id: parentRow.id, stageId: stageRow.id };
-        },
-        { isolationLevel: 'serializable' }
-      );
+      // invariant.
+      const result = await createScheduledActionRows({
+        actionType: input.actionType,
+        targetImageTag: parentTargetImageTag,
+        overridePins: parentOverridePins,
+        noticeLeadHours: input.noticeLeadHours,
+        noticeSubject: input.noticeSubject,
+        noticeBody: input.noticeBody,
+        reason: input.reason ?? null,
+        createdBy: ctx.user.id,
+        stages: [{ stageIndex: 0, scheduledAt: input.scheduledAt }],
+        targets: liveInstanceRows.map(row => ({ ...row, stageIndex: 0 })),
+        notify: input.notify,
+        noticeChannels: input.noticeChannels,
+      });
 
       // Audit log fire-and-forget. Multi-user actions still use the
       // actor's id as the target_user_id sentinel since the column is
@@ -2119,7 +2343,115 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         );
       }
 
-      return { id: result.id, stageId: result.stageId };
+      return { id: result.id, stageId: result.stageIds[0] };
+    }),
+
+  previewFleetUpgrade: adminProcedure.input(FleetUpgradeFilterSchema).query(async ({ input }) => {
+    assertScheduledTimeInFuture(input.startsAt, 'startsAt');
+    const plan = await getFleetUpgradePlan(input);
+
+    return {
+      counts: plan.counts,
+      stages: plan.stages,
+      actionableInstanceIds: plan.actionableInstanceIds,
+      excluded: plan.excluded,
+    };
+  }),
+
+  createFleetUpgrade: adminProcedure
+    .input(FleetUpgradeFilterSchema)
+    .mutation(async ({ input, ctx }) => {
+      assertScheduledTimeInFuture(input.startsAt, 'startsAt');
+      const plan = await getFleetUpgradePlan(input);
+
+      if (plan.excluded.conflictInstanceIds.length > 0) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `${plan.excluded.conflictInstanceIds.length} instances already have pending or in-flight scheduled actions; cancel those first: ${plan.excluded.conflictInstanceIds.join(', ')}`,
+        });
+      }
+
+      if (plan.actionableRows.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No actionable fleet upgrade targets match the selected filters',
+        });
+      }
+
+      const stageTargets: ScheduledActionTargetRow[] = [];
+      let offset = 0;
+      for (const stage of plan.stages) {
+        const rows = plan.actionableRows.slice(offset, offset + stage.targetCount);
+        stageTargets.push(...rows.map(row => ({ ...row, stageIndex: stage.stageIndex })));
+        offset += stage.targetCount;
+      }
+
+      const result = await createScheduledActionRows({
+        actionType: 'version_change',
+        targetImageTag: input.targetImageTag,
+        overridePins: input.overridePins,
+        noticeLeadHours: input.noticeLeadHours,
+        noticeSubject: input.noticeSubject,
+        noticeBody: input.noticeBody,
+        reason: input.reason ?? null,
+        createdBy: ctx.user.id,
+        stages: plan.stages.map(stage => ({
+          stageIndex: stage.stageIndex,
+          scheduledAt: stage.scheduledAt,
+        })),
+        targets: stageTargets,
+        notify: input.notify,
+        noticeChannels: input.noticeChannels,
+      });
+
+      try {
+        await createKiloClawAdminAuditLog({
+          action: 'kiloclaw.fleet_upgrade.created',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          target_user_id: ctx.user.id,
+          message: `Created fleet upgrade to ${input.targetImageTag} for ${stageTargets.length} instances in ${plan.stages.length} tranches`,
+          metadata: {
+            scheduledActionId: result.id,
+            versionBelow: input.versionBelow,
+            targetImageTag: input.targetImageTag,
+            overridePins: input.overridePins,
+            startsAt: input.startsAt,
+            tranchePercent: input.tranchePercent,
+            intervalDays: input.intervalDays,
+            targetCount: stageTargets.length,
+            counts: plan.counts,
+            stageSizes: plan.stages.map(stage => stage.targetCount),
+          },
+        });
+      } catch (auditErr) {
+        console.error('Failed to write audit log for createFleetUpgrade:', auditErr);
+      }
+
+      const internalClient = new KiloClawInternalClient();
+      const wakeConcurrency = 20;
+      for (let i = 0; i < plan.actionableRows.length; i += wakeConcurrency) {
+        const batch = plan.actionableRows.slice(i, i + wakeConcurrency);
+        await Promise.all(
+          batch.map(async row => {
+            try {
+              await internalClient.wakeScheduledAction(row.owner_id, row.instance.id);
+            } catch (wakeErr) {
+              console.error(
+                `Failed to wake DO after createFleetUpgrade (instance=${row.instance.id}):`,
+                wakeErr
+              );
+            }
+          })
+        );
+      }
+
+      return {
+        id: result.id,
+        stageIds: result.stageIds,
+        targetCount: stageTargets.length,
+      };
     }),
 
   /**
@@ -2191,19 +2523,25 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           ? await db
               .select({
                 scheduled_action_id: kiloclaw_scheduled_action_stages.scheduled_action_id,
-                scheduled_at: kiloclaw_scheduled_action_stages.scheduled_at,
+                scheduled_at: sql<string>`MIN(${kiloclaw_scheduled_action_stages.scheduled_at})`,
+                stage_count: sql<number>`COUNT(*)::int`,
+                latest_scheduled_at: sql<string>`MAX(${kiloclaw_scheduled_action_stages.scheduled_at})`,
               })
               .from(kiloclaw_scheduled_action_stages)
               .where(inArray(kiloclaw_scheduled_action_stages.scheduled_action_id, actionIds))
-              .orderBy(asc(kiloclaw_scheduled_action_stages.scheduled_at))
+              .groupBy(kiloclaw_scheduled_action_stages.scheduled_action_id)
           : [];
       const scheduledAtByAction = new Map<string, string>();
+      const stageSummaryByAction = new Map<
+        string,
+        { stage_count: number; latest_scheduled_at: string }
+      >();
       for (const s of stageRows) {
-        // First stage we see per action wins (rows are ordered ascending
-        // so this captures the earliest scheduled_at).
-        if (!scheduledAtByAction.has(s.scheduled_action_id)) {
-          scheduledAtByAction.set(s.scheduled_action_id, s.scheduled_at);
-        }
+        scheduledAtByAction.set(s.scheduled_action_id, s.scheduled_at);
+        stageSummaryByAction.set(s.scheduled_action_id, {
+          stage_count: s.stage_count,
+          latest_scheduled_at: s.latest_scheduled_at,
+        });
       }
 
       const totalCountResult = await db
@@ -2216,6 +2554,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       return {
         items: rows.map(r => {
           const summary = targetSummaryByAction.get(r.id);
+          const stageSummary = stageSummaryByAction.get(r.id);
           return {
             ...r,
             target_count: summary?.count ?? 0,
@@ -2223,6 +2562,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             // "N instances" otherwise.
             first_instance_id: summary?.first_instance_id ?? null,
             scheduled_at: scheduledAtByAction.get(r.id) ?? null,
+            stage_count: stageSummary?.stage_count ?? 0,
+            latest_scheduled_at: stageSummary?.latest_scheduled_at ?? null,
           };
         }),
         pagination: {
@@ -2265,12 +2606,18 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           target: kiloclaw_scheduled_action_targets,
           user_email: kilocode_users.google_user_email,
           instance_sandbox_id: kiloclaw_instances.sandbox_id,
+          stage_index: kiloclaw_scheduled_action_stages.stage_index,
+          stage_scheduled_at: kiloclaw_scheduled_action_stages.scheduled_at,
         })
         .from(kiloclaw_scheduled_action_targets)
         .leftJoin(kilocode_users, eq(kilocode_users.id, kiloclaw_scheduled_action_targets.user_id))
         .leftJoin(
           kiloclaw_instances,
           eq(kiloclaw_instances.id, kiloclaw_scheduled_action_targets.instance_id)
+        )
+        .leftJoin(
+          kiloclaw_scheduled_action_stages,
+          eq(kiloclaw_scheduled_action_stages.id, kiloclaw_scheduled_action_targets.stage_id)
         )
         .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, input.id));
 
@@ -2281,6 +2628,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           ...t.target,
           user_email: t.user_email,
           instance_sandbox_id: t.instance_sandbox_id,
+          stage_index: t.stage_index,
+          stage_scheduled_at: t.stage_scheduled_at,
         })),
       };
     }),
@@ -3091,6 +3440,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         const result = await client.resizeMachine(
           input.userId,
           input.instanceType,
+          { actorId: ctx.user.id, actorEmail: ctx.user.google_user_email },
           workerInstanceId(instance)
         );
 

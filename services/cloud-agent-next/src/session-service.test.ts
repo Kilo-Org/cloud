@@ -66,7 +66,11 @@ import {
   restoreWorkspace as mockRestoreWorkspace,
   cleanupWorkspace as mockCleanupWorkspace,
 } from './workspace.js';
-import { InvalidSessionMetadataError, SessionService } from './session-service.js';
+import {
+  buildAgentEntryFromRuntimeAgent,
+  InvalidSessionMetadataError,
+  SessionService,
+} from './session-service.js';
 import type { SandboxInstance, SessionId, SessionContext, ExecutionSession } from './types.js';
 import type { PersistenceEnv, CloudAgentSessionState } from './persistence/types.js';
 
@@ -3924,8 +3928,6 @@ describe('SessionService', () => {
 });
 
 describe('buildAgentEntryFromRuntimeAgent', () => {
-  const { buildAgentEntryFromRuntimeAgent } = await import('./session-service.js');
-
   it('normalizes model with kilo/ prefix when not already prefixed', () => {
     const result = buildAgentEntryFromRuntimeAgent({
       slug: 'test-agent',

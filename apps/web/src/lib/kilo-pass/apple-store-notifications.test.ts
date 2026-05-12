@@ -1628,4 +1628,154 @@ describe('processAppStoreKiloPassNotification', () => {
       expect(endedSubscription?.status).toBe('canceled');
     }
   );
+
+  it('rolls back credit reversal and processed_at write when markStoreSubscriptionEnded throws', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0 });
+    const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+    const providerTransactionId = `tx-${crypto.randomUUID()}`;
+    const notificationUUID = `rollback-refund-${crypto.randomUUID()}`;
+
+    // Seed a subscription + store purchase + promo issuance item
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'rollback-refund-initial-buy',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: `rollback-refund-initial-buy-${notificationUUID}`,
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          transactionId: providerTransactionId,
+          appAccountToken: user.app_store_account_token,
+          purchaseDate: Date.parse('2026-05-01T00:00:00.000Z'),
+          expiresDate: Date.parse('2026-06-01T00:00:00.000Z'),
+          currency: 'USD',
+          price: 19000,
+        }),
+    });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.provider_subscription_id, providerSubscriptionId),
+    });
+    const issuance = await db.query.kilo_pass_issuances.findFirst({
+      where: eq(kilo_pass_issuances.kilo_pass_subscription_id, subscription?.id ?? ''),
+    });
+
+    const [promoTransaction] = await db
+      .insert(credit_transactions)
+      .values({
+        kilo_user_id: user.id,
+        amount_microdollars: toMicrodollars(4.75),
+        is_free: true,
+        description: 'test promo credits for rollback test',
+        credit_category: `test-kilo-pass-promo-rollback-${crypto.randomUUID()}`,
+      })
+      .returning({ id: credit_transactions.id });
+
+    await db.insert(kilo_pass_issuance_items).values({
+      kilo_pass_issuance_id: issuance?.id ?? '',
+      kind: KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+      credit_transaction_id: promoTransaction?.id ?? '',
+      amount_usd: 4.75,
+      bonus_percent_applied: 0.25,
+    });
+
+    const failingEndSubscription = jest.fn(async () => {
+      throw new Error('simulated DB failure in markStoreSubscriptionEnded');
+    });
+
+    // First attempt — should reject because endStoreSubscription throws inside the outer tx
+    await expect(
+      processAppStoreKiloPassNotification({
+        signedPayload: notificationUUID,
+        decodeNotification: async () =>
+          notification({
+            notificationUUID,
+            notificationType: NotificationTypeV2.REFUND,
+            signedTransactionInfo: 'rollback-refund-transaction',
+          }),
+        decodeTransaction: async () =>
+          transaction({
+            originalTransactionId: providerSubscriptionId,
+            transactionId: providerTransactionId,
+            appAccountToken: user.app_store_account_token,
+            revocationDate: Date.parse('2026-05-02T00:00:00.000Z'),
+            currency: 'USD',
+            price: 19000,
+          }),
+        endStoreSubscription: failingEndSubscription,
+      })
+    ).rejects.toThrow('simulated DB failure in markStoreSubscriptionEnded');
+
+    // processed_at must be null — the outer tx was rolled back
+    const failedEvent = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, notificationUUID),
+    });
+    expect(failedEvent?.processed_at).toBeNull();
+
+    // No negative credit_transactions exist (rollback succeeded)
+    const creditsBefore = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(creditsBefore.filter(row => row.amount_microdollars < 0)).toHaveLength(0);
+
+    // Reset processing_started_at to a stale timestamp to allow retry (simulates processing after the
+    // store event claim TTL has elapsed following the first failed attempt)
+    await db
+      .update(kilo_pass_store_events)
+      .set({ processing_started_at: '2020-01-01T00:00:00.000Z' })
+      .where(eq(kilo_pass_store_events.event_id, notificationUUID));
+
+    // Second attempt without the override — full success, no duplicates
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: notificationUUID,
+      decodeNotification: async () =>
+        notification({
+          notificationUUID,
+          notificationType: NotificationTypeV2.REFUND,
+          signedTransactionInfo: 'rollback-refund-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          transactionId: providerTransactionId,
+          appAccountToken: user.app_store_account_token,
+          revocationDate: Date.parse('2026-05-02T00:00:00.000Z'),
+          currency: 'USD',
+          price: 19000,
+        }),
+    });
+    expect(result).toEqual({ processed: true });
+
+    const successEvent = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, notificationUUID),
+    });
+    expect(successEvent?.processed_at).not.toBeNull();
+
+    // Exactly one set of clawback rows — base + promo, not doubled
+    const negativeCreditTransactions = await db
+      .select({
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        description: credit_transactions.description,
+      })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    const negatives = negativeCreditTransactions.filter(row => row.amountMicrodollars < 0);
+    expect(negatives).toHaveLength(2);
+    expect(negatives).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(19),
+          description: 'App Store Kilo Pass refund clawback',
+        }),
+        expect.objectContaining({
+          amountMicrodollars: -toMicrodollars(4.75),
+          description: 'App Store Kilo Pass promo refund clawback',
+        }),
+      ])
+    );
+  });
 });

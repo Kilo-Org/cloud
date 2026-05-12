@@ -10,6 +10,8 @@ import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
 import type { DrizzleTransaction } from '@/lib/drizzle';
+
+type DbOrTx = DrizzleTransaction | typeof db;
 import { toMicrodollars } from '@/lib/utils';
 import { getMonthlyPriceUsd } from './bonus';
 import { dayjs } from './dayjs';
@@ -429,12 +431,13 @@ async function applyStoreUpgradeCreditAdjustments(
 }
 
 export async function completeStoreKiloPassPurchase(params: {
+  dbOrTx?: DbOrTx;
   user: User;
   purchase: ValidatedStoreKiloPassPurchase;
 }): Promise<CompleteStoreKiloPassPurchaseResult> {
   const { user, purchase } = params;
 
-  return db.transaction(async tx => {
+  const run = async (tx: DrizzleTransaction): Promise<CompleteStoreKiloPassPurchaseResult> => {
     await lockUserForStoreCompletion(tx, user.id);
 
     const existingPurchase = await findStorePurchaseByProviderTransaction(tx, purchase);
@@ -665,5 +668,10 @@ export async function completeStoreKiloPassPurchase(params: {
       cadence: purchase.cadence,
       alreadyProcessed: false,
     };
-  });
+  };
+
+  if (params.dbOrTx !== undefined) {
+    return run(params.dbOrTx as DrizzleTransaction);
+  }
+  return db.transaction(run);
 }

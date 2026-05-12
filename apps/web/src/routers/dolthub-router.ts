@@ -1,4 +1,5 @@
 import 'server-only';
+import { z } from 'zod';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import {
@@ -87,10 +88,19 @@ export const dolthubRouter = createTRPCRouter({
       });
     }
 
-    const data = (await response.json()) as unknown;
-    // The DoltHub profile API returns rows; grab the first row as a sample.
-    const rows = Array.isArray(data) ? data : (data as Record<string, unknown> | null)?.rows;
-    const sample = Array.isArray(rows) ? rows[0] : null;
+    const data = await response.json();
+
+    const DoltHubProfileResponseSchema = z.union([
+      z.array(z.record(z.unknown())),
+      z.object({ rows: z.array(z.record(z.unknown())).optional() }),
+    ]);
+    const parsed = DoltHubProfileResponseSchema.safeParse(data);
+    const rows = parsed.success
+      ? Array.isArray(parsed.data)
+        ? parsed.data
+        : parsed.data.rows ?? []
+      : [];
+    const sample = rows[0] ?? null;
 
     return { ok: true as const, sample };
   }),

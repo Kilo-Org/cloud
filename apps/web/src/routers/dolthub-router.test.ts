@@ -193,8 +193,9 @@ describe('dolthubRouter', () => {
       });
 
       const caller = await createCallerForUser(user.id);
-      await expect(caller.dolthub.verifyToken()).rejects.toBeInstanceOf(TRPCError);
-      await expect(caller.dolthub.verifyToken()).rejects.toMatchObject({
+      const rejection = caller.dolthub.verifyToken();
+      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
+      await expect(rejection).rejects.toMatchObject({
         code: 'UNAUTHORIZED',
       });
     });

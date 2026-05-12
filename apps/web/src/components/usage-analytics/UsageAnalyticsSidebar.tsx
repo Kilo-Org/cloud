@@ -13,10 +13,12 @@ import { X } from 'lucide-react';
 import { FilterGeneratorPopover } from './FilterGeneratorPopover';
 import {
   DIMENSION_LABELS,
+  GRANULARITY_LABELS,
   METRIC_LABELS,
   PERIOD_LABELS,
   type Dimension,
   type FilterDirection,
+  type Granularity,
   type MetricKey,
   type PeriodOption,
 } from './types';
@@ -83,6 +85,11 @@ type UsageAnalyticsSidebarProps = {
   period: PeriodOption;
   onPeriodChange: (value: PeriodOption) => void;
 
+  // Granularity
+  granularity: Granularity;
+  onGranularityChange: (value: Granularity) => void;
+  granularityOptions: Granularity[];
+
   // Trends controls
   chartMetric: MetricKey;
   onChartMetricChange: (value: MetricKey) => void;
@@ -114,6 +121,9 @@ export function UsageAnalyticsSidebar({
   effectiveOrganizationName,
   period,
   onPeriodChange,
+  granularity,
+  onGranularityChange,
+  granularityOptions,
   chartMetric,
   onChartMetricChange,
   metricOptions,
@@ -199,6 +209,21 @@ export function UsageAnalyticsSidebar({
               {(Object.keys(PERIOD_LABELS) as PeriodOption[]).map(p => (
                 <SelectItem key={p} value={p}>
                   {PERIOD_LABELS[p]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Section>
+
+        <Section title="Granularity">
+          <Select value={granularity} onValueChange={v => onGranularityChange(v as Granularity)}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {granularityOptions.map(g => (
+                <SelectItem key={g} value={g}>
+                  {GRANULARITY_LABELS[g]}
                 </SelectItem>
               ))}
             </SelectContent>

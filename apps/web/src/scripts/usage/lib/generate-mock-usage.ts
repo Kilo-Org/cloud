@@ -11,9 +11,8 @@
  *   - Days 8-90: multiple records per day per user
  *   - Months 4-13: sparser — a few days per month per user
  *
- * Does NOT populate rollup tables. The caller must run
- * `pnpm --filter web script:run usage rollup-usage -- --all-time`
- * afterwards.
+ * Inserts into microdollar_usage only. Usage Analytics reads from Snowflake
+ * (DBT_BACKEND_SANDBOX for local dev); no rollup step is needed.
  */
 import { randomUUID } from 'node:crypto';
 import { db } from '@/lib/drizzle';

@@ -30,6 +30,7 @@ import {
 import {
   EMPTY_FILTERS,
   defaultGranularityForPeriod,
+  granularityOptionsForPeriod,
   periodToDateRange,
   useResolveOrgUsers,
   useUsageBreakdown,
@@ -43,6 +44,7 @@ import {
   DIMENSION_LABELS,
   type Dimension,
   type FilterDirection,
+  type Granularity,
   type MetricKey,
   type PeriodOption,
 } from './types';
@@ -103,6 +105,7 @@ export function UsageAnalyticsDashboard({
 }: UsageAnalyticsDashboardProps) {
   const trpc = useTRPC();
   const [period, setPeriod] = useState<PeriodOption>('today');
+  const [granularity, setGranularity] = useState<Granularity>('hour');
   const [chartMetric, setChartMetric] = useState<MetricKey>('cost');
   const [filters, setFilters] = useState<UsageFilters>(EMPTY_FILTERS);
   const [groupBy, setGroupBy] = useState<Dimension | 'none'>('none');
@@ -120,7 +123,12 @@ export function UsageAnalyticsDashboard({
   });
 
   const dateRange = useMemo(() => periodToDateRange(period), [period]);
-  const granularity = useMemo(() => defaultGranularityForPeriod(period), [period]);
+  const granularityOptions = useMemo(() => granularityOptionsForPeriod(period), [period]);
+
+  const handlePeriodChange = useCallback((newPeriod: PeriodOption) => {
+    setPeriod(newPeriod);
+    setGranularity(defaultGranularityForPeriod(newPeriod));
+  }, []);
 
   const effectiveOrgId =
     context === 'organization'
@@ -432,7 +440,10 @@ export function UsageAnalyticsDashboard({
       isOrgWideView={isOrgWideView}
       effectiveOrganizationName={effectiveOrganizationName}
       period={period}
-      onPeriodChange={setPeriod}
+      onPeriodChange={handlePeriodChange}
+      granularity={granularity}
+      onGranularityChange={setGranularity}
+      granularityOptions={granularityOptions}
       chartMetric={chartMetric}
       onChartMetricChange={setChartMetric}
       metricOptions={METRIC_OPTIONS}
@@ -538,6 +549,7 @@ export function UsageAnalyticsDashboard({
                     splitByDimension ? v => labelForDimensionValue(splitByDimension, v) : undefined
                   }
                   period={period}
+                  granularity={granularity}
                 />
               </CardContent>
             </Card>

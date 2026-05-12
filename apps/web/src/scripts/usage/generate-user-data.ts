@@ -13,9 +13,8 @@
  * last 13 months with realistic density and variety across models,
  * providers, features, modes, and projects.
  *
- * After running this script, run:
- *   pnpm --filter web script:run usage rollup-usage -- --all-time
- * to populate the rollup tables that the Usage Analytics page reads.
+ * The Usage Analytics page reads from Snowflake; no further local steps are
+ * needed after inserting records with this script.
  */
 import { strict as assert } from 'node:assert';
 import { db } from '@/lib/drizzle';
@@ -82,6 +81,7 @@ export async function run(...args: string[]): Promise<void> {
   console.log('');
   console.log(`Done. Inserted ${stats.recordCount} usage records.`);
   console.log('');
-  console.log('Next step: populate the rollup tables so the UI renders data:');
-  console.log('  pnpm --filter web script:run usage rollup-usage -- --all-time');
+  console.log(
+    'Usage Analytics reads from Snowflake; point the sandbox env at DBT_BACKEND_SANDBOX to see data.'
+  );
 }

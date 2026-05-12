@@ -9,12 +9,11 @@ export type DateRange = {
 };
 
 /**
- * Rollup buckets are aligned to UTC calendar days (see
- * `apps/web/src/lib/usage-analytics/rollup.ts`). The server slices
- * `startDate`/`endDate` to `YYYY-MM-DD` for the daily/monthly tiers, so
- * snapping boundaries to UTC midnight keeps the filter window consistent
- * with the buckets the UI will display. Using local midnight would let a
- * negative-offset viewer's "today" span two UTC days.
+ * Snowflake date-granularity buckets are aligned to UTC calendar days. The
+ * server slices `startDate`/`endDate` to `YYYY-MM-DD` for the daily/monthly
+ * tiers, so snapping boundaries to UTC midnight keeps the filter window
+ * consistent with the buckets the UI will display. Using local midnight would
+ * let a negative-offset viewer's "today" span two UTC days.
  */
 export function periodToDateRange(period: PeriodOption): DateRange {
   const now = new Date();
@@ -51,7 +50,8 @@ export function periodToDateRange(period: PeriodOption): DateRange {
 }
 
 /**
- * Granularity is picked automatically from the selected period.
+ * Default granularity for the given period. Used to initialize the granularity
+ * selector when the period changes.
  */
 export function defaultGranularityForPeriod(period: PeriodOption): Granularity {
   switch (period) {
@@ -63,6 +63,23 @@ export function defaultGranularityForPeriod(period: PeriodOption): Granularity {
       return 'day';
     case '1y':
       return 'month';
+  }
+}
+
+/**
+ * Available granularity choices for the given period.
+ * - today / yesterday / past week → hourly or daily
+ * - past month / past year → daily, weekly, or monthly
+ */
+export function granularityOptionsForPeriod(period: PeriodOption): Granularity[] {
+  switch (period) {
+    case 'today':
+    case 'yesterday':
+    case '7d':
+      return ['hour', 'day'];
+    case '30d':
+    case '1y':
+      return ['day', 'week', 'month'];
   }
 }
 

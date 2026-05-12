@@ -1,19 +1,15 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { and, desc, eq, gte, inArray, isNull, lt, notInArray, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import { readDb } from '@/lib/drizzle';
-import { timedUsageQuery } from '@/lib/usage-query';
+import { getEnvVariable } from '@/lib/dotenvx';
 import {
-  usage_rollup_hourly,
-  usage_rollup_daily,
-  usage_rollup_monthly,
-  usage_rollup_hourly_totals,
-  usage_rollup_daily_totals,
-  usage_rollup_monthly_totals,
-  kilocode_users,
-  organization_memberships,
-} from '@kilocode/db/schema';
+  executeSnowflakeStatement,
+  resolveSnowflakeConfig,
+  type SnowflakeBinding,
+} from '@/lib/snowflake';
+import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 export const GranularitySchema = z.enum(['hour', 'day', 'week', 'month']);
@@ -75,7 +71,7 @@ const UsageAnalyticsFiltersSchema = z.object(FiltersShape);
 export type UsageAnalyticsFilters = z.infer<typeof UsageAnalyticsFiltersSchema>;
 
 // ---------------------------------------------------------------------------
-// Table resolution
+// Table / tier resolution
 // ---------------------------------------------------------------------------
 
 type GranularityTier = 'hourly' | 'daily' | 'monthly';
@@ -92,43 +88,125 @@ function resolveTier(granularity: Granularity, startDate: string): TableMeta {
   const ageDays = (now - startMs) / (24 * 60 * 60 * 1000);
 
   if (granularity === 'hour') {
-    if (ageDays <= 7) {
+    // Use < 8 rather than <= 7: periodToDateRange('7d') snaps the start to
+    // UTC midnight, so ageDays can be up to ~7.99 for a genuine "past week"
+    // request. The < 8 threshold keeps all 7-day windows in the hourly tier.
+    if (ageDays < 8) {
       return { tier: 'hourly', effectiveGranularity: 'hour' };
     }
-    // Auto-downgrade: hourly retention is 7 days
+    // Auto-downgrade: hourly data is only available for the past 7 days.
     return { tier: 'daily', effectiveGranularity: 'day' };
   }
 
   if (granularity === 'day' || granularity === 'week') {
-    if (ageDays <= 90) {
-      return { tier: 'daily', effectiveGranularity: granularity };
-    }
-    return { tier: 'monthly', effectiveGranularity: 'month' };
+    // MICRODOLLAR_USAGE_DAILY holds full history — no age-based downgrade needed.
+    return { tier: 'daily', effectiveGranularity: granularity };
   }
 
   return { tier: 'monthly', effectiveGranularity: 'month' };
 }
 
 /**
- * Returns true iff the query requires the wide rollup table (because it filters
- * on a dimension that only exists in the wide table). User-scope filters
- * (userIds / excludedUserIds) and organization filter work on both wide and
- * totals tables, so they don't force the wide table.
+ * Returns the Snowflake table name for a given tier.
+ * Both daily and monthly tiers use MICRODOLLAR_USAGE_DAILY; monthly queries
+ * add a DATE_TRUNC('MONTH', usage_day) bucket expression on top.
  */
-function hasDimensionFilters(filters: UsageAnalyticsFilters): boolean {
-  const nonEmpty = (a?: string[]) => !!a && a.length > 0;
-  return (
-    nonEmpty(filters.features) ||
-    nonEmpty(filters.models) ||
-    nonEmpty(filters.modes) ||
-    nonEmpty(filters.providers) ||
-    nonEmpty(filters.projects) ||
-    nonEmpty(filters.excludedFeatures) ||
-    nonEmpty(filters.excludedModels) ||
-    nonEmpty(filters.excludedModes) ||
-    nonEmpty(filters.excludedProviders) ||
-    nonEmpty(filters.excludedProjects)
-  );
+function getTableName(tier: GranularityTier): string {
+  return tier === 'hourly' ? 'MICRODOLLAR_USAGE_HOURLY' : 'MICRODOLLAR_USAGE_DAILY';
+}
+
+/** The column that holds the time value for a given tier. */
+function getTimeColumn(tier: GranularityTier): string {
+  return tier === 'hourly' ? 'usage_hour' : 'usage_date';
+}
+
+// ---------------------------------------------------------------------------
+// Date helpers
+// ---------------------------------------------------------------------------
+
+function ceilIsoToUtcDayExclusive(iso: string): string {
+  const d = new Date(iso);
+  const dayStartMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  if (d.getTime() === dayStartMs) {
+    return iso.slice(0, 10);
+  }
+  return new Date(dayStartMs + 86_400_000).toISOString().slice(0, 10);
+}
+
+function floorIsoToUtcMonth(iso: string): string {
+  return `${iso.slice(0, 7)}-01`;
+}
+
+function ceilIsoToUtcMonthExclusive(iso: string): string {
+  const d = new Date(iso);
+  const firstOfMonthMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+  if (d.getTime() === firstOfMonthMs) {
+    return iso.slice(0, 10);
+  }
+  const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+  return next.toISOString().slice(0, 10);
+}
+
+// ---------------------------------------------------------------------------
+// SQL WHERE clause builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Accumulates SQL WHERE clauses with positional `?` bindings.
+ * Callers push conditions in any order; `sql()` joins them with AND.
+ */
+class WhereBuilder {
+  readonly clauses: string[] = [];
+  readonly bindings: SnowflakeBinding[] = [];
+
+  private push(clause: string, ...bindings: SnowflakeBinding[]) {
+    bindings.forEach(b => this.bindings.push(b));
+    this.clauses.push(clause);
+  }
+
+  addTimestampRange(column: string, gte: string, lt: string): void {
+    this.push(
+      `${column} >= ? AND ${column} < ?`,
+      { type: 'TEXT', value: gte },
+      { type: 'TEXT', value: lt }
+    );
+  }
+
+  addDateRange(column: string, gte: string, lt: string): void {
+    this.push(
+      `${column} >= ? AND ${column} < ?`,
+      { type: 'TEXT', value: gte },
+      { type: 'TEXT', value: lt }
+    );
+  }
+
+  addEq(column: string, value: string): void {
+    this.push(`${column} = ?`, { type: 'TEXT', value });
+  }
+
+  addIsNull(column: string): void {
+    this.clauses.push(`${column} IS NULL`);
+  }
+
+  addIn(column: string, values: string[]): void {
+    const placeholders = values.map(() => '?').join(', ');
+    this.push(
+      `${column} IN (${placeholders})`,
+      ...values.map(v => ({ type: 'TEXT' as const, value: v }))
+    );
+  }
+
+  addNotIn(column: string, values: string[]): void {
+    const placeholders = values.map(() => '?').join(', ');
+    this.push(
+      `${column} NOT IN (${placeholders})`,
+      ...values.map(v => ({ type: 'TEXT' as const, value: v }))
+    );
+  }
+
+  sql(): string {
+    return this.clauses.length > 0 ? this.clauses.join('\n  AND ') : '1=1';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -146,8 +224,6 @@ async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilter
       requiredRoles ? [...requiredRoles] : undefined
     );
 
-    // In 'self' mode, explicit user filters must refer only to the caller.
-    // Prevents a member from crafting `userIds: [someoneElse]` in self scope.
     if (filters.viewAs === 'self') {
       const allUserFilterValues = [...(filters.userIds ?? []), ...(filters.excludedUserIds ?? [])];
       if (allUserFilterValues.some(v => v !== userId)) {
@@ -160,7 +236,6 @@ async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilter
     return;
   }
 
-  // Personal scope: user filters must refer only to the authenticated user.
   const allUserFilterValues = [...(filters.userIds ?? []), ...(filters.excludedUserIds ?? [])];
   if (allUserFilterValues.some(v => v !== userId)) {
     throw new TRPCError({
@@ -171,310 +246,249 @@ async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilter
 }
 
 // ---------------------------------------------------------------------------
-// Column mapping
+// WHERE clause helpers
 // ---------------------------------------------------------------------------
 
-type WideTable =
-  | typeof usage_rollup_hourly
-  | typeof usage_rollup_daily
-  | typeof usage_rollup_monthly;
-
-type TotalsTable =
-  | typeof usage_rollup_hourly_totals
-  | typeof usage_rollup_daily_totals
-  | typeof usage_rollup_monthly_totals;
-
-function getWideTable(tier: GranularityTier): WideTable {
-  switch (tier) {
-    case 'hourly':
-      return usage_rollup_hourly;
-    case 'daily':
-      return usage_rollup_daily;
-    case 'monthly':
-      return usage_rollup_monthly;
-  }
-}
-
-function getTotalsTable(tier: GranularityTier): TotalsTable {
-  switch (tier) {
-    case 'hourly':
-      return usage_rollup_hourly_totals;
-    case 'daily':
-      return usage_rollup_daily_totals;
-    case 'monthly':
-      return usage_rollup_monthly_totals;
-  }
-}
-
-/**
- * Returns the tier-specific time column. Drizzle's column type for `hour`
- * (timestamp) and `day`/`month` (date with mode:'string') both carry their
- * literal data type as `string`, so callers can compare against string values
- * without further narrowing.
- */
-function getTimeColumn(tier: GranularityTier, table: WideTable | TotalsTable) {
-  if (tier === 'hourly') {
-    if (isHourlyTable(table)) return table.hour;
-    throw new Error(`Expected hourly table for tier 'hourly'`);
-  }
-  if (tier === 'daily') {
-    if (isDailyTable(table)) return table.day;
-    throw new Error(`Expected daily table for tier 'daily'`);
-  }
-  if (isMonthlyTable(table)) return table.month;
-  throw new Error(`Expected monthly table for tier 'monthly'`);
-}
-
-// Identity-based guards (vs. structural `'hour' in table`) so a future rename
-// or new rollup table that happens to share a column name can't silently
-// mis-narrow.
-function isHourlyTable(
-  table: WideTable | TotalsTable
-): table is typeof usage_rollup_hourly | typeof usage_rollup_hourly_totals {
-  return table === usage_rollup_hourly || table === usage_rollup_hourly_totals;
-}
-
-function isDailyTable(
-  table: WideTable | TotalsTable
-): table is typeof usage_rollup_daily | typeof usage_rollup_daily_totals {
-  return table === usage_rollup_daily || table === usage_rollup_daily_totals;
-}
-
-function isMonthlyTable(
-  table: WideTable | TotalsTable
-): table is typeof usage_rollup_monthly | typeof usage_rollup_monthly_totals {
-  return table === usage_rollup_monthly || table === usage_rollup_monthly_totals;
-}
-
-/**
- * Rollup buckets are aligned to UTC calendar day/month boundaries. When the
- * caller supplies an `endDate` with a time-of-day (e.g. `2026-04-10T15:32:00Z`
- * for "past 7d"), slicing to YYYY-MM-DD and using `lt` would silently drop
- * today's partially-complete daily/monthly row. This function returns the
- * exclusive calendar-day boundary that includes today when endDate has any
- * time-of-day, and matches the midnight-aligned boundary exactly when endDate
- * is already at UTC midnight (e.g. the "yesterday" preset).
- */
-function ceilIsoToUtcDayExclusive(iso: string): string {
-  const d = new Date(iso);
-  const dayStartMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-  if (d.getTime() === dayStartMs) {
-    return iso.slice(0, 10);
-  }
-  return new Date(dayStartMs + 86_400_000).toISOString().slice(0, 10);
-}
-
-/**
- * Floor an ISO date/datetime to the first day of its UTC calendar month.
- * Used for the monthly tier's lower bound so that the month containing the
- * start of the window is included, even when startDate is not itself the
- * first of the month.
- */
-function floorIsoToUtcMonth(iso: string): string {
-  return `${iso.slice(0, 7)}-01`;
-}
-
-/**
- * Ceil an ISO date/datetime to the first day of the next UTC calendar month,
- * used as an exclusive upper bound. Matches the month exactly when iso is
- * already at the first of the month at UTC midnight.
- */
-function ceilIsoToUtcMonthExclusive(iso: string): string {
-  const d = new Date(iso);
-  const firstOfMonthMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
-  if (d.getTime() === firstOfMonthMs) {
-    return iso.slice(0, 10);
-  }
-  const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
-  return next.toISOString().slice(0, 10);
-}
-
-// ---------------------------------------------------------------------------
-// Time bucketing for charts
-// ---------------------------------------------------------------------------
-
-function bucketExprForEffectiveGranularity(
-  granularity: Granularity,
+function buildDateConditions(
+  where: WhereBuilder,
   tier: GranularityTier,
-  table: WideTable | TotalsTable
-) {
-  const timeCol = getTimeColumn(tier, table);
-  if (granularity === 'hour') return sql<string>`${timeCol}::text`;
-  // Cast through ::date before ::text so the serialized bucket is
-  // `YYYY-MM-DD` (which `isDateOnlyString` detects on the client and formats
-  // with `timeZone: 'UTC'`). Without the explicit date cast, `date_trunc`
-  // returns a timestamp and the client would format the week start in the
-  // viewer's local zone, shifting the day for negative-UTC viewers.
-  if (granularity === 'week') return sql<string>`date_trunc('week', ${timeCol})::date::text`;
-  // 'day' and 'month' both match the column directly
-  return sql<string>`${timeCol}::text`;
+  filters: UsageAnalyticsFilters
+): void {
+  const timeCol = getTimeColumn(tier);
+
+  if (tier === 'hourly') {
+    where.addTimestampRange(timeCol, filters.startDate, filters.endDate);
+  } else if (tier === 'daily') {
+    where.addDateRange(
+      timeCol,
+      filters.startDate.slice(0, 10),
+      ceilIsoToUtcDayExclusive(filters.endDate)
+    );
+  } else {
+    // monthly — daily table, filter by day boundaries aligned to month
+    where.addDateRange(
+      timeCol,
+      floorIsoToUtcMonth(filters.startDate),
+      ceilIsoToUtcMonthExclusive(filters.endDate)
+    );
+  }
 }
 
-// ---------------------------------------------------------------------------
-// Shared filters
-// ---------------------------------------------------------------------------
-
-type AnyPgTable = WideTable | TotalsTable;
-
-function buildWhereCommon(
+function buildScopeConditions(
+  where: WhereBuilder,
   filters: UsageAnalyticsFilters,
-  table: AnyPgTable,
-  ctxUserId: string,
-  tier: GranularityTier
-) {
-  const conditions = [];
-
-  if (tier === 'monthly' && isMonthlyTable(table)) {
-    // Floor startDate to its month (include months that contain startDate) and
-    // ceil endDate to the first of the next month so partial months at both
-    // ends are visible to the caller.
-    conditions.push(gte(table.month, floorIsoToUtcMonth(filters.startDate)));
-    conditions.push(lt(table.month, ceilIsoToUtcMonthExclusive(filters.endDate)));
-  } else if (tier === 'daily' && isDailyTable(table)) {
-    // startDate at the daily tier is always UTC-midnight aligned by the UI,
-    // so date-only slicing is lossless. endDate is usually mid-day ("now"),
-    // so ceil to the next UTC day to include today's partial rollup row.
-    conditions.push(gte(table.day, filters.startDate.slice(0, 10)));
-    conditions.push(lt(table.day, ceilIsoToUtcDayExclusive(filters.endDate)));
-  } else if (tier === 'hourly' && isHourlyTable(table)) {
-    conditions.push(gte(table.hour, filters.startDate));
-    conditions.push(lt(table.hour, filters.endDate));
-  } else {
-    // Unreachable under correct (tier, table) pairing; kept as a defense-in-depth
-    // check so a future bug in getWideTable/getTotalsTable fails loudly rather
-    // than silently returning no rows.
-    throw new Error(`Unexpected table/tier combination: tier=${tier}`);
-  }
-
-  // Scope filter: either org or personal user. All rollup tables share
-  // structural `organization_id` / `kilo_user_id` columns.
+  ctxUserId: string
+): void {
   if (filters.organizationId) {
-    conditions.push(eq(table.organization_id, filters.organizationId));
-    // 'self' mode: unconditionally restrict to the caller. This is the server-side
-    // enforcement that prevents a member from seeing other members' usage.
+    where.addEq('organization_id', filters.organizationId);
     if (filters.viewAs === 'self') {
-      conditions.push(eq(table.kilo_user_id, ctxUserId));
+      where.addEq('kilo_user_id', ctxUserId);
     } else {
       if (filters.userIds && filters.userIds.length > 0) {
-        conditions.push(inArray(table.kilo_user_id, filters.userIds));
+        where.addIn('kilo_user_id', filters.userIds);
       }
       if (filters.excludedUserIds && filters.excludedUserIds.length > 0) {
-        conditions.push(notInArray(table.kilo_user_id, filters.excludedUserIds));
+        where.addNotIn('kilo_user_id', filters.excludedUserIds);
       }
     }
   } else {
-    conditions.push(eq(table.kilo_user_id, ctxUserId));
+    where.addEq('kilo_user_id', ctxUserId);
     if (filters.personalScope === 'personal-only') {
-      conditions.push(isNull(table.organization_id));
+      where.addIsNull('organization_id');
     }
-    // excludedUserIds in personal scope is already restricted to ctxUserId by
-    // ensureScopeAccess, so it would exclude the user's own data — no-op filter.
   }
-
-  return conditions;
 }
 
-function buildWideFilters(filters: UsageAnalyticsFilters, table: WideTable) {
-  const conditions = [];
-  if (filters.features && filters.features.length > 0) {
-    conditions.push(inArray(table.feature, filters.features));
+function buildDimensionConditions(where: WhereBuilder, filters: UsageAnalyticsFilters): void {
+  const nonEmpty = (a?: string[]) => !!a && a.length > 0;
+  if (nonEmpty(filters.features)) where.addIn('feature', filters.features!);
+  if (nonEmpty(filters.models)) where.addIn('model', filters.models!);
+  if (nonEmpty(filters.modes)) where.addIn('mode', filters.modes!);
+  if (nonEmpty(filters.providers)) where.addIn('provider', filters.providers!);
+  if (nonEmpty(filters.projects)) where.addIn('project_id', filters.projects!);
+  if (nonEmpty(filters.excludedFeatures)) where.addNotIn('feature', filters.excludedFeatures!);
+  if (nonEmpty(filters.excludedModels)) where.addNotIn('model', filters.excludedModels!);
+  if (nonEmpty(filters.excludedModes)) where.addNotIn('mode', filters.excludedModes!);
+  if (nonEmpty(filters.excludedProviders)) where.addNotIn('provider', filters.excludedProviders!);
+  if (nonEmpty(filters.excludedProjects)) where.addNotIn('project_id', filters.excludedProjects!);
+}
+
+function buildWhereClause(
+  tier: GranularityTier,
+  filters: UsageAnalyticsFilters,
+  ctxUserId: string,
+  includeDimensions: boolean
+): WhereBuilder {
+  const where = new WhereBuilder();
+  buildDateConditions(where, tier, filters);
+  buildScopeConditions(where, filters, ctxUserId);
+  if (includeDimensions) {
+    buildDimensionConditions(where, filters);
   }
-  if (filters.models && filters.models.length > 0) {
-    conditions.push(inArray(table.model, filters.models));
-  }
-  if (filters.modes && filters.modes.length > 0) {
-    conditions.push(inArray(table.mode, filters.modes));
-  }
-  if (filters.providers && filters.providers.length > 0) {
-    conditions.push(inArray(table.provider, filters.providers));
-  }
-  if (filters.projects && filters.projects.length > 0) {
-    conditions.push(inArray(table.project_id, filters.projects));
-  }
-  if (filters.excludedFeatures && filters.excludedFeatures.length > 0) {
-    conditions.push(notInArray(table.feature, filters.excludedFeatures));
-  }
-  if (filters.excludedModels && filters.excludedModels.length > 0) {
-    conditions.push(notInArray(table.model, filters.excludedModels));
-  }
-  if (filters.excludedModes && filters.excludedModes.length > 0) {
-    conditions.push(notInArray(table.mode, filters.excludedModes));
-  }
-  if (filters.excludedProviders && filters.excludedProviders.length > 0) {
-    conditions.push(notInArray(table.provider, filters.excludedProviders));
-  }
-  if (filters.excludedProjects && filters.excludedProjects.length > 0) {
-    conditions.push(notInArray(table.project_id, filters.excludedProjects));
-  }
-  return conditions;
+  return where;
 }
 
 // ---------------------------------------------------------------------------
-// Metric expression helpers
+// Metric SQL expression
 // ---------------------------------------------------------------------------
 
-function costSum(table: AnyPgTable) {
-  return sql<number>`COALESCE(SUM(${(table as WideTable).cost_microdollars}), 0)::bigint`;
-}
-function requestSum(table: AnyPgTable) {
-  return sql<number>`COALESCE(SUM(${(table as WideTable).request_count}), 0)::bigint`;
-}
-function inputSum(table: AnyPgTable) {
-  return sql<number>`COALESCE(SUM(${(table as WideTable).input_tokens}), 0)::bigint`;
-}
-function outputSum(table: AnyPgTable) {
-  return sql<number>`COALESCE(SUM(${(table as WideTable).output_tokens}), 0)::bigint`;
-}
-function cacheWriteSum(table: AnyPgTable) {
-  return sql<number>`COALESCE(SUM(${(table as WideTable).cache_write_tokens}), 0)::bigint`;
-}
-function cacheHitSum(table: AnyPgTable) {
-  return sql<number>`COALESCE(SUM(${(table as WideTable).cache_hit_tokens}), 0)::bigint`;
-}
-function errorSum(table: AnyPgTable) {
-  return sql<number>`COALESCE(SUM(${(table as WideTable).error_count}), 0)::bigint`;
-}
-function cancelledSum(table: AnyPgTable) {
-  return sql<number>`COALESCE(SUM(${(table as WideTable).cancelled_count}), 0)::bigint`;
-}
-function freeSum(table: AnyPgTable) {
-  return sql<number>`COALESCE(SUM(${(table as WideTable).free_request_count}), 0)::bigint`;
-}
-function byokSum(table: AnyPgTable) {
-  return sql<number>`COALESCE(SUM(${(table as WideTable).byok_request_count}), 0)::bigint`;
-}
-function totalLatencySum(table: AnyPgTable) {
-  return sql<number>`COALESCE(SUM(${(table as WideTable).total_latency_ms}), 0)::bigint`;
-}
-function totalGenerationSum(table: AnyPgTable) {
-  return sql<number>`COALESCE(SUM(${(table as WideTable).total_generation_time_ms}), 0)::bigint`;
-}
-function latencyCountSum(table: AnyPgTable) {
-  return sql<number>`COALESCE(SUM(${(table as WideTable).latency_count}), 0)::bigint`;
-}
-function distinctUsersCount(table: AnyPgTable) {
-  return sql<number>`COUNT(DISTINCT ${(table as WideTable).kilo_user_id})::bigint`;
+function metricExprSql(metric: Metric): string {
+  switch (metric) {
+    case 'cost':
+      return 'COALESCE(SUM(total_cost_microdollars), 0)';
+    case 'requests':
+      return 'COALESCE(SUM(request_count), 0)';
+    case 'inputTokens':
+      return 'COALESCE(SUM(total_input_tokens), 0)';
+    case 'outputTokens':
+      return 'COALESCE(SUM(total_output_tokens), 0)';
+    case 'tokens':
+      return 'COALESCE(SUM(total_input_tokens + total_output_tokens), 0)';
+    case 'errorRate':
+      return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(error_count), 0)::FLOAT / SUM(request_count)::FLOAT END';
+    case 'avgLatencyMs':
+      return 'CASE WHEN COALESCE(SUM(latency_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_latency_ms), 0)::FLOAT / SUM(latency_count)::FLOAT END';
+    case 'avgGenerationTimeMs':
+      return 'CASE WHEN COALESCE(SUM(latency_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_generation_time_ms), 0)::FLOAT / SUM(latency_count)::FLOAT END';
+    case 'costPerRequest':
+      return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_cost_microdollars), 0)::FLOAT / SUM(request_count)::FLOAT END';
+    case 'tokensPerRequest':
+      return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_input_tokens + total_output_tokens), 0)::FLOAT / SUM(request_count)::FLOAT END';
+    case 'cacheHitRatio':
+      return 'CASE WHEN COALESCE(SUM(total_input_tokens + total_cache_hit_tokens), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_cache_hit_tokens), 0)::FLOAT / SUM(total_input_tokens + total_cache_hit_tokens)::FLOAT END';
+    case 'outputInputRatio':
+      return 'CASE WHEN COALESCE(SUM(total_input_tokens), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_output_tokens), 0)::FLOAT / SUM(total_input_tokens)::FLOAT END';
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Dimension column resolver
+// Bucket expression for timeseries / table grouping
 // ---------------------------------------------------------------------------
 
-function getDimensionColumn(table: WideTable, dimension: Dimension) {
+/**
+ * Returns a SQL expression that formats the time column as a string bucket,
+ * matching the granularity the caller requested.
+ *
+ * Hourly  → 'YYYY-MM-DD HH24:MI:SS'  (matches what Postgres timestamp::text returns)
+ * Day     → 'YYYY-MM-DD'
+ * Week    → 'YYYY-MM-DD' of the Monday-aligned week start
+ * Month   → 'YYYY-MM-DD' of the first of the month (from daily table)
+ */
+function bucketExprSql(effectiveGranularity: Granularity, tier: GranularityTier): string {
+  const timeCol = getTimeColumn(tier);
+
+  if (effectiveGranularity === 'hour') {
+    return `TO_VARCHAR(${timeCol}, 'YYYY-MM-DD HH24:MI:SS')`;
+  }
+  if (effectiveGranularity === 'week') {
+    return `TO_VARCHAR(DATE_TRUNC('WEEK', ${timeCol}), 'YYYY-MM-DD')`;
+  }
+  if (effectiveGranularity === 'month') {
+    // Daily table, group by month
+    return `TO_VARCHAR(DATE_TRUNC('MONTH', ${timeCol}), 'YYYY-MM-DD')`;
+  }
+  // 'day'
+  return `TO_VARCHAR(${timeCol}, 'YYYY-MM-DD')`;
+}
+
+// ---------------------------------------------------------------------------
+// Dimension column name
+// ---------------------------------------------------------------------------
+
+function dimensionColumn(dimension: Dimension): string {
   switch (dimension) {
     case 'feature':
-      return table.feature;
+      return 'feature';
     case 'model':
-      return table.model;
+      return 'model';
     case 'mode':
-      return table.mode;
+      return 'mode';
     case 'user':
-      return table.kilo_user_id;
+      return 'kilo_user_id';
     case 'provider':
-      return table.provider;
+      return 'provider';
     case 'project':
-      return table.project_id;
+      return 'project_id';
   }
+}
+
+// ---------------------------------------------------------------------------
+// Timed query wrapper
+// ---------------------------------------------------------------------------
+
+function parseTimeoutEnv(envKey: string, fallback: number): number {
+  const raw = getEnvVariable(envKey);
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return parsed;
+}
+
+function defaultTimeoutForScope(scope: 'user' | 'org' | 'admin'): number {
+  if (scope === 'admin') return parseTimeoutEnv('USAGE_QUERY_TIMEOUT_ADMIN_MS', 20_000);
+  if (scope === 'org') return parseTimeoutEnv('USAGE_QUERY_TIMEOUT_ORG_MS', 10_000);
+  return parseTimeoutEnv('USAGE_QUERY_TIMEOUT_USER_MS', 5_000);
+}
+
+async function timedSnowflakeQuery<T>(
+  params: {
+    route: string;
+    queryLabel: string;
+    scope: 'user' | 'org' | 'admin';
+    period: string | null;
+    timeoutMs?: number;
+  },
+  queryFn: () => Promise<T>
+): Promise<T> {
+  const timeoutMs = params.timeoutMs ?? defaultTimeoutForScope(params.scope);
+  const start = performance.now();
+  let rowCount = 0;
+
+  try {
+    const result = await queryFn();
+    rowCount = Array.isArray(result) ? result.length : 1;
+    return result;
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        type: 'usage_query_error',
+        route: params.route,
+        queryLabel: params.queryLabel,
+        scope: params.scope,
+        period: params.period,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    );
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Usage data temporarily unavailable',
+    });
+  } finally {
+    const durationMs = Math.round((performance.now() - start) * 100) / 100;
+    console.log(
+      JSON.stringify({
+        type: 'usage_query',
+        route: params.route,
+        queryLabel: params.queryLabel,
+        scope: params.scope,
+        period: params.period,
+        durationMs,
+        rowCount,
+        timeoutMs,
+      })
+    );
+  }
+}
+
+function getSnowflakeConfigOrThrow(): ReturnType<typeof resolveSnowflakeConfig> & object {
+  const config = resolveSnowflakeConfig();
+  if (!config) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Snowflake configuration is incomplete',
+    });
+  }
+  return config;
 }
 
 // ---------------------------------------------------------------------------
@@ -514,15 +528,9 @@ function ratioSafe(numerator: number, denominator: number): number {
 }
 
 /**
- * Convert an aggregate value (often returned as a bigint string by pg) to a
- * JS number. Postgres `SUM(bigint)` returns `numeric`; pg delivers it as a
- * string. `Number(...)` of a string larger than 2^53 silently loses precision.
- *
- * We log and return 0 for non-finite inputs (`undefined`, `null`, malformed
- * strings) to match the prior `Number(x) || 0` behavior. Values above
- * `MAX_SAFE_INTEGER` are logged as a warning but still returned so the UI
- * does not crash — precision loss here would mean an organization aggregated
- * over 9e15 microdollars ($9B+) in the window, well beyond realistic scale.
+ * Convert an aggregate value (often returned as a string by Snowflake) to a
+ * JS number. Values above `MAX_SAFE_INTEGER` are logged as a warning but still
+ * returned so the UI does not crash.
  */
 function toSafeNumber(value: unknown): number {
   const n = Number(value);
@@ -553,37 +561,7 @@ const TimeseriesPointSchema = z.object({
 const TimeseriesOutputSchema = z.object({
   timeseries: z.array(TimeseriesPointSchema),
   effectiveGranularity: GranularitySchema,
-  tableType: z.enum(['wide', 'totals']),
 });
-
-function metricExpression(metric: Metric, table: AnyPgTable) {
-  switch (metric) {
-    case 'cost':
-      return costSum(table);
-    case 'requests':
-      return requestSum(table);
-    case 'inputTokens':
-      return inputSum(table);
-    case 'outputTokens':
-      return outputSum(table);
-    case 'tokens':
-      return sql<number>`COALESCE(SUM(${(table as WideTable).input_tokens} + ${(table as WideTable).output_tokens}), 0)::bigint`;
-    case 'errorRate':
-      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).request_count}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).error_count}), 0)::float / SUM(${(table as WideTable).request_count})::float) END`;
-    case 'avgLatencyMs':
-      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).latency_count}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).total_latency_ms}), 0)::float / SUM(${(table as WideTable).latency_count})::float) END`;
-    case 'avgGenerationTimeMs':
-      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).latency_count}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).total_generation_time_ms}), 0)::float / SUM(${(table as WideTable).latency_count})::float) END`;
-    case 'costPerRequest':
-      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).request_count}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).cost_microdollars}), 0)::float / SUM(${(table as WideTable).request_count})::float) END`;
-    case 'tokensPerRequest':
-      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).request_count}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).input_tokens} + ${(table as WideTable).output_tokens}), 0)::float / SUM(${(table as WideTable).request_count})::float) END`;
-    case 'cacheHitRatio':
-      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).input_tokens} + ${(table as WideTable).cache_hit_tokens}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).cache_hit_tokens}), 0)::float / SUM(${(table as WideTable).input_tokens} + ${(table as WideTable).cache_hit_tokens})::float) END`;
-    case 'outputInputRatio':
-      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).input_tokens}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).output_tokens}), 0)::float / SUM(${(table as WideTable).input_tokens})::float) END`;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Breakdown
@@ -664,76 +642,65 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .query(async ({ input, ctx }): Promise<SummaryOutput> => {
       await ensureScopeAccess(ctx, input);
 
+      const config = getSnowflakeConfigOrThrow();
       const meta = resolveTier(input.granularity, input.startDate);
-      const useWide = hasDimensionFilters(input);
-      const table = useWide ? getWideTable(meta.tier) : getTotalsTable(meta.tier);
+      const table = getTableName(meta.tier);
+      const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
 
-      const conditions = buildWhereCommon(input, table, ctx.user.id, meta.tier);
-      if (useWide) {
-        conditions.push(...buildWideFilters(input, table as WideTable));
-      }
+      const statement = `
+        SELECT
+          COALESCE(SUM(total_cost_microdollars), 0),
+          COALESCE(SUM(request_count), 0),
+          COALESCE(SUM(total_input_tokens), 0),
+          COALESCE(SUM(total_output_tokens), 0),
+          COALESCE(SUM(total_cache_write_tokens), 0),
+          COALESCE(SUM(total_cache_hit_tokens), 0),
+          COALESCE(SUM(error_count), 0),
+          COALESCE(SUM(cancelled_count), 0),
+          COALESCE(SUM(free_request_count), 0),
+          COALESCE(SUM(byok_request_count), 0),
+          COALESCE(SUM(total_latency_ms), 0),
+          COALESCE(SUM(total_generation_time_ms), 0),
+          COALESCE(SUM(latency_count), 0),
+          COUNT(DISTINCT kilo_user_id)
+        FROM ${table}
+        WHERE ${where.sql()}
+      `;
 
-      const rows = await timedUsageQuery(
+      const rows = await timedSnowflakeQuery(
         {
-          db: readDb,
           route: 'usageAnalytics.getSummary',
-          queryLabel: `summary_${meta.tier}_${useWide ? 'wide' : 'totals'}`,
+          queryLabel: `summary_${meta.tier}`,
           scope: input.organizationId ? 'org' : 'user',
           period: `${input.startDate}/${input.endDate}`,
         },
-        tx =>
-          tx
-            .select({
-              costMicrodollars: costSum(table),
-              requestCount: requestSum(table),
-              inputTokens: inputSum(table),
-              outputTokens: outputSum(table),
-              cacheWriteTokens: cacheWriteSum(table),
-              cacheHitTokens: cacheHitSum(table),
-              errorCount: errorSum(table),
-              cancelledCount: cancelledSum(table),
-              freeRequestCount: freeSum(table),
-              byokRequestCount: byokSum(table),
-              totalLatencyMs: totalLatencySum(table),
-              totalGenerationTimeMs: totalGenerationSum(table),
-              latencyCount: latencyCountSum(table),
-              distinctUsers: distinctUsersCount(table),
-            })
-            .from(table)
-            .where(and(...conditions))
+        () =>
+          executeSnowflakeStatement({
+            config,
+            statement,
+            bindings: where.bindings,
+            timeoutSeconds: Math.ceil(
+              defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
+            ),
+          })
       );
 
-      const r = rows[0] ?? {
-        costMicrodollars: 0,
-        requestCount: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheWriteTokens: 0,
-        cacheHitTokens: 0,
-        errorCount: 0,
-        cancelledCount: 0,
-        freeRequestCount: 0,
-        byokRequestCount: 0,
-        totalLatencyMs: 0,
-        totalGenerationTimeMs: 0,
-        latencyCount: 0,
-        distinctUsers: 0,
-      };
+      const row = rows[0] ?? [];
 
-      const costMicrodollars = toSafeNumber(r.costMicrodollars);
-      const requestCount = toSafeNumber(r.requestCount);
-      const inputTokens = toSafeNumber(r.inputTokens);
-      const outputTokens = toSafeNumber(r.outputTokens);
-      const cacheWriteTokens = toSafeNumber(r.cacheWriteTokens);
-      const cacheHitTokens = toSafeNumber(r.cacheHitTokens);
-      const errorCount = toSafeNumber(r.errorCount);
-      const cancelledCount = toSafeNumber(r.cancelledCount);
-      const freeRequestCount = toSafeNumber(r.freeRequestCount);
-      const byokRequestCount = toSafeNumber(r.byokRequestCount);
-      const totalLatencyMs = toSafeNumber(r.totalLatencyMs);
-      const totalGenerationTimeMs = toSafeNumber(r.totalGenerationTimeMs);
-      const latencyCount = toSafeNumber(r.latencyCount);
-      const distinctUsers = toSafeNumber(r.distinctUsers);
+      const costMicrodollars = toSafeNumber(row[0]);
+      const requestCount = toSafeNumber(row[1]);
+      const inputTokens = toSafeNumber(row[2]);
+      const outputTokens = toSafeNumber(row[3]);
+      const cacheWriteTokens = toSafeNumber(row[4]);
+      const cacheHitTokens = toSafeNumber(row[5]);
+      const errorCount = toSafeNumber(row[6]);
+      const cancelledCount = toSafeNumber(row[7]);
+      const freeRequestCount = toSafeNumber(row[8]);
+      const byokRequestCount = toSafeNumber(row[9]);
+      const totalLatencyMs = toSafeNumber(row[10]);
+      const totalGenerationTimeMs = toSafeNumber(row[11]);
+      const latencyCount = toSafeNumber(row[12]);
+      const distinctUsers = toSafeNumber(row[13]);
 
       return {
         costMicrodollars,
@@ -767,85 +734,63 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       await ensureScopeAccess(ctx, input);
 
+      const config = getSnowflakeConfigOrThrow();
       const meta = resolveTier(input.granularity, input.startDate);
-      const needsWide = !!input.splitBy || hasDimensionFilters(input);
-      const table = needsWide ? getWideTable(meta.tier) : getTotalsTable(meta.tier);
-      const bucketExpr = bucketExprForEffectiveGranularity(
-        meta.effectiveGranularity,
-        meta.tier,
-        table
+      const table = getTableName(meta.tier);
+      const bucketExpr = bucketExprSql(meta.effectiveGranularity, meta.tier);
+      const metricExpr = metricExprSql(input.metric);
+      const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
+
+      let statement: string;
+      if (input.splitBy) {
+        const splitCol = dimensionColumn(input.splitBy);
+        statement = `
+          SELECT
+            ${bucketExpr} AS bucket,
+            ${metricExpr} AS value,
+            ${splitCol} AS label
+          FROM ${table}
+          WHERE ${where.sql()}
+          GROUP BY 1, 3
+          ORDER BY 1
+        `;
+      } else {
+        statement = `
+          SELECT
+            ${bucketExpr} AS bucket,
+            ${metricExpr} AS value
+          FROM ${table}
+          WHERE ${where.sql()}
+          GROUP BY 1
+          ORDER BY 1
+        `;
+      }
+
+      const rows = await timedSnowflakeQuery(
+        {
+          route: 'usageAnalytics.getTimeseries',
+          queryLabel: `timeseries_${meta.tier}${input.splitBy ? `_split_${input.splitBy}` : ''}`,
+          scope: input.organizationId ? 'org' : 'user',
+          period: `${input.startDate}/${input.endDate}`,
+        },
+        () =>
+          executeSnowflakeStatement({
+            config,
+            statement,
+            bindings: where.bindings,
+            timeoutSeconds: Math.ceil(
+              defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
+            ),
+          })
       );
 
-      const conditions = buildWhereCommon(input, table, ctx.user.id, meta.tier);
-      if (needsWide) {
-        conditions.push(...buildWideFilters(input, table as WideTable));
-      }
-
-      type Row = { bucket: string; value: number; label: string | null };
-
-      let rows: Row[];
-      if (input.splitBy) {
-        if (!needsWide) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'splitBy requires wide table',
-          });
-        }
-        const wideTable = table as WideTable;
-        const splitCol = getDimensionColumn(wideTable, input.splitBy);
-        const valueExpr = metricExpression(input.metric, wideTable);
-        rows = await timedUsageQuery(
-          {
-            db: readDb,
-            route: 'usageAnalytics.getTimeseries',
-            queryLabel: `timeseries_${meta.tier}_wide_split_${input.splitBy}`,
-            scope: input.organizationId ? 'org' : 'user',
-            period: `${input.startDate}/${input.endDate}`,
-          },
-          tx =>
-            tx
-              .select({
-                bucket: bucketExpr,
-                value: valueExpr,
-                label: splitCol,
-              })
-              .from(wideTable)
-              .where(and(...conditions))
-              .groupBy(bucketExpr, splitCol)
-              .orderBy(bucketExpr)
-        );
-      } else {
-        const valueExpr = metricExpression(input.metric, table);
-        rows = await timedUsageQuery(
-          {
-            db: readDb,
-            route: 'usageAnalytics.getTimeseries',
-            queryLabel: `timeseries_${meta.tier}_${needsWide ? 'wide' : 'totals'}`,
-            scope: input.organizationId ? 'org' : 'user',
-            period: `${input.startDate}/${input.endDate}`,
-          },
-          tx =>
-            tx
-              .select({
-                bucket: bucketExpr,
-                value: valueExpr,
-                label: sql<string | null>`NULL::text`,
-              })
-              .from(table)
-              .where(and(...conditions))
-              .groupBy(bucketExpr)
-              .orderBy(bucketExpr)
-        );
-      }
-
       return {
-        timeseries: rows.map(r => ({
-          datetime: r.bucket,
-          value: toSafeNumber(r.value),
-          label: r.label ?? undefined,
+        timeseries: rows.map(row => ({
+          datetime: row[0] ?? '',
+          value: toSafeNumber(row[1]),
+          label: input.splitBy ? (row[2] ?? undefined) : undefined,
         })),
         effectiveGranularity: meta.effectiveGranularity,
-        tableType: needsWide ? ('wide' as const) : ('totals' as const),
       };
     }),
 
@@ -855,36 +800,43 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       await ensureScopeAccess(ctx, input);
 
+      const config = getSnowflakeConfigOrThrow();
       const meta = resolveTier(input.granularity, input.startDate);
-      const table = getWideTable(meta.tier);
-      const conditions = buildWhereCommon(input, table, ctx.user.id, meta.tier);
-      conditions.push(...buildWideFilters(input, table));
+      const table = getTableName(meta.tier);
+      const dimCol = dimensionColumn(input.dimension);
+      const metricExpr = metricExprSql(input.metric);
+      const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
 
-      const dimCol = getDimensionColumn(table, input.dimension);
-      const valueExpr = metricExpression(input.metric, table);
+      const statement = `
+        SELECT
+          ${dimCol} AS key,
+          ${metricExpr} AS value
+        FROM ${table}
+        WHERE ${where.sql()}
+        GROUP BY 1
+        ORDER BY 2 DESC
+        LIMIT ${input.limit}
+      `;
 
-      const rows = await timedUsageQuery(
+      const rows = await timedSnowflakeQuery(
         {
-          db: readDb,
           route: 'usageAnalytics.getBreakdown',
           queryLabel: `breakdown_${meta.tier}_by_${input.dimension}`,
           scope: input.organizationId ? 'org' : 'user',
           period: `${input.startDate}/${input.endDate}`,
         },
-        tx =>
-          tx
-            .select({
-              key: dimCol,
-              value: valueExpr,
-            })
-            .from(table)
-            .where(and(...conditions))
-            .groupBy(dimCol)
-            .orderBy(desc(valueExpr))
-            .limit(input.limit)
+        () =>
+          executeSnowflakeStatement({
+            config,
+            statement,
+            bindings: where.bindings,
+            timeoutSeconds: Math.ceil(
+              defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
+            ),
+          })
       );
 
-      const values = rows.map(r => ({ key: r.key ?? '', value: toSafeNumber(r.value) }));
+      const values = rows.map(row => ({ key: row[0] ?? '', value: toSafeNumber(row[1]) }));
       const totalValue = values.reduce((s, r) => s + r.value, 0);
 
       return {
@@ -905,106 +857,94 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       await ensureScopeAccess(ctx, input);
 
+      const config = getSnowflakeConfigOrThrow();
       const meta = resolveTier(input.granularity, input.startDate);
-      const table = getWideTable(meta.tier);
-      const conditions = buildWhereCommon(input, table, ctx.user.id, meta.tier);
-      conditions.push(...buildWideFilters(input, table));
-
-      const bucketExpr = bucketExprForEffectiveGranularity(
-        meta.effectiveGranularity,
-        meta.tier,
-        table
-      );
-
-      // Always select all 6 dimension columns; we return only the ones in
-      // input.groupBy to the client. We GROUP BY only the requested dimensions
-      // plus the time bucket.
-      const dimAliases = {
-        dim_feature: table.feature,
-        dim_model: table.model,
-        dim_mode: table.mode,
-        dim_user: table.kilo_user_id,
-        dim_provider: table.provider,
-        dim_project: table.project_id,
-      } as const;
+      const table = getTableName(meta.tier);
+      const bucketExpr = bucketExprSql(meta.effectiveGranularity, meta.tier);
+      const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
 
       const requestedDims = input.groupBy;
-      const groupByCols = [bucketExpr, ...requestedDims.map(d => getDimensionColumn(table, d))];
 
-      // For dimensions not in input.groupBy, emit a constant empty string in
-      // the SELECT projection so the row shape stays stable. Using a constant
-      // scalar sidesteps "column must appear in GROUP BY" without widening
-      // the result type to nullable. The client-side mapping below only reads
-      // dimensions listed in `requestedDims`, so the constants are invisible
-      // to callers.
-      const feat = requestedDims.includes('feature') ? dimAliases.dim_feature : sql<string>`''`;
-      const model = requestedDims.includes('model') ? dimAliases.dim_model : sql<string>`''`;
-      const mode = requestedDims.includes('mode') ? dimAliases.dim_mode : sql<string>`''`;
-      const user = requestedDims.includes('user') ? dimAliases.dim_user : sql<string>`''`;
-      const provider = requestedDims.includes('provider')
-        ? dimAliases.dim_provider
-        : sql<string>`''`;
-      const project = requestedDims.includes('project') ? dimAliases.dim_project : sql<string>`''`;
+      // For dimensions not in groupBy, emit an empty string constant so the
+      // row shape stays stable regardless of which dimensions were requested.
+      const featExpr = requestedDims.includes('feature') ? 'feature' : "''";
+      const modelExpr = requestedDims.includes('model') ? 'model' : "''";
+      const modeExpr = requestedDims.includes('mode') ? 'mode' : "''";
+      const userExpr = requestedDims.includes('user') ? 'kilo_user_id' : "''";
+      const providerExpr = requestedDims.includes('provider') ? 'provider' : "''";
+      const projectExpr = requestedDims.includes('project') ? 'project_id' : "''";
 
-      const rows = await timedUsageQuery(
+      // GROUP BY columns: bucket (pos 1) + each requested dimension column
+      const dimGroupByCols = requestedDims.map(d => dimensionColumn(d)).join(', ');
+      const groupByClause = dimGroupByCols ? `1, ${dimGroupByCols}` : '1';
+
+      const statement = `
+        SELECT
+          ${bucketExpr} AS datetime,
+          ${featExpr} AS dim_feature,
+          ${modelExpr} AS dim_model,
+          ${modeExpr} AS dim_mode,
+          ${userExpr} AS dim_user,
+          ${providerExpr} AS dim_provider,
+          ${projectExpr} AS dim_project,
+          COALESCE(SUM(total_cost_microdollars), 0),
+          COALESCE(SUM(request_count), 0),
+          COALESCE(SUM(total_input_tokens), 0),
+          COALESCE(SUM(total_output_tokens), 0),
+          COALESCE(SUM(total_cache_write_tokens), 0),
+          COALESCE(SUM(total_cache_hit_tokens), 0),
+          COALESCE(SUM(error_count), 0)
+        FROM ${table}
+        WHERE ${where.sql()}
+        GROUP BY ${groupByClause}
+        ORDER BY 1 DESC
+        LIMIT ${input.limit}
+      `;
+
+      const rows = await timedSnowflakeQuery(
         {
-          db: readDb,
           route: 'usageAnalytics.getTable',
-          queryLabel: `table_${meta.tier}_groupby_${input.groupBy.join('+') || 'none'}`,
+          queryLabel: `table_${meta.tier}_groupby_${requestedDims.join('+') || 'none'}`,
           scope: input.organizationId ? 'org' : 'user',
           period: `${input.startDate}/${input.endDate}`,
         },
-        tx =>
-          tx
-            .select({
-              datetime: bucketExpr,
-              dim_feature: feat,
-              dim_model: model,
-              dim_mode: mode,
-              dim_user: user,
-              dim_provider: provider,
-              dim_project: project,
-              costMicrodollars: costSum(table),
-              requestCount: requestSum(table),
-              inputTokens: inputSum(table),
-              outputTokens: outputSum(table),
-              cacheWriteTokens: cacheWriteSum(table),
-              cacheHitTokens: cacheHitSum(table),
-              errorCount: errorSum(table),
-            })
-            .from(table)
-            .where(and(...conditions))
-            .groupBy(...groupByCols)
-            .orderBy(desc(bucketExpr))
-            .limit(input.limit)
+        () =>
+          executeSnowflakeStatement({
+            config,
+            statement,
+            bindings: where.bindings,
+            timeoutSeconds: Math.ceil(
+              defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
+            ),
+          })
       );
 
-      const dimKeyMap: Record<Dimension, keyof (typeof rows)[number]> = {
-        feature: 'dim_feature',
-        model: 'dim_model',
-        mode: 'dim_mode',
-        user: 'dim_user',
-        provider: 'dim_provider',
-        project: 'dim_project',
+      const dimIndexMap: Record<Dimension, number> = {
+        feature: 1,
+        model: 2,
+        mode: 3,
+        user: 4,
+        provider: 5,
+        project: 6,
       };
 
       return {
-        rows: rows.map(r => {
+        rows: rows.map(row => {
           const dimensions: Record<string, string> = {};
           for (const d of requestedDims) {
-            const raw = r[dimKeyMap[d]];
+            const raw = row[dimIndexMap[d]];
             dimensions[d] = typeof raw === 'string' ? raw : '';
           }
           return {
-            datetime: r.datetime,
+            datetime: row[0] ?? '',
             dimensions,
-            costMicrodollars: toSafeNumber(r.costMicrodollars),
-            requestCount: toSafeNumber(r.requestCount),
-            inputTokens: toSafeNumber(r.inputTokens),
-            outputTokens: toSafeNumber(r.outputTokens),
-            cacheWriteTokens: toSafeNumber(r.cacheWriteTokens),
-            cacheHitTokens: toSafeNumber(r.cacheHitTokens),
-            errorCount: toSafeNumber(r.errorCount),
+            costMicrodollars: toSafeNumber(row[7]),
+            requestCount: toSafeNumber(row[8]),
+            inputTokens: toSafeNumber(row[9]),
+            outputTokens: toSafeNumber(row[10]),
+            cacheWriteTokens: toSafeNumber(row[11]),
+            cacheHitTokens: toSafeNumber(row[12]),
+            errorCount: toSafeNumber(row[13]),
           };
         }),
         effectiveGranularity: meta.effectiveGranularity,

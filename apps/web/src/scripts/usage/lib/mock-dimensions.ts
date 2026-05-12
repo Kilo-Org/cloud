@@ -1,11 +1,9 @@
 /**
  * Pools of dimension values used by the mock usage generator.
  *
- * The rollup in `apps/web/src/lib/usage-analytics/rollup.ts` groups by
- * `model`, `feature`, `mode`, `provider`, `project_id`, plus the user and
- * org scope. To make the usage-details page look alive, we generate records
- * with enough variety across those dimensions that every breakdown chart
- * has multiple slices.
+ * Snowflake groups by `model`, `feature`, `mode`, `provider`, `project_id`,
+ * plus the user and org scope. We generate records with enough variety across
+ * those dimensions that every breakdown chart has multiple slices.
  */
 import { FEATURE_VALUES } from '@/lib/feature-detection';
 import { GatewayApiKindSchema } from '@kilocode/db';

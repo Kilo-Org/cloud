@@ -87,12 +87,11 @@ const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 /**
  * True when `value` is a bare calendar-date string of the form "YYYY-MM-DD".
  *
- * Usage-analytics rollup buckets (`usage_rollup_daily.day`, `_monthly.month`,
- * and `date_trunc('week', ...)` in the router) are serialized as date-only
- * strings representing a UTC calendar day. `new Date("YYYY-MM-DD")` parses
- * them as UTC midnight, so downstream `toLocaleDateString()` would shift the
- * displayed day into the viewer's local zone. Callers that render these
- * buckets should detect this shape and format with `timeZone: 'UTC'`.
+ * Snowflake date-granularity buckets are serialized as date-only strings
+ * representing a UTC calendar day. `new Date("YYYY-MM-DD")` parses them as
+ * UTC midnight, so downstream `toLocaleDateString()` would shift the displayed
+ * day into the viewer's local zone. Callers that render these buckets should
+ * detect this shape and format with `timeZone: 'UTC'`.
  */
 export function isDateOnlyString(value: unknown): value is string {
   return typeof value === 'string' && DATE_ONLY_RE.test(value);

@@ -12,7 +12,13 @@ import {
 import { isDateOnlyString } from '@/lib/utils';
 import { OTHER_COLOR, colorForIndex as paletteColorForIndex } from './colors';
 import { formatMetric } from './format';
-import { METRIC_LABELS, type MetricKey, type PeriodOption, type UsageTimeseries } from './types';
+import {
+  METRIC_LABELS,
+  type Granularity,
+  type MetricKey,
+  type PeriodOption,
+  type UsageTimeseries,
+} from './types';
 
 const TOP_SERIES = 10;
 const OTHER_KEY = '__other__';
@@ -25,11 +31,12 @@ type PrimaryChartProps = {
   /** Optional transform applied to series keys when labeling (legend + tooltip). */
   seriesLabelFor?: (key: string) => string;
   /**
-   * Selected period. When `'today'` or `'yesterday'` (single UTC day with
-   * hourly buckets) the X-axis ticks render as hour-of-day in the viewer's
-   * local zone instead of `"MMM d"` date labels.
+   * Selected period. Used together with `granularity` to pick the right
+   * X-axis tick format.
    */
   period: PeriodOption;
+  /** Effective granularity of the fetched data. */
+  granularity: Granularity;
 };
 
 export function PrimaryChart({
@@ -39,6 +46,7 @@ export function PrimaryChart({
   splitByLabel,
   seriesLabelFor,
   period,
+  granularity,
 }: PrimaryChartProps) {
   const { chartData, seriesKeys, otherCount } = useMemo(() => {
     const series = data?.timeseries ?? [];
@@ -86,16 +94,23 @@ export function PrimaryChart({
   const xFormatter = (v: string) => {
     const d = new Date(v);
     if (Number.isNaN(d.getTime())) return v;
-    // Today/Yesterday span a single UTC day and bucket strings are full ISO
-    // timestamps. Show hour-of-day in the viewer's **local** zone — this is
-    // intentionally different from the UTC-aligned rollup boundaries (see
-    // `periodToDateRange` in hooks.ts) because viewers expect "Today" ticks
-    // to match their wall clock. Half-hour-offset zones (e.g. IST) will see
-    // non-integer-looking ticks like `12:30 AM`, which Recharts `minTickGap`
-    // still spaces cleanly.
-    if (period === 'today' || period === 'yesterday') {
-      return d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+
+    if (granularity === 'hour') {
+      // Single-day periods: show only the hour in the viewer's local zone.
+      // Multi-day hourly (e.g. Past Week): show abbreviated date + hour so
+      // the viewer can distinguish which day each bucket belongs to.
+      if (period === 'today' || period === 'yesterday') {
+        return d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+      }
+      return d.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        hour12: true,
+      });
     }
+
+    // Day / week / month granularity: date label only.
     const options: Intl.DateTimeFormatOptions = {
       month: 'short',
       day: 'numeric',

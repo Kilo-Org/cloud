@@ -10,8 +10,6 @@ import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
 import type { DrizzleTransaction } from '@/lib/drizzle';
-
-type DbOrTx = DrizzleTransaction | typeof db;
 import { toMicrodollars } from '@/lib/utils';
 import { getMonthlyPriceUsd } from './bonus';
 import { dayjs } from './dayjs';
@@ -36,6 +34,8 @@ import {
   updateKiloPassThresholdAfterBaseCredits,
 } from './subscription-accounting';
 import { isStripeSubscriptionEnded } from './stripe-subscription-status';
+
+type DbOrTx = DrizzleTransaction | typeof db;
 
 export type ValidatedStoreKiloPassPurchase = {
   paymentProvider: KiloPassPaymentProvider.AppStore | KiloPassPaymentProvider.GooglePlay;

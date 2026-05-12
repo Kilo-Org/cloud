@@ -23,6 +23,7 @@ import { Check, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DIMENSION_LABELS, type Dimension, type FilterDirection } from './types';
 import type { DateRange, PersonalScope, UsageFilters } from './hooks';
+import type { MetricKey, Granularity } from './types';
 
 type FilterGeneratorPopoverProps = {
   /** Query scope (to populate value suggestions). */
@@ -46,6 +47,10 @@ type FilterGeneratorPopoverProps = {
   onAdd: (dimension: Dimension, direction: FilterDirection, value: string) => void;
   /** Resolves IDs (e.g. user UUIDs) to display labels for suggestions. */
   labelForDimensionValue?: (dim: Dimension, value: string) => string;
+  /** Metric used to rank breakdown suggestions (defaults to 'cost'). */
+  metric?: MetricKey;
+  /** Granularity for the breakdown query (defaults to 'day'). */
+  granularity?: Granularity;
 };
 
 const DIMENSIONS_PERSONAL: Dimension[] = ['feature', 'model', 'mode', 'provider', 'project'];
@@ -60,6 +65,8 @@ export function FilterGeneratorPopover({
   activeFilters,
   onAdd,
   labelForDimensionValue,
+  metric = 'cost',
+  granularity = 'day',
 }: FilterGeneratorPopoverProps) {
   const [open, setOpen] = useState(false);
   const [dimension, setDimension] = useState<Dimension>('feature');
@@ -72,12 +79,12 @@ export function FilterGeneratorPopover({
     ...trpc.usageAnalytics.getBreakdown.queryOptions({
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
-      granularity: 'day',
+      granularity,
       organizationId: organizationId ?? undefined,
       personalScope,
       viewAs,
       dimension,
-      metric: 'cost',
+      metric,
       limit: 100,
     }),
     enabled: open,

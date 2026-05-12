@@ -177,6 +177,7 @@ export async function executeSnowflakeStatement(params: {
   statement: string;
   bindings?: SnowflakeBinding[];
   timeoutSeconds?: number;
+  signal?: AbortSignal;
 }): Promise<SnowflakeRow[]> {
   const token = buildJwt(params.config);
   const requestId = crypto.randomUUID();
@@ -204,6 +205,7 @@ export async function executeSnowflakeStatement(params: {
     method: 'POST',
     headers: { ...authHeaders(token), 'content-type': 'application/json' },
     body: JSON.stringify(body),
+    signal: params.signal,
   });
 
   if (response.status === 200) {

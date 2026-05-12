@@ -94,6 +94,7 @@ const METRIC_OPTIONS: MetricKey[] = [
   'tokensPerRequest',
   'errorRate',
   'avgLatencyMs',
+  'avgGenerationTimeMs',
   'cacheHitRatio',
   'outputInputRatio',
 ];
@@ -122,9 +123,12 @@ export function UsageAnalyticsDashboard({
   const dateRange = useMemo(() => periodToDateRange(period), [period]);
   const granularityOptions = useMemo(() => granularityOptionsForPeriod(period), [period]);
 
-  const handlePeriodChange = useCallback((newPeriod: PeriodOption) => {
-    setState({ period: newPeriod, granularity: defaultGranularityForPeriod(newPeriod) });
-  }, [setState]);
+  const handlePeriodChange = useCallback(
+    (newPeriod: PeriodOption) => {
+      setState({ period: newPeriod, granularity: defaultGranularityForPeriod(newPeriod) });
+    },
+    [setState]
+  );
 
   const effectiveOrgId =
     context === 'organization'
@@ -559,7 +563,9 @@ export function UsageAnalyticsDashboard({
                   metric={chartMetric}
                   data={timeseries}
                   loading={timeseriesLoading}
-                  splitByLabel={splitByDimension ? DIMENSION_LABELS[splitByDimension as Dimension] : undefined}
+                  splitByLabel={
+                    splitByDimension ? DIMENSION_LABELS[splitByDimension as Dimension] : undefined
+                  }
                   seriesLabelFor={
                     splitByDimension ? v => labelForDimensionValue(splitByDimension, v) : undefined
                   }

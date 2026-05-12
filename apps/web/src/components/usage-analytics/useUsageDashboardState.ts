@@ -51,10 +51,7 @@ const DIM_KEY_TO_NAME: Record<string, Dimension> = {
   excludedProjects: 'project',
 };
 
-function serializeFiltersToParams(
-  params: URLSearchParams,
-  filters: UsageFilters,
-): void {
+function serializeFiltersToParams(params: URLSearchParams, filters: UsageFilters): void {
   // Clear existing filter params
   [...params.keys()].forEach(key => {
     if (key.startsWith('filter.')) params.delete(key);
@@ -158,9 +155,7 @@ function isValidDimension(value: string): value is Dimension {
   return VALID_DIMENSIONS.includes(value as Dimension);
 }
 
-export function useUsageDashboardState(
-  defaultState?: Partial<DashboardState>,
-): {
+export function useUsageDashboardState(defaultState?: Partial<DashboardState>): {
   state: DashboardState;
   setState: (updates: Partial<DashboardState>) => void;
 } {
@@ -169,33 +164,29 @@ export function useUsageDashboardState(
   const [state, setStateInternal] = useState<DashboardState>(() => {
     const params = new URLSearchParams(searchParams.toString());
 
-    const period =
-      VALID_PERIODS.includes(params.get('period') as PeriodOption)
-        ? (params.get('period') as PeriodOption)
-        : defaultState?.period ?? ('today' as PeriodOption);
+    const period = VALID_PERIODS.includes(params.get('period') as PeriodOption)
+      ? (params.get('period') as PeriodOption)
+      : (defaultState?.period ?? ('today' as PeriodOption));
 
-    const granularity = VALID_GRANULARITIES.includes(
-      params.get('granularity') as Granularity,
-    )
+    const granularity = VALID_GRANULARITIES.includes(params.get('granularity') as Granularity)
       ? (params.get('granularity') as Granularity)
-      : defaultState?.granularity ?? ('hour' as Granularity);
+      : (defaultState?.granularity ?? ('hour' as Granularity));
 
     const chartMetric = isValidMetricKey(params.get('metric') ?? '')
       ? (params.get('metric') as MetricKey)
-      : defaultState?.chartMetric ?? ('cost' as MetricKey);
+      : (defaultState?.chartMetric ?? ('cost' as MetricKey));
 
     const groupByRaw = params.get('group');
     const groupBy =
       groupByRaw === 'none' || isValidDimension(groupByRaw ?? '')
         ? (groupByRaw as Dimension | 'none')
-        : defaultState?.groupBy ?? ('none' as const);
+        : (defaultState?.groupBy ?? ('none' as const));
 
     const personalView =
       params.get('personalView') ?? defaultState?.personalView ?? 'personal-only';
 
     const viewAsRaw = params.get('viewAs');
-    const viewAs =
-      viewAsRaw === 'org-wide' ? 'org-wide' : defaultState?.viewAs ?? 'self';
+    const viewAs = viewAsRaw === 'org-wide' ? 'org-wide' : (defaultState?.viewAs ?? 'self');
 
     const filters = deserializeFiltersFromParams(params);
 
@@ -203,61 +194,56 @@ export function useUsageDashboardState(
   });
 
   const isInitialized = useRef(false);
-  const pendingUrlUpdate = useRef<DashboardState | null>(null);
+  const prevState = useRef<DashboardState | null>(null);
 
   // Mark as initialized after first render
   useEffect(() => {
     isInitialized.current = true;
+    prevState.current = state;
   }, []);
 
-  // Apply pending URL updates after render completes
+  // Sync state to URL parameters when state changes
   useEffect(() => {
-    if (!isInitialized.current || !pendingUrlUpdate.current) return;
-
-    const newState = pendingUrlUpdate.current;
-    pendingUrlUpdate.current = null;
+    if (!isInitialized.current) return;
+    if (!prevState.current) {
+      prevState.current = state;
+      return;
+    }
+    // Skip if nothing changed
+    if (JSON.stringify(prevState.current) === JSON.stringify(state)) return;
+    prevState.current = state;
 
     const params = new URLSearchParams(searchParams.toString());
 
     // Set simple params
-    params.set('period', newState.period);
-    params.set('granularity', newState.granularity);
-    params.set('metric', newState.chartMetric);
-    params.set('group', newState.groupBy);
+    params.set('period', state.period);
+    params.set('granularity', state.granularity);
+    params.set('metric', state.chartMetric);
+    params.set('group', state.groupBy);
 
-    if (newState.personalView && newState.personalView !== 'personal-only') {
-      params.set('personalView', newState.personalView);
+    if (state.personalView && state.personalView !== 'personal-only') {
+      params.set('personalView', state.personalView);
     } else {
       params.delete('personalView');
     }
 
-    if (newState.viewAs === 'org-wide') {
+    if (state.viewAs === 'org-wide') {
       params.set('viewAs', 'org-wide');
     } else {
       params.delete('viewAs');
     }
 
-    serializeFiltersToParams(params, newState.filters);
+    serializeFiltersToParams(params, state.filters);
 
     const queryString = params.toString();
     const newUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}`;
 
     router.replace(newUrl, { scroll: false });
-  });
+  }, [router, searchParams, state]);
 
-  const setState = useCallback(
-    (updates: Partial<DashboardState>) => {
-      setStateInternal(prev => {
-        const next = { ...prev, ...updates };
-        // Only schedule URL update if something actually changed
-        if (JSON.stringify(prev) !== JSON.stringify(next)) {
-          pendingUrlUpdate.current = next;
-        }
-        return next;
-      });
-    },
-    [],
-  );
+  const setState = useCallback((updates: Partial<DashboardState>) => {
+    setStateInternal(prev => ({ ...prev, ...updates }));
+  }, []);
 
   return { state, setState };
 }

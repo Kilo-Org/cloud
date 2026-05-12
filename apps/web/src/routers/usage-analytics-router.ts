@@ -438,14 +438,17 @@ async function timedSnowflakeQuery<T>(
     period: string | null;
     timeoutMs?: number;
   },
-  queryFn: () => Promise<T>
+  queryFn: (signal: AbortSignal) => Promise<T>
 ): Promise<T> {
   const timeoutMs = params.timeoutMs ?? defaultTimeoutForScope(params.scope);
   const start = performance.now();
   let rowCount = 0;
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const result = await queryFn();
+    const result = await queryFn(controller.signal);
     rowCount = Array.isArray(result) ? result.length : 1;
     return result;
   } catch (error) {
@@ -464,6 +467,7 @@ async function timedSnowflakeQuery<T>(
       message: 'Usage data temporarily unavailable',
     });
   } finally {
+    clearTimeout(timer);
     const durationMs = Math.round((performance.now() - start) * 100) / 100;
     console.log(
       JSON.stringify({
@@ -480,7 +484,7 @@ async function timedSnowflakeQuery<T>(
   }
 }
 
-function getSnowflakeConfigOrThrow(): ReturnType<typeof resolveSnowflakeConfig> & object {
+function getSnowflakeConfigOrThrow(): SnowflakeConfig {
   const config = resolveSnowflakeConfig();
   if (!config) {
     throw new TRPCError({
@@ -674,7 +678,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
           scope: input.organizationId ? 'org' : 'user',
           period: `${input.startDate}/${input.endDate}`,
         },
-        () =>
+        signal =>
           executeSnowflakeStatement({
             config,
             statement,
@@ -682,6 +686,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
             timeoutSeconds: Math.ceil(
               defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
             ),
+            signal,
           })
       );
 
@@ -773,7 +778,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
           scope: input.organizationId ? 'org' : 'user',
           period: `${input.startDate}/${input.endDate}`,
         },
-        () =>
+        signal =>
           executeSnowflakeStatement({
             config,
             statement,
@@ -781,6 +786,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
             timeoutSeconds: Math.ceil(
               defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
             ),
+            signal,
           })
       );
 
@@ -815,7 +821,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
         WHERE ${where.sql()}
         GROUP BY 1
         ORDER BY 2 DESC
-        LIMIT ${input.limit}
+        LIMIT ${Number(input.limit)}
       `;
 
       const rows = await timedSnowflakeQuery(
@@ -825,7 +831,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
           scope: input.organizationId ? 'org' : 'user',
           period: `${input.startDate}/${input.endDate}`,
         },
-        () =>
+        signal =>
           executeSnowflakeStatement({
             config,
             statement,
@@ -833,6 +839,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
             timeoutSeconds: Math.ceil(
               defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
             ),
+            signal,
           })
       );
 
@@ -898,7 +905,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
         WHERE ${where.sql()}
         GROUP BY ${groupByClause}
         ORDER BY 1 DESC
-        LIMIT ${input.limit}
+        LIMIT ${Number(input.limit)}
       `;
 
       const rows = await timedSnowflakeQuery(
@@ -908,7 +915,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
           scope: input.organizationId ? 'org' : 'user',
           period: `${input.startDate}/${input.endDate}`,
         },
-        () =>
+        signal =>
           executeSnowflakeStatement({
             config,
             statement,
@@ -916,6 +923,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
             timeoutSeconds: Math.ceil(
               defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
             ),
+            signal,
           })
       );
 

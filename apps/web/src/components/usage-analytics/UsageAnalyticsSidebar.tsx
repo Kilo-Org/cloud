@@ -288,6 +288,8 @@ export function UsageAnalyticsSidebar({
               activeFilters={filters}
               onAdd={onAddFilter}
               labelForDimensionValue={labelForDimensionValue}
+              metric={chartMetric}
+              granularity={granularity}
             />
             {activeFilters.length === 0 ? (
               <p className="text-muted-foreground text-xs">No filters applied.</p>

@@ -76,3 +76,8 @@ KILO_SESSION_INGEST_URL=http://host.docker.internal:8800
 # Local dev worker origins allowed to connect to /stream
 # @url nextjs,cloud-agent-next
 WS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8794
+
+# Feature gate: GitHub user-to-server token commit attribution.
+# Set to 'true' to enable user token preference during session prepare.
+# Default false preserves byte-identical behaviour to pre-MVP-3.
+ENABLE_GITHUB_USER_TOKENS=false

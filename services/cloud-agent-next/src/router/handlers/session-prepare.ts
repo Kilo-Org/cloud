@@ -47,8 +47,10 @@ import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
 import { SANDBOX_SLEEP_AFTER_SECONDS } from '../../core/lease.js';
 import {
   resolveGitHubTokenForRepo,
+  resolveUserGitHubTokenForRepo,
   resolveManagedGitLabToken,
 } from '../../services/git-token-service-client.js';
+import type { GitIdentity } from '../../types/git-identity.js';
 import { getPgDb } from '../../db/pg.js';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import {
@@ -265,16 +267,45 @@ const prepareSessionHandler = internalApiProtectedProcedure
       let resolvedGithubToken = input.githubToken;
       let resolvedInstallationId: string | undefined;
       let resolvedGithubAppType: 'standard' | 'lite' | undefined;
+      let resolvedGitIdentity: GitIdentity | undefined;
+
       if (input.githubRepo && !input.githubToken) {
-        const result = await resolveGitHubTokenForRepo(ctx.env, {
-          githubRepo: input.githubRepo,
-          userId: ctx.userId,
-          orgId: input.kilocodeOrganizationId,
-        });
-        if (result.success) {
-          resolvedGithubToken = result.value.token;
-          resolvedInstallationId = result.value.installationId;
-          resolvedGithubAppType = result.value.appType;
+        // User-token path: only attempted when the feature gate is enabled.
+        if (ctx.env.ENABLE_GITHUB_USER_TOKENS === 'true') {
+          const userResult = await resolveUserGitHubTokenForRepo(ctx.env, {
+            kiloUserId: ctx.userId,
+            githubRepo: input.githubRepo,
+          });
+          if (userResult.success) {
+            resolvedGithubToken = userResult.token;
+            resolvedGitIdentity = userResult.identity;
+          }
+        }
+
+        // App-token fallback: used when feature gate is off, or user token unavailable.
+        if (!resolvedGithubToken) {
+          const result = await resolveGitHubTokenForRepo(ctx.env, {
+            githubRepo: input.githubRepo,
+            userId: ctx.userId,
+            orgId: input.kilocodeOrganizationId,
+          });
+          if (result.success) {
+            resolvedGithubToken = result.value.token;
+            resolvedInstallationId = result.value.installationId;
+            resolvedGithubAppType = result.value.appType;
+            // Build app identity from env vars (slug + botUserId for the resolved appType)
+            const slug =
+              result.value.appType === 'lite'
+                ? ctx.env.GITHUB_LITE_APP_SLUG
+                : ctx.env.GITHUB_APP_SLUG;
+            const botUserId =
+              result.value.appType === 'lite'
+                ? ctx.env.GITHUB_LITE_APP_BOT_USER_ID
+                : ctx.env.GITHUB_APP_BOT_USER_ID;
+            if (slug && botUserId) {
+              resolvedGitIdentity = { kind: 'app', slug, botUserId };
+            }
+          }
         }
       }
 
@@ -497,7 +528,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
               workspacePath,
               input.githubRepo,
               resolvedGithubToken,
-              {
+              resolvedGitIdentity ?? {
                 GITHUB_APP_SLUG: ctx.env.GITHUB_APP_SLUG,
                 GITHUB_APP_BOT_USER_ID: ctx.env.GITHUB_APP_BOT_USER_ID,
               },
@@ -700,6 +731,8 @@ const prepareSessionHandler = internalApiProtectedProcedure
           githubToken: input.githubToken,
           githubInstallationId: resolvedInstallationId,
           githubAppType: resolvedGithubAppType,
+          identityKind: resolvedGitIdentity?.kind,
+          identityKiloUserId: resolvedGitIdentity?.kind === 'user' ? ctx.userId : undefined,
           gitUrl: input.gitUrl,
           gitToken: resolvedGitToken,
           platform: input.platform,

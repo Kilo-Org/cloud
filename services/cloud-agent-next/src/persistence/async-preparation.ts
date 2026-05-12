@@ -4,8 +4,10 @@ import { SANDBOX_SLEEP_AFTER_SECONDS } from '../core/lease.js';
 import { generateSandboxId, getSandboxNamespace } from '../sandbox-id.js';
 import {
   resolveGitHubTokenForRepo,
+  resolveUserGitHubTokenForRepo,
   resolveManagedGitLabToken,
 } from '../services/git-token-service-client.js';
+import type { GitIdentity } from '../types/git-identity.js';
 import { getSandbox } from '@cloudflare/sandbox';
 import {
   checkDiskAndCleanBeforeSetup,
@@ -42,6 +44,7 @@ export type PreparationStepsResult = {
   resolvedGithubToken: string | undefined;
   resolvedGitToken: string | undefined;
   gitlabTokenManaged: boolean;
+  resolvedGitIdentity: GitIdentity | undefined;
 };
 
 /**
@@ -62,23 +65,50 @@ export async function executePreparationSteps(
   let resolvedGithubToken = input.githubToken;
   let resolvedInstallationId: string | undefined;
   let resolvedGithubAppType: 'standard' | 'lite' | undefined;
+  let resolvedGitIdentity: GitIdentity | undefined;
 
   if (input.githubRepo && !input.githubToken) {
-    const result = await resolveGitHubTokenForRepo(env, {
-      githubRepo: input.githubRepo,
-      userId: input.userId,
-      orgId: input.orgId,
-    });
-    if (result.success) {
-      resolvedGithubToken = result.value.token;
-      resolvedInstallationId = result.value.installationId;
-      resolvedGithubAppType = result.value.appType;
-    } else {
-      emitProgress(
-        'failed',
-        `GitHub token or active app installation required for this repository (${result.error.reason})`
-      );
-      return undefined;
+    // User-token path: only attempted when the feature gate is enabled.
+    if (env.ENABLE_GITHUB_USER_TOKENS === 'true' && input.identityKiloUserId) {
+      const userResult = await resolveUserGitHubTokenForRepo(env, {
+        kiloUserId: input.identityKiloUserId,
+        githubRepo: input.githubRepo,
+        appType: undefined,
+      });
+      if (userResult.success) {
+        resolvedGithubToken = userResult.token;
+        resolvedGitIdentity = userResult.identity;
+      }
+    }
+
+    // App-token fallback.
+    if (!resolvedGithubToken) {
+      const result = await resolveGitHubTokenForRepo(env, {
+        githubRepo: input.githubRepo,
+        userId: input.userId,
+        orgId: input.orgId,
+      });
+      if (result.success) {
+        resolvedGithubToken = result.value.token;
+        resolvedInstallationId = result.value.installationId;
+        resolvedGithubAppType = result.value.appType;
+        // Build app identity from env vars for the resolved appType
+        const slug =
+          result.value.appType === 'lite' ? env.GITHUB_LITE_APP_SLUG : env.GITHUB_APP_SLUG;
+        const botUserId =
+          result.value.appType === 'lite'
+            ? env.GITHUB_LITE_APP_BOT_USER_ID
+            : env.GITHUB_APP_BOT_USER_ID;
+        if (slug && botUserId) {
+          resolvedGitIdentity = { kind: 'app', slug, botUserId };
+        }
+      } else {
+        emitProgress(
+          'failed',
+          `GitHub token or active app installation required for this repository (${result.error.reason})`
+        );
+        return undefined;
+      }
     }
   }
 
@@ -186,7 +216,7 @@ export async function executePreparationSteps(
           workspacePath,
           input.githubRepo,
           resolvedGithubToken,
-          {
+          resolvedGitIdentity ?? {
             GITHUB_APP_SLUG: env.GITHUB_APP_SLUG,
             GITHUB_APP_BOT_USER_ID: env.GITHUB_APP_BOT_USER_ID,
           },
@@ -265,6 +295,7 @@ export async function executePreparationSteps(
         resolvedGithubToken: input.githubRepo ? resolvedGithubToken : undefined,
         resolvedGitToken,
         gitlabTokenManaged,
+        resolvedGitIdentity,
       };
     }
   );

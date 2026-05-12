@@ -86,7 +86,11 @@ import { getSandbox } from '@cloudflare/sandbox';
 import { stopWrapper } from '../kilo/wrapper-manager.js';
 import { SessionService } from '../session-service.js';
 import { executePreparationSteps } from './async-preparation.js';
-import { resolveManagedGitLabToken } from '../services/git-token-service-client.js';
+import {
+  resolveManagedGitLabToken,
+  resolveGitHubTokenForRepo,
+  resolveUserGitHubTokenForRepo,
+} from '../services/git-token-service-client.js';
 
 // ---------------------------------------------------------------------------
 // Alarm Constants
@@ -886,6 +890,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     githubToken?: string;
     githubInstallationId?: string;
     githubAppType?: 'standard' | 'lite';
+    identityKind?: 'app' | 'user';
+    identityKiloUserId?: string;
     gitUrl?: string;
     gitToken?: string;
     platform?: 'github' | 'gitlab';
@@ -1136,6 +1142,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         githubToken: result.resolvedGithubToken ?? input.githubToken,
         githubInstallationId: result.resolvedInstallationId,
         githubAppType: result.resolvedGithubAppType,
+        identityKind: result.resolvedGitIdentity?.kind,
+        identityKiloUserId:
+          result.resolvedGitIdentity?.kind === 'user' ? input.identityKiloUserId : undefined,
         gitUrl: input.gitUrl,
         gitToken: result.resolvedGitToken,
         platform: input.platform,
@@ -2418,6 +2427,91 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   /**
+   * Refresh the GitHub token for a session, respecting identity kind.
+   *
+   * - `kind === 'user'`: attempts `getUserTokenForRepo`; on failure falls back
+   *   to the app installation token, persists `identityKind = 'app'`, and
+   *   broadcasts a one-time warning to the user.
+   * - `kind === 'app'` / absent: uses the installation-token path unchanged.
+   *
+   * Returns the resolved token (or undefined when none is available).
+   */
+  private async refreshGitHubToken(
+    metadata: CloudAgentSessionState,
+    sessionId: SessionId,
+    executionId: EventSourceId
+  ): Promise<string | undefined> {
+    if (
+      metadata.identityKind === 'user' &&
+      metadata.identityKiloUserId &&
+      metadata.githubRepo &&
+      this.env.ENABLE_GITHUB_USER_TOKENS === 'true'
+    ) {
+      const userResult = await resolveUserGitHubTokenForRepo(this.env, {
+        kiloUserId: metadata.identityKiloUserId,
+        githubRepo: metadata.githubRepo,
+        appType: metadata.githubAppType,
+      });
+
+      if (userResult.success) {
+        return userResult.token;
+      }
+
+      // User token unavailable — fall back to app token and warn the user.
+      logger
+        .withFields({
+          sessionId: metadata.sessionId,
+          reason: userResult.reason,
+        })
+        .info('GitHub user token unavailable mid-session; falling back to app installation token');
+
+      // Broadcast one-time warning to stream clients.
+      this.broadcastVolatileEvent({
+        executionId,
+        sessionId,
+        streamEventType: 'status',
+        payload: JSON.stringify({
+          message:
+            'GitHub user token expired — pushing as the bot for the rest of this session. Reconnect in settings to re-attribute future sessions.',
+        }),
+        timestamp: Date.now(),
+      });
+
+      // Downgrade identity to 'app' so subsequent renewals skip this path.
+      await this.updateMetadata({
+        ...metadata,
+        identityKind: 'app',
+        identityKiloUserId: undefined,
+        version: Date.now(),
+      });
+    }
+
+    // App-token path (original behaviour).
+    if (metadata.githubInstallationId) {
+      const appType = metadata.githubAppType ?? 'standard';
+      return this.env.GIT_TOKEN_SERVICE.getToken(metadata.githubInstallationId, appType);
+    }
+
+    // Sessions prepared via the user-token path don't store githubInstallationId.
+    // After identity is downgraded to 'app', resolve a fresh installation token on-demand.
+    if (metadata.githubRepo) {
+      const result = await resolveGitHubTokenForRepo(this.env, {
+        githubRepo: metadata.githubRepo,
+        userId: metadata.userId,
+        orgId: metadata.orgId,
+      });
+      if (result.success) {
+        return result.value.token;
+      }
+      logger
+        .withFields({ reason: result.error.reason, sessionId: metadata.sessionId })
+        .warn('Could not resolve app installation token for session without installationId');
+    }
+
+    return metadata.githubToken;
+  }
+
+  /**
    * Start a V2 execution using direct execution (no queue).
    * This method performs validation, checks for active execution, and executes directly.
    *
@@ -2592,14 +2686,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         }
 
         const token = request.authToken || metadata.kilocodeToken || '';
-        let githubToken = metadata.githubToken;
-        if (metadata.githubInstallationId) {
-          const appType = metadata.githubAppType || 'standard';
-          githubToken = await this.env.GIT_TOKEN_SERVICE.getToken(
-            metadata.githubInstallationId,
-            appType
-          );
-        }
+        const githubToken = await this.refreshGitHubToken(metadata, sessionId, executionId);
         if (metadata.githubRepo && !githubToken) {
           return this.buildStartError(
             'BAD_REQUEST',
@@ -2698,15 +2785,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         }
       }
 
-      // Token overrides win: only generate from installation ID if no override provided
-      let githubToken = request.tokenOverrides?.githubToken ?? metadata.githubToken;
-      if (!request.tokenOverrides?.githubToken && metadata.githubInstallationId) {
-        const appType = metadata.githubAppType || 'standard';
-        githubToken = await this.env.GIT_TOKEN_SERVICE.getToken(
-          metadata.githubInstallationId,
-          appType
-        );
-      }
+      // Token overrides win: only call identity-aware refresh when no override provided
+      const githubToken = request.tokenOverrides?.githubToken
+        ? request.tokenOverrides.githubToken
+        : await this.refreshGitHubToken(metadata, sessionId, executionId);
       if (metadata.githubRepo && !githubToken) {
         return this.buildStartError(
           'BAD_REQUEST',

@@ -78,11 +78,32 @@ const {
   generateKiloSessionIdMock,
   createCliSessionViaSessionIngestMock,
   deleteCliSessionViaSessionIngestMock,
+  resolveGitHubTokenForRepoMock,
+  resolveUserGitHubTokenForRepoMock,
+  resolveManagedGitLabTokenMock,
 } = vi.hoisted(() => ({
   generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
   generateKiloSessionIdMock: vi.fn(() => 'ses_mock-kilo-session-id'),
   createCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
   deleteCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
+  resolveGitHubTokenForRepoMock: vi
+    .fn()
+    .mockResolvedValue({
+      success: false,
+      error: { reason: 'no_installation_found', message: 'not found' },
+    }),
+  resolveUserGitHubTokenForRepoMock: vi
+    .fn()
+    .mockResolvedValue({ success: false, reason: 'not_connected' }),
+  resolveManagedGitLabTokenMock: vi
+    .fn()
+    .mockResolvedValue({ success: false, reason: 'no_integration_found' }),
+}));
+
+vi.mock('./services/git-token-service-client.js', () => ({
+  resolveGitHubTokenForRepo: resolveGitHubTokenForRepoMock,
+  resolveUserGitHubTokenForRepo: resolveUserGitHubTokenForRepoMock,
+  resolveManagedGitLabToken: resolveManagedGitLabTokenMock,
 }));
 
 // Mock session-service to isolate router tests, but keep the real exported
@@ -167,6 +188,9 @@ function createInternalApiContext(options: {
   internalApiSecret?: string | null; // null means explicitly no internal API secret configured
   requestInternalApiKey?: string | null; // null means no x-internal-api-key header
   doStub?: ReturnType<typeof createMockDOStub>;
+  enableGitHubUserTokens?: boolean;
+  githubAppSlug?: string;
+  githubAppBotUserId?: string;
 }): TRPCContext {
   const {
     userId,
@@ -174,6 +198,9 @@ function createInternalApiContext(options: {
     internalApiSecret,
     requestInternalApiKey,
     doStub = createMockDOStub(),
+    enableGitHubUserTokens = false,
+    githubAppSlug = 'kiloconnect',
+    githubAppBotUserId = '240665456',
   } = options;
 
   // Apply defaults only if not explicitly set to null
@@ -215,6 +242,9 @@ function createInternalApiContext(options: {
       } as unknown as TRPCContext['env']['SESSION_INGEST'],
       INTERNAL_API_SECRET: effectiveInternalApiSecret,
       NEXTAUTH_SECRET: 'test-secret',
+      GITHUB_APP_SLUG: githubAppSlug,
+      GITHUB_APP_BOT_USER_ID: githubAppBotUserId,
+      ENABLE_GITHUB_USER_TOKENS: enableGitHubUserTokens ? 'true' : 'false',
     },
   } as TRPCContext;
 }
@@ -1609,5 +1639,138 @@ describe('DO state machine edge cases', () => {
         })
       ).rejects.toThrow('Invalid metadata after update');
     });
+  });
+});
+
+describe('GitHub user-token selection (ENABLE_GITHUB_USER_TOKENS gate)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
+    createCliSessionViaSessionIngestMock.mockResolvedValue(undefined);
+    deleteCliSessionViaSessionIngestMock.mockResolvedValue(undefined);
+    resolveGitHubTokenForRepoMock.mockResolvedValue({
+      success: true,
+      value: {
+        token: 'ghs_apptoken',
+        installationId: 'inst_123',
+        appType: 'standard' as const,
+        accountLogin: 'myorg',
+      },
+    });
+    resolveUserGitHubTokenForRepoMock.mockResolvedValue({
+      success: false,
+      reason: 'not_connected',
+    });
+  });
+
+  it('does NOT call getUserTokenForRepo when ENABLE_GITHUB_USER_TOKENS=false', async () => {
+    const doStub = createMockDOStub();
+    const ctx = createInternalApiContext({ doStub, enableGitHubUserTokens: false });
+    const caller = appRouter.createCaller(ctx);
+
+    await caller.prepareSession({
+      prompt: 'Test',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(resolveUserGitHubTokenForRepoMock).not.toHaveBeenCalled();
+    expect(resolveGitHubTokenForRepoMock).toHaveBeenCalledOnce();
+  });
+
+  it('uses user token when ENABLE_GITHUB_USER_TOKENS=true and getUserTokenForRepo returns ok', async () => {
+    resolveUserGitHubTokenForRepoMock.mockResolvedValue({
+      success: true,
+      token: 'ghu_usertoken',
+      identity: {
+        kind: 'user' as const,
+        login: 'octocat',
+        userId: '583231',
+        email: 'octocat@github.com',
+      },
+    });
+
+    const doStub = createMockDOStub();
+    const ctx = createInternalApiContext({ doStub, enableGitHubUserTokens: true });
+    const caller = appRouter.createCaller(ctx);
+
+    await caller.prepareSession({
+      prompt: 'Test',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(resolveUserGitHubTokenForRepoMock).toHaveBeenCalledOnce();
+    // App token should NOT be called when user token succeeds
+    expect(resolveGitHubTokenForRepoMock).not.toHaveBeenCalled();
+    // identityKind should be stored as 'user'
+    expect(doStub.prepare).toHaveBeenCalledWith(
+      expect.objectContaining({ identityKind: 'user', identityKiloUserId: 'test-user-123' })
+    );
+  });
+
+  it('falls back to app token when ENABLE_GITHUB_USER_TOKENS=true but getUserTokenForRepo returns not_connected', async () => {
+    resolveUserGitHubTokenForRepoMock.mockResolvedValue({
+      success: false,
+      reason: 'not_connected',
+    });
+
+    const doStub = createMockDOStub();
+    const ctx = createInternalApiContext({ doStub, enableGitHubUserTokens: true });
+    const caller = appRouter.createCaller(ctx);
+
+    await caller.prepareSession({
+      prompt: 'Test',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(resolveUserGitHubTokenForRepoMock).toHaveBeenCalledOnce();
+    expect(resolveGitHubTokenForRepoMock).toHaveBeenCalledOnce();
+    // identityKind should be stored as 'app'
+    expect(doStub.prepare).toHaveBeenCalledWith(expect.objectContaining({ identityKind: 'app' }));
+  });
+
+  it('falls back to app token when ENABLE_GITHUB_USER_TOKENS=true but getUserTokenForRepo returns expired', async () => {
+    resolveUserGitHubTokenForRepoMock.mockResolvedValue({
+      success: false,
+      reason: 'expired',
+    });
+
+    const doStub = createMockDOStub();
+    const ctx = createInternalApiContext({ doStub, enableGitHubUserTokens: true });
+    const caller = appRouter.createCaller(ctx);
+
+    await caller.prepareSession({
+      prompt: 'Test',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(resolveUserGitHubTokenForRepoMock).toHaveBeenCalledOnce();
+    expect(resolveGitHubTokenForRepoMock).toHaveBeenCalledOnce();
+    expect(doStub.prepare).toHaveBeenCalledWith(expect.objectContaining({ identityKind: 'app' }));
+  });
+
+  it('skips user-token call when githubToken is provided directly (client token wins)', async () => {
+    const doStub = createMockDOStub();
+    const ctx = createInternalApiContext({ doStub, enableGitHubUserTokens: true });
+    const caller = appRouter.createCaller(ctx);
+
+    await caller.prepareSession({
+      prompt: 'Test',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      githubToken: 'ghp_provided_token',
+    });
+
+    // Neither resolution call should happen when caller provides a token
+    expect(resolveUserGitHubTokenForRepoMock).not.toHaveBeenCalled();
+    expect(resolveGitHubTokenForRepoMock).not.toHaveBeenCalled();
   });
 });

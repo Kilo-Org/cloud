@@ -3,7 +3,7 @@ import 'server-only';
 import { kilo_pass_store_purchases, kilo_pass_subscriptions } from '@kilocode/db/schema';
 
 import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import {
   type KiloPassPaymentProvider,
@@ -157,6 +157,10 @@ export async function getKiloPassStateForUser(
 
     if (isExpiredAtOrBeforeNow(latestStorePurchase?.expires_at ?? null, nowIso)) {
       if (selected.status !== 'canceled') {
+        // Intentional write on the read path: Apple's EXPIRED server notification is
+        // best-effort and can be dropped, so we self-heal here when we detect expiry.
+        // The ne() guard makes concurrent reads a true DB-level no-op (idempotent).
+        // This is why getKiloPassStateForUser cannot be served from a read replica.
         await db
           .update(kilo_pass_subscriptions)
           .set({
@@ -164,7 +168,12 @@ export async function getKiloPassStateForUser(
             cancel_at_period_end: false,
             ended_at: nowIso,
           })
-          .where(eq(kilo_pass_subscriptions.id, selected.subscriptionId));
+          .where(
+            and(
+              eq(kilo_pass_subscriptions.id, selected.subscriptionId),
+              ne(kilo_pass_subscriptions.status, 'canceled')
+            )
+          );
       }
 
       return {

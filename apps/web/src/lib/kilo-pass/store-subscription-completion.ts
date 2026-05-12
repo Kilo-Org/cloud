@@ -35,8 +35,6 @@ import {
 } from './subscription-accounting';
 import { isStripeSubscriptionEnded } from './stripe-subscription-status';
 
-type DbOrTx = DrizzleTransaction | typeof db;
-
 export type ValidatedStoreKiloPassPurchase = {
   paymentProvider: KiloPassPaymentProvider.AppStore | KiloPassPaymentProvider.GooglePlay;
   productId: string;
@@ -431,7 +429,7 @@ async function applyStoreUpgradeCreditAdjustments(
 }
 
 export async function completeStoreKiloPassPurchase(params: {
-  dbOrTx?: DbOrTx;
+  dbOrTx?: DrizzleTransaction;
   user: User;
   purchase: ValidatedStoreKiloPassPurchase;
 }): Promise<CompleteStoreKiloPassPurchaseResult> {
@@ -671,7 +669,7 @@ export async function completeStoreKiloPassPurchase(params: {
   };
 
   if (params.dbOrTx !== undefined) {
-    return run(params.dbOrTx as DrizzleTransaction);
+    return run(params.dbOrTx);
   }
   return db.transaction(run);
 }

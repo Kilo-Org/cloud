@@ -21,12 +21,12 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { db } from '@/lib/drizzle';
 import { user_github_app_tokens } from '@kilocode/db/schema';
-import { eq, and, isNull, gt } from 'drizzle-orm';
-import { createOAuthState, safeReturnTo } from '@/lib/integrations/platforms/github/oauth-state';
+import { eq, and } from 'drizzle-orm';
+import { createOAuthState } from '@/lib/integrations/platforms/github/oauth-state';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
 import { APP_URL } from '@/lib/constants';
 import { ENABLE_GITHUB_USER_TOKENS, USER_GH_APP_TOKEN_ENCRYPTION_KEY } from '@/lib/config.server';
-import { encryptWithSymmetricKey, decryptWithSymmetricKey } from '@/lib/encryption';
+import { decryptWithSymmetricKey } from '@/lib/encryption';
 
 export const githubAppsRouter = createTRPCRouter({
   // List all integrations

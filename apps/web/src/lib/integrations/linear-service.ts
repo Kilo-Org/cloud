@@ -16,7 +16,7 @@ import {
   createAllowPredicateFromRestrictions,
   hasActiveModelRestrictions,
 } from '@/lib/model-allow.server';
-import { KILO_AUTO_FRONTIER_MODEL } from '@/lib/ai-gateway/kilo-auto';
+import { KILO_AUTO_FRONTIER_MODEL } from '@/lib/ai-gateway/auto-model';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
 // Default model for Linear integrations. Intentionally diverges from

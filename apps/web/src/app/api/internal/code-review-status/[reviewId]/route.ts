@@ -503,6 +503,7 @@ export async function POST(
         success: true,
         message: 'Review already in terminal state',
         currentStatus: review.status,
+        terminalReason: review.terminal_reason,
       });
     }
 

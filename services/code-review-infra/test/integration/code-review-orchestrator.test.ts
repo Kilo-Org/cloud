@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-base-to-string, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from 'cloudflare:test';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { CodeReviewOrchestrator } from '../../src/code-review-orchestrator';
@@ -237,6 +238,15 @@ describe('CodeReviewOrchestrator recovery', () => {
       sessionId: 'agent-retry-session',
       cliSessionId: 'ses_retry_session',
     });
+
+    const failedStatusUpdates = fetchCalls(fetchMock, '/api/internal/code-review-status/').filter(
+      call => {
+        const init = call[1] as RequestInit | undefined;
+        if (typeof init?.body !== 'string') return false;
+        return (JSON.parse(init.body) as { status?: string }).status === 'failed';
+      }
+    );
+    expect(failedStatusUpdates).toHaveLength(0);
   });
 
   it('fails after a second sandbox 500 without initiating', async () => {
@@ -261,12 +271,20 @@ describe('CodeReviewOrchestrator recovery', () => {
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
-    await expect(stub.status()).resolves.toMatchObject({ status: 'failed' });
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'failed',
+      terminalReason: 'sandbox_error',
+    });
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
+      status: 'failed',
+      terminalReason: 'sandbox_error',
+    });
     await expect(storedReview(stub)).resolves.toMatchObject({
       status: 'failed',
       sandboxRetryAttempted: true,
+      terminalReason: 'sandbox_error',
     });
   });
 
@@ -662,6 +680,129 @@ describe('CodeReviewOrchestrator recovery', () => {
       callbackTarget: {
         url: expect.stringContaining('/api/internal/code-review-status/'),
       },
+    });
+  });
+
+  it('retries with a fresh session when sendMessageV2 fails with a sandbox 500', async () => {
+    const stub = getReviewStub();
+    const previousSessionId = 'agent_previous_sandbox_500';
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/getSessionHealth')) {
+        return trpcSuccess({
+          cloudAgentSessionId: previousSessionId,
+          sandboxStatus: 'healthy',
+          executionHealth: 'none',
+        });
+      }
+      if (url.includes('/trpc/updateSession')) {
+        return trpcSuccess({ success: true });
+      }
+      if (url.includes('/trpc/sendMessageV2')) {
+        return trpcError(500, 'Container failed with internal server error status: 500');
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-fresh-after-sandbox-500',
+          kiloSessionId: 'ses_fresh_after_sandbox_500',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-fresh-sandbox', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          previousCloudAgentSessionId: previousSessionId,
+          sessionId: previousSessionId,
+          cliSessionId: 'ses_previous',
+        })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-fresh-after-sandbox-500',
+      cliSessionId: 'ses_fresh_after_sandbox_500',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/getSessionHealth')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/updateSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+
+    const stored = await storedReview(stub);
+    expect(stored).toMatchObject({
+      sandboxRetryAttempted: true,
+      sessionId: 'agent-fresh-after-sandbox-500',
+      cliSessionId: 'ses_fresh_after_sandbox_500',
+    });
+    expect(stored?.previousCloudAgentSessionId).toBeUndefined();
+  });
+
+  it('fails with sandbox_error when sendMessageV2 retry also hits a sandbox 500', async () => {
+    const stub = getReviewStub();
+    const previousSessionId = 'agent_previous_sandbox_repeat';
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/getSessionHealth')) {
+        return trpcSuccess({
+          cloudAgentSessionId: previousSessionId,
+          sandboxStatus: 'healthy',
+          executionHealth: 'none',
+        });
+      }
+      if (url.includes('/trpc/updateSession')) {
+        return trpcSuccess({ success: true });
+      }
+      if (url.includes('/trpc/sendMessageV2')) {
+        return trpcError(500, 'SandboxError: HTTP error! status: 500 during resume');
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(500, 'SandboxError: HTTP error! status: 500 during setup');
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          previousCloudAgentSessionId: previousSessionId,
+        })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'failed',
+      terminalReason: 'sandbox_error',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
+      status: 'failed',
+      terminalReason: 'sandbox_error',
     });
   });
 

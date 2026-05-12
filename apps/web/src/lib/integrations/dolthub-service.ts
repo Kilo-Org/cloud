@@ -75,7 +75,10 @@ const DoltHubTokenPayloadSchema = z.object({
   scope: z.string().optional(),
 });
 
-function parseDoltHubTokenPayload(raw: unknown, operation: 'exchange' | 'refresh'): DoltHubTokenResponse {
+function parseDoltHubTokenPayload(
+  raw: unknown,
+  operation: 'exchange' | 'refresh'
+): DoltHubTokenResponse {
   const parseResult = DoltHubTokenPayloadSchema.safeParse(raw);
   if (!parseResult.success) {
     throw new Error(`DoltHub token ${operation} returned invalid payload`);
@@ -114,7 +117,9 @@ export async function exchangeDoltHubOAuthCode(code: string): Promise<DoltHubTok
   return parseDoltHubTokenPayload(await response.json(), 'exchange');
 }
 
-export async function refreshDoltHubAccessToken(refreshToken: string): Promise<DoltHubTokenResponse> {
+export async function refreshDoltHubAccessToken(
+  refreshToken: string
+): Promise<DoltHubTokenResponse> {
   assertDevOnly();
 
   const body = new URLSearchParams({
@@ -145,7 +150,9 @@ export async function getInstallation(owner: Owner): Promise<PlatformIntegration
   const [integration] = await db
     .select()
     .from(platform_integrations)
-    .where(and(...getOwnershipConditions(owner), eq(platform_integrations.platform, PLATFORM.DOLTHUB)))
+    .where(
+      and(...getOwnershipConditions(owner), eq(platform_integrations.platform, PLATFORM.DOLTHUB))
+    )
     .limit(1);
 
   return integration || null;
@@ -234,14 +241,12 @@ export async function getValidDoltHubToken(
 ): Promise<string | null> {
   assertDevOnly();
 
-  const metadata = integration.metadata as
-    | {
-        access_token?: string;
-        refresh_token?: string;
-        expires_at?: number;
-        scope?: string;
-      }
-    | null;
+  const metadata = integration.metadata as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_at?: number;
+    scope?: string;
+  } | null;
 
   if (!metadata?.access_token) {
     return null;

@@ -91,14 +91,14 @@ export const dolthubRouter = createTRPCRouter({
     const data = await response.json();
 
     const DoltHubProfileResponseSchema = z.union([
-      z.array(z.record(z.unknown())),
-      z.object({ rows: z.array(z.record(z.unknown())).optional() }),
+      z.array(z.record(z.string(), z.unknown())),
+      z.object({ rows: z.array(z.record(z.string(), z.unknown())).optional() }),
     ]);
     const parsed = DoltHubProfileResponseSchema.safeParse(data);
     const rows = parsed.success
       ? Array.isArray(parsed.data)
         ? parsed.data
-        : parsed.data.rows ?? []
+        : (parsed.data.rows ?? [])
       : [];
     const sample = rows[0] ?? null;
 

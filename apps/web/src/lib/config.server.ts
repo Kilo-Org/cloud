@@ -98,9 +98,7 @@ export const USER_DEPLOYMENTS_GIT_TOKEN_ENCRYPTION_KEY = getEnvVariable(
 
 // Dedicated encryption key for GitHub App user-to-server tokens.
 // Do NOT reuse USER_DEPLOYMENTS_GIT_TOKEN_ENCRYPTION_KEY.
-export const USER_GH_APP_TOKEN_ENCRYPTION_KEY = getEnvVariable(
-  'USER_GH_APP_TOKEN_ENCRYPTION_KEY'
-);
+export const USER_GH_APP_TOKEN_ENCRYPTION_KEY = getEnvVariable('USER_GH_APP_TOKEN_ENCRYPTION_KEY');
 
 // HMAC secret for signing GitHub OAuth user-connect state parameters.
 export const GITHUB_OAUTH_STATE_SECRET = getEnvVariable('GITHUB_OAUTH_STATE_SECRET');

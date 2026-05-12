@@ -72,7 +72,10 @@ export class UserGitHubTokenService {
       return { ok: false, reason: 'revoked' };
     }
 
-    if (row.access_token_expires_at !== null && new Date(row.access_token_expires_at) <= new Date()) {
+    if (
+      row.access_token_expires_at !== null &&
+      new Date(row.access_token_expires_at) <= new Date()
+    ) {
       return { ok: false, reason: 'expired' };
     }
 

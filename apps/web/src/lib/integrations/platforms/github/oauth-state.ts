@@ -11,7 +11,10 @@ const STATE_TTL_SECONDS = 10 * 60;
 const NONCE_BYTES = 16;
 
 function sign(data: string): string {
-  return crypto.createHmac(HMAC_ALGORITHM, GITHUB_OAUTH_STATE_SECRET).update(data).digest('base64url');
+  return crypto
+    .createHmac(HMAC_ALGORITHM, GITHUB_OAUTH_STATE_SECRET)
+    .update(data)
+    .digest('base64url');
 }
 
 export type OAuthStatePayload = {

@@ -493,7 +493,9 @@ export function GitHubIntegrationDetails({
                   {disconnectUserIdentity.isPending ? 'Disconnecting...' : 'Disconnect'}
                 </Button>
               </>
-            ) : userConnectionStatus?.login ? (
+            ) : userConnectionStatus &&
+              'login' in userConnectionStatus &&
+              userConnectionStatus.login ? (
               // Expired or revoked state
               <>
                 <Alert>

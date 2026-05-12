@@ -4,10 +4,7 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { Octokit } from '@octokit/rest';
 import { exchangeWebFlowCode } from '@octokit/oauth-methods';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
-import {
-  verifyOAuthState,
-  safeReturnTo,
-} from '@/lib/integrations/platforms/github/oauth-state';
+import { verifyOAuthState, safeReturnTo } from '@/lib/integrations/platforms/github/oauth-state';
 import { db } from '@/lib/drizzle';
 import { user_github_app_tokens } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -78,9 +75,10 @@ export async function GET(request: NextRequest) {
     const auth = exchangeResult.authentication;
     const accessToken = auth.token;
     // MVP: ignore refresh token
-    const accessTokenExpiresAt = auth.expiresAt
-      ? new Date(auth.expiresAt)
-      : new Date(Date.now() + 8 * 60 * 60 * 1000);
+    const accessTokenExpiresAt =
+      'expiresAt' in auth && auth.expiresAt
+        ? new Date(auth.expiresAt)
+        : new Date(Date.now() + 8 * 60 * 60 * 1000);
 
     // 3. Resolve identity
     const octokit = new Octokit({ auth: accessToken });
@@ -96,10 +94,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 4. Encrypt and persist
-    const encryptedToken = encryptWithSymmetricKey(
-      accessToken,
-      USER_GH_APP_TOKEN_ENCRYPTION_KEY
-    );
+    const encryptedToken = encryptWithSymmetricKey(accessToken, USER_GH_APP_TOKEN_ENCRYPTION_KEY);
 
     await db
       .insert(user_github_app_tokens)
@@ -124,7 +119,7 @@ export async function GET(request: NextRequest) {
           access_token_expires_at: accessTokenExpiresAt.toISOString(),
           revoked_at: null,
           revocation_reason: null,
-          updated_at: new Date(),
+          updated_at: new Date().toISOString(),
         },
       });
 

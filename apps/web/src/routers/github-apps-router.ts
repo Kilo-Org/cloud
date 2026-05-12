@@ -22,16 +22,10 @@ import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { db } from '@/lib/drizzle';
 import { user_github_app_tokens } from '@kilocode/db/schema';
 import { eq, and, isNull, gt } from 'drizzle-orm';
-import {
-  createOAuthState,
-  safeReturnTo,
-} from '@/lib/integrations/platforms/github/oauth-state';
+import { createOAuthState, safeReturnTo } from '@/lib/integrations/platforms/github/oauth-state';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
 import { APP_URL } from '@/lib/constants';
-import {
-  ENABLE_GITHUB_USER_TOKENS,
-  USER_GH_APP_TOKEN_ENCRYPTION_KEY,
-} from '@/lib/config.server';
+import { ENABLE_GITHUB_USER_TOKENS, USER_GH_APP_TOKEN_ENCRYPTION_KEY } from '@/lib/config.server';
 import { encryptWithSymmetricKey, decryptWithSymmetricKey } from '@/lib/encryption';
 
 export const githubAppsRouter = createTRPCRouter({
@@ -356,10 +350,15 @@ export const githubAppsRouter = createTRPCRouter({
 
     const now = new Date();
     const isRevoked = row.revoked_at !== null;
-    const isExpired = row.access_token_expires_at !== null && new Date(row.access_token_expires_at) <= now;
+    const isExpired =
+      row.access_token_expires_at !== null && new Date(row.access_token_expires_at) <= now;
 
     if (isRevoked || isExpired) {
-      return { connected: false as const, login: row.github_login, githubUserId: row.github_user_id };
+      return {
+        connected: false as const,
+        login: row.github_login,
+        githubUserId: row.github_user_id,
+      };
     }
 
     return {

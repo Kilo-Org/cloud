@@ -53,7 +53,9 @@ describe('GitHub user-connect callback', () => {
 
   test('redirects with invalid_state when state verification fails', async () => {
     verifyOAuthState.mockReturnValue(null);
-    const request = makeRequest('/api/integrations/github/user-connect/callback?code=abc&state=bad');
+    const request = makeRequest(
+      '/api/integrations/github/user-connect/callback?code=abc&state=bad'
+    );
     const response = await GET(request);
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toContain('gh_error=invalid_state');

@@ -3,6 +3,7 @@ import { db, cleanupDbForTest } from '@/lib/drizzle';
 import { githubAppsRouter } from './github-apps-router';
 import { user_github_app_tokens } from '@kilocode/db/schema';
 import { encryptWithSymmetricKey } from '@/lib/encryption';
+import { eq } from 'drizzle-orm';
 
 // Mock the env vars
 jest.mock('@/lib/config.server', () => ({
@@ -39,9 +40,9 @@ describe('githubAppsRouter', () => {
 
   describe('connectUserIdentity', () => {
     test('rejects lite app', async () => {
-      await expect(
-        caller.connectUserIdentity({ appType: 'lite' })
-      ).rejects.toThrow('Lite app does not support user identity connect');
+      await expect(caller.connectUserIdentity({ appType: 'lite' })).rejects.toThrow(
+        'Lite app does not support user identity connect'
+      );
     });
 
     test('builds correct authorize URL', async () => {

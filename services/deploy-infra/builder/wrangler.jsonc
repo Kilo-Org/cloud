@@ -34,7 +34,6 @@
     "BACKEND_EVENTS_URL": "https://app.kilo.ai/api/user-deployments/webhook",
     "SENTRY_DSN": "https://1f07992a2811f3e5fc4d578527ab3d64@o4509356317474816.ingest.us.sentry.io/4510379756945409",
     "ENVIRONMENT": "production",
-    "WORKER_ENV": "production",
     "DEPLOY_HOSTNAME_BASE": "d.kiloapps.io",
   },
   "secrets_store_secrets": [
@@ -44,13 +43,15 @@
       "secret_name": "NEXTAUTH_SECRET_PROD",
     },
   ],
-  "hyperdrive": [
+  "kv_namespaces": [
     {
-      "binding": "HYPERDRIVE",
-      "id": "624ec80650dd414199349f4e217ddb10",
-      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+      "binding": "HTML_DEPLOYMENTS_KV",
+      "id": "TODO: create with `wrangler kv namespace create HTML_DEPLOYMENTS_KV` and fill in",
     },
   ],
+  "triggers": {
+    "crons": ["0 * * * *"],
+  },
   "containers": [
     {
       "class_name": "Sandbox",

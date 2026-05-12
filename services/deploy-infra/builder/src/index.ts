@@ -5,14 +5,15 @@ import type {
   DeployResponse,
   StatusResponse,
   HtmlDeployResponse,
+  HtmlDeployRecord,
   DeploymentArtifacts,
 } from './types';
 import {
   backendAuthMiddleware,
   createErrorHandler,
   createNotFoundHandler,
+  verifyKiloToken,
 } from '@kilocode/worker-utils';
-import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 import { CloudflareAPI } from './cloudflare-api';
 import { Deployer } from './deployer';
 import { validateWorkerName } from './utils';
@@ -55,6 +56,11 @@ const app = new Hono<HonoEnv>();
 
 const MAX_HTML_BYTES = 10 * 1024 * 1024; // 10 MB
 const DEFAULT_HOSTNAME_BASE = 'd.kiloapps.io';
+const DEFAULT_TTL_SECONDS = 24 * 60 * 60; // 24 hours
+const MAX_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+const KV_KEY_PREFIX = 'html-deploy:';
+
+const HTML_TAG_RE = /<!DOCTYPE\s+html|<html[\s>]/i;
 
 function generateHtmlSlug(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -65,20 +71,29 @@ function generateHtmlSlug(): string {
   return `ksd-${suffix}`;
 }
 
+function parseTtlHeader(header: string | null): number {
+  if (!header) return DEFAULT_TTL_SECONDS;
+  const seconds = parseInt(header, 10);
+  if (isNaN(seconds) || seconds <= 0) return DEFAULT_TTL_SECONDS;
+  return Math.min(seconds, MAX_TTL_SECONDS);
+}
+
 // ── /deploy-html — Kilo JWT auth, no sandbox, synchronous ─────────────────
 
 app.post('/deploy-html', async (c: Context<HonoEnv>) => {
   const authHeader = c.req.header('Authorization');
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return c.json({ error: 'Missing or invalid Authorization header' }, 401);
+  }
 
-  const authResult = await verifyKiloBearerAgainstCurrentPepper({
-    token,
-    nextAuthSecret: c.env.NEXTAUTH_SECRET,
-    workerEnv: c.env.WORKER_ENV,
-    connectionString: c.env.HYPERDRIVE.connectionString,
-  });
+  const secret = await c.env.NEXTAUTH_SECRET.get();
+  if (!secret) {
+    return c.json({ error: 'Server misconfiguration' }, 500);
+  }
 
-  if (!authResult) {
+  try {
+    await verifyKiloToken(authHeader.slice(7), secret);
+  } catch {
     return c.json({ error: 'Invalid or expired token' }, 401);
   }
 
@@ -95,8 +110,20 @@ app.post('/deploy-html', async (c: Context<HonoEnv>) => {
     );
   }
 
+  if (!HTML_TAG_RE.test(html)) {
+    return c.json(
+      {
+        error:
+          'Content does not appear to be a valid HTML document (missing <!DOCTYPE html> or <html> tag)',
+      },
+      400
+    );
+  }
+
   const slug = generateHtmlSlug();
   const hostnameBase = c.env.DEPLOY_HOSTNAME_BASE || DEFAULT_HOSTNAME_BASE;
+  const ttlSeconds = parseTtlHeader(c.req.header('X-Expires-In') ?? null);
+  const expiresAt = Date.now() + ttlSeconds * 1000;
 
   const artifacts: DeploymentArtifacts = {
     workerScript: {
@@ -131,9 +158,13 @@ app.post('/deploy-html', async (c: Context<HonoEnv>) => {
     return c.json({ error: `Deployment failed: ${msg}` }, 500);
   }
 
+  const record: HtmlDeployRecord = { slug, expiresAt };
+  await c.env.HTML_DEPLOYMENTS_KV.put(`${KV_KEY_PREFIX}${slug}`, JSON.stringify(record));
+
   const response: HtmlDeployResponse = {
     slug,
     url: `https://${slug}.${hostnameBase}`,
+    expires_at: new Date(expiresAt).toISOString(),
   };
 
   return c.json(response, 200);
@@ -391,7 +422,43 @@ app.onError((err, c) => {
 // 404 handler
 app.notFound(createNotFoundHandler());
 
-export default Sentry.withSentry((env: Env) => {
+// ── Scheduled handler: auto-delete expired HTML deployments ────────────────
+
+async function cleanupExpiredDeployments(env: Env): Promise<void> {
+  const now = Date.now();
+  const list = await env.HTML_DEPLOYMENTS_KV.list({ prefix: KV_KEY_PREFIX });
+  const dispatchNamespace = 'kilo-deploy';
+  const cloudflareApi = new CloudflareAPI(env.CLOUDFLARE_ACCOUNT_ID, env.CLOUDFLARE_API_TOKEN);
+
+  for (const key of list.keys) {
+    const raw = await env.HTML_DEPLOYMENTS_KV.get(key.name);
+    if (!raw) continue;
+
+    let record: HtmlDeployRecord;
+    try {
+      record = JSON.parse(raw) as HtmlDeployRecord;
+    } catch {
+      await env.HTML_DEPLOYMENTS_KV.delete(key.name);
+      continue;
+    }
+
+    if (record.expiresAt <= now) {
+      try {
+        await cloudflareApi.deleteWorker(record.slug, dispatchNamespace);
+        console.log(`[cleanup] Deleted expired HTML deployment: ${record.slug}`);
+      } catch (error) {
+        Sentry.captureException(error, {
+          extra: { slug: record.slug, action: 'html-deploy-cleanup' },
+        });
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.error(`[cleanup] Failed to delete ${record.slug}: ${errMsg}`);
+      }
+      await env.HTML_DEPLOYMENTS_KV.delete(key.name);
+    }
+  }
+}
+
+const fetchHandler = Sentry.withSentry((env: Env) => {
   const { id: versionId } = env.CF_VERSION_METADATA;
 
   return {
@@ -401,3 +468,10 @@ export default Sentry.withSentry((env: Env) => {
     environment: env.ENVIRONMENT || 'production',
   };
 }, app);
+
+export default {
+  fetch: fetchHandler,
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(cleanupExpiredDeployments(env));
+  },
+};

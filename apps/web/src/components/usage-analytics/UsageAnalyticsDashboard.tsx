@@ -14,7 +14,7 @@ import {
   formatIsoHourString_UsaHourFormat,
   formatLargeNumber,
 } from '@/lib/utils';
-import { SlidersHorizontal } from 'lucide-react';
+import { Download, SlidersHorizontal } from 'lucide-react';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { SummarySection } from './SummarySection';
 import { PrimaryChart } from './PrimaryChart';
@@ -40,6 +40,7 @@ import {
   type UsageFilters,
   type ViewAs,
 } from './hooks';
+import { useUsageDashboardState } from './useUsageDashboardState';
 import {
   DIMENSION_LABELS,
   type Dimension,
@@ -49,6 +50,7 @@ import {
   type PeriodOption,
 } from './types';
 import { formatDollarsFromMicrodollars, humanize } from './format';
+import { exportUsageTableToCsv } from './csvExport';
 
 type UsageAnalyticsDashboardProps = {
   context: 'personal' | 'organization';
@@ -104,13 +106,8 @@ export function UsageAnalyticsDashboard({
   title,
 }: UsageAnalyticsDashboardProps) {
   const trpc = useTRPC();
-  const [period, setPeriod] = useState<PeriodOption>('today');
-  const [granularity, setGranularity] = useState<Granularity>('hour');
-  const [chartMetric, setChartMetric] = useState<MetricKey>('cost');
-  const [filters, setFilters] = useState<UsageFilters>(EMPTY_FILTERS);
-  const [groupBy, setGroupBy] = useState<Dimension | 'none'>('none');
-  const [personalView, setPersonalView] = useState<PersonalView>(PERSONAL_VIEW_PERSONAL_ONLY);
-  const [viewAs, setViewAs] = useState<ViewAs>('self');
+  const { state, setState } = useUsageDashboardState();
+  const { period, granularity, chartMetric, filters, groupBy, personalView, viewAs } = state;
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // `organizations.list` is always available to the caller and returns the
@@ -126,9 +123,8 @@ export function UsageAnalyticsDashboard({
   const granularityOptions = useMemo(() => granularityOptionsForPeriod(period), [period]);
 
   const handlePeriodChange = useCallback((newPeriod: PeriodOption) => {
-    setPeriod(newPeriod);
-    setGranularity(defaultGranularityForPeriod(newPeriod));
-  }, []);
+    setState({ period: newPeriod, granularity: defaultGranularityForPeriod(newPeriod) });
+  }, [setState]);
 
   const effectiveOrgId =
     context === 'organization'
@@ -176,8 +172,8 @@ export function UsageAnalyticsDashboard({
   // Reset viewAs to 'self' whenever the effective org changes (e.g. personal
   // user switches org in the Scope dropdown).
   useEffect(() => {
-    setViewAs('self');
-  }, [effectiveOrgId]);
+    setState({ viewAs: 'self' });
+  }, [effectiveOrgId, setState]);
 
   // When the view collapses to a single user ('self'), drop any stale
   // user-dimension state that no longer makes sense:
@@ -186,13 +182,15 @@ export function UsageAnalyticsDashboard({
   //   self-scope requests carrying userIds referring to someone else).
   useEffect(() => {
     if (isOrgWideView) return;
-    setGroupBy(prev => (prev === 'user' ? 'none' : prev));
-    setFilters(prev =>
-      prev.userIds.length === 0 && prev.excludedUserIds.length === 0
-        ? prev
-        : { ...prev, userIds: [], excludedUserIds: [] }
-    );
-  }, [isOrgWideView]);
+    const updates: Partial<ReturnType<typeof useUsageDashboardState>['state']> = {};
+    if (groupBy === 'user') updates.groupBy = 'none';
+    if (filters.userIds.length > 0 || filters.excludedUserIds.length > 0) {
+      updates.filters = { ...filters, userIds: [], excludedUserIds: [] };
+    }
+    if (Object.keys(updates).length > 0) {
+      setState(updates);
+    }
+  }, [isOrgWideView, groupBy, filters, setState]);
 
   const effectiveOrganizationName = useMemo(() => {
     if (context === 'organization') return organizationName ?? null;
@@ -312,25 +310,32 @@ export function UsageAnalyticsDashboard({
 
   const addFilter = useCallback(
     (dimension: Dimension, direction: FilterDirection, value: string): void => {
-      setFilters(prev => {
-        const key = keyFor(dimension, direction);
-        const current = prev[key] as string[];
-        if (current.includes(value)) return prev;
-        return { ...prev, [key]: [...current, value] };
+      setState({
+        filters: (() => {
+          const key = keyFor(dimension, direction);
+          const current = filters[key] as string[];
+          if (current.includes(value)) return filters;
+          return { ...filters, [key]: [...current, value] };
+        })(),
       });
     },
-    []
+    [setState, filters]
   );
 
-  const removeFilter = useCallback((filter: ActiveFilter): void => {
-    setFilters(prev => {
-      const key = keyFor(filter.dimension, filter.direction);
-      const current = prev[key] as string[];
-      return { ...prev, [key]: current.filter(v => v !== filter.value) };
-    });
-  }, []);
+  const removeFilter = useCallback(
+    (filter: ActiveFilter): void => {
+      setState({
+        filters: (() => {
+          const key = keyFor(filter.dimension, filter.direction);
+          const current = filters[key] as string[];
+          return { ...filters, [key]: current.filter(v => v !== filter.value) };
+        })(),
+      });
+    },
+    [setState, filters]
+  );
 
-  const clearAllFilters = useCallback((): void => setFilters(EMPTY_FILTERS), []);
+  const clearAllFilters = useCallback((): void => setState({ filters: EMPTY_FILTERS }), [setState]);
 
   const tableColumns: UsageTableColumn[] = useMemo(() => {
     const renderDatetime = (value: unknown): string => {
@@ -423,6 +428,16 @@ export function UsageAnalyticsDashboard({
     }));
   }, [tableData]);
 
+  const handleExportCsv = useCallback(() => {
+    exportUsageTableToCsv({
+      rows: tableData?.rows ?? [],
+      groupBy: tableGroupBy,
+      granularity,
+      period,
+      labelForDimensionValue,
+    });
+  }, [tableData, tableGroupBy, granularity, period, labelForDimensionValue]);
+
   const isOrgContext = context === 'organization';
 
   const sidebar = (
@@ -432,23 +447,23 @@ export function UsageAnalyticsDashboard({
       dateRange={dateRange}
       personalScope={effectivePersonalScope}
       personalView={personalView}
-      onPersonalViewChange={setPersonalView}
+      onPersonalViewChange={(v: PersonalView) => setState({ personalView: v })}
       organizations={organizations ?? []}
       viewAs={effectiveViewAs}
-      onViewAsChange={setViewAs}
+      onViewAsChange={(v: ViewAs) => setState({ viewAs: v })}
       canViewAllOrgUsers={canViewAllOrgUsers}
       isOrgWideView={isOrgWideView}
       effectiveOrganizationName={effectiveOrganizationName}
       period={period}
       onPeriodChange={handlePeriodChange}
       granularity={granularity}
-      onGranularityChange={setGranularity}
+      onGranularityChange={(v: Granularity) => setState({ granularity: v })}
       granularityOptions={granularityOptions}
       chartMetric={chartMetric}
-      onChartMetricChange={setChartMetric}
+      onChartMetricChange={(v: MetricKey) => setState({ chartMetric: v })}
       metricOptions={METRIC_OPTIONS}
       groupBy={groupBy}
-      onGroupByChange={setGroupBy}
+      onGroupByChange={(v: Dimension | 'none') => setState({ groupBy: v })}
       filters={filters}
       activeFilters={activeFilters}
       onAddFilter={addFilter}
@@ -544,7 +559,7 @@ export function UsageAnalyticsDashboard({
                   metric={chartMetric}
                   data={timeseries}
                   loading={timeseriesLoading}
-                  splitByLabel={splitByDimension ? DIMENSION_LABELS[splitByDimension] : undefined}
+                  splitByLabel={splitByDimension ? DIMENSION_LABELS[splitByDimension as Dimension] : undefined}
                   seriesLabelFor={
                     splitByDimension ? v => labelForDimensionValue(splitByDimension, v) : undefined
                   }
@@ -561,6 +576,17 @@ export function UsageAnalyticsDashboard({
               emptyMessage={tableLoading ? 'Loading…' : 'No usage data.'}
               sortable
               defaultSort={{ key: 'datetime', direction: 'desc' }}
+              headerActions={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleExportCsv}
+                  disabled={tableLoading || (tableData?.rows.length ?? 0) === 0}
+                >
+                  <Download className="mr-1.5 h-3.5 w-3.5" />
+                  Download CSV
+                </Button>
+              }
             />
           </div>
         </div>

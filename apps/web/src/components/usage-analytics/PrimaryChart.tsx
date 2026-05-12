@@ -58,7 +58,7 @@ export function PrimaryChart({
       // Rank keys by total value across the period; keep top N and aggregate the rest into "Other".
       const totals = new Map<string, number>();
       for (const p of series) {
-        const key = p.label ?? 'Unknown';
+        const key = p.label || '';
         totals.set(key, (totals.get(key) ?? 0) + (p.value || 0));
       }
       const ranked = Array.from(totals.entries()).sort((a, b) => b[1] - a[1]);
@@ -68,7 +68,7 @@ export function PrimaryChart({
 
       const byDatetime = new Map<string, Record<string, number | string>>();
       for (const p of series) {
-        const rawKey = p.label ?? 'Unknown';
+        const rawKey = p.label || '';
         const bucketKey = topKeySet.has(rawKey) ? rawKey : OTHER_KEY;
         const row = byDatetime.get(p.datetime) ?? { datetime: p.datetime };
         row[bucketKey] = ((row[bucketKey] as number) ?? 0) + (p.value || 0);
@@ -122,7 +122,8 @@ export function PrimaryChart({
   const labelForKey = (key: string) => {
     if (key === 'value') return METRIC_LABELS[metric];
     if (key === OTHER_KEY) return `Other (${otherCount})`;
-    return seriesLabelFor ? seriesLabelFor(key) : key;
+    const resolved = seriesLabelFor ? seriesLabelFor(key) : key;
+    return resolved || '—';
   };
 
   const colorForIndex = (i: number, key: string) =>

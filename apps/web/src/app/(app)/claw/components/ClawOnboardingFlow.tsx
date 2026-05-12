@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Loader2, TriangleAlert, X } from 'lucide-react';
 import { KILO_AUTO_BALANCED_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import { controllerVersionOk, gatewayStatusOk } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
 import { useUser } from '@/hooks/useUser';
@@ -147,7 +148,8 @@ function ClawOnboardingFlowInner({
   // instance is running — before that the query stays pending and the
   // optimistic default applies.
   const controllerVersionQuery = useClawControllerVersion(status?.status === 'running');
-  const controllerVersion = controllerVersionQuery.data;
+  // Narrow off the instance-not-running sentinel so `.version` is safe.
+  const controllerVersion = controllerVersionOk(controllerVersionQuery.data);
   const controllerSupportsInterests =
     controllerVersionQuery.isPending ||
     calverAtLeast(
@@ -209,7 +211,8 @@ function ClawOnboardingFlowInner({
     organizationId ?? '',
     !!organizationId && preGatewayFlowState.isRunning
   );
-  const { data: gatewayStatus } = organizationId ? orgGateway : personalGateway;
+  const { data: gatewayStatusRaw } = organizationId ? orgGateway : personalGateway;
+  const gatewayStatus = gatewayStatusOk(gatewayStatusRaw);
   const flowState = getClawOnboardingFlowState({
     ...stateInput,
     gatewayState: gatewayStatus?.state ?? null,

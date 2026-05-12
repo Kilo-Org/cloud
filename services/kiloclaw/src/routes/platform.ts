@@ -709,6 +709,45 @@ function jsonError(message: string, status: number, code?: string): Response {
   });
 }
 
+/**
+ * Short-circuit polling endpoints when the DO state isn't `running`.
+ *
+ * Polling endpoints (gateway/status, controller-version, debug-status,
+ * morning-briefing/status) proxy to port 18789 on the Fly machine via Fly's
+ * HTTPS edge. Even with `services[0].autostart: false`, Fly's proxy will wake
+ * a stopped machine to serve the request. By short-circuiting here, no proxy
+ * traffic reaches the machine while it is stopped.
+ *
+ * Returns a 200 sentinel (not 503) so the frontend's high-frequency polling
+ * doesn't generate a wall of 5xx in logs / Sentry / latency dashboards for
+ * what is a known steady state. Mirrors the `/gateway/ready` precedent.
+ */
+async function shortCircuitIfNotRunning(
+  env: AppEnv['Bindings'],
+  userId: string,
+  instanceId: string | undefined
+): Promise<Response | null> {
+  const status = await withResolvedDORetry(
+    env,
+    userId,
+    instanceId,
+    stub => stub.getStatus(),
+    'getStatus'
+  );
+  if (status.status === 'running') return null;
+  return new Response(
+    JSON.stringify({
+      ok: false,
+      reason: 'instance_not_running',
+      status: status.status,
+    }),
+    {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }
+  );
+}
+
 function kiloCliRunConflictResponse(response: unknown): Response | undefined {
   const result = KiloCliRunConflictSchema.safeParse(response);
   if (result.success) {
@@ -1698,6 +1737,9 @@ platform.get('/gateway/status', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const sentinel = await shortCircuitIfNotRunning(c.env, userId, iidResult.instanceId);
+    if (sentinel) return sentinel;
+
     const gatewayStatus = await withResolvedDORetry(
       c.env,
       userId,
@@ -1750,6 +1792,9 @@ platform.get('/controller-version', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const sentinel = await shortCircuitIfNotRunning(c.env, userId, iidResult.instanceId);
+    if (sentinel) return sentinel;
+
     const result = await withResolvedDORetry(
       c.env,
       userId,
@@ -2044,6 +2089,9 @@ platform.get('/morning-briefing/status', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const sentinel = await shortCircuitIfNotRunning(c.env, userId, iidResult.instanceId);
+    if (sentinel) return sentinel;
+
     const result = await withResolvedDORetry(
       c.env,
       userId,
@@ -3272,6 +3320,9 @@ platform.get('/debug-status', async c => {
   const { instanceId } = iidResult;
 
   try {
+    // No guard here: getDebugState() reads DO storage only and never proxies
+    // through Fly's edge to the machine. The wake-up bug (services that proxy
+    // to port 18789) does not apply.
     const status = await withResolvedDORetry(
       c.env,
       userId,

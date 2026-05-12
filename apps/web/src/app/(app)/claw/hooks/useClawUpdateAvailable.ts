@@ -1,6 +1,7 @@
 'use client';
 
 import { calverAtLeast, cleanVersion, getRunningVersionBadge } from '@/lib/kiloclaw/version';
+import { controllerVersionOk } from '@/lib/kiloclaw/types';
 import { useClawControllerVersion, useClawLatestVersion } from './useClawHooks';
 
 /**
@@ -18,10 +19,14 @@ export function useClawUpdateAvailable(status: {
   const isRunning = status.status === 'running';
 
   const {
-    data: controllerVersion,
+    data: controllerVersionRaw,
     isLoading: isLoadingControllerVersion,
     isError: isControllerVersionError,
   } = useClawControllerVersion(isRunning);
+  // Narrow off the instance-not-running sentinel returned by the worker
+  // when DO state isn't `running`. In that case there is no controller
+  // version to compare against and feature gates should default to off.
+  const controllerVersion = controllerVersionOk(controllerVersionRaw);
   // Pass the instance's current trackedImageTag to the resolver. Without it
   // the resolver can return :latest as an "upgrade" for an instance that's
   // actually on the (newer) candidate — surfacing as a misleading downgrade

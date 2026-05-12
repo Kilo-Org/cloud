@@ -7,9 +7,30 @@ import { useTRPC } from '@/lib/trpc';
 
 export { useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-mutations';
 
+/**
+ * The worker short-circuits polling endpoints (gateway/status,
+ * controller-version, morning-briefing/status) when the DO state isn't
+ * `running`, returning `{ ok: false, reason: 'instance_not_running', ... }`
+ * at HTTP 200. This type predicate matches that variant so callers can
+ * treat the sentinel as "no data" and TypeScript narrows to the OK shape
+ * on the negative branch. Must structurally match the sentinel variant on
+ * the worker's response union — keep in sync with
+ * `apps/web/src/lib/kiloclaw/types.ts:InstanceNotRunningSentinel`.
+ */
+type InstanceNotRunningSentinel = { ok: false; reason: 'instance_not_running' };
+
+function isInstanceNotRunningSentinel(value: unknown): value is InstanceNotRunningSentinel {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'reason' in value &&
+    (value as { reason?: unknown }).reason === 'instance_not_running'
+  );
+}
+
 export type InstanceStatus = NonNullable<ReturnType<typeof useKiloClawStatus>['data']>['status'];
 export type GatewayState = NonNullable<
-  ReturnType<typeof useKiloClawGatewayStatus>['data']
+  NonNullable<ReturnType<typeof useKiloClawGatewayStatus>['data']>
 >['state'];
 
 export function useKiloClawStatus(
@@ -99,7 +120,11 @@ export function useKiloClawGatewayStatus(organizationId?: string | null, enabled
       refetchInterval: orgEnabled ? 30_000 : false,
     })
   );
-  return isOrg ? org : personal;
+  const query = isOrg ? org : personal;
+  // Narrow off the instance-not-running sentinel so consumers always see the
+  // OK-shape payload (or `undefined` while the instance is stopped).
+  const data = query.data && !isInstanceNotRunningSentinel(query.data) ? query.data : undefined;
+  return { ...query, data };
 }
 
 export function useKiloClawGatewayReady(organizationId?: string | null, enabled = true) {

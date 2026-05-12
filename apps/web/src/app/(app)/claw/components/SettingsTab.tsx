@@ -25,6 +25,7 @@ import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { useUser } from '@/hooks/useUser';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus, MorningBriefingStatusLite } from '@/lib/kiloclaw/types';
+import { morningBriefingStatusOk } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import {
@@ -1697,7 +1698,10 @@ export function SettingsTab({
   } = useClawUpdateAvailable(status);
   const { data: myPin } = useClawMyPin();
   const morningBriefingStatusQuery = useClawMorningBriefingStatus(isRunning);
-  const morningBriefingStatus = morningBriefingStatusQuery.data;
+  // Narrow off the instance-not-running sentinel that the worker returns
+  // when DO state isn't `running`. The MB card only renders meaningfully
+  // when the OK-shape payload is available.
+  const morningBriefingStatus = morningBriefingStatusOk(morningBriefingStatusQuery.data);
   const gatewayReadyQuery = useClawGatewayReady(isRunning);
   const gatewayReady = gatewayReadyQuery.data;
   const [confirmDestroy, setConfirmDestroy] = useState(false);

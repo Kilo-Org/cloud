@@ -38,6 +38,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import type { DoctorControllerStatus, DoctorControllerStatusResponse } from '@/lib/kiloclaw/types';
+import { isInstanceNotRunningSentinel } from '@/lib/kiloclaw/types';
 import {
   User,
   Calendar,
@@ -1483,8 +1484,16 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     staleTime: 5 * 60_000,
   });
 
+  // controllerVersion is a union with InstanceNotRunningSentinel — narrow
+  // before reading version/commit fields. In the sentinel case the controller
+  // simply hasn't reported yet because the instance isn't running; treat as
+  // "unknown" so feature gates default to off until the machine comes up.
+  const controllerVersionResolved =
+    controllerVersion && !isInstanceNotRunningSentinel(controllerVersion)
+      ? controllerVersion
+      : undefined;
   const supportsConfigRestore = calverAtLeast(
-    cleanVersion(controllerVersion?.version),
+    cleanVersion(controllerVersionResolved?.version),
     '2026.2.26'
   );
   // /_kilo/doctor/start|status|cancel is expected to land after 14:00 CDT on
@@ -1493,7 +1502,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   // controllers fall through to the catch-all proxy and return 404 —
   // disable the button with a tooltip until they redeploy.
   const supportsDoctorController = calverAtLeast(
-    cleanVersion(controllerVersion?.version),
+    cleanVersion(controllerVersionResolved?.version),
     '2026.5.8.1900'
   );
 
@@ -4158,130 +4167,143 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 </Alert>
               )}
 
-              {gatewayControlsEnabled && gatewayStatus && (
-                <>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <DetailField label="State">
-                      <Badge variant={gatewayStatus.state === 'running' ? 'default' : 'secondary'}>
-                        {gatewayStatus.state}
-                      </Badge>
-                    </DetailField>
-                    <DetailField label="PID">{gatewayStatus.pid ?? '—'}</DetailField>
-                    <DetailField label="Uptime">{formatUptime(gatewayStatus.uptime)}</DetailField>
-                    <DetailField label="Restarts">{gatewayStatus.restarts}</DetailField>
-                    <DetailField label="Last Exit">
-                      {gatewayStatus.lastExit
-                        ? `${gatewayStatus.lastExit.code ?? 'null'} / ${
-                            gatewayStatus.lastExit.signal ?? 'none'
-                          } @ ${formatAbsoluteTime(gatewayStatus.lastExit.at)}`
-                        : '—'}
-                    </DetailField>
-                  </div>
+              {gatewayControlsEnabled &&
+                gatewayStatus &&
+                isInstanceNotRunningSentinel(gatewayStatus) && (
+                  <p className="text-muted-foreground text-sm">
+                    Instance is {gatewayStatus.status ?? 'not running'}. Start the machine to see
+                    gateway status.
+                  </p>
+                )}
 
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={gatewayActionPending}
-                      onClick={() =>
-                        void gatewayStart({ userId: data.user_id, instanceId: data.id })
-                      }
-                    >
-                      {isGatewayStarting ? (
-                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Play className="mr-1 h-4 w-4" />
-                      )}
-                      Start
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={gatewayActionPending}
-                      onClick={() =>
-                        void gatewayStop({ userId: data.user_id, instanceId: data.id })
-                      }
-                    >
-                      {isGatewayStopping ? (
-                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Square className="mr-1 h-4 w-4" />
-                      )}
-                      Stop
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={gatewayActionPending}
-                      onClick={() =>
-                        void gatewayRestart({ userId: data.user_id, instanceId: data.id })
-                      }
-                    >
-                      {isGatewayRestarting ? (
-                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                      ) : (
-                        <RotateCcw className="mr-1 h-4 w-4" />
-                      )}
-                      Restart
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={gatewayActionPending}
-                      onClick={() => {
-                        runDoctorMutation.reset();
-                        setDoctorDialogOpen(true);
-                        runDoctorMutation.mutate({ userId: data.user_id, instanceId: data.id });
-                      }}
-                    >
-                      <Stethoscope className="mr-1 h-4 w-4" />
-                      Run Doctor
-                    </Button>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={!supportsDoctorController || gatewayActionPending}
-                            onClick={() => {
-                              startDoctorControllerMutation.mutate({
-                                userId: data.user_id,
-                                instanceId: data.id,
-                                fix: doctorControllerFix,
-                              });
-                            }}
-                          >
-                            <Stethoscope className="mr-1 h-4 w-4" />
-                            Run Doctor (Controller)
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      {!supportsDoctorController && (
-                        <TooltipContent>Unavailable until redeploy</TooltipContent>
-                      )}
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            disabled={!supportsConfigRestore || gatewayActionPending}
-                            onClick={() => setRestoreConfigDialogOpen(true)}
-                          >
-                            <RotateCcw className="mr-1 h-4 w-4" />
-                            Restore Default Config
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      {!supportsConfigRestore && (
-                        <TooltipContent>Unavailable until redeploy</TooltipContent>
-                      )}
-                    </Tooltip>
-                  </div>
-                </>
-              )}
+              {gatewayControlsEnabled &&
+                gatewayStatus &&
+                !isInstanceNotRunningSentinel(gatewayStatus) && (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                      <DetailField label="State">
+                        <Badge
+                          variant={gatewayStatus.state === 'running' ? 'default' : 'secondary'}
+                        >
+                          {gatewayStatus.state}
+                        </Badge>
+                      </DetailField>
+                      <DetailField label="PID">{gatewayStatus.pid ?? '—'}</DetailField>
+                      <DetailField label="Uptime">{formatUptime(gatewayStatus.uptime)}</DetailField>
+                      <DetailField label="Restarts">{gatewayStatus.restarts}</DetailField>
+                      <DetailField label="Last Exit">
+                        {gatewayStatus.lastExit
+                          ? `${gatewayStatus.lastExit.code ?? 'null'} / ${
+                              gatewayStatus.lastExit.signal ?? 'none'
+                            } @ ${formatAbsoluteTime(gatewayStatus.lastExit.at)}`
+                          : '—'}
+                      </DetailField>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={gatewayActionPending}
+                        onClick={() =>
+                          void gatewayStart({ userId: data.user_id, instanceId: data.id })
+                        }
+                      >
+                        {isGatewayStarting ? (
+                          <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Play className="mr-1 h-4 w-4" />
+                        )}
+                        Start
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={gatewayActionPending}
+                        onClick={() =>
+                          void gatewayStop({ userId: data.user_id, instanceId: data.id })
+                        }
+                      >
+                        {isGatewayStopping ? (
+                          <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Square className="mr-1 h-4 w-4" />
+                        )}
+                        Stop
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={gatewayActionPending}
+                        onClick={() =>
+                          void gatewayRestart({ userId: data.user_id, instanceId: data.id })
+                        }
+                      >
+                        {isGatewayRestarting ? (
+                          <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                        ) : (
+                          <RotateCcw className="mr-1 h-4 w-4" />
+                        )}
+                        Restart
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={gatewayActionPending}
+                        onClick={() => {
+                          runDoctorMutation.reset();
+                          setDoctorDialogOpen(true);
+                          runDoctorMutation.mutate({ userId: data.user_id, instanceId: data.id });
+                        }}
+                      >
+                        <Stethoscope className="mr-1 h-4 w-4" />
+                        Run Doctor
+                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!supportsDoctorController || gatewayActionPending}
+                              onClick={() => {
+                                startDoctorControllerMutation.mutate({
+                                  userId: data.user_id,
+                                  instanceId: data.id,
+                                  fix: doctorControllerFix,
+                                });
+                              }}
+                            >
+                              <Stethoscope className="mr-1 h-4 w-4" />
+                              Run Doctor (Controller)
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!supportsDoctorController && (
+                          <TooltipContent>Unavailable until redeploy</TooltipContent>
+                        )}
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={!supportsConfigRestore || gatewayActionPending}
+                              onClick={() => setRestoreConfigDialogOpen(true)}
+                            >
+                              <RotateCcw className="mr-1 h-4 w-4" />
+                              Restore Default Config
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!supportsConfigRestore && (
+                          <TooltipContent>Unavailable until redeploy</TooltipContent>
+                        )}
+                      </Tooltip>
+                    </div>
+                  </>
+                )}
             </CardContent>
           </Card>
         )}

@@ -420,8 +420,72 @@ export type RestartMachineResponse = {
   error?: string;
 };
 
-/** Response from GET /api/platform/gateway/status */
-export type GatewayProcessStatusResponse = {
+/**
+ * Sentinel returned by the polling endpoints (gateway/status,
+ * controller-version, debug-status, morning-briefing/status) when the DO
+ * state isn't `running`. The worker short-circuits before forwarding to
+ * the Fly proxy so the proxy can't wake a stopped machine.
+ *
+ * Returned as HTTP 200 (not 503) so the frontend's high-frequency polling
+ * doesn't generate log/Sentry noise for what is an expected steady state.
+ * Frontends discriminate on `reason === 'instance_not_running'`.
+ */
+export type InstanceNotRunningSentinel = {
+  ok: false;
+  reason: 'instance_not_running';
+  /** Current DO status. Frontend can use this to render a richer label
+   *  (e.g. "Instance is starting…" vs "Instance is stopped"). */
+  status:
+    | 'provisioned'
+    | 'starting'
+    | 'restarting'
+    | 'recovering'
+    | 'stopped'
+    | 'destroying'
+    | 'restoring'
+    | null;
+};
+
+export function isInstanceNotRunningSentinel(value: unknown): value is InstanceNotRunningSentinel {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'reason' in value &&
+    (value as { reason?: unknown }).reason === 'instance_not_running'
+  );
+}
+
+/**
+ * Narrowing helper: returns the OK-shape variant of a polling-endpoint
+ * response, or `undefined` if the worker short-circuited with the
+ * instance-not-running sentinel. Use this when a caller only cares about
+ * the "instance running" payload (e.g. computing a controller version
+ * gate). Caller pattern: `controllerVersionOk(data)?.version`.
+ */
+export function controllerVersionOk(
+  value: ControllerVersionResponse | undefined | null
+): Exclude<ControllerVersionResponse, InstanceNotRunningSentinel> | undefined {
+  if (!value || isInstanceNotRunningSentinel(value)) return undefined;
+  return value;
+}
+
+export function gatewayStatusOk(
+  value: GatewayProcessStatusResponse | undefined | null
+): GatewayProcessStatusOkResponse | undefined {
+  if (!value || isInstanceNotRunningSentinel(value)) return undefined;
+  return value;
+}
+
+export function morningBriefingStatusOk(
+  value: MorningBriefingStatusResponse | undefined | null
+): MorningBriefingStatusOkResponse | undefined {
+  if (!value || isInstanceNotRunningSentinel(value)) return undefined;
+  return value;
+}
+
+/** OK-shape payload of GET /api/platform/gateway/status (i.e. the worker
+ *  did not short-circuit with the not-running sentinel). */
+export type GatewayProcessStatusOkResponse = {
   state: 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed' | 'shutting_down';
   pid: number | null;
   uptime: number;
@@ -432,6 +496,11 @@ export type GatewayProcessStatusResponse = {
     at: string;
   } | null;
 };
+
+/** Response from GET /api/platform/gateway/status */
+export type GatewayProcessStatusResponse =
+  | GatewayProcessStatusOkResponse
+  | InstanceNotRunningSentinel;
 
 /** Response from POST /api/platform/gateway/{start|stop|restart} */
 export type GatewayProcessActionResponse = {
@@ -448,12 +517,14 @@ export type ConfigRestoreResponse = {
 export type GatewayReadyResponse = Record<string, unknown>;
 
 /** Response from GET /api/platform/controller-version. Null fields = old controller. */
-export type ControllerVersionResponse = {
-  version: string | null;
-  commit: string | null;
-  openclawVersion?: string | null;
-  openclawCommit?: string | null;
-};
+export type ControllerVersionResponse =
+  | {
+      version: string | null;
+      commit: string | null;
+      openclawVersion?: string | null;
+      openclawCommit?: string | null;
+    }
+  | InstanceNotRunningSentinel;
 
 /** Response from GET /api/platform/openclaw-config */
 export type OpenclawConfigResponse = {
@@ -476,7 +547,7 @@ export type MorningBriefingDeliveryResult = {
 };
 
 export type MorningBriefingStatusLite = Pick<
-  MorningBriefingStatusResponse,
+  MorningBriefingStatusOkResponse,
   | 'enabled'
   | 'desiredEnabled'
   | 'observedEnabled'
@@ -491,7 +562,11 @@ export type MorningBriefingStatusLite = Pick<
   | 'interestTopics'
 >;
 
-export type MorningBriefingStatusResponse = {
+export type MorningBriefingStatusResponse =
+  | MorningBriefingStatusOkResponse
+  | InstanceNotRunningSentinel;
+
+export type MorningBriefingStatusOkResponse = {
   ok: boolean;
   enabled?: boolean;
   cron?: string;

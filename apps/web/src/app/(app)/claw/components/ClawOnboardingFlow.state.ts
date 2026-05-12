@@ -1,4 +1,4 @@
-import type { GatewayProcessStatusResponse, KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import type { GatewayProcessStatusOkResponse, KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 
 export type PopulatedClawStatus = KiloClawDashboardStatus & {
   status: NonNullable<KiloClawDashboardStatus['status']>;
@@ -75,7 +75,7 @@ export type ClawOnboardingFlowStateInput = {
   setupFailed?: boolean;
   onboardingStep: OnboardingStep;
   hasBotIdentity: boolean;
-  gatewayState?: GatewayProcessStatusResponse['state'] | null;
+  gatewayState?: GatewayProcessStatusOkResponse['state'] | null;
   /**
    * Whether the calendar step is available in the wizard. Calendar OAuth is
    * gated to Kilo Code admins (the `/api/integrations/google/connect` and

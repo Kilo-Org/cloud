@@ -23,10 +23,18 @@ function errorRedirect(error: GitHubConnectError, returnTo: string, requestUrl: 
   return NextResponse.redirect(url);
 }
 
+function sanitizeForLog(value: string | null): string | null {
+  if (value === null) return null;
+  // Truncate and strip control characters to prevent log injection
+  return value.slice(0, 200).replace(/[\x00-\x1f\x7f]/g, '');
+}
+
 function mapGitHubError(error: string | null, errorDescription: string | null): GitHubConnectError {
   if (error === 'access_denied') return 'access_denied';
-  // Log raw description server-side only
-  console.error('GitHub OAuth error:', { error, errorDescription });
+  console.error('GitHub OAuth error:', {
+    error: sanitizeForLog(error),
+    errorDescription: sanitizeForLog(errorDescription),
+  });
   return 'unknown';
 }
 

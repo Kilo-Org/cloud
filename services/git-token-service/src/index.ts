@@ -1,6 +1,10 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { GitHubTokenService, type GitHubAppType } from './github-token-service.js';
-import { UserGitHubTokenService } from './user-github-token-service.js';
+import {
+  UserGitHubTokenService,
+  type GetUserTokenInput,
+  type GetUserTokenResult,
+} from './user-github-token-service.js';
 import { GitLabLookupService } from './gitlab-lookup-service.js';
 import { GitLabTokenService } from './gitlab-token-service.js';
 import { InstallationLookupService } from './installation-lookup-service.js';
@@ -127,9 +131,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
    * @param params - The kilo user ID, repo, and app type
    * @returns Token and identity, or a failure reason
    */
-  async getUserTokenForRepo(
-    params: import('./user-github-token-service.js').GetUserTokenInput
-  ): Promise<import('./user-github-token-service.js').GetUserTokenResult> {
+  async getUserTokenForRepo(params: GetUserTokenInput): Promise<GetUserTokenResult> {
     return this.userGithubService.getUserTokenForRepo(params);
   }
 

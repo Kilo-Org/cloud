@@ -5,8 +5,9 @@ import { Octokit } from '@octokit/rest';
 import type { GitHubAppType } from './github-token-service';
 
 function getOctokitStatus(e: unknown): number | undefined {
-  if (e != null && typeof e === 'object' && 'status' in e && typeof (e as Record<string, unknown>).status === 'number') {
-    return (e as { status: number }).status;
+  if (e != null && typeof e === 'object' && 'status' in e) {
+    const { status } = e as { status: unknown };
+    if (typeof status === 'number') return status;
   }
   return undefined;
 }

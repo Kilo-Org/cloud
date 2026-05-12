@@ -86,12 +86,10 @@ const {
   generateKiloSessionIdMock: vi.fn(() => 'ses_mock-kilo-session-id'),
   createCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
   deleteCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
-  resolveGitHubTokenForRepoMock: vi
-    .fn()
-    .mockResolvedValue({
-      success: false,
-      error: { reason: 'no_installation_found', message: 'not found' },
-    }),
+  resolveGitHubTokenForRepoMock: vi.fn().mockResolvedValue({
+    success: false,
+    error: { reason: 'no_installation_found', message: 'not found' },
+  }),
   resolveUserGitHubTokenForRepoMock: vi
     .fn()
     .mockResolvedValue({ success: false, reason: 'not_connected' }),

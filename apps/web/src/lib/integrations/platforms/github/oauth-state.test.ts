@@ -1,5 +1,4 @@
 import { createOAuthState, verifyOAuthState, safeReturnTo } from './oauth-state';
-import { GITHUB_OAUTH_STATE_SECRET } from '@/lib/config.server';
 
 describe('oauth-state', () => {
   describe('createOAuthState + verifyOAuthState', () => {

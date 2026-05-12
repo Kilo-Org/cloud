@@ -447,6 +447,32 @@ describe('kiloPassRouter', () => {
       expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
     });
 
+    it('succeeds when the transaction appAccountToken matches the signed-in user', async () => {
+      const verifierMock = getAppStoreVerifierMock();
+      const completionMock = getStoreCompletionMock();
+      const sentryMock = getSentryMock();
+      const user = await insertTestUser();
+      verifierMock.verifyAppleKiloPassTransactionJws.mockResolvedValue(
+        appStorePurchaseFixture({ appAccountToken: user.app_store_account_token })
+      );
+      const expectedResult = {
+        subscriptionId: 'sub-test-id',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        alreadyProcessed: false,
+      };
+      completionMock.completeStoreKiloPassPurchase.mockResolvedValue(expectedResult);
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.completeAppStorePurchase({
+        signedTransactionJws: 'signed-jws',
+      });
+
+      expect(result).toEqual(expectedResult);
+      expect(completionMock.completeStoreKiloPassPurchase).toHaveBeenCalledTimes(1);
+      expect(sentryMock.captureException).not.toHaveBeenCalled();
+    });
+
     it('keeps account mismatch copy stable and does not log it as an internal failure', async () => {
       const verifierMock = getAppStoreVerifierMock();
       const completionMock = getStoreCompletionMock();
@@ -459,6 +485,26 @@ describe('kiloPassRouter', () => {
       await expect(
         caller.kiloPass.completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
       ).rejects.toThrow('App Store purchase account token does not match the signed-in user.');
+      expect(completionMock.completeStoreKiloPassPurchase).not.toHaveBeenCalled();
+      expect(sentryMock.captureException).not.toHaveBeenCalled();
+    });
+
+    it('throws a distinct error when appAccountToken is null and does not log it as an internal failure', async () => {
+      const verifierMock = getAppStoreVerifierMock();
+      const completionMock = getStoreCompletionMock();
+      const sentryMock = getSentryMock();
+      verifierMock.verifyAppleKiloPassTransactionJws.mockResolvedValue(
+        appStorePurchaseFixture({ appAccountToken: null })
+      );
+
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      await expect(
+        caller.kiloPass.completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+      ).rejects.toThrow(
+        "This App Store purchase isn't linked to your Kilo account. Make sure you're signed in to the Apple ID that made the purchase, then try again."
+      );
       expect(completionMock.completeStoreKiloPassPurchase).not.toHaveBeenCalled();
       expect(sentryMock.captureException).not.toHaveBeenCalled();
     });

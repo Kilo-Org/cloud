@@ -161,14 +161,25 @@ type StripeManagedKiloPassSubscription = KiloPassSubscriptionState & {
   stripeSubscriptionId: string;
 };
 
+const APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
+  'App Store purchase account token does not match the signed-in user.';
+const APP_STORE_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE =
+  "This App Store purchase isn't linked to your Kilo account. Make sure you're signed in to the Apple ID that made the purchase, then try again.";
+
 function assertAppStoreAccountTokenMatchesUser(params: {
   appAccountToken: string | null;
   userAppStoreAccountToken: string;
 }): void {
+  if (params.appAccountToken === null) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: APP_STORE_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE,
+    });
+  }
   if (params.appAccountToken !== params.userAppStoreAccountToken) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
-      message: 'App Store purchase account token does not match the signed-in user.',
+      message: APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE,
     });
   }
 }

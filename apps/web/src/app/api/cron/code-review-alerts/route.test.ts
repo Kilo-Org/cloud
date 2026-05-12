@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 
-const mockCheckAndRecordAlert = jest.fn();
+const mockCheckAlertSuppression = jest.fn();
+const mockRecordAlertDelivery = jest.fn();
 
 jest.mock('@/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
@@ -12,7 +13,8 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 jest.mock('@/lib/code-reviews/alerting/dedup-client', () => ({
-  checkAndRecordAlert: (...args: unknown[]) => mockCheckAndRecordAlert(...args),
+  checkAlertSuppression: (...args: unknown[]) => mockCheckAlertSuppression(...args),
+  recordAlertDelivery: (...args: unknown[]) => mockRecordAlertDelivery(...args),
 }));
 
 import { db, sql } from '@/lib/drizzle';
@@ -46,7 +48,8 @@ describe('GET /api/cron/code-review-alerts', () => {
 
   beforeEach(async () => {
     await db.delete(cloud_agent_code_reviews).where(sql`true`);
-    mockCheckAndRecordAlert.mockReset();
+    mockCheckAlertSuppression.mockReset();
+    mockRecordAlertDelivery.mockReset();
     fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(new Response('ok', { status: 200 }));
   });
 
@@ -88,11 +91,12 @@ describe('GET /api/cron/code-review-alerts', () => {
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
-    expect(mockCheckAndRecordAlert).not.toHaveBeenCalled();
+    expect(mockCheckAlertSuppression).not.toHaveBeenCalled();
+    expect(mockRecordAlertDelivery).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('consults dedup before sending Slack alerts', async () => {
+  it('consults dedup and records delivery after sending Slack alerts', async () => {
     await db
       .insert(cloud_agent_code_reviews)
       .values([
@@ -104,16 +108,19 @@ describe('GET /api/cron/code-review-alerts', () => {
           reviewValues({ status: 'queued', created_at: minutesAgo(20), updated_at: minutesAgo(16) })
         ),
       ]);
-    mockCheckAndRecordAlert
+    mockCheckAlertSuppression
       .mockResolvedValueOnce({ suppressed: false })
       .mockResolvedValueOnce({ suppressed: true });
+    mockRecordAlertDelivery.mockResolvedValue({ success: true });
 
     const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
 
     expect(response.status).toBe(200);
-    expect(mockCheckAndRecordAlert).toHaveBeenNthCalledWith(1, 'failure_rate', 'ticket');
-    expect(mockCheckAndRecordAlert).toHaveBeenNthCalledWith(2, 'stuck_reviews', 'ticket');
+    expect(mockCheckAlertSuppression).toHaveBeenNthCalledWith(1, 'failure_rate', 'ticket');
+    expect(mockCheckAlertSuppression).toHaveBeenNthCalledWith(2, 'stuck_reviews', 'ticket');
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(mockRecordAlertDelivery).toHaveBeenCalledTimes(1);
+    expect(mockRecordAlertDelivery).toHaveBeenCalledWith('failure_rate', 'ticket');
 
     const [webhookUrl, init] = fetchSpy.mock.calls[0];
     expect(webhookUrl).toBe('https://hooks.slack.test/code-review');
@@ -142,6 +149,37 @@ describe('GET /api/cron/code-review-alerts', () => {
         },
       ],
       timestamp: expect.any(String),
+    });
+  });
+
+  it('does not record dedup state when Slack delivery fails', async () => {
+    await db
+      .insert(cloud_agent_code_reviews)
+      .values([
+        ...Array.from({ length: 3 }, () =>
+          reviewValues({ status: 'failed', terminal_reason: 'timeout' })
+        ),
+        ...Array.from({ length: 5 }, () => reviewValues({ status: 'completed' })),
+      ]);
+    mockCheckAlertSuppression.mockResolvedValue({ suppressed: false });
+    fetchSpy.mockResolvedValue(new Response('rate limited', { status: 429 }));
+
+    const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+
+    expect(response.status).toBe(200);
+    expect(mockCheckAlertSuppression).toHaveBeenCalledWith('failure_rate', 'ticket');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(mockRecordAlertDelivery).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      tripped: 1,
+      sent: 0,
+      suppressed: 0,
+      slack: 'failed',
+      alerts: [],
+      errors: [
+        { detector: 'failure_rate', message: expect.stringContaining('Slack webhook failed') },
+      ],
     });
   });
 });

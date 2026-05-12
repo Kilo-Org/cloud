@@ -3,7 +3,10 @@ import { NextResponse } from 'next/server';
 import { APP_URL } from '@/lib/constants';
 import { CRON_SECRET, SLACK_CODE_REVIEW_WEBHOOK_URL } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
-import { checkAndRecordAlert } from '@/lib/code-reviews/alerting/dedup-client';
+import {
+  checkAlertSuppression,
+  recordAlertDelivery,
+} from '@/lib/code-reviews/alerting/dedup-client';
 import {
   evaluateErrorCategorySpike,
   evaluateFailureRate,
@@ -95,13 +98,15 @@ async function handleTrippedAlert(
     return { detector, alertKey, suppressed: false, slack: 'skipped' };
   }
 
-  const { suppressed } = await checkAndRecordAlert(alertKey, severity);
+  const { suppressed } = await checkAlertSuppression(alertKey, severity);
 
   if (suppressed) {
     return { detector, alertKey, suppressed: true, slack: 'suppressed' };
   }
 
   const slack = await postToSlack(details, webhookUrl);
+  await recordAlertDelivery(alertKey, severity);
+
   return { detector, alertKey, suppressed: false, slack };
 }
 

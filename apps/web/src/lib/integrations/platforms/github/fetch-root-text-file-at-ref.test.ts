@@ -18,10 +18,6 @@ jest.mock('@octokit/rest', () => ({
   })),
 }));
 
-jest.mock('@octokit/auth-app', () => ({
-  createAppAuth: jest.fn(() => async () => ({ token: 'mock-token', expiresAt: '2099-01-01' })),
-}));
-
 import { decodeGitHubBase64Content, fetchGitHubRootTextFileAtRef } from './adapter';
 
 function httpError(status: number) {
@@ -44,12 +40,11 @@ describe('decodeGitHubBase64Content', () => {
 
 describe('fetchGitHubRootTextFileAtRef', () => {
   const params = {
-    installationId: '42',
+    token: 'mock-token',
     owner: 'acme',
     repo: 'widgets',
     path: 'REVIEW.md',
     ref: 'main',
-    appType: 'standard' as const,
   };
 
   it('fetches and decodes a root text file at the requested ref', async () => {

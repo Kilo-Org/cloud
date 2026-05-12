@@ -159,7 +159,8 @@ export async function prepareReviewPayload(
         // we cannot clone private repos or post review comments. Let the error
         // propagate so the user sees a meaningful failure on the review.
         const tokenData = await generateGitHubInstallationToken(installationId, appType);
-        githubToken = tokenData.token;
+        const installationToken = tokenData.token;
+        githubToken = installationToken;
         const [repoOwner, repoName] = review.repo_full_name.split('/');
 
         if (repoOwner && repoName) {
@@ -169,12 +170,11 @@ export async function prepareReviewPayload(
             baseRef: review.base_ref,
             fetchInstructions: () =>
               fetchGitHubRootTextFileAtRef({
-                installationId,
+                token: installationToken,
                 owner: repoOwner,
                 repo: repoName,
                 path: REVIEW_INSTRUCTIONS_FILE,
                 ref: review.base_ref,
-                appType,
               }),
           });
         } else {

@@ -150,12 +150,11 @@ describe('prepareReviewPayload REVIEW.md support', () => {
     });
 
     expect(mockFetchGitHubRootTextFileAtRef).toHaveBeenCalledWith({
-      installationId: integration.platform_installation_id,
+      token: 'github-token',
       owner: 'test-org',
       repo: REPO.split('/')[1],
       path: 'REVIEW.md',
       ref: 'main',
-      appType: 'standard',
     });
     expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(
       expect.any(Object),

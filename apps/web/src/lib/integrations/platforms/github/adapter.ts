@@ -650,16 +650,14 @@ export function decodeGitHubBase64Content(content: string): string {
  * Returns null for missing files, directories, or unsupported content responses.
  */
 export async function fetchGitHubRootTextFileAtRef(params: {
-  installationId: string;
+  token: string;
   owner: string;
   repo: string;
   path: string;
   ref: string;
-  appType?: GitHubAppType;
 }): Promise<string | null> {
-  const { installationId, owner, repo, path, ref, appType = 'standard' } = params;
-  const tokenData = await generateGitHubInstallationToken(installationId, appType);
-  const octokit = new Octokit({ auth: tokenData.token });
+  const { token, owner, repo, path, ref } = params;
+  const octokit = new Octokit({ auth: token });
 
   try {
     const { data } = await octokit.repos.getContent({

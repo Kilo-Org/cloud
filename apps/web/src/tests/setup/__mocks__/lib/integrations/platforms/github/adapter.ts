@@ -119,12 +119,11 @@ export async function fetchPullRequestReviewDecision(_args: {
 }
 
 export async function fetchGitHubRootTextFileAtRef(_params: {
-  installationId: string;
+  token: string;
   owner: string;
   repo: string;
   path: string;
   ref: string;
-  appType?: GitHubAppType;
 }): Promise<string | null> {
   return null;
 }

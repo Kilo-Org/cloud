@@ -1,6 +1,7 @@
 import type { db as defaultDb } from '@/lib/drizzle';
 import { sql } from '@/lib/drizzle';
 import { cloud_agent_code_reviews } from '@kilocode/db/schema';
+import { CODE_REVIEW_BENIGN_TERMINAL_REASONS } from '@kilocode/db/schema-types';
 import {
   CODE_REVIEW_ALERT_WINDOW_MINUTES,
   ERROR_SPIKE_FRACTION,
@@ -78,7 +79,10 @@ type ErrorReasonRow = {
 
 const terminalStatusesSql = sql`('completed', 'failed', 'cancelled', 'interrupted')`;
 const failureStatusesSql = sql`('failed', 'interrupted')`;
-const benignTerminalReasonsSql = sql`('billing', 'user_cancelled', 'superseded')`;
+const benignTerminalReasonsSql = sql`(${sql.join(
+  CODE_REVIEW_BENIGN_TERMINAL_REASONS.map(reason => sql`${reason}`),
+  sql.raw(', ')
+)})`;
 
 function toNumber(value: CountValue): number {
   if (value === null || value === undefined) return 0;

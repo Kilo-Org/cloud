@@ -97,5 +97,10 @@
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "O11Y_SLACK_WEBHOOK_TICKET",
     },
+    {
+      "binding": "O11Y_CF_CONTAINERS_API_TOKEN",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "O11Y_CF_CONTAINERS_API_TOKEN",
+    },
   ],
 }

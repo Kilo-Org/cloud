@@ -75,7 +75,10 @@ const DoltHubTokenPayloadSchema = z.object({
   scope: z.string().optional(),
 });
 
-function parseDoltHubTokenPayload(raw: unknown, operation: 'exchange' | 'refresh'): DoltHubTokenResponse {
+function parseDoltHubTokenPayload(
+  raw: unknown,
+  operation: 'exchange' | 'refresh'
+): DoltHubTokenResponse {
   const parseResult = DoltHubTokenPayloadSchema.safeParse(raw);
   if (!parseResult.success) {
     throw new Error(`DoltHub token ${operation} returned invalid payload`);
@@ -114,7 +117,9 @@ export async function exchangeDoltHubOAuthCode(code: string): Promise<DoltHubTok
   return parseDoltHubTokenPayload(await response.json(), 'exchange');
 }
 
-export async function refreshDoltHubAccessToken(refreshToken: string): Promise<DoltHubTokenResponse> {
+export async function refreshDoltHubAccessToken(
+  refreshToken: string
+): Promise<DoltHubTokenResponse> {
   assertDevOnly();
 
   const body = new URLSearchParams({
@@ -145,7 +150,9 @@ export async function getInstallation(owner: Owner): Promise<PlatformIntegration
   const [integration] = await db
     .select()
     .from(platform_integrations)
-    .where(and(...getOwnershipConditions(owner), eq(platform_integrations.platform, PLATFORM.DOLTHUB)))
+    .where(
+      and(...getOwnershipConditions(owner), eq(platform_integrations.platform, PLATFORM.DOLTHUB))
+    )
     .limit(1);
 
   return integration || null;
@@ -229,19 +236,66 @@ export async function uninstall(owner: Owner): Promise<{ success: boolean }> {
   return { success: true };
 }
 
+const DoltHubUserResponseSchema = z.object({
+  data: z
+    .object({
+      currentUser: z
+        .object({
+          username: z.string().min(1),
+        })
+        .optional(),
+    })
+    .optional(),
+  errors: z.array(z.unknown()).optional(),
+});
+
+export async function fetchDoltHubUser(accessToken: string): Promise<{ username: string } | null> {
+  assertDevOnly();
+
+  try {
+    const response = await fetch('https://www.dolthub.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        query: '{ currentUser { username } }',
+      }),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const raw = await response.json();
+    const parseResult = DoltHubUserResponseSchema.safeParse(raw);
+    if (!parseResult.success) {
+      return null;
+    }
+
+    const username = parseResult.data.data?.currentUser?.username;
+    if (username) {
+      return { username };
+    }
+  } catch {
+    // Ignore errors and fall through
+  }
+
+  return null;
+}
+
 export async function getValidDoltHubToken(
   integration: PlatformIntegration
 ): Promise<string | null> {
   assertDevOnly();
 
-  const metadata = integration.metadata as
-    | {
-        access_token?: string;
-        refresh_token?: string;
-        expires_at?: number;
-        scope?: string;
-      }
-    | null;
+  const metadata = integration.metadata as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_at?: number;
+    scope?: string;
+  } | null;
 
   if (!metadata?.access_token) {
     return null;

@@ -7,9 +7,6 @@
       "@/types/*": ["../../apps/web/src/types/*"],
       "@/lib/cloud-agent-next/*": ["../../apps/web/src/lib/cloud-agent-next/*"],
       "@/lib/images-schema": ["../../apps/web/src/lib/images-schema.ts"],
-      "@/lib/kiloclaw/instance-not-running-sentinel": [
-        "../../apps/web/src/lib/kiloclaw/instance-not-running-sentinel.ts"
-      ],
       "@/*": ["./src/*"],
       "@/assets/*": ["./assets/*"],
       "cloud-agent-sdk": ["../../apps/web/src/lib/cloud-agent-sdk/index.ts"],

@@ -336,11 +336,15 @@ const PR_POLL_NON_TRANSIENT_THRESHOLD = 3;
 /** Minimum interval between PR polls per MR bead (ms) (#1632). */
 export const PR_POLL_INTERVAL_MS = 60_000; // 1 minute
 
+function providerLabel(provider: 'github' | 'gitlab'): string {
+  return provider === 'github' ? 'GitHub' : 'GitLab';
+}
+
 function failureMessageFor(error: PRStatusError): string {
   switch (error.kind) {
     case 'no_token':
       return (
-        `No GitHub token resolved for this town. Tried (in order): ` +
+        `No ${providerLabel(error.provider)} token resolved for this town. Tried (in order): ` +
         error.resolutionChain.map(s => `\`${s}\``).join(', ') +
         `. Configure one of these in town or rig settings. ` +
         `Note: polecat agents use their own container credentials and ` +
@@ -349,13 +353,17 @@ function failureMessageFor(error: PRStatusError): string {
       );
     case 'http_error':
       if (error.status === 401) {
-        return `Town's GitHub token is invalid or expired (HTTP 401). Refresh the token in town settings.`;
+        return `Town's ${providerLabel(error.provider)} token is invalid or expired (HTTP 401). Refresh the token in town settings.`;
       }
       if (error.status === 403) {
-        return `Town's GitHub token lacks permission for this PR (HTTP 403). Ensure the token has \`pull-requests: read\` scope on the repo, or check for a secondary rate limit.`;
+        const scopeHint =
+          error.provider === 'github'
+            ? 'Ensure the token has `pull-requests: read` scope on the repo, or check for a secondary rate limit.'
+            : 'Ensure the token has permission to read merge requests in the project.';
+        return `Town's ${providerLabel(error.provider)} token lacks permission for this PR (HTTP 403). ${scopeHint}`;
       }
       if (error.status === 404) {
-        return `PR not found (HTTP 404). Was the branch deleted before the PR could be polled, or is the PR URL wrong?`;
+        return `${error.provider === 'github' ? 'PR' : 'MR'} not found (HTTP 404). Was the branch deleted before it could be polled, or is the URL wrong?`;
       }
       return `${error.provider} API returned HTTP ${error.status} ${error.statusText}. ${error.transient ? 'Retrying.' : 'Not retryable.'}`;
     case 'invalid_response':
@@ -388,6 +396,30 @@ function shouldFailImmediately(error: PRStatusError): boolean {
 
 function shouldCountAsTransient(error: PRStatusError): boolean {
   return error.kind === 'http_error' && error.transient;
+}
+
+type PollCounterState = {
+  pollTransientCount: number;
+  pollNonTransientCount: number;
+  shouldFail: boolean;
+};
+
+function nextPollCounterState(error: PRStatusError, current: PollCounterState): PollCounterState {
+  if (shouldCountAsTransient(error)) {
+    const pollTransientCount = current.pollTransientCount + 1;
+    return {
+      pollTransientCount,
+      pollNonTransientCount: 0,
+      shouldFail: pollTransientCount >= PR_POLL_NULL_THRESHOLD,
+    };
+  }
+
+  const pollNonTransientCount = current.pollNonTransientCount + 1;
+  return {
+    pollTransientCount: 0,
+    pollNonTransientCount,
+    shouldFail: pollNonTransientCount >= PR_POLL_NON_TRANSIENT_THRESHOLD,
+  };
 }
 
 function now(): string {
@@ -1679,6 +1711,7 @@ function parsePrUrl(prUrl: string): { repo: string; prNumber: number } | null {
 export { hasExistingFeedbackBead as _hasExistingFeedbackBead, parsePrUrl as _parsePrUrl };
 export {
   failureMessageFor as _failureMessageFor,
+  nextPollCounterState as _nextPollCounterState,
   shouldFailImmediately as _shouldFailImmediately,
   shouldCountAsTransient as _shouldCountAsTransient,
 };

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   _failureMessageFor,
+  _nextPollCounterState,
   _shouldFailImmediately,
   _shouldCountAsTransient,
 } from '../../src/dos/town/actions';
@@ -64,6 +65,26 @@ describe('failureMessageFor', () => {
     const msg = _failureMessageFor(error);
     expect(msg).toContain('not found');
     expect(msg).toContain('HTTP 404');
+  });
+
+  it('produces GitLab-specific messages', () => {
+    const noTokenMessage = _failureMessageFor({
+      kind: 'no_token',
+      provider: 'gitlab',
+      resolutionChain: ['town.git_auth.gitlab_token'],
+    });
+    expect(noTokenMessage).toContain('No GitLab token resolved');
+
+    const forbiddenMessage = _failureMessageFor({
+      kind: 'http_error',
+      provider: 'gitlab',
+      status: 403,
+      statusText: 'Forbidden',
+      transient: false,
+    });
+    expect(forbiddenMessage).toContain("Town's GitLab token lacks permission");
+    expect(forbiddenMessage).toContain('merge requests');
+    expect(forbiddenMessage).not.toContain('pull-requests: read');
   });
 
   it('produces generic HTTP message for other status codes', () => {
@@ -315,16 +336,24 @@ describe('counter cross-contamination', () => {
       reason: 'schema_mismatch',
     };
 
-    expect(_shouldFailImmediately(transientError)).toBe(false);
-    expect(_shouldCountAsTransient(transientError)).toBe(true);
+    let state = { pollTransientCount: 0, pollNonTransientCount: 0, shouldFail: false };
+    for (let i = 0; i < 9; i++) {
+      state = _nextPollCounterState(transientError, state);
+    }
 
-    expect(_shouldFailImmediately(nonTransientError)).toBe(false);
-    expect(_shouldCountAsTransient(nonTransientError)).toBe(false);
+    expect(state).toEqual({
+      pollTransientCount: 9,
+      pollNonTransientCount: 0,
+      shouldFail: false,
+    });
 
-    // After 9 transient errors, poll_transient_count=9, poll_non_transient_count=0.
-    // Then 1 non-transient error resets poll_transient_count=0, increments poll_non_transient_count=1.
-    // 1 < 3, so bead should NOT fail. This test documents the expected behavior;
-    // the actual counter logic lives in the SQL within applyAction.
+    state = _nextPollCounterState(nonTransientError, state);
+
+    expect(state).toEqual({
+      pollTransientCount: 0,
+      pollNonTransientCount: 1,
+      shouldFail: false,
+    });
   });
 
   it('3 consecutive non-transient errors should fail (non-transient counter reaches threshold)', () => {
@@ -334,10 +363,15 @@ describe('counter cross-contamination', () => {
       reason: 'schema_mismatch',
     };
 
-    expect(_shouldFailImmediately(nonTransientError)).toBe(false);
-    expect(_shouldCountAsTransient(nonTransientError)).toBe(false);
+    let state = { pollTransientCount: 0, pollNonTransientCount: 0, shouldFail: false };
+    for (let i = 0; i < 3; i++) {
+      state = _nextPollCounterState(nonTransientError, state);
+    }
 
-    // 3 consecutive non-transient errors: poll_non_transient_count reaches 3.
-    // 3 >= PR_POLL_NON_TRANSIENT_THRESHOLD (3), so bead SHOULD fail.
+    expect(state).toEqual({
+      pollTransientCount: 0,
+      pollNonTransientCount: 3,
+      shouldFail: true,
+    });
   });
 });

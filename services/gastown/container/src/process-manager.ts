@@ -603,16 +603,26 @@ const PERSIST_ENV_KEYS = new Set([
   'KILO_CONFIG_CONTENT',
   'OPENCODE_CONFIG_CONTENT',
   'GASTOWN_ORGANIZATION_ID',
-  // Git auth: token rotations need to land in process.env so that
-  // bash subprocesses spawned by the SDK's bash tool see the fresh
-  // value. Without these here, a cache-hit on /agents/start returns
-  // the prewarmed SDK with whatever GH_TOKEN/GIT_TOKEN was set at
-  // prewarm time, even after the worker rotated them.
+]);
+
+const CACHE_HIT_ENV_KEYS = new Set([
+  ...PERSIST_ENV_KEYS,
   'GH_TOKEN',
   'GIT_TOKEN',
   'GITHUB_TOKEN',
   'GITHUB_CLI_PAT',
 ]);
+
+function applyCacheHitEnv(env: Record<string, string>): void {
+  for (const key of CACHE_HIT_ENV_KEYS) {
+    const value = env[key];
+    if (value) {
+      process.env[key] = value;
+    } else if (!PERSIST_ENV_KEYS.has(key)) {
+      delete process.env[key];
+    }
+  }
+}
 
 async function ensureSDKServer(
   workdir: string,
@@ -629,10 +639,7 @@ async function ensureSDKServer(
       existing.server.close();
       sdkInstances.delete(workdir);
     } else {
-      for (const key of PERSIST_ENV_KEYS) {
-        const value = env[key];
-        if (value) process.env[key] = value;
-      }
+      applyCacheHitEnv(env);
       return {
         client: existing.client,
         port: parseInt(new URL(existing.server.url).port),
@@ -665,10 +672,7 @@ async function ensureSDKServer(
         cached.server.close();
         sdkInstances.delete(workdir);
       } else {
-        for (const key of PERSIST_ENV_KEYS) {
-          const value = env[key];
-          if (value) process.env[key] = value;
-        }
+        applyCacheHitEnv(env);
         return {
           client: cached.client,
           port: parseInt(new URL(cached.server.url).port),
@@ -2900,6 +2904,7 @@ async function bootHydrationImpl(LOG: string): Promise<void> {
   try {
     const resp = await fetch(`${apiUrl}/api/towns/${townId}/container-registry`, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!resp.ok) {
       console.warn(`${LOG} Failed to fetch registry: ${resp.status}`);

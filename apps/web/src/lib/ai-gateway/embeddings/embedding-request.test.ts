@@ -2,7 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import { buildUpstreamBody } from './embedding-request';
 
 describe('buildUpstreamBody', () => {
-  it('should forward supported fields and strip client-only, Mistral-specific, and deprecated fields', () => {
+  it('should forward supported fields and strip client-only, SDK-only, Mistral-specific, and deprecated fields', () => {
     const result = buildUpstreamBody({
       model: 'google/text-embedding-004',
       input: ['text1', 'text2'],
@@ -18,12 +18,12 @@ describe('buildUpstreamBody', () => {
     expect(result).toEqual({
       model: 'google/text-embedding-004',
       input: ['text1', 'text2'],
-      encoding_format: 'float',
       safety_identifier: 'hash-abc',
       provider: { order: ['Google'] },
       input_type: 'search_document',
     });
     expect(result).not.toHaveProperty('dimensions');
+    expect(result).not.toHaveProperty('encoding_format');
     expect(result).not.toHaveProperty('output_dtype');
     expect(result).not.toHaveProperty('output_dimension');
   });

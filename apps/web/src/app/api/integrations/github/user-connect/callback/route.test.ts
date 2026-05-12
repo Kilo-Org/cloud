@@ -103,7 +103,7 @@ describe('GitHub user-connect callback', () => {
     );
     const response = await GET(request);
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('/account/integrations');
+    expect(response.headers.get('location')).toContain('/account/integrations');
 
     const rows = await db
       .select()

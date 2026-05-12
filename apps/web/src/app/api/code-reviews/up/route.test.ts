@@ -184,7 +184,7 @@ describe('GET /api/code-reviews/up', () => {
     expect(kinds).toEqual(expect.arrayContaining(['failure_rate', 'stuck_reviews']));
   });
 
-  it('fails open and captures to Sentry when a detector throws', async () => {
+  it('fails open and captures every detector error to Sentry when the database is unreachable', async () => {
     const executeSpy = jest.spyOn(db, 'execute').mockRejectedValue(new Error('DB unavailable'));
 
     try {
@@ -193,8 +193,16 @@ describe('GET /api/code-reviews/up', () => {
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body).toMatchObject({ healthy: true, alerts: [] });
-      expect(mockCaptureException).toHaveBeenCalledTimes(1);
-      expect(mockCaptureException.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(mockCaptureException).toHaveBeenCalledTimes(4);
+      const detectorTags = mockCaptureException.mock.calls
+        .map(call => call[1].tags.detector)
+        .sort();
+      expect(detectorTags).toEqual([
+        'error_spike',
+        'failure_rate',
+        'no_completions',
+        'stuck_reviews',
+      ]);
       expect(mockCaptureException.mock.calls[0][1]).toMatchObject({
         tags: { endpoint: 'code-reviews/up', source: 'code_review_health_check' },
       });

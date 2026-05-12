@@ -15,6 +15,9 @@ import {
   type CodeReviewHealthResponse,
 } from '@/lib/code-reviews/alerting/health-response';
 
+// Hardcoded query-string filter that the BetterStack monitor passes. Not a
+// secret — just a low-friction way to keep scanners and accidental hits from
+// running detector queries. Mirrors `apps/web/src/app/api/models/up/route.ts`.
 const HEALTH_CHECK_KEY = 'kilo-code-reviews-health-check';
 
 type AlertingDb = Pick<typeof db, 'execute'>;
@@ -43,32 +46,42 @@ export async function GET(
     return NextResponse.json({ healthy: false }, { status: 401 });
   }
 
-  try {
-    const evaluations = await Promise.all(DETECTORS.map(d => d.evaluate(db)));
-    const alerts = evaluations
-      .filter(
-        (evaluation): evaluation is Extract<CodeReviewAlertEvaluation, { tripped: true }> =>
-          evaluation.tripped
-      )
-      .map(evaluation => buildHealthAlert(evaluation.details, APP_URL));
+  // Run detectors independently so a single broken detector does not mask the
+  // alerts the others would have produced. Failed detectors are captured to
+  // Sentry; we still return whatever alerts the surviving detectors produced.
+  const evaluations = await Promise.all(
+    DETECTORS.map(async detector => {
+      try {
+        return await detector.evaluate(db);
+      } catch (error) {
+        captureException(error, {
+          tags: {
+            endpoint: 'code-reviews/up',
+            source: 'code_review_health_check',
+            detector: detector.name,
+          },
+        });
+        return { tripped: false } satisfies CodeReviewAlertEvaluation;
+      }
+    })
+  );
 
-    const response = buildHealthResponse(alerts);
+  const alerts = evaluations.flatMap(evaluation =>
+    evaluation.tripped ? [buildHealthAlert(evaluation.details, APP_URL)] : []
+  );
 
-    if (alerts.length > 0) {
-      console.warn('[code-reviews/up] returning 503: code review pipeline detectors tripped', {
-        kinds: alerts.map(alert => alert.kind),
-      });
-      return NextResponse.json(response, { status: 503 });
-    }
+  const response = buildHealthResponse(alerts);
 
-    return NextResponse.json(response, { status: 200 });
-  } catch (error) {
-    captureException(error, {
-      tags: { endpoint: 'code-reviews/up', source: 'code_review_health_check' },
+  if (alerts.length > 0) {
+    console.warn('[code-reviews/up] returning 503: code review pipeline detectors tripped', {
+      kinds: alerts.map(alert => alert.kind),
     });
-
-    // Fail open: a query timeout or DB error is not evidence of a code review
-    // pipeline outage, and treating it as one would create false incidents.
-    return NextResponse.json(buildHealthResponse([]), { status: 200 });
+    return NextResponse.json(response, { status: 503 });
   }
+
+  // Fail open even when every detector errored: a query timeout or DB error is
+  // not evidence of a code review pipeline outage, and treating it as one
+  // would create false BetterStack incidents. The errors are already captured
+  // to Sentry above.
+  return NextResponse.json(response, { status: 200 });
 }

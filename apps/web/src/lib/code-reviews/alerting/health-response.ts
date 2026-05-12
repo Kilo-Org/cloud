@@ -37,13 +37,12 @@ function adminCodeReviewsUrl(appUrl: string): string {
 
 export function buildHealthAlert(
   details: CodeReviewAlertDetails,
-  appUrl: string,
-  severity: CodeReviewAlertSeverity = CODE_REVIEW_ALERT_SEVERITY
+  appUrl: string
 ): CodeReviewHealthAlert {
   return {
     ...details,
     label: ALERT_KIND_LABELS[details.kind],
-    severity,
+    severity: CODE_REVIEW_ALERT_SEVERITY,
     adminUrl: adminCodeReviewsUrl(appUrl),
     runbookUrl: CODE_REVIEW_RUNBOOK_URL,
   };

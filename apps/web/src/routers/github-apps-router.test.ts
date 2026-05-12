@@ -7,8 +7,9 @@ import { eq } from 'drizzle-orm';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 
 // Mock the env vars
+// Key is 32 bytes: base64("12345678901234567890123456789012")
 jest.mock('@/lib/config.server', () => ({
-  USER_GH_APP_TOKEN_ENCRYPTION_KEY: 'dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXk=',
+  USER_GH_APP_TOKEN_ENCRYPTION_KEY: 'MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=',
   ENABLE_GITHUB_USER_TOKENS: true,
   GITHUB_OAUTH_STATE_SECRET: 'test-secret-test-secret-test-secret-test-secret=',
 }));
@@ -65,7 +66,7 @@ describe('githubAppsRouter', () => {
     });
 
     test('returns connected true with valid row', async () => {
-      const encryptionKey = 'dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXk=';
+      const encryptionKey = 'MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=';
       await db.insert(user_github_app_tokens).values({
         kilo_user_id: TEST_USER_ID,
         github_app_type: 'standard',
@@ -84,7 +85,7 @@ describe('githubAppsRouter', () => {
     });
 
     test('returns connected false when token expired', async () => {
-      const encryptionKey = 'dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXk=';
+      const encryptionKey = 'MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=';
       await db.insert(user_github_app_tokens).values({
         kilo_user_id: TEST_USER_ID,
         github_app_type: 'standard',
@@ -103,7 +104,7 @@ describe('githubAppsRouter', () => {
 
   describe('disconnectUserIdentity', () => {
     test('deletes row and returns ok', async () => {
-      const encryptionKey = 'dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXk=';
+      const encryptionKey = 'MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=';
       await db.insert(user_github_app_tokens).values({
         kilo_user_id: TEST_USER_ID,
         github_app_type: 'standard',

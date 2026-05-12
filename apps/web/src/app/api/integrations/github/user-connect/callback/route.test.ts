@@ -34,8 +34,9 @@ jest.mock('@octokit/rest', () => ({
   })),
 }));
 
+// Key is 32 bytes: base64("12345678901234567890123456789012")
 jest.mock('@/lib/config.server', () => ({
-  USER_GH_APP_TOKEN_ENCRYPTION_KEY: 'dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXk=',
+  USER_GH_APP_TOKEN_ENCRYPTION_KEY: 'MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=',
 }));
 
 const { verifyOAuthState } = jest.requireMock('@/lib/integrations/platforms/github/oauth-state');
@@ -113,7 +114,7 @@ describe('GitHub user-connect callback', () => {
   });
 
   test('onConflictDoUpdate overwrites existing row and resets revoked_at', async () => {
-    const encryptionKey = 'dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXk=';
+    const encryptionKey = 'MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=';
     const { encryptWithSymmetricKey } = await import('@/lib/encryption');
     await db.insert(user_github_app_tokens).values({
       kilo_user_id: 'user-123',

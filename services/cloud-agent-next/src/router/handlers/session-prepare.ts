@@ -427,6 +427,11 @@ const prepareSessionHandler = internalApiProtectedProcedure
             gitToken: resolvedGitToken,
             platform: input.platform,
             gitlabTokenManaged,
+            // Forward the already-resolved git identity so async prep can
+            // use the user token for commit attribution when
+            // ENABLE_GITHUB_USER_TOKENS is enabled.
+            identityKind: resolvedGitIdentity?.kind,
+            identityKiloUserId: resolvedGitIdentity?.kind === 'user' ? ctx.userId : undefined,
             prompt: input.prompt,
             mode: input.mode,
             model: input.model,

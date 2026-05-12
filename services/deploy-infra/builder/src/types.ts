@@ -189,6 +189,11 @@ export type Env = {
   Sandbox: DurableObjectNamespace<Sandbox>;
   DeploymentOrchestrator: DurableObjectNamespace<DeploymentOrchestrator>;
   EventsManager: DurableObjectNamespace<EventsManager>;
+
+  NEXTAUTH_SECRET: SecretsStoreSecret;
+  HYPERDRIVE: Hyperdrive;
+  WORKER_ENV: string;
+  DEPLOY_HOSTNAME_BASE: string;
 };
 
 /**
@@ -234,4 +239,9 @@ export type CloudflareApiResponse<T = unknown> = {
   success: boolean;
   result?: T;
   errors?: Array<{ code: number; message: string }>;
+};
+
+export type HtmlDeployResponse = {
+  slug: string;
+  url: string;
 };

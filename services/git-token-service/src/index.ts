@@ -1,5 +1,6 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { GitHubTokenService, type GitHubAppType } from './github-token-service.js';
+import { UserGitHubTokenService } from './user-github-token-service.js';
 import { GitLabLookupService } from './gitlab-lookup-service.js';
 import { GitLabTokenService } from './gitlab-token-service.js';
 import { InstallationLookupService } from './installation-lookup-service.js';
@@ -55,6 +56,7 @@ export type GetGitLabTokenResult = GetGitLabTokenSuccess | GetGitLabTokenFailure
 
 export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   private githubService: GitHubTokenService;
+  private userGithubService: UserGitHubTokenService;
   private installationLookupService: InstallationLookupService;
   private gitlabLookupService: GitLabLookupService;
   private gitlabTokenService: GitLabTokenService;
@@ -62,6 +64,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   constructor(ctx: ExecutionContext, env: CloudflareEnv) {
     super(ctx, env);
     this.githubService = new GitHubTokenService(env);
+    this.userGithubService = new UserGitHubTokenService(env);
     this.installationLookupService = new InstallationLookupService(env);
     this.gitlabLookupService = new GitLabLookupService(env);
     this.gitlabTokenService = new GitLabTokenService(env);
@@ -112,6 +115,22 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
    */
   async getToken(installationId: string, appType: GitHubAppType = 'standard'): Promise<string> {
     return this.githubService.getToken(installationId, appType);
+  }
+
+  /**
+   * Get a GitHub user-to-server token for a repository.
+   *
+   * Looks up the user's connected GitHub identity, verifies repo access,
+   * and returns the user token. Falls back to installation token when
+   * this returns {ok: false}.
+   *
+   * @param params - The kilo user ID, repo, and app type
+   * @returns Token and identity, or a failure reason
+   */
+  async getUserTokenForRepo(
+    params: import('./user-github-token-service.js').GetUserTokenInput
+  ): Promise<import('./user-github-token-service.js').GetUserTokenResult> {
+    return this.userGithubService.getUserTokenForRepo(params);
   }
 
   /**

@@ -1713,7 +1713,7 @@ describe('User', () => {
           github_login: 'testuser',
           github_email: 'test@example.com',
           access_token_encrypted: 'enc-token-1',
-          access_token_expires_at: new Date(Date.now() + 3600_000),
+          access_token_expires_at: new Date(Date.now() + 3600_000).toISOString(),
         },
         {
           kilo_user_id: otherUser.id,
@@ -1722,7 +1722,7 @@ describe('User', () => {
           github_login: 'otheruser',
           github_email: 'other@example.com',
           access_token_encrypted: 'enc-token-2',
-          access_token_expires_at: new Date(Date.now() + 3600_000),
+          access_token_expires_at: new Date(Date.now() + 3600_000).toISOString(),
         },
       ]);
 

@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
+    "@kilocode/encryption": "workspace:*",
     "@octokit/auth-app": "catalog:",
+    "@octokit/rest": "^22.0.1",
     "drizzle-orm": "catalog:",
     "zod": "catalog:"
   },

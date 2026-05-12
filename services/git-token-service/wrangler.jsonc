@@ -24,8 +24,7 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
-  "vars": {
-  },
+  "vars": {},
   "dev": {
     "port": 8802,
   },

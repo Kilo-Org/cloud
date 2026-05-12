@@ -991,9 +991,7 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(github_branch_pull_requests)
       .where(eq(github_branch_pull_requests.owned_by_user_id, userId));
-    await tx
-      .delete(user_github_app_tokens)
-      .where(eq(user_github_app_tokens.kilo_user_id, userId));
+    await tx.delete(user_github_app_tokens).where(eq(user_github_app_tokens.kilo_user_id, userId));
 
     // Code indexing data
     await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));

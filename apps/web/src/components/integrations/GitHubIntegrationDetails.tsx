@@ -4,7 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle2, XCircle, GitBranch, Settings, ExternalLink, RefreshCw } from 'lucide-react';
+import {
+  CheckCircle2,
+  XCircle,
+  GitBranch,
+  Settings,
+  ExternalLink,
+  RefreshCw,
+  User,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -12,7 +20,6 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useUser } from '@/hooks/useUser';
 import { DevAddGitHubInstallationCard } from './DevAddGitHubInstallationCard';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
-
 type GitHubIntegrationDetailsProps = {
   organizationId?: string;
   organizationName?: string;
@@ -20,6 +27,7 @@ type GitHubIntegrationDetailsProps = {
   error?: string;
   pendingApproval?: boolean;
   existingPendingOrg?: string;
+  enableUserTokens?: boolean;
 };
 
 export function GitHubIntegrationDetails({
@@ -28,6 +36,7 @@ export function GitHubIntegrationDetails({
   error,
   pendingApproval,
   existingPendingOrg,
+  enableUserTokens,
 }: GitHubIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -170,6 +179,53 @@ export function GitHubIntegrationDetails({
         });
       },
     });
+  };
+
+  // User identity connection (user-scoped only)
+  const isUserContext = !organizationId;
+  const { data: userConnectionStatus } = useQuery(
+    trpc.githubApps.getUserConnectionStatus.queryOptions(undefined, {
+      enabled: isUserContext && !!enableUserTokens,
+    })
+  );
+
+  const connectUserIdentity = useMutation(
+    trpc.githubApps.connectUserIdentity.mutationOptions({
+      onSuccess: data => {
+        window.location.href = data.authorizeUrl;
+      },
+      onError: error => {
+        toast.error('Failed to start GitHub connect', {
+          description: error.message,
+        });
+      },
+    })
+  );
+
+  const disconnectUserIdentity = useMutation(
+    trpc.githubApps.disconnectUserIdentity.mutationOptions({
+      onSuccess: () => {
+        toast.success('GitHub identity disconnected');
+        void queryClient.invalidateQueries({
+          queryKey: trpc.githubApps.getUserConnectionStatus.queryKey(),
+        });
+      },
+      onError: error => {
+        toast.error('Failed to disconnect GitHub identity', {
+          description: error.message,
+        });
+      },
+    })
+  );
+
+  const handleConnectUser = () => {
+    connectUserIdentity.mutate({ appType: 'standard', returnTo: '/integrations/github' });
+  };
+
+  const handleDisconnectUser = () => {
+    if (confirm('Are you sure you want to disconnect your GitHub identity?')) {
+      disconnectUserIdentity.mutate();
+    }
   };
 
   if (isLoading) {
@@ -385,6 +441,106 @@ export function GitHubIntegrationDetails({
       {/* Dev-only card for adding existing installations - only show when no app is installed */}
       {!isInstalled && (
         <DevAddGitHubInstallationCard organizationId={organizationId} onSuccess={() => refetch()} />
+      )}
+
+      {/* User identity connection card (user-scoped, gated by env) */}
+      {isUserContext && enableUserTokens && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Commit as You
+                </CardTitle>
+                <CardDescription>
+                  Connect your GitHub identity to push commits as you
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {userConnectionStatus?.connected ? (
+              <>
+                <div className="flex items-center gap-3 rounded-lg border p-4">
+                  <img
+                    src={`https://github.com/${userConnectionStatus.login}.png?size=40`}
+                    alt=""
+                    className="h-10 w-10 rounded-full"
+                  />
+                  <div>
+                    <p className="text-sm font-medium">
+                      Pushing as{' '}
+                      <a
+                        href={`https://github.com/${userConnectionStatus.login}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        @{userConnectionStatus.login}
+                      </a>
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                      Commits will be attributed to your GitHub account
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleDisconnectUser}
+                  disabled={disconnectUserIdentity.isPending}
+                >
+                  {disconnectUserIdentity.isPending ? 'Disconnecting...' : 'Disconnect'}
+                </Button>
+              </>
+            ) : userConnectionStatus &&
+              'login' in userConnectionStatus &&
+              userConnectionStatus.login ? (
+              // Expired or revoked state
+              <>
+                <Alert>
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <p className="font-medium">Reconnect GitHub</p>
+                      <p className="text-muted-foreground text-sm">
+                        Your previous connection for @{userConnectionStatus.login} has expired or
+                        been revoked. Reconnect to continue pushing commits as yourself.
+                      </p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+                <Button
+                  onClick={handleConnectUser}
+                  disabled={connectUserIdentity.isPending}
+                  size="lg"
+                  className="w-full"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Connect GitHub Identity
+                </Button>
+              </>
+            ) : (
+              // Not connected state
+              <>
+                <Alert>
+                  <AlertDescription>
+                    Connect the GitHub account you want commits to be attributed to. This is
+                    separate from your Kilo login and can be a different GitHub account.
+                  </AlertDescription>
+                </Alert>
+                <Button
+                  onClick={handleConnectUser}
+                  disabled={connectUserIdentity.isPending}
+                  size="lg"
+                  className="w-full"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Connect GitHub Identity
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );

@@ -1807,13 +1807,22 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   /**
-   * Reset the sandbox container's sleep timer so it stays alive during an
-   * active execution.
+   * Reset the sandbox container's inactivity timer so it stays alive during
+   * an active execution.
    *
-   * The wrapper heartbeat travels over an outbound WebSocket that bypasses
-   * `containerFetch()`, so it never calls `renewActivityTimeout()`.  Calling
-   * `setSleepAfter()` with the same value is a lightweight RPC that resets
-   * the timer without changing the configuration.
+   * The @cloudflare/containers runtime expires the container after
+   * `sleepAfter` of inactivity and refreshes that window from
+   * `containerFetch()` only.  The wrapper communicates with the worker over
+   * an outbound WebSocket to `/ingest` that bypasses `containerFetch()`, so
+   * the activity timer is never refreshed by wrapper traffic and the
+   * container is SIGTERM-ed at the 15-minute mark even mid-execution.
+   *
+   * `setSleepAfter()` cannot be used to refresh the timer because the
+   * Sandbox implementation is idempotent — when called with the same value
+   * it returns early without resetting `sleepAfterMs`.  Call
+   * `renewActivityTimeout()` (inherited from the base Container class)
+   * directly instead; it is a synchronous in-memory update of
+   * `sleepAfterMs = Date.now() + sleepAfter*1000`.
    *
    * Called from the DO context's `updateHeartbeat` callback (debounced
    * to every 30 s by the ingest handler) while an execution is running.
@@ -1833,7 +1842,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           metadata.botId
         ));
       const sandbox = getSandbox(getSandboxNamespace(this.env, sandboxId), sandboxId);
-      await sandbox.setSleepAfter(SANDBOX_SLEEP_AFTER_SECONDS);
+      // `renewActivityTimeout` is declared as synchronous `void` on the
+      // base Container class, but `sandbox` is a DO RPC stub so the call
+      // is actually async.  `Promise.resolve` wraps the call without
+      // hiding rejection — failures still propagate to the catch below.
+      await Promise.resolve(sandbox.renewActivityTimeout());
     } catch (error) {
       logger
         .withFields({

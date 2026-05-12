@@ -149,8 +149,22 @@ function parseRows(response: SnowflakeApiResponse): SnowflakeRow[] {
   return response.data.filter(Array.isArray) as SnowflakeRow[];
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+      },
+      { once: true }
+    );
+  });
 }
 
 function authHeaders(token: string): Record<string, string> {
@@ -165,7 +179,8 @@ function authHeaders(token: string): Record<string, string> {
 async function pollStatement(
   config: SnowflakeConfig,
   token: string,
-  statusUrl: string
+  statusUrl: string,
+  signal?: AbortSignal
 ): Promise<SnowflakeApiResponse> {
   const url = new URL(statusUrl, `https://${config.accountHost}`);
 
@@ -174,14 +189,14 @@ async function pollStatement(
   }
 
   for (let attempt = 1; attempt <= SNOWFLAKE_MAX_POLL_ATTEMPTS; attempt++) {
-    const response = await fetch(url, { headers: authHeaders(token) });
+    const response = await fetch(url, { headers: authHeaders(token), signal });
 
     if (response.status === 200) {
       return (await response.json()) as SnowflakeApiResponse;
     }
 
     if (response.status === 202 || response.status === 429) {
-      await sleep(SNOWFLAKE_POLL_BASE_DELAY_MS * attempt);
+      await sleep(SNOWFLAKE_POLL_BASE_DELAY_MS * attempt, signal);
       continue;
     }
 
@@ -251,7 +266,12 @@ export async function executeSnowflakeStatement(params: {
     if (!payload.statementStatusUrl) {
       throw new Error('Snowflake response missing statementStatusUrl');
     }
-    const completed = await pollStatement(params.config, token, payload.statementStatusUrl);
+    const completed = await pollStatement(
+      params.config,
+      token,
+      payload.statementStatusUrl,
+      params.signal
+    );
     if (completed.code === '090001' || Array.isArray(completed.data)) {
       return parseRows(completed);
     }

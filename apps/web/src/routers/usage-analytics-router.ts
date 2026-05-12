@@ -8,7 +8,6 @@ import {
   executeSnowflakeStatement,
   resolveSnowflakeConfig,
   type SnowflakeBinding,
-  type SnowflakeConfig,
 } from '@/lib/snowflake';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
@@ -496,17 +495,6 @@ async function timedSnowflakeQuery<T>(
   }
 }
 
-function getSnowflakeConfigOrThrow(): SnowflakeConfig {
-  const config = resolveSnowflakeConfig();
-  if (!config) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Snowflake configuration is incomplete',
-    });
-  }
-  return config;
-}
-
 // ---------------------------------------------------------------------------
 // getSummary
 // ---------------------------------------------------------------------------
@@ -658,8 +646,34 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .query(async ({ input, ctx }): Promise<SummaryOutput> => {
       await ensureScopeAccess(ctx, input);
 
-      const config = getSnowflakeConfigOrThrow();
+      const config = resolveSnowflakeConfig();
       const meta = resolveTier(input.granularity, input.startDate);
+      if (!config) {
+        return {
+          costMicrodollars: 0,
+          requestCount: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheWriteTokens: 0,
+          cacheHitTokens: 0,
+          errorCount: 0,
+          cancelledCount: 0,
+          freeRequestCount: 0,
+          byokRequestCount: 0,
+          totalLatencyMs: 0,
+          totalGenerationTimeMs: 0,
+          latencyCount: 0,
+          distinctUsers: 0,
+          errorRate: 0,
+          avgLatencyMs: 0,
+          avgGenerationTimeMs: 0,
+          costPerRequest: 0,
+          tokensPerRequest: 0,
+          cacheHitRatio: 0,
+          outputInputRatio: 0,
+          effectiveGranularity: meta.effectiveGranularity,
+        };
+      }
       const table = getTableName(meta.tier);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
 
@@ -751,8 +765,11 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       await ensureScopeAccess(ctx, input);
 
-      const config = getSnowflakeConfigOrThrow();
+      const config = resolveSnowflakeConfig();
       const meta = resolveTier(input.granularity, input.startDate);
+      if (!config) {
+        return { timeseries: [], effectiveGranularity: meta.effectiveGranularity };
+      }
       const table = getTableName(meta.tier);
       const bucketExpr = bucketExprSql(meta.effectiveGranularity, meta.tier);
       const metricExpr = metricExprSql(input.metric);
@@ -818,8 +835,11 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       await ensureScopeAccess(ctx, input);
 
-      const config = getSnowflakeConfigOrThrow();
+      const config = resolveSnowflakeConfig();
       const meta = resolveTier(input.granularity, input.startDate);
+      if (!config) {
+        return { breakdown: [], totalValue: 0, effectiveGranularity: meta.effectiveGranularity };
+      }
       const table = getTableName(meta.tier);
       const dimCol = dimensionColumn(input.dimension);
       const metricExpr = metricExprSql(input.metric);
@@ -882,8 +902,11 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       await ensureScopeAccess(ctx, input);
 
-      const config = getSnowflakeConfigOrThrow();
+      const config = resolveSnowflakeConfig();
       const meta = resolveTier(input.granularity, input.startDate);
+      if (!config) {
+        return { rows: [], effectiveGranularity: meta.effectiveGranularity };
+      }
       const table = getTableName(meta.tier);
       const bucketExpr = bucketExprSql(meta.effectiveGranularity, meta.tier);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);

@@ -19,7 +19,12 @@ export type EmbeddingProxyRequest = {
 export function buildUpstreamBody(
   body: EmbeddingProxyRequest & { user?: string }
 ): Record<string, unknown> {
-  const { dimensions: _, output_dtype: __, output_dimension: ___, user: ____, ...upstreamBody } =
-    body;
+  const {
+    dimensions: _,
+    output_dtype: __,
+    output_dimension: ___,
+    user: ____,
+    ...upstreamBody
+  } = body;
   return upstreamBody;
 }

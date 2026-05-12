@@ -184,17 +184,19 @@ export function useUsageBreakdown(
     dimension: Dimension;
     metric: 'cost' | 'requests' | 'tokens';
     limit?: number;
+    enabled?: boolean;
   }
 ) {
   const trpc = useTRPC();
-  return useQuery(
-    trpc.usageAnalytics.getBreakdown.queryOptions({
+  return useQuery({
+    ...trpc.usageAnalytics.getBreakdown.queryOptions({
       ...commonFilters(args),
       dimension: args.dimension,
       metric: args.metric,
       limit: args.limit ?? 15,
-    })
-  );
+    }),
+    enabled: args.enabled ?? true,
+  });
 }
 
 export function useUsageTable(

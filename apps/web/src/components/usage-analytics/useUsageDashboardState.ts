@@ -299,7 +299,11 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
     if (queryString) url.search = queryString;
 
     router.replace(url.toString(), { scroll: false });
-  }, [router, searchParams, state]);
+    // searchParams intentionally excluded: the effect overwrites every relevant
+    // key from `state` anyway, so stale searchParams never produces incorrect
+    // output and including it would cause spurious re-runs after router.replace.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, state]);
 
   const setState = useCallback((updates: Partial<DashboardState>) => {
     setStateInternal(prev => ({ ...prev, ...updates }));

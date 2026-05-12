@@ -251,6 +251,7 @@ export function UsageAnalyticsDashboard({
     dimension: 'user',
     metric: 'cost',
     limit: 10,
+    enabled: isOrgWideView,
   });
 
   const tableGroupBy = useMemo<Dimension[]>(() => (groupBy === 'none' ? [] : [groupBy]), [groupBy]);

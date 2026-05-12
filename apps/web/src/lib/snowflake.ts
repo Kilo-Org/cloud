@@ -169,6 +169,10 @@ async function pollStatement(
 ): Promise<SnowflakeApiResponse> {
   const url = new URL(statusUrl, `https://${config.accountHost}`);
 
+  if (url.hostname !== config.accountHost) {
+    throw new Error(`Snowflake returned unexpected poll host: ${url.hostname}`);
+  }
+
   for (let attempt = 1; attempt <= SNOWFLAKE_MAX_POLL_ATTEMPTS; attempt++) {
     const response = await fetch(url, { headers: authHeaders(token) });
 

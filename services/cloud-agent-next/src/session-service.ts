@@ -10,7 +10,6 @@ import type {
 import type { ExecutionParams as _ExecutionParams } from './schema.js';
 import { generateSandboxId } from './sandbox-id.js';
 import { normalizeKilocodeModel } from './persistence/model-utils.js';
-import { normalizeKilocodeModel } from './persistence/model-utils.js';
 import {
   checkDiskAndCleanBeforeSetup,
   cloneGitHubRepo,

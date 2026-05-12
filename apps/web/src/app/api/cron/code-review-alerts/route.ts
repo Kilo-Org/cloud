@@ -145,11 +145,12 @@ export async function GET(request: Request) {
         slack = 'skipped';
       }
     } catch (error) {
+      const message = errorMessage(error);
       capturedErrors.push(new Error(`${detector.name} detector failed`, { cause: error }));
-      errorSummaries.push({ detector: detector.name, message: errorMessage(error) });
-      slack = errorSummaries.some(item => item.message.startsWith('Slack webhook failed'))
-        ? 'failed'
-        : slack;
+      errorSummaries.push({ detector: detector.name, message });
+      if (message.startsWith('Slack webhook failed')) {
+        slack = 'failed';
+      }
     }
   }
 

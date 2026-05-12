@@ -19,6 +19,14 @@ import {
 } from '@/lib/integrations/resolve-owner';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { db } from '@/lib/drizzle';
+import { user_github_app_tokens } from '@kilocode/db/schema';
+import { eq, and } from 'drizzle-orm';
+import { createOAuthState } from '@/lib/integrations/platforms/github/oauth-state';
+import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
+import { APP_URL } from '@/lib/constants';
+import { ENABLE_GITHUB_USER_TOKENS, USER_GH_APP_TOKEN_ENCRYPTION_KEY } from '@/lib/config.server';
+import { decryptWithSymmetricKey } from '@/lib/encryption';
 
 export const githubAppsRouter = createTRPCRouter({
   // List all integrations
@@ -276,4 +284,138 @@ export const githubAppsRouter = createTRPCRouter({
 
       return { success: true };
     }),
+
+  // Connect the current user's GitHub identity for user-to-server tokens
+  connectUserIdentity: baseProcedure
+    .input(
+      z.object({
+        appType: z.enum(['standard', 'lite']).optional().default('standard'),
+        returnTo: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ENABLE_GITHUB_USER_TOKENS) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'GitHub user token connect is not enabled',
+        });
+      }
+
+      if (input.appType === 'lite') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Lite app does not support user identity connect',
+        });
+      }
+
+      const credentials = getGitHubAppCredentials(input.appType);
+      const state = createOAuthState({
+        kilo_user_id: ctx.user.id,
+        app_type: input.appType,
+        return_to: input.returnTo,
+      });
+
+      const authorizeUrl = new URL('https://github.com/login/oauth/authorize');
+      authorizeUrl.searchParams.set('client_id', credentials.clientId);
+      authorizeUrl.searchParams.set('state', state);
+      authorizeUrl.searchParams.set(
+        'redirect_uri',
+        `${APP_URL}/api/integrations/github/user-connect/callback`
+      );
+
+      return { authorizeUrl: authorizeUrl.toString() };
+    }),
+
+  // Get the current user's GitHub connection status (no token returned)
+  getUserConnectionStatus: baseProcedure.query(async ({ ctx }) => {
+    const rows = await db
+      .select({
+        github_login: user_github_app_tokens.github_login,
+        github_user_id: user_github_app_tokens.github_user_id,
+        revoked_at: user_github_app_tokens.revoked_at,
+        access_token_expires_at: user_github_app_tokens.access_token_expires_at,
+      })
+      .from(user_github_app_tokens)
+      .where(
+        and(
+          eq(user_github_app_tokens.kilo_user_id, ctx.user.id),
+          eq(user_github_app_tokens.github_app_type, 'standard')
+        )
+      );
+
+    const row = rows[0];
+    if (!row) {
+      return { connected: false as const, login: undefined, githubUserId: undefined };
+    }
+
+    const now = new Date();
+    const isRevoked = row.revoked_at !== null;
+    const isExpired =
+      row.access_token_expires_at !== null && new Date(row.access_token_expires_at) <= now;
+
+    if (isRevoked || isExpired) {
+      return {
+        connected: false as const,
+        login: row.github_login,
+        githubUserId: row.github_user_id,
+      };
+    }
+
+    return {
+      connected: true as const,
+      login: row.github_login,
+      githubUserId: row.github_user_id,
+    };
+  }),
+
+  // Disconnect the current user's GitHub identity
+  disconnectUserIdentity: baseProcedure.mutation(async ({ ctx }) => {
+    const rows = await db
+      .select()
+      .from(user_github_app_tokens)
+      .where(eq(user_github_app_tokens.kilo_user_id, ctx.user.id));
+
+    for (const row of rows) {
+      try {
+        const credentials = getGitHubAppCredentials(row.github_app_type);
+        const token = decryptWithSymmetricKey(
+          row.access_token_encrypted,
+          USER_GH_APP_TOKEN_ENCRYPTION_KEY
+        );
+
+        // Revoke the authorization on GitHub's side using Basic auth
+        const auth = Buffer.from(`${credentials.clientId}:${credentials.clientSecret}`).toString(
+          'base64'
+        );
+        const response = await fetch(
+          `https://api.github.com/applications/${credentials.clientId}/grant`,
+          {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Basic ${auth}`,
+              'Content-Type': 'application/json',
+              Accept: 'application/vnd.github+json',
+            },
+            body: JSON.stringify({ access_token: token }),
+          }
+        );
+
+        if (!response.ok && response.status !== 404 && response.status !== 422) {
+          console.error('Failed to revoke GitHub authorization:', {
+            status: response.status,
+            body: await response.text(),
+          });
+        }
+      } catch (error) {
+        console.error('Error revoking GitHub authorization:', error);
+        // Continue to delete the local row regardless
+      }
+    }
+
+    await db
+      .delete(user_github_app_tokens)
+      .where(eq(user_github_app_tokens.kilo_user_id, ctx.user.id));
+
+    return { ok: true };
+  }),
 });

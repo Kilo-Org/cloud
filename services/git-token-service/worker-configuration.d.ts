@@ -14,6 +14,7 @@ declare namespace Cloudflare {
     GITHUB_LITE_APP_PRIVATE_KEY: string;
     GITLAB_CLIENT_ID?: string;
     GITLAB_CLIENT_SECRET?: string;
+    USER_GH_APP_TOKEN_ENCRYPTION_KEY: string;
   }
   interface Env {
     GITHUB_APP_ID: string;
@@ -22,6 +23,7 @@ declare namespace Cloudflare {
     GITHUB_LITE_APP_PRIVATE_KEY: string;
     GITLAB_CLIENT_ID?: string;
     GITLAB_CLIENT_SECRET?: string;
+    USER_GH_APP_TOKEN_ENCRYPTION_KEY: string;
     TOKEN_CACHE: KVNamespace;
     HYPERDRIVE: Hyperdrive;
   }

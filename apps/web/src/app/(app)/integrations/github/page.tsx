@@ -50,6 +50,7 @@ export default async function UserGitHubIntegrationPage({
           error={search.error}
           pendingApproval={search.pending_approval === 'true'}
           existingPendingOrg={search.org}
+          enableUserTokens={process.env.ENABLE_GITHUB_USER_TOKENS === 'true'}
         />
       </Suspense>
     </PageLayout>

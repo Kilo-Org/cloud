@@ -7,6 +7,7 @@ import type {
   HtmlDeployResponse,
   HtmlDeployRecord,
   DeploymentArtifacts,
+  DeploymentFile,
 } from './types';
 import {
   backendAuthMiddleware,
@@ -16,6 +17,7 @@ import {
 import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 import { CloudflareAPI } from './cloudflare-api';
 import { Deployer } from './deployer';
+import { getMimeType } from './utils';
 import { validateWorkerName } from './utils';
 import * as Sentry from '@sentry/cloudflare';
 import staticWorkerContent from './assets/static.worker.js';
@@ -54,11 +56,25 @@ function createDurableObjectBuilderID() {
 type HonoEnv = { Bindings: Env };
 const app = new Hono<HonoEnv>();
 
-const MAX_HTML_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_TOTAL_BYTES = 50 * 1024 * 1024; // 50 MB across all files
 const DEFAULT_HOSTNAME_BASE = 'd.kiloapps.io';
 const DEFAULT_TTL_SECONDS = 24 * 60 * 60; // 24 hours
 const MAX_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 const KV_KEY_PREFIX = 'html-deploy:';
+
+const FORBIDDEN_EXTENSIONS = new Set([
+  'php',
+  'py',
+  'rb',
+  'pl',
+  'sh',
+  'bash',
+  'cgi',
+  'asp',
+  'aspx',
+  'jsp',
+  'cfm',
+]);
 
 function generateHtmlSlug(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -74,6 +90,48 @@ function parseTtlHeader(header: string | null): number {
   const seconds = parseInt(header, 10);
   if (isNaN(seconds) || seconds <= 0) return DEFAULT_TTL_SECONDS;
   return Math.min(seconds, MAX_TTL_SECONDS);
+}
+
+async function parseMultipartFiles(c: Context<HonoEnv>): Promise<DeploymentFile[]> {
+  const formData = await c.req.formData();
+  const files: DeploymentFile[] = [];
+  let totalBytes = 0;
+
+  for (const [key, value] of formData.entries()) {
+    if (!(value instanceof File)) continue;
+
+    const path = key === 'file' && value.name ? value.name : key;
+    const buffer = Buffer.from(await value.arrayBuffer());
+
+    totalBytes += buffer.byteLength;
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      throw new Error(`Total size exceeds the ${MAX_TOTAL_BYTES / (1024 * 1024)} MB limit`);
+    }
+
+    files.push({
+      path,
+      content: buffer,
+      mimeType: getMimeType(path),
+    });
+  }
+
+  return files;
+}
+
+function validateStaticAssets(assets: DeploymentFile[]): string | null {
+  const hasIndexHtml = assets.some(a => a.path === 'index.html' || a.path.endsWith('/index.html'));
+  if (!hasIndexHtml) {
+    return 'index.html is required';
+  }
+
+  for (const file of assets) {
+    const ext = file.path.split('.').pop()?.toLowerCase();
+    if (ext && FORBIDDEN_EXTENSIONS.has(ext)) {
+      return `File "${file.path}" has a disallowed extension (.${ext}) — only static files are allowed`;
+    }
+  }
+
+  return null;
 }
 
 // ── /deploy-html — Kilo JWT auth, no sandbox, synchronous ─────────────────
@@ -93,17 +151,34 @@ app.post('/deploy-html', async (c: Context<HonoEnv>) => {
     return c.json({ error: 'Invalid or expired token' }, 401);
   }
 
-  const html = await c.req.text();
+  const contentType = c.req.header('Content-Type') ?? '';
+  let assets: DeploymentFile[];
 
-  if (!html || html.length === 0) {
-    return c.json({ error: 'Empty HTML body' }, 400);
+  if (contentType.includes('multipart/form-data')) {
+    try {
+      assets = await parseMultipartFiles(c);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to parse multipart body';
+      return c.json({ error: msg }, 400);
+    }
+  } else {
+    const html = await c.req.text();
+    if (!html || html.length === 0) {
+      return c.json({ error: 'Empty body' }, 400);
+    }
+    if (html.length > MAX_TOTAL_BYTES) {
+      return c.json({ error: `Body exceeds the ${MAX_TOTAL_BYTES / (1024 * 1024)} MB limit` }, 400);
+    }
+    assets = [{ path: 'index.html', content: Buffer.from(html, 'utf-8'), mimeType: 'text/html' }];
   }
 
-  if (html.length > MAX_HTML_BYTES) {
-    return c.json(
-      { error: `HTML body exceeds the ${MAX_HTML_BYTES / (1024 * 1024)} MB limit` },
-      400
-    );
+  if (assets.length === 0) {
+    return c.json({ error: 'No files provided' }, 400);
+  }
+
+  const validationError = validateStaticAssets(assets);
+  if (validationError) {
+    return c.json({ error: validationError }, 400);
   }
 
   const slug = generateHtmlSlug();
@@ -118,13 +193,7 @@ app.post('/deploy-html', async (c: Context<HonoEnv>) => {
       mimeType: 'application/javascript+module',
     },
     artifacts: [],
-    assets: [
-      {
-        path: 'index.html',
-        content: Buffer.from(html, 'utf-8'),
-        mimeType: 'text/html',
-      },
-    ],
+    assets,
   };
 
   const cloudflareApi = new CloudflareAPI(c.env.CLOUDFLARE_ACCOUNT_ID, c.env.CLOUDFLARE_API_TOKEN);

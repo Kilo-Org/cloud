@@ -1,6 +1,7 @@
 import type { SandboxInstance, ExecutionSession, SystemSandboxUsageEvent } from './types.js';
 import type { ExecResult, ExecOptions } from '@cloudflare/sandbox';
 import { logger } from './logger.js';
+import type { GitIdentity } from './types/git-identity.js';
 import { findWrapperForSessionInProcesses } from './kilo/wrapper-manager.js';
 import {
   DISK_CHECK_TIMEOUT_MS,
@@ -520,24 +521,49 @@ export async function createSandboxUsageEvent(
   };
 }
 
+/**
+ * Derive git `user.name` / `user.email` from a resolved `GitIdentity`.
+ *
+ * - `app` identity → bot attribution using the GitHub App slug + bot user ID.
+ * - `user` identity → the connected GitHub user; prefers the verified primary
+ *   email (gives a "Verified" badge on GitHub commits) and falls back to the
+ *   noreply address when no email is available.
+ */
+export function buildGitAuthor(identity: GitIdentity): GitAuthorConfig {
+  if (identity.kind === 'app') {
+    return {
+      name: `${identity.slug}[bot]`,
+      email: `${identity.botUserId}+${identity.slug}[bot]@users.noreply.github.com`,
+    };
+  }
+  return {
+    name: identity.login,
+    email: identity.email ?? `${identity.userId}+${identity.login}@users.noreply.github.com`,
+  };
+}
+
 export async function cloneGitHubRepo(
   session: ExecutionSession,
   workspacePath: string,
   githubRepo: string,
   githubToken?: string,
-  env?: { GITHUB_APP_SLUG?: string; GITHUB_APP_BOT_USER_ID?: string },
+  identityOrEnv?: GitIdentity | { GITHUB_APP_SLUG?: string; GITHUB_APP_BOT_USER_ID?: string },
   options?: { shallow?: boolean }
 ): Promise<void> {
   // Convert GitHub repo format (org/repo) to full HTTPS URL and delegate to cloneGitRepo
   const gitUrl = `https://github.com/${githubRepo}.git`;
 
-  // Build git author config from GitHub App environment variables
+  // Build git author config from a GitIdentity (new) or legacy env-var object (old)
   let gitAuthor: GitAuthorConfig | undefined;
-  if (env?.GITHUB_APP_SLUG && env?.GITHUB_APP_BOT_USER_ID) {
-    gitAuthor = {
-      name: `${env.GITHUB_APP_SLUG}[bot]`,
-      email: `${env.GITHUB_APP_BOT_USER_ID}+${env.GITHUB_APP_SLUG}[bot]@users.noreply.github.com`,
-    };
+  if (identityOrEnv) {
+    if ('kind' in identityOrEnv) {
+      gitAuthor = buildGitAuthor(identityOrEnv);
+    } else if (identityOrEnv.GITHUB_APP_SLUG && identityOrEnv.GITHUB_APP_BOT_USER_ID) {
+      gitAuthor = {
+        name: `${identityOrEnv.GITHUB_APP_SLUG}[bot]`,
+        email: `${identityOrEnv.GITHUB_APP_BOT_USER_ID}+${identityOrEnv.GITHUB_APP_SLUG}[bot]@users.noreply.github.com`,
+      };
+    }
   }
 
   await cloneGitRepo(session, workspacePath, gitUrl, githubToken, gitAuthor, options);
@@ -649,7 +675,10 @@ export type RestoreWorkspaceOptions = {
   githubToken?: string;
   gitUrl?: string;
   gitToken?: string;
+  /** Legacy: use `gitIdentity` for new sessions; kept for backwards compat with old DO state. */
   gitAuthorEnv?: { GITHUB_APP_SLUG?: string; GITHUB_APP_BOT_USER_ID?: string };
+  /** Identity-aware attribution (takes precedence over gitAuthorEnv when present). */
+  gitIdentity?: GitIdentity;
   lastSeenBranch?: string;
   platform?: 'github' | 'gitlab';
 };
@@ -670,7 +699,7 @@ export async function restoreWorkspace(
       workspacePath,
       options.githubRepo,
       options.githubToken,
-      options.gitAuthorEnv
+      options.gitIdentity ?? options.gitAuthorEnv
     );
   } else {
     throw new Error('No repository source provided for workspace restore');

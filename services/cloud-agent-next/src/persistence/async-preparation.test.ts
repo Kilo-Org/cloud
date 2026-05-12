@@ -185,12 +185,18 @@ describe('executePreparationSteps', () => {
     expect(result?.resolvedGithubToken).toBe('resolved-github-token');
     expect(result?.resolvedInstallationId).toBe('installation-123');
     expect(result?.resolvedGithubAppType).toBe('standard');
+    // When ENABLE_GITHUB_USER_TOKENS is unset, identity is built from app env vars.
+    expect(result?.resolvedGitIdentity).toEqual({
+      kind: 'app',
+      slug: 'kilo-connect',
+      botUserId: '12345',
+    });
     expect(cloneGitHubRepo).toHaveBeenCalledWith(
       fakeSession,
       '/workspace/test-org/test-user/sessions/agent_test',
       'acme/repo',
       'resolved-github-token',
-      { GITHUB_APP_SLUG: 'kilo-connect', GITHUB_APP_BOT_USER_ID: '12345' },
+      { kind: 'app', slug: 'kilo-connect', botUserId: '12345' },
       undefined
     );
   });

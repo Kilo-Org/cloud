@@ -114,6 +114,14 @@ export type CloudAgentSessionState = {
   githubInstallationId?: string;
   /** GitHub App type: 'standard' for full KiloConnect, 'lite' for read-only KiloConnect-Lite */
   githubAppType?: 'standard' | 'lite';
+  /**
+   * Which identity was resolved during session prepare.
+   * 'user' → GitHub user-to-server token; 'app' → GitHub App installation token.
+   * Absent on sessions prepared before MVP-3 (treated as 'app').
+   */
+  identityKind?: 'app' | 'user';
+  /** Present when identityKind === 'user': the kilo user ID used to look up the user token. */
+  identityKiloUserId?: string;
   /** Generic git repository URL (full HTTPS URL, e.g., 'https://gitlab.com/org/repo.git') */
   gitUrl?: string;
   /** Git token for authentication (username is always 'x-access-token') */
@@ -230,6 +238,8 @@ export type PersistenceEnv = {
   GITHUB_APP_SLUG?: string;
   /** GitHub App bot user ID for git commit email (e.g., '240665456') */
   GITHUB_APP_BOT_USER_ID?: string;
+  /** Feature gate: set to 'true' to enable GitHub user-to-server token commit attribution. */
+  ENABLE_GITHUB_USER_TOKENS?: string;
   /** GitHub Lite App slug for git commit attribution (e.g., 'kiloconnect-lite') */
   GITHUB_LITE_APP_SLUG?: string;
   /** GitHub Lite App bot user ID for git commit email */

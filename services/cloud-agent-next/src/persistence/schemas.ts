@@ -309,6 +309,8 @@ export const MetadataSchema = z.object({
   githubToken: z.string().optional(),
   githubInstallationId: z.string().optional(),
   githubAppType: z.enum(['standard', 'lite']).optional(),
+  identityKind: z.enum(['app', 'user']).optional(),
+  identityKiloUserId: z.string().optional(),
   gitUrl: z.string().optional(),
   gitToken: z.string().optional(),
   platform: z.enum(['github', 'gitlab']).optional(),
@@ -401,6 +403,9 @@ export const PreparationInputSchema = z.object({
   botId: z.string().optional(),
   // Auth
   authToken: z.string(),
+  // Git identity
+  identityKind: z.enum(['app', 'user']).optional(),
+  identityKiloUserId: z.string().optional(),
   // Git source
   githubRepo: z.string().optional(),
   githubToken: z.string().optional(),

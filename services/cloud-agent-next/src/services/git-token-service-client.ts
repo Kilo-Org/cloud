@@ -1,5 +1,6 @@
 import { logger } from '../logger.js';
 import type { Env as WorkerEnv } from '../types.js';
+import type { GitIdentity } from '../types/git-identity.js';
 
 export type ResolvedGitHubToken = {
   token: string;
@@ -58,6 +59,55 @@ export async function resolveGitHubTokenForRepo(
       success: false,
       error: { reason: 'rpc_error', message: `git-token-service RPC failed: ${message}` },
     };
+  }
+}
+
+export type ResolveUserGitHubTokenResult =
+  | { success: true; token: string; identity: Extract<GitIdentity, { kind: 'user' }> }
+  | { success: false; reason: string };
+
+/**
+ * Attempt to resolve a GitHub user-to-server token for `githubRepo`.
+ * Returns `{ success: false }` on any failure (not connected, expired, revoked,
+ * no repo access, or RPC error) — callers fall back to the app installation token.
+ *
+ * Does NOT log the token on success. Logs `{ kiloUserId, githubRepo, reason }` on failure.
+ */
+export async function resolveUserGitHubTokenForRepo(
+  env: WorkerEnv,
+  params: { kiloUserId: string; githubRepo: string; appType?: 'standard' | 'lite' }
+): Promise<ResolveUserGitHubTokenResult> {
+  try {
+    const result = await env.GIT_TOKEN_SERVICE.getUserTokenForRepo(params);
+    if (result.ok) {
+      logger
+        .withFields({ kiloUserId: params.kiloUserId, githubRepo: params.githubRepo })
+        .info('Resolved GitHub user token via git-token-service');
+      return {
+        success: true,
+        token: result.token,
+        identity: {
+          kind: 'user',
+          login: result.githubLogin,
+          userId: result.githubUserId,
+          email: result.githubEmail,
+        },
+      };
+    }
+    logger
+      .withFields({
+        kiloUserId: params.kiloUserId,
+        githubRepo: params.githubRepo,
+        reason: result.reason,
+      })
+      .info('GitHub user token lookup failed, will fall back to app token');
+    return { success: false, reason: result.reason };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger
+      .withFields({ error: message })
+      .error('Failed to call git-token-service getUserTokenForRepo');
+    return { success: false, reason: 'rpc_error' };
   }
 }
 

@@ -114,6 +114,17 @@ type GetGitLabTokenResult =
         | 'token_expired_no_refresh';
     };
 
+type GetUserTokenResult =
+  | {
+      ok: true;
+      token: string;
+      expiresAt: number;
+      githubLogin: string;
+      githubUserId: string;
+      githubEmail: string | null;
+    }
+  | { ok: false; reason: 'not_connected' | 'expired' | 'revoked' | 'no_repo_access' };
+
 export type GitTokenService = {
   getTokenForRepo(params: {
     githubRepo: string;
@@ -122,6 +133,11 @@ export type GitTokenService = {
   }): Promise<GetTokenForRepoResult>;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
   getGitLabToken(params: { userId: string; orgId?: string }): Promise<GetGitLabTokenResult>;
+  getUserTokenForRepo(params: {
+    kiloUserId: string;
+    githubRepo: string;
+    appType?: 'standard' | 'lite';
+  }): Promise<GetUserTokenResult>;
 };
 
 export type Env = {
@@ -177,6 +193,12 @@ export type Env = {
   GITHUB_APP_BOT_USER_ID?: string;
   /** Comma-separated org IDs that use per-session sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /**
+   * Feature gate for GitHub user token commit attribution.
+   * Set to 'true' to enable user-token preference in session prepare.
+   * Default (unset or 'false') preserves byte-identical behaviour to pre-MVP-3.
+   */
+  ENABLE_GITHUB_USER_TOKENS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

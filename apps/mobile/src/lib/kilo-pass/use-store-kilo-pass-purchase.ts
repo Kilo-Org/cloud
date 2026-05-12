@@ -77,6 +77,10 @@ const StoreKiloPassPurchaseContext = createContext<StoreKiloPassPurchaseContextV
 const sharedPurchaseCompletions = new Map<string, Promise<boolean>>();
 let lastPurchaseErrorToast: { message: string; shownAt: number } | null = null;
 
+export function resetPurchaseErrorToastDedup() {
+  lastPurchaseErrorToast = null;
+}
+
 type PurchaseCompletionOptions = {
   invalidateAfterCompletion?: boolean;
   notifyErrors?: boolean;

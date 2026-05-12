@@ -41,8 +41,8 @@ export async function evaluateContainerCapacity(
 
   const alerts = evaluateCapacityThresholds(apps);
 
-  // Sort: page alerts first so their dedup markers can suppress ticket alerts
-  // for the same application in the same cron tick.
+  // Sort: page alerts first so a page marker for one app can suppress
+  // a ticket alert for another app within the same cron tick.
   const sorted = [...alerts].sort((a, b) => {
     if (a.severity === b.severity) return 0;
     return a.severity === 'page' ? -1 : 1;

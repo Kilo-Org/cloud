@@ -25,6 +25,7 @@ type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 
 const CF_API_BASE = 'https://api.cloudflare.com/client/v4';
 const PER_PAGE = 20;
+const MAX_PAGES = 50;
 
 async function fetchListPage(
   accountId: string,
@@ -111,7 +112,7 @@ export async function queryContainerApplications(
   let page = 1;
   let totalPages = 1;
 
-  while (page <= totalPages) {
+  while (page <= totalPages && page <= MAX_PAGES) {
     const result = await fetchListPage(accountId, token, page, fetchFn);
     totalPages = result.totalPages;
 

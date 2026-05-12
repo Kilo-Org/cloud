@@ -1,8 +1,13 @@
 /* eslint-disable @typescript-eslint/no-base-to-string, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from 'cloudflare:test';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 import type { CodeReviewOrchestrator } from '../../src/code-review-orchestrator';
 import type { CodeReview, SessionInput } from '../../src/types';
+
+const QUEUED_REVIEW_TIMEOUT_MS = 10 * 60 * 1000;
+const RUNNING_REVIEW_TIMEOUT_MS = 90 * 60 * 1000;
+const ALARM_RETRY_DELAY_MS = 5 * 60 * 1000;
+const CLEANUP_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
 
 function getReviewStub(name = `review-${crypto.randomUUID()}`) {
   const id = env.CODE_REVIEW_ORCHESTRATOR.idFromName(name);
@@ -89,6 +94,12 @@ async function storedReview(stub: DurableObjectStub<CodeReviewOrchestrator>) {
   );
 }
 
+async function storedAlarm(stub: DurableObjectStub<CodeReviewOrchestrator>) {
+  return runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) =>
+    state.storage.getAlarm()
+  );
+}
+
 describe('CodeReviewOrchestrator recovery', () => {
   const originalFetch = globalThis.fetch;
 
@@ -97,6 +108,10 @@ describe('CodeReviewOrchestrator recovery', () => {
   });
 
   afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  afterAll(() => {
     globalThis.fetch = originalFetch;
   });
 
@@ -149,6 +164,7 @@ describe('CodeReviewOrchestrator recovery', () => {
 
   it('queued review alarm retries runReview and transitions to running', async () => {
     const stub = getReviewStub();
+    const startedBefore = Date.now();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
       const url = String(request);
       if (url.includes('/api/internal/code-review-status/')) {
@@ -183,6 +199,11 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(true);
     expect(hasFetchCall(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toBe(true);
+
+    const alarm = await storedAlarm(stub);
+    expect(alarm).toEqual(expect.any(Number));
+    expect(alarm).toBeGreaterThanOrEqual(startedBefore + RUNNING_REVIEW_TIMEOUT_MS);
+    expect(alarm).toBeLessThanOrEqual(Date.now() + RUNNING_REVIEW_TIMEOUT_MS);
   });
 
   it('retries prepareSession once after a sandbox 500 and initiates the retry session', async () => {
@@ -832,10 +853,196 @@ describe('CodeReviewOrchestrator recovery', () => {
     const status = await stub.status();
     expect(status.status).toBe('cancelled');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    const alarm = await storedAlarm(stub);
+    expect(alarm).toEqual(expect.any(Number));
+    expect(alarm).toBeGreaterThan(Date.now());
   });
 
-  it('terminal cleanup alarm still deletes storage', async () => {
+  it('recent running alarm syncs DB status and re-arms watchdog without failing', async () => {
     const stub = getReviewStub();
+    const startedAt = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      return new Response('cloud-agent should not be called', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          status: 'running',
+          startedAt,
+          updatedAt: startedAt,
+          sessionId: 'agent-running-session',
+        })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-running-session',
+    });
+    expect(fetchCalls(fetchMock, '/api/internal/code-review-status/')).toHaveLength(1);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({ status: 'running' });
+    expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(false);
+    await expect(storedAlarm(stub)).resolves.toBe(
+      Date.parse(startedAt) + RUNNING_REVIEW_TIMEOUT_MS
+    );
+  });
+
+  it('running alarm syncs local terminal state when DB is already terminal', async () => {
+    const stub = getReviewStub();
+    const startedAt = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const cleanupStart = Date.now();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({
+          success: true,
+          message: 'Review already in terminal state',
+          currentStatus: 'completed',
+          terminalReason: 'timeout',
+        });
+      }
+      return new Response('cloud-agent should not be called', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          status: 'running',
+          startedAt,
+          updatedAt: startedAt,
+          events: [{ timestamp: startedAt, eventType: 'test', message: 'stored' }],
+        })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    const stored = await storedReview(stub);
+    expect(stored).toMatchObject({
+      status: 'completed',
+      terminalReason: 'timeout',
+      events: [],
+    });
+    expect(stored?.completedAt).toEqual(expect.any(String));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const alarm = await storedAlarm(stub);
+    expect(alarm).toEqual(expect.any(Number));
+    expect(alarm).toBeGreaterThanOrEqual(cleanupStart + CLEANUP_DELAY_MS);
+    expect(alarm).toBeLessThanOrEqual(Date.now() + CLEANUP_DELAY_MS);
+  });
+
+  it('stale running alarm marks review failed and schedules cleanup', async () => {
+    const stub = getReviewStub();
+    const startedAt = new Date(Date.now() - RUNNING_REVIEW_TIMEOUT_MS - 1_000).toISOString();
+    const cleanupStart = Date.now();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      return new Response('cloud-agent should not be called', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          status: 'running',
+          startedAt,
+          updatedAt: startedAt,
+          sessionId: 'agent-stale-session',
+        })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'failed',
+      errorMessage: 'Review timed out waiting for cloud agent callback',
+      terminalReason: 'timeout',
+    });
+    expect(fetchCalls(fetchMock, '/api/internal/code-review-status/')).toHaveLength(2);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
+      status: 'failed',
+      terminalReason: 'timeout',
+      errorMessage: 'Review timed out waiting for cloud agent callback',
+    });
+    expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(false);
+    const alarm = await storedAlarm(stub);
+    expect(alarm).toEqual(expect.any(Number));
+    expect(alarm).toBeGreaterThanOrEqual(cleanupStart + CLEANUP_DELAY_MS);
+    expect(alarm).toBeLessThanOrEqual(Date.now() + CLEANUP_DELAY_MS);
+  });
+
+  it('stale queued alarm marks review failed without calling cloud-agent', async () => {
+    const stub = getReviewStub();
+    const queuedAt = new Date(Date.now() - QUEUED_REVIEW_TIMEOUT_MS - 1_000).toISOString();
+    const cleanupStart = Date.now();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      return new Response('cloud-agent should not be called', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview({ updatedAt: queuedAt }));
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'failed',
+      errorMessage: 'Review timed out waiting to start',
+      terminalReason: 'timeout',
+    });
+    expect(fetchCalls(fetchMock, '/api/internal/code-review-status/')).toHaveLength(1);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
+      status: 'failed',
+      terminalReason: 'timeout',
+      errorMessage: 'Review timed out waiting to start',
+    });
+    expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(false);
+    expect(hasFetchCall(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toBe(false);
+    const alarm = await storedAlarm(stub);
+    expect(alarm).toEqual(expect.any(Number));
+    expect(alarm).toBeGreaterThanOrEqual(cleanupStart + CLEANUP_DELAY_MS);
+    expect(alarm).toBeLessThanOrEqual(Date.now() + CLEANUP_DELAY_MS);
+  });
+
+  it('terminal cleanup deletes storage after DB terminal sync succeeds', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
 
     await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
       await state.storage.put(
@@ -843,6 +1050,9 @@ describe('CodeReviewOrchestrator recovery', () => {
         codeReview({
           status: 'completed',
           completedAt: new Date().toISOString(),
+          sessionId: 'agent-terminal-session',
+          cliSessionId: 'ses_terminal',
+          terminalReason: 'timeout',
           events: [{ timestamp: new Date().toISOString(), eventType: 'test', message: 'stored' }],
         })
       );
@@ -857,5 +1067,88 @@ describe('CodeReviewOrchestrator recovery', () => {
       async (_instance: CodeReviewOrchestrator, state) => state.storage.get('state')
     );
     expect(stored).toBeUndefined();
+    await expect(storedAlarm(stub)).resolves.toBeNull();
+    expect(fetchCalls(fetchMock, '/api/internal/code-review-status/')).toHaveLength(1);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
+      status: 'completed',
+      sessionId: 'agent-terminal-session',
+      cliSessionId: 'ses_terminal',
+      terminalReason: 'timeout',
+    });
+  });
+
+  it('terminal cleanup retries instead of deleting when DB terminal sync fails transiently', async () => {
+    const stub = getReviewStub();
+    const retryStart = Date.now();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return new Response('temporary status failure', { status: 500 });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          status: 'failed',
+          completedAt: new Date().toISOString(),
+          errorMessage: 'temporary local failure',
+          terminalReason: 'upstream_error',
+        })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'failed',
+      errorMessage: 'temporary local failure',
+      terminalReason: 'upstream_error',
+    });
+    const alarm = await storedAlarm(stub);
+    expect(alarm).toEqual(expect.any(Number));
+    expect(alarm).toBeGreaterThanOrEqual(retryStart + ALARM_RETRY_DELAY_MS);
+    expect(alarm).toBeLessThanOrEqual(Date.now() + ALARM_RETRY_DELAY_MS);
+  });
+
+  it('alarm handler failure leaves a future retry alarm', async () => {
+    const stub = getReviewStub();
+    const retryStart = Date.now();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+        if (body?.status === 'failed') {
+          return new Response('temporary status failure', { status: 500 });
+        }
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(400, 'Branch not found: main', 'BAD_REQUEST');
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(storedReview(stub)).resolves.toMatchObject({ status: 'failed' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({ status: 'failed' });
+    const alarm = await storedAlarm(stub);
+    expect(alarm).toEqual(expect.any(Number));
+    expect(alarm).toBeGreaterThanOrEqual(retryStart + ALARM_RETRY_DELAY_MS);
+    expect(alarm).toBeLessThanOrEqual(Date.now() + ALARM_RETRY_DELAY_MS);
   });
 });

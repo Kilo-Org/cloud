@@ -175,6 +175,14 @@ const BRAVE_SEARCH_FIELD_KEY = 'braveSearchApiKey';
  * For null persisted state, falls back to live inference from machineSize +
  * volumeSizeGb, which returns null when there's nothing to infer from.
  */
+function shallowEqualStringArrays(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 function resolveInstanceTypeFromState(
   state: Pick<InstanceMutableState, 'instanceType' | 'machineSize' | 'volumeSizeGb'>
 ): InstanceType | null {
@@ -3702,11 +3710,39 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       );
     }
 
-    // Augment the plugin response with interest_topics from Postgres.
-    // Other fields (enabled/cron/timezone) come from the plugin so a
-    // running-state mismatch (e.g. operator-edited config.json) surfaces.
-    if (pg?.row) {
-      return { ...pluginStatus, interestTopics: pg.row.interest_topics };
+    // Plugin is the source of truth for interestTopics — the Postgres
+    // row is a denormalized read cache. When the plugin reports topics
+    // and Postgres disagrees (e.g. a previous best-effort `waitUntil`
+    // mirror write failed after the plugin accepted a change), the
+    // plugin response wins on this read AND we schedule a repair so
+    // subsequent admin queries against Postgres see the fresh value.
+    // Without the repair, an existing-but-stale row would survive the
+    // lazy backfill check above (which only fires when `row === null`)
+    // and serve stale topics forever.
+    const pluginTopics = Array.isArray(pluginStatus.interestTopics)
+      ? pluginStatus.interestTopics
+      : null;
+    if (pg && pluginTopics !== null) {
+      const pgTopics = pg.row?.interest_topics ?? null;
+      const pgStale = pgTopics === null || !shallowEqualStringArrays(pgTopics, pluginTopics);
+      if (pgStale) {
+        this.ctx.waitUntil(
+          syncMorningBriefingConfigToPostgresHelper(
+            this.env,
+            this.s,
+            { interestTopics: pluginTopics },
+            pg.instanceId
+          )
+        );
+      }
+    }
+
+    // Merge: plugin wins for `interestTopics` when present (plugin is
+    // authoritative); fall back to Postgres mirror when the plugin
+    // response omits it (older controller image predating the field).
+    const responseInterestTopics = pluginTopics ?? pg?.row?.interest_topics;
+    if (responseInterestTopics !== undefined) {
+      return { ...pluginStatus, interestTopics: responseInterestTopics };
     }
     return pluginStatus;
   }

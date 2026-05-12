@@ -79,6 +79,14 @@ async function createHarness(options?: {
   messageSendFailures?: Partial<Record<'telegram' | 'discord' | 'slack', string>>;
   messageSendFailureCounts?: Partial<Record<'telegram' | 'discord' | 'slack', number>>;
   omitRuntimeChannelsConfig?: boolean;
+  /**
+   * When set, the cron `add` command awaits this promise before
+   * proceeding. Used by the reconcile-vs-interests race test to hold
+   * `ensureCronJob` inside reconcile so a concurrent interests write
+   * can land while reconcile is mid-flight. Resolve the promise to let
+   * reconcile finish.
+   */
+  cronAddBarrier?: Promise<void>;
 }): Promise<TestHarness> {
   const { default: morningBriefingPlugin } = await import('./index');
   const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'morning-briefing-'));
@@ -189,6 +197,12 @@ async function createHarness(options?: {
       }
 
       if (subcommand === 'add') {
+        // The race test holds reconcile here so a concurrent interests
+        // handler can land on the config write queue while reconcile is
+        // mid-flight inside `ensureCronJob`.
+        if (options?.cronAddBarrier) {
+          await options.cronAddBarrier;
+        }
         const id = `job-${++sequence}`;
         const now = Date.now();
         cronJobs.push({
@@ -1111,33 +1125,73 @@ describe('morning briefing lifecycle', () => {
       expect(stored.interestTopics).toEqual(['Tech']);
     });
 
-    it('serialises concurrent interest writes so neither is silently clobbered', async () => {
-      const harness = await createHarness();
-      const r1 = new FakeResponse();
-      const r2 = new FakeResponse();
+    it('preserves an interests write that lands while a slow reconcile holds a stale config', async () => {
+      // The production race the per-config-path write queue protects
+      // against: reconcile reads `StoredConfig`, awaits `ensureCronJob`
+      // (which is slow because it shells out to the cron system), then
+      // writes a `{ ...stale, cronJobId, cron, timezone }` spread. If
+      // an interests handler writes during that window, the reconcile's
+      // final spread overwrites the fresh interestTopics with the
+      // stale base it read at the start.
+      //
+      // The barrier holds reconcile inside `cron add` so this test
+      // deterministically lands the interests write during the race
+      // window. Without `queueConfigWrite`, the assertions below would
+      // see `interestTopics: []` (clobbered by reconcile's stale base);
+      // with the queue, both edits land cleanly.
+      let releaseCronAdd: () => void = () => {};
+      const cronAddBarrier = new Promise<void>(resolve => {
+        releaseCronAdd = resolve;
+      });
+      const preloadedAt = new Date(Date.now() - 60_000).toISOString();
+      const harness = await createHarness({
+        cronAddBarrier,
+        preloadedConfig: {
+          enabled: false,
+          cronJobId: null,
+          cron: '0 8 * * *',
+          timezone: 'America/Chicago',
+          interestTopics: [],
+          updatedAt: preloadedAt,
+        },
+      });
 
-      // Fire both writes without awaiting between them — exercises the
-      // read-modify-write race the per-config-path queue is meant to
-      // prevent. Without serialisation, both reads see the empty initial
-      // config and the second write would clobber the first.
-      await Promise.all([
-        harness.interestsHttpHandler(createJsonRequest({ topics: ['Tech', 'AI'] }), r1),
-        harness.interestsHttpHandler(createJsonRequest({ topics: ['Finance'] }), r2),
-      ]);
+      // Trigger reconcile: enableHttpHandler writes the config and
+      // kicks off the reconcile loop in the background. The cron `add`
+      // call inside reconcile now blocks on `cronAddBarrier`.
+      await harness.enableHttpHandler(createJsonRequest({}), new FakeResponse());
 
-      expect(r1.statusCode).toBe(200);
-      expect(r2.statusCode).toBe(200);
+      // Fire interests update while reconcile is paused. With the
+      // queue this Promise blocks on the lock; without the queue it
+      // completes immediately on the stale base.
+      const interestsResponse = new FakeResponse();
+      const interestsDone = harness.interestsHttpHandler(
+        createJsonRequest({ topics: ['Tech', 'AI'] }),
+        interestsResponse
+      );
 
-      // The second write wins (later in the queue), but crucially the
-      // result is one of the two inputs — NOT a merge or a default. If
-      // the queue regressed, the on-disk topics could revert to [] on
-      // the next reconcile write.
+      // Give the interests handler a tick to enqueue (without
+      // releasing reconcile).
+      await new Promise(resolve => setTimeout(resolve, 20));
+
+      // Release reconcile; it finishes its write and the interests
+      // handler then takes the lock.
+      releaseCronAdd();
+      await interestsDone;
+      await waitForReconcileState(harness.stateDir, 'succeeded');
+
+      expect(interestsResponse.statusCode).toBe(200);
+
       const configPath = path.join(harness.stateDir, 'morning-briefing', 'config.json');
-      const stored = (await readJson(configPath)) as { interestTopics: string[] };
-      const ordered =
-        JSON.stringify(stored.interestTopics) === JSON.stringify(['Tech', 'AI']) ||
-        JSON.stringify(stored.interestTopics) === JSON.stringify(['Finance']);
-      expect(ordered).toBe(true);
+      const stored = (await readJson(configPath)) as Record<string, unknown>;
+      // Reconcile's enable spread + interests write both landed.
+      expect(stored.enabled).toBe(true);
+      expect(stored.interestTopics).toEqual(['Tech', 'AI']);
+      // Unrelated fields are preserved through the serialised writes.
+      expect(stored.cron).toBe('0 8 * * *');
+      expect(stored.timezone).toBe('America/Chicago');
+      expect(typeof stored.cronJobId).toBe('string');
+      expect(stored.cronJobId).not.toBe(null);
     });
   });
 

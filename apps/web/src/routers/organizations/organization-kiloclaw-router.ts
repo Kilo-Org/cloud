@@ -1245,6 +1245,17 @@ export const organizationKiloclawRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Morning briefing is admin-only today (matches the UI gate in
+      // SettingsTab.tsx and ClawOnboardingFlow.tsx). The Kilo internal
+      // admin flag is checked here, not org-role membership, since the
+      // UI gate uses `user?.is_admin` regardless of whether the
+      // instance is personal or org-owned.
+      if (!ctx.user.is_admin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Morning briefing is admin-only',
+        });
+      }
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
       return client.updateBriefingInterests(ctx.user.id, input.topics, workerInstanceId(instance));

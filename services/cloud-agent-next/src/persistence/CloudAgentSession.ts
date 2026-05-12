@@ -392,7 +392,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         .map(value => value.trim())
         .filter(Boolean);
 
-      if (allowedOrigins.length > 0 && origin && !allowedOrigins.includes(origin)) {
+      // Only enforce the Origin allowlist when the client sends a real browser
+      // Origin. Native clients (iOS/Android) either omit the header entirely or
+      // send the literal string "null" — both cases are allowed through because
+      // the Worker already authenticated the request via the JWT ticket before
+      // forwarding here.
+      const isRealOrigin = origin !== null && origin !== 'null';
+      if (allowedOrigins.length > 0 && isRealOrigin && !allowedOrigins.includes(origin)) {
         logger
           .withFields({ origin, allowedOrigins, sessionId: sessionIdParam })
           .warn('DO /stream: Origin not allowed');

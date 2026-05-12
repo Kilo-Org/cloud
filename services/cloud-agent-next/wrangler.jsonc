@@ -51,7 +51,7 @@
     "STALE_THRESHOLD_MS": "600000",
     "PENDING_START_TIMEOUT_MS": "300000",
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
-    "WS_ALLOWED_ORIGINS": "https://app.kilo.ai",
+    "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
   },
   "placement": { "mode": "smart" },

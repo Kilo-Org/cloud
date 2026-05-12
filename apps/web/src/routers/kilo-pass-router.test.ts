@@ -1682,7 +1682,7 @@ describe('kiloPassRouter', () => {
       await expect(caller.kiloPass.getCustomerPortalUrl({})).rejects.toThrow(
         'Manage this Kilo Pass subscription through the mobile app store.'
       );
-      expect(stripeMock.billingPortal.sessions.create).not.toHaveBeenCalled();
+      expectNoStripeManagementCalls(stripeMock);
     });
 
     it('rejects active Google Play subscriptions without opening the Stripe portal', async () => {
@@ -2593,6 +2593,28 @@ describe('kiloPassRouter', () => {
         kiloUserId: user.id,
         paymentProvider: KiloPassPaymentProvider.GooglePlay,
         providerSubscriptionId: 'google-play-original-billing-history',
+        stripeSubscriptionId: null,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.getBillingHistory({})).rejects.toThrow(
+        'Manage this Kilo Pass subscription through the mobile app store.'
+      );
+      expectNoStripeManagementCalls(stripeMock);
+    });
+
+    it('rejects active App Store subscriptions without listing Stripe invoices', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-billing-history-app-store@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerSubscriptionId: 'app-store-original-billing-history',
         stripeSubscriptionId: null,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,

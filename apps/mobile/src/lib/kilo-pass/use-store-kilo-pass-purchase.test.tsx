@@ -721,7 +721,8 @@ describe('StoreKiloPassPurchaseProvider', () => {
     expect(onCompleted).not.toHaveBeenCalled();
     expect(stillPendingValue.isPending).toBe(true);
 
-    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    const activePurchase = createPurchase();
+    mockedIap.handlers?.onPurchaseSuccess(activePurchase);
     await flushPromises();
     const releasedValue = provider.render();
 
@@ -729,7 +730,7 @@ describe('StoreKiloPassPurchaseProvider', () => {
       signedTransactionJws: 'signed-jws',
     });
     expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
-      purchase: createPurchase(),
+      purchase: activePurchase,
       isConsumable: false,
     });
     expect(onCompleted).toHaveBeenCalledTimes(1);

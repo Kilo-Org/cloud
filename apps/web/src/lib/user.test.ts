@@ -1773,10 +1773,12 @@ describe('User', () => {
       });
 
       const subId = randomUUID();
+      const stripeSubscriptionId = `sub_test_${randomUUID()}`;
       await db.insert(kilo_pass_subscriptions).values({
         id: subId,
         kilo_user_id: user.id,
-        stripe_subscription_id: `sub_test_${randomUUID()}`,
+        provider_subscription_id: stripeSubscriptionId,
+        stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'canceled',
@@ -1835,9 +1837,11 @@ describe('User', () => {
 
     it('should throw SoftDeletePreconditionError for active subscription', async () => {
       const user = await insertTestUser();
+      const stripeSubscriptionId = `sub_test_${randomUUID()}`;
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: user.id,
-        stripe_subscription_id: `sub_test_${randomUUID()}`,
+        provider_subscription_id: stripeSubscriptionId,
+        stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'active',
@@ -1852,9 +1856,11 @@ describe('User', () => {
 
     it('should allow soft-delete when subscription is pending cancellation', async () => {
       const user = await insertTestUser();
+      const stripeSubscriptionId = `sub_test_${randomUUID()}`;
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: user.id,
-        stripe_subscription_id: `sub_test_${randomUUID()}`,
+        provider_subscription_id: stripeSubscriptionId,
+        stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'active',

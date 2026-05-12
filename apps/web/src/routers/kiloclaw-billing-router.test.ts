@@ -307,10 +307,13 @@ async function insertPersonalSubscriptionFixture(params: PersonalSubscriptionFix
   });
 }
 
-async function seedDeliveredImpactSignupEvent(userId: string, email: string) {
+async function seedDeliveredImpactSignupEvent(
+  userId: string,
+  email: string,
+  eventDate = new Date(Date.now() - 24 * 60 * 60 * 1000)
+) {
   const { recordAffiliateAttributionAndQueueParentEvent } = await import('@/lib/affiliate-events');
   const { recordImpactAffiliateTouch } = await import('@/lib/impact-referral');
-  const eventDate = new Date('2026-04-09T10:00:00.000Z');
 
   const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
     userId,
@@ -333,7 +336,7 @@ async function seedDeliveredImpactSignupEvent(userId: string, email: string) {
       utmTerm: null,
       utmContent: null,
       touchedAt: eventDate,
-      expiresAt: new Date('2026-05-09T10:00:00.000Z'),
+      expiresAt: new Date(eventDate.getTime() + 90 * 24 * 60 * 60 * 1000),
     },
   });
 
@@ -1441,9 +1444,11 @@ describe('subscription center procedures', () => {
         status: 'active',
       },
     ]);
+    const kiloPassStripeSubscriptionId = `kp-target-convert-${crypto.randomUUID()}`;
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
-      stripe_subscription_id: `kp-target-convert-${crypto.randomUUID()}`,
+      provider_subscription_id: kiloPassStripeSubscriptionId,
+      stripe_subscription_id: kiloPassStripeSubscriptionId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,
       status: 'active',
@@ -1536,9 +1541,11 @@ describe('subscription center procedures', () => {
       plan: 'standard',
       status: 'active',
     });
+    const kiloPassStripeSubscriptionId = `kp-target-convert-rollback-${crypto.randomUUID()}`;
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
-      stripe_subscription_id: `kp-target-convert-rollback-${crypto.randomUUID()}`,
+      provider_subscription_id: kiloPassStripeSubscriptionId,
+      stripe_subscription_id: kiloPassStripeSubscriptionId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,
       status: 'active',
@@ -2796,7 +2803,11 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
   });
 
   it('enqueues sale affiliate events for delivered attributed users', async () => {
-    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+    await seedDeliveredImpactSignupEvent(
+      user.id,
+      user.google_user_email,
+      new Date('2026-04-09T10:00:00.000Z')
+    );
 
     const [instance] = await db
       .insert(kiloclaw_instances)
@@ -5433,16 +5444,21 @@ describe('getBillingStatus with credits', () => {
     providerSubscriptionId?: string | null;
   }) {
     const paymentProvider = params.paymentProvider ?? KiloPassPaymentProvider.Stripe;
+    const stripeSubscriptionId =
+      paymentProvider === KiloPassPaymentProvider.Stripe
+        ? (params.providerSubscriptionId ?? `kp-stripe-sub-${crypto.randomUUID()}`)
+        : null;
+    const providerSubscriptionId =
+      paymentProvider === KiloPassPaymentProvider.Stripe
+        ? stripeSubscriptionId
+        : (params.providerSubscriptionId ?? null);
     const [subscription] = await db
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: params.userId,
         payment_provider: paymentProvider,
-        provider_subscription_id: params.providerSubscriptionId ?? null,
-        stripe_subscription_id:
-          paymentProvider === KiloPassPaymentProvider.Stripe
-            ? `kp-stripe-sub-${crypto.randomUUID()}`
-            : null,
+        provider_subscription_id: providerSubscriptionId,
+        stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: params.status,
@@ -5680,9 +5696,11 @@ describe('getBillingStatus with credits', () => {
       })
       .where(eq(kilocode_users.id, user.id));
 
+    const stripeSubscriptionId = `kp-stripe-sub-${crypto.randomUUID()}`;
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
-      stripe_subscription_id: `kp-stripe-sub-${crypto.randomUUID()}`,
+      provider_subscription_id: stripeSubscriptionId,
+      stripe_subscription_id: stripeSubscriptionId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Yearly,
       status: 'active',
@@ -5888,9 +5906,11 @@ describe('pure credit cancel/reactivate', () => {
 
 describe('acceptConversion', () => {
   async function createActiveKiloPass(userId: string) {
+    const stripeSubscriptionId = `kp-stripe-sub-${crypto.randomUUID()}`;
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: userId,
-      stripe_subscription_id: `kp-stripe-sub-${crypto.randomUUID()}`,
+      provider_subscription_id: stripeSubscriptionId,
+      stripe_subscription_id: stripeSubscriptionId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,
       status: 'active',

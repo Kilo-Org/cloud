@@ -4,6 +4,7 @@ import { GET } from './route';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
 import { user_github_app_tokens } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import { insertTestUser } from '@/tests/helpers/user.helper';
 
 jest.mock('@/lib/integrations/platforms/github/app-selector', () => ({
   getGitHubAppCredentials: jest.fn(() => ({
@@ -46,10 +47,13 @@ function makeRequest(url: string) {
   return new NextRequest(new URL(url, 'http://localhost:3000'));
 }
 
+const TEST_USER_ID = 'user-123';
+
 describe('GitHub user-connect callback', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
     jest.clearAllMocks();
+    await insertTestUser({ id: TEST_USER_ID });
   });
 
   test('redirects with invalid_state when state verification fails', async () => {

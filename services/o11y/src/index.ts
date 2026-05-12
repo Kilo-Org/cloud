@@ -3,7 +3,6 @@ import { Hono } from 'hono';
 import { registerApiMetricsRoutes } from './api-metrics-routes';
 import { evaluateAlerts } from './alerting/evaluate';
 import { registerAlertingConfigRoutes } from './alerting/config-routes';
-import { registerCodeReviewDedupRoutes } from './alerting/code-review-dedup-routes';
 import { SessionMetricsParamsSchema } from './session-metrics-schema';
 import type { SessionMetricsParamsInput } from './session-metrics-schema';
 import { writeSessionMetricsDataPoint } from './session-metrics-analytics';
@@ -14,7 +13,6 @@ const app = new Hono<{ Bindings: Env }>();
 
 registerApiMetricsRoutes(app);
 registerAlertingConfigRoutes(app);
-registerCodeReviewDedupRoutes(app);
 
 export default class extends WorkerEntrypoint<Env> {
   async fetch(request: Request): Promise<Response> {

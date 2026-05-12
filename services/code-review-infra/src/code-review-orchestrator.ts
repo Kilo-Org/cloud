@@ -216,7 +216,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     return baseTimestamp + CodeReviewOrchestrator.RUNNING_REVIEW_TIMEOUT_MS;
   }
 
-  private async scheduleRunningWatchdog(options: { force?: boolean; now?: number } = {}): Promise<number> {
+  private async scheduleRunningWatchdog(
+    options: { force?: boolean; now?: number } = {}
+  ): Promise<number> {
     const now = options.now ?? Date.now();
     const deadline = this.runningWatchdogDeadlineMs(now);
     const alarmAt = Math.max(deadline, now + 1_000);
@@ -403,7 +405,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   private async handleQueuedAlarm(): Promise<void> {
     const now = Date.now();
     const updatedAt = CodeReviewOrchestrator.timestampMs(this.state.updatedAt);
-    if (updatedAt === undefined || now - updatedAt > CodeReviewOrchestrator.QUEUED_REVIEW_TIMEOUT_MS) {
+    if (
+      updatedAt === undefined ||
+      now - updatedAt > CodeReviewOrchestrator.QUEUED_REVIEW_TIMEOUT_MS
+    ) {
       console.warn('[CodeReviewOrchestrator] Queued review timed out', {
         reviewId: this.state.reviewId,
         updatedAt: this.state.updatedAt,

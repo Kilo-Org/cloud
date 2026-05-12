@@ -3922,3 +3922,60 @@ describe('SessionService', () => {
     });
   });
 });
+
+describe('buildAgentEntryFromRuntimeAgent', () => {
+  const { buildAgentEntryFromRuntimeAgent } = await import('./session-service.js');
+
+  it('normalizes model with kilo/ prefix when not already prefixed', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: { model: 'anthropic/claude-opus-4.7', mode: 'subagent' },
+    });
+    expect(result.model).toBe('kilo/anthropic/claude-opus-4.7');
+  });
+
+  it('does not double-prefix models that already have kilo/', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: { model: 'kilo/code', mode: 'subagent' },
+    });
+    expect(result.model).toBe('kilo/code');
+  });
+
+  it('handles null model', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: { model: null, mode: 'subagent' },
+    });
+    expect(result.model).toBeUndefined();
+  });
+
+  it('handles undefined model', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: { mode: 'subagent' },
+    });
+    expect(result.model).toBeUndefined();
+  });
+
+  it('passes through other config fields unchanged', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: {
+        model: 'anthropic/claude-sonnet-4',
+        mode: 'subagent',
+        temperature: 0.7,
+        prompt: 'You are a test agent',
+      },
+    });
+    expect(result.model).toBe('kilo/anthropic/claude-sonnet-4');
+    expect(result.temperature).toBe(0.7);
+    expect(result.prompt).toBe('You are a test agent');
+    expect(result.mode).toBe('subagent');
+  });
+});

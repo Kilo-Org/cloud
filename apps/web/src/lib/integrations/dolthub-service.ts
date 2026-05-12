@@ -78,8 +78,7 @@ const DoltHubTokenPayloadSchema = z.object({
 function parseDoltHubTokenPayload(raw: unknown, operation: 'exchange' | 'refresh'): DoltHubTokenResponse {
   const parseResult = DoltHubTokenPayloadSchema.safeParse(raw);
   if (!parseResult.success) {
-    const verb = operation === 'exchange' ? 'exchange' : 'refresh';
-    throw new Error(`DoltHub token ${verb} returned invalid payload`);
+    throw new Error(`DoltHub token ${operation} returned invalid payload`);
   }
   const parsed = parseResult.data;
   return {

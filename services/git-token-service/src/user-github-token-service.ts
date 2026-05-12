@@ -1,6 +1,6 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { user_github_app_tokens } from '@kilocode/db/schema';
-import { eq, and, isNull, lte } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { Octokit } from '@octokit/rest';
 import type { GitHubAppType } from './github-token-service';
 

@@ -1,16 +1,14 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
 import { Octokit } from '@octokit/rest';
 import { exchangeWebFlowCode } from '@octokit/oauth-methods';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
 import { verifyOAuthState, safeReturnTo } from '@/lib/integrations/platforms/github/oauth-state';
 import { db } from '@/lib/drizzle';
 import { user_github_app_tokens } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
 import { USER_GH_APP_TOKEN_ENCRYPTION_KEY } from '@/lib/config.server';
 import { encryptWithSymmetricKey } from '@/lib/encryption';
-import { captureException, captureMessage } from '@sentry/nextjs';
+import { captureException } from '@sentry/nextjs';
 
 type GitHubConnectError =
   | 'exchange_failed'

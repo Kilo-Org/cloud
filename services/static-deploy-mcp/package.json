@@ -1,0 +1,25 @@
+{
+  "name": "static-deploy-mcp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --env dev",
+    "deploy": "wrangler deploy",
+    "deploy:dev": "wrangler deploy --env dev",
+    "cf-typegen": "wrangler types",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/static-deploy-mcp/src"
+  },
+  "dependencies": {
+    "@kilocode/worker-utils": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "fetch-to-node": "^2.1.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

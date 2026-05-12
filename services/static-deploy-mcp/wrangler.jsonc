@@ -1,0 +1,53 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "name": "static-deploy-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "dev": {
+    "port": 8806,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "vars": {
+    "BUILDER_URL": "https://kilo-deploy-builder.workers.dev",
+    "DEPLOY_HOSTNAME_BASE": "d.kiloapps.io",
+  },
+  "secrets_store_secrets": [
+    {
+      "binding": "NEXTAUTH_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "NEXTAUTH_SECRET_PROD",
+    },
+  ],
+  // Secrets (not in config): BUILDER_AUTH_TOKEN
+
+  // ============================================
+  // DEVELOPMENT ENVIRONMENT
+  // Deploy with: wrangler deploy --env dev
+  // This creates a SEPARATE worker: static-deploy-mcp-dev
+  // ============================================
+  "env": {
+    "dev": {
+      "name": "static-deploy-mcp-dev",
+      "workers_dev": true,
+      "vars": {
+        "BUILDER_URL": "https://kilo-deploy-builder-dev.workers.dev",
+        "DEPLOY_HOSTNAME_BASE": "d-staging.kiloapps.io",
+      },
+      "secrets_store_secrets": [
+        {
+          // To set: wrangler secrets-store secret create 342a86d9e3a94da698e82d0c6e2a36f0 --name NEXTAUTH_SECRET_DEV --scopes workers
+          "binding": "NEXTAUTH_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "NEXTAUTH_SECRET_DEV",
+        },
+      ],
+    },
+  },
+}

@@ -152,6 +152,47 @@ describe('GET /api/cron/code-review-alerts', () => {
     });
   });
 
+  it('still reports alert as sent when recording dedup state fails', async () => {
+    await db
+      .insert(cloud_agent_code_reviews)
+      .values([
+        ...Array.from({ length: 3 }, () =>
+          reviewValues({ status: 'failed', terminal_reason: 'timeout' })
+        ),
+        ...Array.from({ length: 5 }, () => reviewValues({ status: 'completed' })),
+      ]);
+    mockCheckAlertSuppression.mockResolvedValue({ suppressed: false });
+    mockRecordAlertDelivery.mockRejectedValue(
+      new Error('Failed to record code review alert dedup state')
+    );
+
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+
+      expect(response.status).toBe(200);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(mockRecordAlertDelivery).toHaveBeenCalledTimes(1);
+      await expect(response.json()).resolves.toMatchObject({
+        success: true,
+        tripped: 1,
+        sent: 1,
+        suppressed: 0,
+        slack: 'sent',
+        alerts: [
+          { detector: 'failure_rate', alertKey: 'failure_rate', suppressed: false, slack: 'sent' },
+        ],
+        errors: [],
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Slack alert sent but failed to record dedup state')
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('does not record dedup state when Slack delivery fails', async () => {
     await db
       .insert(cloud_agent_code_reviews)

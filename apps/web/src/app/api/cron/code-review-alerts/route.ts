@@ -105,7 +105,18 @@ async function handleTrippedAlert(
   }
 
   const slack = await postToSlack(details, webhookUrl);
-  await recordAlertDelivery(alertKey, severity);
+
+  try {
+    await recordAlertDelivery(alertKey, severity);
+  } catch (error) {
+    console.warn(
+      `Slack alert sent but failed to record dedup state for ${alertKey}: ${errorMessage(error)}`
+    );
+    captureException(error, {
+      tags: { endpoint: 'cron/code-review-alerts', step: 'record-alert-delivery' },
+      extra: { alertKey, severity, detector },
+    });
+  }
 
   return { detector, alertKey, suppressed: false, slack };
 }

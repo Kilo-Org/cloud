@@ -79,6 +79,10 @@ export function ProfileScreen() {
   };
 
   const confirmRevokeConsent = () => {
+    if (!userId) {
+      toast.error('Could not load your account. Please try again.');
+      return;
+    }
     Alert.alert(
       'Revoke data sharing consent?',
       'Kilo Code needs this consent to function. Revoking will sign you out. You can accept again on next sign-in.',
@@ -89,9 +93,7 @@ export function ProfileScreen() {
           style: 'destructive',
           onPress: () => {
             void (async () => {
-              if (userId) {
-                await revokeConsent(userId);
-              }
+              await revokeConsent(userId);
               await signOut();
             })();
           },

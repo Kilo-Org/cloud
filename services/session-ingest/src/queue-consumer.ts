@@ -10,13 +10,16 @@ import { MAX_INGEST_ITEM_BYTES, MAX_SINGLE_ITEM_BYTES } from './util/ingest-limi
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { withDORetry, normalizeGitUrl } from '@kilocode/worker-utils';
 
-export interface IngestQueueMessage {
+const PARENT_SESSION_LOOKUP_ATTEMPTS = 3;
+const PARENT_SESSION_LOOKUP_DELAY_MS = 250;
+
+export type IngestQueueMessage = {
   r2Key: string;
   kiloUserId: string;
   sessionId: string;
   ingestVersion: number;
   ingestedAt: number;
-}
+};
 
 /**
  * Creates a streaming item extractor that uses a low-level Tokenizer to parse
@@ -320,6 +323,49 @@ export function computeSessionMetadataUpdates(
   return updates;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function parentSessionExists(
+  db: ReturnType<typeof getWorkerDb>,
+  kiloUserId: string,
+  parentSessionId: string
+): Promise<boolean> {
+  const parentRows = await db
+    .select({ session_id: cli_sessions_v2.session_id })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.session_id, parentSessionId),
+        eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+      )
+    )
+    .limit(1);
+
+  return Boolean(parentRows[0]);
+}
+
+export async function resolveSafeParentSessionId(
+  db: ReturnType<typeof getWorkerDb>,
+  kiloUserId: string,
+  sessionId: string,
+  parentSessionId: string,
+  options: { attempts?: number; delayMs?: number } = {}
+): Promise<string | null> {
+  if (parentSessionId === sessionId) return null;
+
+  const attempts = options.attempts ?? PARENT_SESSION_LOOKUP_ATTEMPTS;
+  const delayMs = options.delayMs ?? PARENT_SESSION_LOOKUP_DELAY_MS;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    if (await parentSessionExists(db, kiloUserId, parentSessionId)) return parentSessionId;
+    if (attempt < attempts && delayMs > 0) await sleep(delayMs);
+  }
+
+  return null;
+}
+
 async function applyMetadataChanges(
   env: Env,
   kiloUserId: string,
@@ -345,26 +391,22 @@ async function applyMetadataChanges(
     : undefined;
   if (parentSessionId !== undefined) {
     if (parentSessionId && parentSessionId !== sessionId) {
-      const parentRows = await db
-        .select({ session_id: cli_sessions_v2.session_id })
-        .from(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, parentSessionId),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-          )
-        )
-        .limit(1);
+      const safeParentSessionId = await resolveSafeParentSessionId(
+        db,
+        kiloUserId,
+        sessionId,
+        parentSessionId
+      );
 
-      if (parentRows[0]) {
+      if (safeParentSessionId) {
         await db
           .update(cli_sessions_v2)
-          .set({ parent_session_id: parentSessionId })
+          .set({ parent_session_id: safeParentSessionId })
           .where(
             and(
               eq(cli_sessions_v2.session_id, sessionId),
               eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-              sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
+              sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${safeParentSessionId}`
             )
           );
       }

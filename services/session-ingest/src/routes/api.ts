@@ -21,27 +21,75 @@ export type ApiContext = {
 
 export const api = new Hono<ApiContext>();
 
-const createSessionSchema = z.object({
-  sessionId: z.string().startsWith('ses_').length(30),
-});
-
 const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
+const createSessionSchema = z
+  .object({
+    sessionId: sessionIdSchema,
+    title: z.string().trim().max(512).optional(),
+    parentSessionId: sessionIdSchema.optional(),
+    createdOnPlatform: z.string().trim().min(1).max(128).optional(),
+  })
+  .strict();
+
 const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
+const PARENT_SESSION_LOOKUP_ATTEMPTS = 3;
+const PARENT_SESSION_LOOKUP_DELAY_MS = 250;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function getSafeParentSessionId(
+  db: ReturnType<typeof getWorkerDb>,
+  kiloUserId: string,
+  sessionId: string,
+  parentSessionId: string | undefined
+): Promise<string | undefined> {
+  if (!parentSessionId || parentSessionId === sessionId) return undefined;
+
+  for (let attempt = 1; attempt <= PARENT_SESSION_LOOKUP_ATTEMPTS; attempt++) {
+    const parentRows = await db
+      .select({ session_id: cli_sessions_v2.session_id })
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parentSessionId),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+        )
+      )
+      .limit(1);
+
+    if (parentRows[0]) return parentSessionId;
+    if (attempt < PARENT_SESSION_LOOKUP_ATTEMPTS) await sleep(PARENT_SESSION_LOOKUP_DELAY_MS);
+  }
+
+  return undefined;
+}
 
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
 
-  // Persist a placeholder session row.
-  // This is intentionally minimal; we only need a working Hyperdrive -> Postgres path.
+  // Persist a placeholder session row plus safe attribution metadata supplied at bootstrap.
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
+  const parentSessionId = await getSafeParentSessionId(
+    db,
+    kiloUserId,
+    body.sessionId,
+    body.parentSessionId
+  );
 
   await db
     .insert(cli_sessions_v2)
     .values({
       session_id: body.sessionId,
       kilo_user_id: kiloUserId,
+      ...(body.title !== undefined ? { title: body.title === '' ? null : body.title } : {}),
+      ...(body.createdOnPlatform !== undefined
+        ? { created_on_platform: body.createdOnPlatform }
+        : {}),
+      ...(parentSessionId !== undefined ? { parent_session_id: parentSessionId } : {}),
     })
     .onConflictDoNothing({
       target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],

@@ -117,6 +117,7 @@ function makeDbFakes() {
     db,
     fns: {
       insert: insertFn,
+      insertValues: insert.values,
       select: selectFn,
       update: updateFn,
       updateSet,
@@ -231,6 +232,101 @@ describe('api routes', () => {
       id: 'ses_12345678901234567890123456',
       ingestPath: '/api/session/ses_12345678901234567890123456/ingest',
     });
+  });
+
+  it('POST /session persists initial attribution metadata when the parent is safe', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_parent12345678901234567890' }]);
+
+    const sessionCache = {
+      add: vi.fn(async () => undefined),
+      has: vi.fn(async () => true),
+      remove: vi.fn(async () => undefined),
+    };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'ses_child123456789012345678901',
+          parentSessionId: 'ses_parent12345678901234567890',
+          createdOnPlatform: 'agent-manager',
+          title: '  Child run  ',
+        }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(fns.insertValues).toHaveBeenCalledWith({
+      session_id: 'ses_child123456789012345678901',
+      kilo_user_id: 'usr_test',
+      title: 'Child run',
+      created_on_platform: 'agent-manager',
+      parent_session_id: 'ses_parent12345678901234567890',
+    });
+  });
+
+  it('POST /session ignores unsafe parent metadata at bootstrap', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([]);
+
+    const sessionCache = {
+      add: vi.fn(async () => undefined),
+      has: vi.fn(async () => true),
+      remove: vi.fn(async () => undefined),
+    };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'ses_child123456789012345678901',
+          parentSessionId: 'ses_parent12345678901234567890',
+          createdOnPlatform: 'vscode',
+        }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(fns.insertValues).toHaveBeenCalledWith({
+      session_id: 'ses_child123456789012345678901',
+      kilo_user_id: 'usr_test',
+      created_on_platform: 'vscode',
+    });
+  });
+
+  it('POST /session rejects unknown bootstrap metadata fields', async () => {
+    const { db } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'ses_12345678901234567890123456',
+          privateField: 'nope',
+        }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(400);
   });
 
   it('POST /session/:sessionId/ingest streams to R2 and enqueues on cache hit', async () => {

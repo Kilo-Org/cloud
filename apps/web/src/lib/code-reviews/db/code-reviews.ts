@@ -412,13 +412,17 @@ export async function ensureCodeReviewAttemptForRunningCallback(params: {
       });
     }
 
-    const shouldUpdateLatestPending =
-      latestAttempt.status === 'pending' ||
+    const sessionMatches =
       (params.sessionId !== undefined && latestAttempt.session_id === params.sessionId) ||
-      (params.cliSessionId !== undefined && latestAttempt.cli_session_id === params.cliSessionId) ||
-      (!latestAttempt.session_id &&
-        !latestAttempt.cli_session_id &&
-        !isTerminalCodeReviewStatus(latestAttempt.status));
+      (params.cliSessionId !== undefined && latestAttempt.cli_session_id === params.cliSessionId);
+    const latestAttemptIsRetry = latestAttempt.retry_of_attempt_id !== null;
+    const shouldUpdateLatestPending =
+      sessionMatches ||
+      (!latestAttemptIsRetry &&
+        (latestAttempt.status === 'pending' ||
+          (!latestAttempt.session_id &&
+            !latestAttempt.cli_session_id &&
+            !isTerminalCodeReviewStatus(latestAttempt.status))));
 
     if (shouldUpdateLatestPending) {
       const [updated] = await db

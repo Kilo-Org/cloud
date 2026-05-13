@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC, useGastownTRPCClient } from '@/lib/gastown/trpc';
 import { useWastelandTRPC, useWastelandTRPCClient } from '@/lib/wasteland/trpc';
+import { useTRPC } from '@/lib/trpc/utils';
 import { useUser } from '@/hooks/useUser';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -26,7 +28,10 @@ import {
   Users,
   Rocket,
   ChevronLeft,
+  ChevronDown,
   ArrowRight,
+  ArrowUpRight,
+  Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -217,6 +222,7 @@ function ConnectWastelandDialog({
 }) {
   const gastownTrpc = useGastownTRPC();
   const wastelandTrpc = useWastelandTRPC();
+  const mainTrpc = useTRPC();
   const gastownClient = useGastownTRPCClient();
   const wastelandClient = useWastelandTRPCClient();
   const { data: currentUser } = useUser();
@@ -234,9 +240,13 @@ function ConnectWastelandDialog({
   const [upstreamInput, setUpstreamInput] = useState(DEFAULT_UPSTREAM);
 
   // Step: Credentials
+  // OAuth path — hydrated from the dolthub integration when it's installed.
+  // Manual path — same fields the dialog used before the OAuth integration
+  // shipped, kept available behind an "Advanced" toggle for users who can't
+  // install the dev-only OAuth app.
+  const [manualOpen, setManualOpen] = useState(false);
   const [dolthubToken, setDolthubToken] = useState('');
   const [dolthubOrg, setDolthubOrg] = useState('');
-  const [doltCredsJwk, setDoltCredsJwk] = useState('');
   // User explicitly attests they own the upstream. Create mode implies
   // this is true (they're creating the repo) but keep it toggleable so
   // they can opt back out.
@@ -244,8 +254,6 @@ function ConnectWastelandDialog({
 
   // Step: Identity
   const [rigHandle, setRigHandle] = useState('');
-  const [doltUserName, setDoltUserName] = useState('');
-  const [doltUserEmail, setDoltUserEmail] = useState('');
 
   const [connectedUpstream, setConnectedUpstream] = useState(DEFAULT_UPSTREAM);
   /** wastelandId that just got connected — used to offer a "Visit wasteland"
@@ -253,18 +261,41 @@ function ConnectWastelandDialog({
   const [connectedWastelandId, setConnectedWastelandId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Pre-fill identity fields from user profile
+  // OAuth integration lookup. Only fetched while the dialog is open so we
+  // don't ship a bearer token to the browser on every Gastown render. The
+  // bearer-token query also gates on the credentials step so the token isn't
+  // pulled into browser memory while the user is still on intent / select /
+  // new-details — the wizard only needs it once we're at the credentials
+  // step (or about to be, via the prefill effect below).
+  const installationQuery = useQuery({
+    ...mainTrpc.dolthub.getInstallation.queryOptions(undefined),
+    enabled: open,
+  });
+  const dolthubCredentialsQuery = useQuery({
+    ...mainTrpc.dolthub.getInstallationCredentials.queryOptions(undefined),
+    enabled: open && step === 'credentials' && installationQuery.data?.installed === true,
+  });
+  const isDolthubInstalled = installationQuery.data?.installed === true;
+  const oauthDolthubToken = dolthubCredentialsQuery.data?.token ?? null;
+
+  // When the user lands on the credentials step with an OAuth token in hand,
+  // pre-fill the username from the integration cache (or from their Google
+  // profile as a soft fallback). They can still override before connecting.
+  useEffect(() => {
+    if (step !== 'credentials') return;
+    if (dolthubOrg) return;
+    const cached = dolthubCredentialsQuery.data?.dolthubUsername;
+    if (cached) setDolthubOrg(cached);
+  }, [step, dolthubOrg, dolthubCredentialsQuery.data?.dolthubUsername]);
+
+  // When OAuth is available, we don't need to ask for a separate API token —
+  // hide the manual "Advanced" disclosure by default.
+  const rememberUsername = useMutation(mainTrpc.dolthub.rememberUsername.mutationOptions());
+
   const handleProceedToIdentity = () => {
     const displayName = currentUser?.google_user_name;
-    const email = currentUser?.google_user_email;
     if (!rigHandle && displayName) {
       setRigHandle(`kilo-${displayName.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`);
-    }
-    if (!doltUserName && displayName) {
-      setDoltUserName(displayName);
-    }
-    if (!doltUserEmail && email) {
-      setDoltUserEmail(email);
     }
     setStep('identity');
   };
@@ -279,13 +310,11 @@ function ConnectWastelandDialog({
       setConnectedWastelandId(null);
       setUpstreamInput(DEFAULT_UPSTREAM);
       setNewWastelandName('');
+      setManualOpen(false);
       setDolthubToken('');
       setDolthubOrg('');
-      setDoltCredsJwk('');
       setIsUpstreamAdmin(false);
       setRigHandle('');
-      setDoltUserName('');
-      setDoltUserEmail('');
       setError(null);
     }
     onOpenChange(nextOpen);
@@ -362,6 +391,21 @@ function ConnectWastelandDialog({
     }
   };
 
+  /**
+   * The DoltHub token to use for storeCredential. When the user opted in
+   * to OAuth (manualOpen === false) and the integration is installed we
+   * forward the OAuth-issued access token; otherwise — only when the user
+   * has explicitly opened the manual disclosure — we use whatever they
+   * pasted into the manual-entry field. Mirrors the validity check
+   * (`oauthCredentialsValid` / `manualCredentialsValid`) so a stale value
+   * left over in collapsed manual fields can't leak into the call.
+   */
+  const resolveDolthubToken = (): string | null => {
+    if (!manualOpen && oauthDolthubToken) return oauthDolthubToken;
+    if (manualOpen && dolthubToken.trim()) return dolthubToken;
+    return null;
+  };
+
   const handleConnectJoin = async () => {
     setStep('connecting');
     setError(null);
@@ -381,14 +425,16 @@ function ConnectWastelandDialog({
       }
       setConnectedWastelandId(wastelandId);
 
+      const tokenToStore = resolveDolthubToken();
+      if (!tokenToStore) {
+        throw new Error('Connect your DoltHub account or paste an API token to continue.');
+      }
+
       await wastelandClient.wasteland.storeCredential.mutate({
         wastelandId,
-        dolthubToken,
+        dolthubToken: tokenToStore,
         dolthubOrg,
         rigHandle,
-        doltCredsJwk: doltCredsJwk.trim() || undefined,
-        doltUserName: doltUserName.trim() || undefined,
-        doltUserEmail: doltUserEmail.trim() || undefined,
         isUpstreamAdmin,
       });
 
@@ -404,6 +450,13 @@ function ConnectWastelandDialog({
         rigHandle,
         dolthubOrg,
       });
+
+      // Cache the confirmed username on the OAuth integration metadata so
+      // the next wasteland connect skips this prompt. Best-effort; failures
+      // here don't fail the connect we just completed.
+      if (!manualOpen && oauthDolthubToken && dolthubOrg.trim()) {
+        rememberUsername.mutate({ username: dolthubOrg.trim() });
+      }
 
       void queryClient.invalidateQueries({
         queryKey: gastownTrpc.gastown.getTownWastelandConnection.queryKey({ townId }),
@@ -427,6 +480,11 @@ function ConnectWastelandDialog({
       const name =
         newWastelandName.trim() || `${dolthubOrg}-${upstream.split('/')[1] ?? 'wasteland'}`;
 
+      const tokenToStore = resolveDolthubToken();
+      if (!tokenToStore) {
+        throw new Error('Connect your DoltHub account or paste an API token to continue.');
+      }
+
       // 1. Create the wasteland record (auto-adds caller as owner member)
       const created = await wastelandClient.wasteland.createWasteland.mutate({
         name,
@@ -439,12 +497,9 @@ function ConnectWastelandDialog({
       // 2. Store credentials with admin flag (required for createUpstream)
       await wastelandClient.wasteland.storeCredential.mutate({
         wastelandId,
-        dolthubToken,
+        dolthubToken: tokenToStore,
         dolthubOrg,
         rigHandle,
-        doltCredsJwk: doltCredsJwk.trim() || undefined,
-        doltUserName: doltUserName.trim() || undefined,
-        doltUserEmail: doltUserEmail.trim() || undefined,
         isUpstreamAdmin: true,
       });
 
@@ -453,8 +508,6 @@ function ConnectWastelandDialog({
         wastelandId,
         upstream,
         rigHandle,
-        rigDisplayName: doltUserName.trim() || undefined,
-        rigEmail: doltUserEmail.trim() || undefined,
       });
 
       // 4. Persist the town↔wasteland association on the Town DO.
@@ -472,6 +525,10 @@ function ConnectWastelandDialog({
         rigHandle,
         dolthubOrg,
       });
+
+      if (!manualOpen && oauthDolthubToken && dolthubOrg.trim()) {
+        rememberUsername.mutate({ username: dolthubOrg.trim() });
+      }
 
       void queryClient.invalidateQueries({
         queryKey: gastownTrpc.gastown.getTownWastelandConnection.queryKey({ townId }),
@@ -491,7 +548,18 @@ function ConnectWastelandDialog({
 
   const upstreamValid = /^[^/\s]+\/[^/\s]+$/.test(upstreamInput.trim());
   const newDetailsValid = upstreamValid && newWastelandName.trim().length > 0;
-  const credentialsValid = dolthubToken.trim().length > 0 && dolthubOrg.trim().length > 0;
+  // The credentials step accepts either:
+  //   - the OAuth-issued token (when the dolthub integration is installed
+  //     and the user hasn't toggled the manual fallback open), plus a
+  //     username so we can label commits and contribution branches; or
+  //   - a manually pasted API token + username when the user opted in to
+  //     the "Advanced" disclosure (e.g. they don't have the dev-only
+  //     OAuth app installed).
+  const oauthCredentialsValid =
+    !manualOpen && Boolean(oauthDolthubToken) && dolthubOrg.trim().length > 0;
+  const manualCredentialsValid =
+    manualOpen && dolthubToken.trim().length > 0 && dolthubOrg.trim().length > 0;
+  const credentialsValid = oauthCredentialsValid || manualCredentialsValid;
   const identityValid = rigHandle.trim().length > 0;
 
   return (
@@ -673,46 +741,98 @@ function ConnectWastelandDialog({
         {step === 'credentials' && (
           <>
             <DialogHeader>
-              <DialogTitle className="text-white/90">DoltHub Credentials</DialogTitle>
+              <DialogTitle className="text-white/90">DoltHub credentials</DialogTitle>
               <DialogDescription className="text-white/50">
                 {mode === 'create'
-                  ? 'Enter DoltHub credentials with push access — these are used to create the repo and register the first rig.'
-                  : 'Enter your DoltHub credentials. These are used to fork the commons and push contributions.'}
+                  ? 'Connect your DoltHub account to create the repo and register the first rig.'
+                  : 'Connect your DoltHub account to fork the commons and push contributions.'}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
-              <FieldGroup
-                label="DoltHub API Token"
-                hint="Create one at dolthub.com/settings/tokens"
-              >
-                <Input
-                  type="password"
-                  value={dolthubToken}
-                  onChange={e => setDolthubToken(e.target.value)}
-                  placeholder="Enter your DoltHub API token"
-                  className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
-                />
-              </FieldGroup>
-              <FieldGroup label="DoltHub Organization" hint="Your DoltHub username or org">
-                <Input
-                  value={dolthubOrg}
-                  onChange={e => setDolthubOrg(e.target.value)}
-                  placeholder="my-org"
-                  className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
-                />
-              </FieldGroup>
-              <FieldGroup
-                label="Dolt Credential (JWK)"
-                hint="Optional. Contents of your ~/.dolt/creds/*.jwk file. Required for dolt push."
-              >
-                <Input
-                  type="password"
-                  value={doltCredsJwk}
-                  onChange={e => setDoltCredsJwk(e.target.value)}
-                  placeholder='{"kid":"...","kty":"OKP",...}'
-                  className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
-                />
-              </FieldGroup>
+              {installationQuery.isLoading ? (
+                <div className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <Loader2 className="size-3.5 animate-spin text-white/30" />
+                  <span className="text-xs text-white/40">Checking DoltHub integration...</span>
+                </div>
+              ) : isDolthubInstalled ? (
+                <div className="space-y-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-3">
+                  <div className="flex items-start gap-2">
+                    <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[color:oklch(95%_0.15_108_/_0.9)]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-white/85">Use your connected DoltHub account</p>
+                      <p className="mt-0.5 text-[11px] text-white/40">
+                        We&apos;ll forward your OAuth-issued token. Just confirm your DoltHub
+                        username so we can label commits and contribution branches.
+                      </p>
+                    </div>
+                  </div>
+                  <FieldGroup
+                    label="Your DoltHub username"
+                    hint={
+                      dolthubCredentialsQuery.data?.dolthubUsername
+                        ? 'Cached from your last connect. Edit if needed.'
+                        : 'Saved on the DoltHub integration after connect.'
+                    }
+                  >
+                    <Input
+                      value={dolthubOrg}
+                      onChange={e => setDolthubOrg(e.target.value)}
+                      placeholder="my-username"
+                      className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
+                    />
+                  </FieldGroup>
+                </div>
+              ) : (
+                <div className="space-y-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <p className="text-sm text-white/70">
+                    Connect with DoltHub for the smoothest setup
+                  </p>
+                  <p className="text-[11px] text-white/40">
+                    Install the DoltHub integration once and skip pasting tokens.
+                  </p>
+                  <a
+                    href="/integrations/dolthub"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-flex items-center gap-1 text-xs text-[color:oklch(95%_0.15_108_/_0.9)] underline-offset-4 hover:underline"
+                  >
+                    Install DoltHub integration
+                    <ArrowUpRight className="size-3" />
+                  </a>
+                </div>
+              )}
+
+              <Collapsible open={manualOpen} onOpenChange={setManualOpen}>
+                <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-1 py-1 text-[11px] text-white/40 hover:text-white/60">
+                  <span className="uppercase tracking-wider">Advanced — paste an API token</span>
+                  <ChevronDown
+                    className={`size-3 transition-transform ${manualOpen ? 'rotate-180' : ''}`}
+                  />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2 space-y-3">
+                  <FieldGroup
+                    label="DoltHub API token"
+                    hint="Create one at dolthub.com/settings/tokens"
+                  >
+                    <Input
+                      type="password"
+                      value={dolthubToken}
+                      onChange={e => setDolthubToken(e.target.value)}
+                      placeholder="Paste a personal API token"
+                      className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
+                    />
+                  </FieldGroup>
+                  <FieldGroup label="DoltHub username" hint="Your DoltHub username or org">
+                    <Input
+                      value={dolthubOrg}
+                      onChange={e => setDolthubOrg(e.target.value)}
+                      placeholder="my-username"
+                      className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
+                    />
+                  </FieldGroup>
+                </CollapsibleContent>
+              </Collapsible>
+
               <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
                 <input
                   type="checkbox"
@@ -727,7 +847,7 @@ function ConnectWastelandDialog({
                     contributions from others.{' '}
                     {mode === 'create'
                       ? "Enabled by default since you're creating this repo."
-                      : 'Only check this if your DoltHub token has push access to the upstream repo.'}
+                      : 'Only check this if your DoltHub account has push access to the upstream repo.'}
                     You can toggle this later in settings.
                   </p>
                 </div>
@@ -757,7 +877,7 @@ function ConnectWastelandDialog({
         {step === 'identity' && (
           <>
             <DialogHeader>
-              <DialogTitle className="text-white/90">Rig Identity</DialogTitle>
+              <DialogTitle className="text-white/90">Rig identity</DialogTitle>
               <DialogDescription className="text-white/50">
                 Choose a handle for this town&apos;s rig on the commons. This identifies your
                 contributions.
@@ -765,7 +885,7 @@ function ConnectWastelandDialog({
             </DialogHeader>
             <div className="space-y-4 py-2">
               <FieldGroup
-                label="Rig Handle"
+                label="Rig handle"
                 hint="A unique identifier for this town on the wasteland"
               >
                 <Input
@@ -773,25 +893,6 @@ function ConnectWastelandDialog({
                   onChange={e => setRigHandle(e.target.value)}
                   placeholder="kilo-my-town"
                   className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
-                />
-              </FieldGroup>
-              <FieldGroup label="Dolt User Name" hint="Used for dolt commits (like git user.name)">
-                <Input
-                  value={doltUserName}
-                  onChange={e => setDoltUserName(e.target.value)}
-                  placeholder="Your Name"
-                  className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85 placeholder:text-white/20"
-                />
-              </FieldGroup>
-              <FieldGroup
-                label="Dolt User Email"
-                hint="Used for dolt commits (like git user.email)"
-              >
-                <Input
-                  value={doltUserEmail}
-                  onChange={e => setDoltUserEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85 placeholder:text-white/20"
                 />
               </FieldGroup>
               {error && (

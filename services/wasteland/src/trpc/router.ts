@@ -612,9 +612,6 @@ export const wastelandRouter = router({
         dolthubToken: z.string().min(1),
         dolthubOrg: z.string().min(1),
         rigHandle: z.string().optional(),
-        doltCredsJwk: z.string().optional(),
-        doltUserName: z.string().optional(),
-        doltUserEmail: z.string().email().optional(),
         isUpstreamAdmin: z.boolean().optional(),
       })
     )
@@ -645,20 +642,16 @@ export const wastelandRouter = router({
 
       // Inject token and config into the container env vars (persisted
       // for next boot) and tell the running container to init immediately.
+      // Per-user dolt commit identity (DOLT_USER_NAME / DOLT_USER_EMAIL) and
+      // the JWK push credential (DOLT_CREDS_JWK) are intentionally not
+      // collected here — the container's `configureDolt` falls back to
+      // sensible defaults derived from DOLTHUB_ORG, and pushes use the
+      // OAuth-issued token rather than a per-user JWK.
       const config = await stub.getConfig();
       if (config && config.owner_user_id === ctx.userId) {
         const container = getWastelandContainerStub(ctx.env, input.wastelandId);
         await container.setEnvVar('DOLTHUB_TOKEN', input.dolthubToken);
         await container.setEnvVar('DOLTHUB_ORG', input.dolthubOrg);
-        if (input.doltCredsJwk) {
-          await container.setEnvVar('DOLT_CREDS_JWK', input.doltCredsJwk);
-        }
-        if (input.doltUserName) {
-          await container.setEnvVar('DOLT_USER_NAME', input.doltUserName);
-        }
-        if (input.doltUserEmail) {
-          await container.setEnvVar('DOLT_USER_EMAIL', input.doltUserEmail);
-        }
         if (config.dolthub_upstream) {
           await container.setEnvVar('WL_UPSTREAM', config.dolthub_upstream);
 

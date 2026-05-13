@@ -185,9 +185,6 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
         dolthubToken: string;
         dolthubOrg: string;
         rigHandle?: string | undefined;
-        doltCredsJwk?: string | undefined;
-        doltUserName?: string | undefined;
-        doltUserEmail?: string | undefined;
         isUpstreamAdmin?: boolean | undefined;
       };
       output: {
@@ -940,9 +937,6 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
             dolthubToken: string;
             dolthubOrg: string;
             rigHandle?: string | undefined;
-            doltCredsJwk?: string | undefined;
-            doltUserName?: string | undefined;
-            doltUserEmail?: string | undefined;
             isUpstreamAdmin?: boolean | undefined;
           };
           output: {

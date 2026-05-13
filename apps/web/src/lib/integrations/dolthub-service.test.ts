@@ -13,6 +13,8 @@ import {
   upsertDoltHubInstallation,
   uninstall,
   getValidDoltHubToken,
+  getCachedDoltHubUsername,
+  rememberDoltHubUsername,
   DOLTHUB_REDIRECT_URI,
   DOLTHUB_SCOPES,
 } from '@/lib/integrations/dolthub-service';
@@ -519,6 +521,119 @@ describe('dolthub-service', () => {
         .returning();
 
       await expect(getValidDoltHubToken(integration)).rejects.toThrow(
+        'DoltHub integration is dev-only and not available in production'
+      );
+    });
+  });
+
+  describe('getCachedDoltHubUsername / rememberDoltHubUsername', () => {
+    test('round-trips a username through metadata', async () => {
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: user.id,
+          owned_by_organization_id: null,
+          platform: PLATFORM.DOLTHUB,
+          integration_type: 'oauth',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata: { access_token: 'token', refresh_token: 'r', scope: 'api_read_write' },
+          installed_at: new Date().toISOString(),
+        })
+        .returning();
+
+      expect(getCachedDoltHubUsername(integration)).toBeNull();
+
+      await rememberDoltHubUsername(integration, 'my-username');
+
+      const [reloaded] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id));
+      expect(reloaded).toBeDefined();
+      expect(getCachedDoltHubUsername(reloaded!)).toBe('my-username');
+    });
+
+    test('does not clobber existing OAuth fields when caching the username', async () => {
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: user.id,
+          owned_by_organization_id: null,
+          platform: PLATFORM.DOLTHUB,
+          integration_type: 'oauth',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata: {
+            access_token: 'preserved-access',
+            refresh_token: 'preserved-refresh',
+            expires_at: 1234567890,
+            scope: 'api_read_write',
+          },
+          installed_at: new Date().toISOString(),
+        })
+        .returning();
+
+      await rememberDoltHubUsername(integration, 'someone');
+
+      const [reloaded] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id));
+      const meta = reloaded!.metadata as {
+        access_token: string;
+        refresh_token: string;
+        expires_at: number;
+        scope: string;
+        dolthub_username: string;
+      };
+      expect(meta.access_token).toBe('preserved-access');
+      expect(meta.refresh_token).toBe('preserved-refresh');
+      expect(meta.expires_at).toBe(1234567890);
+      expect(meta.scope).toBe('api_read_write');
+      expect(meta.dolthub_username).toBe('someone');
+    });
+
+    test('overwrites a previously cached username', async () => {
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: user.id,
+          owned_by_organization_id: null,
+          platform: PLATFORM.DOLTHUB,
+          integration_type: 'oauth',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata: { access_token: 'token', dolthub_username: 'old-name' },
+          installed_at: new Date().toISOString(),
+        })
+        .returning();
+
+      expect(getCachedDoltHubUsername(integration)).toBe('old-name');
+
+      await rememberDoltHubUsername(integration, 'new-name');
+
+      const [reloaded] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id));
+      expect(getCachedDoltHubUsername(reloaded!)).toBe('new-name');
+    });
+
+    test('rememberDoltHubUsername throws in production', async () => {
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: user.id,
+          owned_by_organization_id: null,
+          platform: PLATFORM.DOLTHUB,
+          integration_type: 'oauth',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata: { access_token: 'token' },
+          installed_at: new Date().toISOString(),
+        })
+        .returning();
+
+      setNodeEnv('production');
+
+      await expect(rememberDoltHubUsername(integration, 'x')).rejects.toThrow(
         'DoltHub integration is dev-only and not available in production'
       );
     });

@@ -94,7 +94,8 @@ async function recreatePRGateCheck(review: CloudAgentCodeReview) {
           repoOwner,
           repoName,
           checkRunId,
-          { status: 'completed', conclusion: 'cancelled' }
+          { status: 'completed', conclusion: 'cancelled' },
+          appType
         );
         logExceptInTest(
           `[retrigger] Cancelled orphaned check run ${checkRunId} for ${review.repo_full_name}#${review.pr_number}`
@@ -146,6 +147,7 @@ async function cancelPRGateCheck(review: CloudAgentCodeReview) {
   if (platform === 'github' && integration.platform_installation_id) {
     if (!review.check_run_id) return;
 
+    const appType = integration.github_app_type ?? 'standard';
     const [repoOwner, repoName] = review.repo_full_name.split('/');
     await updateCheckRun(
       integration.platform_installation_id,
@@ -157,7 +159,8 @@ async function cancelPRGateCheck(review: CloudAgentCodeReview) {
         conclusion: 'cancelled',
         detailsUrl,
         output: { title: 'Kilo Code Review cancelled', summary: 'Review was cancelled.' },
-      }
+      },
+      appType
     );
     logExceptInTest(
       `[cancel] Finalized check run for ${review.repo_full_name}#${review.pr_number}`

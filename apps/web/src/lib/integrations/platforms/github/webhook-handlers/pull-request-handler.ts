@@ -299,7 +299,8 @@ export async function handlePullRequestCodeReview(
               repoOwner,
               repoName,
               checkRunId,
-              { status: 'completed', conclusion: 'cancelled' }
+              { status: 'completed', conclusion: 'cancelled' },
+              appType
             );
             logExceptInTest(
               `Cancelled orphaned check run ${checkRunId} for ${repository.full_name}#${pull_request.number}`
@@ -477,7 +478,8 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
             args.baseOwner,
             args.baseRepoName,
             newCheckRunId,
-            { status: 'completed', conclusion: 'cancelled' }
+            { status: 'completed', conclusion: 'cancelled' },
+            args.appType
           );
         } catch (cancelError) {
           logExceptInTest('Failed to cancel orphaned merge-commit check run:', cancelError);

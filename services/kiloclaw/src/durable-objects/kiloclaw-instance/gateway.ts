@@ -15,6 +15,7 @@ import {
   OpenclawConfigResponseSchema,
   MorningBriefingStatusResponseSchema,
   MorningBriefingActionResponseSchema,
+  MorningBriefingInterestsResponseSchema,
   MorningBriefingReadResponseSchema,
   OpenclawWorkspaceImportResponseSchema,
   GatewayControllerError,
@@ -556,6 +557,27 @@ export async function disableMorningBriefing(
       'POST',
       MorningBriefingActionResponseSchema,
       {},
+      { timeoutMs: 8_000 }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function updateMorningBriefingInterests(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  input: { topics: string[] }
+): Promise<z.infer<typeof MorningBriefingInterestsResponseSchema> | null> {
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/morning-briefing/interests',
+      'POST',
+      MorningBriefingInterestsResponseSchema,
+      input,
       { timeoutMs: 8_000 }
     );
   } catch (error) {

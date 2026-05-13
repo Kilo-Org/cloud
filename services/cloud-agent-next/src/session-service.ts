@@ -9,6 +9,7 @@ import type {
 } from './types.js';
 import type { ExecutionParams as _ExecutionParams } from './schema.js';
 import { generateSandboxId } from './sandbox-id.js';
+import { normalizeKilocodeModel } from './persistence/model-utils.js';
 import {
   checkDiskAndCleanBeforeSetup,
   cloneGitHubRepo,
@@ -512,7 +513,7 @@ export function buildAgentEntryFromRuntimeAgent(agent: RuntimeAgent): Record<str
   };
   if (config.prompt !== undefined) entry.prompt = config.prompt;
   if (config.description !== undefined) entry.description = config.description;
-  if (config.model !== undefined) entry.model = config.model;
+  if (config.model !== undefined) entry.model = normalizeKilocodeModel(config.model);
   if (config.variant !== undefined) entry.variant = config.variant;
   if (config.temperature !== undefined) entry.temperature = config.temperature;
   if (config.top_p !== undefined) entry.top_p = config.top_p;

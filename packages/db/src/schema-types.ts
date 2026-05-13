@@ -349,6 +349,7 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.orphan.destroy',
   'kiloclaw.instances.bulk_change_version',
   'kiloclaw.scheduled_action.created',
+  'kiloclaw.fleet_upgrade.created',
   'kiloclaw.scheduled_action.cancelled',
 ]);
 
@@ -1127,7 +1128,25 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'interrupted',
   'timeout',
   'upstream_error',
+  'sandbox_error',
   'unknown',
 ] as const;
 
 export type CodeReviewTerminalReason = (typeof CODE_REVIEW_TERMINAL_REASONS)[number];
+
+/**
+ * Subset of CODE_REVIEW_TERMINAL_REASONS that represent expected, non-system
+ * outcomes (user/billing-driven cancellations or supersession). Alerting
+ * detectors exclude these so they are not counted as system failures.
+ *
+ * KEEP IN SYNC with CODE_REVIEW_TERMINAL_REASONS — when adding a new reason
+ * above, decide whether it is a system failure or a benign outcome and
+ * include it here when it is the latter.
+ */
+export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
+  'billing',
+  'user_cancelled',
+  'superseded',
+] as const satisfies readonly CodeReviewTerminalReason[];
+
+export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];

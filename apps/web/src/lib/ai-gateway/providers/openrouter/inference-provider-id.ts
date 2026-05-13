@@ -75,6 +75,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
 export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'anthropic',
   'bedrock',
+  'deepseek',
   'fireworks',
   'google', // Google AI Studio
   'inception',
@@ -116,6 +117,7 @@ export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',
+  [VercelUserByokInferenceProviderIdSchema.enum.deepseek]: 'deepseek/deepseek-v3.2',
   [VercelUserByokInferenceProviderIdSchema.enum.fireworks]: 'openai/gpt-oss-20b',
   [VercelUserByokInferenceProviderIdSchema.enum.inception]: 'inception/mercury-2',
   [VercelUserByokInferenceProviderIdSchema.enum.moonshotai]: 'moonshotai/kimi-k2.5',
@@ -148,7 +150,6 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'chutes',
   'cohere',
   'deepinfra',
-  'deepseek',
   'groq',
   'interfaze',
   'klingai',

@@ -132,7 +132,7 @@ export function KiloPassSubscribeCard(props: {
         <div className="space-y-2 text-xs">
           <div className="text-muted-foreground flex items-start gap-2">
             <Check className="mt-0.5 h-4 w-4 flex-none text-emerald-400" />
-            <span>Your payment converts 1:1 into paid credits that never expire</span>
+            <span>Your payment converts 1:1 into credits that are added to your balance</span>
           </div>
           <div className="text-muted-foreground flex items-start gap-2">
             <Check className="mt-0.5 h-4 w-4 flex-none text-emerald-400" />

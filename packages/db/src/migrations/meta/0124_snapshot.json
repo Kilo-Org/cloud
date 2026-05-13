@@ -1,5 +1,5 @@
 {
-  "id": "afc6cd01-3309-4e02-9a6e-732c52f6797d",
+  "id": "8eaa5c7d-b58b-480b-b64d-ed68a514b2cd",
   "prevId": "01479a6c-dedf-4e9d-ab2b-b3af700c5cc2",
   "version": "7",
   "dialect": "postgresql",
@@ -4276,26 +4276,6 @@
           "type": "bigint",
           "primaryKey": false,
           "notNull": false
-        },
-        "repository_review_instructions_used": {
-          "name": "repository_review_instructions_used",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "repository_review_instructions_ref": {
-          "name": "repository_review_instructions_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "repository_review_instructions_truncated": {
-          "name": "repository_review_instructions_truncated",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "model": {
           "name": "model",
@@ -11380,6 +11360,98 @@
           "value": "\"kiloclaw_instances\".\"instance_type\" IS NULL OR \"kiloclaw_instances\".\"instance_type\" IN ('perf-1-3', 'perf-4-8', 'perf-4-16', 'shared-2-3', 'shared-2-4', 'custom')"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.kiloclaw_morning_briefing_configs": {
+      "name": "kiloclaw_morning_briefing_configs",
+      "schema": "",
+      "columns": {
+        "instance_id": {
+          "name": "instance_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "cron": {
+          "name": "cron",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0 7 * * *'"
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'UTC'"
+        },
+        "interest_topics": {
+          "name": "interest_topics",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_kiloclaw_morning_briefing_configs_enabled": {
+          "name": "IDX_kiloclaw_morning_briefing_configs_enabled",
+          "columns": [
+            {
+              "expression": "instance_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kiloclaw_morning_briefing_configs\".\"enabled\" = true",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "kiloclaw_morning_briefing_configs_instance_id_kiloclaw_instances_id_fk": {
+          "name": "kiloclaw_morning_briefing_configs_instance_id_kiloclaw_instances_id_fk",
+          "tableFrom": "kiloclaw_morning_briefing_configs",
+          "tableTo": "kiloclaw_instances",
+          "columnsFrom": [
+            "instance_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.kiloclaw_referral_conversions": {

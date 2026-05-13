@@ -599,14 +599,14 @@ function BonusStreakContent({ subscription }: { subscription: KiloPassSubscripti
       {subscription.cadence === KiloPassCadence.Monthly ? (
         subscription.status === 'paused' ? (
           <div className="text-muted-foreground text-xs">
-            Unused paid credits never expire. Free bonus credits are not renewed while your
-            subscription is paused; monthly credits resume when the subscription resumes.
+            Free bonus credits are not renewed while your subscription is paused; monthly credits
+            resume when the subscription resumes.
           </div>
         ) : (
           <div className="text-muted-foreground text-xs">
-            Unused paid credits never expire and roll over every month into your total. Free bonus
-            credits are earned after using the month&apos;s paid credits. Unused free bonus credits
-            do not roll over{expiresAtLabel ? ` and will expire on ${expiresAtLabel}.` : '.'}
+            Free bonus credits are earned after using the month&apos;s paid credits. Unused free
+            bonus credits do not roll over
+            {expiresAtLabel ? ` and will expire on ${expiresAtLabel}.` : '.'}
           </div>
         )
       ) : null}

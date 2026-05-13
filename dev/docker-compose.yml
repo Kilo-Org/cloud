@@ -5,6 +5,10 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
+    # Increase /dev/shm so parallel aggregates (e.g. rollup SUM over large
+    # microdollar_usage JOINs) don't fail with "could not resize shared
+    # memory segment" on default 64M tmpfs.
+    shm_size: '2gb'
     ports:
       - '5432:5432'
     volumes:

@@ -128,10 +128,14 @@ export function CodeReviewStats({ data }: { data: StatsData }) {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Billing Errors</CardTitle>
-          <CardDescription>{data.billingRate.toFixed(1)}% of terminal outcomes</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold text-orange-500">{data.billingErrorCount}</div>
+          <div className="text-3xl font-bold tabular-nums text-orange-500">
+            {data.billingRate.toFixed(1)}%
+          </div>
+          <div className="text-muted-foreground mt-1 text-xs tabular-nums">
+            {data.billingErrorCount.toLocaleString()} billing errors
+          </div>
         </CardContent>
       </Card>
 
@@ -161,10 +165,11 @@ export function CodeReviewStats({ data }: { data: StatsData }) {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-          <CardDescription>Pending/Queued/Running</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold text-blue-600">{data.inProgressCount}</div>
+          <div className="text-3xl font-bold tabular-nums text-blue-600">
+            {data.inProgressCount.toLocaleString()}
+          </div>
         </CardContent>
       </Card>
     </div>

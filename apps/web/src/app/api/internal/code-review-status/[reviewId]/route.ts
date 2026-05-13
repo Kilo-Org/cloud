@@ -134,6 +134,10 @@ function normalizePayload(raw: StatusUpdatePayload): {
     terminalReason = 'billing';
   }
 
+  if (!terminalReason && raw.status === 'interrupted') {
+    terminalReason = 'interrupted';
+  }
+
   return {
     status,
     sessionId,
@@ -409,7 +413,7 @@ async function updatePRGateCheck(
           summary: checkRunMapping.summary,
         },
       },
-      integration.github_app_type || 'standard'
+      integration.github_app_type ?? 'standard'
     );
 
     logExceptInTest(
@@ -513,6 +517,7 @@ export async function POST(
         success: true,
         message: 'Review already in terminal state',
         currentStatus: review.status,
+        terminalReason: review.terminal_reason,
       });
     }
 

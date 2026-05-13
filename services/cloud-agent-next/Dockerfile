@@ -3,7 +3,7 @@ FROM docker.io/cloudflare/sandbox:0.9.2
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""
 ARG VCS_REF=""
-ARG KILOCODE_CLI_VERSION="7.1.23"
+ARG KILOCODE_CLI_VERSION="7.2.52"
 
 # Install latest stable git + git-lfs from the git-core PPA, GitHub CLI, and supporting tools.
 # The default Ubuntu git (2.34.1 on 22.04) is outdated; the git-core PPA ships the latest

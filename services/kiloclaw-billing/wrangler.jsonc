@@ -79,9 +79,11 @@
     },
   ],
   // Secrets:
-  // - STRIPE_KILOCLAW_COMMIT_PRICE_ID: canonical Stripe commit plan price ID for Impact sale SKU reporting
-  // - STRIPE_KILOCLAW_STANDARD_PRICE_ID: canonical Stripe standard plan price ID for Impact sale SKU reporting
-  // - STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: canonical Stripe intro price ID shared with standard-plan reporting
+  // - STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID: legacy recognized Stripe Standard intro price ID for settlement, plan detection, version-aware repair, and reporting
+  // - STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID: legacy recognized Stripe Standard recurring price ID for settlement, plan detection, repair, and reporting
+  // - STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID: legacy recognized Stripe Commit price ID for settlement, plan detection, and reporting
+  // - STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID: current checkout Stripe Standard recurring price ID for settlement, plan detection, and reporting
+  // - STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID: current checkout Stripe Commit price ID for settlement, plan detection, and reporting
   // - INTERNAL_API_SECRET: auth for the Next.js billing side-effect endpoint
   // - KILOCLAW_INTERNAL_API_SECRET: auth for /api/platform/* on the kiloclaw worker
   // - SNOWFLAKE_PRIVATE_KEY_PEM: Snowflake JWT private key in raw PEM format

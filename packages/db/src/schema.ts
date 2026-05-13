@@ -70,6 +70,7 @@ import type {
   KiloClawScheduledActionNotificationChannel,
   KiloClawScheduledActionNotificationKind,
 } from './schema-types';
+import type { KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
   OrganizationModeConfig,
   OrganizationPlan,
@@ -5137,6 +5138,12 @@ export const kiloclaw_subscriptions = pgTable(
     instance_id: uuid().references(() => kiloclaw_instances.id),
     access_origin: text().$type<KiloClawSubscriptionAccessOrigin>(),
     payment_source: text().$type<KiloClawPaymentSource>(),
+    kiloclaw_price_version: text()
+      .notNull()
+      .$type<KiloClawPriceVersion>()
+      .$defaultFn((): KiloClawPriceVersion => {
+        throw new Error('kiloclaw_price_version must be set explicitly by subscription writers');
+      }),
     plan: text().notNull().$type<KiloClawPlan>(),
     scheduled_plan: text().$type<KiloClawScheduledPlan>(),
     scheduled_by: text().$type<KiloClawScheduledBy>(),
@@ -5166,6 +5173,7 @@ export const kiloclaw_subscriptions = pgTable(
     index('IDX_kiloclaw_subscriptions_status').on(table.status),
     index('IDX_kiloclaw_subscriptions_user_id').on(table.user_id),
     index('IDX_kiloclaw_subscriptions_user_status').on(table.user_id, table.status),
+    index('IDX_kiloclaw_subscriptions_price_version').on(table.kiloclaw_price_version),
     index('IDX_kiloclaw_subscriptions_transferred_to').on(table.transferred_to_subscription_id),
     index('IDX_kiloclaw_subscriptions_stripe_schedule_id').on(table.stripe_schedule_id),
     index('IDX_kiloclaw_subscriptions_auto_resume_retry_after').on(table.auto_resume_retry_after),

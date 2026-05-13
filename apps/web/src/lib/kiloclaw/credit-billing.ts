@@ -5,7 +5,11 @@ import { addMonths, format } from 'date-fns';
 
 import { db } from '@/lib/drizzle';
 import {
+  CURRENT_KILOCLAW_PRICE_VERSION,
+  getKiloClawPlanCostMicrodollars,
+  getKiloClawPricingCatalogEntry,
   insertKiloClawSubscriptionChangeLog,
+  type KiloClawPriceVersion,
   type KiloClawSubscriptionChangeAction,
   type KiloClawSubscriptionChangeActor,
 } from '@kilocode/db';
@@ -251,6 +255,7 @@ async function clearTransferredSettlementStripeOwnership(params: {
       stripe_subscription_id: null,
       stripe_schedule_id: null,
       cancel_at_period_end: false,
+      pending_conversion: false,
     })
     .where(eq(kiloclaw_subscriptions.id, params.row.subscription.id))
     .returning();
@@ -265,17 +270,11 @@ async function clearTransferredSettlementStripeOwnership(params: {
   });
 }
 
-export const KILOCLAW_PLAN_COST_MICRODOLLARS = {
-  standard: 9_000_000, // $9/month
-  commit: 48_000_000, // $48/6 months
-} as const;
-
-// First-month discount for new standard-plan credit enrollments (matches
-// the Stripe-configured intro price). See spec Credit Enrollment rule 3.
-export const KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS = 4_000_000; // $4
-
-function getKiloClawAffiliateItemCategory(plan: 'commit' | 'standard'): string {
-  return `kiloclaw-${plan}`;
+function getKiloClawAffiliateItemCategory(params: {
+  plan: 'commit' | 'standard';
+  priceVersion: string;
+}): string {
+  return `kiloclaw-${params.plan}-${params.priceVersion}`;
 }
 
 function getKiloClawAffiliateItemName(plan: 'commit' | 'standard'): string {
@@ -290,6 +289,7 @@ async function enqueueCreditEnrollmentAffiliateEvents(params: {
   saleAmountMicrodollars: number;
   eventDate: Date;
   saleItemSku: string;
+  priceVersion: string;
   trialEndEntityId?: string;
 }): Promise<void> {
   if (params.trialEndEntityId) {
@@ -307,13 +307,18 @@ async function enqueueCreditEnrollmentAffiliateEvents(params: {
     });
   }
 
+  const itemCategory = getKiloClawAffiliateItemCategory({
+    plan: params.plan,
+    priceVersion: params.priceVersion,
+  });
+
   const conversionDisposition = await processPersonalKiloClawPaidConversion({
     userId: params.userId,
     sourcePaymentId: params.saleOrderId,
     orderId: params.saleOrderId,
     amount: params.saleAmountMicrodollars / 1_000_000,
     currencyCode: 'usd',
-    itemCategory: getKiloClawAffiliateItemCategory(params.plan),
+    itemCategory,
     itemName: getKiloClawAffiliateItemName(params.plan),
     itemSku: params.saleItemSku,
     convertedAt: params.eventDate,
@@ -336,7 +341,7 @@ async function enqueueCreditEnrollmentAffiliateEvents(params: {
     orderId: params.saleOrderId,
     amount: params.saleAmountMicrodollars / 1_000_000,
     currencyCode: 'usd',
-    itemCategory: getKiloClawAffiliateItemCategory(params.plan),
+    itemCategory,
     itemName: getKiloClawAffiliateItemName(params.plan),
     itemSku: params.saleItemSku,
   });
@@ -435,6 +440,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   stripeSubscriptionId: string;
   stripePaymentId: string;
   plan: 'commit' | 'standard';
+  priceVersion: KiloClawPriceVersion;
   amountMicrodollars: number;
   periodStart: string;
   periodEnd: string;
@@ -445,6 +451,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     stripeSubscriptionId,
     stripePaymentId,
     plan,
+    priceVersion,
     amountMicrodollars,
     periodStart,
     periodEnd,
@@ -555,11 +562,31 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     }
 
     const targetRow = resolvedTarget.subscription;
+    if (targetRow.kiloclaw_price_version !== priceVersion) {
+      logWarning('Stripe-funded settlement quarantined: invoice price version mismatch', {
+        user_id: userId,
+        stripe_subscription_id: stripeSubscriptionId,
+        subscription_id: targetRow.id,
+        row_price_version: targetRow.kiloclaw_price_version,
+        invoice_price_version: priceVersion,
+      });
+      return;
+    }
+
     wasSuspended = !!targetRow.suspended_at;
     resolvedInstanceId = targetRow.instance_id ?? undefined;
     resolvedSubscriptionId = targetRow.id;
 
     const shouldClearSchedule = targetRow.scheduled_plan === plan;
+    if (targetRow.plan !== plan && !shouldClearSchedule) {
+      logWarning('Stripe-funded settlement invoice plan differs from local subscription plan', {
+        user_id: userId,
+        stripe_subscription_id: stripeSubscriptionId,
+        subscription_id: targetRow.id,
+        row_plan: targetRow.plan,
+        invoice_plan: plan,
+      });
+    }
     const commitEndsAt = plan === 'commit' ? periodEnd : null;
 
     const deposited = await processTopUp(
@@ -1108,18 +1135,6 @@ export async function enrollWithCredits(params: {
 }): Promise<void> {
   const { userId, instanceId, plan, hadPaidSubscription } = params;
 
-  // First-time standard-plan subscribers get the intro price ($4).
-  // Returning subscribers (had a prior paid, non-trial subscription) pay full price ($9).
-  // Commit plan has no intro discount. See spec Credit Enrollment rule 3.
-  const costMicrodollars =
-    plan === 'standard' && !hadPaidSubscription
-      ? KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS
-      : KILOCLAW_PLAN_COST_MICRODOLLARS[plan];
-  const saleItemSku =
-    plan === 'standard' && !hadPaidSubscription
-      ? getStripePriceIdForClawPlanIntro('standard')
-      : getStripePriceIdForClawPlan(plan);
-
   // Step 1: Read current state
   const [user] = await db
     .select({
@@ -1142,6 +1157,7 @@ export async function enrollWithCredits(params: {
       plan: kiloclaw_subscriptions.plan,
       status: kiloclaw_subscriptions.status,
       suspended_at: kiloclaw_subscriptions.suspended_at,
+      kiloclaw_price_version: kiloclaw_subscriptions.kiloclaw_price_version,
     })
     .from(kiloclaw_subscriptions)
     .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
@@ -1159,6 +1175,30 @@ export async function enrollWithCredits(params: {
   if (existingSub && existingSub.status !== 'trialing' && existingSub.status !== 'canceled') {
     throw new Error('Cannot enroll: an active subscription already exists. Cancel it first.');
   }
+
+  const isLiveTrialLineage = existingSub?.status === 'trialing';
+  const kiloclawPriceVersion = isLiveTrialLineage
+    ? existingSub.kiloclaw_price_version
+    : CURRENT_KILOCLAW_PRICE_VERSION;
+  const kiloclawPricing = getKiloClawPricingCatalogEntry(kiloclawPriceVersion);
+
+  // First-time standard-plan subscribers in an eligible live pre-rollout lineage
+  // get that version's intro price. Current and canceled-history enrollments use
+  // recurring pricing from the first paid period. Commit has no intro discount.
+  // See spec Credit Enrollment rule 3.
+  const useStandardIntro =
+    isLiveTrialLineage &&
+    plan === 'standard' &&
+    kiloclawPricing.standardIntroMicrodollars !== undefined &&
+    !hadPaidSubscription;
+  const costMicrodollars = getKiloClawPlanCostMicrodollars({
+    priceVersion: kiloclawPriceVersion,
+    plan,
+    useStandardIntro,
+  });
+  const saleItemSku = useStandardIntro
+    ? getStripePriceIdForClawPlanIntro('standard', { priceVersion: kiloclawPriceVersion })
+    : getStripePriceIdForClawPlan(plan, { priceVersion: kiloclawPriceVersion });
 
   // Save suspension state for post-transaction auto-resume (spec rule 4)
   const wasSuspended = !!existingSub?.suspended_at;
@@ -1263,6 +1303,7 @@ export async function enrollWithCredits(params: {
         payment_source: 'credits',
         status: 'active',
         plan,
+        kiloclaw_price_version: kiloclawPriceVersion,
         current_period_start: periodStartIso,
         current_period_end: periodEndIso,
         credit_renewal_at: periodEndIso,
@@ -1282,6 +1323,7 @@ export async function enrollWithCredits(params: {
           payment_source: 'credits',
           status: 'active',
           plan,
+          kiloclaw_price_version: kiloclawPriceVersion,
           current_period_start: periodStartIso,
           current_period_end: periodEndIso,
           credit_renewal_at: periodEndIso,
@@ -1320,6 +1362,7 @@ export async function enrollWithCredits(params: {
         saleAmountMicrodollars: costMicrodollars,
         eventDate: now,
         saleItemSku,
+        priceVersion: kiloclawPriceVersion,
         trialEndEntityId,
       });
     } catch (error) {
@@ -1342,6 +1385,7 @@ export async function enrollWithCredits(params: {
     saleAmountMicrodollars: costMicrodollars,
     eventDate: now,
     saleItemSku,
+    priceVersion: kiloclawPriceVersion,
     trialEndEntityId,
   });
 

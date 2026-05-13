@@ -11,10 +11,15 @@ KILOCODE_BACKEND_BASE_URL=http://localhost:3000
 
 # Worker secrets for local dev. In deployed environments, set these with
 # wrangler secrets instead of committing them in wrangler.jsonc.
-# Canonical KiloClaw Stripe price IDs used for affiliate sale SKU reporting.
-STRIPE_KILOCLAW_COMMIT_PRICE_ID=price_commit
-STRIPE_KILOCLAW_STANDARD_PRICE_ID=price_standard
-STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID=price_standard_intro
+# KiloClaw legacy recognized Stripe price IDs used for settlement, plan detection,
+# version-aware Standard intro repair, and affiliate sale SKU reporting.
+STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID=price_test_kiloclaw_2026_03_19_standard_intro
+STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID=price_test_kiloclaw_2026_03_19_standard
+STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID=price_test_kiloclaw_2026_03_19_commit
+# KiloClaw current checkout Stripe price IDs. Fresh current checkout uses recurring
+# Standard immediately; no current Standard intro price is required.
+STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID=price_test_kiloclaw_2026_05_10_standard
+STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID=price_test_kiloclaw_2026_05_10_commit
 
 # Trial inactivity stop rollout flags.
 TRIAL_INACTIVITY_STOP_ENABLED=false

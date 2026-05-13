@@ -272,6 +272,32 @@ describe('dolthub-service', () => {
         })
       ).rejects.toThrow('DoltHub integration is dev-only and not available in production');
     });
+
+    test('concurrent upserts for the same owner produce a single row', async () => {
+      const tokens = (suffix: string) => ({
+        accessToken: `token-${suffix}`,
+        refreshToken: `refresh-${suffix}`,
+        expiresIn: 3600,
+        scope: 'api_read_write',
+      });
+
+      await Promise.all([
+        upsertDoltHubInstallation({ owner: { type: 'user', id: user.id }, tokens: tokens('a') }),
+        upsertDoltHubInstallation({ owner: { type: 'user', id: user.id }, tokens: tokens('b') }),
+        upsertDoltHubInstallation({ owner: { type: 'user', id: user.id }, tokens: tokens('c') }),
+      ]);
+
+      const rows = await db
+        .select()
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.DOLTHUB),
+            eq(platform_integrations.owned_by_user_id, user.id)
+          )
+        );
+      expect(rows).toHaveLength(1);
+    });
   });
 
   describe('uninstall', () => {
@@ -384,7 +410,7 @@ describe('dolthub-service', () => {
       expect(meta.expires_at).toBeGreaterThan(Date.now());
     });
 
-    test('preserves existing refresh token when refresh response omits it', async () => {
+    test('preserves existing refresh_token and scope when refresh response omits them', async () => {
       const [integration] = await db
         .insert(platform_integrations)
         .values({
@@ -403,12 +429,13 @@ describe('dolthub-service', () => {
         })
         .returning();
 
+      // DoltHub may return only an access_token on refresh; per RFC 6749 the
+      // previous refresh_token and scope remain valid.
       globalThis.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
           access_token: 'refreshed-access',
           expires_in: 3600,
-          scope: 'api_read_write',
         }),
       });
 
@@ -423,9 +450,11 @@ describe('dolthub-service', () => {
         access_token: string;
         refresh_token: string;
         expires_at: number;
+        scope: string;
       };
       expect(meta.access_token).toBe('refreshed-access');
       expect(meta.refresh_token).toBe('old-refresh');
+      expect(meta.scope).toBe('api_read_write');
       expect(meta.expires_at).toBeGreaterThan(Date.now());
     });
 

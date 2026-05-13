@@ -59,11 +59,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Build a redacted copy of the callback query params so we never write
+    // the raw `code` (a short-lived credential) into Sentry/logs even if a
+    // future change adds another logging path here.
+    const redactedParams = Object.fromEntries(
+      Array.from(searchParams.entries()).map(([k, v]) => [k, k === 'code' ? '***' : v])
+    );
+
     if (!code) {
       captureMessage('DoltHub callback missing code', {
         level: 'warning',
         tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
-        extra: { state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: { state, allParams: redactedParams },
       });
 
       return NextResponse.redirect(
@@ -73,9 +80,6 @@ export async function GET(request: NextRequest) {
 
     const verified = verifyOAuthState(state);
     if (!verified) {
-      const redactedParams = Object.fromEntries(
-        Array.from(searchParams.entries()).map(([k, v]) => [k, k === 'code' ? '***' : v])
-      );
       captureMessage('DoltHub callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },

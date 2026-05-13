@@ -164,8 +164,6 @@ export async function upsertDoltHubInstallation({
 }): Promise<PlatformIntegration> {
   assertDevOnly();
 
-  const existing = await getInstallation(owner);
-
   const expiresAt = tokens.expiresIn ? Date.now() + tokens.expiresIn * 1000 : null;
 
   const metadata = {
@@ -175,45 +173,61 @@ export async function upsertDoltHubInstallation({
     scope: tokens.scope,
   };
 
-  if (existing) {
-    const [updated] = await db
-      .update(platform_integrations)
-      .set({
-        scopes: DOLTHUB_SCOPES,
-        integration_status: INTEGRATION_STATUS.ACTIVE,
-        metadata,
-        updated_at: new Date().toISOString(),
-      })
-      .where(eq(platform_integrations.id, existing.id))
-      .returning();
+  // The synthetic platform_installation_id makes the existing partial unique
+  // indexes UQ_platform_integrations_owned_by_(user|org)_platform_inst apply
+  // here, so we can let Postgres atomically resolve concurrent OAuth
+  // completions instead of racing in the old select-then-insert path.
+  const platformInstallationId = `dolthub-${owner.type}-${owner.id}`;
 
-    if (!updated) {
-      throw new Error('DoltHub installation update returned no rows');
-    }
+  const updateSet = {
+    scopes: DOLTHUB_SCOPES,
+    integration_status: INTEGRATION_STATUS.ACTIVE,
+    metadata,
+    updated_at: new Date().toISOString(),
+  };
 
-    return updated;
-  }
+  const onConflict =
+    owner.type === 'user'
+      ? {
+          target: [
+            platform_integrations.owned_by_user_id,
+            platform_integrations.platform,
+            platform_integrations.platform_installation_id,
+          ],
+          targetWhere: sql`${platform_integrations.owned_by_user_id} IS NOT NULL`,
+          set: updateSet,
+        }
+      : {
+          target: [
+            platform_integrations.owned_by_organization_id,
+            platform_integrations.platform,
+            platform_integrations.platform_installation_id,
+          ],
+          targetWhere: sql`${platform_integrations.owned_by_organization_id} IS NOT NULL`,
+          set: updateSet,
+        };
 
-  const [created] = await db
+  const [upserted] = await db
     .insert(platform_integrations)
     .values({
       owned_by_user_id: owner.type === 'user' ? owner.id : null,
       owned_by_organization_id: owner.type === 'org' ? owner.id : null,
       platform: PLATFORM.DOLTHUB,
       integration_type: 'oauth',
-      platform_installation_id: `dolthub-${owner.type}-${owner.id}`,
+      platform_installation_id: platformInstallationId,
       scopes: DOLTHUB_SCOPES,
       integration_status: INTEGRATION_STATUS.ACTIVE,
       metadata,
       installed_at: new Date().toISOString(),
     })
+    .onConflictDoUpdate(onConflict)
     .returning();
 
-  if (!created) {
-    throw new Error('DoltHub installation insert returned no rows');
+  if (!upserted) {
+    throw new Error('DoltHub installation upsert returned no rows');
   }
 
-  return created;
+  return upserted;
 }
 
 export async function uninstall(owner: Owner): Promise<{ success: boolean }> {
@@ -254,15 +268,18 @@ export async function getValidDoltHubToken(
     const newTokens = await refreshDoltHubAccessToken(metadata.refresh_token);
     const newExpiresAt = newTokens.expiresIn ? Date.now() + newTokens.expiresIn * 1000 : null;
 
+    // OAuth refresh responses may omit refresh_token / scope, in which case
+    // RFC 6749 says the previous values remain valid. Falling back here
+    // prevents overwriting a still-good refresh_token (or scope) with null.
     await db
       .update(platform_integrations)
       .set({
         metadata: {
           ...metadata,
           access_token: newTokens.accessToken,
-          refresh_token: newTokens.refreshToken ?? metadata?.refresh_token,
+          refresh_token: newTokens.refreshToken ?? metadata.refresh_token,
           expires_at: newExpiresAt,
-          scope: newTokens.scope,
+          scope: newTokens.scope ?? metadata.scope,
         },
         updated_at: new Date().toISOString(),
       })

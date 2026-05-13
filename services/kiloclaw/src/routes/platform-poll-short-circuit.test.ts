@@ -85,24 +85,53 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// Sentinel shape per route. Most guarded routes return the unified
+// `{ ok, reason, status }` shape, but `/gateway/ready` keeps its existing
+// `{ ready, reason, status }` shape so consumers that already check
+// `gatewayReady?.ready` keep working unchanged. Parameterising this lets
+// the same matrix exercise both shapes.
+type SentinelBuilder = (status: string | null) => Record<string, unknown>;
+const unifiedSentinel: SentinelBuilder = status => ({
+  ok: false,
+  reason: 'instance_not_running',
+  status,
+});
+const readySentinel: SentinelBuilder = status => ({
+  ready: false,
+  reason: 'instance_not_running',
+  status,
+});
+
 describe('polling endpoint short-circuit guard', () => {
   describe.each([
     {
       path: '/gateway/status?userId=user-1',
       proxiedMethod: 'getGatewayProcessStatus' as const,
       okPayload: { state: 'running', pid: 42, uptime: 10, restarts: 0, lastExit: null },
+      sentinelFor: unifiedSentinel,
     },
     {
       path: '/controller-version?userId=user-1',
       proxiedMethod: 'getControllerVersion' as const,
       okPayload: { version: '2026.5.12', commit: 'abc' },
+      sentinelFor: unifiedSentinel,
     },
     {
       path: '/morning-briefing/status?userId=user-1',
       proxiedMethod: 'getMorningBriefingStatus' as const,
       okPayload: { ok: true, enabled: true, reconcileState: 'idle' },
+      sentinelFor: unifiedSentinel,
     },
-  ])('$path', ({ path, proxiedMethod, okPayload }) => {
+    {
+      // /gateway/ready is polled every 5s on the user dashboard — the
+      // highest-frequency wake vector. Shares the same guard but returns
+      // a ready-shaped sentinel rather than the unified one.
+      path: '/gateway/ready?userId=user-1',
+      proxiedMethod: 'getGatewayReady' as const,
+      okPayload: { ready: true, settled: true },
+      sentinelFor: readySentinel,
+    },
+  ])('$path', ({ path, proxiedMethod, okPayload, sentinelFor }) => {
     describe('layer 1: DO cached state says not running', () => {
       it('returns the sentinel and skips both proxy and Fly API when DO says stopped', async () => {
         const getStatus = vi.fn().mockResolvedValue({ status: 'stopped', provider: 'fly' });
@@ -112,11 +141,7 @@ describe('polling endpoint short-circuit guard', () => {
         const response = await platform.request(path, {}, env);
 
         expect(response.status).toBe(200);
-        expect(await response.json()).toEqual({
-          ok: false,
-          reason: 'instance_not_running',
-          status: 'stopped',
-        });
+        expect(await response.json()).toEqual(sentinelFor('stopped'));
         // No proxy traffic.
         expect(proxiedFn).not.toHaveBeenCalled();
         // No Fly API call either — the cheap DO check was enough.
@@ -131,11 +156,7 @@ describe('polling endpoint short-circuit guard', () => {
         const response = await platform.request(path, {}, env);
 
         expect(response.status).toBe(200);
-        expect(await response.json()).toEqual({
-          ok: false,
-          reason: 'instance_not_running',
-          status: 'starting',
-        });
+        expect(await response.json()).toEqual(sentinelFor('starting'));
         expect(proxiedFn).not.toHaveBeenCalled();
         expect(vi.mocked(fly.getMachine)).not.toHaveBeenCalled();
       });
@@ -168,11 +189,7 @@ describe('polling endpoint short-circuit guard', () => {
         const response = await platform.request(path, {}, env);
 
         expect(response.status).toBe(200);
-        expect(await response.json()).toEqual({
-          ok: false,
-          reason: 'instance_not_running',
-          status: 'stopped',
-        });
+        expect(await response.json()).toEqual(sentinelFor('stopped'));
         // Critical: no proxy traffic. This is what prevents the wake.
         expect(proxiedFn).not.toHaveBeenCalled();
       });
@@ -194,11 +211,7 @@ describe('polling endpoint short-circuit guard', () => {
         const response = await platform.request(path, {}, env);
 
         expect(response.status).toBe(200);
-        expect(await response.json()).toEqual({
-          ok: false,
-          reason: 'instance_not_running',
-          status: expectedStatus,
-        });
+        expect(await response.json()).toEqual(sentinelFor(expectedStatus));
         expect(proxiedFn).not.toHaveBeenCalled();
       });
 

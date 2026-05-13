@@ -743,11 +743,21 @@ function jsonError(message: string, status: number, code?: string): Response {
  * doesn't generate a wall of 5xx in logs / Sentry / latency dashboards for
  * what is a known steady state. Mirrors the `/gateway/ready` precedent.
  */
-async function shortCircuitIfNotRunning(
+/**
+ * Result of the running-state check used by the polling guards.
+ *
+ * `running: true` means the proxied call is safe to make. `running: false`
+ * carries the best-known instance status label (from DO or, when verified,
+ * the mapped Fly state) so the caller can include it in the sentinel
+ * payload — useful for the frontend's "Instance is {status}…" hint.
+ */
+type InstanceRunningCheck = { running: true } | { running: false; status: string | null };
+
+async function checkInstanceRunningState(
   env: AppEnv['Bindings'],
   userId: string,
   instanceId: string | undefined
-): Promise<Response | null> {
+): Promise<InstanceRunningCheck> {
   const status = await withResolvedDORetry(
     env,
     userId,
@@ -758,7 +768,7 @@ async function shortCircuitIfNotRunning(
 
   // Layer 1: DO cached state says not running. Trust it (cheapest path).
   if (status.status !== 'running') {
-    return instanceNotRunningSentinelResponse(status.status);
+    return { running: false, status: status.status };
   }
 
   // Layer 2: DO says running. Verify against live Fly state when we can,
@@ -773,7 +783,7 @@ async function shortCircuitIfNotRunning(
   const flyMachineId = status.flyMachineId;
   const flyAppName = status.flyAppName;
   if (status.provider !== 'fly' || !flyMachineId || !flyAppName || !env.FLY_API_TOKEN) {
-    return null;
+    return { running: true };
   }
 
   try {
@@ -794,7 +804,7 @@ async function shortCircuitIfNotRunning(
         doStatus: status.status,
         flyState: machine.state,
       });
-      return instanceNotRunningSentinelResponse(mapFlyStateToDoStatus(machine.state));
+      return { running: false, status: mapFlyStateToDoStatus(machine.state) };
     }
   } catch (err) {
     // Fail open: trust DO state when Fly is unreachable. The alternative
@@ -807,15 +817,41 @@ async function shortCircuitIfNotRunning(
     });
   }
 
-  return null;
+  return { running: true };
 }
 
-function instanceNotRunningSentinelResponse(status: string | null): Response {
+/**
+ * Short-circuit polling endpoints when the instance isn't actually running.
+ *
+ * Polling endpoints (gateway/status, gateway/ready, controller-version,
+ * morning-briefing/status) proxy to port 18789 on the Fly machine via Fly's
+ * HTTPS edge. Even with `services[0].autostart: false`, Fly's proxy will wake
+ * a stopped machine to serve the request. By short-circuiting here, no proxy
+ * traffic reaches the machine while it is stopped.
+ *
+ * See `checkInstanceRunningState` for the two-layer state check (DO cache
+ * + live Fly verification).
+ *
+ * Returns a 200 sentinel (not 503) so the frontend's high-frequency polling
+ * doesn't generate a wall of 5xx in logs / Sentry / latency dashboards for
+ * what is a known steady state.
+ *
+ * Routes whose existing response shape is `{ ready, ... }` rather than
+ * `{ ok, reason, ... }` should call `checkInstanceRunningState` directly
+ * and build a route-shaped sentinel — see `/gateway/ready` for an example.
+ */
+async function shortCircuitIfNotRunning(
+  env: AppEnv['Bindings'],
+  userId: string,
+  instanceId: string | undefined
+): Promise<Response | null> {
+  const check = await checkInstanceRunningState(env, userId, instanceId);
+  if (check.running) return null;
   return new Response(
     JSON.stringify({
       ok: false,
       reason: 'instance_not_running',
-      status,
+      status: check.status,
     }),
     {
       status: 200,
@@ -1861,7 +1897,12 @@ platform.get('/gateway/status', async c => {
 
 // GET /api/platform/gateway/ready?userId=...
 // Non-fatal polling endpoint — always returns 200 so the frontend poll
-// doesn't generate a wall of errors during startup.
+// doesn't generate a wall of errors during startup. Polled aggressively
+// (every 5s on the user dashboard) so it shares the wake-bug exposure with
+// the other guarded routes; the guard below short-circuits it for the same
+// reason. The response keeps its existing `{ ready, ... }` shape rather
+// than the unified `{ ok, reason }` sentinel so consumers that already
+// check `gatewayReady?.ready` keep working unchanged.
 platform.get('/gateway/ready', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) {
@@ -1872,6 +1913,11 @@ platform.get('/gateway/ready', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const check = await checkInstanceRunningState(c.env, userId, iidResult.instanceId);
+    if (!check.running) {
+      return c.json({ ready: false, reason: 'instance_not_running', status: check.status }, 200);
+    }
+
     const result = await withResolvedDORetry(
       c.env,
       userId,

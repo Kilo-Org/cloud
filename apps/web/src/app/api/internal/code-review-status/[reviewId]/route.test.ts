@@ -2,7 +2,7 @@ import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import type { NextRequest } from 'next/server';
 import type * as codeReviewsDbModule from '@/lib/code-reviews/db/code-reviews';
 import type * as platformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
-import type { CloudAgentCodeReview } from '@kilocode/db/schema';
+import type { CloudAgentCodeReview, PlatformIntegration } from '@kilocode/db/schema';
 
 // --- Mock functions ---
 
@@ -173,18 +173,8 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
   };
 }
 
-// --- Tests ---
-
-import type { POST as POSTType } from './route';
-
-let POST: typeof POSTType;
-
-beforeEach(async () => {
-  jest.clearAllMocks();
-  mockUpdateCodeReviewStatus.mockResolvedValue(undefined);
-  mockTryDispatchPendingReviews.mockResolvedValue(undefined);
-  mockGetBotUserId.mockResolvedValue(null);
-  mockGetIntegrationById.mockResolvedValue({
+function makeIntegration(overrides: Partial<PlatformIntegration> = {}): PlatformIntegration {
+  return {
     id: 'int-1',
     platform_installation_id: 'inst-1',
     platform: 'github',
@@ -209,7 +199,22 @@ beforeEach(async () => {
     installed_at: '2025-01-01T00:00:00Z',
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
-  });
+    ...overrides,
+  };
+}
+
+// --- Tests ---
+
+import type { POST as POSTType } from './route';
+
+let POST: typeof POSTType;
+
+beforeEach(async () => {
+  jest.clearAllMocks();
+  mockUpdateCodeReviewStatus.mockResolvedValue(undefined);
+  mockTryDispatchPendingReviews.mockResolvedValue(undefined);
+  mockGetBotUserId.mockResolvedValue(null);
+  mockGetIntegrationById.mockResolvedValue(makeIntegration());
   mockUpdateCheckRun.mockResolvedValue(undefined);
   mockAddReactionToPR.mockResolvedValue(undefined);
   mockCreatePRComment.mockResolvedValue(undefined);
@@ -221,7 +226,7 @@ beforeEach(async () => {
 
 describe('POST /api/internal/code-review-status/[reviewId]', () => {
   describe('normalization', () => {
-    it('maps interrupted status to cancelled', async () => {
+    it('maps interrupted status to cancelled with interrupted terminal reason', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
       const response = await POST(
@@ -233,7 +238,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
         REVIEW_ID,
         'cancelled',
-        expect.objectContaining({ errorMessage: 'User interrupted' })
+        expect.objectContaining({
+          errorMessage: 'User interrupted',
+          terminalReason: 'interrupted',
+        })
       );
     });
 
@@ -304,7 +312,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
-    it('does not reclassify interrupted status with non-billing error message', async () => {
+    it('keeps interrupted non-billing callbacks as cancelled', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
       const response = await POST(
@@ -321,7 +329,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'cancelled',
         expect.objectContaining({
           errorMessage: 'User cancelled the review',
-          terminalReason: undefined,
+          terminalReason: 'interrupted',
         })
       );
     });
@@ -426,7 +434,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
             title: 'Insufficient credits to run review',
             summary: 'Review could not start because the account has insufficient credits.',
           }),
-        })
+        }),
+        'standard'
       );
     });
 
@@ -452,7 +461,27 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           output: expect.objectContaining({
             title: 'Kilo Code Review failed',
           }),
-        })
+        }),
+        'standard'
+      );
+    });
+
+    it('passes the integration GitHub app type to check run updates', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockGetIntegrationById.mockResolvedValue(makeIntegration({ github_app_type: 'lite' }));
+
+      await POST(makeRequest({ status: 'running' }), makeParams(REVIEW_ID));
+
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          status: 'in_progress',
+          conclusion: undefined,
+        }),
+        'lite'
       );
     });
 
@@ -477,7 +506,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           output: expect.objectContaining({
             title: 'Insufficient credits to run review',
           }),
-        })
+        }),
+        'standard'
       );
     });
   });

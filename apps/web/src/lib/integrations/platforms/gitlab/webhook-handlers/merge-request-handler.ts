@@ -8,12 +8,13 @@
  */
 
 import { NextResponse } from 'next/server';
-import { captureException } from '@sentry/nextjs';
+import { addBreadcrumb, captureException } from '@sentry/nextjs';
 import type { MergeRequestPayload } from '../webhook-schemas';
 import { GITLAB_ACTION, PLATFORM } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import {
   createCodeReview,
+  cancelSupersededReviewsForPR,
   findExistingReview,
   findActiveReviewsForPR,
   updateReviewHeadShaAndCheckRun,
@@ -198,25 +199,97 @@ export async function handleMergeRequestCodeReview(
 
     // 5. Cancel any existing reviews for this MR (different SHA)
     // This prevents spam when user pushes multiple commits quickly
-    const oldReviewIds = await findActiveReviewsForPR(project.path_with_namespace, mr.iid, headSha);
+    const cancelledReviews = await cancelSupersededReviewsForPR(
+      project.path_with_namespace,
+      mr.iid,
+      headSha
+    );
 
-    if (oldReviewIds.length > 0) {
+    if (cancelledReviews.length > 0) {
+      const cancellationCounts = {
+        pending: cancelledReviews.filter(review => review.prevStatus === 'pending').length,
+        queued: cancelledReviews.filter(review => review.prevStatus === 'queued').length,
+        running: cancelledReviews.filter(review => review.prevStatus === 'running').length,
+      };
+
       logExceptInTest(
-        `Cancelling ${oldReviewIds.length} old review(s) for ${project.path_with_namespace}!${mr.iid}`
+        `Cancelled ${cancelledReviews.length} superseded review(s) for ${project.path_with_namespace}!${mr.iid}`,
+        cancellationCounts
       );
 
-      // Cancel each review via the orchestrator (fire-and-forget, don't block new review)
       await Promise.allSettled(
-        oldReviewIds.map(reviewId =>
-          codeReviewWorkerClient.cancelReview(reviewId, 'Superseded by new push').catch(err => {
-            logExceptInTest(`Failed to cancel review ${reviewId}:`, err);
-            return { success: false, reviewId };
+        cancelledReviews
+          .filter(review => review.prevStatus !== 'pending')
+          .map(async review => {
+            try {
+              const response = await codeReviewWorkerClient.cancelReview(
+                review.id,
+                'Superseded by new push'
+              );
+
+              if (!response.success) {
+                addBreadcrumb({
+                  category: 'code-review.cancel',
+                  level: 'info',
+                  message: 'Worker cancel returned success=false for superseded review',
+                  data: {
+                    reviewId: review.id,
+                    prevStatus: review.prevStatus,
+                    repo: project.path_with_namespace,
+                    prNumber: mr.iid,
+                  },
+                });
+              }
+            } catch (error) {
+              logExceptInTest(`Failed to interrupt review ${review.id}:`, error);
+            }
           })
-        )
       );
     }
 
-    // 6. Check for duplicate review (same project, MR, SHA)
+    // 6. Get integration details needed for best-effort GitLab status cleanup.
+    // This must run before duplicate-review return so redeliveries still clean up
+    // stale statuses on superseded SHAs even when the new review already exists.
+    const fullIntegration = await getIntegrationById(integration.id);
+    const metadata = fullIntegration?.metadata as {
+      gitlab_instance_url?: string;
+    } | null;
+    const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+
+    if (cancelledReviews.length > 0 && fullIntegration) {
+      await Promise.allSettled(
+        cancelledReviews
+          .filter(
+            review =>
+              review.platform === 'gitlab' &&
+              review.platformProjectId != null &&
+              review.headSha.length > 0
+          )
+          .map(async review => {
+            try {
+              const pratToken = await getOrCreateProjectAccessToken(
+                fullIntegration,
+                review.platformProjectId as number
+              );
+              await setCommitStatus(
+                pratToken,
+                review.platformProjectId as number,
+                review.headSha,
+                'canceled',
+                { description: 'Superseded by new push' },
+                instanceUrl
+              );
+            } catch (error) {
+              logExceptInTest(
+                `Failed to cancel old commit status for ${review.headSha} on project ${review.platformProjectId}:`,
+                error
+              );
+            }
+          })
+      );
+    }
+
+    // 7. Check for duplicate review (same project, MR, SHA)
     const existingReview = await findExistingReview(project.path_with_namespace, mr.iid, headSha);
 
     if (existingReview) {
@@ -233,10 +306,10 @@ export async function handleMergeRequestCodeReview(
       );
     }
 
-    // 7. Resolve checkout ref (fork MRs use refs/merge-requests/<iid>/head)
+    // 8. Resolve checkout ref (fork MRs use refs/merge-requests/<iid>/head)
     const { checkoutRef } = resolveMergeRequestCheckoutRef(payload);
 
-    // 8. Create review record (session_id will be updated async)
+    // 9. Create review record (session_id will be updated async)
     const reviewId = await createCodeReview({
       owner,
       platformIntegrationId: integration.id,
@@ -253,14 +326,6 @@ export async function handleMergeRequestCodeReview(
     });
 
     logExceptInTest(`Created code review ${reviewId} for ${project.path_with_namespace}!${mr.iid}`);
-
-    // 9. Get or create Project Access Token (PrAT) for bot identity
-    // This is also used later in prepare-review-payload.ts for the actual review
-    const fullIntegration = await getIntegrationById(integration.id);
-    const metadata = fullIntegration?.metadata as {
-      gitlab_instance_url?: string;
-    } | null;
-    const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
 
     // 10. Post 👀 reaction and set commit status (using PrAT for bot identity)
     if (fullIntegration) {

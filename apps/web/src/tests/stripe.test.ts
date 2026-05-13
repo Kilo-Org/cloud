@@ -933,6 +933,7 @@ describe('processStripePaymentEventHook', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: testUser.id,
+        provider_subscription_id: stripeSubscriptionId,
         stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Yearly,
@@ -994,6 +995,7 @@ describe('processStripePaymentEventHook', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: testUser.id,
+        provider_subscription_id: stripeSubscriptionId,
         stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
@@ -1048,6 +1050,7 @@ describe('processStripePaymentEventHook', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: testUser.id,
+        provider_subscription_id: stripeSubscriptionId,
         stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Monthly,
@@ -1102,6 +1105,7 @@ describe('processStripePaymentEventHook', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: testUser.id,
+        provider_subscription_id: stripeSubscriptionId,
         stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
@@ -1187,6 +1191,7 @@ describe('releaseScheduledChangeForSubscription', () => {
 
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
+      provider_subscription_id: stripeSubId,
       stripe_subscription_id: stripeSubId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,
@@ -1249,6 +1254,7 @@ describe('releaseScheduledChangeForSubscription', () => {
 
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
+      provider_subscription_id: stripeSubId,
       stripe_subscription_id: stripeSubId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,

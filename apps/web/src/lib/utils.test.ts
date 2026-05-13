@@ -1,4 +1,10 @@
-import { assertNotNullish, toNonNullish, parseResultJsonWithZodSchema } from './utils';
+import {
+  assertNotNullish,
+  toNonNullish,
+  parseResultJsonWithZodSchema,
+  formatIsoDateString_UsaDateOnlyFormat,
+  isDateOnlyString,
+} from './utils';
 import * as z from 'zod';
 
 describe('assertNotNull', () => {
@@ -169,6 +175,99 @@ describe('parseResultJsonWithZodSchema', () => {
     await expect(parseResultJsonWithZodSchema(response, testSchema)).rejects.toThrow(
       'Failed to fetch data: Bad Request'
     );
+  });
+});
+
+describe('isDateOnlyString', () => {
+  it('accepts YYYY-MM-DD strings', () => {
+    expect(isDateOnlyString('2026-04-21')).toBe(true);
+    expect(isDateOnlyString('1999-12-31')).toBe(true);
+    expect(isDateOnlyString('2026-01-01')).toBe(true);
+  });
+
+  it('rejects strings with a time component', () => {
+    expect(isDateOnlyString('2026-04-21T00:00:00Z')).toBe(false);
+    expect(isDateOnlyString('2026-04-21 13:00:00+00')).toBe(false);
+    expect(isDateOnlyString('2026-04-21T13:00:00.000Z')).toBe(false);
+  });
+
+  it('rejects malformed date-like strings', () => {
+    expect(isDateOnlyString('2026-04')).toBe(false);
+    expect(isDateOnlyString('04-21-2026')).toBe(false);
+    expect(isDateOnlyString('2026/04/21')).toBe(false);
+    expect(isDateOnlyString('2026-4-21')).toBe(false);
+    expect(isDateOnlyString('')).toBe(false);
+  });
+
+  it('rejects non-string values', () => {
+    expect(isDateOnlyString(null)).toBe(false);
+    expect(isDateOnlyString(undefined)).toBe(false);
+    expect(isDateOnlyString(20260421)).toBe(false);
+    expect(isDateOnlyString(new Date())).toBe(false);
+    expect(isDateOnlyString({})).toBe(false);
+  });
+});
+
+describe('formatIsoDateString_UsaDateOnlyFormat', () => {
+  it('returns em-dash for null input', () => {
+    expect(formatIsoDateString_UsaDateOnlyFormat(null)).toBe('—');
+  });
+
+  it('returns em-dash for empty string', () => {
+    expect(formatIsoDateString_UsaDateOnlyFormat('')).toBe('—');
+  });
+
+  it('formats a date-only string as the UTC calendar day', () => {
+    // Regression: a viewer west of UTC would otherwise see "2026-04-21"
+    // re-labeled as "Apr 20" because new Date("YYYY-MM-DD") parses as UTC
+    // midnight and toLocaleDateString() shifts to local TZ. We force UTC
+    // formatting for date-only inputs, so the displayed day must be 21.
+    const formatted = formatIsoDateString_UsaDateOnlyFormat('2026-04-21');
+    const utcOracle = new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date('2026-04-21'));
+    expect(formatted).toBe(utcOracle);
+    // Sanity assertion that's TZ-agnostic: the UTC day for "2026-04-21" is 21.
+    expect(formatted).toContain('Apr');
+    expect(formatted).toContain('21');
+    expect(formatted).toContain('2026');
+  });
+
+  it('formats a full ISO datetime in the viewer local TZ (unchanged behavior)', () => {
+    // Full ISO datetimes represent an instant in time (e.g. subscription
+    // refill timestamps, DB created_at). Local-TZ rendering is intentional
+    // and must not regress.
+    const input = '2026-04-21T13:00:00.000Z';
+    const expected = new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }).format(new Date(input));
+    expect(formatIsoDateString_UsaDateOnlyFormat(input)).toBe(expected);
+  });
+
+  it('formats Date object input in the viewer local TZ (unchanged behavior)', () => {
+    const date = new Date('2026-04-21T12:00:00.000Z');
+    const expected = new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }).format(date);
+    expect(formatIsoDateString_UsaDateOnlyFormat(date)).toBe(expected);
+  });
+
+  it('returns em-dash for malformed string inputs', () => {
+    // Regression: previously fell through to toLocaleDateString which emits
+    // the literal "Invalid Date" for malformed inputs.
+    expect(formatIsoDateString_UsaDateOnlyFormat('not-a-date')).toBe('—');
+    expect(formatIsoDateString_UsaDateOnlyFormat('2026-13-45')).toBe('—');
+  });
+
+  it('returns em-dash for an Invalid Date object', () => {
+    expect(formatIsoDateString_UsaDateOnlyFormat(new Date('invalid'))).toBe('—');
   });
 });
 

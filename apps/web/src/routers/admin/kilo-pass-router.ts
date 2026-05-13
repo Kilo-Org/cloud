@@ -20,6 +20,7 @@ type BulkResultStatus =
   | 'skipped_no_user'
   | 'skipped_no_subscription'
   | 'skipped_already_canceled'
+  | 'skipped_store_managed'
   | 'error';
 
 type BulkResultRow = {
@@ -118,13 +119,17 @@ export async function runBulkCancelAndRefundKiloPass({
       });
 
       if (result.status === 'skipped') {
+        const reasonKind = result.reason.kind;
+        const status: BulkResultStatus =
+          reasonKind === 'no_subscription'
+            ? 'skipped_no_subscription'
+            : reasonKind === 'already_canceled'
+              ? 'skipped_already_canceled'
+              : 'skipped_store_managed';
         results.push({
           email,
           userId: user.id,
-          status:
-            result.reason.kind === 'no_subscription'
-              ? 'skipped_no_subscription'
-              : 'skipped_already_canceled',
+          status,
           refundedAmountCents: null,
           balanceResetAmountUsd: null,
           alreadyBlocked: false,

@@ -22,6 +22,7 @@ const mockUser: User = {
   microdollars_used: 0,
   kilo_pass_threshold: null,
   stripe_customer_id: 'cus_test123',
+  app_store_account_token: '550e8400-e29b-41d4-a716-446655440000',
   is_admin: false,
   total_microdollars_acquired: 0,
   next_credit_expiration_at: null,

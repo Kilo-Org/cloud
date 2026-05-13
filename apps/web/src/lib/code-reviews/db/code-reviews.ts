@@ -81,7 +81,6 @@ function buildAttemptUpdateData(
 
   return updateData;
 }
-
 export type CancelledReviewRow = {
   id: string;
   prevStatus: 'pending' | 'queued' | 'running';
@@ -102,7 +101,6 @@ function canCreateInfraRetryAttempt(review: { status: string; terminal_reason: s
     RETRYABLE_PARENT_REVIEW_STATUSES.includes(review.status)
   );
 }
-
 /**
  * Creates a new code review record
  * Returns the created review ID

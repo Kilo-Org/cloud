@@ -15,6 +15,8 @@ import {
   user_affiliate_events,
   user_admin_notes,
   user_auth_provider,
+  kilo_pass_store_events,
+  kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   cloud_agent_webhook_triggers,
   enrichment_data,
@@ -104,6 +106,7 @@ import {
   type ParsedImpactAffiliateTouch,
   type ParsedImpactReferralTouch,
 } from '@/lib/impact-referral-utils';
+import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -723,6 +726,7 @@ export class SoftDeletePreconditionError extends Error {
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
  * - credit_campaigns (created_by_kilo_user_id anonymized)
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
+ * - App Store account token and retained Kilo Pass store purchase/event token fields
  * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
@@ -746,6 +750,7 @@ export async function softDeleteUser(userId: string) {
   // Grab the original email before we anonymize — needed for cleanup of
   // magic_link_tokens and organization_invitations addressed to this user.
   const originalEmail = user.google_user_email;
+  const originalAppStoreAccountToken = user.app_store_account_token;
 
   await db.transaction(async tx => {
     // ── Precondition checks (inside tx to avoid TOCTOU races) ──────────
@@ -821,6 +826,7 @@ export async function softDeleteUser(userId: string) {
         discord_server_membership_verified_at: null,
         api_token_pepper: randomUUID(),
         web_session_pepper: randomUUID(),
+        app_store_account_token: randomUUID(),
         default_model: null,
         blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
         blocked_at: null,
@@ -991,6 +997,43 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(code_indexing_manifest).where(eq(code_indexing_manifest.kilo_user_id, userId));
 
     // ── 3. Anonymize PII in retained tables ──────────────────────────────
+
+    const storePurchases = await tx
+      .select({
+        id: kilo_pass_store_purchases.id,
+        rawPayloadJson: kilo_pass_store_purchases.raw_payload_json,
+      })
+      .from(kilo_pass_store_purchases)
+      .where(eq(kilo_pass_store_purchases.kilo_user_id, userId));
+
+    for (const purchase of storePurchases) {
+      await tx
+        .update(kilo_pass_store_purchases)
+        .set({
+          app_account_token: null,
+          purchase_token: null,
+          raw_payload_json: redactStoreAccountLinkedJson(purchase.rawPayloadJson),
+        })
+        .where(eq(kilo_pass_store_purchases.id, purchase.id));
+    }
+
+    const storeEvents = await tx
+      .select({
+        id: kilo_pass_store_events.id,
+        payloadJson: kilo_pass_store_events.payload_json,
+      })
+      .from(kilo_pass_store_events)
+      .where(eq(kilo_pass_store_events.app_account_token, originalAppStoreAccountToken));
+
+    for (const event of storeEvents) {
+      await tx
+        .update(kilo_pass_store_events)
+        .set({
+          app_account_token: null,
+          payload_json: redactStoreAccountLinkedJson(event.payloadJson),
+        })
+        .where(eq(kilo_pass_store_events.id, event.id));
+    }
 
     // kiloclaw_instances.admin_size_override JSONB carries actorEmail (an
     // admin's address) and a free-form reason (often referencing a ticket

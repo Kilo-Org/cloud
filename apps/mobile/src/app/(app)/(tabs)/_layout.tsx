@@ -6,8 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BlurBar } from '@/components/ui/blur-bar';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ANDROID_TAB_BAR_EXTRA_PADDING, TAB_BAR_BASE_HEIGHT } from '@/lib/tab-bar-layout';
 
-const ANDROID_TAB_BAR_EXTRA_PADDING = 4;
 const TAB_BAR_ITEM_CONTENT_WIDTH = 64;
 const TAB_BAR_ICON_STYLE = {
   alignItems: 'center',
@@ -64,7 +64,7 @@ export default function TabsLayout() {
           elevation: 0,
           position: 'absolute',
           ...(Platform.OS === 'android' && {
-            height: 50 + bottom + ANDROID_TAB_BAR_EXTRA_PADDING,
+            height: TAB_BAR_BASE_HEIGHT + bottom + ANDROID_TAB_BAR_EXTRA_PADDING,
           }),
         },
       }}

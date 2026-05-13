@@ -1,18 +1,68 @@
 'use client';
 
 import { useState } from 'react';
+import { signOut } from 'next-auth/react';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle2, XCircle, Loader2, Shield } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { CheckCircle2, XCircle, Loader2, Shield, LogOut } from 'lucide-react';
 
 type DeviceAuthClientProps = {
   code: string;
+  user: {
+    name: string;
+    email: string;
+    imageUrl: string;
+  };
 };
 
-export function DeviceAuthClient({ code }: DeviceAuthClientProps) {
+const apiErrorSchema = z.object({
+  error: z.string().optional(),
+});
+
+async function getApiErrorMessage(response: Response, fallback: string): Promise<string> {
+  const data: unknown = await response.json().catch(() => null);
+  const parsed = apiErrorSchema.safeParse(data);
+  return parsed.success ? (parsed.data.error ?? fallback) : fallback;
+}
+
+function getUserInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const first = parts[0]?.[0] ?? '';
+    const last = parts.at(-1)?.[0] ?? '';
+    return `${first}${last}`.toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
+export function getDeviceAuthSignInUrl(code: string): string {
+  const callbackPath = `/device-auth?${new URLSearchParams({ code }).toString()}`;
+  return `/users/sign_in?${new URLSearchParams({ callbackPath }).toString()}`;
+}
+
+export function DeviceAuthClient({ code, user }: DeviceAuthClientProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'denied' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const displayName = user.name.trim() || user.email;
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+
+    try {
+      await fetch('/api/auth/revoke-web-session', { method: 'POST' });
+    } finally {
+      await signOut({ callbackUrl: getDeviceAuthSignInUrl(code) });
+    }
+  };
+
+  const redirectToSignIn = () => {
+    window.location.assign(getDeviceAuthSignInUrl(code));
+  };
 
   const handleAuthorize = async (approved: boolean) => {
     setStatus('loading');
@@ -29,9 +79,12 @@ export function DeviceAuthClient({ code }: DeviceAuthClientProps) {
       });
 
       if (!response.ok) {
-        const data = await response.json();
+        if (response.status === 401) {
+          redirectToSignIn();
+          return;
+        }
         setStatus('error');
-        setErrorMessage(data.error || 'Failed to authorize device');
+        setErrorMessage(await getApiErrorMessage(response, 'Failed to authorize device'));
         return;
       }
     } else {
@@ -41,9 +94,12 @@ export function DeviceAuthClient({ code }: DeviceAuthClientProps) {
       });
 
       if (!response.ok) {
-        const data = await response.json();
+        if (response.status === 401) {
+          redirectToSignIn();
+          return;
+        }
         setStatus('error');
-        setErrorMessage(data.error || 'Failed to deny device');
+        setErrorMessage(await getApiErrorMessage(response, 'Failed to deny device'));
         return;
       }
       setStatus('denied');
@@ -119,6 +175,36 @@ export function DeviceAuthClient({ code }: DeviceAuthClientProps) {
               <div className="text-2xl font-bold tracking-wider">{code}</div>
             </AlertDescription>
           </Alert>
+
+          <div className="bg-muted/40 flex items-center justify-between gap-3 rounded-lg border p-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <Avatar className="h-9 w-9">
+                <AvatarImage src={user.imageUrl} alt={displayName} />
+                <AvatarFallback className="text-xs">{getUserInitials(displayName)}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="text-muted-foreground text-xs font-medium">Signed in as</p>
+                <p className="truncate text-sm font-medium">{displayName}</p>
+                {user.email !== displayName ? (
+                  <p className="text-muted-foreground truncate text-xs">{user.email}</p>
+                ) : null}
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0"
+              onClick={handleSignOut}
+              disabled={isSigningOut || status === 'loading'}
+            >
+              {isSigningOut ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <LogOut className="mr-2 h-4 w-4" />
+              )}
+              Sign out
+            </Button>
+          </div>
 
           <div className="space-y-2 rounded-lg border p-4">
             <p className="text-sm font-medium">This will allow the device to:</p>

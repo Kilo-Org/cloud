@@ -470,7 +470,6 @@ describe('tryDispatchPendingReviews', () => {
     expect(storedReview?.status).toBe('cancelled');
     expect(storedReview?.terminal_reason).toBe('superseded');
   });
-
   it('does not count stale queued reviews against owner capacity', async () => {
     const recentTimestamp = minutesAgo(1);
     const staleQueuedTimestamp = minutesAgo(6);

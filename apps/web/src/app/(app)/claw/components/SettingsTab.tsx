@@ -1805,8 +1805,13 @@ export function SettingsTab({
   const configuredSecrets = config?.configuredSecrets ?? {};
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
   const braveSearchConfigured = configuredSecrets['brave-search'] ?? false;
+  // Reflects which provider is actually active. Mirrors controller arbitration
+  // in services/kiloclaw/controller/src/config-writer.ts.
   const exaSearchConfigured =
-    supportsExaSearchUi && (kiloExaSearchMode === 'kilo-proxy' || kiloExaSearchMode === null);
+    supportsExaSearchUi &&
+    (kiloExaSearchMode === 'kilo-proxy' || (kiloExaSearchMode === null && !braveSearchConfigured));
+  // Editor reflects stored intent, not the resolved active provider, so users
+  // can persist an explicit choice when their mode is unset.
   const exaSearchDisplayMode =
     supportsExaSearchUi && kiloExaSearchMode === null ? 'kilo-proxy' : kiloExaSearchMode;
   const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;

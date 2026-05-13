@@ -1,68 +1,92 @@
-name: Auto-docs dry-run intake
+name: Auto-docs intake
 
-# Trigger on merged feature PRs, or manually with a specific PR number.
-# IMPORTANT: This workflow intentionally does NOT check out PR code and does NOT
-# execute any code from the PR branch. It only reads PR metadata and forwards it
-# to a webhook. This is required for safe use of pull_request_target on a public repo.
+# Trigger when PRs are merged to main, or manually with a PR number for testing.
+# IMPORTANT: This workflow does NOT check out PR code and does NOT execute any
+# code from the PR branch. It only reads PR metadata and forwards it to a webhook.
 on:
-  pull_request_target:
-    types: [closed]
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR number to test"
+        description: "PR number to process manually"
         required: true
+        type: number
 
 # Minimal permissions: read repo contents and PR metadata only.
 permissions:
   contents: read
   pull-requests: read
 
-# One run per PR at a time. Does not cancel in progress — let the current run
-# finish so we don't drop events when a PR is quickly closed/reopened/closed.
+# One run per push or manual dispatch at a time. Does not cancel in progress.
 concurrency:
-  group: auto-docs-${{ github.event.pull_request.number || inputs.pr_number }}
+  group: ${{ github.event_name == 'push' && format('push-{0}', github.sha) || format('manual-{0}', inputs.pr_number) }}
   cancel-in-progress: false
 
 jobs:
   call-valtown:
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event.pull_request.merged == true &&
-        (
-          startsWith(github.event.pull_request.title, 'feat:') ||
-          startsWith(github.event.pull_request.title, 'feat(')
-        )
-      )
-
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
-      - name: Build webhook payload
+      - name: Determine PR number and check branch prefix
+        id: pr
         env:
           GH_TOKEN: ${{ github.token }}
-          EVENT_NAME: ${{ github.event_name }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER_FROM_EVENT: ${{ github.event.pull_request.number }}
-          PR_NUMBER_FROM_INPUT: ${{ inputs.pr_number }}
         run: |
           set -euo pipefail
+          trap 'rm -f /tmp/gh_err.txt' EXIT
 
-          PR_NUMBER="${PR_NUMBER_FROM_EVENT:-$PR_NUMBER_FROM_INPUT}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            PR_NUMBER="${{ inputs.pr_number }}"
+          else
+            PR_NUMBER=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '.[0].number // empty' 2>/tmp/gh_err.txt) || {
+              echo "Failed to fetch PR for commit: $(cat /tmp/gh_err.txt)"
+              echo "should_send=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            }
 
-          if [ -z "$PR_NUMBER" ]; then
-            echo "Missing PR number"
-            exit 1
+            if [[ ! "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+              echo "No PR found for commit, skipping."
+              echo "should_send=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           fi
 
-          gh api "repos/$REPO/pulls/$PR_NUMBER" > pr.json
+          HEAD_BRANCH=$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" --jq '.head.ref' 2>/tmp/gh_err.txt) || {
+            echo "Failed to fetch branch info for PR #$PR_NUMBER: $(cat /tmp/gh_err.txt), skipping."
+            echo "should_send=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+
+          if [[ ! "$HEAD_BRANCH" =~ ^feat(ure)?[/-] ]]; then
+            echo "Branch name does not start with feat/ or feature/, skipping."
+            echo "should_send=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "should_send=true" >> "$GITHUB_OUTPUT"
+          echo "Found PR #$PR_NUMBER with branch: $HEAD_BRANCH"
+
+      - name: Build webhook payload
+        if: steps.pr.outputs.should_send == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          trap 'rm -f pr.json payload.json /tmp/gh_err.txt' EXIT
+          PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
+
+          gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" > pr.json 2>/tmp/gh_err.txt || {
+            echo "Failed to fetch PR #$PR_NUMBER details: $(cat /tmp/gh_err.txt)"
+            exit 1
+          }
 
           jq -n \
-            --arg event_name "$EVENT_NAME" \
-            --arg repo "$REPO" \
-            --arg pr_number "$PR_NUMBER" \
+            --arg event_name "${{ github.event_name }}" \
+            --arg repo "${{ github.repository }}" \
+            --arg pr_number "${{ steps.pr.outputs.pr_number }}" \
             --slurpfile pr pr.json \
             '{
               event_name: $event_name,
@@ -91,6 +115,7 @@ jobs:
           }' payload.json
 
       - name: Send webhook to Val Town
+        if: steps.pr.outputs.should_send == 'true'
         env:
           DOC_WEBHOOK_URL: ${{ secrets.DOC_WEBHOOK_URL }}
           DOC_WEBHOOK_SECRET: ${{ secrets.DOC_WEBHOOK_SECRET }}
@@ -107,7 +132,7 @@ jobs:
             exit 1
           fi
 
-          curl --fail-with-body -sS -X POST "$DOC_WEBHOOK_URL" \
+          curl --fail-with-body -sS --connect-timeout 10 --max-time 30 -X POST "$DOC_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -H "X-Docs-Webhook-Secret: $DOC_WEBHOOK_SECRET" \
             --data-binary @payload.json

@@ -30,10 +30,10 @@ export type InstanceNotRunningSentinel = {
 };
 
 export function isInstanceNotRunningSentinel(value: unknown): value is InstanceNotRunningSentinel {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'reason' in value &&
-    (value as { reason?: unknown }).reason === 'instance_not_running'
-  );
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('reason' in value)) return false;
+  // After the `'reason' in value` narrowing, TS resolves `value.reason` to
+  // `unknown`, so the literal comparison below is type-safe without an
+  // `as` cast (project rule: avoid `as` where flow-sensitive typing works).
+  return value.reason === 'instance_not_running';
 }

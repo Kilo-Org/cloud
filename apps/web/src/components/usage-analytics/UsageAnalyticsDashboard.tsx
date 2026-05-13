@@ -70,8 +70,8 @@ type UsageAnalyticsDashboardProps = {
   title?: string;
 };
 
-/** Sentinel written by the rollup for rows with NULL project_id. */
-const PROJECT_SENTINEL_NONE = 'none';
+/** Sentinel written by DBT rollups for rows with NULL project_id. */
+const PROJECT_SENTINEL_NONE = '';
 const PROJECT_UNATTRIBUTED_LABEL = 'Unattributed';
 
 function labelForProjectValue(value: string): string {

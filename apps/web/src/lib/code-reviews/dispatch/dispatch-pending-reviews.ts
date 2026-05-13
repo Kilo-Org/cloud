@@ -26,6 +26,7 @@ import {
   reviewIsStillQueued,
   updateCodeReviewAttemptForCallback,
   updateCodeReviewStatus,
+  updateCodeReviewStatusIfNonTerminal,
 } from '../db/code-reviews';
 import { captureException } from '@sentry/nextjs';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
@@ -391,12 +392,34 @@ async function handleAmbiguousDispatchFailure(
       return true;
     }
 
+    const completedAt = workerStatus.completedAt ? new Date(workerStatus.completedAt) : undefined;
+    await updateCodeReviewAttemptForCallback({
+      codeReviewId: review.id,
+      attemptId,
+      status: workerStatus.status,
+      sessionId: workerStatus.sessionId,
+      cliSessionId: workerStatus.cliSessionId,
+      errorMessage: workerStatus.errorMessage,
+      completedAt,
+    });
+    const parentUpdated = await updateCodeReviewStatusIfNonTerminal(
+      review.id,
+      workerStatus.status,
+      {
+        sessionId: workerStatus.sessionId,
+        cliSessionId: workerStatus.cliSessionId,
+        errorMessage: workerStatus.errorMessage,
+        completedAt,
+      }
+    );
+
     logExceptInTest('[dispatchReview] Worker returned terminal status for fresh dispatch', {
       reviewId: review.id,
       attemptId,
       status: workerStatus.status,
+      parentUpdated,
     });
-    return false;
+    return true;
   } catch (statusError) {
     errorExceptInTest('[dispatchReview] Worker status probe failed, leaving review queued', {
       reviewId: review.id,

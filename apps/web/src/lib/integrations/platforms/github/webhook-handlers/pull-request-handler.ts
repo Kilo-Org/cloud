@@ -20,6 +20,7 @@ import type { GitHubAppType } from '@/lib/integrations/platforms/github/adapter'
 import {
   addReactionToPR,
   createCheckRun,
+  getPRHeadCommit,
   isMergeCommit,
   updateCheckRun,
 } from '@/lib/integrations/platforms/github/adapter';
@@ -154,6 +155,25 @@ export async function handlePullRequestCodeReview(
     const appType = integration.github_app_type ?? 'standard';
     const headFullName = checkoutRef.headRepoFullName ?? repository.full_name;
     const [headOwner, headRepoName] = headFullName.split('/');
+    const [repoOwner, repoName] = repository.full_name.split('/');
+
+    const currentHeadSha = await getPRHeadCommit(
+      integration.platform_installation_id as string,
+      repoOwner,
+      repoName,
+      pull_request.number,
+      appType
+    );
+
+    if (currentHeadSha !== pull_request.head.sha) {
+      logExceptInTest('Skipping stale pull request event:', {
+        pr_number: pull_request.number,
+        repo: repository.full_name,
+        payload_head_sha: pull_request.head.sha,
+        current_head_sha: currentHeadSha,
+      });
+      return NextResponse.json({ message: 'Skipped stale pull request event' }, { status: 200 });
+    }
 
     // 4. Skip merge commits on synchronize (e.g. merging base branch into feature branch).
     // Runs before cancellation so that an in-flight review at an earlier SHA is preserved:
@@ -183,14 +203,13 @@ export async function handlePullRequestCodeReview(
       // updates the gate on the commit GitHub actually evaluates. Note
       // the check run goes on the *base* repo (where branch protection
       // lives and where the app is installed), not the head/fork repo.
-      const [baseOwner, baseRepoName] = repository.full_name.split('/');
       await migrateInFlightReviewsToMergeCommitHead({
         repoFullName: repository.full_name,
         prNumber: pull_request.number,
         newHeadSha: pull_request.head.sha,
         installationId: integration.platform_installation_id as string,
-        baseOwner,
-        baseRepoName,
+        baseOwner: repoOwner,
+        baseRepoName: repoName,
         appType,
       });
 
@@ -251,7 +270,6 @@ export async function handlePullRequestCodeReview(
           })
       );
 
-      const [repoOwner, repoName] = repository.full_name.split('/');
       await Promise.allSettled(
         cancelledReviews
           .filter(review => review.checkRunId != null && review.platform === 'github')
@@ -319,8 +337,6 @@ export async function handlePullRequestCodeReview(
     logExceptInTest(
       `Created code review ${reviewId} for ${repository.full_name}#${pull_request.number}`
     );
-
-    const [repoOwner, repoName] = repository.full_name.split('/');
 
     // 8. Create GitHub Check Run (PR gate) — skip for lite (read-only) app
     if (appType !== 'lite') {

@@ -25,7 +25,7 @@ import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/code-reviews/core';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
-import { addReactionToMR, isMergeCommit, setCommitStatus } from '../adapter';
+import { addReactionToMR, getMRHeadCommit, isMergeCommit, setCommitStatus } from '../adapter';
 import { resolveMergeRequestCheckoutRef } from './merge-request-checkout-ref';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
@@ -154,6 +154,28 @@ export async function handleMergeRequestCodeReview(
         project: project.path_with_namespace,
       });
       return NextResponse.json({ message: 'No head commit found' }, { status: 400 });
+    }
+
+    const currentHeadMetadata = integration.metadata as {
+      gitlab_instance_url?: string;
+    } | null;
+    const currentHeadInstanceUrl = currentHeadMetadata?.gitlab_instance_url || 'https://gitlab.com';
+    const currentHeadAccessToken = await getValidGitLabToken(integration);
+    const currentHeadSha = await getMRHeadCommit(
+      currentHeadAccessToken,
+      project.id,
+      mr.iid,
+      currentHeadInstanceUrl
+    );
+
+    if (currentHeadSha !== headSha) {
+      logExceptInTest('Skipping stale merge request event:', {
+        mr_iid: mr.iid,
+        project: project.path_with_namespace,
+        payload_head_sha: headSha,
+        current_head_sha: currentHeadSha,
+      });
+      return NextResponse.json({ message: 'Skipped stale merge request event' }, { status: 200 });
     }
 
     // 4. Skip merge commits on update (e.g. merging base branch into feature branch).

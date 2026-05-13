@@ -8,6 +8,7 @@ const mockUpdateReviewHeadShaAndCheckRun = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 const mockCancelReview = jest.fn();
 const mockAddReactionToMR = jest.fn();
+const mockGetMRHeadCommit = jest.fn();
 const mockSetCommitStatus = jest.fn();
 const mockIsMergeCommit = jest.fn();
 const mockGetIntegrationById = jest.fn();
@@ -43,6 +44,7 @@ jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
 
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   addReactionToMR: (...args: unknown[]) => mockAddReactionToMR(...args),
+  getMRHeadCommit: (...args: unknown[]) => mockGetMRHeadCommit(...args),
   isMergeCommit: (...args: unknown[]) => mockIsMergeCommit(...args),
   setCommitStatus: (...args: unknown[]) => mockSetCommitStatus(...args),
 }));
@@ -128,6 +130,7 @@ beforeEach(() => {
   mockTryDispatchPendingReviews.mockResolvedValue({ dispatched: 0, pending: 1, activeCount: 0 });
   mockCancelReview.mockResolvedValue({ success: true, reviewId: 'old-review' });
   mockAddReactionToMR.mockResolvedValue(undefined);
+  mockGetMRHeadCommit.mockResolvedValue('abc123');
   mockSetCommitStatus.mockResolvedValue(undefined);
   mockIsMergeCommit.mockResolvedValue(false);
   mockGetIntegrationById.mockResolvedValue({
@@ -290,6 +293,31 @@ describe('handleMergeRequestCodeReview', () => {
     expect(response.status).toBe(200);
     expect(mockCancelSupersededReviewsForPR).not.toHaveBeenCalled();
     expect(mockCancelReview).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('skips stale merge request events that do not match the current head sha', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockGetMRHeadCommit.mockResolvedValue('newer-sha');
+
+    const response = await handleMergeRequestCodeReview(
+      mergeRequestPayload(),
+      platformIntegration()
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Skipped stale merge request event' });
+    expect(mockGetMRHeadCommit).toHaveBeenCalledWith(
+      'gitlab-token',
+      123,
+      42,
+      'https://gitlab.example.com'
+    );
+    expect(mockCancelSupersededReviewsForPR).not.toHaveBeenCalled();
     expect(mockCreateCodeReview).not.toHaveBeenCalled();
   });
 });

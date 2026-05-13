@@ -11,6 +11,7 @@ const mockUpdateReviewHeadShaAndCheckRun = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 const mockCancelReview = jest.fn();
 const mockAddReactionToPR = jest.fn();
+const mockGetPRHeadCommit = jest.fn();
 const mockIsMergeCommit = jest.fn();
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
@@ -46,6 +47,7 @@ jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   addReactionToPR: (...args: unknown[]) => mockAddReactionToPR(...args),
   createCheckRun: (...args: unknown[]) => mockCreateCheckRun(...args),
+  getPRHeadCommit: (...args: unknown[]) => mockGetPRHeadCommit(...args),
   isMergeCommit: (...args: unknown[]) => mockIsMergeCommit(...args),
   updateCheckRun: (...args: unknown[]) => mockUpdateCheckRun(...args),
 }));
@@ -109,6 +111,7 @@ beforeEach(() => {
   mockTryDispatchPendingReviews.mockResolvedValue({ dispatched: 0, pending: 1, activeCount: 0 });
   mockCancelReview.mockResolvedValue({ success: true, reviewId: 'old-review' });
   mockAddReactionToPR.mockResolvedValue(undefined);
+  mockGetPRHeadCommit.mockResolvedValue('abc123');
   mockIsMergeCommit.mockResolvedValue(false);
 });
 
@@ -376,6 +379,23 @@ describe('handlePullRequest', () => {
     expect(response.status).toBe(200);
     expect(mockCancelSupersededReviewsForPR).not.toHaveBeenCalled();
     expect(mockCancelReview).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('skips stale pull request events that do not match the current head sha', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockGetPRHeadCommit.mockResolvedValue('newer-sha');
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Skipped stale pull request event' });
+    expect(mockGetPRHeadCommit).toHaveBeenCalledWith('98765', 'acme', 'widgets', 42, 'standard');
+    expect(mockCancelSupersededReviewsForPR).not.toHaveBeenCalled();
     expect(mockCreateCodeReview).not.toHaveBeenCalled();
   });
 

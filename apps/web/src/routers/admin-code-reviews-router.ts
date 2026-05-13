@@ -7,7 +7,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import * as z from 'zod';
-import { sql, and, gte, lt, eq, isNotNull, desc, ilike, or, type SQL } from 'drizzle-orm';
+import { sql, and, gte, lt, eq, isNotNull, desc, ilike, or, inArray, type SQL } from 'drizzle-orm';
 
 /**
  * SQL condition that identifies billing/credits errors (402 Payment Required).
@@ -130,12 +130,29 @@ const validStartedWaitCondition = sql`${cloud_agent_code_reviews.started_at} IS 
 const attemptWaitSecondsExpr = sql<number>`EXTRACT(EPOCH FROM (${cloud_agent_code_review_attempts.started_at} - ${cloud_agent_code_review_attempts.created_at}))`;
 const validAttemptStartedWaitCondition = sql`${cloud_agent_code_review_attempts.started_at} IS NOT NULL AND ${cloud_agent_code_review_attempts.started_at} >= ${cloud_agent_code_review_attempts.created_at}`;
 
+function accountingCreatedAt(input: FilterInput) {
+  return input.retryAccountingMode === 'all_attempts'
+    ? cloud_agent_code_review_attempts.created_at
+    : cloud_agent_code_reviews.created_at;
+}
+
+function accountingDayExpr(input: FilterInput): SQL {
+  return sql`DATE_TRUNC('day', ${accountingCreatedAt(input)})`;
+}
+
 function buildBaseConditions(input: FilterInput): SQL[] {
-  return [
-    gte(cloud_agent_code_reviews.created_at, input.startDate),
-    lt(cloud_agent_code_reviews.created_at, input.endDate),
-    buildOwnershipFilter(input.userId, input.organizationId, input.ownershipType),
-  ].filter(Boolean) as SQL[];
+  const createdAt = accountingCreatedAt(input);
+  const conditions = [gte(createdAt, input.startDate), lt(createdAt, input.endDate)];
+  const ownershipFilter = buildOwnershipFilter(
+    input.userId,
+    input.organizationId,
+    input.ownershipType
+  );
+  if (ownershipFilter) {
+    conditions.push(ownershipFilter);
+  }
+
+  return conditions;
 }
 
 export const adminCodeReviewsRouter = createTRPCRouter({
@@ -253,6 +270,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
   // Get daily time series data
   getDailyStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
+    const dayExpr = accountingDayExpr(input);
     const statusTable =
       input.retryAccountingMode === 'all_attempts'
         ? cloud_agent_code_review_attempts
@@ -266,7 +284,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
 
     const query = db
       .select({
-        day: sql<string>`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})::date::text`,
+        day: sql<string>`${dayExpr}::date::text`,
         total: sql<number>`COUNT(*)`,
         completed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'completed')`,
         // Exclude billing errors from system failure count
@@ -286,12 +304,12 @@ export const adminCodeReviewsRouter = createTRPCRouter({
               eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
             )
             .where(and(...conditions))
-            .groupBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`)
-            .orderBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`)
+            .groupBy(dayExpr)
+            .orderBy(dayExpr)
         : await query
             .where(and(...conditions))
-            .groupBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`)
-            .orderBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`);
+            .groupBy(dayExpr)
+            .orderBy(dayExpr);
 
     return result.map(row => ({
       day: row.day,
@@ -307,6 +325,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
 
   // Get cancellation reasons analysis
   getCancellationAnalysis: adminProcedure.input(FilterSchema).query(async ({ input }) => {
+    const createdAt = accountingCreatedAt(input);
     const statusTable =
       input.retryAccountingMode === 'all_attempts'
         ? cloud_agent_code_review_attempts
@@ -331,8 +350,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       .select({
         reason: cancellationReasonExpr,
         count: sql<number>`COUNT(*)`,
-        first_occurrence: sql<string>`MIN(${cloud_agent_code_reviews.created_at})::text`,
-        last_occurrence: sql<string>`MAX(${cloud_agent_code_reviews.created_at})::text`,
+        first_occurrence: sql<string>`MIN(${createdAt})::text`,
+        last_occurrence: sql<string>`MAX(${createdAt})::text`,
       })
       .from(cloud_agent_code_reviews);
 
@@ -361,6 +380,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
 
   // Get error analysis (excludes billing errors — those have their own KPI bucket)
   getErrorAnalysis: adminProcedure.input(FilterSchema).query(async ({ input }) => {
+    const createdAt = accountingCreatedAt(input);
     const statusTable =
       input.retryAccountingMode === 'all_attempts'
         ? cloud_agent_code_review_attempts
@@ -387,8 +407,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       .select({
         category: errorCategory,
         count: sql<number>`COUNT(*)`,
-        first_occurrence: sql<string>`MIN(${cloud_agent_code_reviews.created_at})::text`,
-        last_occurrence: sql<string>`MAX(${cloud_agent_code_reviews.created_at})::text`,
+        first_occurrence: sql<string>`MIN(${createdAt})::text`,
+        last_occurrence: sql<string>`MAX(${createdAt})::text`,
       })
       .from(cloud_agent_code_reviews);
 
@@ -413,8 +433,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         error_type: sql<string>`COALESCE(SUBSTRING(${errorMessageColumn} FROM 1 FOR 200), 'Unknown Error')`,
         category: errorCategory,
         count: sql<number>`COUNT(*)`,
-        first_occurrence: sql<string>`MIN(${cloud_agent_code_reviews.created_at})::text`,
-        last_occurrence: sql<string>`MAX(${cloud_agent_code_reviews.created_at})::text`,
+        first_occurrence: sql<string>`MIN(${createdAt})::text`,
+        last_occurrence: sql<string>`MAX(${createdAt})::text`,
       })
       .from(cloud_agent_code_reviews);
 
@@ -728,7 +748,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       input.retryAccountingMode === 'all_attempts' ? attemptWaitSecondsExpr : waitSecondsExpr;
     const conditions = [...buildBaseConditions(input), waitCondition] as SQL[];
 
-    const dayExpr = sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`;
+    const dayExpr = accountingDayExpr(input);
 
     const query = db
       .select({
@@ -789,10 +809,11 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     ] as SQL[];
 
     const durationExpr = sql`EXTRACT(EPOCH FROM (${completedAt}::timestamp - ${startedAt}::timestamp))`;
+    const dayExpr = accountingDayExpr(input);
 
     const query = db
       .select({
-        day: sql<string>`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})::date::text`,
+        day: sql<string>`${dayExpr}::date::text`,
         avg_seconds: sql<number>`AVG(${durationExpr})`,
         p50_seconds: sql<number>`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${durationExpr})`,
         p90_seconds: sql<number>`percentile_cont(0.9) WITHIN GROUP (ORDER BY ${durationExpr})`,
@@ -808,12 +829,12 @@ export const adminCodeReviewsRouter = createTRPCRouter({
               eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
             )
             .where(and(...conditions))
-            .groupBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`)
-            .orderBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`)
+            .groupBy(dayExpr)
+            .orderBy(dayExpr)
         : await query
             .where(and(...conditions))
-            .groupBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`)
-            .orderBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`);
+            .groupBy(dayExpr)
+            .orderBy(dayExpr);
 
     return result.map(row => ({
       day: row.day,
@@ -829,6 +850,24 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     const conditions = buildBaseConditions(input);
 
     if (input.retryAccountingMode === 'all_attempts') {
+      const cappedReviewIds = await db
+        .selectDistinct({
+          id: cloud_agent_code_reviews.id,
+          created_at: cloud_agent_code_reviews.created_at,
+        })
+        .from(cloud_agent_code_reviews)
+        .innerJoin(
+          cloud_agent_code_review_attempts,
+          eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+        )
+        .where(and(...conditions))
+        .orderBy(desc(cloud_agent_code_reviews.created_at))
+        .limit(10000);
+
+      if (cappedReviewIds.length === 0) {
+        return [];
+      }
+
       return await db
         .select({
           id: cloud_agent_code_reviews.id,
@@ -862,12 +901,19 @@ export const adminCodeReviewsRouter = createTRPCRouter({
           cloud_agent_code_review_attempts,
           eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
         )
-        .where(and(...conditions))
+        .where(
+          and(
+            inArray(
+              cloud_agent_code_reviews.id,
+              cappedReviewIds.map(row => row.id)
+            ),
+            ...conditions
+          )
+        )
         .orderBy(
           desc(cloud_agent_code_reviews.created_at),
           desc(cloud_agent_code_review_attempts.attempt_number)
-        )
-        .limit(10000);
+        );
     }
 
     return await db

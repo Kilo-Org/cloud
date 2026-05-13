@@ -7,6 +7,7 @@
 
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import * as fly from '../fly/client';
 import type { AppEnv } from '../types';
 import {
   ProvisionRequestSchema,
@@ -710,13 +711,33 @@ function jsonError(message: string, status: number, code?: string): Response {
 }
 
 /**
- * Short-circuit polling endpoints when the DO state isn't `running`.
+ * Short-circuit polling endpoints when the instance isn't actually running.
  *
- * Polling endpoints (gateway/status, controller-version, debug-status,
+ * Polling endpoints (gateway/status, controller-version,
  * morning-briefing/status) proxy to port 18789 on the Fly machine via Fly's
  * HTTPS edge. Even with `services[0].autostart: false`, Fly's proxy will wake
  * a stopped machine to serve the request. By short-circuiting here, no proxy
  * traffic reaches the machine while it is stopped.
+ *
+ * Two layers of state check, in order:
+ *
+ * 1. **Durable Object cached state.** Cheap (storage read). Handles the
+ *    common case where DO state and Fly state agree, and the case where the
+ *    user just stopped through our admin UI (DO updated state).
+ *
+ * 2. **Fly Machines REST API state.** Only when DO says `running` and the
+ *    instance is on Fly. The Machines REST API is a separate path from the
+ *    HTTPS edge proxy, so this call does not wake the machine. Catches
+ *    drift where DO cached state lags real Fly state (out-of-band stops:
+ *    Fly CLI, dashboard, health-check kill, platform incidents). Also
+ *    closes the in-flight stop race: while `DO.stop()` is waiting on
+ *    `Fly.stopMachine`, DO state still reads `running` for the duration of
+ *    that call, so a concurrent poll would otherwise fall through. Adds
+ *    ~50-200ms to each poll where DO says running; acceptable given the
+ *    10s+ polling cadence and the alternative (the wake bug).
+ *
+ * Fail-open on Fly API errors: if we can't reach Fly to verify, trust the
+ * DO state and forward. Logs a warning so the failure mode is visible.
  *
  * Returns a 200 sentinel (not 503) so the frontend's high-frequency polling
  * doesn't generate a wall of 5xx in logs / Sentry / latency dashboards for
@@ -734,18 +755,102 @@ async function shortCircuitIfNotRunning(
     stub => stub.getStatus(),
     'getStatus'
   );
-  if (status.status === 'running') return null;
+
+  // Layer 1: DO cached state says not running. Trust it (cheapest path).
+  if (status.status !== 'running') {
+    return instanceNotRunningSentinelResponse(status.status);
+  }
+
+  // Layer 2: DO says running. Verify against live Fly state when we can,
+  // because DO state can lag (out-of-band stops, in-flight stops where DO
+  // hasn't yet updated its cached status after the Fly stop call).
+  //
+  // Skip the Fly check when:
+  //   - the instance has no flyMachineId yet (pre-provisioning or non-Fly
+  //     provider — nothing to verify, and forwarding is safe because there
+  //     is nothing for Fly's proxy to wake);
+  //   - FLY_API_TOKEN isn't configured (dev environments without Fly creds).
+  const flyMachineId = status.flyMachineId;
+  const flyAppName = status.flyAppName;
+  if (status.provider !== 'fly' || !flyMachineId || !flyAppName || !env.FLY_API_TOKEN) {
+    return null;
+  }
+
+  try {
+    const machine = await fly.getMachine(
+      { apiToken: env.FLY_API_TOKEN, appName: flyAppName },
+      flyMachineId
+    );
+    if (machine.state !== 'started') {
+      // Drift detected. DO will reconcile its cached state on the next
+      // `maybeDispatchLiveCheck` tick (already dispatched by getStatus()
+      // above), so we don't force a synchronous reconcile here. Return
+      // the sentinel using Fly's reported state so the frontend can show
+      // an accurate label.
+      console.warn('[platform] poll short-circuit: Fly reports machine not started', {
+        userId,
+        instanceId,
+        flyMachineId,
+        doStatus: status.status,
+        flyState: machine.state,
+      });
+      return instanceNotRunningSentinelResponse(mapFlyStateToDoStatus(machine.state));
+    }
+  } catch (err) {
+    // Fail open: trust DO state when Fly is unreachable. The alternative
+    // (failing closed) would break polling during any Fly API hiccup.
+    console.warn('[platform] poll short-circuit: Fly state check failed, trusting DO', {
+      userId,
+      instanceId,
+      flyMachineId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  return null;
+}
+
+function instanceNotRunningSentinelResponse(status: string | null): Response {
   return new Response(
     JSON.stringify({
       ok: false,
       reason: 'instance_not_running',
-      status: status.status,
+      status,
     }),
     {
       status: 200,
       headers: { 'content-type': 'application/json' },
     }
   );
+}
+
+/**
+ * Map a Fly machine state into the closest equivalent DO status label so
+ * the frontend's "Instance is {status}…" hint reads naturally. We can't
+ * always represent Fly states 1:1 (e.g. Fly has no `restoring`), so
+ * unknown states fall through to `stopped` which is the safer default for
+ * a polling guard.
+ */
+function mapFlyStateToDoStatus(state: string): string {
+  switch (state) {
+    case 'started':
+      return 'running';
+    case 'starting':
+    case 'created':
+    case 'replacing':
+    case 'updating':
+      return 'starting';
+    case 'stopping':
+      return 'stopped';
+    case 'stopped':
+    case 'suspended':
+    case 'destroying':
+    case 'destroyed':
+    case 'failed':
+      return 'stopped';
+    default:
+      return 'stopped';
+  }
 }
 
 function kiloCliRunConflictResponse(response: unknown): Response | undefined {

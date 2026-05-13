@@ -201,6 +201,10 @@ function isRetryableInfraFailure(
   );
 }
 
+function isSupersededReview(review: CloudAgentCodeReview): boolean {
+  return review.terminal_reason === 'superseded';
+}
+
 const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
 
 const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
@@ -612,6 +616,16 @@ export async function POST(
     }
 
     if (isRetryableInfraFailure(status, terminalReason, errorMessage)) {
+      const retryableReview = await getCodeReviewById(reviewId);
+      if (!retryableReview || isSupersededReview(retryableReview)) {
+        logExceptInTest('[code-review-status] Skipping infra retry for superseded review', {
+          reviewId,
+          status: retryableReview?.status,
+          terminalReason: retryableReview?.terminal_reason,
+        });
+        return NextResponse.json({ success: true, retried: false, skipped: 'superseded' });
+      }
+
       const retryAttemptResult = await createInfraRetryAttemptIfMissing({
         codeReviewId: reviewId,
         retryOfAttemptId: attempt.id,
@@ -621,6 +635,25 @@ export async function POST(
         const retryAttempt = retryAttemptResult.attempt;
 
         try {
+          const latestReview = await getCodeReviewById(reviewId);
+          if (!latestReview || isSupersededReview(latestReview)) {
+            await updateCodeReviewAttemptForCallback({
+              codeReviewId: reviewId,
+              attemptId: retryAttempt.id,
+              status: 'cancelled',
+              errorMessage: 'Superseded by new push',
+              terminalReason: 'superseded',
+              completedAt: new Date(),
+            });
+            logExceptInTest('[code-review-status] Skipping fresh retry for superseded review', {
+              reviewId,
+              retryAttemptId: retryAttempt.id,
+              status: latestReview?.status,
+              terminalReason: latestReview?.terminal_reason,
+            });
+            return NextResponse.json({ success: true, retried: false, skipped: 'superseded' });
+          }
+
           const retryResult = await codeReviewWorkerClient.retryReviewFresh(reviewId, {
             sessionId,
             reason: errorMessage ?? terminalReason ?? 'retryable infra failure',
@@ -670,6 +703,14 @@ export async function POST(
           sessionId,
         });
         return NextResponse.json({ success: true, retried: true });
+      } else if (retryAttemptResult.outcome === 'skipped-inactive') {
+        logExceptInTest('[code-review-status] Skipping infra retry for inactive review', {
+          reviewId,
+          failedAttemptId: attempt.id,
+          reviewStatus: retryAttemptResult.reviewStatus,
+          terminalReason: retryAttemptResult.terminalReason,
+        });
+        return NextResponse.json({ success: true, retried: false, skipped: 'inactive' });
       }
     }
 

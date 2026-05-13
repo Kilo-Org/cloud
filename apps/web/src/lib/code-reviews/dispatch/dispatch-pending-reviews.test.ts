@@ -33,6 +33,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
+import { cancelSupersededReviewsForPR } from '../db/code-reviews';
 
 const REPO = `test-org/dispatch-pending-${Date.now()}`;
 const FUNDED_BALANCE_MICRODOLLARS = 5_000_001;
@@ -375,6 +376,99 @@ describe('tryDispatchPendingReviews', () => {
       activeCount: 20,
     });
     expect(mockDispatchReview).not.toHaveBeenCalled();
+  });
+
+  it('does not claim a review that was cancelled as superseded before dispatch', async () => {
+    const recentTimestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+
+    await db.insert(cloud_agent_code_reviews).values({
+      ...reviewValues({
+        owner,
+        status: 'pending',
+        createdAt: recentTimestamp,
+        updatedAt: recentTimestamp,
+      }),
+      pr_number: 99,
+      head_sha: 'sha-old',
+    });
+
+    await cancelSupersededReviewsForPR(REPO, 99, 'sha-new');
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    expect(result).toEqual({
+      dispatched: 0,
+      pending: 0,
+      activeCount: 0,
+    });
+    expect(mockDispatchReview).not.toHaveBeenCalled();
+
+    const [review] = await db
+      .select({
+        status: cloud_agent_code_reviews.status,
+        terminalReason: cloud_agent_code_reviews.terminal_reason,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.pr_number, 99))
+      .limit(1);
+
+    expect(review?.status).toBe('cancelled');
+    expect(review?.terminalReason).toBe('superseded');
+  });
+
+  it('does not dispatch a review that is superseded after claim', async () => {
+    const recentTimestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        ...reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentTimestamp,
+          updatedAt: recentTimestamp,
+        }),
+        pr_number: 100,
+        head_sha: 'sha-race-old',
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected review to be inserted');
+    }
+
+    mockPrepareReviewPayload.mockImplementationOnce(async (params: { reviewId: string }) => {
+      queueMicrotask(() => {
+        void cancelSupersededReviewsForPR(REPO, 100, 'sha-race-new');
+      });
+      return { reviewId: params.reviewId };
+    });
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({
+      dispatched: 0,
+      pending: 1,
+      activeCount: 0,
+    });
+    expect(mockDispatchReview).not.toHaveBeenCalled();
+    expect(storedReview?.status).toBe('cancelled');
+    expect(storedReview?.terminal_reason).toBe('superseded');
   });
 
   it('does not count stale queued reviews against owner capacity', async () => {

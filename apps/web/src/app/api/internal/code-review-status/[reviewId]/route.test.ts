@@ -150,6 +150,7 @@ const REVIEW_ID = '00000000-0000-0000-0000-000000000001';
 
 function makeRequest(body: Record<string, unknown>, secret = VALID_SECRET): NextRequest {
   return {
+    nextUrl: new URL(`https://test.kilo.ai/api/internal/code-review-status/${REVIEW_ID}`),
     headers: {
       get: (name: string) => (name === 'X-Internal-Secret' ? secret : null),
     },
@@ -557,10 +558,163 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
         sessionId: 'agent-old',
         reason: 'Container shutdown: SIGTERM',
+        failedAttemptId: '00000000-0000-0000-0000-000000000201',
+        retryAttemptId: '00000000-0000-0000-0000-000000000202',
       });
       expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it('does not retry when the parent review is already superseded', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'cancelled', terminal_reason: 'superseded' })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000211',
+          status: 'failed',
+          terminal_reason: 'sandbox_error',
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000211',
+          status: 'failed',
+          terminal_reason: 'sandbox_error',
+        })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Container shutdown: SIGTERM',
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        success: true,
+        message: 'Review already in terminal state',
+        currentStatus: 'cancelled',
+        terminalReason: 'superseded',
+      });
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+    });
+
+    it('does not start a fresh retry if the review becomes superseded before worker startup', async () => {
+      mockGetCodeReviewById
+        .mockResolvedValueOnce(makeReview({ status: 'running', session_id: 'agent-old' }))
+        .mockResolvedValueOnce(makeReview({ status: 'running', session_id: 'agent-old' }))
+        .mockResolvedValueOnce(makeReview({ status: 'cancelled', terminal_reason: 'superseded' }));
+      mockUpdateCodeReviewAttemptForCallback
+        .mockResolvedValueOnce(
+          makeAttempt({
+            id: '00000000-0000-0000-0000-000000000221',
+            status: 'failed',
+            session_id: 'agent-old',
+          })
+        )
+        .mockResolvedValueOnce(
+          makeAttempt({
+            id: '00000000-0000-0000-0000-000000000222',
+            attempt_number: 2,
+            status: 'cancelled',
+            terminal_reason: 'superseded',
+          })
+        );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000221',
+          status: 'failed',
+          session_id: 'agent-old',
+        })
+      );
+      mockCreateInfraRetryAttemptIfMissing.mockResolvedValue({
+        outcome: 'created',
+        attempt: makeAttempt({
+          id: '00000000-0000-0000-0000-000000000222',
+          attempt_number: 2,
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000221',
+          status: 'pending',
+        }),
+      });
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-old',
+          errorMessage: 'Container shutdown: SIGTERM',
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        success: true,
+        retried: false,
+        skipped: 'superseded',
+      });
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          codeReviewId: REVIEW_ID,
+          attemptId: '00000000-0000-0000-0000-000000000222',
+          status: 'cancelled',
+          terminalReason: 'superseded',
+        })
+      );
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+    });
+
+    it('does not retry when retry creation is skipped because the review is inactive', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: 'agent-old' })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000231',
+          status: 'failed',
+          session_id: 'agent-old',
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000231',
+          status: 'failed',
+          session_id: 'agent-old',
+        })
+      );
+      mockCreateInfraRetryAttemptIfMissing.mockResolvedValue({
+        outcome: 'skipped-inactive',
+        reviewStatus: 'cancelled',
+        terminalReason: 'superseded',
+      });
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-old',
+          errorMessage: 'Container shutdown: SIGTERM',
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        success: true,
+        retried: false,
+        skipped: 'inactive',
+      });
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
     });
 
     it('does not retry maximum runtime failures', async () => {

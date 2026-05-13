@@ -32,6 +32,11 @@ type InfraRetryAttemptResult =
   | {
       outcome: 'existing-for-review';
       attempt: CloudAgentCodeReviewAttempt;
+    }
+  | {
+      outcome: 'skipped-inactive';
+      reviewStatus: string;
+      terminalReason: string | null;
     };
 
 type AttemptCallbackFields = {
@@ -75,6 +80,27 @@ function buildAttemptUpdateData(
   }
 
   return updateData;
+}
+
+export type CancelledReviewRow = {
+  id: string;
+  prevStatus: 'pending' | 'queued' | 'running';
+  sessionId: string | null;
+  latestActiveAttemptId: string | null;
+  checkRunId: number | null;
+  headSha: string;
+  platform: 'github' | 'gitlab';
+  platformProjectId: number | null;
+  platformIntegrationId: string | null;
+};
+
+const RETRYABLE_PARENT_REVIEW_STATUSES = ['queued', 'running'];
+
+function canCreateInfraRetryAttempt(review: { status: string; terminal_reason: string | null }) {
+  return (
+    review.terminal_reason !== 'superseded' &&
+    RETRYABLE_PARENT_REVIEW_STATUSES.includes(review.status)
+  );
 }
 
 /**
@@ -277,12 +303,33 @@ export async function createInfraRetryAttemptIfMissing(params: {
 }): Promise<InfraRetryAttemptResult> {
   try {
     return await db.transaction(async tx => {
-      await tx
-        .select({ id: cloud_agent_code_reviews.id })
+      const [review] = await tx
+        .select({
+          id: cloud_agent_code_reviews.id,
+          status: cloud_agent_code_reviews.status,
+          terminalReason: cloud_agent_code_reviews.terminal_reason,
+        })
         .from(cloud_agent_code_reviews)
         .where(eq(cloud_agent_code_reviews.id, params.codeReviewId))
         .for('update')
         .limit(1);
+
+      if (!review) {
+        throw new Error(`Code review ${params.codeReviewId} not found`);
+      }
+
+      if (
+        !canCreateInfraRetryAttempt({
+          status: review.status,
+          terminal_reason: review.terminalReason,
+        })
+      ) {
+        return {
+          outcome: 'skipped-inactive',
+          reviewStatus: review.status,
+          terminalReason: review.terminalReason,
+        };
+      }
 
       const [existingForAttempt] = await tx
         .select()
@@ -778,6 +825,47 @@ export async function releaseQueuedReviewClaim(reviewId: string): Promise<boolea
   }
 }
 
+export async function reviewIsStillQueued(reviewId: string): Promise<boolean> {
+  try {
+    const [review] = await db
+      .select({ id: cloud_agent_code_reviews.id })
+      .from(cloud_agent_code_reviews)
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.id, reviewId),
+          eq(cloud_agent_code_reviews.status, 'queued')
+        )
+      )
+      .limit(1);
+
+    return !!review;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'reviewIsStillQueued' },
+      extra: { reviewId },
+    });
+    throw error;
+  }
+}
+
+export async function reviewIsSuperseded(reviewId: string): Promise<boolean> {
+  try {
+    const [review] = await db
+      .select({ terminalReason: cloud_agent_code_reviews.terminal_reason })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId))
+      .limit(1);
+
+    return review?.terminalReason === 'superseded';
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'reviewIsSuperseded' },
+      extra: { reviewId },
+    });
+    throw error;
+  }
+}
+
 /**
  * Updates only usage-related columns on a code review, without touching status or timestamps.
  */
@@ -1040,6 +1128,99 @@ export async function findActiveReviewsForPR(
   } catch (error) {
     captureException(error, {
       tags: { operation: 'findActiveReviewsForPR' },
+      extra: { repoFullName, prNumber, excludeSha },
+    });
+    throw error;
+  }
+}
+
+export async function cancelSupersededReviewsForPR(
+  repoFullName: string,
+  prNumber: number,
+  excludeSha: string
+): Promise<CancelledReviewRow[]> {
+  try {
+    const result = await db.execute<{
+      id: string;
+      prev_status: 'pending' | 'queued' | 'running';
+      session_id: string | null;
+      latest_active_attempt_id: string | null;
+      check_run_id: number | null;
+      head_sha: string;
+      platform: 'github' | 'gitlab';
+      platform_project_id: number | null;
+      platform_integration_id: string | null;
+    }>(sql`
+      WITH targets AS (
+        SELECT
+          id,
+          status AS prev_status,
+          session_id,
+          (
+            SELECT attempts.id
+            FROM ${cloud_agent_code_review_attempts} AS attempts
+            WHERE attempts.code_review_id = ${cloud_agent_code_reviews}.id
+              AND attempts.status IN ('pending', 'queued', 'running')
+            ORDER BY attempts.attempt_number DESC
+            LIMIT 1
+          ) AS latest_active_attempt_id,
+          check_run_id,
+          head_sha,
+          platform,
+          platform_project_id,
+          platform_integration_id
+        FROM ${cloud_agent_code_reviews}
+        WHERE ${cloud_agent_code_reviews.repo_full_name} = ${repoFullName}
+          AND ${cloud_agent_code_reviews.pr_number} = ${prNumber}
+          AND ${cloud_agent_code_reviews.head_sha} != ${excludeSha}
+          AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
+      ), cancelled_attempts AS (
+        UPDATE ${cloud_agent_code_review_attempts} AS attempts
+        SET
+          status = 'cancelled',
+          terminal_reason = 'superseded',
+          error_message = 'Superseded by new push',
+          completed_at = now(),
+          updated_at = now()
+        FROM targets
+        WHERE attempts.code_review_id = targets.id
+          AND attempts.status IN ('pending', 'queued', 'running')
+      )
+      UPDATE ${cloud_agent_code_reviews} AS reviews
+      SET
+        status = 'cancelled',
+        terminal_reason = 'superseded',
+        error_message = 'Superseded by new push',
+        completed_at = now(),
+        updated_at = now()
+      FROM targets
+      WHERE reviews.id = targets.id
+      RETURNING
+        reviews.id,
+        targets.prev_status,
+        targets.session_id,
+        targets.latest_active_attempt_id,
+        targets.check_run_id,
+        targets.head_sha,
+        targets.platform,
+        targets.platform_project_id,
+        targets.platform_integration_id
+    `);
+
+    return result.rows.map(row => ({
+      id: row.id,
+      prevStatus: row.prev_status,
+      sessionId: row.session_id,
+      latestActiveAttemptId: row.latest_active_attempt_id,
+      checkRunId: row.check_run_id,
+      headSha: row.head_sha,
+      platform: row.platform,
+      platformProjectId: row.platform_project_id,
+      platformIntegrationId: row.platform_integration_id,
+    }));
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'cancelSupersededReviewsForPR' },
       extra: { repoFullName, prNumber, excludeSha },
     });
     throw error;

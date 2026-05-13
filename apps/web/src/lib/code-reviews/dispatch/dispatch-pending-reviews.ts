@@ -22,6 +22,9 @@ import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import {
   ensureCurrentCodeReviewAttemptFromReview,
   releaseQueuedReviewClaim,
+  reviewIsSuperseded,
+  reviewIsStillQueued,
+  updateCodeReviewAttemptForCallback,
   updateCodeReviewStatus,
 } from '../db/code-reviews';
 import { captureException } from '@sentry/nextjs';
@@ -285,6 +288,13 @@ async function dispatchReview(
     return false;
   }
 
+  if (!(await reviewIsStillQueued(review.id))) {
+    logExceptInTest('[dispatchReview] Review was cancelled after claim, skipping worker dispatch', {
+      reviewId: review.id,
+    });
+    return false;
+  }
+
   // 4. Dispatch to Cloudflare Worker to create CodeReviewOrchestrator DO.
   //    If this fails, probe DO state before deciding whether to release the claim.
   const agentVersion = 'v2';
@@ -292,6 +302,24 @@ async function dispatchReview(
     ...review,
     status: 'queued',
   });
+
+  if (!(await reviewIsStillQueued(review.id))) {
+    const superseded = await reviewIsSuperseded(review.id);
+    await updateCodeReviewAttemptForCallback({
+      codeReviewId: review.id,
+      attemptId: attempt.id,
+      status: 'cancelled',
+      errorMessage: superseded ? 'Superseded by new push' : 'Review cancelled before dispatch',
+      terminalReason: superseded ? 'superseded' : undefined,
+      completedAt: new Date(),
+    });
+    logExceptInTest('[dispatchReview] Review was cancelled before worker dispatch', {
+      reviewId: review.id,
+      attemptId: attempt.id,
+      superseded,
+    });
+    return false;
+  }
 
   try {
     await codeReviewWorkerClient.dispatchReview({

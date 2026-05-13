@@ -16,14 +16,21 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
 }));
 
 import { db } from '@/lib/drizzle';
+import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { cloud_agent_code_reviews, kilocode_users, type User } from '@kilocode/db/schema';
+import {
+  cloud_agent_code_reviews,
+  kilocode_users,
+  platform_integrations,
+  type User,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
 const REPO = `test-org/code-reviews-cancel-${Date.now()}`;
 type ReviewStatus = 'pending' | 'queued' | 'running';
 type CodeReviewInsert = typeof cloud_agent_code_reviews.$inferInsert;
+const mockUpdateCheckRun = jest.mocked(updateCheckRun);
 
 function reviewValues(
   userId: string,
@@ -50,6 +57,21 @@ function reviewValues(
   } satisfies CodeReviewInsert;
 }
 
+async function insertGitHubIntegration(userId: string, githubAppType: 'standard' | 'lite') {
+  const [integration] = await db
+    .insert(platform_integrations)
+    .values({
+      owned_by_user_id: userId,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: `inst-${crypto.randomUUID()}`,
+      github_app_type: githubAppType,
+    })
+    .returning();
+
+  return integration;
+}
+
 describe('codeReviewRouter.cancel', () => {
   let testUser: User;
 
@@ -59,13 +81,18 @@ describe('codeReviewRouter.cancel', () => {
 
   beforeEach(() => {
     mockCancelReview.mockResolvedValue({ success: true, reviewId: 'unused' });
+    mockUpdateCheckRun.mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
     await db
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
     mockCancelReview.mockReset();
+    mockUpdateCheckRun.mockReset();
   });
 
   afterAll(async () => {
@@ -186,5 +213,32 @@ describe('codeReviewRouter.cancel', () => {
     expect(result).toEqual({ success: false, error: 'Worker could not cancel code review' });
     expect(storedReview?.status).toBe('running');
     expect(storedReview?.completed_at).toBeNull();
+  });
+
+  it('passes the integration GitHub app type when cancelling a pending check run', async () => {
+    const integration = await insertGitHubIntegration(testUser.id, 'lite');
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'pending', {
+          platform_integration_id: integration.id,
+          check_run_id: 12345,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    const [repoOwner, repoName] = REPO.split('/');
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.cancel({ reviewId: review.id });
+
+    expect(result.success).toBe(true);
+    expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+      integration.platform_installation_id,
+      repoOwner,
+      repoName,
+      12345,
+      expect.objectContaining({ status: 'completed', conclusion: 'cancelled' }),
+      'lite'
+    );
   });
 });

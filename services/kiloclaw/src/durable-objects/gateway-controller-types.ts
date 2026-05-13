@@ -140,6 +140,11 @@ export const MorningBriefingStatusResponseSchema = z.object({
     })
     .optional(),
   lastDelivery: z.array(MorningBriefingDeliverySchema).optional(),
+  // Selected morning-briefing interest topics, sourced from the
+  // `kiloclaw_morning_briefing_configs` Postgres row. Optional so callers
+  // talking to an instance that pre-dates the table (or a Postgres-down
+  // response) still parse; default to `[]` at the consumer.
+  interestTopics: z.array(z.string()).optional(),
   code: z.string().optional(),
   retryAfterSec: z.number().int().positive().optional(),
   error: z.string().optional(),
@@ -157,6 +162,17 @@ export const MorningBriefingActionResponseSchema = z.object({
   delivery: z.array(MorningBriefingDeliverySchema).optional(),
   code: z.string().optional(),
   retryAfterSec: z.number().int().positive().optional(),
+  error: z.string().optional(),
+});
+
+export const MorningBriefingInterestsRequestSchema = z.object({
+  topics: z.array(z.string()),
+});
+
+export const MorningBriefingInterestsResponseSchema = z.object({
+  ok: z.boolean(),
+  interestTopics: z.array(z.string()).optional(),
+  code: z.string().optional(),
   error: z.string().optional(),
 });
 

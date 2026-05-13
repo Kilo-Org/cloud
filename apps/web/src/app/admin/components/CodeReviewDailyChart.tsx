@@ -51,6 +51,11 @@ type CustomTooltipProps = {
   label?: string;
 };
 
+function formatStatusBreakdown(count: number, total: number): string {
+  const percentage = total > 0 ? (count / total) * 100 : 0;
+  return `${percentage.toFixed(1)}% (${count.toLocaleString()})`;
+}
+
 export function CodeReviewDailyChart({ data }: { data: DailyData[] }) {
   const chartData: ChartDataPoint[] = data.map(item => ({
     day: format(parseISO(item.day), 'MM/dd'),
@@ -75,35 +80,47 @@ export function CodeReviewDailyChart({ data }: { data: DailyData[] }) {
           <div className="mt-2 space-y-1">
             <p className="text-sm">
               <span className="text-muted-foreground">Total:</span>{' '}
-              <span className="font-medium">{data.total}</span>
+              <span className="font-medium tabular-nums">{data.total.toLocaleString()}</span>
             </p>
             <p className="text-sm">
               <span className="text-muted-foreground">Completed:</span>{' '}
-              <span className="font-medium text-green-600">{data.completed}</span>
+              <span className="font-medium tabular-nums text-green-600">
+                {formatStatusBreakdown(data.completed, data.total)}
+              </span>
             </p>
             <p className="text-sm">
               <span className="text-muted-foreground">Failed:</span>{' '}
-              <span className="font-medium text-red-600">{data.failed}</span>
+              <span className="font-medium tabular-nums text-red-600">
+                {formatStatusBreakdown(data.failed, data.total)}
+              </span>
             </p>
             <p className="text-sm">
               <span className="text-muted-foreground">Cancelled:</span>{' '}
-              <span className="font-medium text-yellow-600">{data.cancelled}</span>
+              <span className="font-medium tabular-nums text-yellow-600">
+                {formatStatusBreakdown(data.cancelled, data.total)}
+              </span>
             </p>
             <p className="text-sm">
               <span className="text-muted-foreground">Interrupted:</span>{' '}
-              <span className="font-medium text-orange-600">{data.interrupted}</span>
+              <span className="font-medium tabular-nums text-orange-600">
+                {formatStatusBreakdown(data.interrupted, data.total)}
+              </span>
             </p>
             <p className="text-sm">
               <span className="text-muted-foreground">Billing Errors:</span>{' '}
-              <span className="font-medium text-amber-500">{data.billingErrors}</span>
+              <span className="font-medium tabular-nums text-amber-500">
+                {formatStatusBreakdown(data.billingErrors, data.total)}
+              </span>
             </p>
             <p className="text-sm">
               <span className="text-muted-foreground">In Progress:</span>{' '}
-              <span className="font-medium text-blue-600">{data.inProgress}</span>
+              <span className="font-medium tabular-nums text-blue-600">
+                {formatStatusBreakdown(data.inProgress, data.total)}
+              </span>
             </p>
             <p className="text-sm">
               <span className="text-muted-foreground">Success Rate:</span>{' '}
-              <span className="font-medium">{data.successRate.toFixed(1)}%</span>
+              <span className="font-medium tabular-nums">{data.successRate.toFixed(1)}%</span>
             </p>
           </div>
         </div>

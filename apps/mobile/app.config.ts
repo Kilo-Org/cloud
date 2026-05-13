@@ -122,6 +122,7 @@ const config: ExpoConfig = {
     ],
     'expo-apple-authentication',
     'expo-audio',
+    'expo-iap',
     'expo-sharing',
     'expo-video',
     'expo-asset',

@@ -78,6 +78,7 @@ function createMockUser(overrides: Partial<User> = {}): User {
     auto_top_up_enabled: false,
     kiloclaw_early_access: false,
     stripe_customer_id: 'cus_test123',
+    app_store_account_token: crypto.randomUUID(),
     microdollars_used: 0,
     kilo_pass_threshold: null,
     total_microdollars_acquired: 0,

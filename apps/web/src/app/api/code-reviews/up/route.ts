@@ -3,10 +3,8 @@ import { NextResponse } from 'next/server';
 import { APP_URL } from '@/lib/constants';
 import { db, sql } from '@/lib/drizzle';
 import {
-  evaluateErrorCategorySpike,
-  evaluateFailureRate,
-  evaluateNoCompletions,
-  evaluateStuckReviews,
+  evaluateErrorSpike,
+  evaluateSlowReviews,
   type CodeReviewAlertEvaluation,
 } from '@/lib/code-reviews/alerting/detectors';
 import {
@@ -29,10 +27,8 @@ type Detector = {
 };
 
 const DETECTORS: Detector[] = [
-  { name: 'failure_rate', evaluate: evaluateFailureRate },
-  { name: 'stuck_reviews', evaluate: evaluateStuckReviews },
-  { name: 'no_completions', evaluate: evaluateNoCompletions },
-  { name: 'error_spike', evaluate: evaluateErrorCategorySpike },
+  { name: 'slow_reviews', evaluate: evaluateSlowReviews },
+  { name: 'error_spike', evaluate: evaluateErrorSpike },
 ];
 
 type UnauthorizedResponse = { healthy: false };

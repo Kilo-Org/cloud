@@ -51,7 +51,8 @@ describe('GET /api/code-reviews/up', () => {
 
   function reviewValues(overrides: Partial<CodeReviewInsert> = {}) {
     const sequence = reviewSequence++;
-    const timestamp = minutesAgo(5);
+    const startedAt = minutesAgo(10);
+    const completedAt = minutesAgo(5);
 
     return {
       owned_by_user_id: testUser.id,
@@ -66,9 +67,10 @@ describe('GET /api/code-reviews/up', () => {
       head_sha: `sha-${sequence}`,
       status: 'completed',
       agent_version: 'v2',
-      created_at: timestamp,
-      updated_at: timestamp,
-      completed_at: timestamp,
+      created_at: startedAt,
+      updated_at: completedAt,
+      started_at: startedAt,
+      completed_at: completedAt,
       ...overrides,
     } satisfies CodeReviewInsert;
   }
@@ -114,8 +116,8 @@ describe('GET /api/code-reviews/up', () => {
       const response = await GET(makeRequest('kilo-code-reviews-health-check'));
 
       expect(response.status).toBe(200);
-      expect(transactionSpy).toHaveBeenCalledTimes(4);
-      expect(txExecuteCalls).toHaveLength(4);
+      expect(transactionSpy).toHaveBeenCalledTimes(2);
+      expect(txExecuteCalls).toHaveLength(2);
       for (const execute of txExecuteCalls) {
         expect(execute).toHaveBeenCalledTimes(2);
       }
@@ -124,46 +126,14 @@ describe('GET /api/code-reviews/up', () => {
     }
   });
 
-  it('returns 503 with failure-rate alert when failure rate trips', async () => {
-    await db
-      .insert(cloud_agent_code_reviews)
-      .values([
-        ...Array.from({ length: 4 }, () =>
-          reviewValues({ status: 'failed', terminal_reason: 'timeout' })
-        ),
-        ...Array.from({ length: 11 }, () => reviewValues({ status: 'completed' })),
-      ]);
-
-    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
-
-    expect(response.status).toBe(503);
-    const body = await response.json();
-    expect(body).toMatchObject({
-      healthy: false,
-      alerts: [
-        {
-          kind: 'failure_rate',
-          label: 'High Failure Rate',
-          severity: 'ticket',
-          rate: expect.any(Number),
-          total: 15,
-          failures: 4,
-          topReason: 'timeout',
-          topReasonCount: 4,
-          adminUrl: expect.stringContaining('/admin/code-reviews'),
-          runbookUrl: CODE_REVIEW_RUNBOOK_URL,
-        },
-      ],
-    });
-  });
-
-  it('returns 503 with stuck-reviews alert when reviews are stuck', async () => {
+  it('returns 503 with slow-review alert when slow-review rate trips', async () => {
     await db.insert(cloud_agent_code_reviews).values([
-      ...Array.from({ length: 5 }, () =>
-        reviewValues({ status: 'queued', created_at: minutesAgo(20), updated_at: minutesAgo(16) })
-      ),
-      // Avoid also tripping no_completions: keep at least one completed review.
-      reviewValues({ status: 'completed' }),
+      reviewValues({
+        started_at: minutesAgo(71),
+        created_at: minutesAgo(71),
+        completed_at: minutesAgo(10),
+      }),
+      ...Array.from({ length: 9 }, () => reviewValues()),
     ]);
 
     const response = await GET(makeRequest('kilo-code-reviews-health-check'));
@@ -174,28 +144,85 @@ describe('GET /api/code-reviews/up', () => {
       healthy: false,
       alerts: [
         {
-          kind: 'stuck_reviews',
-          label: 'Stuck Reviews',
+          kind: 'slow_reviews',
+          label: 'Slow Reviews',
           severity: 'ticket',
-          queuedCount: 5,
-          runningCount: 0,
+          rate: 0.1,
+          startedCount: 10,
+          slowCount: 1,
+          windowMinutes: 120,
+          durationMinutes: 60,
+          adminUrl: expect.stringContaining('/admin/code-reviews'),
+          runbookUrl: CODE_REVIEW_RUNBOOK_URL,
         },
       ],
     });
   });
 
-  it('returns multiple alerts when multiple detectors trip', async () => {
+  it('returns 503 with error-spike alert when error rate trips', async () => {
     await db
       .insert(cloud_agent_code_reviews)
       .values([
-        ...Array.from({ length: 4 }, () =>
-          reviewValues({ status: 'failed', terminal_reason: 'timeout' })
-        ),
-        ...Array.from({ length: 11 }, () => reviewValues({ status: 'completed' })),
-        ...Array.from({ length: 5 }, () =>
-          reviewValues({ status: 'queued', created_at: minutesAgo(20), updated_at: minutesAgo(16) })
-        ),
+        reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
+        ...Array.from({ length: 19 }, () => reviewValues()),
       ]);
+
+    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      healthy: false,
+      alerts: [
+        {
+          kind: 'error_spike',
+          label: 'Error Spike',
+          severity: 'ticket',
+          rate: 0.05,
+          startedCount: 20,
+          errorCount: 1,
+          windowMinutes: 30,
+          topReason: 'timeout',
+          topReasonCount: 1,
+          adminUrl: expect.stringContaining('/admin/code-reviews'),
+          runbookUrl: CODE_REVIEW_RUNBOOK_URL,
+        },
+      ],
+    });
+  });
+
+  it('ignores stale queued rows for health', async () => {
+    await db.insert(cloud_agent_code_reviews).values(
+      Array.from({ length: 20 }, () =>
+        reviewValues({
+          status: 'queued',
+          created_at: minutesAgo(60),
+          updated_at: minutesAgo(60),
+          started_at: null,
+          completed_at: null,
+        })
+      )
+    );
+
+    const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ healthy: true, alerts: [] });
+  });
+
+  it('returns multiple alerts when multiple detectors trip', async () => {
+    await db.insert(cloud_agent_code_reviews).values([
+      ...Array.from({ length: 3 }, () =>
+        reviewValues({
+          started_at: minutesAgo(71),
+          created_at: minutesAgo(71),
+          completed_at: minutesAgo(10),
+        })
+      ),
+      reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
+      ...Array.from({ length: 19 }, () => reviewValues()),
+    ]);
 
     const response = await GET(makeRequest('kilo-code-reviews-health-check'));
 
@@ -203,7 +230,7 @@ describe('GET /api/code-reviews/up', () => {
     const body = await response.json();
     expect(body.healthy).toBe(false);
     const kinds = body.alerts.map((alert: { kind: string }) => alert.kind);
-    expect(kinds).toEqual(expect.arrayContaining(['failure_rate', 'stuck_reviews']));
+    expect(kinds).toEqual(expect.arrayContaining(['slow_reviews', 'error_spike']));
   });
 
   it('fails open and captures every detector error to Sentry when the database is unreachable', async () => {
@@ -217,16 +244,11 @@ describe('GET /api/code-reviews/up', () => {
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body).toMatchObject({ healthy: true, alerts: [] });
-      expect(mockCaptureException).toHaveBeenCalledTimes(4);
+      expect(mockCaptureException).toHaveBeenCalledTimes(2);
       const detectorTags = mockCaptureException.mock.calls
         .map(call => call[1].tags.detector)
         .sort();
-      expect(detectorTags).toEqual([
-        'error_spike',
-        'failure_rate',
-        'no_completions',
-        'stuck_reviews',
-      ]);
+      expect(detectorTags).toEqual(['error_spike', 'slow_reviews']);
       expect(mockCaptureException.mock.calls[0][1]).toMatchObject({
         tags: { endpoint: 'code-reviews/up', source: 'code_review_health_check' },
       });

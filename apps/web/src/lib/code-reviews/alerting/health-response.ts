@@ -7,10 +7,8 @@ export const CODE_REVIEW_RUNBOOK_URL =
 type AlertKindLabel = Record<CodeReviewAlertDetails['kind'], string>;
 
 const ALERT_KIND_LABELS: AlertKindLabel = {
-  failure_rate: 'High Failure Rate',
-  stuck_reviews: 'Stuck Reviews',
-  no_completions: 'No Completions',
-  error_spike: 'Error Category Spike',
+  slow_reviews: 'Slow Reviews',
+  error_spike: 'Error Spike',
 };
 
 type CodeReviewHealthAlertCommon = {

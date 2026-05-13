@@ -14,6 +14,13 @@ export default {
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
     transformRequest() {},
   },
+  FASTROUTER: {
+    id: 'fastrouter',
+    apiUrl: 'https://go.fastrouter.ai/api/v1',
+    apiKey: getEnvVariable('FASTROUTER_API_KEY'),
+    supportedChatApis: ['chat_completions'],
+    transformRequest() {},
+  },
   ALIBABA: {
     id: 'alibaba',
     apiUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',

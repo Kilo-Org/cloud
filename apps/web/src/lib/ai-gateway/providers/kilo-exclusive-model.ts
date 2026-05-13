@@ -67,7 +67,13 @@ export function getInferenceProvider(
   model: KiloExclusiveModel
 ): OpenRouterInferenceProviderId | null {
   if (model.flags.includes('stealth')) return 'stealth';
-  if (model.gateway === 'openrouter' || model.gateway === 'vercel') return null;
+  if (
+    model.gateway === 'openrouter' ||
+    model.gateway === 'vercel' ||
+    model.gateway === 'fastrouter'
+  ) {
+    return null;
+  }
   return OpenRouterInferenceProviderIdSchema.parse(model.gateway);
 }
 

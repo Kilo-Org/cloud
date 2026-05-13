@@ -117,7 +117,6 @@ export function KiloClawSubscribeCard({
   const standardDetails = [
     'Month-to-month hosting for one personal KiloClaw instance.',
     signupDisplay.standard.accessoryDetail,
-    `Includes ${signupDisplay.selfServiceInstanceType} self-service instance entitlement.`,
     hasActiveKiloPass
       ? 'Use Kilo Pass credits during activation or pay directly with Stripe.'
       : 'Activate and manage the instance inside KiloClaw.',
@@ -127,7 +126,6 @@ export function KiloClawSubscribeCard({
     'Six-month hosting commitment for one personal KiloClaw instance.',
     signupDisplay.commit.accessoryDetail,
     signupDisplay.commit.monthlyEquivalent,
-    `Includes ${signupDisplay.selfServiceInstanceType} self-service instance entitlement.`,
     hasActiveKiloPass
       ? 'Works when your Kilo Pass balance can cover the first commit charge.'
       : 'Best for steady usage when you want the lower effective monthly rate.',

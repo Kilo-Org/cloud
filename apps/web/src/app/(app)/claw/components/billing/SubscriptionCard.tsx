@@ -225,7 +225,6 @@ function ActiveSubscriptionCard({
             hasStripeFunding: sub.hasStripeFunding,
           })}
         />
-        <DetailRow label="Included instance" value={sub.selfServiceInstanceType} />
         {isCommit ? (
           <DetailRow label="Auto-renew" value={`Yes, every ${COMMIT_PERIOD_MONTHS} months`} />
         ) : null}
@@ -241,8 +240,10 @@ function ActiveSubscriptionCard({
       {hasUserRequestedSwitch ? (
         <Alert variant="warning">
           <AlertDescription>
-            Switching to {isCommit ? 'Standard' : 'Commit'} on{' '}
-            <span className="tabular-nums">{formatBillingDate(sub.currentPeriodEnd)}</span>.
+            <p>
+              Switching to {isCommit ? 'Standard' : 'Commit'} on{' '}
+              <span className="tabular-nums">{formatBillingDate(sub.currentPeriodEnd)}</span>.
+            </p>
           </AlertDescription>
         </Alert>
       ) : null}
@@ -430,9 +431,11 @@ function CancelingSubscriptionCard({
 
       <Alert variant="warning">
         <AlertDescription>
-          Your subscription cancels on{' '}
-          <span className="tabular-nums">{formatBillingDate(sub.currentPeriodEnd)}</span>.
-          Reactivate to keep it renewing.
+          <p>
+            Your subscription cancels on{' '}
+            <span className="tabular-nums">{formatBillingDate(sub.currentPeriodEnd)}</span>.
+            Reactivate to keep it renewing.
+          </p>
         </AlertDescription>
       </Alert>
 

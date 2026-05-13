@@ -64,10 +64,6 @@ export type DoltHubTokenResponse = {
   scope: string | null;
 };
 
-export type DoltHubAccount = {
-  username: string;
-};
-
 const DoltHubTokenPayloadSchema = z.object({
   access_token: z.string().min(1),
   refresh_token: z.string().optional(),
@@ -160,11 +156,9 @@ export async function getInstallation(owner: Owner): Promise<PlatformIntegration
 
 export async function upsertDoltHubInstallation({
   owner,
-  account,
   tokens,
 }: {
   owner: Owner;
-  account: DoltHubAccount;
   tokens: DoltHubTokenResponse;
 }): Promise<PlatformIntegration> {
   assertDevOnly();
@@ -184,7 +178,6 @@ export async function upsertDoltHubInstallation({
     const [updated] = await db
       .update(platform_integrations)
       .set({
-        platform_account_login: account.username,
         scopes: DOLTHUB_SCOPES,
         integration_status: INTEGRATION_STATUS.ACTIVE,
         metadata,
@@ -207,7 +200,6 @@ export async function upsertDoltHubInstallation({
       owned_by_organization_id: owner.type === 'org' ? owner.id : null,
       platform: PLATFORM.DOLTHUB,
       integration_type: 'oauth',
-      platform_account_login: account.username,
       scopes: DOLTHUB_SCOPES,
       integration_status: INTEGRATION_STATUS.ACTIVE,
       metadata,
@@ -234,55 +226,6 @@ export async function uninstall(owner: Owner): Promise<{ success: boolean }> {
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
 
   return { success: true };
-}
-
-const DoltHubUserResponseSchema = z.object({
-  data: z
-    .object({
-      currentUser: z
-        .object({
-          username: z.string().min(1),
-        })
-        .optional(),
-    })
-    .optional(),
-  errors: z.array(z.unknown()).optional(),
-});
-
-export async function fetchDoltHubUser(accessToken: string): Promise<{ username: string } | null> {
-  assertDevOnly();
-
-  try {
-    const response = await fetch('https://www.dolthub.com/graphql', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        query: '{ currentUser { username } }',
-      }),
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const raw = await response.json();
-    const parseResult = DoltHubUserResponseSchema.safeParse(raw);
-    if (!parseResult.success) {
-      return null;
-    }
-
-    const username = parseResult.data.data?.currentUser?.username;
-    if (username) {
-      return { username };
-    }
-  } catch {
-    // Ignore errors and fall through
-  }
-
-  return null;
 }
 
 export async function getValidDoltHubToken(

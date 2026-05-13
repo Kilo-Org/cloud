@@ -7,7 +7,6 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { IS_DEVELOPMENT } from '@/lib/constants';
 import {
   exchangeDoltHubOAuthCode,
-  fetchDoltHubUser,
   upsertDoltHubInstallation,
 } from '@/lib/integrations/dolthub-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
@@ -117,22 +116,8 @@ export async function GET(request: NextRequest) {
 
     const tokens = await exchangeDoltHubOAuthCode(code);
 
-    const userInfo = await fetchDoltHubUser(tokens.accessToken);
-    const username = userInfo?.username;
-
-    if (!username) {
-      captureMessage('DoltHub user info fetch returned no username', {
-        level: 'warning',
-        tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
-      });
-      return NextResponse.redirect(
-        new URL(buildDoltHubRedirectPath(state, 'error=user_info_failed'), APP_URL)
-      );
-    }
-
     await upsertDoltHubInstallation({
       owner,
-      account: { username },
       tokens,
     });
 

@@ -10,7 +10,6 @@ jest.mock('@/lib/config.server', () => {
 });
 
 import { describe, test, expect, beforeAll, afterEach } from '@jest/globals';
-import { TRPCError } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
@@ -66,7 +65,6 @@ describe('dolthubRouter', () => {
         owned_by_organization_id: null,
         platform: PLATFORM.DOLTHUB,
         integration_type: 'oauth',
-        platform_account_login: 'testuser',
         integration_status: INTEGRATION_STATUS.ACTIVE,
         scopes: ['api_read_write'],
         metadata: { access_token: 'token' },
@@ -77,7 +75,6 @@ describe('dolthubRouter', () => {
       const result = await caller.dolthub.getInstallation();
       expect(result.installed).toBe(true);
       expect(result.installation).toMatchObject({
-        username: 'testuser',
         status: 'active',
         scopes: ['api_read_write'],
       });
@@ -125,86 +122,6 @@ describe('dolthubRouter', () => {
           )
         );
       expect(rows).toHaveLength(0);
-    });
-  });
-
-  describe('verifyToken', () => {
-    test('throws in production', async () => {
-      setNodeEnv('production');
-      const caller = await createCallerForUser(user.id);
-      await expect(caller.dolthub.verifyToken()).rejects.toMatchObject({
-        code: 'NOT_FOUND',
-      });
-    });
-
-    test('makes the expected HTTP call with Authorization: Bearer ...', async () => {
-      await db.insert(platform_integrations).values({
-        owned_by_user_id: user.id,
-        owned_by_organization_id: null,
-        platform: PLATFORM.DOLTHUB,
-        integration_type: 'oauth',
-        platform_account_login: 'testuser',
-        integration_status: INTEGRATION_STATUS.ACTIVE,
-        metadata: {
-          access_token: 'test-access-token',
-          refresh_token: 'refresh-token',
-          expires_at: Date.now() + 3600 * 1000,
-          scope: 'api_read_write',
-        },
-      });
-
-      const mockFetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: async () => [{ '1': 1 }],
-      });
-      globalThis.fetch = mockFetch;
-
-      const caller = await createCallerForUser(user.id);
-      const result = await caller.dolthub.verifyToken();
-      expect(result.ok).toBe(true);
-      expect(result.sample).toEqual({ '1': 1 });
-
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      const [url, init] = mockFetch.mock.calls[0];
-      expect(url).toBe('https://www.dolthub.com/api/v1alpha1/dolthub/profile?q=select+1');
-      expect(init?.headers?.Authorization).toBe('Bearer test-access-token');
-    });
-
-    test('rejects when the smoke test fails', async () => {
-      await db.insert(platform_integrations).values({
-        owned_by_user_id: user.id,
-        owned_by_organization_id: null,
-        platform: PLATFORM.DOLTHUB,
-        integration_type: 'oauth',
-        platform_account_login: 'testuser',
-        integration_status: INTEGRATION_STATUS.ACTIVE,
-        metadata: {
-          access_token: 'bad-token',
-          refresh_token: 'refresh-token',
-          expires_at: Date.now() + 3600 * 1000,
-          scope: 'api_read_write',
-        },
-      });
-
-      globalThis.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 401,
-        statusText: 'Unauthorized',
-      });
-
-      const caller = await createCallerForUser(user.id);
-      const rejection = caller.dolthub.verifyToken();
-      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
-      await expect(rejection).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
-    });
-
-    test('rejects when no integration exists', async () => {
-      const caller = await createCallerForUser(user.id);
-      await expect(caller.dolthub.verifyToken()).rejects.toMatchObject({
-        code: 'NOT_FOUND',
-      });
     });
   });
 });

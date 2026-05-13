@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { CheckCircle2, XCircle, Database, RefreshCw, Info } from 'lucide-react';
+import { CheckCircle2, XCircle, Database, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -35,16 +35,6 @@ export function DoltHubIntegrationDetails({
 
   const disconnect = useMutation(
     trpc.dolthub.disconnect.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.dolthub.getInstallation.queryKey(input),
-        });
-      },
-    })
-  );
-
-  const verifyToken = useMutation(
-    trpc.dolthub.verifyToken.mutationOptions({
       onSuccess: () => {
         void queryClient.invalidateQueries({
           queryKey: trpc.dolthub.getInstallation.queryKey(input),
@@ -89,19 +79,6 @@ export function DoltHubIntegrationDetails({
         },
       });
     }
-  };
-
-  const handleVerifyToken = () => {
-    verifyToken.mutate(input, {
-      onSuccess: () => {
-        toast.success('DoltHub token is valid');
-      },
-      onError: err => {
-        toast.error('DoltHub token verification failed', {
-          description: err.message,
-        });
-      },
-    });
   };
 
   if (isLoading) {
@@ -165,10 +142,6 @@ export function DoltHubIntegrationDetails({
           {installation ? (
             <>
               <div className="space-y-3 rounded-lg border p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Username:</span>
-                  <span className="text-sm">{installation.username}</span>
-                </div>
                 {installation.scopes && installation.scopes.length > 0 && (
                   <div className="space-y-2">
                     <span className="text-sm font-medium">Permissions:</span>
@@ -193,14 +166,6 @@ export function DoltHubIntegrationDetails({
 
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={handleVerifyToken}
-                    disabled={verifyToken.isPending}
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    {verifyToken.isPending ? 'Verifying...' : 'Verify token'}
-                  </Button>
                   <Button
                     variant="destructive"
                     onClick={handleDisconnect}

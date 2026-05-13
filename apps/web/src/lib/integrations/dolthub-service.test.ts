@@ -197,7 +197,6 @@ describe('dolthub-service', () => {
     test('creates a new installation when none exists', async () => {
       const result = await upsertDoltHubInstallation({
         owner: { type: 'user', id: user.id },
-        account: { username: 'newuser' },
         tokens: {
           accessToken: 'token-new',
           refreshToken: 'refresh-new',
@@ -206,9 +205,9 @@ describe('dolthub-service', () => {
         },
       });
 
-      expect(result.platform_account_login).toBe('newuser');
       expect(result.platform).toBe(PLATFORM.DOLTHUB);
       expect(result.integration_status).toBe(INTEGRATION_STATUS.ACTIVE);
+      expect(result.platform_account_login).toBeNull();
 
       const [row] = await db
         .select()
@@ -219,13 +218,13 @@ describe('dolthub-service', () => {
             eq(platform_integrations.owned_by_user_id, user.id)
           )
         );
-      expect(row.platform_account_login).toBe('newuser');
+      const meta = row.metadata as { access_token: string };
+      expect(meta.access_token).toBe('token-new');
     });
 
     test('updates an existing installation', async () => {
       await upsertDoltHubInstallation({
         owner: { type: 'user', id: user.id },
-        account: { username: 'olduser' },
         tokens: {
           accessToken: 'token-old',
           refreshToken: 'refresh-old',
@@ -234,9 +233,8 @@ describe('dolthub-service', () => {
         },
       });
 
-      const result = await upsertDoltHubInstallation({
+      await upsertDoltHubInstallation({
         owner: { type: 'user', id: user.id },
-        account: { username: 'updateduser' },
         tokens: {
           accessToken: 'token-updated',
           refreshToken: 'refresh-updated',
@@ -244,8 +242,6 @@ describe('dolthub-service', () => {
           scope: 'api_read_write',
         },
       });
-
-      expect(result.platform_account_login).toBe('updateduser');
 
       const [row] = await db
         .select()
@@ -256,7 +252,9 @@ describe('dolthub-service', () => {
             eq(platform_integrations.owned_by_user_id, user.id)
           )
         );
-      expect(row.platform_account_login).toBe('updateduser');
+      const meta = row.metadata as { access_token: string; refresh_token: string };
+      expect(meta.access_token).toBe('token-updated');
+      expect(meta.refresh_token).toBe('refresh-updated');
     });
 
     test('throws in production', async () => {
@@ -264,7 +262,6 @@ describe('dolthub-service', () => {
       await expect(
         upsertDoltHubInstallation({
           owner: { type: 'user', id: user.id },
-          account: { username: 'x' },
           tokens: {
             accessToken: 't',
             refreshToken: null,

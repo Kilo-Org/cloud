@@ -653,7 +653,7 @@ export const codeReviewRouter = createTRPCRouter({
         }
 
         return successResult({
-          cloudAgentSessionId: attempt?.session_id ?? review.session_id ?? null,
+          cloudAgentSessionId: input.attemptId ? (attempt?.session_id ?? null) : review.session_id,
           organizationId: review.owned_by_organization_id ?? undefined,
           status: attempt?.status ?? review.status,
           agentVersion: review.agent_version ?? 'v1',

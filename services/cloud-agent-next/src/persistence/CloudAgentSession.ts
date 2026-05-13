@@ -109,8 +109,8 @@ const LAST_ACTIVITY_KEY = 'last_activity';
 /** Kilo server idle timeout: 15 minutes */
 const KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT = 15 * 60 * 1000;
 
-/** Default per-execution wall-clock deadline: 30 minutes */
-const DEFAULT_MAX_RUNTIME_MS = 1_800_000;
+/** Default per-execution wall-clock deadline: 60 minutes */
+const DEFAULT_MAX_RUNTIME_MS = 3_600_000;
 
 /** Hung execution timeout: no non-heartbeat events for 5 minutes */
 const HUNG_EXECUTION_TIMEOUT_MS = 5 * 60 * 1000;
@@ -392,7 +392,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         .map(value => value.trim())
         .filter(Boolean);
 
-      if (allowedOrigins.length > 0 && origin && !allowedOrigins.includes(origin)) {
+      // Only enforce the Origin allowlist when the client sends a real browser
+      // Origin. Native clients (iOS/Android) either omit the header entirely or
+      // send the literal string "null" — both cases are allowed through because
+      // the Worker already authenticated the request via the JWT ticket before
+      // forwarding here.
+      const isRealOrigin = origin !== null && origin !== 'null';
+      if (allowedOrigins.length > 0 && isRealOrigin && !allowedOrigins.includes(origin)) {
         logger
           .withFields({ origin, allowedOrigins, sessionId: sessionIdParam })
           .warn('DO /stream: Origin not allowed');
@@ -1638,7 +1644,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
   /**
    * Fail a running execution that has exceeded its wall-clock deadline
-   * (DEFAULT_MAX_RUNTIME_MS = 30 min).
+   * (DEFAULT_MAX_RUNTIME_MS = 60 min).
    */
   private async checkMaxRuntime(now: number): Promise<void> {
     const activeExecutionId = await this.executionQueries.getActiveExecutionId();

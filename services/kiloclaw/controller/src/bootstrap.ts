@@ -333,6 +333,19 @@ export function applyFeatureFlags(env: EnvLike, deps: BootstrapDeps = defaultDep
   }
 }
 
+export function cleanNpmCache(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
+  try {
+    deps.execFileSync('npm', ['cache', 'clean', '--force'], {
+      env: { ...process.env, ...env },
+      stdio: 'pipe',
+    });
+    console.log('[controller] npm cache clean completed');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn('[controller] npm cache clean failed, continuing:', message);
+  }
+}
+
 // ---- Step 4: Hooks token ----
 
 /** Generate a per-boot random hooks token for local gateway hook delivery. */
@@ -1345,4 +1358,5 @@ export async function bootstrap(
   if (!result.ok) {
     throw new Error(result.error);
   }
+  cleanNpmCache(env, deps);
 }

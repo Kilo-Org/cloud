@@ -4,12 +4,167 @@ import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import {
+  cancelSupersededReviewsForPR,
   createCodeReview,
-  updateCodeReviewStatus,
   findPreviousCompletedReview,
+  updateCodeReviewStatus,
 } from './code-reviews';
 
 const REPO = `test-org/session-continuation-${Date.now()}`;
+
+describe('cancelSupersededReviewsForPR', () => {
+  let testUser: User;
+  const createdReviewIds: string[] = [];
+  const repo = `${REPO}-superseded`;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterAll(async () => {
+    for (const id of createdReviewIds) {
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, id));
+    }
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function createReview({
+    headSha,
+    prNumber = 42,
+    repoFullName = repo,
+    platform = 'github' as const,
+    platformProjectId,
+  }: {
+    headSha: string;
+    prNumber?: number;
+    repoFullName?: string;
+    platform?: 'github' | 'gitlab';
+    platformProjectId?: number;
+  }) {
+    const id = await createCodeReview({
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      repoFullName,
+      prNumber,
+      prUrl: `https://github.com/${repoFullName}/pull/${prNumber}`,
+      prTitle: 'test PR',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: `feature/${headSha}`,
+      headSha,
+      platform,
+      platformProjectId,
+    });
+    createdReviewIds.push(id);
+    return id;
+  }
+
+  it('cancels pending, queued, and running rows and returns accurate prev_status values', async () => {
+    const pendingId = await createReview({ headSha: 'sha-pending' });
+    const queuedId = await createReview({ headSha: 'sha-queued' });
+    const runningId = await createReview({ headSha: 'sha-running' });
+
+    await updateCodeReviewStatus(queuedId, 'queued');
+    await updateCodeReviewStatus(runningId, 'running', { sessionId: 'session-running' });
+
+    const cancelled = await cancelSupersededReviewsForPR(repo, 42, 'sha-latest');
+
+    expect(cancelled).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: pendingId, prevStatus: 'pending', headSha: 'sha-pending' }),
+        expect.objectContaining({ id: queuedId, prevStatus: 'queued', headSha: 'sha-queued' }),
+        expect.objectContaining({
+          id: runningId,
+          prevStatus: 'running',
+          headSha: 'sha-running',
+          sessionId: 'session-running',
+        }),
+      ])
+    );
+
+    const rows = await db
+      .select({
+        id: cloud_agent_code_reviews.id,
+        status: cloud_agent_code_reviews.status,
+        terminalReason: cloud_agent_code_reviews.terminal_reason,
+        errorMessage: cloud_agent_code_reviews.error_message,
+        completedAt: cloud_agent_code_reviews.completed_at,
+        startedAt: cloud_agent_code_reviews.started_at,
+        sessionId: cloud_agent_code_reviews.session_id,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, repo));
+
+    for (const row of rows.filter(row => [pendingId, queuedId, runningId].includes(row.id))) {
+      expect(row.status).toBe('cancelled');
+      expect(row.terminalReason).toBe('superseded');
+      expect(row.errorMessage).toBe('Superseded by new push');
+      expect(row.completedAt).not.toBeNull();
+    }
+
+    expect(rows.find(row => row.id === pendingId)?.startedAt).toBeNull();
+    expect(rows.find(row => row.id === pendingId)?.sessionId).toBeNull();
+    expect(rows.find(row => row.id === runningId)?.sessionId).toBe('session-running');
+  });
+
+  it('ignores same-sha, different repo or pr, and already-terminal rows; second call is idempotent', async () => {
+    const sameShaId = await createReview({ headSha: 'sha-keep' });
+    const otherPrId = await createReview({ headSha: 'sha-other-pr', prNumber: 43 });
+    const otherRepoId = await createReview({
+      headSha: 'sha-other-repo',
+      repoFullName: `${repo}-other`,
+    });
+    const terminalCompletedId = await createReview({ headSha: 'sha-completed' });
+    const terminalFailedId = await createReview({ headSha: 'sha-failed' });
+    const targetId = await createReview({
+      headSha: 'sha-gitlab',
+      platform: 'gitlab',
+      platformProjectId: 999,
+    });
+
+    await updateCodeReviewStatus(terminalCompletedId, 'completed');
+    await updateCodeReviewStatus(terminalFailedId, 'failed', {
+      errorMessage: 'failed before cancel',
+    });
+
+    const cancelled = await cancelSupersededReviewsForPR(repo, 42, 'sha-keep');
+    expect(cancelled).toHaveLength(1);
+    expect(cancelled[0]).toEqual(
+      expect.objectContaining({
+        id: targetId,
+        prevStatus: 'pending',
+        headSha: 'sha-gitlab',
+        platform: 'gitlab',
+        platformProjectId: 999,
+        platformIntegrationId: null,
+      })
+    );
+
+    const cancelledAgain = await cancelSupersededReviewsForPR(repo, 42, 'sha-keep');
+    expect(cancelledAgain).toEqual([]);
+
+    const rows = await db
+      .select({
+        id: cloud_agent_code_reviews.id,
+        status: cloud_agent_code_reviews.status,
+        terminalReason: cloud_agent_code_reviews.terminal_reason,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, repo));
+
+    expect(rows.find(row => row.id === sameShaId)?.status).toBe('pending');
+    expect(rows.find(row => row.id === targetId)?.status).toBe('cancelled');
+    expect(rows.find(row => row.id === otherPrId)?.status).toBe('pending');
+    expect(rows.find(row => row.id === terminalCompletedId)?.status).toBe('completed');
+    expect(rows.find(row => row.id === terminalFailedId)?.status).toBe('failed');
+
+    const [otherRepoRow] = await db
+      .select({ status: cloud_agent_code_reviews.status })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, otherRepoId))
+      .limit(1);
+    expect(otherRepoRow?.status).toBe('pending');
+  });
+});
 
 describe('findPreviousCompletedReview', () => {
   let testUser: User;

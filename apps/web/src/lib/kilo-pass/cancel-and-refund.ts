@@ -13,6 +13,7 @@ import type { db as defaultDb } from '@/lib/drizzle';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import { fromMicrodollars } from '@/lib/utils';
+import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 
 type Db = typeof defaultDb;
 
@@ -23,7 +24,8 @@ export type CancelAndRefundKiloPassStripeClient = Pick<
 
 export type CancelAndRefundKiloPassReason =
   | { kind: 'no_subscription' }
-  | { kind: 'already_canceled' };
+  | { kind: 'already_canceled' }
+  | { kind: 'store_managed_subscription'; paymentProvider: 'apple' };
 
 export type CancelAndRefundKiloPassResult =
   | {
@@ -87,10 +89,22 @@ export async function cancelAndRefundKiloPassForUser({
     return { status: 'skipped', reason: { kind: 'already_canceled' } };
   }
 
+  if (subscription.paymentProvider !== KiloPassPaymentProvider.Stripe) {
+    return {
+      status: 'skipped',
+      reason: { kind: 'store_managed_subscription', paymentProvider: 'apple' },
+    };
+  }
+
+  const stripeSubscriptionId = subscription.stripeSubscriptionId;
+  if (!stripeSubscriptionId) {
+    return { status: 'skipped', reason: { kind: 'no_subscription' } };
+  }
+
   const scheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
     columns: { stripe_schedule_id: true },
     where: and(
-      eq(kilo_pass_scheduled_changes.stripe_subscription_id, subscription.stripeSubscriptionId),
+      eq(kilo_pass_scheduled_changes.stripe_subscription_id, stripeSubscriptionId),
       isNull(kilo_pass_scheduled_changes.deleted_at)
     ),
   });
@@ -99,18 +113,18 @@ export async function cancelAndRefundKiloPassForUser({
     await releaseScheduledChangeForSubscription({
       dbOrTx: db,
       stripe,
-      stripeSubscriptionId: subscription.stripeSubscriptionId,
+      stripeSubscriptionId,
       stripeScheduleIdIfMissingRow: scheduledChange.stripe_schedule_id,
       kiloUserIdIfMissingRow: userId,
       reason: 'cancel_subscription',
     });
   }
 
-  await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
+  await stripe.subscriptions.cancel(stripeSubscriptionId);
 
   let refundedAmountCents: number | null = null;
   const paidInvoices = await stripe.invoices.list({
-    subscription: subscription.stripeSubscriptionId,
+    subscription: stripeSubscriptionId,
     status: 'paid',
     limit: 1,
   });
@@ -150,7 +164,7 @@ export async function cancelAndRefundKiloPassForUser({
         ended_at: new Date().toISOString(),
         current_streak_months: 0,
       })
-      .where(eq(kilo_pass_subscriptions.stripe_subscription_id, subscription.stripeSubscriptionId));
+      .where(eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId));
 
     if (!user.blocked_reason) {
       await tx

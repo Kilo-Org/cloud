@@ -133,6 +133,10 @@ function normalizePayload(raw: StatusUpdatePayload): {
     terminalReason = 'billing';
   }
 
+  if (!terminalReason && raw.status === 'interrupted') {
+    terminalReason = 'interrupted';
+  }
+
   return {
     status,
     sessionId,
@@ -399,7 +403,8 @@ async function updatePRGateCheck(
           title: checkRunMapping.title,
           summary: checkRunMapping.summary,
         },
-      }
+      },
+      integration.github_app_type ?? 'standard'
     );
 
     logExceptInTest(

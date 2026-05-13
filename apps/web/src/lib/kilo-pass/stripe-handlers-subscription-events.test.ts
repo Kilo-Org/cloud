@@ -209,6 +209,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
 
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
+      provider_subscription_id: stripeSubId,
       stripe_subscription_id: stripeSubId,
       tier: KiloPassTier.Tier49,
       cadence: KiloPassCadence.Monthly,
@@ -328,6 +329,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
 
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
+      provider_subscription_id: stripeSubId,
       stripe_subscription_id: stripeSubId,
       tier: KiloPassTier.Tier49,
       cadence: KiloPassCadence.Monthly,

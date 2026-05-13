@@ -112,8 +112,10 @@ import {
 import {
   restoreFromPostgres,
   markDestroyedInPostgresHelper,
+  readMorningBriefingConfigFromPostgresHelper,
   syncAdminSizeOverrideToPostgresHelper,
   syncInstanceTypeToPostgresHelper,
+  syncMorningBriefingConfigToPostgresHelper,
   syncTrackedImageTagToPostgresHelper,
 } from './postgres';
 import {
@@ -173,6 +175,14 @@ const BRAVE_SEARCH_FIELD_KEY = 'braveSearchApiKey';
  * For null persisted state, falls back to live inference from machineSize +
  * volumeSizeGb, which returns null when there's nothing to infer from.
  */
+function shallowEqualStringArrays(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 function resolveInstanceTypeFromState(
   state: Pick<InstanceMutableState, 'instanceType' | 'machineSize' | 'volumeSizeGb'>
 ): InstanceType | null {
@@ -3640,22 +3650,158 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   async getMorningBriefingStatus() {
     await this.loadState();
-    return gateway.getMorningBriefingStatus(this.s, this.env);
+    // Plugin remains the source of truth for runtime state (reconcileState,
+    // lastGeneratedAt, observedEnabled). Postgres mirrors desired-state
+    // (enabled / cron / timezone / interest_topics). Read both, surface
+    // interest_topics from Postgres (the plugin response has no such field
+    // in PR-4a), and keep the plugin's own enabled/cron/timezone for the
+    // response — those agree under steady state, and the plugin is what
+    // actually drives the cron.
+    const [pg, pluginStatus] = await Promise.all([
+      readMorningBriefingConfigFromPostgresHelper(this.env, this.s),
+      gateway.getMorningBriefingStatus(this.s, this.env),
+    ]);
+
+    // Plugin not reachable (gateway warming, route missing, etc.) → return
+    // null to preserve the existing controller_route_unavailable behavior
+    // the route handler relies on. We could synthesize a response from
+    // Postgres here, but doing so would mask the warming state from
+    // callers that branch on it.
+    if (!pluginStatus) return null;
+
+    // Lazy backfill: plugin reports a configured briefing for an instance
+    // that has no Postgres row yet (legacy instance pre-dating PR-4a, or
+    // a post-PR instance whose previous best-effort waitUntil mirror
+    // write failed). Schedule the write via `waitUntil` so it doesn't
+    // add latency to the status response. Best-effort: matches the
+    // enable/disable paths.
+    //
+    // Forward `interestTopics` from the plugin response when present.
+    // Without this, an instance with valid topics in config.json but a
+    // missing Postgres row (e.g. transient Hyperdrive failure on the
+    // interests path) would have its topics silently reset to `[]` by
+    // the backfill row's column default. Falling back to "omit" when
+    // older controllers don't include the field keeps existing
+    // interests untouched via the upsert helper's patch semantics.
+    //
+    // `pg.instanceId` was just resolved by the parallel Postgres read;
+    // pass it through so the helper skips the redundant
+    // `getInstanceBySandboxId` lookup.
+    if (
+      pg &&
+      pg.row === null &&
+      typeof pluginStatus.enabled === 'boolean' &&
+      typeof pluginStatus.cron === 'string'
+    ) {
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(
+          this.env,
+          this.s,
+          {
+            enabled: pluginStatus.enabled,
+            cron: pluginStatus.cron,
+            timezone: pluginStatus.timezone,
+            ...(Array.isArray(pluginStatus.interestTopics) && {
+              interestTopics: pluginStatus.interestTopics,
+            }),
+          },
+          pg.instanceId
+        )
+      );
+    }
+
+    // Plugin is the source of truth for interestTopics — the Postgres
+    // row is a denormalized read cache. When the plugin reports topics
+    // and Postgres disagrees (e.g. a previous best-effort `waitUntil`
+    // mirror write failed after the plugin accepted a change), the
+    // plugin response wins on this read AND we schedule a repair so
+    // subsequent admin queries against Postgres see the fresh value.
+    // Without the repair, an existing-but-stale row would survive the
+    // lazy backfill check above (which only fires when `row === null`)
+    // and serve stale topics forever.
+    const pluginTopics = Array.isArray(pluginStatus.interestTopics)
+      ? pluginStatus.interestTopics
+      : null;
+    if (pg && pluginTopics !== null) {
+      const pgTopics = pg.row?.interest_topics ?? null;
+      const pgStale = pgTopics === null || !shallowEqualStringArrays(pgTopics, pluginTopics);
+      if (pgStale) {
+        this.ctx.waitUntil(
+          syncMorningBriefingConfigToPostgresHelper(
+            this.env,
+            this.s,
+            { interestTopics: pluginTopics },
+            pg.instanceId
+          )
+        );
+      }
+    }
+
+    // Merge: plugin wins for `interestTopics` when present (plugin is
+    // authoritative); fall back to Postgres mirror when the plugin
+    // response omits it (older controller image predating the field).
+    const responseInterestTopics = pluginTopics ?? pg?.row?.interest_topics;
+    if (responseInterestTopics !== undefined) {
+      return { ...pluginStatus, interestTopics: responseInterestTopics };
+    }
+    return pluginStatus;
   }
 
   async enableMorningBriefing(input: { cron?: string; timezone?: string }) {
     await this.loadState();
-    return gateway.enableMorningBriefing(this.s, this.env, input);
+    const response = await gateway.enableMorningBriefing(this.s, this.env, input);
+    if (response && response.ok !== false) {
+      // Mirror to Postgres after the plugin accepted. Best-effort via
+      // waitUntil — the user-facing success is gated on the plugin write,
+      // not the Postgres mirror. Pass through whichever cron/timezone
+      // the plugin resolved (it echoes them on success); fall back to the
+      // request input.
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(this.env, this.s, {
+          enabled: true,
+          cron: response.cron ?? input.cron,
+          timezone: response.timezone ?? input.timezone,
+        })
+      );
+    }
+    return response;
   }
 
   async disableMorningBriefing() {
     await this.loadState();
-    return gateway.disableMorningBriefing(this.s, this.env);
+    const response = await gateway.disableMorningBriefing(this.s, this.env);
+    if (response && response.ok !== false) {
+      // Only flip `enabled`; preserve the user's last cron/timezone so a
+      // future re-enable defaults to the same schedule.
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(this.env, this.s, {
+          enabled: false,
+        })
+      );
+    }
+    return response;
   }
 
   async runMorningBriefing() {
     await this.loadState();
     return gateway.runMorningBriefing(this.s, this.env);
+  }
+
+  async updateBriefingInterests(input: { topics: string[] }) {
+    await this.loadState();
+    const response = await gateway.updateMorningBriefingInterests(this.s, this.env, input);
+    if (response && response.ok !== false) {
+      // Mirror to Postgres after the plugin accepted. Best-effort via
+      // waitUntil — the user-facing success is gated on the plugin write,
+      // not the Postgres mirror. Patch semantics: only interest_topics is
+      // touched; enabled/cron/timezone are preserved.
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(this.env, this.s, {
+          interestTopics: response.interestTopics ?? input.topics,
+        })
+      );
+    }
+    return response;
   }
 
   async readMorningBriefing(day: 'today' | 'yesterday') {

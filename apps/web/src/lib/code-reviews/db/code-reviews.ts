@@ -17,6 +17,17 @@ import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } f
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
 
+export type CancelledReviewRow = {
+  id: string;
+  prevStatus: 'pending' | 'queued' | 'running';
+  sessionId: string | null;
+  checkRunId: number | null;
+  headSha: string;
+  platform: 'github' | 'gitlab';
+  platformProjectId: number | null;
+  platformIntegrationId: string | null;
+};
+
 /**
  * Creates a new code review record
  * Returns the created review ID
@@ -519,6 +530,77 @@ export async function findActiveReviewsForPR(
   } catch (error) {
     captureException(error, {
       tags: { operation: 'findActiveReviewsForPR' },
+      extra: { repoFullName, prNumber, excludeSha },
+    });
+    throw error;
+  }
+}
+
+export async function cancelSupersededReviewsForPR(
+  repoFullName: string,
+  prNumber: number,
+  excludeSha: string
+): Promise<CancelledReviewRow[]> {
+  try {
+    const result = await db.execute<{
+      id: string;
+      prev_status: 'pending' | 'queued' | 'running';
+      session_id: string | null;
+      check_run_id: number | null;
+      head_sha: string;
+      platform: 'github' | 'gitlab';
+      platform_project_id: number | null;
+      platform_integration_id: string | null;
+    }>(sql`
+      WITH targets AS (
+        SELECT
+          id,
+          status AS prev_status,
+          session_id,
+          check_run_id,
+          head_sha,
+          platform,
+          platform_project_id,
+          platform_integration_id
+        FROM ${cloud_agent_code_reviews}
+        WHERE ${cloud_agent_code_reviews.repo_full_name} = ${repoFullName}
+          AND ${cloud_agent_code_reviews.pr_number} = ${prNumber}
+          AND ${cloud_agent_code_reviews.head_sha} != ${excludeSha}
+          AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
+      )
+      UPDATE ${cloud_agent_code_reviews} AS reviews
+      SET
+        status = 'cancelled',
+        terminal_reason = 'superseded',
+        error_message = 'Superseded by new push',
+        completed_at = now(),
+        updated_at = now()
+      FROM targets
+      WHERE reviews.id = targets.id
+      RETURNING
+        reviews.id,
+        targets.prev_status,
+        targets.session_id,
+        targets.check_run_id,
+        targets.head_sha,
+        targets.platform,
+        targets.platform_project_id,
+        targets.platform_integration_id
+    `);
+
+    return result.rows.map(row => ({
+      id: row.id,
+      prevStatus: row.prev_status,
+      sessionId: row.session_id,
+      checkRunId: row.check_run_id,
+      headSha: row.head_sha,
+      platform: row.platform,
+      platformProjectId: row.platform_project_id,
+      platformIntegrationId: row.platform_integration_id,
+    }));
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'cancelSupersededReviewsForPR' },
       extra: { repoFullName, prNumber, excludeSha },
     });
     throw error;

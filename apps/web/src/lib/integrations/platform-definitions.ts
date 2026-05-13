@@ -1,6 +1,14 @@
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { IS_DEVELOPMENT } from '@/lib/constants';
 
-export type PlatformType = 'github' | 'gitlab' | 'bitbucket' | 'slack' | 'discord' | 'linear';
+export type PlatformType =
+  | 'github'
+  | 'gitlab'
+  | 'bitbucket'
+  | 'slack'
+  | 'discord'
+  | 'linear'
+  | 'dolthub';
 
 export type PlatformStatus = 'installed' | 'not_installed' | 'coming_soon';
 
@@ -70,6 +78,14 @@ export const PLATFORM_DEFINITIONS: PlatformDefinition[] = [
     orgRoute: organizationId => `/organizations/${organizationId}/integrations/linear`,
   },
   {
+    id: PLATFORM.DOLTHUB,
+    name: 'DoltHub',
+    description: 'Query Dolt-versioned data directly from your workspace',
+    enabled: IS_DEVELOPMENT,
+    personalRoute: '/integrations/dolthub',
+    orgRoute: organizationId => `/organizations/${organizationId}/integrations/dolthub`,
+  },
+  {
     id: 'bitbucket',
     name: 'Bitbucket',
     description: 'Integrate Bitbucket repositories for intelligent code analysis and automation',
@@ -83,6 +99,7 @@ type InstallationStatus = {
   gitlab?: { installed: boolean };
   discord?: { installed: boolean };
   linear?: { installed: boolean };
+  dolthub?: { installed: boolean };
 };
 
 function getStatus(id: PlatformType, installations: InstallationStatus): PlatformStatus {

@@ -8,6 +8,7 @@ import {
   kilo_pass_audit_log,
   kilo_pass_issuance_items,
   kilo_pass_subscriptions,
+  kilocode_users,
 } from '@kilocode/db/schema';
 import { KiloPassAuditLogResult } from './enums';
 import { KiloPassAuditLogAction } from './enums';
@@ -24,6 +25,10 @@ import {
   issueBaseCreditsForIssuance,
   issueBonusCreditsForIssuance,
 } from './issuance';
+import {
+  computeMonthlyKiloPassStreak,
+  updateKiloPassThresholdAfterBaseCredits,
+} from './subscription-accounting';
 
 import { KILO_PASS_TIER_CONFIG } from './constants';
 
@@ -41,6 +46,7 @@ async function createTestSubscription(params: {
     .insert(kilo_pass_subscriptions)
     .values({
       kilo_user_id: kiloUserId,
+      provider_subscription_id: stripeSubscriptionId,
       stripe_subscription_id: stripeSubscriptionId,
       tier,
       cadence,
@@ -138,6 +144,53 @@ test('base issuance is idempotent: calling twice only creates one credit_transac
     KiloPassAuditLogResult.SkippedIdempotent,
     KiloPassAuditLogResult.Success,
   ]);
+});
+
+test('computeMonthlyKiloPassStreak counts consecutive issuance months', async () => {
+  const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+  const { subscriptionId } = await createTestSubscription({
+    kiloUserId: user.id,
+    tier: KiloPassTier.Tier49,
+    cadence: KiloPassCadence.Monthly,
+  });
+
+  await db.transaction(async tx => {
+    await createOrGetIssuanceHeader(tx, {
+      subscriptionId,
+      issueMonth: '2026-01-01',
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripeInvoiceId: `inv-streak-jan-${crypto.randomUUID()}`,
+    });
+    await createOrGetIssuanceHeader(tx, {
+      subscriptionId,
+      issueMonth: '2026-02-01',
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripeInvoiceId: `inv-streak-feb-${crypto.randomUUID()}`,
+    });
+
+    await expect(
+      computeMonthlyKiloPassStreak(tx, {
+        subscriptionId,
+        issueMonth: '2026-02-01',
+      })
+    ).resolves.toBe(2);
+  });
+});
+
+test('updateKiloPassThresholdAfterBaseCredits anchors threshold to current usage plus base amount', async () => {
+  const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 123 });
+
+  await db.transaction(async tx => {
+    await updateKiloPassThresholdAfterBaseCredits(tx, {
+      kiloUserId: user.id,
+      baseAmountUsd: 19,
+    });
+  });
+
+  const updatedUser = await db.query.kilocode_users.findFirst({
+    where: eq(kilocode_users.id, user.id),
+  });
+  expect(updatedUser?.kilo_pass_threshold).toBe(19_000_000 + 123);
 });
 
 test('createOrGetIssuanceHeader throws if the same stripeInvoiceId is reused for a different subscription/month', async () => {

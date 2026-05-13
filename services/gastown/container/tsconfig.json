@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "esnext",
-    "lib": ["esnext"],
+    "lib": ["webworker", "esnext"],
     "module": "esnext",
     "moduleResolution": "bundler",
     "outDir": "dist",

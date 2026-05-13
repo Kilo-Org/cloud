@@ -4,6 +4,7 @@ import {
   decryptEnvVars,
   setupDirectories,
   applyFeatureFlags,
+  cleanNpmCache,
   generateHooksToken,
   configureGitHub,
   configureLinear,
@@ -414,6 +415,49 @@ describe('applyFeatureFlags', () => {
 
     expect(env.NPM_CONFIG_PREFIX).toBeUndefined();
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('failed to create npm-global'));
+    warnSpy.mockRestore();
+  });
+});
+
+// ---- cleanNpmCache ----
+
+describe('cleanNpmCache', () => {
+  it('runs npm cache clean with the runtime env', () => {
+    const { deps, execCalls } = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      NPM_CONFIG_PREFIX: '/root/.npm-global',
+    };
+
+    cleanNpmCache(env, deps);
+
+    expect(execCalls).toContainEqual({
+      cmd: 'npm',
+      args: ['cache', 'clean', '--force'],
+      input: undefined,
+    });
+    expect(deps.execFileSync).toHaveBeenCalledWith(
+      'npm',
+      ['cache', 'clean', '--force'],
+      expect.objectContaining({
+        env: expect.objectContaining({ NPM_CONFIG_PREFIX: '/root/.npm-global' }),
+        stdio: 'pipe',
+      })
+    );
+  });
+
+  it('logs and continues when npm cache clean fails', () => {
+    const { deps } = fakeDeps();
+    (deps.execFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('npm failed');
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() => cleanNpmCache({}, deps)).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[controller] npm cache clean failed, continuing:',
+      'npm failed'
+    );
+
     warnSpy.mockRestore();
   });
 });
@@ -1760,6 +1804,23 @@ describe('bootstrapCritical', () => {
     expect(JSON.parse(env.KILOCLAW_GATEWAY_ARGS ?? '[]')).toContain('gw-token');
   });
 
+  it('does not clean npm cache before readiness-critical steps complete', async () => {
+    const harness = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      KILOCODE_API_KEY: 'api-key',
+      OPENCLAW_GATEWAY_TOKEN: 'gw-token',
+      AUTO_APPROVE_DEVICES: 'true',
+    };
+
+    await bootstrapCritical(env, () => {}, harness.deps);
+
+    expect(harness.execCalls).not.toContainEqual({
+      cmd: 'npm',
+      args: ['cache', 'clean', '--force'],
+      input: undefined,
+    });
+  });
+
   it('throws before later steps when decryption fails', async () => {
     const phases: string[] = [];
     const harness = fakeDeps();
@@ -1939,6 +2000,11 @@ describe('bootstrap', () => {
       'tools-md',
       'mcporter',
     ]);
+    expect(harness.execCalls.at(-1)).toEqual({
+      cmd: 'npm',
+      args: ['cache', 'clean', '--force'],
+      input: undefined,
+    });
   });
 
   it('reports doctor phase when config exists', async () => {

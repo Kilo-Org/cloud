@@ -29,7 +29,25 @@ const CRON_PROMPT =
   'Call the tool morning_briefing_generate exactly once with no arguments. Do not call any other tool.';
 const DEFAULT_CRON = '0 7 * * *';
 const DEFAULT_TIMEZONE = 'UTC';
+// Caps for the interests HTTP handler. Authoritative validation lives
+// on the worker (`MorningBriefingInterestsSchema` in
+// `services/kiloclaw/src/routes/platform.ts`); these are defense-in-
+// depth so a direct authenticated gateway call (test tooling, future
+// internal bypass, worker bug) can't write a runaway payload into
+// `config.json` and blow up the next briefing's web-search query.
+// Keep in sync with the worker schema's `MAX_INTEREST_TOPICS` /
+// `MAX_INTEREST_TOPIC_LENGTH` — service boundary means we can't share
+// the constants.
+const MAX_INTEREST_TOPICS = 20;
+const MAX_INTEREST_TOPIC_LENGTH = 64;
 const statusWriteQueueByPath = new Map<string, Promise<unknown>>();
+// Per-instance serialisation for `config.json` read-modify-write sequences.
+// reconcileDesiredState holds a stale `StoredConfig` across the long
+// `ensureCronJob` call; without this queue an interests/enable/disable
+// write that lands in that window would be silently clobbered when
+// reconcile resumes and re-writes its stale-base. Same pattern as
+// `statusWriteQueueByPath` above.
+const configWriteQueueByPath = new Map<string, Promise<unknown>>();
 
 type BriefingPluginConfig = {
   defaultCron?: string;
@@ -41,6 +59,12 @@ type StoredConfig = {
   cronJobId: string | null;
   cron: string;
   timezone: string;
+  // User-selected interest topics that scope the morning briefing's
+  // web-search query. Empty array means "no topics selected" — the
+  // search query path falls back to its default in that case. Written
+  // by the gateway `interests` route; read on every reconcile and on
+  // every briefing run.
+  interestTopics: string[];
   updatedAt: string;
 };
 
@@ -302,6 +326,7 @@ async function readStoredConfig(
       cronJobId: null,
       cron: defaults.cron,
       timezone: defaults.timezone,
+      interestTopics: [],
       updatedAt: new Date().toISOString(),
     };
   }
@@ -314,6 +339,9 @@ async function readStoredConfig(
       typeof existing.timezone === 'string' && existing.timezone
         ? existing.timezone
         : defaults.timezone,
+    interestTopics: Array.isArray(existing.interestTopics)
+      ? existing.interestTopics.filter((topic): topic is string => typeof topic === 'string')
+      : [],
     updatedAt:
       typeof existing.updatedAt === 'string' ? existing.updatedAt : new Date().toISOString(),
   };
@@ -380,6 +408,25 @@ async function queueStatusWrite<T>(statusPath: string, work: () => Promise<T>): 
   } finally {
     if (statusWriteQueueByPath.get(statusPath) === next) {
       statusWriteQueueByPath.delete(statusPath);
+    }
+  }
+}
+
+/**
+ * Serialise every read-modify-write of `config.json`. Holds the lock for
+ * the full duration of `work`, including any external await calls
+ * (e.g. `ensureCronJob` during reconcile). Mirror of `queueStatusWrite`
+ * for the status file.
+ */
+async function queueConfigWrite<T>(configPath: string, work: () => Promise<T>): Promise<T> {
+  const previous = configWriteQueueByPath.get(configPath) ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(work);
+  configWriteQueueByPath.set(configPath, next);
+  try {
+    return await next;
+  } finally {
+    if (configWriteQueueByPath.get(configPath) === next) {
+      configWriteQueueByPath.delete(configPath);
     }
   }
 }
@@ -623,18 +670,39 @@ async function collectGithub(api: {
   }
 }
 
-async function collectWebSearch(api: {
-  runtime: {
-    webSearch: {
-      listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-      search: (params: { args: Record<string, unknown>; config?: unknown }) => Promise<{
-        provider: string;
-        result: Record<string, unknown>;
-      }>;
+/**
+ * Build the web-search query for the morning briefing.
+ *
+ * If the user picked interest topics in the onboarding step (or Settings
+ * editor), interpolate them into the query so the briefing is scoped to
+ * their interests. Falls back to the original hardcoded "engineering
+ * updates" query when no topics are selected — keeps the briefing useful
+ * out of the box and preserves behavior for instances that pre-date the
+ * interests feature.
+ */
+export function buildBriefingWebSearchQuery(interestTopics: readonly string[]): string {
+  const cleaned = interestTopics.map(topic => topic.trim()).filter(topic => topic.length > 0);
+  if (cleaned.length === 0) {
+    return 'top engineering updates and breaking software infrastructure news from the last 24 hours';
+  }
+  return `latest news and updates on ${cleaned.join(', ')} from the last 24 hours`;
+}
+
+async function collectWebSearch(
+  api: {
+    runtime: {
+      webSearch: {
+        listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
+        search: (params: { args: Record<string, unknown>; config?: unknown }) => Promise<{
+          provider: string;
+          result: Record<string, unknown>;
+        }>;
+      };
     };
-  };
-  config: unknown;
-}): Promise<SourceCollectionResult> {
+    config: unknown;
+  },
+  interestTopics: readonly string[]
+): Promise<SourceCollectionResult> {
   const readiness = await resolveWebSearchReady(api);
   if (!readiness.configured) {
     return {
@@ -650,8 +718,7 @@ async function collectWebSearch(api: {
     const response = await api.runtime.webSearch.search({
       config: api.config,
       args: {
-        query:
-          'top engineering updates and breaking software infrastructure news from the last 24 hours',
+        query: buildBriefingWebSearchQuery(interestTopics),
         count: 6,
       },
     });
@@ -802,10 +869,20 @@ async function generateBriefing(
   const paths = getStatePaths(api);
   await ensureStorage(paths);
 
+  // Read interest topics directly from config.json — we only need this
+  // narrow field here, and the surrounding `api` shape doesn't have the
+  // `pluginConfig` / `agents.defaults.userTimezone` context that
+  // `readStoredConfig` uses to default cron/timezone. Missing or
+  // malformed file => empty topics (fallback query).
+  const storedConfig = await readJsonFile<StoredConfig>(paths.configPath);
+  const interestTopics = Array.isArray(storedConfig?.interestTopics)
+    ? storedConfig.interestTopics.filter((value): value is string => typeof value === 'string')
+    : [];
+
   const [github, linear, web] = await Promise.all([
     collectGithub(api),
     collectLinear(api),
-    collectWebSearch(api),
+    collectWebSearch(api, interestTopics),
   ]);
   const sources = [github, linear, web];
   const successes = sources.filter(source => source.ok);
@@ -964,6 +1041,7 @@ async function getStatusSnapshot(api: {
   lastReconcileAction: 'enable' | 'disable' | null;
   desiredEnabled: boolean;
   observedEnabled: boolean | null;
+  interestTopics: string[];
 }> {
   const paths = getStatePaths(api);
   await ensureStorage(paths);
@@ -992,6 +1070,7 @@ async function getStatusSnapshot(api: {
     lastReconcileAction: status.lastReconcileAction,
     desiredEnabled: config.enabled,
     observedEnabled: status.observedEnabled,
+    interestTopics: config.interestTopics,
   };
 }
 
@@ -1017,20 +1096,67 @@ export default definePluginEntry({
       });
 
       try {
-        const config = await readStoredConfig(api, paths);
+        // Hold the config-write lock across the entire reconcile so a
+        // concurrent interests/enable/disable handler can't slip a write
+        // between our read and our final write (the `ensureCronJob` call
+        // below is slow). `patchStoredStatus` uses a separate queue, so
+        // no deadlock from nesting.
+        return await queueConfigWrite(paths.configPath, async () => {
+          const config = await readStoredConfig(api, paths);
 
-        if (config.enabled) {
-          const ensured = await ensureCronJob(api, config);
+          if (config.enabled) {
+            const ensured = await ensureCronJob(api, config);
+            const finalConfig: StoredConfig = {
+              ...config,
+              cronJobId: ensured.cronJobId,
+              cron: ensured.cron,
+              timezone: ensured.timezone,
+              updatedAt: new Date().toISOString(),
+            };
+            await writeJsonFile(paths.configPath, finalConfig);
+            await patchStoredStatus(paths, {
+              observedEnabled: true,
+              reconcileState: 'succeeded',
+              lastReconcileAt: new Date().toISOString(),
+              lastReconcileError: null,
+              lastReconcileDurationMs: Date.now() - startedAt,
+              lastReconcileAction: action,
+            });
+            return 'succeeded';
+          }
+
+          const jobs = await listBriefingCronJobs(api);
+          const disableErrors: string[] = [];
+          for (const job of jobs) {
+            try {
+              await runCronCommand(api, ['disable', job.id]);
+            } catch (error) {
+              disableErrors.push(
+                `Failed to disable cron ${job.id}: ${error instanceof Error ? error.message : String(error)}`
+              );
+            }
+          }
+          const remainingEnabledJobs = filterEnabledBriefingJobs(await listBriefingCronJobs(api));
+          if (disableErrors.length > 0 || remainingEnabledJobs.length > 0) {
+            const issues: string[] = [];
+            issues.push(...disableErrors);
+            if (remainingEnabledJobs.length > 0) {
+              issues.push(
+                `Cron jobs still enabled after disable: ${remainingEnabledJobs.map(job => job.id).join(', ')}`
+              );
+            }
+            throw new Error(issues.join(' | '));
+          }
+
           const finalConfig: StoredConfig = {
             ...config,
-            cronJobId: ensured.cronJobId,
-            cron: ensured.cron,
-            timezone: ensured.timezone,
+            enabled: false,
+            cronJobId: null,
             updatedAt: new Date().toISOString(),
           };
           await writeJsonFile(paths.configPath, finalConfig);
           await patchStoredStatus(paths, {
-            observedEnabled: true,
+            observedEnabled: false,
             reconcileState: 'succeeded',
             lastReconcileAt: new Date().toISOString(),
             lastReconcileError: null,
@@ -1038,47 +1164,7 @@ export default definePluginEntry({
             lastReconcileAction: action,
           });
           return 'succeeded';
-        }
-
-        const jobs = await listBriefingCronJobs(api);
-        const disableErrors: string[] = [];
-        for (const job of jobs) {
-          try {
-            await runCronCommand(api, ['disable', job.id]);
-          } catch (error) {
-            disableErrors.push(
-              `Failed to disable cron ${job.id}: ${error instanceof Error ? error.message : String(error)}`
-            );
-          }
-        }
-        const remainingEnabledJobs = filterEnabledBriefingJobs(await listBriefingCronJobs(api));
-        if (disableErrors.length > 0 || remainingEnabledJobs.length > 0) {
-          const issues: string[] = [];
-          issues.push(...disableErrors);
-          if (remainingEnabledJobs.length > 0) {
-            issues.push(
-              `Cron jobs still enabled after disable: ${remainingEnabledJobs.map(job => job.id).join(', ')}`
-            );
-          }
-          throw new Error(issues.join(' | '));
-        }
-
-        const finalConfig: StoredConfig = {
-          ...config,
-          enabled: false,
-          cronJobId: null,
-          updatedAt: new Date().toISOString(),
-        };
-        await writeJsonFile(paths.configPath, finalConfig);
-        await patchStoredStatus(paths, {
-          observedEnabled: false,
-          reconcileState: 'succeeded',
-          lastReconcileAt: new Date().toISOString(),
-          lastReconcileError: null,
-          lastReconcileDurationMs: Date.now() - startedAt,
-          lastReconcileAction: action,
         });
-        return 'succeeded';
       } catch (error) {
         await patchStoredStatus(paths, {
           reconcileState: 'failed',
@@ -1135,23 +1221,27 @@ export default definePluginEntry({
       const paths = getStatePaths(api);
       await ensureStorage(paths);
 
-      const current = await readStoredConfig(api, paths);
       const requestedTimezone = input.timezone?.trim();
       if (requestedTimezone && !isValidTimezone(requestedTimezone)) {
         throw new Error(`Invalid timezone: ${requestedTimezone}`);
       }
-      const timezone = requestedTimezone
-        ? requestedTimezone
-        : resolveEffectiveTimezone(api, current.timezone, 'enable');
-      const nextConfig: StoredConfig = {
-        ...current,
-        enabled: true,
-        cron: input.cron?.trim() || current.cron,
-        timezone,
-        updatedAt: new Date().toISOString(),
-      };
 
-      await writeJsonFile(paths.configPath, nextConfig);
+      const nextConfig = await queueConfigWrite(paths.configPath, async () => {
+        const current = await readStoredConfig(api, paths);
+        const timezone = requestedTimezone
+          ? requestedTimezone
+          : resolveEffectiveTimezone(api, current.timezone, 'enable');
+        const next: StoredConfig = {
+          ...current,
+          enabled: true,
+          cron: input.cron?.trim() || current.cron,
+          timezone,
+          updatedAt: new Date().toISOString(),
+        };
+        await writeJsonFile(paths.configPath, next);
+        return next;
+      });
+
       await patchStoredStatus(paths, {
         reconcileState: 'in_progress',
         lastReconcileError: null,
@@ -1168,13 +1258,18 @@ export default definePluginEntry({
     const disableFromCommand = async () => {
       const paths = getStatePaths(api);
       await ensureStorage(paths);
-      const current = await readStoredConfig(api, paths);
-      const nextConfig: StoredConfig = {
-        ...current,
-        enabled: false,
-        updatedAt: new Date().toISOString(),
-      };
-      await writeJsonFile(paths.configPath, nextConfig);
+
+      const nextConfig = await queueConfigWrite(paths.configPath, async () => {
+        const current = await readStoredConfig(api, paths);
+        const next: StoredConfig = {
+          ...current,
+          enabled: false,
+          updatedAt: new Date().toISOString(),
+        };
+        await writeJsonFile(paths.configPath, next);
+        return next;
+      });
+
       await patchStoredStatus(paths, {
         reconcileState: 'in_progress',
         lastReconcileError: null,
@@ -1182,6 +1277,25 @@ export default definePluginEntry({
       });
       triggerReconcile('disable');
       return nextConfig;
+    };
+
+    // Update interest topics only — does NOT trigger reconcile because
+    // topics only affect the *next* briefing run's web-search query,
+    // not the cron registration. The worker enforces caps + sanitization
+    // before calling this route; we trust its input here.
+    const updateInterestsFromInput = async (topics: string[]): Promise<StoredConfig> => {
+      const paths = getStatePaths(api);
+      await ensureStorage(paths);
+      return queueConfigWrite(paths.configPath, async () => {
+        const current = await readStoredConfig(api, paths);
+        const next: StoredConfig = {
+          ...current,
+          interestTopics: topics,
+          updatedAt: new Date().toISOString(),
+        };
+        await writeJsonFile(paths.configPath, next);
+        return next;
+      });
     };
 
     void (async () => {
@@ -1462,6 +1576,65 @@ export default definePluginEntry({
             timezone: result.timezone,
             reconcileState: status.reconcileState,
             message: 'Disable requested. Reconciliation is running in background.',
+          });
+        } catch (error) {
+          sendJson(res, 500, {
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      },
+    });
+
+    api.registerHttpRoute({
+      path: '/api/plugins/kiloclaw-morning-briefing/interests',
+      auth: 'gateway',
+      match: 'exact',
+      handler: async (req, res) => {
+        try {
+          const body = asObject(await readRequestBody(req));
+          const rawTopics = Array.isArray(body.topics) ? body.topics : null;
+          if (!rawTopics) {
+            sendJson(res, 400, { ok: false, error: 'topics must be an array of strings' });
+            return;
+          }
+          // Defense in depth — the worker validates first, but caps here
+          // make sure a direct gateway call can't write a runaway payload.
+          if (rawTopics.length > MAX_INTEREST_TOPICS) {
+            sendJson(res, 400, {
+              ok: false,
+              error: `topics must not exceed ${MAX_INTEREST_TOPICS} items`,
+            });
+            return;
+          }
+          // Trim to match the worker's `z.string().trim().min(1)` Zod
+          // shape — a direct authenticated gateway call that bypasses
+          // Zod could otherwise write " Tech " and break case-insensitive
+          // equality against the "Tech" preset on the UI side. Empty
+          // (after trim) entries are silently skipped, matching Zod's
+          // `.min(1)` rejection without surfacing an error for what's
+          // effectively whitespace garbage.
+          const topics: string[] = [];
+          for (const value of rawTopics) {
+            if (typeof value !== 'string') {
+              sendJson(res, 400, { ok: false, error: 'topics must be an array of strings' });
+              return;
+            }
+            const trimmed = value.trim();
+            if (trimmed.length === 0) continue;
+            if (trimmed.length > MAX_INTEREST_TOPIC_LENGTH) {
+              sendJson(res, 400, {
+                ok: false,
+                error: `each topic must be ${MAX_INTEREST_TOPIC_LENGTH} characters or fewer`,
+              });
+              return;
+            }
+            topics.push(trimmed);
+          }
+          const result = await updateInterestsFromInput(topics);
+          sendJson(res, 200, {
+            ok: true,
+            interestTopics: result.interestTopics,
           });
         } catch (error) {
           sendJson(res, 500, {

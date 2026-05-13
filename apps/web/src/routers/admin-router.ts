@@ -1360,6 +1360,13 @@ export const adminRouter = createTRPCRouter({
               message: 'No Kilo Pass subscription found for this user',
             });
           }
+          if (result.reason.kind === 'store_managed_subscription') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message:
+                'Refund must be initiated via the App Store. The customer needs to contact Apple Support.',
+            });
+          }
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Kilo Pass subscription is already canceled',

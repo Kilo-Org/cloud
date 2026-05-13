@@ -42,6 +42,7 @@ import type {
   OpenclawConfigResponse,
   MorningBriefingStatusResponse,
   MorningBriefingActionResponse,
+  MorningBriefingInterestsResponse,
   MorningBriefingReadResponse,
   GoogleCredentialsInput,
   GoogleCredentialsResponse,
@@ -424,6 +425,22 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async updateBriefingInterests(
+    userId: string,
+    topics: string[],
+    instanceId?: string
+  ): Promise<MorningBriefingInterestsResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/interests${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, topics }),
       },
       { userId }
     );

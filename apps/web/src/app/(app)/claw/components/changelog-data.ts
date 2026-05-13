@@ -11,9 +11,9 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
-    date: '2026-05-11',
+    date: '2026-05-13',
     description:
-      'Optimized the Docker image build by cleaning npm and Bun package caches to reduce deployed image size. KiloClaw also runs npm cache cleanup during startup to reduce package-cache growth on persistent instance storage.',
+      'Optimized the KiloClaw image and startup path by cleaning npm and Bun package caches. Build-time cleanup reduces deployed image size, and runtime npm cache cleanup now runs after bootstrap finishes so it reduces persistent storage growth without delaying readiness.',
     category: 'feature',
     deployHint: 'redeploy_suggested',
   },

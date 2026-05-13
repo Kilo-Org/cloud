@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { db } from '@/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { DOLTHUB_APP_DEV_CLIENT_ID, DOLTHUB_APP_DEV_CLIENT_SECRET } from '@/lib/config.server';
@@ -149,6 +149,7 @@ export async function getInstallation(owner: Owner): Promise<PlatformIntegration
     .where(
       and(...getOwnershipConditions(owner), eq(platform_integrations.platform, PLATFORM.DOLTHUB))
     )
+    .orderBy(sql`${platform_integrations.updated_at} DESC`)
     .limit(1);
 
   return integration || null;
@@ -200,6 +201,7 @@ export async function upsertDoltHubInstallation({
       owned_by_organization_id: owner.type === 'org' ? owner.id : null,
       platform: PLATFORM.DOLTHUB,
       integration_type: 'oauth',
+      platform_installation_id: `dolthub-${owner.type}-${owner.id}`,
       scopes: DOLTHUB_SCOPES,
       integration_status: INTEGRATION_STATUS.ACTIVE,
       metadata,
@@ -217,13 +219,11 @@ export async function upsertDoltHubInstallation({
 export async function uninstall(owner: Owner): Promise<{ success: boolean }> {
   assertDevOnly();
 
-  const integration = await getInstallation(owner);
+  const ownershipConditions = getOwnershipConditions(owner);
 
-  if (!integration) {
-    return { success: true };
-  }
-
-  await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
+  await db
+    .delete(platform_integrations)
+    .where(and(...ownershipConditions, eq(platform_integrations.platform, PLATFORM.DOLTHUB)));
 
   return { success: true };
 }
@@ -260,7 +260,7 @@ export async function getValidDoltHubToken(
         metadata: {
           ...metadata,
           access_token: newTokens.accessToken,
-          refresh_token: newTokens.refreshToken,
+          refresh_token: newTokens.refreshToken ?? metadata?.refresh_token,
           expires_at: newExpiresAt,
           scope: newTokens.scope,
         },

@@ -73,10 +73,13 @@ export async function GET(request: NextRequest) {
 
     const verified = verifyOAuthState(state);
     if (!verified) {
+      const redactedParams = Object.fromEntries(
+        Array.from(searchParams.entries()).map(([k, v]) => [k, k === 'code' ? '***' : v])
+      );
       captureMessage('DoltHub callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
-        extra: { code: '***', state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: { code: '***', state, allParams: redactedParams },
       });
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }

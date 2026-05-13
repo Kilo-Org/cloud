@@ -208,6 +208,7 @@ describe('dolthub-service', () => {
       expect(result.platform).toBe(PLATFORM.DOLTHUB);
       expect(result.integration_status).toBe(INTEGRATION_STATUS.ACTIVE);
       expect(result.platform_account_login).toBeNull();
+      expect(result.platform_installation_id).toBe(`dolthub-user-${user.id}`);
 
       const [row] = await db
         .select()
@@ -380,6 +381,51 @@ describe('dolthub-service', () => {
       };
       expect(meta.access_token).toBe('refreshed-access');
       expect(meta.refresh_token).toBe('refreshed-refresh');
+      expect(meta.expires_at).toBeGreaterThan(Date.now());
+    });
+
+    test('preserves existing refresh token when refresh response omits it', async () => {
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: user.id,
+          owned_by_organization_id: null,
+          platform: PLATFORM.DOLTHUB,
+          integration_type: 'oauth',
+          platform_account_login: 'testuser',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata: {
+            access_token: 'expired-token',
+            refresh_token: 'old-refresh',
+            expires_at: Date.now() - 1000,
+            scope: 'api_read_write',
+          },
+        })
+        .returning();
+
+      globalThis.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          access_token: 'refreshed-access',
+          expires_in: 3600,
+          scope: 'api_read_write',
+        }),
+      });
+
+      const token = await getValidDoltHubToken(integration);
+      expect(token).toBe('refreshed-access');
+
+      const [row] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id));
+      const meta = row.metadata as {
+        access_token: string;
+        refresh_token: string;
+        expires_at: number;
+      };
+      expect(meta.access_token).toBe('refreshed-access');
+      expect(meta.refresh_token).toBe('old-refresh');
       expect(meta.expires_at).toBeGreaterThan(Date.now());
     });
 

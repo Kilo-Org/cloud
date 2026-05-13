@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR number to process manually"
+        description: 'PR number to process manually'
         required: true
         type: number
 
@@ -60,7 +60,7 @@ jobs:
           }
 
           if [[ ! "$HEAD_BRANCH" =~ ^feat(ure)?[/-] ]]; then
-            echo "Branch name does not start with feat/ or feature/, skipping."
+            echo "Skipping PR #$PR_NUMBER: branch '$HEAD_BRANCH' does not start with feat/ or feature/"
             echo "should_send=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi

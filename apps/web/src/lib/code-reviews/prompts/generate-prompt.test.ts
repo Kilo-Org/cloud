@@ -296,7 +296,18 @@ describe('normalizeRepositoryReviewInstructions', () => {
 const existingReviewStateWithSummary: ExistingReviewState = {
   summaryComment: {
     commentId: 123,
-    body: '<!-- kilo-review -->\n## Code Review Summary\n\n**Status:** 2 Issues Found',
+    body: [
+      '<!-- kilo-review -->',
+      '## Code Review Summary',
+      '',
+      '**Status:** 2 Issues Found',
+      '',
+      '---',
+      '<!-- kilo-usage -->',
+      '<sub>Reviewed by stale-model · 1,234 tokens</sub>',
+      '<!-- kilo-review-guidance -->',
+      '<sub>Review guidance: REVIEW.md from base branch `main`</sub>',
+    ].join('\n'),
   },
   inlineComments: [
     { id: 1, path: 'src/foo.ts', line: 10, body: '**WARNING:** Issue one', isOutdated: false },
@@ -325,6 +336,8 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).toContain('abc123prev');
     expect(prompt).toContain('git diff abc123prev..HEAD');
     expect(prompt).toContain('2 Issues Found');
+    expect(prompt).not.toContain('stale-model');
+    expect(prompt).not.toContain('Review guidance: REVIEW.md');
     // Should contain the active comment count (1 active, 1 outdated)
     expect(prompt).toContain('1 active');
     // Should NOT contain the standard workflow step 1

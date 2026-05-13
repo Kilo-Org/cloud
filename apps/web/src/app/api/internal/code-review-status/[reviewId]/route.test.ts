@@ -53,6 +53,8 @@ const mockHasMRNoteWithMarker = jest.fn<any>();
 const mockCaptureException = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockCaptureMessage = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockAppendReviewSummaryFooter = jest.fn<any>();
 
 // --- Module mocks ---
 
@@ -108,7 +110,7 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 jest.mock('@/lib/code-reviews/summary/usage-footer', () => ({
-  appendUsageFooter: jest.fn().mockReturnValue('body with footer'),
+  appendReviewSummaryFooter: (...args: unknown[]) => mockAppendReviewSummaryFooter(...args),
 }));
 
 jest.mock('@/lib/constants', () => ({
@@ -161,6 +163,9 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     terminal_reason: null,
     agent_version: 'v2',
     check_run_id: 12345,
+    repository_review_instructions_used: false,
+    repository_review_instructions_ref: null,
+    repository_review_instructions_truncated: false,
     model: null,
     total_tokens_in: null,
     total_tokens_out: null,
@@ -216,6 +221,13 @@ beforeEach(async () => {
   mockHasPRCommentWithMarker.mockResolvedValue(false);
   mockCreateMRNote.mockResolvedValue(undefined);
   mockHasMRNoteWithMarker.mockResolvedValue(false);
+  mockFindKiloReviewComment.mockResolvedValue({ commentId: 99, body: 'existing body' });
+  mockUpdateKiloReviewComment.mockResolvedValue(undefined);
+  mockFindKiloReviewNote.mockResolvedValue({ noteId: 88, body: 'existing note body' });
+  mockUpdateKiloReviewNote.mockResolvedValue(undefined);
+  mockGetSessionUsageFromBilling.mockResolvedValue(null);
+  mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
+  mockAppendReviewSummaryFooter.mockReturnValue('body with footer');
   ({ POST } = await import('./route'));
 });
 
@@ -407,7 +419,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
             title: 'Insufficient credits to run review',
             summary: 'Review could not start because the account has insufficient credits.',
           }),
-        })
+        }),
+        'standard'
       );
     });
 
@@ -433,7 +446,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           output: expect.objectContaining({
             title: 'Kilo Code Review failed',
           }),
-        })
+        }),
+        'standard'
       );
     });
 
@@ -458,7 +472,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           output: expect.objectContaining({
             title: 'Insufficient credits to run review',
           }),
-        })
+        }),
+        'standard'
       );
     });
   });
@@ -482,14 +497,16 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'owner',
         'repo',
         1,
-        '<!-- kilo-billing-notice -->'
+        '<!-- kilo-billing-notice -->',
+        'standard'
       );
       expect(mockCreatePRComment).toHaveBeenCalledWith(
         'inst-1',
         'owner',
         'repo',
         1,
-        expect.stringContaining('your account is out of credits')
+        expect.stringContaining('your account is out of credits'),
+        'standard'
       );
     });
 
@@ -594,7 +611,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'owner',
         'repo',
         1,
-        expect.stringContaining('https://app.kilo.ai/')
+        expect.stringContaining('https://app.kilo.ai/'),
+        'standard'
       );
     });
 
@@ -616,8 +634,118 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'owner',
         'repo',
         1,
-        expect.stringContaining('switch to a free model')
+        expect.stringContaining('switch to a free model'),
+        'standard'
       );
+    });
+  });
+
+  describe('summary footer guidance', () => {
+    it('updates completed GitHub summary with REVIEW.md guidance metadata when used', async () => {
+      const review = makeReview({
+        repository_review_instructions_used: true,
+        repository_review_instructions_ref: 'main',
+        repository_review_instructions_truncated: false,
+        model: 'anthropic/claude-sonnet-4.6',
+        total_tokens_in: 1000,
+        total_tokens_out: 200,
+      });
+      mockGetCodeReviewById.mockResolvedValue(review);
+
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(mockFindKiloReviewComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        1,
+        'standard'
+      );
+      expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing body', {
+        usage: { model: 'anthropic/claude-sonnet-4.6', tokensIn: 1000, tokensOut: 200 },
+        reviewGuidance: { used: true, ref: 'main', truncated: false },
+      });
+      expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        99,
+        'body with footer',
+        'standard'
+      );
+    });
+
+    it('updates completed GitLab summary with REVIEW.md guidance metadata when used', async () => {
+      const review = makeReview({
+        platform: 'gitlab',
+        platform_project_id: 42,
+        check_run_id: null,
+        repository_review_instructions_used: true,
+        repository_review_instructions_ref: 'main',
+        repository_review_instructions_truncated: true,
+        model: 'anthropic/claude-sonnet-4.6',
+        total_tokens_in: 1000,
+        total_tokens_out: 200,
+      });
+      mockGetCodeReviewById.mockResolvedValue(review);
+
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(mockFindKiloReviewNote).toHaveBeenCalledWith(
+        'mock-token',
+        'owner/repo',
+        1,
+        'https://gitlab.com'
+      );
+      expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing note body', {
+        usage: { model: 'anthropic/claude-sonnet-4.6', tokensIn: 1000, tokensOut: 200 },
+        reviewGuidance: { used: true, ref: 'main', truncated: true },
+      });
+      expect(mockUpdateKiloReviewNote).toHaveBeenCalledWith(
+        'mock-token',
+        'owner/repo',
+        1,
+        88,
+        'body with footer',
+        'https://gitlab.com'
+      );
+    });
+
+    it('updates guidance footer when usage data is unavailable', async () => {
+      const review = makeReview({
+        repository_review_instructions_used: true,
+        repository_review_instructions_ref: 'main',
+        repository_review_instructions_truncated: false,
+        model: null,
+        total_tokens_in: null,
+        total_tokens_out: null,
+      });
+      mockGetCodeReviewById.mockResolvedValue(review);
+
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing body', {
+        usage: undefined,
+        reviewGuidance: { used: true, ref: 'main', truncated: false },
+      });
+      expect(mockUpdateKiloReviewComment).toHaveBeenCalled();
+    });
+
+    it('does not append guidance when metadata says unused', async () => {
+      const review = makeReview({
+        repository_review_instructions_used: false,
+        repository_review_instructions_ref: null,
+        repository_review_instructions_truncated: false,
+        model: null,
+        total_tokens_in: null,
+        total_tokens_out: null,
+      });
+      mockGetCodeReviewById.mockResolvedValue(review);
+
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(mockAppendReviewSummaryFooter).not.toHaveBeenCalled();
+      expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
     });
   });
 });

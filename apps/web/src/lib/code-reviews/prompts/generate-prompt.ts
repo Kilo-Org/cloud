@@ -24,6 +24,7 @@ import { getPromptTemplateFeatureFlag, getPlatformConfig } from './platform-help
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { sanitizeUserInput } from './prompt-utils';
 import { formatRepositoryReviewInstructions } from './repository-review-instructions';
+import { stripReviewSummaryFooter } from '../summary/usage-footer';
 
 /**
  * Inline comment info for duplicate detection
@@ -272,9 +273,10 @@ export async function generateReviewPrompt(
     existingReviewState?.summaryComment
   ) {
     const activeCount = existingReviewState.inlineComments?.filter(c => !c.isOutdated).length ?? 0;
+    const previousSummary = stripReviewSummaryFooter(existingReviewState.summaryComment.body);
     const incrementalWorkflow = template.incrementalReviewWorkflow
       .replace(/{PREVIOUS_SHA}/g, previousHeadSha)
-      .replace(/{PREVIOUS_SUMMARY}/g, existingReviewState.summaryComment.body)
+      .replace(/{PREVIOUS_SUMMARY}/g, previousSummary)
       .replace(/{ACTIVE_COMMENT_COUNT}/g, String(activeCount));
     prompt += replacePlaceholders(incrementalWorkflow) + '\n\n';
     logExceptInTest('[generateReviewPrompt] Using incremental workflow', {

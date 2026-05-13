@@ -18,8 +18,17 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
 import { db } from '@/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { cloud_agent_code_reviews, kilocode_users, type User } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import {
+  agent_configs,
+  cloud_agent_code_reviews,
+  kilocode_users,
+  organization_audit_logs,
+  organizations,
+  type Organization,
+  type User,
+} from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
 
 const REPO = `test-org/code-reviews-cancel-${Date.now()}`;
 type ReviewStatus = 'pending' | 'queued' | 'running';
@@ -186,5 +195,164 @@ describe('codeReviewRouter.cancel', () => {
     expect(result).toEqual({ success: false, error: 'Worker could not cancel code review' });
     expect(storedReview?.status).toBe('running');
     expect(storedReview?.completed_at).toBeNull();
+  });
+});
+
+describe('review agent config REVIEW.md setting', () => {
+  let testUser: User;
+  let organization: Organization;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+    organization = await createTestOrganization('Review Config Org', testUser.id, 0, {}, false);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(agent_configs)
+      .where(
+        and(
+          eq(agent_configs.agent_type, 'code_review'),
+          eq(agent_configs.platform, 'github'),
+          eq(agent_configs.owned_by_user_id, testUser.id)
+        )
+      );
+    await db
+      .delete(agent_configs)
+      .where(
+        and(
+          eq(agent_configs.agent_type, 'code_review'),
+          eq(agent_configs.platform, 'github'),
+          eq(agent_configs.owned_by_organization_id, organization.id)
+        )
+      );
+    await db
+      .delete(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organization.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('returns disableReviewMd false for personal default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const config = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
+
+    expect(config.disableReviewMd).toBe(false);
+  });
+
+  it('returns disableReviewMd false for organization default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const config = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+    });
+
+    expect(config.disableReviewMd).toBe(false);
+  });
+
+  it('persists personal disableReviewMd true as disable_review_md true', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      maxReviewTimeMinutes: 10,
+      modelSlug: 'test-model',
+      disableReviewMd: true,
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
+
+    const refetched = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
+    expect(refetched.disableReviewMd).toBe(true);
+  });
+
+  it('persists organization disableReviewMd true as disable_review_md true', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      maxReviewTimeMinutes: 10,
+      modelSlug: 'test-model',
+      disableReviewMd: true,
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_organization_id, organization.id)
+      ),
+    });
+
+    expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
+
+    const refetched = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+    });
+    expect(refetched.disableReviewMd).toBe(true);
+  });
+
+  it('persists omitted personal disableReviewMd as false for backward compatibility', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      maxReviewTimeMinutes: 10,
+      modelSlug: 'test-model',
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: false }));
+  });
+
+  it('persists omitted organization disableReviewMd as false for backward compatibility', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      maxReviewTimeMinutes: 10,
+      modelSlug: 'test-model',
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_organization_id, organization.id)
+      ),
+    });
+
+    expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: false }));
   });
 });

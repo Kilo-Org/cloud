@@ -25,6 +25,7 @@ import type {
   SessionInput,
 } from './types';
 import { InternalStatusResponseSchema } from './types';
+import { doNameForAttempt } from './do-name';
 
 function callbackUrlForAttempt(apiUrl: string, reviewId: string, attemptId?: string): string {
   const url = new URL(`/api/internal/code-review-status/${reviewId}`, apiUrl);
@@ -751,7 +752,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     await this.saveState();
 
     const retryId = this.env.CODE_REVIEW_ORCHESTRATOR.idFromName(
-      `${this.state.reviewId}:${params.retryAttemptId}`
+      doNameForAttempt(this.state.reviewId, params.retryAttemptId)
     );
     const retryStub = this.env.CODE_REVIEW_ORCHESTRATOR.get(retryId);
     const started = await retryStub.start({

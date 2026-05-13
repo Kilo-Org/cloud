@@ -26,6 +26,7 @@ import {
   createErrorHandler,
   createNotFoundHandler,
 } from '@kilocode/worker-utils';
+import { doNameForAttempt } from './do-name';
 
 // Import base Durable Object
 import { CodeReviewOrchestrator as CodeReviewOrchestratorBase } from './code-review-orchestrator';
@@ -36,10 +37,6 @@ export const CodeReviewOrchestrator = CodeReviewOrchestratorBase;
 // Create Hono app with Env type
 type HonoEnv = { Bindings: Env };
 const app = new Hono<HonoEnv>();
-
-function doNameForAttempt(reviewId: string, attemptId?: string): string {
-  return attemptId ? `${reviewId}:${attemptId}` : reviewId;
-}
 
 // Authentication middleware
 app.use(

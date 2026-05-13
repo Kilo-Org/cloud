@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';

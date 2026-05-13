@@ -28,6 +28,13 @@ export type CancelledReviewRow = {
   platformIntegrationId: string | null;
 };
 
+type CancelSupersededReviewsOptions = {
+  owner?: Owner;
+  platform?: 'github' | 'gitlab';
+  platformProjectId?: number | null;
+  platformIntegrationId?: string | null;
+};
+
 /**
  * Creates a new code review record
  * Returns the created review ID
@@ -539,9 +546,23 @@ export async function findActiveReviewsForPR(
 export async function cancelSupersededReviewsForPR(
   repoFullName: string,
   prNumber: number,
-  excludeSha: string
+  excludeSha: string,
+  options?: CancelSupersededReviewsOptions
 ): Promise<CancelledReviewRow[]> {
   try {
+    const ownerFilter =
+      options?.owner?.type === 'org'
+        ? sql`
+            AND ${cloud_agent_code_reviews.owned_by_organization_id} = ${options.owner.id}
+            AND ${cloud_agent_code_reviews.owned_by_user_id} IS NULL
+          `
+        : options?.owner?.type === 'user'
+          ? sql`
+              AND ${cloud_agent_code_reviews.owned_by_user_id} = ${options.owner.id}
+              AND ${cloud_agent_code_reviews.owned_by_organization_id} IS NULL
+            `
+          : sql``;
+
     const result = await db.execute<{
       id: string;
       prev_status: 'pending' | 'queued' | 'running';
@@ -565,6 +586,22 @@ export async function cancelSupersededReviewsForPR(
         FROM ${cloud_agent_code_reviews}
         WHERE ${cloud_agent_code_reviews.repo_full_name} = ${repoFullName}
           AND ${cloud_agent_code_reviews.pr_number} = ${prNumber}
+          ${
+            options?.platform != null
+              ? sql`AND ${cloud_agent_code_reviews.platform} = ${options.platform}`
+              : sql``
+          }
+          ${
+            options?.platformProjectId !== undefined
+              ? sql`AND ${cloud_agent_code_reviews.platform_project_id} IS NOT DISTINCT FROM ${options.platformProjectId}`
+              : sql``
+          }
+          ${
+            options?.platformIntegrationId !== undefined
+              ? sql`AND ${cloud_agent_code_reviews.platform_integration_id} IS NOT DISTINCT FROM ${options.platformIntegrationId}`
+              : sql``
+          }
+          ${ownerFilter}
           AND ${cloud_agent_code_reviews.head_sha} != ${excludeSha}
           AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
       )
@@ -601,7 +638,7 @@ export async function cancelSupersededReviewsForPR(
   } catch (error) {
     captureException(error, {
       tags: { operation: 'cancelSupersededReviewsForPR' },
-      extra: { repoFullName, prNumber, excludeSha },
+      extra: { repoFullName, prNumber, excludeSha, options },
     });
     throw error;
   }

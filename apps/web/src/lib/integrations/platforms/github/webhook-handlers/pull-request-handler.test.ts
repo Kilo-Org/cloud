@@ -316,7 +316,15 @@ describe('handlePullRequest', () => {
     const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
 
     expect(response.status).toBe(202);
-    expect(mockCancelSupersededReviewsForPR).toHaveBeenCalledWith('acme/widgets', 42, 'abc123');
+    expect(mockCancelSupersededReviewsForPR).toHaveBeenCalledWith('acme/widgets', 42, 'abc123', {
+      owner: {
+        type: 'org',
+        id: 'f2aa36d7-9c1b-4db9-ae4a-a4492618796d',
+        userId: 'bot-user-1',
+      },
+      platform: 'github',
+      platformIntegrationId: '8b2ff443-8396-4b07-99ae-7015789da7dd',
+    });
     expect(mockCancelReview).toHaveBeenCalledTimes(2);
     expect(mockCancelReview).toHaveBeenNthCalledWith(1, 'queued-review', 'Superseded by new push');
     expect(mockCancelReview).toHaveBeenNthCalledWith(2, 'running-review', 'Superseded by new push');

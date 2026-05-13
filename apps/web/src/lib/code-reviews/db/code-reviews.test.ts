@@ -14,11 +14,13 @@ const REPO = `test-org/session-continuation-${Date.now()}`;
 
 describe('cancelSupersededReviewsForPR', () => {
   let testUser: User;
+  let otherTestUser: User;
   const createdReviewIds: string[] = [];
   const repo = `${REPO}-superseded`;
 
   beforeAll(async () => {
     testUser = await insertTestUser();
+    otherTestUser = await insertTestUser();
   });
 
   afterAll(async () => {
@@ -26,6 +28,7 @@ describe('cancelSupersededReviewsForPR', () => {
       await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, id));
     }
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, otherTestUser.id));
   });
 
   async function createReview({
@@ -34,15 +37,19 @@ describe('cancelSupersededReviewsForPR', () => {
     repoFullName = repo,
     platform = 'github' as const,
     platformProjectId,
+    platformIntegrationId,
+    ownerId = testUser.id,
   }: {
     headSha: string;
     prNumber?: number;
     repoFullName?: string;
     platform?: 'github' | 'gitlab';
     platformProjectId?: number;
+    platformIntegrationId?: string;
+    ownerId?: string;
   }) {
     const id = await createCodeReview({
-      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      owner: { type: 'user', id: ownerId, userId: ownerId },
       repoFullName,
       prNumber,
       prUrl: `https://github.com/${repoFullName}/pull/${prNumber}`,
@@ -53,6 +60,7 @@ describe('cancelSupersededReviewsForPR', () => {
       headSha,
       platform,
       platformProjectId,
+      platformIntegrationId,
     });
     createdReviewIds.push(id);
     return id;
@@ -106,7 +114,7 @@ describe('cancelSupersededReviewsForPR', () => {
     expect(rows.find(row => row.id === runningId)?.sessionId).toBe('session-running');
   });
 
-  it('ignores same-sha, different repo or pr, and already-terminal rows; second call is idempotent', async () => {
+  it('ignores same-sha, different repo or pr, different owner/integration/project, and terminal rows', async () => {
     const sameShaId = await createReview({ headSha: 'sha-keep' });
     const otherPrId = await createReview({ headSha: 'sha-other-pr', prNumber: 43 });
     const otherRepoId = await createReview({
@@ -120,13 +128,28 @@ describe('cancelSupersededReviewsForPR', () => {
       platform: 'gitlab',
       platformProjectId: 999,
     });
+    const otherGitLabProjectId = await createReview({
+      headSha: 'sha-gitlab-other-project',
+      platform: 'gitlab',
+      platformProjectId: 1000,
+    });
+    const otherOwnerId = await createReview({
+      headSha: 'sha-gitlab-other-owner',
+      platform: 'gitlab',
+      platformProjectId: 999,
+      ownerId: otherTestUser.id,
+    });
 
     await updateCodeReviewStatus(terminalCompletedId, 'completed');
     await updateCodeReviewStatus(terminalFailedId, 'failed', {
       errorMessage: 'failed before cancel',
     });
 
-    const cancelled = await cancelSupersededReviewsForPR(repo, 42, 'sha-keep');
+    const cancelled = await cancelSupersededReviewsForPR(repo, 42, 'sha-keep', {
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      platform: 'gitlab',
+      platformProjectId: 999,
+    });
     expect(cancelled).toHaveLength(1);
     expect(cancelled[0]).toEqual(
       expect.objectContaining({
@@ -139,7 +162,11 @@ describe('cancelSupersededReviewsForPR', () => {
       })
     );
 
-    const cancelledAgain = await cancelSupersededReviewsForPR(repo, 42, 'sha-keep');
+    const cancelledAgain = await cancelSupersededReviewsForPR(repo, 42, 'sha-keep', {
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      platform: 'gitlab',
+      platformProjectId: 999,
+    });
     expect(cancelledAgain).toEqual([]);
 
     const rows = await db
@@ -153,6 +180,8 @@ describe('cancelSupersededReviewsForPR', () => {
 
     expect(rows.find(row => row.id === sameShaId)?.status).toBe('pending');
     expect(rows.find(row => row.id === targetId)?.status).toBe('cancelled');
+    expect(rows.find(row => row.id === otherGitLabProjectId)?.status).toBe('pending');
+    expect(rows.find(row => row.id === otherOwnerId)?.status).toBe('pending');
     expect(rows.find(row => row.id === otherPrId)?.status).toBe('pending');
     expect(rows.find(row => row.id === terminalCompletedId)?.status).toBe('completed');
     expect(rows.find(row => row.id === terminalFailedId)?.status).toBe('failed');

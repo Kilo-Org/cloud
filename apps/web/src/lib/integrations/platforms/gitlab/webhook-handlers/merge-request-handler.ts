@@ -202,7 +202,13 @@ export async function handleMergeRequestCodeReview(
     const cancelledReviews = await cancelSupersededReviewsForPR(
       project.path_with_namespace,
       mr.iid,
-      headSha
+      headSha,
+      {
+        owner,
+        platform: PLATFORM.GITLAB,
+        platformProjectId: project.id,
+        platformIntegrationId: integration.id,
+      }
     );
 
     if (cancelledReviews.length > 0) {

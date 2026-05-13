@@ -202,7 +202,12 @@ export async function handlePullRequestCodeReview(
     const cancelledReviews = await cancelSupersededReviewsForPR(
       repository.full_name,
       pull_request.number,
-      pull_request.head.sha
+      pull_request.head.sha,
+      {
+        owner,
+        platform: 'github',
+        platformIntegrationId: integration.id,
+      }
     );
 
     if (cancelledReviews.length > 0) {

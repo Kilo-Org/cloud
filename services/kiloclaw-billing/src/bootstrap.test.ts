@@ -5,17 +5,41 @@ const { mockGetWorkerDb, mockInsertKiloClawSubscriptionChangeLog } = vi.hoisted(
   mockInsertKiloClawSubscriptionChangeLog: vi.fn(async () => undefined),
 }));
 
-vi.mock('@kilocode/db', () => ({
-  getWorkerDb: mockGetWorkerDb,
-  insertKiloClawSubscriptionChangeLog: mockInsertKiloClawSubscriptionChangeLog,
-  kiloclaw_earlybird_purchases: {},
-  kiloclaw_instances: {},
-  kiloclaw_subscriptions: {},
-  organizations: {},
-  organization_seats_purchases: {},
-}));
+vi.mock('@kilocode/db', () => {
+  const legacyPriceVersion = '2026-03-19';
+  const currentPriceVersion = '2026-05-10';
 
-import { bootstrapProvisionSubscription } from './bootstrap.js';
+  return {
+    CURRENT_KILOCLAW_PRICE_VERSION: currentPriceVersion,
+    LEGACY_KILOCLAW_PRICE_VERSION: legacyPriceVersion,
+    getKiloClawPricingCatalogEntry: vi.fn((priceVersion: string) => {
+      if (priceVersion === legacyPriceVersion) {
+        return {
+          priceVersion: legacyPriceVersion,
+          trialDurationDays: 7,
+          selfServiceInstanceType: 'perf-1-3',
+        };
+      }
+      if (priceVersion === currentPriceVersion) {
+        return {
+          priceVersion: currentPriceVersion,
+          trialDurationDays: 1,
+          selfServiceInstanceType: 'perf-1-3',
+        };
+      }
+      throw new Error(`Unknown KiloClaw price version: ${priceVersion}`);
+    }),
+    getWorkerDb: mockGetWorkerDb,
+    insertKiloClawSubscriptionChangeLog: mockInsertKiloClawSubscriptionChangeLog,
+    kiloclaw_earlybird_purchases: {},
+    kiloclaw_instances: {},
+    kiloclaw_subscriptions: {},
+    organizations: {},
+    organization_seats_purchases: {},
+  };
+});
+
+import { bootstrapProvisionSubscription, resolveProvisionEntitlement } from './bootstrap.js';
 import type { BillingWorkerEnv } from './types.js';
 
 type SelectBuilder<T> = PromiseLike<T[]> & {
@@ -108,9 +132,11 @@ function createEnv(): BillingWorkerEnv {
       fetch: vi.fn(),
     },
     KILOCODE_BACKEND_BASE_URL: 'https://app.kilo.ai',
-    STRIPE_KILOCLAW_COMMIT_PRICE_ID: 'price_commit',
-    STRIPE_KILOCLAW_STANDARD_PRICE_ID: 'price_standard',
-    STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
+    STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID: 'price_legacy_standard_intro',
+    STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID: 'price_legacy_standard',
+    STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID: 'price_legacy_commit',
+    STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID: 'price_current_standard',
+    STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID: 'price_current_commit',
     INTERNAL_API_SECRET: 'next-internal-api-secret',
     KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
   };
@@ -132,6 +158,7 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
       transferred_to_subscription_id: null,
       access_origin: null,
       payment_source: 'stripe',
+      kiloclaw_price_version: '2026-03-19',
       plan: 'standard',
       scheduled_plan: null,
       scheduled_by: null,
@@ -206,6 +233,7 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
         instance_id: 'instance-new',
         stripe_subscription_id: null,
         stripe_schedule_id: null,
+        kiloclaw_price_version: '2026-03-19',
       })
     );
     expect(updateSets).toHaveLength(2);
@@ -699,6 +727,204 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
   beforeEach(() => {
     mockGetWorkerDb.mockReset();
     mockInsertKiloClawSubscriptionChangeLog.mockReset();
+  });
+
+  it('resolves live legacy destroyed-lineage provisioning entitlement to perf-1-3', async () => {
+    const legacySource = {
+      id: 'sub-legacy-live',
+      user_id: 'user-1',
+      instance_id: 'instance-old',
+      plan: 'standard',
+      status: 'active',
+      kiloclaw_price_version: '2026-03-19',
+      access_origin: null,
+      payment_source: 'credits',
+      cancel_at_period_end: false,
+      trial_started_at: null,
+      trial_ends_at: null,
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+      transferred_to_subscription_id: null,
+      scheduled_plan: null,
+      scheduled_by: null,
+      pending_conversion: false,
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-06-01T00:00:00.000Z',
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      created_at: '2026-04-01T00:00:00.000Z',
+      updated_at: '2026-05-01T00:00:00.000Z',
+    };
+    const { db } = createFreshInsertDb({
+      selectRows: [
+        [legacySource],
+        [{ id: 'instance-old', destroyedAt: '2026-05-12T00:00:00.000Z', organizationId: null }],
+        [],
+      ],
+      insertFirstReturningRows: [],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    await expect(
+      resolveProvisionEntitlement(createEnv(), { userId: 'user-1', orgId: null })
+    ).resolves.toEqual({
+      priceVersion: '2026-03-19',
+      selfServiceInstanceType: 'perf-1-3',
+    });
+  });
+
+  it('personal fresh-insert creates a current-version one-day trial', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-12T00:00:00.000Z'));
+    const createdRow = {
+      id: 'sub-current-trial',
+      user_id: 'user-1',
+      instance_id: 'instance-new',
+      plan: 'trial',
+      status: 'trialing',
+      kiloclaw_price_version: '2026-05-10',
+      access_origin: null,
+      payment_source: null,
+      cancel_at_period_end: false,
+      trial_started_at: '2026-05-12T00:00:00.000Z',
+      trial_ends_at: '2026-05-13T00:00:00.000Z',
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+      transferred_to_subscription_id: null,
+      scheduled_plan: null,
+      scheduled_by: null,
+      pending_conversion: false,
+      current_period_start: null,
+      current_period_end: null,
+      credit_renewal_at: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      created_at: '2026-05-12T00:00:00.000Z',
+      updated_at: '2026-05-12T00:00:00.000Z',
+    };
+    const { db, insertValues } = createFreshInsertDb({
+      selectRows: [[], [], [{ id: 'instance-new', destroyedAt: null, organizationId: null }], []],
+      insertFirstReturningRows: [createdRow],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    try {
+      const result = await bootstrapProvisionSubscription(createEnv(), {
+        userId: 'user-1',
+        instanceId: 'instance-new',
+        orgId: null,
+      });
+
+      expect(result).toEqual(createdRow);
+      expect(insertValues[0]).toEqual(
+        expect.objectContaining({
+          kiloclaw_price_version: '2026-05-10',
+          trial_started_at: '2026-05-12T00:00:00.000Z',
+          trial_ends_at: '2026-05-13T00:00:00.000Z',
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('personal fresh-insert after canceled legacy history creates a current-version trial', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-12T00:00:00.000Z'));
+    const canceledLegacyRow = {
+      id: 'sub-canceled-legacy',
+      user_id: 'user-1',
+      instance_id: 'instance-old',
+      plan: 'standard',
+      status: 'canceled',
+      kiloclaw_price_version: '2026-03-19',
+      access_origin: null,
+      payment_source: 'credits',
+      cancel_at_period_end: false,
+      trial_started_at: null,
+      trial_ends_at: null,
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+      transferred_to_subscription_id: null,
+      scheduled_plan: null,
+      scheduled_by: null,
+      pending_conversion: false,
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+      credit_renewal_at: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      created_at: '2026-04-01T00:00:00.000Z',
+      updated_at: '2026-05-01T00:00:00.000Z',
+    };
+    const createdRow = {
+      ...canceledLegacyRow,
+      id: 'sub-current-trial',
+      instance_id: 'instance-new',
+      plan: 'trial',
+      status: 'trialing',
+      kiloclaw_price_version: '2026-05-10',
+      payment_source: null,
+      current_period_start: null,
+      current_period_end: null,
+      trial_started_at: '2026-05-12T00:00:00.000Z',
+      trial_ends_at: '2026-05-13T00:00:00.000Z',
+      created_at: '2026-05-12T00:00:00.000Z',
+      updated_at: '2026-05-12T00:00:00.000Z',
+    };
+    const { db, insertValues } = createFreshInsertDb({
+      selectRows: [
+        [],
+        [canceledLegacyRow],
+        [
+          { id: 'instance-old', destroyedAt: '2026-05-01T00:00:00.000Z', organizationId: null },
+          { id: 'instance-new', destroyedAt: null, organizationId: null },
+        ],
+        [],
+      ],
+      insertFirstReturningRows: [createdRow],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    try {
+      const result = await bootstrapProvisionSubscription(createEnv(), {
+        userId: 'user-1',
+        instanceId: 'instance-new',
+        orgId: null,
+      });
+
+      expect(result).toEqual(createdRow);
+      expect(insertValues[0]).toEqual(
+        expect.objectContaining({
+          kiloclaw_price_version: '2026-05-10',
+          trial_ends_at: '2026-05-13T00:00:00.000Z',
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('personal fresh-insert: loser of insert race returns winner row instead of throwing', async () => {

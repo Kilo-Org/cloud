@@ -22,9 +22,11 @@ import {
   InstanceIdParam,
 } from '../schemas/instance-config';
 import {
+  compareTierRank,
   DEFAULT_INSTANCE_TIER,
   InstanceTierKeySchema,
   isOfferedTier,
+  type InstanceTierKey,
 } from '@kilocode/kiloclaw-instance-tiers';
 import { ImageVersionEntrySchema, imageVersionKey } from '../schemas/image-version';
 import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
@@ -45,7 +47,10 @@ import {
 } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
+  getKiloClawPricingCatalogEntry,
+  isKiloClawPriceVersion,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  type KiloClawPriceVersion,
   type KiloClawSubscriptionChangeActor,
 } from '@kilocode/db';
 import {
@@ -73,6 +78,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import {
   BootstrapProvisionFallbackError,
   bootstrapProvisionedSubscriptionWithFallback,
+  resolveProvisionEntitlementWithFallback,
 } from './provision-bootstrap';
 
 const GmailHistoryIdSchema = z.object({
@@ -398,6 +404,15 @@ type ProvisionedInstanceRecord = {
 
 function buildDefaultInboundEmailAlias(instanceId: string): string {
   return `claw-${instanceId.replaceAll('-', '')}`;
+}
+
+function isWithinSelfServiceEntitlement(
+  requestedTier: InstanceTierKey,
+  entitlementTier: InstanceTierKey
+): boolean {
+  if (requestedTier === entitlementTier) return true;
+  if (!isOfferedTier(entitlementTier)) return false;
+  return compareTierRank(requestedTier, entitlementTier) <= 0;
 }
 
 async function insertProvisionedInstanceRecord(params: {
@@ -1084,17 +1099,8 @@ platform.post('/provision', async c => {
   const provisionedInstanceId = instanceId ?? crypto.randomUUID();
   const shouldInsertInstanceRecord = !instanceId;
   const shouldBootstrapSubscription = !instanceId || bootstrapSubscription === true;
-  // Only default to the catalog tier on FRESH inserts. On re-provision (config
-  // updates with an existing instanceId), pass `undefined` so the DO's
-  // `inferredInstanceType` path preserves existing tier / machineSize /
-  // volumeSizeGb. `provision()` is overloaded as the entrypoint for both
-  // fresh-create and config-update flows; defaulting unconditionally would
-  // silently overwrite custom (e.g. extend-volume) and legacy tiers on the
-  // next config change.
-  const instanceType =
-    requestedInstanceType ?? (shouldInsertInstanceRecord ? DEFAULT_INSTANCE_TIER : undefined);
-  const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
   const provisionRoute = '/api/platform/provision';
+  const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
   const provisionStartedAt = performance.now();
 
   let selectedProvider = provider;
@@ -1108,11 +1114,57 @@ platform.post('/provision', async c => {
     });
   }
 
+  let provisionEntitlement: {
+    priceVersion: KiloClawPriceVersion;
+    selfServiceInstanceType: InstanceTierKey;
+  } | null = null;
+  let instanceType: InstanceTierKey | undefined;
   let provision: Awaited<ReturnType<KiloClawInstanceStub['provision']>>;
   try {
     if (selectedProvider) {
       assertAvailableProvider(c.env, selectedProvider);
     }
+    if (shouldInsertInstanceRecord) {
+      const resolvedEntitlement = await resolveProvisionEntitlementWithFallback({
+        env: c.env,
+        input: { userId, orgId: orgId ?? null },
+      });
+      if (!isKiloClawPriceVersion(resolvedEntitlement.priceVersion)) {
+        throw new Error(`Unknown KiloClaw price version: ${resolvedEntitlement.priceVersion}`);
+      }
+      const pricing = getKiloClawPricingCatalogEntry(resolvedEntitlement.priceVersion);
+      const resolvedSelfServiceInstanceType = InstanceTierKeySchema.parse(
+        resolvedEntitlement.selfServiceInstanceType
+      );
+      if (resolvedSelfServiceInstanceType !== pricing.selfServiceInstanceType) {
+        throw new Error(
+          `KiloClaw entitlement tier drift during provision: price version ${pricing.priceVersion} resolved ${resolvedSelfServiceInstanceType}, catalog expects ${pricing.selfServiceInstanceType}`
+        );
+      }
+      provisionEntitlement = {
+        priceVersion: pricing.priceVersion,
+        selfServiceInstanceType: pricing.selfServiceInstanceType,
+      };
+      if (
+        requestedInstanceType &&
+        !isWithinSelfServiceEntitlement(
+          requestedInstanceType,
+          provisionEntitlement.selfServiceInstanceType
+        )
+      ) {
+        return c.json({ error: 'instanceType exceeds self-service entitlement' }, 400);
+      }
+    }
+    // Only default to the billing entitlement tier on FRESH inserts. On
+    // re-provision (config updates with an existing instanceId), pass
+    // `undefined` so the DO's `inferredInstanceType` path preserves existing
+    // tier / machineSize / volumeSizeGb. `provision()` is overloaded as the
+    // entrypoint for both fresh-create and config-update flows; defaulting
+    // unconditionally would silently overwrite custom (e.g. extend-volume) and
+    // legacy tiers on the next config change.
+    instanceType =
+      requestedInstanceType ??
+      (shouldInsertInstanceRecord ? provisionEntitlement?.selfServiceInstanceType : undefined);
     provision = await withResolvedDORetry(
       c.env,
       userId,
@@ -1173,7 +1225,10 @@ platform.post('/provision', async c => {
         // worker-side tier default has already been applied to `instanceType`
         // — but TS can't narrow `string | undefined` from the broader scope.
         // Re-derive locally so the helper signature stays `string`.
-        instanceType: requestedInstanceType ?? DEFAULT_INSTANCE_TIER,
+        instanceType:
+          requestedInstanceType ??
+          provisionEntitlement?.selfServiceInstanceType ??
+          DEFAULT_INSTANCE_TIER,
       });
       writeEvent(c.env, {
         event: 'instance.record_inserted',
@@ -1240,6 +1295,7 @@ platform.post('/provision', async c => {
           userId,
           instanceId: provisionedInstanceId,
           orgId: orgId ?? null,
+          expectedPriceVersion: provisionEntitlement?.priceVersion,
         },
       });
       logProvisionWrite('info', 'Provisioned subscription bootstrapped', {
@@ -1308,6 +1364,18 @@ platform.post('/provision', async c => {
         durationMs: performance.now() - bootstrapStartedAt,
       });
       if (shouldInsertInstanceRecord) {
+        await withResolvedDORetry(
+          c.env,
+          userId,
+          provisionedInstanceId,
+          stub => stub.destroy({ reason: 'bootstrap_cleanup_failure' }),
+          'destroy'
+        ).catch(destroyErr => {
+          console.error(
+            '[platform] Failed to destroy provisioned instance after subscription bootstrap error:',
+            destroyErr
+          );
+        });
         await markProvisionedInstanceDestroyed({
           env: c.env,
           instanceId: provisionedInstanceId,

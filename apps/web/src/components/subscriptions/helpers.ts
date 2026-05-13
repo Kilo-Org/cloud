@@ -1,6 +1,7 @@
 import { formatDollars, formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
 import { KiloPassCadence, type KiloPassTier } from '@/lib/kilo-pass/enums';
+import { formatKiloClawPlanPrice } from '@/app/(app)/claw/components/billing/billing-types';
 
 export function isKiloPassTerminal(status: string): boolean {
   return status === 'canceled' || status === 'incomplete_expired';
@@ -62,14 +63,28 @@ export function formatMonthCountLabel(months: number): string {
   return `${months} month${months === 1 ? '' : 's'}`;
 }
 
-export function formatKiloclawPrice(plan: string): string {
+export function formatKiloclawPrice(
+  input:
+    | string
+    | {
+        plan: string;
+        priceVersion?: string;
+        renewalCostMicrodollars?: number | null;
+      }
+): string {
+  const plan = typeof input === 'string' ? input : input.plan;
   if (plan === 'trial') {
     return 'Free trial';
   }
-  if (plan === 'commit') {
-    return '$48.00 / 6 months';
+  if (plan !== 'commit' && plan !== 'standard') {
+    return '—';
   }
-  return '$9.00/month';
+
+  return formatKiloClawPlanPrice({
+    plan,
+    priceVersion: typeof input === 'string' ? undefined : input.priceVersion,
+    costMicrodollars: typeof input === 'string' ? undefined : input.renewalCostMicrodollars,
+  });
 }
 
 export function formatDateLabel(date: string | null, fallback: string = '—'): string {

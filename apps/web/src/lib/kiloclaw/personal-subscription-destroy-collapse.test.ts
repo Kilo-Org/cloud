@@ -1127,9 +1127,12 @@ describe('personal subscription destroy collapse', () => {
       .update(kilocode_users)
       .set({ total_microdollars_acquired: 50_000_000 })
       .where(eq(kilocode_users.id, user.id));
-    process.env.STRIPE_KILOCLAW_COMMIT_PRICE_ID ||= 'price_commit';
-    process.env.STRIPE_KILOCLAW_STANDARD_PRICE_ID ||= 'price_standard';
-    process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
+    process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID ||=
+      'price_legacy_standard_intro';
+    process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID ||= 'price_legacy_standard';
+    process.env.STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID ||= 'price_legacy_commit';
+    process.env.STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID ||= 'price_current_standard';
+    process.env.STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID ||= 'price_current_commit';
 
     await enrollWithCreditsImpl({
       userId: user.id,

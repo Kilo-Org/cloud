@@ -56,7 +56,11 @@ export function KiloClawGroup({
               title={subscription.instanceName ?? 'KiloClaw instance'}
               subtitle={subscription.instanceName || subscription.instanceId}
               status={getKiloclawDisplayStatus(subscription)}
-              price={formatKiloclawPrice(subscription.plan)}
+              price={formatKiloclawPrice({
+                plan: subscription.plan,
+                priceVersion: subscription.priceVersion,
+                renewalCostMicrodollars: subscription.renewalCostMicrodollars,
+              })}
               billingDate={formatDateLabel(
                 subscription.creditRenewalAt ??
                   subscription.currentPeriodEnd ??
@@ -84,7 +88,12 @@ export function KiloClawGroup({
         </div>
       ) : nonTerminalSubscriptions.length === 0 ? (
         <KiloClawSubscribeCard
-          creditIntroEligible={summaryQuery.data?.creditIntroEligible ?? false}
+          standardCostMicrodollars={
+            summaryQuery.data?.creditEnrollmentPreview.standard.costMicrodollars
+          }
+          commitCostMicrodollars={
+            summaryQuery.data?.creditEnrollmentPreview.commit.costMicrodollars
+          }
           hasActiveKiloPass={summaryQuery.data?.hasActiveKiloPass ?? false}
         />
       ) : null}

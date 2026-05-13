@@ -11,6 +11,7 @@
     ".": "./src/index.ts",
     "./schema": "./src/schema.ts",
     "./schema-types": "./src/schema-types.ts",
+    "./kiloclaw-pricing-catalog": "./src/kiloclaw-pricing-catalog.ts",
     "./client": "./src/client.ts"
   },
   "dependencies": {

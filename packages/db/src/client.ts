@@ -36,14 +36,22 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
 
 export type GetWorkerDbOptions = Omit<pg.PoolConfig, 'connectionString' | 'max'>;
 
+const workerDbCache = new Map<string, ReturnType<typeof drizzle>>();
+
 /**
  * Convenience wrapper for Cloudflare Workers using Hyperdrive.
  * Hyperdrive handles connection pooling at the infrastructure level,
  * so we use max: 1 here. Pass env.HYPERDRIVE.connectionString directly.
  */
 export function getWorkerDb(connectionString: string, options: GetWorkerDbOptions = {}) {
+  const cacheKey = JSON.stringify({ connectionString, options });
+  const cached = workerDbCache.get(cacheKey);
+  if (cached) return cached;
+
   const pool = new pg.Pool({ connectionString, max: 1, ...options });
-  return drizzle(pool, { schema });
+  const db = drizzle(pool, { schema });
+  workerDbCache.set(cacheKey, db);
+  return db;
 }
 
 export type WorkerDb = ReturnType<typeof getWorkerDb>;

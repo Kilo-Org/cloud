@@ -112,3 +112,5 @@ TMP_CI_commit_msg.txt
 run-milvus-test.sh
 
 .beads/
+.env*.local
+.tests/

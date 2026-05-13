@@ -31,7 +31,7 @@ import {
   COMMIT_PERIOD_MONTHS,
   formatBillingDate,
   formatMicrodollars,
-  PLAN_DISPLAY,
+  formatKiloClawPlanPrice,
   planLabel,
   type ClawBillingStatus,
 } from './billing-types';
@@ -130,9 +130,10 @@ function ActiveSubscriptionCard({
 
   const isCommit = sub.plan === 'commit';
   const otherPlan = isCommit ? 'standard' : 'commit';
-  const otherPlanLabel = isCommit
-    ? `Standard ($${PLAN_DISPLAY.standard.monthlyDollars}/mo)`
-    : `Commit ($${PLAN_DISPLAY.commit.monthlyDollars}/mo · ${COMMIT_PERIOD_MONTHS}-mo term)`;
+  const otherPlanLabel = formatKiloClawPlanPrice({
+    plan: otherPlan,
+    priceVersion: sub.priceVersion,
+  });
 
   const hasUserRequestedSwitch = sub.scheduledBy === 'user';
   const isCreditFunded = !sub.hasStripeFunding && sub.paymentSource === 'credits';
@@ -211,7 +212,7 @@ function ActiveSubscriptionCard({
   return (
     <KiloClawCardShell status="active">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <DetailRow label="Plan" value={planLabel(sub.plan)} numeric />
+        <DetailRow label="Plan" value={planLabel(sub.plan, sub.priceVersion)} numeric />
         <DetailRow
           label={isCommit ? 'Commit period ends' : 'Next billing'}
           value={formatBillingDate(renewalDate)}
@@ -224,8 +225,9 @@ function ActiveSubscriptionCard({
             hasStripeFunding: sub.hasStripeFunding,
           })}
         />
+        <DetailRow label="Included instance" value={sub.selfServiceInstanceType} />
         {isCommit ? (
-          <DetailRow label="Auto-renew" value={`Yes — every ${COMMIT_PERIOD_MONTHS} months`} />
+          <DetailRow label="Auto-renew" value={`Yes, every ${COMMIT_PERIOD_MONTHS} months`} />
         ) : null}
         {isCreditFunded && sub.renewalCostMicrodollars != null ? (
           <DetailRow
@@ -366,7 +368,7 @@ function ConvertingSubscriptionCard({
   return (
     <KiloClawCardShell status="pending_cancellation">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <DetailRow label="Plan" value={planLabel(sub.plan)} numeric />
+        <DetailRow label="Plan" value={planLabel(sub.plan, sub.priceVersion)} numeric />
         <DetailRow
           label="Switches to credits on"
           value={formatBillingDate(sub.currentPeriodEnd)}
@@ -415,7 +417,7 @@ function CancelingSubscriptionCard({
   return (
     <KiloClawCardShell status="pending_cancellation">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <DetailRow label="Plan" value={planLabel(sub.plan)} numeric />
+        <DetailRow label="Plan" value={planLabel(sub.plan, sub.priceVersion)} numeric />
         <DetailRow label="Cancels on" value={formatBillingDate(sub.currentPeriodEnd)} numeric />
         <DetailRow
           label="Payment source"
@@ -468,7 +470,7 @@ function PastDueSubscriptionCard({
   return (
     <KiloClawCardShell status={status}>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <DetailRow label="Plan" value={planLabel(sub.plan)} numeric />
+        <DetailRow label="Plan" value={planLabel(sub.plan, sub.priceVersion)} numeric />
         <DetailRow
           label="Payment source"
           value={formatPaymentSummary({

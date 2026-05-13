@@ -112,15 +112,14 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
   const targetPlanDetails =
     otherPlan === 'commit'
       ? {
-          price: formatKiloclawPrice(otherPlan),
+          price: formatKiloclawPrice({ plan: otherPlan, priceVersion: subscription.priceVersion }),
           cadence: 'Renews every 6 months',
-          summary:
-            'Lower effective rate at $8.00/month, billed $48.00 upfront for each 6-month term.',
+          summary: `Renews at ${formatKiloclawPrice({ plan: otherPlan, priceVersion: subscription.priceVersion })}.`,
         }
       : {
-          price: formatKiloclawPrice(otherPlan),
+          price: formatKiloclawPrice({ plan: otherPlan, priceVersion: subscription.priceVersion }),
           cadence: 'Renews monthly',
-          summary: 'Flexible month-to-month billing with no long-term commitment.',
+          summary: `Renews at ${formatKiloclawPrice({ plan: otherPlan, priceVersion: subscription.priceVersion })}.`,
         };
 
   const confirmationDetails: ConfirmationDetails | null =
@@ -153,7 +152,11 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
                     <div className="text-muted-foreground text-xs">Current plan</div>
                     <div className="font-medium">{capitalize(subscription.plan)}</div>
                     <div className="text-muted-foreground text-xs">
-                      {formatKiloclawPrice(subscription.plan)}
+                      {formatKiloclawPrice({
+                        plan: subscription.plan,
+                        priceVersion: subscription.priceVersion,
+                        renewalCostMicrodollars: subscription.renewalCostMicrodollars,
+                      })}
                     </div>
                   </div>
                   <ArrowRight className="text-muted-foreground h-4 w-4 shrink-0" />
@@ -227,7 +230,15 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
 
   const primaryDetailRows: Array<{ label: string; value: string; numeric?: boolean }> = [
     { label: 'Plan', value: capitalize(subscription.plan) },
-    { label: 'Price', value: formatKiloclawPrice(subscription.plan), numeric: true },
+    {
+      label: 'Price',
+      value: formatKiloclawPrice({
+        plan: subscription.plan,
+        priceVersion: subscription.priceVersion,
+        renewalCostMicrodollars: subscription.renewalCostMicrodollars,
+      }),
+      numeric: true,
+    },
     {
       label: 'Payment source',
       value: formatPaymentSummary({

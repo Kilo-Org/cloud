@@ -1,5 +1,6 @@
 export * from './schema';
 export * from './schema-types';
+export * from './kiloclaw-pricing-catalog';
 export {
   createDrizzleClient,
   type CreateDrizzleClientOptions,

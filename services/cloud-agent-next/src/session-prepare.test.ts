@@ -29,6 +29,7 @@ const createMockSandbox = () => {
     createSession: vi.fn().mockResolvedValue(mockSession),
     listProcesses: vi.fn().mockResolvedValue([]),
     mkdir: vi.fn().mockResolvedValue(undefined),
+    writeFile: vi.fn().mockResolvedValue(undefined),
     destroy: vi.fn().mockResolvedValue(undefined),
   };
 };
@@ -55,6 +56,10 @@ vi.mock('./workspace.js', async importOriginal => {
   };
 });
 
+vi.mock('./utils/kilo-session-id.js', () => ({
+  generateKiloSessionId: () => generateKiloSessionIdMock(),
+}));
+
 // Mock WrapperClient.ensureWrapper (wrapper now starts kilo server in-process)
 vi.mock('./kilo/wrapper-client.js', () => ({
   WrapperClient: {
@@ -69,10 +74,12 @@ vi.mock('./kilo/wrapper-client.js', () => ({
 // vi.hoisted() ensures these are available when the mock factory runs
 const {
   generateSessionIdMock,
+  generateKiloSessionIdMock,
   createCliSessionViaSessionIngestMock,
   deleteCliSessionViaSessionIngestMock,
 } = vi.hoisted(() => ({
   generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
+  generateKiloSessionIdMock: vi.fn(() => 'ses_mock-kilo-session-id'),
   createCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
   deleteCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
 }));
@@ -317,12 +324,12 @@ describe('prepareSession endpoint', () => {
       });
 
       expect(result.cloudAgentSessionId).toMatch(/^agent_[0-9a-f-]+$/);
-      expect(result.kiloSessionId).toBe('cli-session-abc123');
+      expect(result.kiloSessionId).toBe('ses_mock-kilo-session-id');
       expect(doStub.prepare).toHaveBeenCalledWith(
         expect.objectContaining({
           sessionId: expect.stringMatching(/^agent_/) as unknown,
           userId: 'test-user-123',
-          kiloSessionId: 'cli-session-abc123',
+          kiloSessionId: 'ses_mock-kilo-session-id',
           prompt: 'Test prompt',
           mode: 'code',
           model: 'claude-3',
@@ -348,7 +355,7 @@ describe('prepareSession endpoint', () => {
       });
 
       expect(result.cloudAgentSessionId).toBeDefined();
-      expect(result.kiloSessionId).toBe('cli-session-abc123');
+      expect(result.kiloSessionId).toBe('ses_mock-kilo-session-id');
       expect(doStub.prepare).toHaveBeenCalledWith(
         expect.objectContaining({
           gitUrl: 'https://gitlab.com/org/repo.git',

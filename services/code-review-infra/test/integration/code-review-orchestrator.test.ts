@@ -61,6 +61,25 @@ function trpcError(status: number, message: string, code = 'INTERNAL_SERVER_ERRO
   );
 }
 
+function mockSuccessfulCloudAgentNextRun() {
+  const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+    const url = String(request);
+    if (url.includes('/api/internal/code-review-status/')) {
+      return Response.json({ success: true });
+    }
+    if (url.includes('/trpc/prepareSession')) {
+      return trpcSuccess({ cloudAgentSessionId: 'agent-fresh', kiloSessionId: 'ses_fresh' });
+    }
+    if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+      return trpcSuccess({ executionId: 'exec-fresh', status: 'running' });
+    }
+
+    return new Response('unexpected fetch', { status: 500 });
+  });
+  globalThis.fetch = fetchMock;
+  return fetchMock;
+}
+
 function fetchCalls(fetchMock: ReturnType<typeof vi.fn>, path: string) {
   return fetchMock.mock.calls.filter(([request]) => String(request).includes(path));
 }
@@ -148,6 +167,7 @@ describe('CodeReviewOrchestrator recovery', () => {
   });
 
   it('POST /review uses attempt-specific durable object names', async () => {
+    mockSuccessfulCloudAgentNextRun();
     const reviewId = crypto.randomUUID();
     const attemptId = crypto.randomUUID();
 
@@ -180,6 +200,7 @@ describe('CodeReviewOrchestrator recovery', () => {
   });
 
   it('fresh attempt dispatch does not reuse failed state from an earlier attempt', async () => {
+    mockSuccessfulCloudAgentNextRun();
     const reviewId = crypto.randomUUID();
     const attemptA = crypto.randomUUID();
     const attemptB = crypto.randomUUID();

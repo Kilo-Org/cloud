@@ -46,7 +46,7 @@ export function ConsentDetails() {
           title="Analytics & attribution"
           what="App events (opens, screens viewed, feature use), device type, app version, install source."
           why="Measure app performance and understand which channels bring new users."
-          who="[MMP vendor - TBD]."
+          who="The analytics provider named in our privacy policy."
           footer={
             <View className="mt-3 rounded-md bg-amber-50 p-3 dark:bg-amber-950">
               <Text className="text-xs text-amber-900 dark:text-amber-100">

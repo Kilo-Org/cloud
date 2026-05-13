@@ -11,26 +11,35 @@ import * as Sentry from '@sentry/react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { isRunningInExpoGo } from 'expo';
 import { useFonts } from 'expo-font';
-import { type Href, Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
+import {
+  type Href,
+  Slot,
+  useNavigationContainerRef,
+  usePathname,
+  useRouter,
+  useSegments,
+} from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
-import { OrganizationProvider } from '@/lib/organization-context';
 import { initAppsFlyer } from '@/lib/appsflyer';
+import { hasAcceptedConsent } from '@/lib/consent';
+import { useForceUpdate } from '@/lib/hooks/use-force-update';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
   checkInitialNotification,
   getPendingNotificationLink,
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
+import { OrganizationProvider } from '@/lib/organization-context';
 import { resolvePendingNotificationNavigation } from '@/lib/pending-notification-navigation';
-import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
@@ -78,7 +87,11 @@ function RootLayoutNav() {
     JetBrainsMono_600SemiBold,
   });
   const segments = useSegments();
+  const pathname = usePathname();
   const router = useRouter();
+  const { userId, isLoading: userIdLoading } = useCurrentUserId({ enabled: token != null });
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [needsConsent, setNeedsConsent] = useState(false);
 
   useEffect(() => {
     if (fontsError) {
@@ -94,6 +107,32 @@ function RootLayoutNav() {
   const isLoading = authLoading || updateChecking || !fontsReady;
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
+  const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkConsent() {
+      if (!token || !userId) {
+        setConsentChecked(false);
+        setNeedsConsent(false);
+        return;
+      }
+
+      const accepted = await hasAcceptedConsent(userId);
+      if (cancelled) {
+        return;
+      }
+      setNeedsConsent(!accepted);
+      setConsentChecked(true);
+    }
+
+    void checkConsent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, userId]);
 
   useEffect(() => {
     if (isLoading) {
@@ -121,9 +160,25 @@ function RootLayoutNav() {
       } else {
         router.replace('/(auth)/login');
       }
-    } else if (inAuthGroup) {
-      router.replace('/(app)');
     } else {
+      if (userIdLoading || !consentChecked) {
+        return;
+      }
+
+      if (needsConsent) {
+        if (onConsentRoute) {
+          void SplashScreen.hideAsync();
+        } else {
+          router.replace('/(app)/consent' as Href);
+        }
+        return;
+      }
+
+      if (onConsentRoute || inAuthGroup) {
+        router.replace('/(app)');
+        return;
+      }
+
       void SplashScreen.hideAsync();
       // Navigate to pending notification deep link (cold start / background tap)
       const pendingNavigation = resolvePendingNotificationNavigation(getPendingNotificationLink());
@@ -131,21 +186,37 @@ function RootLayoutNav() {
         router.replace(pendingNavigation.href as Href);
       }
     }
-  }, [token, isLoading, updateRequired, inAuthGroup, inForceUpdate, router]);
+  }, [
+    token,
+    isLoading,
+    updateRequired,
+    inAuthGroup,
+    inForceUpdate,
+    router,
+    userIdLoading,
+    consentChecked,
+    needsConsent,
+    onConsentRoute,
+  ]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;
   const needsAuth = !token && !inAuthGroup;
   const needsAppRedirect = token != null && inAuthGroup;
+  const consentLoading =
+    token != null && !consentChecked && !inAuthGroup && !inForceUpdate && !onConsentRoute;
+  const needsConsentRedirect = consentChecked && needsConsent && !onConsentRoute;
 
   const needsRedirect =
-    !isLoading && (needsForceUpdate || (!showingForceUpdate && (needsAuth || needsAppRedirect)));
+    !isLoading &&
+    (needsForceUpdate ||
+      (!showingForceUpdate && (needsAuth || needsAppRedirect || needsConsentRedirect)));
 
   // Always keep Slot mounted so Expo Router's navigation tree stays
   // initialised — returning null unmounts it and breaks router.replace.
   // The native splash screen covers everything during initial load, and
   // opacity 0 hides the wrong screen during redirects.
-  const hidden = isLoading || needsRedirect;
+  const hidden = isLoading || needsRedirect || consentLoading;
 
   return (
     <View

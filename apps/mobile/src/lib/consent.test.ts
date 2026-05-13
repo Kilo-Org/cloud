@@ -1,18 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const store = new Map<string, string>();
+const store = vi.hoisted(() => new Map<string, string>());
 
 vi.mock('expo-secure-store', () => ({
-  getItemAsync: vi.fn(async (key: string) => store.get(key) ?? null),
+  getItemAsync: vi.fn(async (key: string) => {
+    await Promise.resolve();
+    return store.get(key) ?? null;
+  }),
   setItemAsync: vi.fn(async (key: string, value: string) => {
+    await Promise.resolve();
     store.set(key, value);
   }),
   deleteItemAsync: vi.fn(async (key: string) => {
+    await Promise.resolve();
     store.delete(key);
   }),
 }));
-
-import { acceptConsent, hasAcceptedConsent, revokeConsent } from './consent';
 
 describe('consent storage', () => {
   beforeEach(() => {
@@ -20,20 +23,46 @@ describe('consent storage', () => {
   });
 
   it('returns false when nothing is stored for the user', async () => {
+    const { hasAcceptedConsent } = await import('./consent');
+
     expect(await hasAcceptedConsent('user-1')).toBe(false);
   });
 
   it('returns true after acceptConsent for the same user', async () => {
+    const { CURRENT_CONSENT_VERSION, acceptConsent, hasAcceptedConsent } =
+      await import('./consent');
+
     await acceptConsent('user-1');
+    expect(store.get('consent-accepted:user-1')).toBe(String(CURRENT_CONSENT_VERSION));
     expect(await hasAcceptedConsent('user-1')).toBe(true);
   });
 
+  it('returns false when the stored consent version is old', async () => {
+    const { hasAcceptedConsent } = await import('./consent');
+
+    store.set('consent-accepted:user-1', '0');
+
+    expect(await hasAcceptedConsent('user-1')).toBe(false);
+  });
+
+  it('returns false for old unversioned consent records', async () => {
+    const { hasAcceptedConsent } = await import('./consent');
+
+    store.set('consent-accepted:user-1', 'true');
+
+    expect(await hasAcceptedConsent('user-1')).toBe(false);
+  });
+
   it('isolates acceptance per user id', async () => {
+    const { acceptConsent, hasAcceptedConsent } = await import('./consent');
+
     await acceptConsent('user-1');
     expect(await hasAcceptedConsent('user-2')).toBe(false);
   });
 
   it('revokes acceptance for the user', async () => {
+    const { acceptConsent, hasAcceptedConsent, revokeConsent } = await import('./consent');
+
     await acceptConsent('user-1');
     await revokeConsent('user-1');
     expect(await hasAcceptedConsent('user-1')).toBe(false);

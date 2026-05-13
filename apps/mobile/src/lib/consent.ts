@@ -2,17 +2,23 @@ import * as SecureStore from 'expo-secure-store';
 
 import { CONSENT_USER_KEY_PREFIX } from '@/lib/storage-keys';
 
+export const CURRENT_CONSENT_VERSION = 1;
+
 function keyFor(userId: string): string {
   return `${CONSENT_USER_KEY_PREFIX}${userId}`;
 }
 
 export async function hasAcceptedConsent(userId: string): Promise<boolean> {
   const value = await SecureStore.getItemAsync(keyFor(userId));
-  return value === 'true';
+  if (!value) {
+    return false;
+  }
+
+  return Number(value) === CURRENT_CONSENT_VERSION;
 }
 
 export async function acceptConsent(userId: string): Promise<void> {
-  await SecureStore.setItemAsync(keyFor(userId), 'true');
+  await SecureStore.setItemAsync(keyFor(userId), String(CURRENT_CONSENT_VERSION));
 }
 
 export async function revokeConsent(userId: string): Promise<void> {

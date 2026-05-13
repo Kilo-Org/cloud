@@ -356,14 +356,16 @@ function metricExprSql(metric: Metric, tier: GranularityTier): string {
       return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(error_count), 0)::FLOAT / SUM(request_count)::FLOAT END';
     case 'avgLatencyMs':
       return 'CASE WHEN COALESCE(SUM(latency_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_latency_ms), 0)::FLOAT / SUM(latency_count)::FLOAT END';
-    case 'avgGenerationTimeMs':
-      return `CASE WHEN COALESCE(SUM(${generationTimeCountExprSql(tier)}), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_generation_time_ms), 0)::FLOAT / SUM(${generationTimeCountExprSql(tier)})::FLOAT END`;
+    case 'avgGenerationTimeMs': {
+      const countExpr = generationTimeCountExprSql(tier);
+      return `CASE WHEN COALESCE(SUM(${countExpr}), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_generation_time_ms), 0)::FLOAT / SUM(${countExpr})::FLOAT END`;
+    }
     case 'costPerRequest':
       return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_cost_microdollars), 0)::FLOAT / SUM(request_count)::FLOAT END';
     case 'tokensPerRequest':
       return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_tokens), 0)::FLOAT / SUM(request_count)::FLOAT END';
     case 'cacheHitRatio':
-      return 'CASE WHEN COALESCE(SUM(total_input_tokens), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_cache_hit_tokens), 0)::FLOAT / SUM(total_input_tokens)::FLOAT END';
+      return 'CASE WHEN COALESCE(SUM(total_input_tokens + total_cache_hit_tokens), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_cache_hit_tokens), 0)::FLOAT / SUM(total_input_tokens + total_cache_hit_tokens)::FLOAT END';
     case 'outputInputRatio':
       return 'CASE WHEN COALESCE(SUM(total_input_tokens), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_output_tokens), 0)::FLOAT / SUM(total_input_tokens)::FLOAT END';
   }
@@ -776,7 +778,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
         avgGenerationTimeMs: ratioSafe(totalGenerationTimeMs, generationTimeCount),
         costPerRequest: ratioSafe(costMicrodollars, requestCount),
         tokensPerRequest: ratioSafe(totalTokens, requestCount),
-        cacheHitRatio: ratioSafe(cacheHitTokens, inputTokens),
+        cacheHitRatio: ratioSafe(cacheHitTokens, inputTokens + cacheHitTokens),
         outputInputRatio: ratioSafe(outputTokens, inputTokens),
         effectiveGranularity: meta.effectiveGranularity,
       };

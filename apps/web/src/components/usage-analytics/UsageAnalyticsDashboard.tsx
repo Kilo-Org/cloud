@@ -380,14 +380,15 @@ export function UsageAnalyticsDashboard({
           label: DIMENSION_LABELS[d],
           render: (_v, row) => {
             const dims = (row.dimensions as Record<string, string>) ?? {};
-            const rawVal = dims[d] ?? '';
-            if (!rawVal) return '—';
+            const rawVal = dims[d];
+            if (rawVal == null || (d !== 'project' && rawVal === '')) return '—';
             return labelForDimensionValue(d, rawVal);
           },
           sortAccessor: row => {
             const dims = (row.dimensions as Record<string, string>) ?? {};
-            const rawVal = dims[d] ?? '';
-            return rawVal ? labelForDimensionValue(d, rawVal) : '';
+            const rawVal = dims[d];
+            if (rawVal == null || (d !== 'project' && rawVal === '')) return '';
+            return labelForDimensionValue(d, rawVal);
           },
         })
       ),

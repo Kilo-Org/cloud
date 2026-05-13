@@ -274,6 +274,11 @@ describe('handleMergeRequestCodeReview', () => {
     );
     expect(mockCreateCodeReview).toHaveBeenCalledTimes(1);
     expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
+    expect(mockGetOrCreateProjectAccessToken).toHaveBeenCalledTimes(2);
+    expect(mockGetOrCreateProjectAccessToken).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '8b2ff443-8396-4b07-99ae-7015789da7dd' }),
+      123
+    );
   });
 
   it('skips supersession cancel on merge-commit update events', async () => {

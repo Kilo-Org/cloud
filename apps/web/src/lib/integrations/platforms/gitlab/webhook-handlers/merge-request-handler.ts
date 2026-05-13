@@ -283,37 +283,36 @@ export async function handleMergeRequestCodeReview(
       gitlab_instance_url?: string;
     } | null;
     const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+    const gitlabReviewsToClear = cancelledReviews.filter(
+      review =>
+        review.platform === 'gitlab' &&
+        review.platformProjectId != null &&
+        review.headSha.length > 0
+    );
+    const cleanupPratToken =
+      gitlabReviewsToClear.length > 0 && fullIntegration
+        ? await getOrCreateProjectAccessToken(fullIntegration, project.id)
+        : null;
 
-    if (cancelledReviews.length > 0 && fullIntegration) {
+    if (gitlabReviewsToClear.length > 0 && cleanupPratToken) {
       await Promise.allSettled(
-        cancelledReviews
-          .filter(
-            review =>
-              review.platform === 'gitlab' &&
-              review.platformProjectId != null &&
-              review.headSha.length > 0
-          )
-          .map(async review => {
-            try {
-              const pratToken = await getOrCreateProjectAccessToken(
-                fullIntegration,
-                review.platformProjectId as number
-              );
-              await setCommitStatus(
-                pratToken,
-                review.platformProjectId as number,
-                review.headSha,
-                'canceled',
-                { description: 'Superseded by new push' },
-                instanceUrl
-              );
-            } catch (error) {
-              logExceptInTest(
-                `Failed to cancel old commit status for ${review.headSha} on project ${review.platformProjectId}:`,
-                error
-              );
-            }
-          })
+        gitlabReviewsToClear.map(async review => {
+          try {
+            await setCommitStatus(
+              cleanupPratToken,
+              review.platformProjectId ?? project.id,
+              review.headSha,
+              'canceled',
+              { description: 'Superseded by new push' },
+              instanceUrl
+            );
+          } catch (error) {
+            logExceptInTest(
+              `Failed to cancel old commit status for ${review.headSha} on project ${review.platformProjectId}:`,
+              error
+            );
+          }
+        })
       );
     }
 

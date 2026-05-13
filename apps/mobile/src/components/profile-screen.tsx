@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
-import { KeyRound, LogOut, Trash2 } from 'lucide-react-native';
+import { KeyRound, Lock, LogOut, Trash2 } from 'lucide-react-native';
 import { Alert, Platform, Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
+import { revokeConsent } from '@/lib/consent';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 
@@ -22,6 +24,7 @@ function providerIcon(_provider: string) {
 
 export function ProfileScreen() {
   const { signOut } = useAuth();
+  const { userId } = useCurrentUserId();
   const trpc = useTRPC();
   const colors = useThemeColors();
   const {
@@ -73,6 +76,28 @@ export function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const confirmRevokeConsent = () => {
+    Alert.alert(
+      'Revoke data sharing consent?',
+      'Kilo Code needs this consent to function. Revoking will sign you out. You can accept again on next sign-in.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Revoke and sign out',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              if (userId) {
+                await revokeConsent(userId);
+              }
+              await signOut();
+            })();
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -141,6 +166,16 @@ export function ProfileScreen() {
 
         {/* Actions */}
         <View className="mt-6 gap-3">
+          <Button
+            variant="ghost"
+            className="flex-row gap-2"
+            onPress={confirmRevokeConsent}
+            accessibilityLabel="Revoke data sharing consent"
+          >
+            <Lock size={16} color={colors.mutedForeground} />
+            <Text className="text-muted-foreground">Privacy choices</Text>
+          </Button>
+
           <Button
             variant="ghost"
             className="flex-row gap-2"

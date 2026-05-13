@@ -188,4 +188,39 @@ describe('findPreviousCompletedReview', () => {
     expect(updatedFirstAttempt?.status).toBe('failed');
     expect(updatedFirstAttempt?.error_message).toBe('Container shutdown: SIGTERM');
   });
+
+  it('does not reopen a terminal attempt without session ids', async () => {
+    const reviewId = await createReview('sha-terminal-attempt');
+    const failedAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'failed',
+      errorMessage: 'startup failed',
+      terminalReason: 'sandbox_error',
+    });
+
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_late',
+      cliSessionId: 'ses_late',
+      executionId: 'exec_late',
+    });
+
+    expect(result.id).toBe(failedAttempt.id);
+    expect(result.status).toBe('failed');
+    expect(result.session_id).toBeNull();
+    expect(result.cli_session_id).toBeNull();
+    expect(result.execution_id).toBeNull();
+
+    const [storedAttempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, failedAttempt.id))
+      .limit(1);
+
+    expect(storedAttempt?.status).toBe('failed');
+    expect(storedAttempt?.session_id).toBeNull();
+    expect(storedAttempt?.cli_session_id).toBeNull();
+    expect(storedAttempt?.execution_id).toBeNull();
+  });
 });

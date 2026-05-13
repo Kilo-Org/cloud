@@ -279,7 +279,9 @@ export async function ensureCodeReviewAttemptForRunningCallback(params: {
       latestAttempt.status === 'pending' ||
       (params.sessionId !== undefined && latestAttempt.session_id === params.sessionId) ||
       (params.cliSessionId !== undefined && latestAttempt.cli_session_id === params.cliSessionId) ||
-      (!latestAttempt.session_id && !latestAttempt.cli_session_id);
+      (!latestAttempt.session_id &&
+        !latestAttempt.cli_session_id &&
+        !isTerminalCodeReviewStatus(latestAttempt.status));
 
     if (shouldUpdateLatestPending) {
       const [updated] = await db

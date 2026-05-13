@@ -9,9 +9,7 @@ import { getItemIdentity } from './util/compaction';
 import { MAX_INGEST_ITEM_BYTES, MAX_SINGLE_ITEM_BYTES } from './util/ingest-limits';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { withDORetry, normalizeGitUrl } from '@kilocode/worker-utils';
-
-const PARENT_SESSION_LOOKUP_ATTEMPTS = 3;
-const PARENT_SESSION_LOOKUP_DELAY_MS = 250;
+import { setSafeParentSessionId } from './services/session-parent';
 
 export type IngestQueueMessage = {
   r2Key: string;
@@ -266,6 +264,12 @@ async function processItem(
     'SessionIngestDO.ingest'
   );
 
+  for (const extracted of ingestResult.extracted) {
+    if (extracted.name === 'parentId') {
+      mergedChanges.set(extracted.name, extracted.value);
+    }
+  }
+
   for (const change of ingestResult.changes) {
     mergedChanges.set(change.name, change.value);
   }
@@ -323,49 +327,6 @@ export function computeSessionMetadataUpdates(
   return updates;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function parentSessionExists(
-  db: ReturnType<typeof getWorkerDb>,
-  kiloUserId: string,
-  parentSessionId: string
-): Promise<boolean> {
-  const parentRows = await db
-    .select({ session_id: cli_sessions_v2.session_id })
-    .from(cli_sessions_v2)
-    .where(
-      and(
-        eq(cli_sessions_v2.session_id, parentSessionId),
-        eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-      )
-    )
-    .limit(1);
-
-  return Boolean(parentRows[0]);
-}
-
-export async function resolveSafeParentSessionId(
-  db: ReturnType<typeof getWorkerDb>,
-  kiloUserId: string,
-  sessionId: string,
-  parentSessionId: string,
-  options: { attempts?: number; delayMs?: number } = {}
-): Promise<string | null> {
-  if (parentSessionId === sessionId) return null;
-
-  const attempts = options.attempts ?? PARENT_SESSION_LOOKUP_ATTEMPTS;
-  const delayMs = options.delayMs ?? PARENT_SESSION_LOOKUP_DELAY_MS;
-
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    if (await parentSessionExists(db, kiloUserId, parentSessionId)) return parentSessionId;
-    if (attempt < attempts && delayMs > 0) await sleep(delayMs);
-  }
-
-  return null;
-}
-
 async function applyMetadataChanges(
   env: Env,
   kiloUserId: string,
@@ -391,25 +352,7 @@ async function applyMetadataChanges(
     : undefined;
   if (parentSessionId !== undefined) {
     if (parentSessionId && parentSessionId !== sessionId) {
-      const safeParentSessionId = await resolveSafeParentSessionId(
-        db,
-        kiloUserId,
-        sessionId,
-        parentSessionId
-      );
-
-      if (safeParentSessionId) {
-        await db
-          .update(cli_sessions_v2)
-          .set({ parent_session_id: safeParentSessionId })
-          .where(
-            and(
-              eq(cli_sessions_v2.session_id, sessionId),
-              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-              sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${safeParentSessionId}`
-            )
-          );
-      }
+      await setSafeParentSessionId(db, kiloUserId, sessionId, parentSessionId);
     } else if (parentSessionId === null) {
       await db
         .update(cli_sessions_v2)

@@ -10,6 +10,7 @@ import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { getSessionExport } from '../services/session-export';
+import { setSafeParentSessionId } from '../services/session-parent';
 import type { IngestQueueMessage } from '../queue-consumer';
 
 export type ApiContext = {
@@ -33,39 +34,6 @@ const createSessionSchema = z
   .strict();
 
 const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
-const PARENT_SESSION_LOOKUP_ATTEMPTS = 3;
-const PARENT_SESSION_LOOKUP_DELAY_MS = 250;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function getSafeParentSessionId(
-  db: ReturnType<typeof getWorkerDb>,
-  kiloUserId: string,
-  sessionId: string,
-  parentSessionId: string | undefined
-): Promise<string | undefined> {
-  if (!parentSessionId || parentSessionId === sessionId) return undefined;
-
-  for (let attempt = 1; attempt <= PARENT_SESSION_LOOKUP_ATTEMPTS; attempt++) {
-    const parentRows = await db
-      .select({ session_id: cli_sessions_v2.session_id })
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, parentSessionId),
-          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-        )
-      )
-      .limit(1);
-
-    if (parentRows[0]) return parentSessionId;
-    if (attempt < PARENT_SESSION_LOOKUP_ATTEMPTS) await sleep(PARENT_SESSION_LOOKUP_DELAY_MS);
-  }
-
-  return undefined;
-}
 
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
@@ -73,27 +41,37 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   // Persist a placeholder session row plus safe attribution metadata supplied at bootstrap.
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
-  const parentSessionId = await getSafeParentSessionId(
-    db,
-    kiloUserId,
-    body.sessionId,
-    body.parentSessionId
-  );
+  const sessionValues: typeof cli_sessions_v2.$inferInsert = {
+    session_id: body.sessionId,
+    kilo_user_id: kiloUserId,
+  };
+  const conflictUpdates: Partial<typeof cli_sessions_v2.$inferInsert> = {};
 
-  await db
-    .insert(cli_sessions_v2)
-    .values({
-      session_id: body.sessionId,
-      kilo_user_id: kiloUserId,
-      ...(body.title !== undefined ? { title: body.title === '' ? null : body.title } : {}),
-      ...(body.createdOnPlatform !== undefined
-        ? { created_on_platform: body.createdOnPlatform }
-        : {}),
-      ...(parentSessionId !== undefined ? { parent_session_id: parentSessionId } : {}),
-    })
-    .onConflictDoNothing({
+  if (body.title !== undefined) {
+    const title = body.title === '' ? null : body.title;
+    sessionValues.title = title;
+    conflictUpdates.title = title;
+  }
+  if (body.createdOnPlatform !== undefined) {
+    sessionValues.created_on_platform = body.createdOnPlatform;
+    conflictUpdates.created_on_platform = body.createdOnPlatform;
+  }
+
+  const insertQuery = db.insert(cli_sessions_v2).values(sessionValues);
+  if (Object.keys(conflictUpdates).length > 0) {
+    await insertQuery.onConflictDoUpdate({
+      target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
+      set: conflictUpdates,
+    });
+  } else {
+    await insertQuery.onConflictDoNothing({
       target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
     });
+  }
+
+  if (body.parentSessionId !== undefined) {
+    await setSafeParentSessionId(db, kiloUserId, body.sessionId, body.parentSessionId);
+  }
 
   // Warm the session cache so the first ingest can skip Postgres.
   await withDORetry(

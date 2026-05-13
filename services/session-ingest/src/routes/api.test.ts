@@ -73,7 +73,7 @@ function makeDbFakes() {
   };
 
   // Drizzle update chain: db.update(table).set({}).where().returning()
-  const updateResult = vi.fn<() => Promise<unknown>>(async () => undefined);
+  const updateResult = vi.fn<() => Promise<unknown>>(async () => []);
   const updateSet = vi.fn(() => update);
   const updateWhere = vi.fn(() => update);
   const updateReturning = vi.fn(() => update);
@@ -118,6 +118,8 @@ function makeDbFakes() {
     fns: {
       insert: insertFn,
       insertValues: insert.values,
+      insertOnConflictDoNothing: insert.onConflictDoNothing,
+      insertOnConflictDoUpdate: insert.onConflictDoUpdate,
       select: selectFn,
       update: updateFn,
       updateSet,
@@ -225,6 +227,7 @@ describe('api routes', () => {
 
     expect(res.status).toBe(200);
     expect(fns.insert).toHaveBeenCalled();
+    expect(fns.insertOnConflictDoNothing).toHaveBeenCalled();
     expect(sessionCache.add).toHaveBeenCalledWith('ses_12345678901234567890123456');
 
     const json = await res.json();
@@ -237,7 +240,7 @@ describe('api routes', () => {
   it('POST /session persists initial attribution metadata when the parent is safe', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_parent12345678901234567890' }]);
+    fns.updateResult.mockResolvedValueOnce([{ session_id: 'ses_child123456789012345678901' }]);
 
     const sessionCache = {
       add: vi.fn(async () => undefined),
@@ -269,6 +272,16 @@ describe('api routes', () => {
       kilo_user_id: 'usr_test',
       title: 'Child run',
       created_on_platform: 'agent-manager',
+    });
+    expect(fns.insertOnConflictDoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        set: {
+          title: 'Child run',
+          created_on_platform: 'agent-manager',
+        },
+      })
+    );
+    expect(fns.updateSet).toHaveBeenCalledWith({
       parent_session_id: 'ses_parent12345678901234567890',
     });
   });
@@ -276,7 +289,6 @@ describe('api routes', () => {
   it('POST /session ignores unsafe parent metadata at bootstrap', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([]);
 
     const sessionCache = {
       add: vi.fn(async () => undefined),
@@ -307,6 +319,7 @@ describe('api routes', () => {
       kilo_user_id: 'usr_test',
       created_on_platform: 'vscode',
     });
+    expect(fns.updateResult).toHaveBeenCalledTimes(3);
   });
 
   it('POST /session rejects unknown bootstrap metadata fields', async () => {

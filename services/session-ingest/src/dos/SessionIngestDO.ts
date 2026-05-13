@@ -102,6 +102,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     r2References?: Record<string, string>
   ): Promise<{
     changes: Changes;
+    extracted: Changes;
   }> {
     const deletedRow = this.db
       .select({ value: ingestMeta.value })
@@ -116,7 +117,7 @@ export class SessionIngestDO extends DurableObject<Env> {
           await this.env.SESSION_INGEST_R2.delete(keys);
         }
       }
-      return { changes: [] };
+      return { changes: [], extracted: [] };
     }
 
     writeIngestMetaIfChanged(this.db, { key: 'kiloUserId', incomingValue: kiloUserId });
@@ -211,10 +212,12 @@ export class SessionIngestDO extends DurableObject<Env> {
     }
 
     const changes: Changes = [];
+    const extracted: Changes = [];
 
     for (const key of Object.keys(incomingByKey) as ExtractableMetaKey[]) {
       const incoming = incomingByKey[key];
       if (incoming === undefined) continue;
+      extracted.push({ name: key, value: incoming });
       const meta = writeIngestMetaIfChanged(this.db, {
         key,
         incomingValue: incoming,
@@ -251,6 +254,7 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     return {
       changes,
+      extracted,
     };
   }
 

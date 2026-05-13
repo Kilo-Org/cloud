@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { getWorkerDb } from '@kilocode/db/client';
 
 // Mock cloudflare:workers before any imports that might pull in DO code
 vi.mock('cloudflare:workers', () => ({
@@ -33,28 +32,9 @@ vi.mock('./util/ingest-limits', () => ({
   MAX_SINGLE_ITEM_BYTES: 50,
 }));
 
-import {
-  createItemExtractor,
-  computeSessionMetadataUpdates,
-  resolveSafeParentSessionId,
-} from './queue-consumer';
+import { createItemExtractor, computeSessionMetadataUpdates } from './queue-consumer';
 
 const encoder = new TextEncoder();
-type WorkerDb = ReturnType<typeof getWorkerDb>;
-
-function makeParentLookupDb(selectResult: ReturnType<typeof vi.fn>) {
-  const select = {
-    from: vi.fn(() => select),
-    where: vi.fn(() => select),
-    limit: vi.fn(() => select),
-    then: vi.fn((resolve: (v: unknown) => unknown) => resolve(selectResult())),
-  };
-
-  return {
-    db: { select: vi.fn(() => select) },
-    selectResult,
-  };
-}
 
 function feedAll(extractor: ReturnType<typeof createItemExtractor>, json: string) {
   extractor.tokenizer.write(encoder.encode(json));
@@ -206,43 +186,5 @@ describe('computeSessionMetadataUpdates', () => {
   it('ignores a null "platform" change (creation value stays sticky)', () => {
     const updates = computeSessionMetadataUpdates(new Map([['platform', null]]), fixedNow);
     expect('created_on_platform' in updates).toBe(false);
-  });
-});
-
-describe('resolveSafeParentSessionId', () => {
-  it('waits for a shortly delayed same-user parent row', async () => {
-    const selectResult = vi
-      .fn()
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ session_id: 'ses_parent12345678901234567890' }]);
-    const { db } = makeParentLookupDb(selectResult);
-
-    await expect(
-      resolveSafeParentSessionId(
-        db as unknown as WorkerDb,
-        'usr_test',
-        'ses_child123456789012345678901',
-        'ses_parent12345678901234567890',
-        { attempts: 2, delayMs: 0 }
-      )
-    ).resolves.toBe('ses_parent12345678901234567890');
-    expect(selectResult).toHaveBeenCalledTimes(2);
-  });
-
-  it('rejects self-parenting without querying Postgres', async () => {
-    const selectResult = vi
-      .fn()
-      .mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
-    const { db } = makeParentLookupDb(selectResult);
-
-    await expect(
-      resolveSafeParentSessionId(
-        db as unknown as WorkerDb,
-        'usr_test',
-        'ses_12345678901234567890123456',
-        'ses_12345678901234567890123456'
-      )
-    ).resolves.toBeNull();
-    expect(selectResult).not.toHaveBeenCalled();
   });
 });

@@ -4,6 +4,7 @@ const mockCreateCheckRun = jest.fn();
 const mockUpdateCheckRun = jest.fn();
 const mockUpdateCheckRunId = jest.fn();
 const mockCreateCodeReview = jest.fn();
+const mockCancelSupersededReviewsForPR = jest.fn();
 const mockFindExistingReview = jest.fn();
 const mockFindActiveReviewsForPR = jest.fn();
 const mockUpdateReviewHeadShaAndCheckRun = jest.fn();
@@ -24,6 +25,7 @@ jest.mock('@/lib/agent-config/db/agent-configs', () => ({
 
 jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   createCodeReview: (...args: unknown[]) => mockCreateCodeReview(...args),
+  cancelSupersededReviewsForPR: (...args: unknown[]) => mockCancelSupersededReviewsForPR(...args),
   findExistingReview: (...args: unknown[]) => mockFindExistingReview(...args),
   findActiveReviewsForPR: (...args: unknown[]) => mockFindActiveReviewsForPR(...args),
   updateReviewHeadShaAndCheckRun: (...args: unknown[]) =>
@@ -100,6 +102,7 @@ beforeEach(() => {
   mockUpdateCheckRun.mockResolvedValue(undefined);
   mockUpdateCheckRunId.mockResolvedValue(undefined);
   mockCreateCodeReview.mockResolvedValue('review-1');
+  mockCancelSupersededReviewsForPR.mockResolvedValue([]);
   mockFindExistingReview.mockResolvedValue(null);
   mockFindActiveReviewsForPR.mockResolvedValue([]);
   mockUpdateReviewHeadShaAndCheckRun.mockResolvedValue(undefined);
@@ -269,6 +272,103 @@ describe('handlePullRequest', () => {
       { status: 'completed', conclusion: 'cancelled' },
       'standard'
     );
+  });
+
+  it('cancels superseded DB rows, interrupts queued/running only, and creates the new review', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockCancelSupersededReviewsForPR.mockResolvedValue([
+      {
+        id: 'pending-review',
+        prevStatus: 'pending',
+        sessionId: null,
+        checkRunId: 101,
+        headSha: 'old-pending-sha',
+        platform: 'github',
+        platformProjectId: null,
+        platformIntegrationId: 'integration-1',
+      },
+      {
+        id: 'queued-review',
+        prevStatus: 'queued',
+        sessionId: 'session-queued',
+        checkRunId: 102,
+        headSha: 'old-queued-sha',
+        platform: 'github',
+        platformProjectId: null,
+        platformIntegrationId: 'integration-1',
+      },
+      {
+        id: 'running-review',
+        prevStatus: 'running',
+        sessionId: 'session-running',
+        checkRunId: null,
+        headSha: 'old-running-sha',
+        platform: 'github',
+        platformProjectId: null,
+        platformIntegrationId: 'integration-1',
+      },
+    ]);
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(response.status).toBe(202);
+    expect(mockCancelSupersededReviewsForPR).toHaveBeenCalledWith('acme/widgets', 42, 'abc123');
+    expect(mockCancelReview).toHaveBeenCalledTimes(2);
+    expect(mockCancelReview).toHaveBeenNthCalledWith(1, 'queued-review', 'Superseded by new push');
+    expect(mockCancelReview).toHaveBeenNthCalledWith(2, 'running-review', 'Superseded by new push');
+    expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+      '98765',
+      'acme',
+      'widgets',
+      101,
+      {
+        status: 'completed',
+        conclusion: 'cancelled',
+        output: {
+          title: 'Kilo Code Review superseded',
+          summary: 'A newer commit was pushed; this review was cancelled.',
+        },
+      },
+      'standard'
+    );
+    expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+      '98765',
+      'acme',
+      'widgets',
+      102,
+      {
+        status: 'completed',
+        conclusion: 'cancelled',
+        output: {
+          title: 'Kilo Code Review superseded',
+          summary: 'A newer commit was pushed; this review was cancelled.',
+        },
+      },
+      'standard'
+    );
+    expect(mockCreateCodeReview).toHaveBeenCalledTimes(1);
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips supersession cancel on merge-commit synchronize events', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockFindActiveReviewsForPR.mockResolvedValue(['review-1']);
+    mockIsMergeCommit.mockResolvedValue(true);
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(response.status).toBe(200);
+    expect(mockCancelSupersededReviewsForPR).not.toHaveBeenCalled();
+    expect(mockCancelReview).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
   });
 
   it('passes the integration GitHub app type when cancelling an orphaned merge-commit check run', async () => {

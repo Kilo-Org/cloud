@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { captureException } from '@sentry/nextjs';
+import { addBreadcrumb, captureException } from '@sentry/nextjs';
 import type { PullRequestPayload } from '../webhook-schemas';
 import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import {
   createCodeReview,
+  cancelSupersededReviewsForPR,
   findExistingReview,
   findActiveReviewsForPR,
   updateReviewHeadShaAndCheckRun,
@@ -198,25 +199,78 @@ export async function handlePullRequestCodeReview(
 
     // 5. Cancel any existing reviews for this PR (different SHA)
     // This prevents spam when user pushes multiple commits quickly
-    const oldReviewIds = await findActiveReviewsForPR(
+    const cancelledReviews = await cancelSupersededReviewsForPR(
       repository.full_name,
       pull_request.number,
       pull_request.head.sha
     );
 
-    if (oldReviewIds.length > 0) {
+    if (cancelledReviews.length > 0) {
+      const cancellationCounts = {
+        pending: cancelledReviews.filter(review => review.prevStatus === 'pending').length,
+        queued: cancelledReviews.filter(review => review.prevStatus === 'queued').length,
+        running: cancelledReviews.filter(review => review.prevStatus === 'running').length,
+      };
+
       logExceptInTest(
-        `Cancelling ${oldReviewIds.length} old review(s) for ${repository.full_name}#${pull_request.number}`
+        `Cancelled ${cancelledReviews.length} superseded review(s) for ${repository.full_name}#${pull_request.number}`,
+        cancellationCounts
       );
 
-      // Cancel each review via the orchestrator (fire-and-forget, don't block new review)
       await Promise.allSettled(
-        oldReviewIds.map(reviewId =>
-          codeReviewWorkerClient.cancelReview(reviewId, 'Superseded by new push').catch(err => {
-            logExceptInTest(`Failed to cancel review ${reviewId}:`, err);
-            return { success: false, reviewId };
+        cancelledReviews
+          .filter(review => review.prevStatus !== 'pending')
+          .map(async review => {
+            try {
+              const response = await codeReviewWorkerClient.cancelReview(
+                review.id,
+                'Superseded by new push'
+              );
+
+              if (!response.success) {
+                addBreadcrumb({
+                  category: 'code-review.cancel',
+                  level: 'info',
+                  message: 'Worker cancel returned success=false for superseded review',
+                  data: {
+                    reviewId: review.id,
+                    prevStatus: review.prevStatus,
+                    repo: repository.full_name,
+                    prNumber: pull_request.number,
+                  },
+                });
+              }
+            } catch (error) {
+              logExceptInTest(`Failed to interrupt review ${review.id}:`, error);
+            }
           })
-        )
+      );
+
+      const [repoOwner, repoName] = repository.full_name.split('/');
+      await Promise.allSettled(
+        cancelledReviews
+          .filter(review => review.checkRunId != null && review.platform === 'github')
+          .map(async review => {
+            try {
+              await updateCheckRun(
+                integration.platform_installation_id as string,
+                repoOwner,
+                repoName,
+                review.checkRunId as number,
+                {
+                  status: 'completed',
+                  conclusion: 'cancelled',
+                  output: {
+                    title: 'Kilo Code Review superseded',
+                    summary: 'A newer commit was pushed; this review was cancelled.',
+                  },
+                },
+                appType
+              );
+            } catch (error) {
+              logExceptInTest(`Failed to cancel old check run ${review.checkRunId}:`, error);
+            }
+          })
       );
     }
 

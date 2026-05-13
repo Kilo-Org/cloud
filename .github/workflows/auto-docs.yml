@@ -72,13 +72,26 @@ jobs:
           echo "should_send=true" >> "$GITHUB_OUTPUT"
           echo "Found PR #$PR_NUMBER with branch: $HEAD_BRANCH, title: $PR_TITLE"
 
-      - name: Build webhook payload
+      - name: Build and send webhook payload
         if: steps.pr.outputs.should_send == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          DOC_WEBHOOK_URL: ${{ secrets.DOC_WEBHOOK_URL }}
+          DOC_WEBHOOK_SECRET: ${{ secrets.DOC_WEBHOOK_SECRET }}
         run: |
           set -euo pipefail
-          trap 'rm -f pr.json payload.json /tmp/gh_err.txt' EXIT
+          trap 'rm -f pr.json /tmp/gh_err.txt' EXIT
+
+          if [ -z "${DOC_WEBHOOK_URL:-}" ]; then
+            echo "DOC_WEBHOOK_URL secret is not set"
+            exit 1
+          fi
+
+          if [ -z "${DOC_WEBHOOK_SECRET:-}" ]; then
+            echo "DOC_WEBHOOK_SECRET secret is not set"
+            exit 1
+          fi
+
           PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
 
           gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" > pr.json 2>/tmp/gh_err.txt || {
@@ -86,7 +99,7 @@ jobs:
             exit 1
           }
 
-          jq -n \
+          PAYLOAD=$(jq -c -n \
             --arg event_name "${{ github.event_name }}" \
             --arg repo "${{ github.repository }}" \
             --arg pr_number "${{ steps.pr.outputs.pr_number }}" \
@@ -102,40 +115,12 @@ jobs:
               pr_url: $pr[0].html_url,
               base_branch: $pr[0].base.ref,
               head_branch: $pr[0].head.ref
-            }' > payload.json
+            }')
 
           echo "Payload created:"
-          jq '{
-            event_name,
-            repo,
-            pr_number,
-            title,
-            author,
-            merged_at,
-            pr_url,
-            base_branch,
-            head_branch
-          }' payload.json
-
-      - name: Send webhook to Val Town
-        if: steps.pr.outputs.should_send == 'true'
-        env:
-          DOC_WEBHOOK_URL: ${{ secrets.DOC_WEBHOOK_URL }}
-          DOC_WEBHOOK_SECRET: ${{ secrets.DOC_WEBHOOK_SECRET }}
-        run: |
-          set -euo pipefail
-
-          if [ -z "${DOC_WEBHOOK_URL:-}" ]; then
-            echo "DOC_WEBHOOK_URL secret is not set"
-            exit 1
-          fi
-
-          if [ -z "${DOC_WEBHOOK_SECRET:-}" ]; then
-            echo "DOC_WEBHOOK_SECRET secret is not set"
-            exit 1
-          fi
+          echo "$PAYLOAD" | jq .
 
           curl --fail-with-body -sS --connect-timeout 10 --max-time 30 -X POST "$DOC_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -H "X-Docs-Webhook-Secret: $DOC_WEBHOOK_SECRET" \
-            --data-binary @payload.json
+            --data-binary "$PAYLOAD"

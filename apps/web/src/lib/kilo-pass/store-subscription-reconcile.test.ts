@@ -28,9 +28,7 @@ type InsertSubscriptionParams = {
   startedAt?: string;
 };
 
-async function insertStoreSubscription(
-  params: InsertSubscriptionParams
-): Promise<{ id: string }> {
+async function insertStoreSubscription(params: InsertSubscriptionParams): Promise<{ id: string }> {
   const [row] = await db
     .insert(kilo_pass_subscriptions)
     .values({

@@ -25,8 +25,7 @@ import {
   getSessionUsageFromBilling,
   updateCodeReviewAttemptForCallback,
   getLatestCodeReviewAttempt,
-  createCodeReviewAttempt,
-  hasInfraRetryAttempt,
+  createInfraRetryAttemptIfMissing,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
@@ -602,54 +601,61 @@ export async function POST(
       });
     }
 
-    if (
-      isRetryableInfraFailure(status, terminalReason, errorMessage) &&
-      !(await hasInfraRetryAttempt(reviewId))
-    ) {
-      const retryAttempt = await createCodeReviewAttempt({
+    if (isRetryableInfraFailure(status, terminalReason, errorMessage)) {
+      const retryAttemptResult = await createInfraRetryAttemptIfMissing({
         codeReviewId: reviewId,
         retryOfAttemptId: attempt.id,
-        retryReason: 'infra_failure',
-        status: 'pending',
       });
 
-      try {
-        const retryResult = await codeReviewWorkerClient.retryReviewFresh(reviewId, {
-          sessionId,
-          reason: errorMessage ?? terminalReason ?? 'retryable infra failure',
-        });
+      if (retryAttemptResult.outcome === 'created') {
+        const retryAttempt = retryAttemptResult.attempt;
 
-        if (retryResult.success) {
-          logExceptInTest('[code-review-status] Started fresh retry after infra failure', {
+        try {
+          const retryResult = await codeReviewWorkerClient.retryReviewFresh(reviewId, {
+            sessionId,
+            reason: errorMessage ?? terminalReason ?? 'retryable infra failure',
+          });
+
+          if (retryResult.success) {
+            logExceptInTest('[code-review-status] Started fresh retry after infra failure', {
+              reviewId,
+              failedAttemptId: attempt.id,
+              retryAttemptId: retryAttempt.id,
+              sessionId,
+            });
+            return NextResponse.json({ success: true, retried: true });
+          }
+
+          await updateCodeReviewAttemptForCallback({
+            codeReviewId: reviewId,
+            status: 'failed',
+            errorMessage: 'Worker declined fresh retry after infra failure',
+            terminalReason: 'sandbox_error',
+            completedAt: new Date(),
+          });
+        } catch (retryError) {
+          await updateCodeReviewAttemptForCallback({
+            codeReviewId: reviewId,
+            status: 'failed',
+            errorMessage: retryError instanceof Error ? retryError.message : String(retryError),
+            terminalReason: 'sandbox_error',
+            completedAt: new Date(),
+          });
+          logExceptInTest('[code-review-status] Fresh retry startup failed, falling through', {
             reviewId,
             failedAttemptId: attempt.id,
             retryAttemptId: retryAttempt.id,
-            sessionId,
+            error: retryError instanceof Error ? retryError.message : String(retryError),
           });
-          return NextResponse.json({ success: true, retried: true });
         }
-
-        await updateCodeReviewAttemptForCallback({
-          codeReviewId: reviewId,
-          status: 'failed',
-          errorMessage: 'Worker declined fresh retry after infra failure',
-          terminalReason: 'sandbox_error',
-          completedAt: new Date(),
-        });
-      } catch (retryError) {
-        await updateCodeReviewAttemptForCallback({
-          codeReviewId: reviewId,
-          status: 'failed',
-          errorMessage: retryError instanceof Error ? retryError.message : String(retryError),
-          terminalReason: 'sandbox_error',
-          completedAt: new Date(),
-        });
-        logExceptInTest('[code-review-status] Fresh retry startup failed, falling through', {
+      } else if (retryAttemptResult.outcome === 'existing-for-attempt') {
+        logExceptInTest('[code-review-status] Fresh retry already queued for failed attempt', {
           reviewId,
           failedAttemptId: attempt.id,
-          retryAttemptId: retryAttempt.id,
-          error: retryError instanceof Error ? retryError.message : String(retryError),
+          retryAttemptId: retryAttemptResult.attempt.id,
+          sessionId,
         });
+        return NextResponse.json({ success: true, retried: true });
       }
     }
 

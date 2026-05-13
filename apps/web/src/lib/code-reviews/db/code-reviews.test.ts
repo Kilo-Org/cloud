@@ -10,6 +10,7 @@ import type { User } from '@kilocode/db/schema';
 import {
   createCodeReview,
   createCodeReviewAttempt,
+  createInfraRetryAttemptIfMissing,
   listCodeReviewAttempts,
   updateCodeReviewAttemptForCallback,
   updateCodeReviewStatus,
@@ -222,5 +223,31 @@ describe('findPreviousCompletedReview', () => {
     expect(storedAttempt?.session_id).toBeNull();
     expect(storedAttempt?.cli_session_id).toBeNull();
     expect(storedAttempt?.execution_id).toBeNull();
+  });
+
+  it('creates only one infra retry attempt for the same failed attempt', async () => {
+    const reviewId = await createReview('sha-infra-retry');
+    const failedAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent_failed',
+      terminalReason: 'sandbox_error',
+    });
+
+    const first = await createInfraRetryAttemptIfMissing({
+      codeReviewId: reviewId,
+      retryOfAttemptId: failedAttempt.id,
+    });
+    const second = await createInfraRetryAttemptIfMissing({
+      codeReviewId: reviewId,
+      retryOfAttemptId: failedAttempt.id,
+    });
+
+    expect(first.outcome).toBe('created');
+    expect(second.outcome).toBe('existing-for-attempt');
+    expect(second.attempt.id).toBe(first.attempt.id);
+
+    const attempts = await listCodeReviewAttempts(reviewId);
+    expect(attempts.filter(attempt => attempt.retry_reason === 'infra_failure')).toHaveLength(1);
   });
 });

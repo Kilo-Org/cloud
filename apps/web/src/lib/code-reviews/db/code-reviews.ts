@@ -20,6 +20,20 @@ import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
 
 type CodeReviewAttemptStatus = CodeReviewStatus;
 
+type InfraRetryAttemptResult =
+  | {
+      outcome: 'created';
+      attempt: CloudAgentCodeReviewAttempt;
+    }
+  | {
+      outcome: 'existing-for-attempt';
+      attempt: CloudAgentCodeReviewAttempt;
+    }
+  | {
+      outcome: 'existing-for-review';
+      attempt: CloudAgentCodeReviewAttempt;
+    };
+
 type AttemptCallbackFields = {
   codeReviewId: string;
   status: CodeReviewAttemptStatus;
@@ -250,6 +264,83 @@ export async function createCodeReviewAttempt(params: {
   } catch (error) {
     captureException(error, {
       tags: { operation: 'createCodeReviewAttempt' },
+      extra: { params },
+    });
+    throw error;
+  }
+}
+
+export async function createInfraRetryAttemptIfMissing(params: {
+  codeReviewId: string;
+  retryOfAttemptId: string;
+}): Promise<InfraRetryAttemptResult> {
+  try {
+    return await db.transaction(async tx => {
+      await tx
+        .select({ id: cloud_agent_code_reviews.id })
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, params.codeReviewId))
+        .for('update')
+        .limit(1);
+
+      const [existingForAttempt] = await tx
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(
+          and(
+            eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId),
+            eq(cloud_agent_code_review_attempts.retry_reason, 'infra_failure'),
+            eq(cloud_agent_code_review_attempts.retry_of_attempt_id, params.retryOfAttemptId)
+          )
+        )
+        .limit(1);
+
+      if (existingForAttempt) {
+        return { outcome: 'existing-for-attempt', attempt: existingForAttempt };
+      }
+
+      const [existingForReview] = await tx
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(
+          and(
+            eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId),
+            eq(cloud_agent_code_review_attempts.retry_reason, 'infra_failure')
+          )
+        )
+        .limit(1);
+
+      if (existingForReview) {
+        return { outcome: 'existing-for-review', attempt: existingForReview };
+      }
+
+      const [latest] = await tx
+        .select({ attempt_number: cloud_agent_code_review_attempts.attempt_number })
+        .from(cloud_agent_code_review_attempts)
+        .where(eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId))
+        .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+        .limit(1);
+
+      const [attempt] = await tx
+        .insert(cloud_agent_code_review_attempts)
+        .values({
+          code_review_id: params.codeReviewId,
+          attempt_number: (latest?.attempt_number ?? 0) + 1,
+          retry_of_attempt_id: params.retryOfAttemptId,
+          retry_reason: 'infra_failure',
+          status: 'pending',
+        })
+        .returning();
+
+      if (!attempt) {
+        throw new Error('Failed to create infra retry attempt');
+      }
+
+      return { outcome: 'created', attempt };
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'createInfraRetryAttemptIfMissing' },
       extra: { params },
     });
     throw error;

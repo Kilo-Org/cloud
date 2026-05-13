@@ -506,15 +506,21 @@ describe('CodeReviewOrchestrator recovery', () => {
 
     expect(ran).toBe(true);
     const status = await stub.status();
-    expect(status).toMatchObject({ status: 'queued' });
+    expect(status).toMatchObject({
+      status: 'running',
+      sessionId: 'agent-retry-session',
+      cliSessionId: 'ses_retry_session',
+    });
 
-    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
     const initiateCalls = fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2');
-    expect(initiateCalls).toHaveLength(0);
+    expect(initiateCalls).toHaveLength(1);
 
     await expect(storedReview(stub)).resolves.toMatchObject({
       sandboxRetryAttempted: true,
-      status: 'queued',
+      status: 'running',
+      sessionId: 'agent-retry-session',
+      cliSessionId: 'ses_retry_session',
     });
 
     const failedStatusUpdates = fetchCalls(fetchMock, '/api/internal/code-review-status/').filter(
@@ -550,12 +556,13 @@ describe('CodeReviewOrchestrator recovery', () => {
 
     expect(ran).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({
-      status: 'queued',
+      status: 'failed',
+      terminalReason: 'sandbox_error',
     });
-    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
     await expect(storedReview(stub)).resolves.toMatchObject({
-      status: 'queued',
+      status: 'failed',
       sandboxRetryAttempted: true,
     });
   });

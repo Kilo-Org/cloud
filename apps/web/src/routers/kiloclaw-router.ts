@@ -1559,13 +1559,9 @@ const KILO_PASS_UPSELL_CADENCE_MAP = {
   monthly: KiloPassCadence.Monthly,
   yearly: KiloPassCadence.Yearly,
 } as const;
-const KILO_PASS_UPSELL_TIERS = Object.keys(KILO_PASS_UPSELL_TIER_MAP) as KiloPassUpsellTier[];
-const KILO_PASS_UPSELL_CADENCES = Object.keys(
-  KILO_PASS_UPSELL_CADENCE_MAP
-) as KiloPassUpsellCadence[];
-
 type KiloPassUpsellTier = keyof typeof KILO_PASS_UPSELL_TIER_MAP;
 type KiloPassUpsellCadence = keyof typeof KILO_PASS_UPSELL_CADENCE_MAP;
+
 type KiloPassUpsellActivationPreview = {
   eligible: boolean;
   costMicrodollars: number;
@@ -1638,28 +1634,48 @@ async function getKiloPassUpsellPreviewMatrix(params: {
   standardCostMicrodollars: number;
   commitCostMicrodollars: number;
 }): Promise<KiloPassUpsellPreviewMatrix> {
-  const result = {
-    standard: { monthly: {}, yearly: {} },
-    commit: { monthly: {}, yearly: {} },
-  } as KiloPassUpsellPreviewMatrix;
-
-  for (const plan of ['standard', 'commit'] as const) {
-    for (const cadence of KILO_PASS_UPSELL_CADENCES) {
-      for (const tier of KILO_PASS_UPSELL_TIERS) {
-        result[plan][cadence][tier] = await getKiloPassUpsellActivationPreview({
-          userId: params.userId,
-          tier: KILO_PASS_UPSELL_TIER_MAP[tier],
-          cadence: KILO_PASS_UPSELL_CADENCE_MAP[cadence],
-          balanceMicrodollars: params.balanceMicrodollars,
-          microdollarsUsed: params.microdollarsUsed,
-          costMicrodollars:
-            plan === 'standard' ? params.standardCostMicrodollars : params.commitCostMicrodollars,
-        });
-      }
-    }
+  async function getPreview(
+    plan: 'standard' | 'commit',
+    cadence: KiloPassUpsellCadence,
+    tier: KiloPassUpsellTier
+  ): Promise<KiloPassUpsellActivationPreview> {
+    return await getKiloPassUpsellActivationPreview({
+      userId: params.userId,
+      tier: KILO_PASS_UPSELL_TIER_MAP[tier],
+      cadence: KILO_PASS_UPSELL_CADENCE_MAP[cadence],
+      balanceMicrodollars: params.balanceMicrodollars,
+      microdollarsUsed: params.microdollarsUsed,
+      costMicrodollars:
+        plan === 'standard' ? params.standardCostMicrodollars : params.commitCostMicrodollars,
+    });
   }
 
-  return result;
+  async function getTierPreviews(
+    plan: 'standard' | 'commit',
+    cadence: KiloPassUpsellCadence
+  ): Promise<Record<KiloPassUpsellTier, KiloPassUpsellActivationPreview>> {
+    return {
+      '19': await getPreview(plan, cadence, '19'),
+      '49': await getPreview(plan, cadence, '49'),
+      '199': await getPreview(plan, cadence, '199'),
+    };
+  }
+
+  async function getCadencePreviews(
+    plan: 'standard' | 'commit'
+  ): Promise<
+    Record<KiloPassUpsellCadence, Record<KiloPassUpsellTier, KiloPassUpsellActivationPreview>>
+  > {
+    return {
+      monthly: await getTierPreviews(plan, 'monthly'),
+      yearly: await getTierPreviews(plan, 'yearly'),
+    };
+  }
+
+  return {
+    standard: await getCadencePreviews('standard'),
+    commit: await getCadencePreviews('commit'),
+  };
 }
 
 function getKiloPassUpsellInsufficientMessage(plan: 'commit' | 'standard'): string {

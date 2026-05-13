@@ -71,7 +71,7 @@ import type {
   KiloClawScheduledActionNotificationChannel,
   KiloClawScheduledActionNotificationKind,
 } from './schema-types';
-import type { KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
+import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
   OrganizationModeConfig,
   OrganizationPlan,
@@ -5376,6 +5376,13 @@ export const kiloclaw_subscriptions = pgTable(
     index('IDX_kiloclaw_subscriptions_transferred_to').on(table.transferred_to_subscription_id),
     index('IDX_kiloclaw_subscriptions_stripe_schedule_id').on(table.stripe_schedule_id),
     index('IDX_kiloclaw_subscriptions_auto_resume_retry_after').on(table.auto_resume_retry_after),
+    check(
+      'kiloclaw_subscriptions_price_version_check',
+      sql`${table.kiloclaw_price_version} IN (${sql.join(
+        KILOCLAW_PRICE_VERSIONS.map(version => sql.raw(`'${version}'`)),
+        sql.raw(', ')
+      )})`
+    ),
     enumCheck('kiloclaw_subscriptions_plan_check', table.plan, KiloClawPlan),
     enumCheck(
       'kiloclaw_subscriptions_scheduled_plan_check',

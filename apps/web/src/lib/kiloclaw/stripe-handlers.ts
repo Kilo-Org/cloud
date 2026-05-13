@@ -868,6 +868,26 @@ export async function handleKiloClawSubscriptionCreated(params: {
       return;
     }
 
+    const rowIsHybrid =
+      existingRow.payment_source === 'credits' && existingRow.stripe_subscription_id !== null;
+    const incomingPriceVersion = stripePriceVersion ?? existingRow.kiloclaw_price_version;
+    if (
+      !rowIsHybrid &&
+      existingRow.status !== 'canceled' &&
+      stripePriceVersion &&
+      stripePriceVersion !== existingRow.kiloclaw_price_version
+    ) {
+      logQuarantinedStripeEvent('subscription_created_price_version_mismatch', {
+        stripe_event_id: eventId,
+        stripe_subscription_id: subscription.id,
+        subscription_id: existingRow.id,
+        user_id: kiloUserId,
+        row_price_version: existingRow.kiloclaw_price_version,
+        stripe_price_version: stripePriceVersion,
+      });
+      return;
+    }
+
     wasSuspended = !!existingRow.suspended_at;
     const retainsTrialHistory =
       existingRow.trial_started_at !== null || existingRow.trial_ends_at !== null;
@@ -904,7 +924,7 @@ export async function handleKiloClawSubscriptionCreated(params: {
         stripe_subscription_id: subscription.id,
         cancel_at_period_end: subscription.cancel_at_period_end,
         payment_source: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.payment_source} ELSE 'stripe' END`,
-        kiloclaw_price_version: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.kiloclaw_price_version} ELSE ${stripePriceVersion ?? existingRow.kiloclaw_price_version} END`,
+        kiloclaw_price_version: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.kiloclaw_price_version} ELSE ${incomingPriceVersion} END`,
         plan: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.plan} ELSE ${plan} END`,
         status: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.status} ELSE ${status} END`,
         current_period_start: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.current_period_start} ELSE ${periods.current_period_start}::timestamptz END`,

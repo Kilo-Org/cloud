@@ -14,6 +14,7 @@ import {
   createKiloClawSignupDisplay,
   formatKiloClawFirstChargeLabel,
   formatMicrodollars,
+  isKiloClawStandardIntroCost,
   PLAN_COST_MICRODOLLARS,
   type ClawPlan,
   type KiloClawSignupDisplay,
@@ -352,7 +353,7 @@ function CreditEnrollmentSection({
   isPending: boolean;
 }) {
   const priceLabel = formatKiloClawFirstChargeLabel({ plan: selectedPlan, costMicrodollars });
-  const isIntro = selectedPlan === 'standard' && priceLabel.includes(' first month');
+  const isIntro = selectedPlan === 'standard' && isKiloClawStandardIntroCost({ costMicrodollars });
   const hasProjectedBonus = projectedKiloPassBonusMicrodollars > 0;
   const hasSufficientBalance = effectiveBalanceMicrodollars >= costMicrodollars;
   const shortfall = Math.max(0, costMicrodollars - effectiveBalanceMicrodollars);
@@ -561,21 +562,22 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
     selectedTier !== null && hostingPlan !== null
       ? (kiloPassUpsellPreview?.[hostingPlan]?.[cadence]?.[selectedTier] ?? null)
       : null;
+  const selectedKiloPassPreviewLoading =
+    selectedTier !== null && hostingPlan !== null && selectedKiloPassPreview === null;
   const selectedKiloPassInsufficient = selectedKiloPassPreview?.eligible === false;
   const selectedCommitPreview =
     selectedTier !== null
       ? (kiloPassUpsellPreview?.commit?.[cadence]?.[selectedTier] ?? null)
       : null;
+  const commitPreviewLoading = selectedTier !== null && selectedCommitPreview === null;
   const commitDisabled = selectedCommitPreview
     ? !selectedCommitPreview.eligible
-    : !isCommitAvailable(selectedTier, cadence);
+    : commitPreviewLoading || !isCommitAvailable(selectedTier, cadence);
 
   function isCommitEligibleForSelection(tier: Tier | null, selectedCadence: Cadence) {
     if (!tier) return false;
-    return (
-      kiloPassUpsellPreview?.commit?.[selectedCadence]?.[tier]?.eligible ??
-      isCommitAvailable(tier, selectedCadence)
-    );
+    const preview = kiloPassUpsellPreview?.commit?.[selectedCadence]?.[tier] ?? null;
+    return preview ? preview.eligible : false;
   }
 
   // When cadence or tier changes, reset hosting if commit becomes unavailable
@@ -652,13 +654,14 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
     }
   }
 
-  const kiloPassReady =
-    selectedTier !== null && hostingPlan !== null && !selectedKiloPassInsufficient;
-  const kiloPassButtonLabel = selectedKiloPassInsufficient
-    ? 'Choose a larger tier or add credits'
-    : kiloPassReady
-      ? `Get Kilo Pass + Hosting`
-      : 'Select a tier and hosting plan';
+  const kiloPassReady = selectedKiloPassPreview?.eligible === true;
+  const kiloPassButtonLabel = selectedKiloPassPreviewLoading
+    ? 'Checking credits…'
+    : selectedKiloPassInsufficient
+      ? 'Choose a larger tier or add credits'
+      : kiloPassReady
+        ? 'Get Kilo Pass + Hosting'
+        : 'Select a tier and hosting plan';
 
   const hostingOnlyCostMicrodollars = hostingOnlyPlan
     ? (selectedCreditEnrollmentPreview?.costMicrodollars ?? PLAN_COST_MICRODOLLARS[hostingOnlyPlan])

@@ -2749,6 +2749,42 @@ describe('handleKiloClawSubscriptionCreated', () => {
     expect(row.kiloclaw_price_version).toBe(CURRENT_KILOCLAW_PRICE_VERSION);
   });
 
+  it('quarantines subscription.created when Stripe price version conflicts with a live lineage', async () => {
+    const instance = await createWebhookAnchor();
+
+    const subscription = makeStripeSubscription({
+      id: 'sub_mismatched_price_version',
+      metadata: {
+        type: 'kiloclaw',
+        plan: 'standard',
+        kiloUserId: user.id,
+        instanceId: instance.id,
+      },
+      status: 'active',
+      priceId: 'price_current_standard',
+    });
+
+    await handleKiloClawSubscriptionCreated({
+      eventId: 'evt_mismatched_price_version',
+      subscription,
+    });
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(row).toEqual(
+      expect.objectContaining({
+        stripe_subscription_id: null,
+        plan: 'trial',
+        status: 'trialing',
+        kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+      })
+    );
+  });
+
   it('enqueues trial_end affiliate events when a Stripe subscription upgrades a delivered trial', async () => {
     await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
     const instance = await createWebhookAnchor();

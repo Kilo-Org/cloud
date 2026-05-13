@@ -29,6 +29,7 @@ import {
 } from '@kilocode/db';
 
 const ROLLOUT_STARTED_AT_ISO = `${CURRENT_KILOCLAW_PRICE_VERSION}T00:00:00.000Z`;
+// Split literals prevent the audit from matching its own pattern list.
 const LEGACY_AMOUNT_PATTERNS = [
   '4' + '_000_000',
   '4' + '000000',

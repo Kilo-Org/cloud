@@ -126,12 +126,7 @@ export function ConsentCard() {
           >
             <Text>Accept and continue</Text>
           </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onPress={handleDecline}
-            accessibilityLabel="Decline"
-          >
+          <Button variant="outline" size="lg" onPress={handleDecline} accessibilityLabel="Decline">
             <Text>Decline</Text>
           </Button>
         </View>

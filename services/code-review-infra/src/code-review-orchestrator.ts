@@ -224,7 +224,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       sandboxRetryAttempted: true,
     });
 
-    await this.runWithCloudAgentNext();
     return true;
   }
 

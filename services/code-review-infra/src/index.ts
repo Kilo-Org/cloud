@@ -238,6 +238,21 @@ app.post('/reviews/:reviewId/retry-fresh', async (c: Context<HonoEnv>) => {
     'retryFreshAfterInfraFailure'
   );
 
+  if (result) {
+    c.executionCtx.waitUntil(
+      withDORetry(
+        () => c.env.CODE_REVIEW_ORCHESTRATOR.get(id),
+        stub => stub.runReview(),
+        'runReview'
+      ).catch((error: Error) => {
+        console.error('[POST /reviews/:reviewId/retry-fresh] runReview failed:', {
+          reviewId,
+          error: error.message,
+        });
+      })
+    );
+  }
+
   return c.json({ success: result, reviewId });
 });
 

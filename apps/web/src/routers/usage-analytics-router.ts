@@ -294,7 +294,9 @@ function buildScopeConditions(
   } else {
     where.addEq('kilo_user_id', ctxUserId);
     if (filters.personalScope === 'personal-only') {
-      where.addIsNull('organization_id');
+      // DBT coalesces personal Snowflake usage rollups to an empty-string sentinel
+      // so incremental merges can match on organization_id.
+      where.addEq('organization_id', '');
     }
   }
 }

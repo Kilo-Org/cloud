@@ -127,16 +127,14 @@ describe('GET /api/code-reviews/up', () => {
   });
 
   it('returns 503 with slow-review alert when slow-review rate trips', async () => {
-    await db
-      .insert(cloud_agent_code_reviews)
-      .values([
-        reviewValues({
-          started_at: minutesAgo(71),
-          created_at: minutesAgo(71),
-          completed_at: minutesAgo(10),
-        }),
-        ...Array.from({ length: 9 }, () => reviewValues()),
-      ]);
+    await db.insert(cloud_agent_code_reviews).values([
+      reviewValues({
+        started_at: minutesAgo(71),
+        created_at: minutesAgo(71),
+        completed_at: minutesAgo(10),
+      }),
+      ...Array.from({ length: 9 }, () => reviewValues()),
+    ]);
 
     const response = await GET(makeRequest('kilo-code-reviews-health-check'));
 
@@ -214,19 +212,17 @@ describe('GET /api/code-reviews/up', () => {
   });
 
   it('returns multiple alerts when multiple detectors trip', async () => {
-    await db
-      .insert(cloud_agent_code_reviews)
-      .values([
-        ...Array.from({ length: 3 }, () =>
-          reviewValues({
-            started_at: minutesAgo(71),
-            created_at: minutesAgo(71),
-            completed_at: minutesAgo(10),
-          })
-        ),
-        reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
-        ...Array.from({ length: 19 }, () => reviewValues()),
-      ]);
+    await db.insert(cloud_agent_code_reviews).values([
+      ...Array.from({ length: 3 }, () =>
+        reviewValues({
+          started_at: minutesAgo(71),
+          created_at: minutesAgo(71),
+          completed_at: minutesAgo(10),
+        })
+      ),
+      reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
+      ...Array.from({ length: 19 }, () => reviewValues()),
+    ]);
 
     const response = await GET(makeRequest('kilo-code-reviews-health-check'));
 

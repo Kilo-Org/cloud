@@ -11,6 +11,7 @@ import {
   createCodeReview,
   createCodeReviewAttempt,
   createInfraRetryAttemptIfMissing,
+  getCodeReviewAttemptForReview,
   listCodeReviewAttempts,
   updateCodeReviewAttemptForCallback,
   updateCodeReviewStatus,
@@ -249,5 +250,53 @@ describe('findPreviousCompletedReview', () => {
 
     const attempts = await listCodeReviewAttempts(reviewId);
     expect(attempts.filter(attempt => attempt.retry_reason === 'infra_failure')).toHaveLength(1);
+  });
+
+  it('updates an explicit attempt id even when a newer attempt exists', async () => {
+    const reviewId = await createReview('sha-explicit-attempt');
+    const firstAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent-first',
+    });
+    const newerAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      retryOfAttemptId: firstAttempt.id,
+      retryReason: 'manual_retrigger',
+      status: 'running',
+      sessionId: 'agent-second',
+    });
+
+    await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      attemptId: firstAttempt.id,
+      status: 'cancelled',
+      errorMessage: 'superseded callback',
+    });
+
+    const updatedFirst = await getCodeReviewAttemptForReview(reviewId, firstAttempt.id);
+    const unchangedLatest = await getCodeReviewAttemptForReview(reviewId, newerAttempt.id);
+
+    expect(updatedFirst?.status).toBe('cancelled');
+    expect(updatedFirst?.error_message).toBe('superseded callback');
+    expect(unchangedLatest?.status).toBe('running');
+  });
+
+  it('throws for an explicit missing attempt id', async () => {
+    const reviewId = await createReview('sha-missing-explicit-attempt');
+    await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent-existing',
+    });
+
+    await expect(
+      updateCodeReviewAttemptForCallback({
+        codeReviewId: reviewId,
+        attemptId: '00000000-0000-0000-0000-000000000999',
+        status: 'failed',
+        errorMessage: 'bad callback',
+      })
+    ).rejects.toThrow('not found');
   });
 });

@@ -24,6 +24,7 @@ import {
   getCodeReviewAttemptForReview,
   ensureCurrentCodeReviewAttemptFromReview,
   createCodeReviewAttempt,
+  getLatestCodeReviewAttempt,
 } from '@/lib/code-reviews/db/code-reviews';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { createCheckRun, updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
@@ -382,9 +383,11 @@ export const codeReviewRouter = createTRPCRouter({
       // This will: stop stream processing, update DB, and interrupt cloud agent session (kill processes)
       if (['running', 'queued'].includes(review.status)) {
         try {
+          const latestAttempt = await getLatestCodeReviewAttempt(input.reviewId);
           const cancelResult = await codeReviewWorkerClient.cancelReview(
             input.reviewId,
-            'Cancelled by user'
+            'Cancelled by user',
+            latestAttempt?.id
           );
           if (!cancelResult.success && review.status === 'queued' && !review.session_id) {
             logExceptInTest(
@@ -576,7 +579,10 @@ export const codeReviewRouter = createTRPCRouter({
         }
 
         // Fetch events from worker (server-side, auth token stays secure)
-        const events = await codeReviewWorkerClient.getReviewEvents(input.reviewId);
+        const events = await codeReviewWorkerClient.getReviewEvents(
+          input.reviewId,
+          input.attemptId
+        );
 
         return successResult({ events });
       } catch (error) {

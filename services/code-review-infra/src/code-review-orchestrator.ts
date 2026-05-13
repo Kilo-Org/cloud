@@ -26,6 +26,14 @@ import type {
 } from './types';
 import { InternalStatusResponseSchema } from './types';
 
+function callbackUrlForAttempt(apiUrl: string, reviewId: string, attemptId?: string): string {
+  const url = new URL(`/api/internal/code-review-status/${reviewId}`, apiUrl);
+  if (attemptId) {
+    url.searchParams.set('attemptId', attemptId);
+  }
+  return url.toString();
+}
+
 type UpdateStatusResult = 'updated' | 'db-terminal';
 
 function canContinueCloudAgentNextSession(health: CloudAgentSessionHealthOutput): boolean {
@@ -210,6 +218,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     this.state.sessionId = undefined;
     this.state.cliSessionId = undefined;
     this.state.sandboxId = undefined;
+    this.state.status = 'queued';
     this.state.updatedAt = new Date().toISOString();
     await this.saveState();
 
@@ -481,11 +490,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     }
   ): Promise<UpdateStatusResult> {
     // Use path-based endpoint (same as callback endpoint for consistency)
-    const url = `${this.env.API_URL}/api/internal/code-review-status/${this.state.reviewId}`;
+    const url = callbackUrlForAttempt(this.env.API_URL, this.state.reviewId, this.state.attemptId);
 
     // Payload without reviewId (it's in the URL path)
     const payload = {
       status,
+      attemptId: this.state.attemptId,
       sessionId: options?.sessionId,
       cliSessionId: options?.cliSessionId,
       errorMessage: options?.errorMessage,
@@ -604,6 +614,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
    */
   async start(params: {
     reviewId: string;
+    attemptId?: string;
     authToken: string;
     sessionInput: SessionInput;
     owner: {
@@ -630,6 +641,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     this.state = {
       reviewId: params.reviewId,
+      attemptId: params.attemptId,
       authToken: params.authToken,
       sessionInput: params.sessionInput,
       owner: params.owner,
@@ -681,6 +693,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     return {
       reviewId: this.state.reviewId,
+      attemptId: this.state.attemptId,
       status: this.state.status,
       sessionId: this.state.sessionId,
       cliSessionId: this.state.cliSessionId,
@@ -698,6 +711,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   async retryFreshAfterInfraFailure(params: {
     sessionId?: string;
     reason: string;
+    retryAttemptId?: string;
   }): Promise<boolean> {
     await this.loadState();
 
@@ -706,10 +720,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     }
 
     if (this.state.agentVersion !== 'v2') {
-      return false;
-    }
-
-    if (isTerminalStatus(this.state.status)) {
       return false;
     }
 
@@ -729,52 +739,37 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       return false;
     }
 
-    const previousCloudAgentSessionId = this.state.previousCloudAgentSessionId;
-    const previousSessionId = this.state.sessionId;
-    const previousCliSessionId = this.state.cliSessionId;
-    const previousSandboxId = this.state.sandboxId;
+    if (!params.retryAttemptId) {
+      return false;
+    }
 
-    this.cancelled = false;
-    this.unsavedEventCount = 0;
-    this.totalTokensIn = 0;
-    this.totalTokensOut = 0;
-    this.totalCost = 0;
-    this.model = undefined;
-
-    this.state = {
-      ...this.state,
-      status: 'queued',
-      sessionId: undefined,
-      cliSessionId: undefined,
-      sandboxId: undefined,
+    const retryId = this.env.CODE_REVIEW_ORCHESTRATOR.idFromName(
+      `${this.state.reviewId}:${params.retryAttemptId}`
+    );
+    const retryStub = this.env.CODE_REVIEW_ORCHESTRATOR.get(retryId);
+    const started = await retryStub.start({
+      reviewId: this.state.reviewId,
+      attemptId: params.retryAttemptId,
+      authToken: this.state.authToken,
+      sessionInput: this.state.sessionInput,
+      owner: this.state.owner,
+      skipBalanceCheck: this.state.skipBalanceCheck,
+      agentVersion: this.state.agentVersion,
       previousCloudAgentSessionId: undefined,
-      sandboxRetryAttempted: true,
-      errorMessage: undefined,
-      terminalReason: undefined,
-      completedAt: undefined,
-      events: [],
-      model: undefined,
-      totalTokensIn: undefined,
-      totalTokensOut: undefined,
-      totalCost: undefined,
-      updatedAt: new Date().toISOString(),
-    };
-    await this.saveState();
+    });
 
     console.warn(
       '[CodeReviewOrchestrator] Retrying review with fresh session after infra failure',
       {
         reviewId: this.state.reviewId,
+        failedAttemptId: this.state.attemptId,
+        retryAttemptId: params.retryAttemptId,
         reason: params.reason,
-        previousCloudAgentSessionId,
-        previousSessionId,
-        previousCliSessionId,
-        previousSandboxId,
+        status: started.status,
       }
     );
 
-    await this.runWithCloudAgentNext();
-    return true;
+    return started.status === 'queued' || started.status === 'running';
   }
 
   /**
@@ -939,7 +934,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
       // Step 1: Prepare session with callback target
       const callbackTarget = {
-        url: `${this.env.API_URL}/api/internal/code-review-status/${this.state.reviewId}`,
+        url: callbackUrlForAttempt(this.env.API_URL, this.state.reviewId, this.state.attemptId),
         headers: {
           'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
         },
@@ -1133,7 +1128,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       // callbackTarget must be set through an internal procedure, not the
       // user-facing sendMessageV2, to prevent SSRF via arbitrary callback URLs.
       const callbackTarget = {
-        url: `${this.env.API_URL}/api/internal/code-review-status/${this.state.reviewId}`,
+        url: callbackUrlForAttempt(this.env.API_URL, this.state.reviewId, this.state.attemptId),
         headers: {
           'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
         },
@@ -1256,7 +1251,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       const sessionInputWithCallback = {
         ...this.state.sessionInput,
         createdOnPlatform: 'code-review',
-        callbackUrl: `${this.env.API_URL}/api/internal/code-review-status/${this.state.reviewId}`,
+        callbackUrl: callbackUrlForAttempt(
+          this.env.API_URL,
+          this.state.reviewId,
+          this.state.attemptId
+        ),
         callbackHeaders: {
           'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
         },

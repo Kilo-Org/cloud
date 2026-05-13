@@ -1,4 +1,5 @@
 const mockCancelReview = jest.fn();
+const mockTryDispatchPendingReviews = jest.fn();
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
   codeReviewWorkerClient: {
@@ -7,7 +8,7 @@ jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
 }));
 
 jest.mock('@/lib/code-reviews/dispatch/dispatch-pending-reviews', () => ({
-  tryDispatchPendingReviews: jest.fn().mockResolvedValue(undefined),
+  tryDispatchPendingReviews: (...args: unknown[]) => mockTryDispatchPendingReviews(...args),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
@@ -31,7 +32,7 @@ import {
 import { eq } from 'drizzle-orm';
 
 const REPO = `test-org/code-reviews-cancel-${Date.now()}`;
-type ReviewStatus = 'pending' | 'queued' | 'running';
+type ReviewStatus = 'pending' | 'queued' | 'running' | 'failed';
 type CodeReviewInsert = typeof cloud_agent_code_reviews.$inferInsert;
 
 function reviewValues(
@@ -68,6 +69,7 @@ describe('codeReviewRouter.cancel', () => {
 
   beforeEach(() => {
     mockCancelReview.mockResolvedValue({ success: true, reviewId: 'unused' });
+    mockTryDispatchPendingReviews.mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -75,6 +77,7 @@ describe('codeReviewRouter.cancel', () => {
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
     mockCancelReview.mockReset();
+    mockTryDispatchPendingReviews.mockReset();
   });
 
   afterAll(async () => {
@@ -96,7 +99,7 @@ describe('codeReviewRouter.cancel', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(mockCancelReview).toHaveBeenCalledWith(review.id, 'Cancelled by user');
+    expect(mockCancelReview).toHaveBeenCalledWith(review.id, 'Cancelled by user', undefined);
     expect(storedReview?.status).toBe('cancelled');
     expect(storedReview?.completed_at).toBeTruthy();
   });
@@ -135,7 +138,7 @@ describe('codeReviewRouter.cancel', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(mockCancelReview).toHaveBeenCalledWith(review.id, 'Cancelled by user');
+    expect(mockCancelReview).toHaveBeenCalledWith(review.id, 'Cancelled by user', undefined);
     expect(storedReview?.status).toBe('cancelled');
     expect(storedReview?.completed_at).toBeTruthy();
   });
@@ -251,6 +254,32 @@ describe('codeReviewRouter attempts', () => {
     });
     expect(storedReview?.status).toBe('pending');
     expect(storedReview?.session_id).toBeNull();
+  });
+
+  it('retrigger dispatches using the newly created attempt id', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'failed', {
+          session_id: 'agent-first',
+          cli_session_id: 'ses_first',
+          error_message: 'Container shutdown: SIGTERM',
+          terminal_reason: 'sandbox_error',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const caller = await createCallerForUser(testUser.id);
+    await caller.codeReviews.retrigger({ reviewId: review.id });
+
+    const attempts = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
+    const latestAttempt = attempts.sort((a, b) => b.attempt_number - a.attempt_number)[0];
+
+    expect(latestAttempt?.retry_reason).toBe('manual_retrigger');
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalled();
   });
 
   it('rejects stream info attempts from another review', async () => {

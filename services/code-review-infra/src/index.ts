@@ -37,6 +37,10 @@ export const CodeReviewOrchestrator = CodeReviewOrchestratorBase;
 type HonoEnv = { Bindings: Env };
 const app = new Hono<HonoEnv>();
 
+function doNameForAttempt(reviewId: string, attemptId?: string): string {
+  return attemptId ? `${reviewId}:${attemptId}` : reviewId;
+}
+
 // Authentication middleware
 app.use(
   '*',
@@ -70,7 +74,7 @@ app.post('/review', async (c: Context<HonoEnv>) => {
   });
 
   // Create DO name from reviewId (concurrency controlled by Next.js dispatch)
-  const doName = body.reviewId;
+  const doName = doNameForAttempt(body.reviewId, body.attemptId);
 
   console.log('[POST /review] Creating DO', {
     reviewId: body.reviewId,
@@ -86,6 +90,7 @@ app.post('/review', async (c: Context<HonoEnv>) => {
     stub =>
       stub.start({
         reviewId: body.reviewId,
+        attemptId: body.attemptId,
         authToken: body.authToken,
         sessionInput: body.sessionInput,
         owner: body.owner,
@@ -120,6 +125,7 @@ app.post('/review', async (c: Context<HonoEnv>) => {
   // Return 202 Accepted with review details
   const response: CodeReviewResponse = {
     reviewId: body.reviewId,
+    attemptId: body.attemptId,
     status: result.status,
   };
 
@@ -129,6 +135,7 @@ app.post('/review', async (c: Context<HonoEnv>) => {
 // Route: GET /reviews/:reviewId/events (used by SSE/cloud-agent flow for event polling)
 app.get('/reviews/:reviewId/events', async (c: Context<HonoEnv>) => {
   const reviewId = c.req.param('reviewId');
+  const attemptId = c.req.query('attemptId') ?? undefined;
 
   if (!reviewId) {
     return c.json({ error: 'reviewId parameter required' }, 400);
@@ -137,7 +144,7 @@ app.get('/reviews/:reviewId/events', async (c: Context<HonoEnv>) => {
   console.log('[GET /reviews/:reviewId/events] Fetching events', { reviewId });
 
   // Get Durable Object ID
-  const id = c.env.CODE_REVIEW_ORCHESTRATOR.idFromName(reviewId);
+  const id = c.env.CODE_REVIEW_ORCHESTRATOR.idFromName(doNameForAttempt(reviewId, attemptId));
 
   // Get events via RPC with retry
   const result = await withDORetry(
@@ -152,6 +159,7 @@ app.get('/reviews/:reviewId/events', async (c: Context<HonoEnv>) => {
 // Route: GET /reviews/:reviewId/status
 app.get('/reviews/:reviewId/status', async (c: Context<HonoEnv>) => {
   const reviewId = c.req.param('reviewId');
+  const attemptId = c.req.query('attemptId') ?? undefined;
 
   if (!reviewId) {
     return c.json({ error: 'reviewId parameter required' }, 400);
@@ -159,7 +167,7 @@ app.get('/reviews/:reviewId/status', async (c: Context<HonoEnv>) => {
 
   console.log('[GET /reviews/:reviewId/status] Fetching status', { reviewId });
 
-  const id = c.env.CODE_REVIEW_ORCHESTRATOR.idFromName(reviewId);
+  const id = c.env.CODE_REVIEW_ORCHESTRATOR.idFromName(doNameForAttempt(reviewId, attemptId));
 
   const result = await withDORetry(
     () => c.env.CODE_REVIEW_ORCHESTRATOR.get(id),
@@ -182,18 +190,19 @@ app.post('/reviews/:reviewId/cancel', async (c: Context<HonoEnv>) => {
     return c.json({ error: 'reviewId parameter required' }, 400);
   }
 
-  let body: { reason?: string };
+  let body: { reason?: string; attemptId?: string };
   try {
     body = await c.req.json();
   } catch {
     return c.json({ error: 'Invalid JSON body' }, 400);
   }
   const reason = body.reason;
+  const attemptId = c.req.query('attemptId') ?? body.attemptId;
 
   console.log('[POST /reviews/:reviewId/cancel] Cancelling review', { reviewId, reason });
 
   // Get Durable Object ID
-  const id = c.env.CODE_REVIEW_ORCHESTRATOR.idFromName(reviewId);
+  const id = c.env.CODE_REVIEW_ORCHESTRATOR.idFromName(doNameForAttempt(reviewId, attemptId));
 
   // Cancel via RPC with retry
   const result = await withDORetry(
@@ -213,7 +222,12 @@ app.post('/reviews/:reviewId/retry-fresh', async (c: Context<HonoEnv>) => {
     return c.json({ error: 'reviewId parameter required' }, 400);
   }
 
-  let body: { sessionId?: string; reason?: string };
+  let body: {
+    sessionId?: string;
+    reason?: string;
+    failedAttemptId?: string;
+    retryAttemptId?: string;
+  };
   try {
     body = await c.req.json();
   } catch {
@@ -231,17 +245,27 @@ app.post('/reviews/:reviewId/retry-fresh', async (c: Context<HonoEnv>) => {
     sessionId: body.sessionId,
   });
 
-  const id = c.env.CODE_REVIEW_ORCHESTRATOR.idFromName(reviewId);
+  const failedId = c.env.CODE_REVIEW_ORCHESTRATOR.idFromName(
+    doNameForAttempt(reviewId, body.failedAttemptId)
+  );
   const result = await withDORetry(
-    () => c.env.CODE_REVIEW_ORCHESTRATOR.get(id),
-    stub => stub.retryFreshAfterInfraFailure({ sessionId: body.sessionId, reason }),
+    () => c.env.CODE_REVIEW_ORCHESTRATOR.get(failedId),
+    stub =>
+      stub.retryFreshAfterInfraFailure({
+        sessionId: body.sessionId,
+        reason,
+        retryAttemptId: body.retryAttemptId,
+      }),
     'retryFreshAfterInfraFailure'
   );
 
   if (result) {
+    const retryId = c.env.CODE_REVIEW_ORCHESTRATOR.idFromName(
+      doNameForAttempt(reviewId, body.retryAttemptId)
+    );
     c.executionCtx.waitUntil(
       withDORetry(
-        () => c.env.CODE_REVIEW_ORCHESTRATOR.get(id),
+        () => c.env.CODE_REVIEW_ORCHESTRATOR.get(retryId),
         stub => stub.runReview(),
         'runReview'
       ).catch((error: Error) => {

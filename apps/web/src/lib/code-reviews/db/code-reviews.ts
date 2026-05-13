@@ -36,6 +36,7 @@ type InfraRetryAttemptResult =
 
 type AttemptCallbackFields = {
   codeReviewId: string;
+  attemptId?: string;
   status: CodeReviewAttemptStatus;
   sessionId?: string;
   cliSessionId?: string;
@@ -405,6 +406,41 @@ export async function updateCodeReviewAttemptForCallback(
   params: AttemptCallbackFields
 ): Promise<CloudAgentCodeReviewAttempt> {
   try {
+    if (params.attemptId) {
+      const explicitAttempt = await getCodeReviewAttemptForReview(
+        params.codeReviewId,
+        params.attemptId
+      );
+      if (!explicitAttempt) {
+        throw new Error(
+          `Code review attempt ${params.attemptId} not found for review ${params.codeReviewId}`
+        );
+      }
+
+      const [updated] = await db
+        .update(cloud_agent_code_review_attempts)
+        .set(
+          buildAttemptUpdateData({
+            status: params.status,
+            sessionId: params.sessionId,
+            cliSessionId: params.cliSessionId,
+            executionId: params.executionId,
+            errorMessage: params.errorMessage,
+            terminalReason: params.terminalReason,
+            startedAt: params.startedAt,
+            completedAt: params.completedAt,
+          })
+        )
+        .where(eq(cloud_agent_code_review_attempts.id, explicitAttempt.id))
+        .returning();
+
+      if (!updated) {
+        throw new Error('Failed to update code review attempt');
+      }
+
+      return updated;
+    }
+
     if (params.status === 'running') {
       return await ensureCodeReviewAttemptForRunningCallback(params);
     }

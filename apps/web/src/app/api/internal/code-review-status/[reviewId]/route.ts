@@ -69,6 +69,7 @@ import {
  * Payload from the orchestrator DO (legacy format).
  */
 type OrchestratorPayload = {
+  attemptId?: string;
   sessionId?: string;
   cliSessionId?: string;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
@@ -81,6 +82,7 @@ type OrchestratorPayload = {
  * Payload from cloud-agent-next callback (ExecutionCallbackPayload).
  */
 type CloudAgentNextCallbackPayload = {
+  attemptId?: string;
   sessionId?: string;
   cloudAgentSessionId?: string;
   executionId?: string;
@@ -489,6 +491,7 @@ export async function POST(
 
     const { reviewId } = await params;
     const rawPayload: StatusUpdatePayload = await req.json();
+    const attemptId = req.nextUrl.searchParams.get('attemptId') ?? rawPayload.attemptId;
     const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult } =
       normalizePayload(rawPayload);
     const executionId = 'executionId' in rawPayload ? rawPayload.executionId : undefined;
@@ -508,6 +511,7 @@ export async function POST(
 
     logExceptInTest('[code-review-status] Received status update', {
       reviewId,
+      attemptId,
       sessionId,
       cliSessionId,
       status,
@@ -525,6 +529,7 @@ export async function POST(
 
     const attempt = await updateCodeReviewAttemptForCallback({
       codeReviewId: reviewId,
+      attemptId: attemptId ?? undefined,
       status,
       sessionId,
       cliSessionId,
@@ -614,6 +619,8 @@ export async function POST(
           const retryResult = await codeReviewWorkerClient.retryReviewFresh(reviewId, {
             sessionId,
             reason: errorMessage ?? terminalReason ?? 'retryable infra failure',
+            failedAttemptId: attempt.id,
+            retryAttemptId: retryAttempt.id,
           });
 
           if (retryResult.success) {
@@ -628,6 +635,7 @@ export async function POST(
 
           await updateCodeReviewAttemptForCallback({
             codeReviewId: reviewId,
+            attemptId: retryAttempt.id,
             status: 'failed',
             errorMessage: 'Worker declined fresh retry after infra failure',
             terminalReason: 'sandbox_error',
@@ -636,6 +644,7 @@ export async function POST(
         } catch (retryError) {
           await updateCodeReviewAttemptForCallback({
             codeReviewId: reviewId,
+            attemptId: retryAttempt.id,
             status: 'failed',
             errorMessage: retryError instanceof Error ? retryError.message : String(retryError),
             terminalReason: 'sandbox_error',

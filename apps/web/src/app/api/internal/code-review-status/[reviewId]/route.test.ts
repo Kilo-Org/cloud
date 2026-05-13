@@ -650,6 +650,63 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
       expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
     });
+
+    it('marks the retry attempt failed when retry startup fails', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: 'agent-old' })
+      );
+      mockUpdateCodeReviewAttemptForCallback
+        .mockResolvedValueOnce(
+          makeAttempt({
+            id: '00000000-0000-0000-0000-000000000501',
+            status: 'failed',
+            session_id: 'agent-old',
+          })
+        )
+        .mockResolvedValueOnce(
+          makeAttempt({
+            id: '00000000-0000-0000-0000-000000000502',
+            attempt_number: 2,
+            status: 'failed',
+          })
+        );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000501',
+          status: 'failed',
+          session_id: 'agent-old',
+        })
+      );
+      mockCreateInfraRetryAttemptIfMissing.mockResolvedValue({
+        outcome: 'created',
+        attempt: makeAttempt({
+          id: '00000000-0000-0000-0000-000000000502',
+          attempt_number: 2,
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000501',
+          status: 'pending',
+        }),
+      });
+      mockRetryReviewFresh.mockRejectedValue(new Error('worker retry failed'));
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-old',
+          errorMessage: 'Container shutdown: SIGTERM',
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          codeReviewId: REVIEW_ID,
+          attemptId: '00000000-0000-0000-0000-000000000502',
+          status: 'failed',
+        })
+      );
+    });
   });
 
   describe('GitHub check run billing messaging', () => {

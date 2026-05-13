@@ -18,7 +18,7 @@ export const KILO_EMBEDDING_MODELS = [
   {
     id: 'mistralai/codestral-embed-2505',
     name: 'Codestral Embed 2505',
-    dimension: 256,
+    dimension: 1536,
     scoreThreshold: 0.35,
     note: 'code',
   },

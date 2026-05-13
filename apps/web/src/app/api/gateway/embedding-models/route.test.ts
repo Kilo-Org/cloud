@@ -24,7 +24,7 @@ describe('GET /api/gateway/embedding-models', () => {
     });
     expect(getKiloEmbeddingModel('codestral-embed-2505')).toMatchObject({
       id: 'mistralai/codestral-embed-2505',
-      dimension: 256,
+      dimension: 1536,
       scoreThreshold: 0.35,
     });
     expect(normalizeKiloEmbeddingModelId('text-embedding-3-small')).toBe(

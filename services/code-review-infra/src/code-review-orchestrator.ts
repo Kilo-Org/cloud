@@ -233,6 +233,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       sandboxRetryAttempted: true,
     });
 
+    await this.runFreshCloudAgentNextFallback(
+      previousCloudAgentSessionId ?? previousSessionId ?? 'unknown'
+    );
+
     return true;
   }
 

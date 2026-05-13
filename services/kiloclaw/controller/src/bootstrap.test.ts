@@ -1804,6 +1804,23 @@ describe('bootstrapCritical', () => {
     expect(JSON.parse(env.KILOCLAW_GATEWAY_ARGS ?? '[]')).toContain('gw-token');
   });
 
+  it('does not clean npm cache before readiness-critical steps complete', async () => {
+    const harness = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      KILOCODE_API_KEY: 'api-key',
+      OPENCLAW_GATEWAY_TOKEN: 'gw-token',
+      AUTO_APPROVE_DEVICES: 'true',
+    };
+
+    await bootstrapCritical(env, () => {}, harness.deps);
+
+    expect(harness.execCalls).not.toContainEqual({
+      cmd: 'npm',
+      args: ['cache', 'clean', '--force'],
+      input: undefined,
+    });
+  });
+
   it('throws before later steps when decryption fails', async () => {
     const phases: string[] = [];
     const harness = fakeDeps();
@@ -1983,6 +2000,11 @@ describe('bootstrap', () => {
       'tools-md',
       'mcporter',
     ]);
+    expect(harness.execCalls.at(-1)).toEqual({
+      cmd: 'npm',
+      args: ['cache', 'clean', '--force'],
+      input: undefined,
+    });
   });
 
   it('reports doctor phase when config exists', async () => {

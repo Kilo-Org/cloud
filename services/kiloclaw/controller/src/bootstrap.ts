@@ -1282,8 +1282,6 @@ export async function bootstrapCritical(
   setPhase('feature-flags');
   applyFeatureFlags(env, deps);
 
-  cleanNpmCache(env, deps);
-
   generateHooksToken(env);
   env.KILOCLAW_GATEWAY_ARGS = JSON.stringify(buildGatewayArgs(env));
   await yieldToEventLoop();
@@ -1360,4 +1358,5 @@ export async function bootstrap(
   if (!result.ok) {
     throw new Error(result.error);
   }
+  cleanNpmCache(env, deps);
 }

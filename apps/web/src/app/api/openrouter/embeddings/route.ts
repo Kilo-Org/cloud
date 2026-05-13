@@ -33,7 +33,6 @@ import {
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
-  buildDownstreamResponse,
   buildUpstreamBody,
   type EmbeddingProxyRequest,
 } from '@/lib/ai-gateway/embeddings/embedding-request';
@@ -252,15 +251,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     };
   }
 
-  const upstreamResponse = await embeddingProxyRequest({
+  const response = await embeddingProxyRequest({
     body: upstreamBody,
     provider: effectiveProvider,
     signal: request.signal,
   });
-  const response = await buildDownstreamResponse(
-    upstreamResponse,
-    requestBodyParsed.encoding_format
-  );
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;

@@ -1029,16 +1029,19 @@ describe('kiloPassRouter', () => {
         })
       );
 
+      // The read path is pure: getState derives `canceled` from the lapsed store-purchase
+      // expiry but does not mutate the subscription row. Persistence is handled by the
+      // `/api/cron/kilo-pass-store-subscription-reconcile` cron (see
+      // store-subscription-reconcile.test.ts).
       const subscriptionRow = await db.query.kilo_pass_subscriptions.findFirst({
         where: eq(kilo_pass_subscriptions.id, subscriptionId),
       });
-
       expect(subscriptionRow).toEqual(
         expect.objectContaining({
-          status: 'canceled',
+          status: 'active',
+          ended_at: null,
         })
       );
-      expect(new Date(subscriptionRow!.ended_at!).toISOString()).toBe('2026-03-01T00:00:00.000Z');
     });
 
     it('keeps an App Store subscription active when the latest purchase expires in the future', async () => {

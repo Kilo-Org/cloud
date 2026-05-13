@@ -965,7 +965,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
   });
 
   test('trialing trial -> credit enrollment sends one subscription-started email and writes the log row', async () => {
-    const user = await insertTestUser({ total_microdollars_acquired: 50_000_000 });
+    const user = await insertTestUser({ total_microdollars_acquired: 60_000_000 });
     const instance = await seedCreditEnrollmentAnchor(user.id);
 
     await enrollWithCredits({

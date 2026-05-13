@@ -4,6 +4,9 @@ process.env.STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID ||= 'price_legacy_commit'
 process.env.STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID ||= 'price_current_standard';
 process.env.STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID ||= 'price_current_commit';
 
+const CURRENT_KILOCLAW_STANDARD_PRICE_ID =
+  process.env.STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID ?? 'price_current_standard';
+
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import type * as creditsModule from '@/lib/credits';
 import type * as organizationBillingModule from '@/lib/organizations/organization-billing';
@@ -699,7 +702,7 @@ describe('processStripePaymentEventHook', () => {
       impact_action_id: '1000.2000.3000',
     });
 
-    const retrieveSpy = await mockChargeRetrieveForKiloClaw('price_test_kiloclaw_standard');
+    const retrieveSpy = await mockChargeRetrieveForKiloClaw(CURRENT_KILOCLAW_STANDARD_PRICE_ID);
 
     const event: Stripe.Event = {
       ...baseStripeEvent(),
@@ -737,7 +740,7 @@ describe('processStripePaymentEventHook', () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
 
-    const retrieveSpy = await mockChargeRetrieveForKiloClaw('price_test_kiloclaw_standard');
+    const retrieveSpy = await mockChargeRetrieveForKiloClaw(CURRENT_KILOCLAW_STANDARD_PRICE_ID);
 
     const event: Stripe.Event = {
       ...baseStripeEvent(),
@@ -825,7 +828,7 @@ describe('processStripePaymentEventHook', () => {
       stripe_charge_id: 'ch_legacy_missing_mapping',
     });
 
-    const retrieveSpy = await mockChargeRetrieveForKiloClaw('price_test_kiloclaw_standard');
+    const retrieveSpy = await mockChargeRetrieveForKiloClaw(CURRENT_KILOCLAW_STANDARD_PRICE_ID);
 
     const event: Stripe.Event = {
       ...baseStripeEvent(),

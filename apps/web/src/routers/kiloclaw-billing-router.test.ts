@@ -5692,9 +5692,11 @@ describe('enrollWithCredits', () => {
       trial_ends_at: new Date(Date.now() + 86_400_000).toISOString(),
       kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
     });
+    const kiloPassSubscriptionId = `kp-auto-enroll-${crypto.randomUUID()}`;
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
-      stripe_subscription_id: `kp-auto-enroll-${crypto.randomUUID()}`,
+      provider_subscription_id: kiloPassSubscriptionId,
+      stripe_subscription_id: kiloPassSubscriptionId,
       tier: KiloPassTier.Tier199,
       cadence: KiloPassCadence.Monthly,
       status: 'active',

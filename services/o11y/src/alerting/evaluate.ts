@@ -17,6 +17,7 @@ import { shouldSuppress, recordAlertFired } from './dedup';
 import { sendAlertNotification, type AlertPayload } from './notify';
 import { listAlertingConfigs, type AlertingConfig } from './config-store';
 import { listTtfbAlertingConfigs, type TtfbAlertingConfig } from './ttfb-config-store';
+import { evaluateContainerCapacity } from './container-capacity-evaluate';
 
 /**
  * Compute the burn rate from an observed bad-event fraction and the SLO.
@@ -297,6 +298,13 @@ export async function evaluateAlerts(env: Env): Promise<void> {
     } catch (err) {
       errors.push(new Error(`ttfb window (${window.longWindowMinutes}m)`, { cause: err }));
     }
+  }
+
+  // Container capacity evaluation runs once per cron tick, independent of burn-rate windows.
+  try {
+    await evaluateContainerCapacity(env);
+  } catch (err) {
+    errors.push(new Error('container_capacity evaluation', { cause: err }));
   }
 
   if (errors.length > 0) {

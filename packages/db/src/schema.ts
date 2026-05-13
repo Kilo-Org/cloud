@@ -4636,6 +4636,94 @@ export const kiloclaw_inbound_email_aliases = pgTable(
 export type KiloClawInboundEmailAlias = typeof kiloclaw_inbound_email_aliases.$inferSelect;
 export type NewKiloClawInboundEmailAlias = typeof kiloclaw_inbound_email_aliases.$inferInsert;
 
+// KiloClaw Morning Briefing Configuration
+//
+// Denormalized read cache of which instances have the morning briefing
+// enabled and how it's configured (cron, timezone, interest topics). The
+// briefing plugin's local `config.json` on the instance remains the source
+// of truth for actual runtime behavior; this table mirrors the same
+// values so external readers (admin tooling, analytics, dashboard reads)
+// can answer "who has briefing enabled?" / "who picked topic X?" without
+// scanning every instance gateway.
+//
+// Write ownership: the KiloClaw worker is the sole writer (matches
+// `kiloclaw_instances` ownership). The worker pushes the same config to
+// the plugin in the same request; if the Postgres write fails the
+// briefing still works — the plugin has the config — the mirror is just
+// stale for that instance. Plugin runtime state (cronJobId, last-generated
+// timestamps, reconcile state) is NOT mirrored here.
+//
+// Backfill: pre-existing instances have no row here until the first
+// post-deploy `getMorningBriefingStatus` call lazily writes one from the
+// plugin response. Same pattern as `kiloclaw_instances.tracked_image_tag`.
+// Admin queries that scan this table are "current-best-known view," not
+// authoritative — per-instance gateway queries remain the ground truth.
+//
+// 1:1 with `kiloclaw_instances`. No surrogate id; `instance_id` is the
+// natural key (compare `kiloclaw_inbound_email_aliases`, which uses `alias`
+// as PK). Skips the join indirection from any future FK to this table.
+// Owner / org are NOT denormalized — join through `kiloclaw_instances` if
+// you need them (no precedent for denorm on the other kiloclaw_* tables).
+export const kiloclaw_morning_briefing_configs = pgTable(
+  'kiloclaw_morning_briefing_configs',
+  {
+    instance_id: uuid()
+      .primaryKey()
+      .notNull()
+      .references(() => kiloclaw_instances.id, { onDelete: 'cascade' }),
+    // Desired state. `false` means the user has not enabled briefing (or
+    // has disabled it). The plugin's `observedEnabled` (in gateway status)
+    // may lag during reconcile.
+    enabled: boolean().default(false).notNull(),
+    // Defaults match the plugin's hard-coded defaults
+    // (`services/kiloclaw/plugins/kiloclaw-morning-briefing/src/index.ts`).
+    // Keep these in sync if the plugin defaults ever change.
+    cron: text().notNull().default('0 7 * * *'),
+    timezone: text().notNull().default('UTC'),
+    // Selected by the user during onboarding (PR-4b) or from settings.
+    // Empty array means "no topics selected" — the plugin (PR-4c) falls
+    // back to its default web-search query in that case. Column is
+    // defined in PR-4a and unused until PR-4b lands. `text[]` (not jsonb)
+    // matches the existing pattern in `kiloclaw_google_oauth_connections`
+    // (`scopes`, `capabilities`); native array operators and GIN-indexable.
+    interest_topics: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    // NOTE: `$onUpdateFn` only fires on Drizzle ORM writes. Any raw
+    // `db.execute(sql\`UPDATE ...\`)` writer must set `updated_at = now()`
+    // explicitly; otherwise the column will silently miss bumps.
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    // Powers the bulk admin scan "list instance_ids where briefing is
+    // enabled" — partial so it stays small (only enabled rows occupy
+    // it). `instance_id` is the PK so this index gives no lookup
+    // benefit beyond the predicate-narrowed scan; the value is purely
+    // in skipping disabled rows.
+    //
+    // If/when an admin query also needs `interest_topics` per row,
+    // consider an INCLUDE clause (e.g.
+    // `INCLUDE (interest_topics)`) so Postgres can satisfy the scan
+    // index-only without heap fetches. Drizzle 0.45's PgIndexBuilder
+    // doesn't expose `.include()` declaratively; it would need raw
+    // SQL in the migration. Skipping for now — the table is small
+    // enough that the heap fetch is cheap, and we don't have a
+    // concrete admin query that reads topics in bulk yet.
+    index('IDX_kiloclaw_morning_briefing_configs_enabled')
+      .on(table.instance_id)
+      .where(sql`${table.enabled} = true`),
+  ]
+);
+
+export type KiloClawMorningBriefingConfig = typeof kiloclaw_morning_briefing_configs.$inferSelect;
+export type NewKiloClawMorningBriefingConfig =
+  typeof kiloclaw_morning_briefing_configs.$inferInsert;
+
 // KiloClaw Admin Audit Log — tracks admin actions on KiloClaw instances
 export const kiloclaw_admin_audit_logs = pgTable(
   'kiloclaw_admin_audit_logs',

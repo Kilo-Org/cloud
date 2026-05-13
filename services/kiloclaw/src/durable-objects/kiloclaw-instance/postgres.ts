@@ -10,12 +10,14 @@ import {
   getActivePersonalInstance,
   getInstanceById,
   getInstanceBySandboxId,
+  getMorningBriefingConfig,
   markInstanceDestroyed,
   syncAdminSizeOverride,
   syncInstanceType,
   syncTrackedImageTag,
+  upsertMorningBriefingConfig,
 } from '../../db';
-import type { AdminSizeOverridePayload } from '../../db';
+import type { AdminSizeOverridePayload, MorningBriefingConfigRow } from '../../db';
 import { appNameFromUserId, appNameFromInstanceId } from '../../fly/apps';
 import type { InstanceMutableState } from './types';
 import { getAppKey, getFlyConfig } from './types';
@@ -377,6 +379,114 @@ export async function syncAdminSizeOverrideToPostgresHelper(
     doWarn(state, 'Failed to sync admin_size_override to Postgres', {
       error: toLoggable(err),
     });
+  }
+}
+
+// ─── Morning Briefing config (kiloclaw_morning_briefing_configs) ─────
+//
+// Denormalized read cache. Plugin's local config.json on the instance is
+// the source of truth for actual runtime behavior; this table mirrors
+// the same values so external readers can answer "who has briefing
+// enabled / picked topic X?" without scanning every gateway. Worker is
+// the sole writer; pushes to the plugin and to Postgres in the same DO
+// method. Runtime state (cronJobId, lastGeneratedAt, reconcile state)
+// is not mirrored.
+
+export type MorningBriefingDesiredConfig = {
+  /** Omit to preserve enabled (or take `false` on insert). */
+  enabled?: boolean;
+  /** Omit to preserve the existing cron (or take the column default on insert). */
+  cron?: string;
+  /** Omit to preserve the existing timezone (or take the column default on insert). */
+  timezone?: string;
+  /** Omit to preserve existing interest_topics. Pass [] to clear. */
+  interestTopics?: string[];
+};
+
+/**
+ * Upsert the row for this instance's morning briefing config.
+ *
+ * Looks up `kiloclaw_instances.id` via `getInstanceBySandboxId` because
+ * the table FKs to it. Callers that already have the resolved instance
+ * UUID (e.g. the backfill path in `getMorningBriefingStatus`, which got
+ * it from `readMorningBriefingConfigFromPostgresHelper`) can pass it via
+ * `resolvedInstanceId` to skip the redundant lookup.
+ *
+ * No transaction — the worst case is a stale row that the next call
+ * fixes. Failures are logged and swallowed so the caller's primary
+ * operation (the gateway/plugin push) is not gated on Postgres
+ * availability.
+ */
+export async function syncMorningBriefingConfigToPostgresHelper(
+  env: KiloClawEnv,
+  state: InstanceMutableState,
+  config: MorningBriefingDesiredConfig,
+  resolvedInstanceId?: string
+): Promise<void> {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return;
+  if (!state.userId || !state.sandboxId) return;
+
+  try {
+    const db = getWorkerDb(connectionString);
+
+    let instanceId = resolvedInstanceId;
+    if (!instanceId) {
+      const instance = await getInstanceBySandboxId(db, state.sandboxId);
+      if (!instance) {
+        doWarn(state, 'syncMorningBriefingConfigToPostgresHelper: no active instance row', {
+          sandboxId: state.sandboxId,
+        });
+        return;
+      }
+      instanceId = instance.id;
+    }
+
+    await upsertMorningBriefingConfig(db, {
+      instanceId,
+      enabled: config.enabled,
+      cron: config.cron,
+      timezone: config.timezone,
+      interestTopics: config.interestTopics,
+    });
+  } catch (err) {
+    doWarn(state, 'Failed to sync morning_briefing_configs to Postgres', {
+      error: toLoggable(err),
+    });
+  }
+}
+
+/**
+ * Read the desired-state row from Postgres. Returns null when:
+ * - HYPERDRIVE is not configured (dev/test),
+ * - the DO has no userId/sandboxId yet,
+ * - no instance row exists (lookup miss),
+ * - the read fails.
+ *
+ * Returns `{ instanceId, row: null }` when the instance exists but no
+ * config row has been written yet (legacy instance pre-dating PR-4a, or
+ * an instance whose user has never enabled briefing). The status path
+ * uses this to backfill from the plugin response on first read.
+ */
+export async function readMorningBriefingConfigFromPostgresHelper(
+  env: KiloClawEnv,
+  state: InstanceMutableState
+): Promise<{ instanceId: string; row: MorningBriefingConfigRow | null } | null> {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return null;
+  if (!state.userId || !state.sandboxId) return null;
+
+  try {
+    const db = getWorkerDb(connectionString);
+    const instance = await getInstanceBySandboxId(db, state.sandboxId);
+    if (!instance) return null;
+    const row = await getMorningBriefingConfig(db, instance.id);
+    return { instanceId: instance.id, row };
+  } catch (err) {
+    doWarn(state, 'Failed to read morning_briefing_configs from Postgres', {
+      error: toLoggable(err),
+    });
+    return null;
   }
 }
 

@@ -1,3 +1,4 @@
+import { dirname } from 'node:path';
 import { TRPCError } from '@trpc/server';
 import type * as z from 'zod';
 import { getSandbox } from '@cloudflare/sandbox';
@@ -588,7 +589,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
         const escapedWorkspace = workspacePath.replaceAll("'", "'\\''");
         const restoreResult = await session.exec(
           `bun /usr/local/bin/kilo-restore-session.js --file '${escapedFile}' '${escapedId}' '${escapedWorkspace}'`,
-          { cwd: workspacePath }
+          { cwd: dirname(workspacePath) }
         );
         if (restoreResult.exitCode !== 0) {
           const stdout = restoreResult.stdout?.trim() ?? '';

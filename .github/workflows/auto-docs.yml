@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Determine PR number and check branch prefix
+      - name: Determine PR number and check branch prefix or title
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
@@ -53,21 +53,24 @@ jobs:
             fi
           fi
 
-          HEAD_BRANCH=$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" --jq '.head.ref' 2>/tmp/gh_err.txt) || {
-            echo "Failed to fetch branch info for PR #$PR_NUMBER: $(cat /tmp/gh_err.txt), skipping."
+          PR_META=$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" --jq '{ref: .head.ref, title: .title}' 2>/tmp/gh_err.txt) || {
+            echo "Failed to fetch PR #$PR_NUMBER info: $(cat /tmp/gh_err.txt), skipping."
             echo "should_send=false" >> "$GITHUB_OUTPUT"
             exit 0
           }
 
-          if [[ ! "$HEAD_BRANCH" =~ ^feat(ure)?[/-] ]]; then
-            echo "Skipping PR #$PR_NUMBER: branch '$HEAD_BRANCH' does not start with feat/ or feature/"
+          HEAD_BRANCH=$(echo "$PR_META" | jq -r '.ref')
+          PR_TITLE=$(echo "$PR_META" | jq -r '.title')
+
+          if [[ ! "$HEAD_BRANCH" =~ ^feat(ure)?[/-] ]] && [[ ! "${PR_TITLE,,}" =~ feat(ure)? ]]; then
+            echo "Skipping PR #$PR_NUMBER: branch '$HEAD_BRANCH' does not start with feat/ or feature/, and title '$PR_TITLE' does not contain feat or feature"
             echo "should_send=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "should_send=true" >> "$GITHUB_OUTPUT"
-          echo "Found PR #$PR_NUMBER with branch: $HEAD_BRANCH"
+          echo "Found PR #$PR_NUMBER with branch: $HEAD_BRANCH, title: $PR_TITLE"
 
       - name: Build webhook payload
         if: steps.pr.outputs.should_send == 'true'

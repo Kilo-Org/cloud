@@ -73,6 +73,20 @@ export default function AppLayout() {
                 gestureEnabled: false,
               }}
             />
+            <Stack.Screen
+              name="consent"
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="consent-details"
+              options={{
+                headerShown: false,
+              }}
+            />
           </Stack>
         </StoreKiloPassPurchaseProvider>
       </KiloChatPresenceMount>

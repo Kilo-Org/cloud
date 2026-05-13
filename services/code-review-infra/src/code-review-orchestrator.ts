@@ -743,6 +743,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       return false;
     }
 
+    this.state.sandboxRetryAttempted = true;
+    await this.saveState();
+
     const retryId = this.env.CODE_REVIEW_ORCHESTRATOR.idFromName(
       `${this.state.reviewId}:${params.retryAttemptId}`
     );

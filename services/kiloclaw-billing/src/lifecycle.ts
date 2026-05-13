@@ -396,6 +396,12 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+// Defence-in-depth check. The trial inactivity SQL queries already restrict to
+// `TRIAL_INACTIVITY_PRICE_VERSIONS`, which is the same set of price versions
+// whose `trialDurationDays >= TRIAL_INACTIVITY_MIN_DURATION_DAYS`. This helper
+// re-validates the catalog entry on each row so that a future SQL change that
+// drops or weakens the `inArray` predicate cannot silently send one-day (or
+// otherwise ineligible) trials through the inactivity-stop pipeline.
 function hasTrialInactivityEligibleDuration(row: { kiloclaw_price_version: string }): boolean {
   return (
     getKiloClawPricingCatalogEntry(row.kiloclaw_price_version).trialDurationDays >=

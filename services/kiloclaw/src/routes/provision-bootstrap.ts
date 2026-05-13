@@ -97,6 +97,14 @@ export async function resolveProvisionEntitlementLocally(params: {
   return await resolveProvisionEntitlementWithDb({ db, input: params.input });
 }
 
+// Coupling note: this catch swallows every RPC error, including legitimate blocking
+// conditions thrown by the billing service (e.g. existing live subscription guards,
+// earlybird guards). The local fallback must therefore stay behaviourally identical
+// to the RPC path, otherwise we silently produce a different result when the RPC
+// fails. Today both paths execute `resolveProvisionEntitlementWithDb` from
+// `provision-bootstrap-shared.ts`, so they share the same guards. If the billing
+// service's `resolveProvisionEntitlement` ever diverges from the shared
+// implementation, this fallback contract must be revisited.
 export async function resolveProvisionEntitlementWithFallback(params: {
   env: AppEnv['Bindings'];
   input: Pick<BootstrapProvisionInput, 'userId' | 'orgId'>;

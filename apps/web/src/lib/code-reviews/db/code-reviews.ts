@@ -46,7 +46,7 @@ type AttemptCallbackFields = {
   completedAt?: Date;
 };
 
-function isTerminalCodeReviewStatus(status: CodeReviewStatus): boolean {
+function isTerminalCodeReviewStatus(status: string): boolean {
   return status === 'completed' || status === 'failed' || status === 'cancelled';
 }
 

@@ -696,6 +696,88 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     };
   }
 
+  async retryFreshAfterInfraFailure(params: {
+    sessionId?: string;
+    reason: string;
+  }): Promise<boolean> {
+    await this.loadState();
+
+    if (!this.state) {
+      return false;
+    }
+
+    if (this.state.agentVersion !== 'v2') {
+      return false;
+    }
+
+    if (isTerminalStatus(this.state.status)) {
+      return false;
+    }
+
+    if (this.state.sandboxRetryAttempted === true) {
+      return false;
+    }
+
+    if (params.sessionId && this.state.sessionId && params.sessionId !== this.state.sessionId) {
+      console.warn(
+        '[CodeReviewOrchestrator] retryFreshAfterInfraFailure ignored session mismatch',
+        {
+          reviewId: this.state.reviewId,
+          requestedSessionId: params.sessionId,
+          currentSessionId: this.state.sessionId,
+        }
+      );
+      return false;
+    }
+
+    const previousCloudAgentSessionId = this.state.previousCloudAgentSessionId;
+    const previousSessionId = this.state.sessionId;
+    const previousCliSessionId = this.state.cliSessionId;
+    const previousSandboxId = this.state.sandboxId;
+
+    this.cancelled = false;
+    this.unsavedEventCount = 0;
+    this.totalTokensIn = 0;
+    this.totalTokensOut = 0;
+    this.totalCost = 0;
+    this.model = undefined;
+
+    this.state = {
+      ...this.state,
+      status: 'queued',
+      sessionId: undefined,
+      cliSessionId: undefined,
+      sandboxId: undefined,
+      previousCloudAgentSessionId: undefined,
+      sandboxRetryAttempted: true,
+      errorMessage: undefined,
+      terminalReason: undefined,
+      completedAt: undefined,
+      events: [],
+      model: undefined,
+      totalTokensIn: undefined,
+      totalTokensOut: undefined,
+      totalCost: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.saveState();
+
+    console.warn(
+      '[CodeReviewOrchestrator] Retrying review with fresh session after infra failure',
+      {
+        reviewId: this.state.reviewId,
+        reason: params.reason,
+        previousCloudAgentSessionId,
+        previousSessionId,
+        previousCliSessionId,
+        previousSandboxId,
+      }
+    );
+
+    await this.runWithCloudAgentNext();
+    return true;
+  }
+
   /**
    * RPC method: Cancel a running review.
    * Sets the cancellation flag to stop stream processing and interrupts the cloud agent session.

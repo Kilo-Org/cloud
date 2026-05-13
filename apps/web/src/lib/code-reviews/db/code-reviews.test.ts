@@ -1,10 +1,17 @@
 import { db } from '@/lib/drizzle';
-import { cloud_agent_code_reviews, kilocode_users } from '@kilocode/db/schema';
+import {
+  cloud_agent_code_review_attempts,
+  cloud_agent_code_reviews,
+  kilocode_users,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import {
   createCodeReview,
+  createCodeReviewAttempt,
+  listCodeReviewAttempts,
+  updateCodeReviewAttemptForCallback,
   updateCodeReviewStatus,
   findPreviousCompletedReview,
 } from './code-reviews';
@@ -140,5 +147,45 @@ describe('findPreviousCompletedReview', () => {
       .limit(1);
 
     expect(review?.agentVersion).toBe('v2');
+  });
+
+  it('creates, links, lists, and updates code review attempts', async () => {
+    const reviewId = await createReview('sha-attempts');
+    const firstAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_attempt_1',
+      cliSessionId: 'ses_attempt_1',
+    });
+    const secondAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      retryOfAttemptId: firstAttempt.id,
+      retryReason: 'infra_failure',
+      status: 'pending',
+    });
+
+    expect(firstAttempt.attempt_number).toBe(1);
+    expect(secondAttempt.attempt_number).toBe(2);
+    expect(secondAttempt.retry_of_attempt_id).toBe(firstAttempt.id);
+
+    const attempts = await listCodeReviewAttempts(reviewId);
+    expect(attempts.map(attempt => attempt.attempt_number)).toEqual([1, 2]);
+
+    await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent_attempt_1',
+      errorMessage: 'Container shutdown: SIGTERM',
+      terminalReason: 'sandbox_error',
+    });
+
+    const [updatedFirstAttempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, firstAttempt.id))
+      .limit(1);
+
+    expect(updatedFirstAttempt?.status).toBe('failed');
+    expect(updatedFirstAttempt?.error_message).toBe('Container shutdown: SIGTERM');
   });
 });

@@ -6,6 +6,10 @@ jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
   },
 }));
 
+jest.mock('@/lib/code-reviews/dispatch/dispatch-pending-reviews', () => ({
+  tryDispatchPendingReviews: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   createCheckRun: jest.fn(),
   updateCheckRun: jest.fn(),
@@ -18,7 +22,12 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
 import { db } from '@/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { cloud_agent_code_reviews, kilocode_users, type User } from '@kilocode/db/schema';
+import {
+  cloud_agent_code_review_attempts,
+  cloud_agent_code_reviews,
+  kilocode_users,
+  type User,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
 const REPO = `test-org/code-reviews-cancel-${Date.now()}`;
@@ -186,5 +195,89 @@ describe('codeReviewRouter.cancel', () => {
     expect(result).toEqual({ success: false, error: 'Worker could not cancel code review' });
     expect(storedReview?.status).toBe('running');
     expect(storedReview?.completed_at).toBeNull();
+  });
+});
+
+describe('codeReviewRouter attempts', () => {
+  let testUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
+    mockCancelReview.mockReset();
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('returns attempts from get and preserves history during retrigger', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'running', {
+          session_id: 'agent-first',
+          cli_session_id: 'ses_first',
+          status: 'failed',
+          error_message: 'Container shutdown: SIGTERM',
+          terminal_reason: 'sandbox_error',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const caller = await createCallerForUser(testUser.id);
+    const before = await caller.codeReviews.get({ reviewId: review.id });
+    expect(before.success).toBe(true);
+    expect(before.success ? before.attempts : []).toEqual([]);
+
+    await caller.codeReviews.retrigger({ reviewId: review.id });
+
+    const after = await caller.codeReviews.get({ reviewId: review.id });
+    if (!after.success) {
+      throw new Error('Expected successful code review get');
+    }
+
+    expect(after.attempts).toHaveLength(2);
+    expect(after.attempts.map(attempt => attempt.retry_reason)).toEqual([null, 'manual_retrigger']);
+    expect(after.attempts[0]?.session_id).toBe('agent-first');
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+    expect(storedReview?.status).toBe('pending');
+    expect(storedReview?.session_id).toBeNull();
+  });
+
+  it('rejects stream info attempts from another review', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(reviewValues(testUser.id, 'running', { session_id: 'agent-review' }))
+      .returning({ id: cloud_agent_code_reviews.id });
+    const [otherReview] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(reviewValues(testUser.id, 'running', { session_id: 'agent-other' }))
+      .returning({ id: cloud_agent_code_reviews.id });
+    const [otherAttempt] = await db
+      .insert(cloud_agent_code_review_attempts)
+      .values({
+        code_review_id: otherReview.id,
+        attempt_number: 1,
+        status: 'running',
+        session_id: 'agent-other',
+      })
+      .returning({ id: cloud_agent_code_review_attempts.id });
+
+    const caller = await createCallerForUser(testUser.id);
+    await expect(
+      caller.codeReviews.getReviewStreamInfo({
+        reviewId: review.id,
+        attemptId: otherAttempt.id,
+      })
+    ).rejects.toThrow('Code review attempt not found');
   });
 });

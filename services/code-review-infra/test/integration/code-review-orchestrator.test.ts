@@ -147,6 +147,136 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
   });
 
+  it('retry-fresh route requires auth', async () => {
+    const response = await SELF.fetch(
+      `https://worker.test/reviews/${crypto.randomUUID()}/retry-fresh`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'test' }),
+      }
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it('retry-fresh starts a fresh session without continuation APIs', async () => {
+    const reviewId = crypto.randomUUID();
+    const stub = getReviewStub(reviewId);
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-retry-fresh',
+          kiloSessionId: 'ses_retry_fresh',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-retry-fresh', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          reviewId,
+          status: 'running',
+          sessionId: 'agent-old',
+          cliSessionId: 'ses_old',
+          sandboxId: 'sandbox-old',
+          previousCloudAgentSessionId: 'agent-previous',
+          errorMessage: 'Container shutdown: SIGTERM',
+          terminalReason: 'sandbox_error',
+        })
+      );
+    });
+
+    const response = await SELF.fetch(`https://worker.test/reviews/${reviewId}/retry-fresh`, {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: 'agent-old', reason: 'Container shutdown: SIGTERM' }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true, reviewId });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/getSessionHealth')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/updateSession')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(0);
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-retry-fresh',
+      cliSessionId: 'ses_retry_fresh',
+      sandboxRetryAttempted: true,
+    });
+    const stored = await storedReview(stub);
+    expect(stored?.previousCloudAgentSessionId).toBeUndefined();
+    expect(stored?.sandboxId).toBeUndefined();
+    expect(stored?.errorMessage).toBeUndefined();
+  });
+
+  it('retry-fresh ignores mismatched sessions', async () => {
+    const reviewId = crypto.randomUUID();
+    const stub = getReviewStub(reviewId);
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          reviewId,
+          status: 'running',
+          sessionId: 'agent-current',
+        })
+      );
+    });
+
+    const response = await SELF.fetch(`https://worker.test/reviews/${reviewId}/retry-fresh`, {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: 'agent-old', reason: 'Container shutdown: SIGTERM' }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: false, reviewId });
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-current',
+    });
+  });
+
+  it('retry-fresh ignores exhausted retries', async () => {
+    const reviewId = crypto.randomUUID();
+    const stub = getReviewStub(reviewId);
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          reviewId,
+          status: 'running',
+          sessionId: 'agent-current',
+          sandboxRetryAttempted: true,
+        })
+      );
+    });
+
+    const response = await SELF.fetch(`https://worker.test/reviews/${reviewId}/retry-fresh`, {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: 'agent-current', reason: 'Container shutdown: SIGTERM' }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: false, reviewId });
+  });
+
   it('queued review alarm retries runReview and transitions to running', async () => {
     const stub = getReviewStub();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {

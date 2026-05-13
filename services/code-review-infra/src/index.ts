@@ -205,6 +205,42 @@ app.post('/reviews/:reviewId/cancel', async (c: Context<HonoEnv>) => {
   return c.json({ success: result, reviewId });
 });
 
+// Route: POST /reviews/:reviewId/retry-fresh
+app.post('/reviews/:reviewId/retry-fresh', async (c: Context<HonoEnv>) => {
+  const reviewId = c.req.param('reviewId');
+
+  if (!reviewId) {
+    return c.json({ error: 'reviewId parameter required' }, 400);
+  }
+
+  let body: { sessionId?: string; reason?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const reason = body.reason;
+  if (!reason) {
+    return c.json({ error: 'Missing required field: reason' }, 400);
+  }
+
+  console.log('[POST /reviews/:reviewId/retry-fresh] Retrying review with fresh session', {
+    reviewId,
+    reason,
+    sessionId: body.sessionId,
+  });
+
+  const id = c.env.CODE_REVIEW_ORCHESTRATOR.idFromName(reviewId);
+  const result = await withDORetry(
+    () => c.env.CODE_REVIEW_ORCHESTRATOR.get(id),
+    stub => stub.retryFreshAfterInfraFailure({ sessionId: body.sessionId, reason }),
+    'retryFreshAfterInfraFailure'
+  );
+
+  return c.json({ success: result, reviewId });
+});
+
 // Health check endpoint
 app.get('/health', (c: Context<HonoEnv>) => {
   return c.json({ status: 'ok', service: 'code-review-worker' });

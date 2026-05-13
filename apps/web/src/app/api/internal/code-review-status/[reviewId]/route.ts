@@ -23,8 +23,13 @@ import {
   updateCodeReviewUsage,
   getCodeReviewById,
   getSessionUsageFromBilling,
+  updateCodeReviewAttemptForCallback,
+  getLatestCodeReviewAttempt,
+  createCodeReviewAttempt,
+  hasInfraRetryAttempt,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
+import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import {
@@ -158,6 +163,36 @@ function isBillingCodeReviewTerminalReason(
 
   return ['insufficient credits', 'paid model', 'add credits', 'credits required'].some(pattern =>
     message.includes(pattern)
+  );
+}
+
+function isRetryableInfraFailure(
+  status: 'running' | 'completed' | 'failed' | 'cancelled',
+  terminalReason?: CodeReviewTerminalReason,
+  errorMessage?: string
+): boolean {
+  if (status !== 'failed') return false;
+  if (terminalReason === 'billing') return false;
+  if (isBillingCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
+
+  const message = errorMessage?.toLowerCase();
+  if (!message) return false;
+
+  if (message.includes('execution exceeded maximum runtime')) return false;
+  if (message.includes('cancelled') || message.includes('canceled')) return false;
+  if (message.includes('superseded')) return false;
+  if (message.includes('user interrupted')) return false;
+
+  return (
+    message.includes('container shutdown: sigterm') ||
+    message.includes('execution timeout - no heartbeat received') ||
+    ((message.includes('sandbox') ||
+      message.includes('container') ||
+      message.includes('cloudflare')) &&
+      (message.includes('http 500') ||
+        message.includes('status: 500') ||
+        message.includes('internal server error') ||
+        message.includes('internal_server_error')))
   );
 }
 
@@ -457,6 +492,7 @@ export async function POST(
     const rawPayload: StatusUpdatePayload = await req.json();
     const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult } =
       normalizePayload(rawPayload);
+    const executionId = 'executionId' in rawPayload ? rawPayload.executionId : undefined;
 
     // Validate payload
     if (!status) {
@@ -488,12 +524,42 @@ export async function POST(
       return NextResponse.json({ error: 'Review not found' }, { status: 404 });
     }
 
+    const attempt = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status,
+      sessionId,
+      cliSessionId,
+      executionId,
+      errorMessage,
+      terminalReason,
+      startedAt: status === 'running' ? new Date() : undefined,
+      completedAt:
+        status === 'completed' || status === 'failed' || status === 'cancelled'
+          ? new Date()
+          : undefined,
+    });
+
+    const latestAttempt = await getLatestCodeReviewAttempt(reviewId);
+    const isStaleAttempt = !!latestAttempt && attempt.id !== latestAttempt.id;
+    if (isStaleAttempt) {
+      logExceptInTest('[code-review-status] Stale callback updated old attempt, skipping parent', {
+        reviewId,
+        attemptId: attempt.id,
+        latestAttemptId: latestAttempt?.id,
+        requestedStatus: status,
+      });
+      return NextResponse.json({
+        success: true,
+        message: 'Stale callback from superseded attempt',
+      });
+    }
+
     // Determine valid transitions based on incoming status
     const isTerminalState =
       review.status === 'completed' || review.status === 'failed' || review.status === 'cancelled';
 
     if (isTerminalState) {
-      // Already in terminal state - skip update
+      // Already in terminal state - skip parent update, but attempt history above is still recorded.
       logExceptInTest('[code-review-status] Review already in terminal state, skipping update', {
         reviewId,
         currentStatus: review.status,
@@ -513,7 +579,14 @@ export async function POST(
     // may arrive and corrupt the new review's state.  If the review already
     // has a session_id and the callback carries a different sessionId, the
     // callback belongs to a previous (superseded) session — ignore it.
-    if (sessionId && review.session_id && sessionId !== review.session_id) {
+    const updatesLatestAttemptSession =
+      sessionId && latestAttempt?.id === attempt.id && attempt.session_id === sessionId;
+    if (
+      sessionId &&
+      review.session_id &&
+      sessionId !== review.session_id &&
+      !updatesLatestAttemptSession
+    ) {
       logExceptInTest(
         '[code-review-status] Stale callback from superseded session, skipping update',
         {
@@ -527,6 +600,57 @@ export async function POST(
         success: true,
         message: 'Stale callback from superseded session',
       });
+    }
+
+    if (
+      isRetryableInfraFailure(status, terminalReason, errorMessage) &&
+      !(await hasInfraRetryAttempt(reviewId))
+    ) {
+      const retryAttempt = await createCodeReviewAttempt({
+        codeReviewId: reviewId,
+        retryOfAttemptId: attempt.id,
+        retryReason: 'infra_failure',
+        status: 'pending',
+      });
+
+      try {
+        const retryResult = await codeReviewWorkerClient.retryReviewFresh(reviewId, {
+          sessionId,
+          reason: errorMessage ?? terminalReason ?? 'retryable infra failure',
+        });
+
+        if (retryResult.success) {
+          logExceptInTest('[code-review-status] Started fresh retry after infra failure', {
+            reviewId,
+            failedAttemptId: attempt.id,
+            retryAttemptId: retryAttempt.id,
+            sessionId,
+          });
+          return NextResponse.json({ success: true, retried: true });
+        }
+
+        await updateCodeReviewAttemptForCallback({
+          codeReviewId: reviewId,
+          status: 'failed',
+          errorMessage: 'Worker declined fresh retry after infra failure',
+          terminalReason: 'sandbox_error',
+          completedAt: new Date(),
+        });
+      } catch (retryError) {
+        await updateCodeReviewAttemptForCallback({
+          codeReviewId: reviewId,
+          status: 'failed',
+          errorMessage: retryError instanceof Error ? retryError.message : String(retryError),
+          terminalReason: 'sandbox_error',
+          completedAt: new Date(),
+        });
+        logExceptInTest('[code-review-status] Fresh retry startup failed, falling through', {
+          reviewId,
+          failedAttemptId: attempt.id,
+          retryAttemptId: retryAttempt.id,
+          error: retryError instanceof Error ? retryError.message : String(retryError),
+        });
+      }
     }
 
     // Valid transitions:
@@ -588,7 +712,12 @@ export async function POST(
       cliSessionId,
       errorMessage,
       terminalReason,
-      startedAt: status === 'running' ? new Date() : undefined,
+      startedAt:
+        status === 'running'
+          ? review.started_at
+            ? new Date(review.started_at)
+            : new Date()
+          : undefined,
       completedAt:
         status === 'completed' || status === 'failed' || status === 'cancelled'
           ? new Date()

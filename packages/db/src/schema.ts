@@ -3046,6 +3046,51 @@ export const cloud_agent_code_reviews = pgTable(
 
 export type CloudAgentCodeReview = typeof cloud_agent_code_reviews.$inferSelect;
 
+export const cloud_agent_code_review_attempts = pgTable(
+  'cloud_agent_code_review_attempts',
+  {
+    id: idPrimaryKeyColumn,
+    code_review_id: uuid()
+      .notNull()
+      .references(() => cloud_agent_code_reviews.id, { onDelete: 'cascade' }),
+    attempt_number: integer().notNull(),
+    retry_of_attempt_id: uuid().references((): AnyPgColumn => cloud_agent_code_review_attempts.id, {
+      onDelete: 'set null',
+    }),
+    retry_reason: text(),
+    session_id: text(),
+    cli_session_id: text(),
+    execution_id: text(),
+    status: text().notNull().default('pending'),
+    error_message: text(),
+    terminal_reason: text(),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_code_review_attempts_review_attempt_number').on(
+      table.code_review_id,
+      table.attempt_number
+    ),
+    index('idx_cloud_agent_code_review_attempts_code_review_id').on(table.code_review_id),
+    index('idx_cloud_agent_code_review_attempts_session_id').on(table.session_id),
+    index('idx_cloud_agent_code_review_attempts_cli_session_id').on(table.cli_session_id),
+    index('idx_cloud_agent_code_review_attempts_status').on(table.status),
+    index('idx_cloud_agent_code_review_attempts_retry_reason').on(table.retry_reason),
+    check(
+      'cloud_agent_code_review_attempts_attempt_number_check',
+      sql`${table.attempt_number} >= 1`
+    ),
+  ]
+);
+
+export type CloudAgentCodeReviewAttempt = typeof cloud_agent_code_review_attempts.$inferSelect;
+
 export const cliSessions = pgTable(
   'cli_sessions',
   {

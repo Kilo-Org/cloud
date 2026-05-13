@@ -63,6 +63,11 @@ export type CancelReviewResponse = {
   reviewId: string;
 };
 
+export type RetryReviewFreshResponse = {
+  success: boolean;
+  reviewId: string;
+};
+
 const ReviewStatusResponseSchema = z.object({
   reviewId: z.string(),
   status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
@@ -164,6 +169,26 @@ class CodeReviewWorkerClient {
     }
 
     return response.json() as Promise<CancelReviewResponse>;
+  }
+
+  async retryReviewFresh(
+    reviewId: string,
+    input: { sessionId?: string; reason: string }
+  ): Promise<RetryReviewFreshResponse> {
+    const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/retry-fresh`, {
+      method: 'POST',
+      headers: this.getHeaders({
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify(input),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Worker returned ${response.status}: ${errorText}`);
+    }
+
+    return response.json() as Promise<RetryReviewFreshResponse>;
   }
 
   async getReviewStatus(reviewId: string): Promise<ReviewStatusResponse | null> {

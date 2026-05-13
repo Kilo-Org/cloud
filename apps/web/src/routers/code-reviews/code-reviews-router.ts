@@ -20,6 +20,10 @@ import {
   cancelCodeReview,
   resetCodeReviewForRetry,
   updateCheckRunId,
+  listCodeReviewAttempts,
+  getCodeReviewAttemptForReview,
+  ensureCurrentCodeReviewAttemptFromReview,
+  createCodeReviewAttempt,
 } from '@/lib/code-reviews/db/code-reviews';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { createCheckRun, updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
@@ -319,7 +323,9 @@ export const codeReviewRouter = createTRPCRouter({
         });
       }
 
-      return successResult({ review });
+      const attempts = await listCodeReviewAttempts(input.reviewId);
+
+      return successResult({ review, attempts });
     } catch (error) {
       if (error instanceof TRPCError) {
         throw error;
@@ -480,8 +486,16 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
+        const currentAttempt = await ensureCurrentCodeReviewAttemptFromReview(review);
+
         // Reset the review for retry
         await resetCodeReviewForRetry(input.reviewId);
+        await createCodeReviewAttempt({
+          codeReviewId: input.reviewId,
+          retryOfAttemptId: currentAttempt.id,
+          retryReason: 'manual_retrigger',
+          status: 'pending',
+        });
 
         // Build owner object for dispatch.
         // For org reviews, use the bot user ID so retrigger dispatch matches webhook-created reviews.
@@ -530,6 +544,7 @@ export const codeReviewRouter = createTRPCRouter({
     .input(
       z.object({
         reviewId: z.string().uuid(),
+        attemptId: z.string().uuid().optional(),
       })
     )
     .query(async ({ input, ctx }) => {
@@ -587,6 +602,7 @@ export const codeReviewRouter = createTRPCRouter({
     .input(
       z.object({
         reviewId: z.string().uuid(),
+        attemptId: z.string().uuid().optional(),
       })
     )
     .query(async ({ input, ctx }) => {
@@ -617,10 +633,20 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
+        const attempt = input.attemptId
+          ? await getCodeReviewAttemptForReview(input.reviewId, input.attemptId)
+          : null;
+        if (input.attemptId && !attempt) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Code review attempt not found',
+          });
+        }
+
         return successResult({
-          cloudAgentSessionId: review.session_id ?? null,
+          cloudAgentSessionId: attempt?.session_id ?? review.session_id ?? null,
           organizationId: review.owned_by_organization_id ?? undefined,
-          status: review.status,
+          status: attempt?.status ?? review.status,
           agentVersion: review.agent_version ?? 'v1',
         });
       } catch (error) {
@@ -642,6 +668,7 @@ export const codeReviewRouter = createTRPCRouter({
     .input(
       z.object({
         reviewId: z.string().uuid(),
+        attemptId: z.string().uuid().optional(),
       })
     )
     .query(async ({ input, ctx }) => {
@@ -672,7 +699,17 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
-        const cliSessionId = review.cli_session_id;
+        const attempt = input.attemptId
+          ? await getCodeReviewAttemptForReview(input.reviewId, input.attemptId)
+          : null;
+        if (input.attemptId && !attempt) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Code review attempt not found',
+          });
+        }
+
+        const cliSessionId = attempt?.cli_session_id ?? review.cli_session_id;
         if (!cliSessionId) {
           return successResult({ entries: [] });
         }

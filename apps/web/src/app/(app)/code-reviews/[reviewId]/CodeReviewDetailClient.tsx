@@ -311,6 +311,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
       {showStreamView && (
         <CodeReviewStreamView
           reviewId={reviewId}
+          attempts={data.attempts}
           onComplete={() => {
             void queryClient.invalidateQueries({
               queryKey: trpc.codeReviews.get.queryKey({ reviewId }),

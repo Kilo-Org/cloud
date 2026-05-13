@@ -2,7 +2,7 @@ import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import type { NextRequest } from 'next/server';
 import type * as codeReviewsDbModule from '@/lib/code-reviews/db/code-reviews';
 import type * as platformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
-import type { CloudAgentCodeReview } from '@kilocode/db/schema';
+import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
 
 // --- Mock functions ---
 
@@ -17,6 +17,18 @@ const mockUpdateCodeReviewUsage = jest.fn() as jest.MockedFunction<
 >;
 const mockGetSessionUsageFromBilling = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.getSessionUsageFromBilling
+>;
+const mockUpdateCodeReviewAttemptForCallback = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.updateCodeReviewAttemptForCallback
+>;
+const mockGetLatestCodeReviewAttempt = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.getLatestCodeReviewAttempt
+>;
+const mockCreateCodeReviewAttempt = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.createCodeReviewAttempt
+>;
+const mockHasInfraRetryAttempt = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.hasInfraRetryAttempt
 >;
 const mockGetIntegrationById = jest.fn() as jest.MockedFunction<
   typeof platformIntegrationsModule.getIntegrationById
@@ -53,6 +65,8 @@ const mockHasMRNoteWithMarker = jest.fn<any>();
 const mockCaptureException = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockCaptureMessage = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockRetryReviewFresh = jest.fn<any>();
 
 // --- Module mocks ---
 
@@ -65,6 +79,16 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   updateCodeReviewStatus: mockUpdateCodeReviewStatus,
   updateCodeReviewUsage: mockUpdateCodeReviewUsage,
   getSessionUsageFromBilling: mockGetSessionUsageFromBilling,
+  updateCodeReviewAttemptForCallback: mockUpdateCodeReviewAttemptForCallback,
+  getLatestCodeReviewAttempt: mockGetLatestCodeReviewAttempt,
+  createCodeReviewAttempt: mockCreateCodeReviewAttempt,
+  hasInfraRetryAttempt: mockHasInfraRetryAttempt,
+}));
+
+jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
+  codeReviewWorkerClient: {
+    retryReviewFresh: mockRetryReviewFresh,
+  },
 }));
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
@@ -173,6 +197,29 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
   };
 }
 
+function makeAttempt(
+  overrides: Partial<CloudAgentCodeReviewAttempt> = {}
+): CloudAgentCodeReviewAttempt {
+  return {
+    id: '00000000-0000-0000-0000-000000000101',
+    code_review_id: REVIEW_ID,
+    attempt_number: 1,
+    retry_of_attempt_id: null,
+    retry_reason: null,
+    session_id: null,
+    cli_session_id: null,
+    execution_id: null,
+    status: 'running',
+    error_message: null,
+    terminal_reason: null,
+    started_at: '2025-01-01T00:00:00Z',
+    completed_at: null,
+    created_at: '2025-01-01T00:00:00Z',
+    updated_at: '2025-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
 // --- Tests ---
 
 import type { POST as POSTType } from './route';
@@ -182,6 +229,27 @@ let POST: typeof POSTType;
 beforeEach(async () => {
   jest.clearAllMocks();
   mockUpdateCodeReviewStatus.mockResolvedValue(undefined);
+  mockUpdateCodeReviewAttemptForCallback.mockImplementation(async params =>
+    makeAttempt({
+      status: params.status,
+      session_id: params.sessionId ?? null,
+      cli_session_id: params.cliSessionId ?? null,
+      execution_id: params.executionId ?? null,
+      error_message: params.errorMessage ?? null,
+      terminal_reason: params.terminalReason ?? null,
+    })
+  );
+  mockGetLatestCodeReviewAttempt.mockResolvedValue(makeAttempt());
+  mockCreateCodeReviewAttempt.mockResolvedValue(
+    makeAttempt({
+      id: '00000000-0000-0000-0000-000000000102',
+      attempt_number: 2,
+      retry_reason: 'infra_failure',
+      status: 'pending',
+    })
+  );
+  mockHasInfraRetryAttempt.mockResolvedValue(true);
+  mockRetryReviewFresh.mockResolvedValue({ success: true, reviewId: REVIEW_ID });
   mockTryDispatchPendingReviews.mockResolvedValue(undefined);
   mockGetBotUserId.mockResolvedValue(null);
   mockGetIntegrationById.mockResolvedValue({
@@ -352,6 +420,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
   describe('terminal_reason persistence', () => {
     it('passes terminalReason to updateCodeReviewStatus', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockHasInfraRetryAttempt.mockResolvedValue(true);
 
       await POST(
         makeRequest({
@@ -398,6 +467,142 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'completed',
         expect.objectContaining({ terminalReason: undefined })
       );
+    });
+  });
+
+  describe('attempt tracking and infra retry', () => {
+    it('records running callbacks on the current attempt', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'queued' }));
+
+      await POST(
+        makeRequest({
+          status: 'running',
+          sessionId: 'agent-current',
+          cliSessionId: 'ses_current',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          codeReviewId: REVIEW_ID,
+          status: 'running',
+          sessionId: 'agent-current',
+          cliSessionId: 'ses_current',
+        })
+      );
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'running',
+        expect.objectContaining({
+          sessionId: 'agent-current',
+          cliSessionId: 'ses_current',
+        })
+      );
+    });
+
+    it('retries a first SIGTERM infra failure without marking parent terminal', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: 'agent-old' })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000201',
+          status: 'failed',
+          session_id: 'agent-old',
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000201',
+          status: 'failed',
+          session_id: 'agent-old',
+        })
+      );
+      mockHasInfraRetryAttempt.mockResolvedValue(false);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-old',
+          errorMessage: 'Container shutdown: SIGTERM',
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCreateCodeReviewAttempt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          codeReviewId: REVIEW_ID,
+          retryOfAttemptId: '00000000-0000-0000-0000-000000000201',
+          retryReason: 'infra_failure',
+          status: 'pending',
+        })
+      );
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: 'agent-old',
+        reason: 'Container shutdown: SIGTERM',
+      });
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it('does not retry maximum runtime failures', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'running' }));
+      mockHasInfraRetryAttempt.mockResolvedValue(false);
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Execution exceeded maximum runtime',
+          terminalReason: 'timeout',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'timeout' })
+      );
+    });
+
+    it('updates stale attempt callbacks without changing the parent review', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: 'agent-new' })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000301',
+          status: 'failed',
+          session_id: 'agent-old',
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000302',
+          attempt_number: 2,
+          status: 'running',
+          session_id: 'agent-new',
+        })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-old',
+          errorMessage: 'Container shutdown: SIGTERM',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
     });
   });
 

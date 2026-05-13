@@ -72,6 +72,7 @@
     "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
     "KILO_API_URL": "https://api.kilo.ai",
     "GASTOWN_API_URL": "https://gastown.kiloapps.io",
+    "WASTELAND_API_URL": "https://wasteland.kiloapps.io",
   },
 
   // Hyperdrive binding for Postgres (user lookups, token generation)
@@ -96,6 +97,11 @@
       "binding": "GIT_TOKEN_SERVICE",
       "service": "git-token-service",
       "entrypoint": "GitTokenRPCEntrypoint",
+    },
+    {
+      "binding": "WASTELAND_SERVICE",
+      "service": "wasteland",
+      "entrypoint": "WastelandRPCEntrypoint",
     },
   ],
 
@@ -125,6 +131,7 @@
         // the host's dev servers.
         "KILO_API_URL": "http://192.168.65.254:3000",
         "GASTOWN_API_URL": "http://192.168.65.254:8803",
+        "WASTELAND_API_URL": "http://192.168.65.254:8788",
       },
       "containers": [
         {
@@ -150,6 +157,14 @@
           "binding": "GIT_TOKEN_SERVICE",
           "service": "git-token-service-dev",
           "entrypoint": "GitTokenRPCEntrypoint",
+        },
+        {
+          "binding": "WASTELAND_SERVICE",
+          // In dev, wasteland registers as "wasteland-dev" because its
+          // dev script uses `wrangler dev --env dev`. The prod binding
+          // (above) uses the plain "wasteland" service name.
+          "service": "wasteland-dev",
+          "entrypoint": "WastelandRPCEntrypoint",
         },
       ],
       "ai": { "binding": "AI" },

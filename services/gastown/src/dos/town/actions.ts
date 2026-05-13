@@ -191,6 +191,15 @@ const EmitEvent = z.object({
   data: z.record(z.string(), z.unknown()),
 });
 
+const ReportWastelandDone = z.object({
+  type: z.literal('report_wasteland_done'),
+  /** The bead the reporter stamps `reported_done_at` on once the RPC succeeds. */
+  canonical_bead_id: z.string(),
+  wasteland_id: z.string(),
+  item_id: z.string(),
+  evidence: z.string(),
+});
+
 // ── Union ───────────────────────────────────────────────────────────
 
 export const Action = z.discriminatedUnion('type', [
@@ -223,6 +232,7 @@ export const Action = z.discriminatedUnion('type', [
   CreateTriageRequest,
   NotifyMayor,
   EmitEvent,
+  ReportWastelandDone,
 ]);
 
 export type Action = z.infer<typeof Action>;
@@ -256,6 +266,7 @@ export type SendNudge = z.infer<typeof SendNudge>;
 export type CreateTriageRequest = z.infer<typeof CreateTriageRequest>;
 export type NotifyMayor = z.infer<typeof NotifyMayor>;
 export type EmitEvent = z.infer<typeof EmitEvent>;
+export type ReportWastelandDone = z.infer<typeof ReportWastelandDone>;
 
 // ── Action application context ──────────────────────────────────────
 // applyAction needs access to TownDO-level resources for side effects.
@@ -323,6 +334,19 @@ export type ApplyActionContext = {
       auto_merge_delay_minutes?: number | null;
     };
   }>;
+  /**
+   * Mark a wasteland wanted item as done upstream and stamp
+   * `metadata.wasteland.reported_done_at` on the canonical bead. Returns
+   * true on success, false otherwise; failures are logged and do not throw.
+   * The reconciler retries on the next tick because the local stamp is
+   * the idempotency gate.
+   */
+  reportWastelandDone: (input: {
+    wastelandId: string;
+    itemId: string;
+    evidence: string;
+    canonicalBeadId: string;
+  }) => Promise<boolean>;
 };
 
 const LOG = '[actions]';
@@ -1433,6 +1457,23 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     case 'emit_event': {
       ctx.emitEvent({ event: action.event_name, townId, ...action.data });
       return null;
+    }
+
+    case 'report_wasteland_done': {
+      const { wasteland_id, item_id, evidence, canonical_bead_id } = action;
+      return async () => {
+        const ok = await ctx.reportWastelandDone({
+          wastelandId: wasteland_id,
+          itemId: item_id,
+          evidence,
+          canonicalBeadId: canonical_bead_id,
+        });
+        if (!ok) {
+          console.warn(
+            `${LOG} report_wasteland_done: deferred call returned false for item=${item_id}; will retry next tick`
+          );
+        }
+      };
     }
 
     default: {

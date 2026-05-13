@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationDir": "./dist-types",
+    "noEmit": false,
+    "skipLibCheck": true
+  },
+  "include": ["src/trpc/router.ts", "src/trpc/init.ts", "src/trpc/schemas.ts"]
+}

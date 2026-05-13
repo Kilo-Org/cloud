@@ -108,7 +108,7 @@ export function useGastownUiContext(townId: string, gastownUrl: string): string 
   const prevPathnameRef = useRef<string>(pathname);
   const prevDrawerRef = useRef<ResourceRef | null>(null);
 
-  const topDrawer = stack.length > 0 ? stack[stack.length - 1].resource : null;
+  const topDrawer = stack.length > 0 ? stack[stack.length - 1] : null;
 
   // Track activity changes synchronously during render so the XML
   // built below always includes the current navigation state.

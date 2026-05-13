@@ -124,4 +124,143 @@ describe('dolthubRouter', () => {
       expect(rows).toHaveLength(0);
     });
   });
+
+  describe('getInstallationCredentials', () => {
+    test('returns null in production', async () => {
+      setNodeEnv('production');
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.dolthub.getInstallationCredentials();
+      expect(result).toBeNull();
+    });
+
+    test('returns null when no integration exists', async () => {
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.dolthub.getInstallationCredentials();
+      expect(result).toBeNull();
+    });
+
+    test('returns the access token plus null username when nothing cached yet', async () => {
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: user.id,
+        owned_by_organization_id: null,
+        platform: PLATFORM.DOLTHUB,
+        integration_type: 'oauth',
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        scopes: ['api_read_write'],
+        metadata: {
+          access_token: 'live-access-token',
+          refresh_token: 'r',
+          scope: 'api_read_write',
+        },
+        installed_at: new Date().toISOString(),
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.dolthub.getInstallationCredentials();
+      expect(result).toEqual({ token: 'live-access-token', dolthubUsername: null });
+    });
+
+    test('returns the cached username alongside the token when present', async () => {
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: user.id,
+        owned_by_organization_id: null,
+        platform: PLATFORM.DOLTHUB,
+        integration_type: 'oauth',
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        scopes: ['api_read_write'],
+        metadata: { access_token: 'tok', dolthub_username: 'me-on-dolthub' },
+        installed_at: new Date().toISOString(),
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.dolthub.getInstallationCredentials();
+      expect(result).toEqual({ token: 'tok', dolthubUsername: 'me-on-dolthub' });
+    });
+
+    test('returns null when the integration is not active', async () => {
+      // Mirrors the `installed` semantics on `getInstallation` so a stale,
+      // non-active row never leaks its bearer token through this endpoint.
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: user.id,
+        owned_by_organization_id: null,
+        platform: PLATFORM.DOLTHUB,
+        integration_type: 'oauth',
+        integration_status: INTEGRATION_STATUS.SUSPENDED,
+        scopes: ['api_read_write'],
+        metadata: { access_token: 'should-not-leak' },
+        installed_at: new Date().toISOString(),
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.dolthub.getInstallationCredentials();
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('rememberUsername', () => {
+    test('throws in production', async () => {
+      setNodeEnv('production');
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.dolthub.rememberUsername({ username: 'me' })).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+    });
+
+    test('errors with PRECONDITION_FAILED when no integration exists', async () => {
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.dolthub.rememberUsername({ username: 'me' })).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+      });
+    });
+
+    test('persists the username on the integration metadata', async () => {
+      const [inserted] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: user.id,
+          owned_by_organization_id: null,
+          platform: PLATFORM.DOLTHUB,
+          integration_type: 'oauth',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata: { access_token: 'tok', refresh_token: 'r' },
+          installed_at: new Date().toISOString(),
+        })
+        .returning();
+
+      const caller = await createCallerForUser(user.id);
+      await caller.dolthub.rememberUsername({ username: 'me-on-dolthub' });
+
+      const [reloaded] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, inserted!.id));
+      const meta = reloaded!.metadata as {
+        access_token: string;
+        refresh_token: string;
+        dolthub_username: string;
+      };
+      expect(meta.access_token).toBe('tok');
+      expect(meta.refresh_token).toBe('r');
+      expect(meta.dolthub_username).toBe('me-on-dolthub');
+    });
+
+    test('rejects usernames with invalid characters', async () => {
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: user.id,
+        owned_by_organization_id: null,
+        platform: PLATFORM.DOLTHUB,
+        integration_type: 'oauth',
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        metadata: { access_token: 'tok' },
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.dolthub.rememberUsername({ username: 'has spaces' })).rejects.toThrow(
+        /Invalid DoltHub username/
+      );
+      await expect(caller.dolthub.rememberUsername({ username: 'foo/bar' })).rejects.toThrow(
+        /Invalid DoltHub username/
+      );
+    });
+  });
 });

@@ -7,6 +7,7 @@ import { useUrlOrganizationId } from '@/hooks/useUrlOrganizationId';
 import PersonalAppSidebar from './PersonalAppSidebar';
 import OrganizationAppSidebar from './OrganizationAppSidebar';
 import { GastownTownSidebar } from '@/components/gastown/GastownTownSidebar';
+import { WastelandSidebar } from '@/components/wasteland/WastelandSidebar';
 
 const UUID = '[0-9a-f-]{36}';
 
@@ -24,6 +25,18 @@ function extractOrgGastownTownId(pathname: string): { orgId: string; townId: str
 
 function isKiloClawNewPath(pathname: string): boolean {
   return pathname === '/claw/new' || new RegExp(`^/organizations/${UUID}/claw/new$`).test(pathname);
+}
+
+/** Extract the wastelandId from a /wasteland/[wastelandId] pathname, or null. */
+function extractWastelandId(pathname: string): string | null {
+  const match = pathname.match(new RegExp(`^/wasteland/(${UUID})`));
+  return match ? match[1] : null;
+}
+
+/** Extract {orgId, wastelandId} from an /organizations/[id]/wasteland/[wastelandId] pathname, or null. */
+function extractOrgWastelandId(pathname: string): { orgId: string; wastelandId: string } | null {
+  const match = pathname.match(new RegExp(`^/organizations/(${UUID})/wasteland/(${UUID})`));
+  return match ? { orgId: match[1], wastelandId: match[2] } : null;
 }
 
 export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
@@ -73,6 +86,26 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
         townId={orgGastown.townId}
         basePath={`${orgBase}/gastown/${orgGastown.townId}`}
         backHref={`${orgBase}/gastown`}
+        {...props}
+      />
+    );
+  }
+
+  // Personal wasteland — show the wasteland-specific sidebar
+  const wastelandId = extractWastelandId(pathname);
+  if (wastelandId) {
+    return <WastelandSidebar wastelandId={wastelandId} {...props} />;
+  }
+
+  // Org wasteland — show the same sidebar with org-prefixed paths
+  const orgWasteland = extractOrgWastelandId(pathname);
+  if (orgWasteland) {
+    const orgBase = `/organizations/${orgWasteland.orgId}`;
+    return (
+      <WastelandSidebar
+        wastelandId={orgWasteland.wastelandId}
+        basePath={`${orgBase}/wasteland/${orgWasteland.wastelandId}`}
+        backHref={`${orgBase}/wasteland`}
         {...props}
       />
     );

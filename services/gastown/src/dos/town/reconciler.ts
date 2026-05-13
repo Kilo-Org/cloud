@@ -38,6 +38,13 @@ import { PR_POLL_INTERVAL_MS } from './actions';
 import type { Action } from './actions';
 import type { TownEventRecord } from '../../db/tables/town-events.table';
 import type { TownConfig } from '../../types';
+import {
+  buildEvidence,
+  computeClaimStatus,
+  groupBeadsByWastelandClaim,
+  isAlreadyReported,
+  type ReporterBead,
+} from './wasteland-reporter';
 
 const LOG = '[reconciler]';
 
@@ -667,6 +674,7 @@ export function reconcile(
   actions.push(...reconcileConvoys(sql));
   actions.push(...reconcileGUPP(sql, { draining }));
   actions.push(...reconcileGC(sql));
+  actions.push(...reconcileWastelandClaims(sql));
   return actions;
 }
 
@@ -2652,6 +2660,94 @@ function buildConflictResolutionPrompt(
   lines.push(`   - \`branch\`: \`${branch}\``);
 
   return lines.join('\n');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// reconcileWastelandClaims — auto-report `done` upstream once every
+// wasteland-tagged MR for a claim has reached a merged terminal state.
+// Idempotent via `metadata.wasteland.reported_done_at` on the canonical
+// bead (the convoy bead if one exists, else the first task bead).
+// ════════════════════════════════════════════════════════════════════
+
+const WastelandReporterRow = BeadRecord.pick({
+  bead_id: true,
+  type: true,
+  status: true,
+  title: true,
+  metadata: true,
+  created_at: true,
+}).extend({
+  pr_url: ReviewMetadataRecord.shape.pr_url,
+});
+
+export function reconcileWastelandClaims(sql: SqlStorage): Action[] {
+  // Load every wasteland-tagged bead whose claim has NOT been reported yet.
+  // The "reported" flag lives on a single canonical bead per claim, so we
+  // filter at the SQL layer using a NOT EXISTS over the same
+  // (wasteland_id, item_id) group. This keeps the scan bounded to active
+  // claims even when the town has accumulated many completed ones.
+  const rows = WastelandReporterRow.array().parse([
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${beads.bead_id},
+               ${beads.type},
+               ${beads.status},
+               ${beads.title},
+               ${beads.metadata},
+               ${beads.created_at},
+               ${review_metadata.pr_url} AS pr_url
+        FROM ${beads}
+        LEFT JOIN ${review_metadata}
+          ON ${review_metadata.bead_id} = ${beads.bead_id}
+        WHERE json_extract(${beads.metadata}, '$.wasteland.item_id') IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM ${beads} other
+            WHERE json_extract(other.${beads.columns.metadata}, '$.wasteland.wasteland_id')
+                  = json_extract(${beads.metadata}, '$.wasteland.wasteland_id')
+              AND json_extract(other.${beads.columns.metadata}, '$.wasteland.item_id')
+                  = json_extract(${beads.metadata}, '$.wasteland.item_id')
+              AND json_extract(other.${beads.columns.metadata}, '$.wasteland.reported_done_at')
+                  IS NOT NULL
+          )
+      `,
+      []
+    ),
+  ]);
+
+  const reporterBeads: ReporterBead[] = rows.map(r => ({
+    bead_id: r.bead_id,
+    type: r.type,
+    status: r.status,
+    title: r.title,
+    metadata: r.metadata,
+    pr_url: r.pr_url,
+    created_at: r.created_at,
+  }));
+
+  const claims = groupBeadsByWastelandClaim(reporterBeads);
+  const actions: Action[] = [];
+
+  for (const claim of claims) {
+    if (isAlreadyReported(claim)) continue;
+    const status = computeClaimStatus(claim);
+    if (status.kind !== 'merged') continue;
+
+    const evidence = buildEvidence(
+      status,
+      claim.beads[0]?.title ?? `wasteland item ${claim.item_id}`
+    );
+    actions.push({
+      type: 'report_wasteland_done',
+      canonical_bead_id: claim.canonical_bead_id,
+      wasteland_id: claim.wasteland_id,
+      item_id: claim.item_id,
+      evidence,
+    });
+  }
+
+  return actions;
 }
 
 // ════════════════════════════════════════════════════════════════════

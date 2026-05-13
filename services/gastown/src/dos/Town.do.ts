@@ -32,6 +32,8 @@ import * as events from './town/events';
 import { stopContainerIfIdle as _stopContainerIfIdle } from './town/container-idle-stop';
 import * as scm from './town/town-scm';
 import * as reconciler from './town/reconciler';
+import * as wasteland from './town/wasteland';
+import { pickCanonicalBead, type ReporterBead } from './town/wasteland-reporter';
 import { applyAction } from './town/actions';
 import type { Action, ApplyActionContext } from './town/actions';
 import { buildPolecatSystemPrompt } from '../prompts/polecat-system.prompt';
@@ -398,7 +400,176 @@ export class TownDO extends DurableObject<Env> {
           this.emitEvent(data as Parameters<typeof this.emitEvent>[0]);
         }
       },
+      reportWastelandDone: async input => this.reportWastelandDone(input),
     };
+  }
+
+  /**
+   * Stamp the canonical bead for a wasteland claim with `reported_done_at`.
+   * Used by the manual `handleWastelandDone` path so the auto-done
+   * reconciler doesn't re-fire for items the mayor already reported.
+   * No-op when no canonical bead is found (e.g. the mayor reported done
+   * for an item that never produced a wasteland-tagged bead in this town).
+   */
+  async stampWastelandReported(input: {
+    wastelandId: string;
+    itemId: string;
+    evidence: string;
+  }): Promise<{ stamped: boolean; bead_id: string | null }> {
+    // Find every bead carrying this wasteland tag and pick the canonical one
+    // by the same rule the reconciler uses (convoy bead if any, else the
+    // earliest-created bead).
+    const candidates = BeadRecord.array().parse([
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${beads}
+          WHERE json_extract(${beads.metadata}, '$.wasteland.wasteland_id') = ?
+            AND json_extract(${beads.metadata}, '$.wasteland.item_id') = ?
+          ORDER BY ${beads.created_at} ASC
+        `,
+        [input.wastelandId, input.itemId]
+      ),
+    ]);
+    if (candidates.length === 0) {
+      return { stamped: false, bead_id: null };
+    }
+    // Reuse the same canonical-bead rule the reconciler uses so the manual
+    // and auto paths can never disagree about which bead carries the flag.
+    const reporterCandidates: ReporterBead[] = candidates.map(b => ({
+      bead_id: b.bead_id,
+      type: b.type,
+      status: b.status,
+      title: b.title,
+      metadata: b.metadata,
+      pr_url: null,
+      created_at: b.created_at,
+    }));
+    const canonical = pickCanonicalBead(reporterCandidates);
+    if (!canonical) {
+      return { stamped: false, bead_id: null };
+    }
+    const stamped = wasteland.stampWastelandReportedDone(this.sql, canonical.bead_id, {
+      evidence: input.evidence,
+    });
+    if (!stamped) {
+      console.warn(
+        `${TOWN_LOG} stampWastelandReported: bead=${canonical.bead_id} has no metadata.wasteland; nothing to stamp`
+      );
+    }
+    return { stamped, bead_id: canonical.bead_id };
+  }
+
+  /**
+   * Mark a wasteland wanted item as done upstream and stamp
+   * `metadata.wasteland.reported_done_at` on the canonical bead. Best
+   * effort: returns false on any failure so the reconciler retries on
+   * the next tick (the local stamp is the idempotency gate). The
+   * upstream RPC is the meaningful side effect; the local stamp is just
+   * how we remember we did it.
+   *
+   * Before issuing the RPC, this checks whether the upstream item is
+   * already in `done` state — that handles the crash-window case where
+   * a previous tick called the RPC successfully but the worker died
+   * before writing the local stamp. In that case we just stamp locally
+   * and skip the duplicate RPC.
+   */
+  private async reportWastelandDone(input: {
+    wastelandId: string;
+    itemId: string;
+    evidence: string;
+    canonicalBeadId: string;
+  }): Promise<boolean> {
+    const townConfig = await this.getTownConfig();
+    const userId = townConfig.owner_user_id;
+    if (!userId) {
+      console.warn(
+        `${TOWN_LOG} reportWastelandDone: town has no owner_user_id; skipping item=${input.itemId}`
+      );
+      return false;
+    }
+
+    // Crash-window guard: if a previous tick already called markWantedItemDone
+    // but died before stamping locally, the upstream item is already in
+    // 'done' state. Detect that and just stamp locally — calling the RPC
+    // again can produce a duplicate upstream PR.
+    const alreadyDoneUpstream = await this.isWantedItemDoneUpstream(
+      input.wastelandId,
+      userId,
+      input.itemId
+    );
+    if (alreadyDoneUpstream) {
+      const stamped = wasteland.stampWastelandReportedDone(this.sql, input.canonicalBeadId, {
+        evidence: input.evidence,
+      });
+      if (!stamped) {
+        console.warn(
+          `${TOWN_LOG} reportWastelandDone: upstream already done but bead=${input.canonicalBeadId} has no metadata.wasteland; cannot stamp`
+        );
+        return false;
+      }
+      console.log(
+        `${TOWN_LOG} reportWastelandDone: upstream already done for item=${input.itemId}; stamped bead=${input.canonicalBeadId} without re-calling RPC`
+      );
+      return true;
+    }
+
+    try {
+      const result = await this.env.WASTELAND_SERVICE.markWantedItemDone({
+        wastelandId: input.wastelandId,
+        userId,
+        itemId: input.itemId,
+        evidence: input.evidence,
+      });
+      if (!result.success) {
+        console.warn(
+          `${TOWN_LOG} reportWastelandDone: upstream call failed code=${result.code} item=${input.itemId} msg=${result.message}`
+        );
+        return false;
+      }
+      const stamped = wasteland.stampWastelandReportedDone(this.sql, input.canonicalBeadId, {
+        evidence: input.evidence,
+      });
+      if (!stamped) {
+        console.warn(
+          `${TOWN_LOG} reportWastelandDone: RPC succeeded but bead=${input.canonicalBeadId} has no metadata.wasteland; cannot stamp (will retry next tick — risk of duplicate upstream call mitigated by isWantedItemDoneUpstream precheck)`
+        );
+        return false;
+      }
+      console.log(
+        `${TOWN_LOG} reportWastelandDone: marked item=${input.itemId} as done; stamped bead=${input.canonicalBeadId}`
+      );
+      return true;
+    } catch (err) {
+      console.error(`${TOWN_LOG} reportWastelandDone: unexpected error item=${input.itemId}:`, err);
+      return false;
+    }
+  }
+
+  /**
+   * Best-effort check of whether a wanted item is already `done` upstream.
+   * Returns false on any error (network, parse, item missing) so the
+   * caller falls through to the normal RPC path. Used as the crash-window
+   * guard inside `reportWastelandDone`.
+   */
+  private async isWantedItemDoneUpstream(
+    wastelandId: string,
+    userId: string,
+    itemId: string
+  ): Promise<boolean> {
+    try {
+      const browse = await this.env.WASTELAND_SERVICE.browseWantedBoard({
+        wastelandId,
+        userId,
+      });
+      if (!browse.success) return false;
+      const item = browse.data.find(it => it.id === itemId);
+      if (!item) return false;
+      return item.status === 'done';
+    } catch (err) {
+      console.warn(`${TOWN_LOG} isWantedItemDoneUpstream: browse failed for item=${itemId}:`, err);
+      return false;
+    }
   }
 
   // ── WebSocket: status broadcast ──────────────────────────────────────
@@ -606,6 +777,9 @@ export class TownDO extends DurableObject<Env> {
     for (const idx of getIndexesAgentNudges()) {
       query(this.sql, idx, []);
     }
+
+    // Wasteland connections
+    wasteland.initWastelandTables(this.sql);
 
     // Reconciler event log
     events.initTownEventsTable(this.sql);
@@ -920,6 +1094,26 @@ export class TownDO extends DurableObject<Env> {
   async updateRigConfig(rigId: string, config: RigOverrideConfig): Promise<rigs.RigRecord | null> {
     rigs.updateRigConfig(this.sql, rigId, config);
     return rigs.getRig(this.sql, rigId);
+  }
+
+  // ── Wasteland Connection ─────────────────────────────────────────────
+
+  async connectWasteland(input: {
+    connectionId: string;
+    wastelandId: string;
+    upstream: string;
+    rigHandle: string;
+    dolthubOrg: string;
+  }): Promise<wasteland.WastelandConnectionRecord> {
+    return wasteland.connectWasteland(this.sql, input);
+  }
+
+  async disconnectWasteland(wastelandId: string): Promise<void> {
+    wasteland.disconnectWasteland(this.sql, wastelandId);
+  }
+
+  async getWastelandConnection(): Promise<wasteland.WastelandConnectionRecord | null> {
+    return wasteland.getWastelandConnection(this.sql);
   }
 
   // ── Rig Config (KV, per-rig — configuration needed for container dispatch) ──
@@ -2404,19 +2598,27 @@ export class TownDO extends DurableObject<Env> {
    * Create an open bead with the given labels, without arming the reconciler alarm.
    * The caller is responsible for including `gt:held` in the labels if the bead
    * should not be dispatched immediately.
+   *
+   * `rigId` is optional: callers like the wasteland integration that don't have
+   * a confidently-resolved local rig can omit it; the bead will still be
+   * persisted (the `rig_id` column is nullable) and surfaces in admin views.
    */
   async createHeldBead(input: {
-    rigId: string;
+    rigId: string | null;
     title: string;
     body?: string;
     labels?: string[];
+    metadata?: Record<string, unknown>;
+    created_by?: string;
   }): Promise<Bead> {
     const bead = beadOps.createBead(this.sql, {
       type: 'issue',
       title: input.title,
       body: input.body,
-      rig_id: input.rigId,
+      rig_id: input.rigId ?? undefined,
       labels: input.labels,
+      metadata: input.metadata,
+      created_by: input.created_by,
     });
 
     events.insertEvent(this.sql, 'bead_created', {
@@ -3191,6 +3393,12 @@ export class TownDO extends DurableObject<Env> {
     tasks: Array<{ title: string; body?: string; depends_on?: number[] }>;
     merge_mode?: 'review-then-land' | 'review-and-merge';
     staged?: boolean;
+    /**
+     * Metadata stamped onto BOTH the convoy bead AND every task bead. Useful
+     * for cross-cutting context like the wasteland origin tag. Reserved keys
+     * managed internally (`convoy_id`, `feature_branch`) take precedence.
+     */
+    metadata?: Record<string, unknown>;
   }): Promise<{
     convoy: ConvoyEntry;
     beads: Array<{ bead: Bead; agent: Agent | null }>;
@@ -3255,6 +3463,12 @@ export class TownDO extends DurableObject<Env> {
     }
 
     // 2. Create convoy bead + convoy_metadata
+    // Merge caller-supplied metadata FIRST so reserved keys (feature_branch)
+    // always win and can't be accidentally overridden.
+    const convoyBeadMetadata = {
+      ...(input.metadata ?? {}),
+      feature_branch: featureBranch,
+    };
     query(
       this.sql,
       /* sql */ `
@@ -3278,7 +3492,7 @@ export class TownDO extends DurableObject<Env> {
         null, // assignee_agent_bead_id
         'medium',
         JSON.stringify(['gt:convoy']),
-        JSON.stringify({ feature_branch: featureBranch }),
+        JSON.stringify(convoyBeadMetadata),
         null,
         timestamp,
         timestamp,
@@ -3335,13 +3549,20 @@ export class TownDO extends DurableObject<Env> {
     const results: Array<{ bead: Bead; agent: Agent | null }> = [];
 
     for (const task of input.tasks) {
+      // Merge caller-supplied metadata FIRST so reserved keys
+      // (convoy_id, feature_branch) always win.
+      const taskBeadMetadata = {
+        ...(input.metadata ?? {}),
+        convoy_id: convoyId,
+        feature_branch: featureBranch,
+      };
       const createdBead = beadOps.createBead(this.sql, {
         type: 'issue',
         title: task.title,
         body: task.body,
         priority: 'medium',
         rig_id: input.rigId,
-        metadata: { convoy_id: convoyId, feature_branch: featureBranch },
+        metadata: taskBeadMetadata,
       });
       beadIds.push(createdBead.bead_id);
 
@@ -5158,6 +5379,26 @@ export class TownDO extends DurableObject<Env> {
     }
   }
 
+  // DEBUG: enumerate every bead carrying a `metadata.wasteland` tag.
+  // Used by the /debug/towns/:townId/wasteland-beads endpoint to verify the
+  // wasteland → bead integration without going through the UI.
+  // Returns `unknown[]` to keep Hono's response type inference shallow —
+  // the caller validates / projects the rows it cares about.
+  async debugListWastelandBeads(): Promise<unknown[]> {
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${beads}
+          WHERE json_extract(${beads.metadata}, '$.wasteland') IS NOT NULL
+          ORDER BY ${beads.created_at} DESC
+        `,
+        []
+      ),
+    ];
+    return BeadRecord.array().parse(rows);
+  }
+
   // DEBUG: concise non-terminal bead summary — remove after debugging
   async debugBeadSummary(): Promise<unknown[]> {
     return [
@@ -5169,6 +5410,10 @@ export class TownDO extends DurableObject<Env> {
                  ${beads.status},
                  ${beads.title},
                  ${beads.assignee_agent_bead_id},
+                 ${beads.rig_id},
+                 ${beads.created_by},
+                 ${beads.labels},
+                 ${beads.metadata},
                  ${beads.updated_at}
           FROM ${beads}
           WHERE ${beads.status} NOT IN ('closed', 'failed')

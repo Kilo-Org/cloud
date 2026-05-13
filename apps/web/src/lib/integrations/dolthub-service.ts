@@ -242,19 +242,33 @@ export async function uninstall(owner: Owner): Promise<{ success: boolean }> {
   return { success: true };
 }
 
+/**
+ * Shape of the JSONB metadata column for a DoltHub integration. The fields
+ * mirror the OAuth token-response payload, plus an optional cached
+ * `dolthub_username` we capture the first time the user wires the
+ * integration into a wasteland (DoltHub's REST API has no `/me` endpoint
+ * we can hit to learn the username from the access token alone).
+ */
+type DoltHubMetadata = {
+  access_token?: string;
+  refresh_token?: string | null;
+  expires_at?: number | null;
+  scope?: string | null;
+  dolthub_username?: string | null;
+};
+
+function readMetadata(integration: PlatformIntegration): DoltHubMetadata {
+  return (integration.metadata as DoltHubMetadata | null) ?? {};
+}
+
 export async function getValidDoltHubToken(
   integration: PlatformIntegration
 ): Promise<string | null> {
   assertDevOnly();
 
-  const metadata = integration.metadata as {
-    access_token?: string;
-    refresh_token?: string;
-    expires_at?: number;
-    scope?: string;
-  } | null;
+  const metadata = readMetadata(integration);
 
-  if (!metadata?.access_token) {
+  if (!metadata.access_token) {
     return null;
   }
 
@@ -280,7 +294,7 @@ export async function getValidDoltHubToken(
           refresh_token: newTokens.refreshToken ?? metadata.refresh_token,
           expires_at: newExpiresAt,
           scope: newTokens.scope ?? metadata.scope,
-        },
+        } satisfies DoltHubMetadata,
         updated_at: new Date().toISOString(),
       })
       .where(eq(platform_integrations.id, integration.id));
@@ -289,4 +303,35 @@ export async function getValidDoltHubToken(
   }
 
   return metadata.access_token;
+}
+
+/**
+ * Returns the DoltHub username we've captured for this integration, if any.
+ * Captured on first wasteland connect via {@link rememberDoltHubUsername}
+ * because DoltHub's REST API does not expose a `/me` lookup we could use
+ * to derive it from the access token.
+ */
+export function getCachedDoltHubUsername(integration: PlatformIntegration): string | null {
+  return readMetadata(integration).dolthub_username ?? null;
+}
+
+/**
+ * Persist the DoltHub username on the integration metadata so subsequent
+ * wasteland connects can skip the prompt. Idempotent — overwrites whatever
+ * was there before.
+ */
+export async function rememberDoltHubUsername(
+  integration: PlatformIntegration,
+  username: string
+): Promise<void> {
+  assertDevOnly();
+
+  const metadata = readMetadata(integration);
+  await db
+    .update(platform_integrations)
+    .set({
+      metadata: { ...metadata, dolthub_username: username } satisfies DoltHubMetadata,
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integration.id));
 }

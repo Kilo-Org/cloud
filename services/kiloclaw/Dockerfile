@@ -10,6 +10,7 @@ FROM debian:trixie-slim AS runtime
 
 # Install Node.js 24 (required by OpenClaw)
 ENV NODE_VERSION=24.15.0
+ENV OPENCLAW_PLUGIN_STAGE_DIR=/usr/local/share/openclaw-plugin-runtime-deps
 ARG APT_CACHE_BUST
 RUN echo "apt cache bust: ${APT_CACHE_BUST}" \
     && apt-get update \
@@ -79,17 +80,22 @@ RUN npm install -g pnpm openclaw@2026.4.23 clawhub mcporter@0.7.3 @steipete/summ
     && openclaw --version \
     && npm cache clean --force
 
-# Bake bundled plugin runtime deps into the image so first boot is pure
-# startup — no npm install from `openclaw doctor` on shared-cpu Fly machines.
-# Each step writes to a temp file and is chained with && so failures break
-# the build (Debian's /bin/sh is dash, no pipefail). jq does the workspace:
-# filter so no pipe is needed between jq and sort.
+# Bake bundled plugin runtime deps into OpenClaw's external stage dir so first
+# boot is pure startup — no npm install from `openclaw doctor` or gateway plugin
+# load on shared-cpu Fly machines. The stage-root naming mirrors OpenClaw
+# 2026.4.23's resolveExternalBundledRuntimeDepsInstallRoot().
 RUN cd /usr/local/lib/node_modules/openclaw \
+    && OPENCLAW_PACKAGE_ROOT="$(pwd -P)" \
+    && OPENCLAW_PACKAGE_VERSION="$(node -p "require('./package.json').version")" \
+    && OPENCLAW_PACKAGE_HASH="$(node -e "process.stdout.write(require('node:crypto').createHash('sha256').update(process.argv[1]).digest('hex').slice(0, 12))" "$OPENCLAW_PACKAGE_ROOT")" \
+    && OPENCLAW_BUNDLED_RUNTIME_ROOT="${OPENCLAW_PLUGIN_STAGE_DIR}/openclaw-${OPENCLAW_PACKAGE_VERSION}-${OPENCLAW_PACKAGE_HASH}" \
+    && mkdir -p "$OPENCLAW_BUNDLED_RUNTIME_ROOT" \
     && jq -r '((.dependencies // {}) + (.optionalDependencies // {})) | to_entries[] | select(.value | startswith("workspace:") | not) | "\(.key)@\(.value)"' \
          dist/extensions/*/package.json > /tmp/bundled-plugin-specs.raw \
     && sort -u /tmp/bundled-plugin-specs.raw > /tmp/bundled-plugin-specs.txt \
     && test -s /tmp/bundled-plugin-specs.txt \
     && xargs -a /tmp/bundled-plugin-specs.txt npm install \
+           --prefix "$OPENCLAW_BUNDLED_RUNTIME_ROOT" \
            --omit=dev --no-save --package-lock=false \
            --ignore-scripts --legacy-peer-deps \
            --no-fund --no-audit \

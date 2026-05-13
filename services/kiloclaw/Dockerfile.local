@@ -2,6 +2,7 @@ FROM debian:trixie-slim AS runtime
 
 # Install Node.js 24 (required by OpenClaw)
 ENV NODE_VERSION=24.15.0
+ENV OPENCLAW_PLUGIN_STAGE_DIR=/usr/local/share/openclaw-plugin-runtime-deps
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        ca-certificates curl gnupg git xz-utils unzip jq ripgrep rsync zstd \
@@ -45,6 +46,27 @@ RUN npm install -g pnpm /tmp/openclaw.tgz clawhub mcporter@0.7.3 @steipete/summa
     && rm /tmp/openclaw.tgz \
     && openclaw --version \
     && npm cache clean --force
+
+# Bake bundled plugin runtime deps into OpenClaw's external stage dir so local
+# images match production startup behavior. The stage-root naming mirrors
+# OpenClaw's resolveExternalBundledRuntimeDepsInstallRoot().
+RUN cd /usr/local/lib/node_modules/openclaw \
+    && OPENCLAW_PACKAGE_ROOT="$(pwd -P)" \
+    && OPENCLAW_PACKAGE_VERSION="$(node -p "require('./package.json').version")" \
+    && OPENCLAW_PACKAGE_HASH="$(node -e "process.stdout.write(require('node:crypto').createHash('sha256').update(process.argv[1]).digest('hex').slice(0, 12))" "$OPENCLAW_PACKAGE_ROOT")" \
+    && OPENCLAW_BUNDLED_RUNTIME_ROOT="${OPENCLAW_PLUGIN_STAGE_DIR}/openclaw-${OPENCLAW_PACKAGE_VERSION}-${OPENCLAW_PACKAGE_HASH}" \
+    && mkdir -p "$OPENCLAW_BUNDLED_RUNTIME_ROOT" \
+    && jq -r '((.dependencies // {}) + (.optionalDependencies // {})) | to_entries[] | select(.value | startswith("workspace:") | not) | "\(.key)@\(.value)"' \
+         dist/extensions/*/package.json > /tmp/bundled-plugin-specs.raw \
+    && sort -u /tmp/bundled-plugin-specs.raw > /tmp/bundled-plugin-specs.txt \
+    && test -s /tmp/bundled-plugin-specs.txt \
+    && xargs -a /tmp/bundled-plugin-specs.txt npm install \
+           --prefix "$OPENCLAW_BUNDLED_RUNTIME_ROOT" \
+           --omit=dev --no-save --package-lock=false \
+           --ignore-scripts --legacy-peer-deps \
+           --no-fund --no-audit \
+    && rm -f /tmp/bundled-plugin-specs.raw /tmp/bundled-plugin-specs.txt \
+    && rm -rf /root/.npm
 
 # Install Go (available at runtime for users to `go install` additional tools)
 ENV GO_VERSION=1.26.2

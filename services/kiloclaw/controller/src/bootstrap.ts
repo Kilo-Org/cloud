@@ -32,6 +32,7 @@ const DEVICE_PAIRED_PATH = '/root/.openclaw/devices/paired.json';
 const DEVICE_PENDING_PATH = '/root/.openclaw/devices/pending.json';
 const WORKSPACE_DIR = '/root/clawd';
 const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
+const OPENCLAW_PLUGIN_STAGE_DIR = '/usr/local/share/openclaw-plugin-runtime-deps';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
 const TOOLS_MD_DEST = '/root/.openclaw/workspace/TOOLS.md';
 const WEATHER_SKILL_SOURCE = '/usr/local/share/kiloclaw/skills/weather/SKILL.md';
@@ -272,6 +273,13 @@ export function setupDirectories(env: EnvLike, deps: BootstrapDeps = defaultDeps
 
   // GOG_KEYRING_PASSWORD is NOT a secret — see gog-credentials.ts for context.
   env.GOG_KEYRING_PASSWORD = 'kiloclaw';
+
+  // Keep bundled OpenClaw plugin runtime deps in the image-baked stage dir
+  // instead of mutating each bundled plugin directory or the persistent /root
+  // volume during doctor/gateway startup.
+  if (!env.OPENCLAW_PLUGIN_STAGE_DIR?.trim()) {
+    env.OPENCLAW_PLUGIN_STAGE_DIR = OPENCLAW_PLUGIN_STAGE_DIR;
+  }
 
   // Derive the API origin for the Kilo CLI from the full base URL.
   if (env.KILOCODE_API_BASE_URL) {

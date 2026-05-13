@@ -297,6 +297,18 @@ describe('setupDirectories', () => {
     expect(env.NODE_COMPILE_CACHE).toBe('/var/tmp/openclaw-compile-cache');
     expect(env.INVOCATION_ID).toBe('1');
     expect(env.GOG_KEYRING_PASSWORD).toBe('kiloclaw');
+    expect(env.OPENCLAW_PLUGIN_STAGE_DIR).toBe('/usr/local/share/openclaw-plugin-runtime-deps');
+  });
+
+  it('preserves an explicit OpenClaw plugin stage dir', () => {
+    const { deps } = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      OPENCLAW_PLUGIN_STAGE_DIR: '/custom/plugin-runtime-deps',
+    };
+
+    setupDirectories(env, deps);
+
+    expect(env.OPENCLAW_PLUGIN_STAGE_DIR).toBe('/custom/plugin-runtime-deps');
   });
 
   it('derives KILO_API_URL from KILOCODE_API_BASE_URL origin', () => {

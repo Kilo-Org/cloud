@@ -275,6 +275,10 @@ tag (16 bytes)`.
      supervisor.
    - `GOG_KEYRING_PASSWORD=kiloclaw` — required for the gog keyring
      backend (not a secret; see gog-credentials.ts).
+   - `OPENCLAW_PLUGIN_STAGE_DIR=/usr/local/share/openclaw-plugin-runtime-deps`
+     when unset — keep bundled OpenClaw plugin runtime dependencies in
+     the image-baked stage directory instead of mutating `/root` or each
+     bundled plugin directory during doctor/gateway startup.
 
 ### Feature Flags
 

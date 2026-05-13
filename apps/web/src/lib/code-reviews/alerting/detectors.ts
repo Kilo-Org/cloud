@@ -78,11 +78,14 @@ type ErrorReasonRow = {
 };
 
 const terminalStatusesSql = sql`('completed', 'failed', 'cancelled', 'interrupted')`;
-const failureStatusesSql = sql`('failed', 'interrupted')`;
 const benignTerminalReasonsSql = sql`(${sql.join(
   CODE_REVIEW_BENIGN_TERMINAL_REASONS.map(reason => sql`${reason}`),
   sql.raw(', ')
 )})`;
+const systemFailureSql = sql`(
+  status IN ('failed', 'interrupted')
+  OR (status = 'cancelled' AND terminal_reason IS NOT NULL)
+)`;
 
 function toNumber(value: CountValue): number {
   if (value === null || value === undefined) return 0;
@@ -105,7 +108,7 @@ export async function evaluateFailureRate(
     ), top_reason AS (
       SELECT COALESCE(NULLIF(terminal_reason, ''), 'unknown') AS reason, COUNT(*) AS count
       FROM windowed
-      WHERE status IN ${failureStatusesSql}
+      WHERE ${systemFailureSql}
         AND COALESCE(terminal_reason, '') NOT IN ${benignTerminalReasonsSql}
       GROUP BY 1
       ORDER BY 2 DESC, 1 ASC
@@ -114,7 +117,7 @@ export async function evaluateFailureRate(
     SELECT
       COUNT(*) FILTER (WHERE status IN ${terminalStatusesSql}) AS terminal_count,
       COUNT(*) FILTER (
-        WHERE status IN ${failureStatusesSql}
+        WHERE ${systemFailureSql}
           AND COALESCE(terminal_reason, '') NOT IN ${benignTerminalReasonsSql}
       ) AS system_failure_count,
       (SELECT reason FROM top_reason) AS top_reason,
@@ -202,7 +205,7 @@ export async function evaluateErrorCategorySpike(
   const result = await database.execute<ErrorReasonRow>(sql`
     SELECT COALESCE(NULLIF(terminal_reason, ''), 'unknown') AS reason, COUNT(*) AS count
     FROM ${cloud_agent_code_reviews}
-    WHERE status IN ${failureStatusesSql}
+    WHERE ${systemFailureSql}
       AND created_at >= NOW() - (${CODE_REVIEW_ALERT_WINDOW_MINUTES} * INTERVAL '1 minute')
       AND COALESCE(terminal_reason, '') NOT IN ${benignTerminalReasonsSql}
     GROUP BY 1

@@ -221,7 +221,7 @@ beforeEach(async () => {
 
 describe('POST /api/internal/code-review-status/[reviewId]', () => {
   describe('normalization', () => {
-    it('maps interrupted status to cancelled', async () => {
+    it('maps interrupted status to cancelled with interrupted terminal reason', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
       const response = await POST(
@@ -233,7 +233,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
         REVIEW_ID,
         'cancelled',
-        expect.objectContaining({ errorMessage: 'User interrupted' })
+        expect.objectContaining({
+          errorMessage: 'User interrupted',
+          terminalReason: 'interrupted',
+        })
       );
     });
 
@@ -304,7 +307,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
-    it('does not reclassify interrupted status with non-billing error message', async () => {
+    it('keeps interrupted non-billing callbacks as cancelled', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
       const response = await POST(
@@ -321,7 +324,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'cancelled',
         expect.objectContaining({
           errorMessage: 'User cancelled the review',
-          terminalReason: undefined,
+          terminalReason: 'interrupted',
         })
       );
     });

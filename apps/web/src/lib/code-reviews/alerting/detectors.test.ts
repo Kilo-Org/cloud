@@ -130,6 +130,20 @@ describe('code review alert detectors', () => {
     });
   });
 
+  it('counts cancelled interrupted reviews as system failures', async () => {
+    await insertReviews([
+      ...Array.from({ length: 3 }, () =>
+        reviewValues({ status: 'cancelled', terminal_reason: 'interrupted' })
+      ),
+      ...Array.from({ length: 6 }, () => reviewValues({ status: 'completed' })),
+    ]);
+
+    await expect(evaluateFailureRate(db)).resolves.toMatchObject({
+      tripped: true,
+      details: { kind: 'failure_rate', failures: 3, total: 9 },
+    });
+  });
+
   it('trips stuck-review alerts only at the count threshold', async () => {
     await insertReviews(
       Array.from({ length: 4 }, () =>
@@ -227,6 +241,19 @@ describe('code review alert detectors', () => {
     await expect(evaluateErrorCategorySpike(db)).resolves.toMatchObject({
       tripped: true,
       details: { kind: 'error_spike', reason: 'timeout', count: 5, total: 6 },
+    });
+  });
+
+  it('counts cancelled interrupted reviews in error spikes', async () => {
+    await insertReviews(
+      Array.from({ length: 6 }, () =>
+        reviewValues({ status: 'cancelled', terminal_reason: 'interrupted' })
+      )
+    );
+
+    await expect(evaluateErrorCategorySpike(db)).resolves.toMatchObject({
+      tripped: true,
+      details: { kind: 'error_spike', reason: 'interrupted', count: 6, total: 6 },
     });
   });
 

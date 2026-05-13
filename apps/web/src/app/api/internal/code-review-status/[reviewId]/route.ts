@@ -133,6 +133,10 @@ function normalizePayload(raw: StatusUpdatePayload): {
     terminalReason = 'billing';
   }
 
+  if (!terminalReason && raw.status === 'interrupted') {
+    terminalReason = 'interrupted';
+  }
+
   return {
     status,
     sessionId,

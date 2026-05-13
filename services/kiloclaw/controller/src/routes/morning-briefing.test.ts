@@ -70,4 +70,35 @@ describe('morning briefing controller routes', () => {
       })
     );
   });
+
+  it('proxies the interests route with the request body', async () => {
+    const app = new Hono();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, interestTopics: ['Tech', 'AI'] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    registerMorningBriefingRoutes(app, createRunningSupervisor(), 'expected-token');
+
+    const response = await app.request('/_kilo/morning-briefing/interests', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer expected-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ topics: ['Tech', 'AI'] }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:3001/api/plugins/kiloclaw-morning-briefing/interests',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ topics: ['Tech', 'AI'] }),
+      })
+    );
+  });
 });

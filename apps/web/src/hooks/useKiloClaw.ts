@@ -396,6 +396,15 @@ export function useKiloClawMutations() {
         },
       })
     ),
+    updateBriefingInterests: useMutation(
+      trpc.kiloclaw.updateBriefingInterests.mutationOptions({
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey(),
+          });
+        },
+      })
+    ),
     rename: useMutation(
       trpc.kiloclaw.renameInstance.mutationOptions({ onSuccess: invalidateStatus })
     ),

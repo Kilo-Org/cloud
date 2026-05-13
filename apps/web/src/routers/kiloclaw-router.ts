@@ -18,6 +18,10 @@ import {
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
 import { KILOCLAW_API_URL, KILOCLAW_INSTANCE_URL_TEMPLATE } from '@/lib/config.server';
+import {
+  MORNING_BRIEFING_INTERESTS_MAX_TOPICS,
+  MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH,
+} from '@/lib/kiloclaw/morning-briefing-interests';
 import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
@@ -2837,6 +2841,34 @@ export const kiloclawRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     return client.runMorningBriefing(ctx.user.id, workerInstanceId(instance));
   }),
+
+  updateBriefingInterests: clawAccessProcedure
+    .input(
+      z.object({
+        // Caps come from the shared `morning-briefing-interests`
+        // module; the worker (`services/kiloclaw/src/routes/platform.ts`)
+        // keeps its own copy across the service boundary.
+        topics: z
+          .array(z.string().trim().min(1).max(MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH))
+          .max(MORNING_BRIEFING_INTERESTS_MAX_TOPICS),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Morning briefing is admin-only today (matches the UI gate
+      // `canSeeMorningBriefing = !!user?.is_admin` in SettingsTab.tsx
+      // and `isAdminForInterests` in ClawOnboardingFlow.tsx). Without
+      // the server-side check, a non-admin could call this mutation
+      // directly via the tRPC client and bypass the hidden UI.
+      if (!ctx.user.is_admin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Morning briefing is admin-only',
+        });
+      }
+      const instance = await getActiveInstance(ctx.user.id);
+      const client = new KiloClawInternalClient();
+      return client.updateBriefingInterests(ctx.user.id, input.topics, workerInstanceId(instance));
+    }),
 
   readMorningBriefing: clawAccessProcedure
     .input(z.object({ day: z.enum(['today', 'yesterday']) }))

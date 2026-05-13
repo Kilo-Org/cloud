@@ -17,6 +17,7 @@ import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
 import { CalendarConnectStepView } from './CalendarConnectStep';
 import { InboundEmailStepView } from './InboundEmailStep';
+import { InterestsStepView } from './InterestsStep';
 import { ClawSetupCompleteStep, ClawSetupErrorStep } from './ClawOnboardingFlow';
 import { ProvisioningStepView } from './ProvisioningStep';
 
@@ -24,6 +25,7 @@ const FAKE_STEP_LABELS: Record<ClawOnboardingRenderStep, string> = {
   identity: 'Identity',
   calendar: 'Calendar',
   email: 'Inbound Email',
+  interests: 'Interests',
   provisioning: 'Provisioning',
   complete: 'Complete',
   error: 'Error',
@@ -175,6 +177,7 @@ function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
     case 'identity':
     case 'calendar':
     case 'email':
+    case 'interests':
     case 'provisioning':
       return step;
     case 'complete':
@@ -209,7 +212,17 @@ function renderFakeStep({ step, setStep, stepProgress, basePath }: RenderFakeSte
           address="operator@inbound.example.com"
           enabled={true}
           loading={false}
+          onContinue={() => setStep('interests')}
+        />
+      );
+    }
+    case 'interests': {
+      return (
+        <InterestsStepView
+          {...stepProgress}
+          saving={false}
           onContinue={() => setStep('provisioning')}
+          onSkip={() => setStep('provisioning')}
         />
       );
     }

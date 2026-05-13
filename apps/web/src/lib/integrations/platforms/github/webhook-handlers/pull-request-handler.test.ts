@@ -1,5 +1,16 @@
 const mockGetBotUserId = jest.fn();
 const mockGetAgentConfigForOwner = jest.fn();
+const mockCreateCheckRun = jest.fn();
+const mockUpdateCheckRun = jest.fn();
+const mockUpdateCheckRunId = jest.fn();
+const mockCreateCodeReview = jest.fn();
+const mockFindExistingReview = jest.fn();
+const mockFindActiveReviewsForPR = jest.fn();
+const mockUpdateReviewHeadShaAndCheckRun = jest.fn();
+const mockTryDispatchPendingReviews = jest.fn();
+const mockCancelReview = jest.fn();
+const mockAddReactionToPR = jest.fn();
+const mockIsMergeCommit = jest.fn();
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
   getBotUserId: (organizationId: string, botType: string) =>
@@ -9,6 +20,32 @@ jest.mock('@/lib/bot-users/bot-user-service', () => ({
 jest.mock('@/lib/agent-config/db/agent-configs', () => ({
   getAgentConfigForOwner: (owner: unknown, agentType: string, platform: string) =>
     mockGetAgentConfigForOwner(owner, agentType, platform),
+}));
+
+jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
+  createCodeReview: (...args: unknown[]) => mockCreateCodeReview(...args),
+  findExistingReview: (...args: unknown[]) => mockFindExistingReview(...args),
+  findActiveReviewsForPR: (...args: unknown[]) => mockFindActiveReviewsForPR(...args),
+  updateReviewHeadShaAndCheckRun: (...args: unknown[]) =>
+    mockUpdateReviewHeadShaAndCheckRun(...args),
+  updateCheckRunId: (...args: unknown[]) => mockUpdateCheckRunId(...args),
+}));
+
+jest.mock('@/lib/code-reviews/dispatch/dispatch-pending-reviews', () => ({
+  tryDispatchPendingReviews: (...args: unknown[]) => mockTryDispatchPendingReviews(...args),
+}));
+
+jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
+  codeReviewWorkerClient: {
+    cancelReview: (...args: unknown[]) => mockCancelReview(...args),
+  },
+}));
+
+jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
+  addReactionToPR: (...args: unknown[]) => mockAddReactionToPR(...args),
+  createCheckRun: (...args: unknown[]) => mockCreateCheckRun(...args),
+  isMergeCommit: (...args: unknown[]) => mockIsMergeCommit(...args),
+  updateCheckRun: (...args: unknown[]) => mockUpdateCheckRun(...args),
 }));
 
 import { resolvePullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
@@ -59,6 +96,17 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockGetBotUserId.mockResolvedValue(null);
   mockGetAgentConfigForOwner.mockResolvedValue(null);
+  mockCreateCheckRun.mockResolvedValue(98765);
+  mockUpdateCheckRun.mockResolvedValue(undefined);
+  mockUpdateCheckRunId.mockResolvedValue(undefined);
+  mockCreateCodeReview.mockResolvedValue('review-1');
+  mockFindExistingReview.mockResolvedValue(null);
+  mockFindActiveReviewsForPR.mockResolvedValue([]);
+  mockUpdateReviewHeadShaAndCheckRun.mockResolvedValue(undefined);
+  mockTryDispatchPendingReviews.mockResolvedValue({ dispatched: 0, pending: 1, activeCount: 0 });
+  mockCancelReview.mockResolvedValue({ success: true, reviewId: 'old-review' });
+  mockAddReactionToPR.mockResolvedValue(undefined);
+  mockIsMergeCommit.mockResolvedValue(false);
 });
 
 describe('resolvePullRequestCheckoutRef', () => {
@@ -197,5 +245,55 @@ describe('handlePullRequest', () => {
       'code-review'
     );
     expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
+  });
+
+  it('passes the integration GitHub app type when cancelling an orphaned check run', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockUpdateCheckRunId.mockRejectedValue(new Error('database write failed'));
+
+    const response = await handlePullRequest(
+      pullRequestPayload(),
+      platformIntegration({ github_app_type: 'standard' })
+    );
+
+    expect(response.status).toBe(202);
+    expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+      '98765',
+      'acme',
+      'widgets',
+      98765,
+      { status: 'completed', conclusion: 'cancelled' },
+      'standard'
+    );
+  });
+
+  it('passes the integration GitHub app type when cancelling an orphaned merge-commit check run', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockFindActiveReviewsForPR.mockResolvedValue(['review-1']);
+    mockUpdateReviewHeadShaAndCheckRun.mockRejectedValue(new Error('database write failed'));
+    mockIsMergeCommit.mockResolvedValue(true);
+
+    const response = await handlePullRequest(
+      pullRequestPayload(),
+      platformIntegration({ github_app_type: 'standard' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+      '98765',
+      'acme',
+      'widgets',
+      98765,
+      { status: 'completed', conclusion: 'cancelled' },
+      'standard'
+    );
   });
 });

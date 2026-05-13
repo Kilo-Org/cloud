@@ -151,33 +151,38 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('complete');
   });
 
-  test('the active wizard has four steps regardless of input', () => {
+  test('the active wizard has five steps when all admin-gated steps are visible', () => {
     // Channels and pairing were removed from the active wizard. The
-    // counter is now constant at 4 (identity, calendar, email,
-    // provisioning). Future Interests step (PR-4) will renumber.
+    // counter is 5 with all admin-gated steps visible: identity,
+    // calendar, email, interests, provisioning. Non-admins skip the
+    // calendar and interests steps (see the describe block below).
     const defaultState = getClawOnboardingFlowState(createInput());
-    expect(defaultState.totalSteps).toBe(4);
+    expect(defaultState.totalSteps).toBe(5);
     expect(defaultState.currentStep).toBe(1);
   });
 
   test('getClawOnboardingStepProgress returns correct live current and total steps', () => {
     expect(getClawOnboardingStepProgress('identity')).toEqual({
       currentStep: 1,
-      totalSteps: 4,
+      totalSteps: 5,
     });
     expect(getClawOnboardingStepProgress('calendar')).toEqual({
       currentStep: 2,
-      totalSteps: 4,
+      totalSteps: 5,
     });
     expect(getClawOnboardingStepProgress('email')).toEqual({
       currentStep: 3,
-      totalSteps: 4,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('interests')).toEqual({
+      currentStep: 4,
+      totalSteps: 5,
     });
     expect(getClawOnboardingStepProgress('provisioning')).toEqual({
-      currentStep: 4,
-      totalSteps: 4,
+      currentStep: 5,
+      totalSteps: 5,
     });
-    expect(getClawOnboardingStepProgress('done')).toEqual({ currentStep: 4, totalSteps: 4 });
+    expect(getClawOnboardingStepProgress('done')).toEqual({ currentStep: 5, totalSteps: 5 });
   });
 
   test.each(CLAW_ONBOARDING_PROVISIONING_STATUSES)(
@@ -278,11 +283,18 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('provisioning');
   });
 
-  describe('when calendar step is hidden (non-admin user)', () => {
-    test('drops calendar from total step count', () => {
-      const noCalendar = getClawOnboardingFlowState(createInput({ hasCalendarStep: false }));
-      expect(noCalendar.totalSteps).toBe(3);
-      expect(noCalendar.hasCalendarStep).toBe(false);
+  describe('when admin-gated steps are hidden (non-admin user)', () => {
+    // A real non-admin has BOTH calendar and interests hidden (they share
+    // the same admin gate). Each test passes both flags as `false` so the
+    // total step count reflects the actual non-admin wizard: identity,
+    // email, provisioning = 3 steps.
+    test('drops calendar and interests from total step count', () => {
+      const nonAdmin = getClawOnboardingFlowState(
+        createInput({ hasCalendarStep: false, hasInterestsStep: false })
+      );
+      expect(nonAdmin.totalSteps).toBe(3);
+      expect(nonAdmin.hasCalendarStep).toBe(false);
+      expect(nonAdmin.hasInterestsStep).toBe(false);
     });
 
     test('redirects calendar render step to email in create-first mode', () => {
@@ -292,6 +304,7 @@ describe('ClawOnboardingFlow state machine', () => {
           onboardingStep: 'calendar',
           hasBotIdentity: true,
           hasCalendarStep: false,
+          hasInterestsStep: false,
         })
       );
 
@@ -307,6 +320,7 @@ describe('ClawOnboardingFlow state machine', () => {
           hasBotIdentity: true,
           gatewayState: 'running',
           hasCalendarStep: false,
+          hasInterestsStep: false,
         })
       );
 
@@ -323,6 +337,7 @@ describe('ClawOnboardingFlow state machine', () => {
           onboardingStep: 'calendar',
           hasBotIdentity: true,
           hasCalendarStep: false,
+          hasInterestsStep: false,
         })
       );
 
@@ -331,20 +346,34 @@ describe('ClawOnboardingFlow state machine', () => {
       expect(state.totalSteps).toBe(3);
     });
 
-    test('getClawOnboardingStepProgress positions remaining steps correctly without calendar', () => {
-      expect(getClawOnboardingStepProgress('identity', false)).toEqual({
+    test('redirects interests render step to provisioning in create-first mode', () => {
+      const state = getClawOnboardingFlowState(
+        createInput({
+          createSetupStarted: true,
+          onboardingStep: 'interests',
+          hasBotIdentity: true,
+          hasCalendarStep: false,
+          hasInterestsStep: false,
+        })
+      );
+
+      expect(state.renderStep).toBe('provisioning');
+    });
+
+    test('getClawOnboardingStepProgress positions remaining steps correctly without calendar or interests', () => {
+      expect(getClawOnboardingStepProgress('identity', false, false)).toEqual({
         currentStep: 1,
         totalSteps: 3,
       });
-      expect(getClawOnboardingStepProgress('email', false)).toEqual({
+      expect(getClawOnboardingStepProgress('email', false, false)).toEqual({
         currentStep: 2,
         totalSteps: 3,
       });
-      expect(getClawOnboardingStepProgress('provisioning', false)).toEqual({
+      expect(getClawOnboardingStepProgress('provisioning', false, false)).toEqual({
         currentStep: 3,
         totalSteps: 3,
       });
-      expect(getClawOnboardingStepProgress('done', false)).toEqual({
+      expect(getClawOnboardingStepProgress('done', false, false)).toEqual({
         currentStep: 3,
         totalSteps: 3,
       });

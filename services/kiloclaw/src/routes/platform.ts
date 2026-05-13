@@ -1969,6 +1969,15 @@ const MorningBriefingSetupSchema = z.object({
   timezone: z.string().min(1).optional(),
 });
 
+// Caps protect both the plugin (config.json size) and the eventual
+// web-search query (PR-4c) from runaway input.
+const MAX_INTEREST_TOPICS = 20;
+const MAX_INTEREST_TOPIC_LENGTH = 64;
+const MorningBriefingInterestsSchema = z.object({
+  userId: z.string().min(1),
+  topics: z.array(z.string().trim().min(1).max(MAX_INTEREST_TOPIC_LENGTH)).max(MAX_INTEREST_TOPICS),
+});
+
 type MorningBriefingWarmupRetryPolicy = {
   includeTimeout: boolean;
 };
@@ -2146,6 +2155,45 @@ platform.post('/morning-briefing/disable', async c => {
       return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
     }
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/disable');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/morning-briefing/interests
+platform.post('/morning-briefing/interests', async c => {
+  const result = await parseBody(c, MorningBriefingInterestsSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, topics } = result.data;
+  try {
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
+        stub => stub.updateBriefingInterests({ topics }),
+        'updateBriefingInterests'
+      )
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'morning-briefing/interests'
+    );
     return jsonError(message, status, code);
   }
 });

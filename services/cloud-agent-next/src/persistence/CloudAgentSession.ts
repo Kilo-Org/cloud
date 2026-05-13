@@ -109,8 +109,8 @@ const LAST_ACTIVITY_KEY = 'last_activity';
 /** Kilo server idle timeout: 15 minutes */
 const KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT = 15 * 60 * 1000;
 
-/** Default per-execution wall-clock deadline: 30 minutes */
-const DEFAULT_MAX_RUNTIME_MS = 1_800_000;
+/** Default per-execution wall-clock deadline: 60 minutes */
+const DEFAULT_MAX_RUNTIME_MS = 3_600_000;
 
 /** Hung execution timeout: no non-heartbeat events for 5 minutes */
 const HUNG_EXECUTION_TIMEOUT_MS = 5 * 60 * 1000;
@@ -392,7 +392,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         .map(value => value.trim())
         .filter(Boolean);
 
-      if (allowedOrigins.length > 0 && origin && !allowedOrigins.includes(origin)) {
+      // Only enforce the Origin allowlist when the client sends a real browser
+      // Origin. Native clients (iOS/Android) either omit the header entirely or
+      // send the literal string "null" — both cases are allowed through because
+      // the Worker already authenticated the request via the JWT ticket before
+      // forwarding here.
+      const isRealOrigin = origin !== null && origin !== 'null';
+      if (allowedOrigins.length > 0 && isRealOrigin && !allowedOrigins.includes(origin)) {
         logger
           .withFields({ origin, allowedOrigins, sessionId: sessionIdParam })
           .warn('DO /stream: Origin not allowed');
@@ -1638,7 +1644,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
   /**
    * Fail a running execution that has exceeded its wall-clock deadline
-   * (DEFAULT_MAX_RUNTIME_MS = 30 min).
+   * (DEFAULT_MAX_RUNTIME_MS = 60 min).
    */
   private async checkMaxRuntime(now: number): Promise<void> {
     const activeExecutionId = await this.executionQueries.getActiveExecutionId();
@@ -1807,13 +1813,22 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   /**
-   * Reset the sandbox container's sleep timer so it stays alive during an
-   * active execution.
+   * Reset the sandbox container's inactivity timer so it stays alive during
+   * an active execution.
    *
-   * The wrapper heartbeat travels over an outbound WebSocket that bypasses
-   * `containerFetch()`, so it never calls `renewActivityTimeout()`.  Calling
-   * `setSleepAfter()` with the same value is a lightweight RPC that resets
-   * the timer without changing the configuration.
+   * The @cloudflare/containers runtime expires the container after
+   * `sleepAfter` of inactivity and refreshes that window from
+   * `containerFetch()` only.  The wrapper communicates with the worker over
+   * an outbound WebSocket to `/ingest` that bypasses `containerFetch()`, so
+   * the activity timer is never refreshed by wrapper traffic and the
+   * container is SIGTERM-ed at the 15-minute mark even mid-execution.
+   *
+   * `setSleepAfter()` cannot be used to refresh the timer because the
+   * Sandbox implementation is idempotent — when called with the same value
+   * it returns early without resetting `sleepAfterMs`.  Call
+   * `renewActivityTimeout()` (inherited from the base Container class)
+   * directly instead; it is a synchronous in-memory update of
+   * `sleepAfterMs = Date.now() + sleepAfter*1000`.
    *
    * Called from the DO context's `updateHeartbeat` callback (debounced
    * to every 30 s by the ingest handler) while an execution is running.
@@ -1833,7 +1848,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           metadata.botId
         ));
       const sandbox = getSandbox(getSandboxNamespace(this.env, sandboxId), sandboxId);
-      await sandbox.setSleepAfter(SANDBOX_SLEEP_AFTER_SECONDS);
+      // `renewActivityTimeout` is declared as synchronous `void` on the
+      // base Container class, but `sandbox` is a DO RPC stub so the call
+      // is actually async.  `Promise.resolve` wraps the call without
+      // hiding rejection — failures still propagate to the catch below.
+      await Promise.resolve(sandbox.renewActivityTimeout());
     } catch (error) {
       logger
         .withFields({

@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { APP_URL } from '@/lib/constants';
-import { db } from '@/lib/drizzle';
+import { db, sql } from '@/lib/drizzle';
 import {
   evaluateErrorCategorySpike,
   evaluateFailureRate,
@@ -19,6 +19,7 @@ import {
 // secret — just a low-friction way to keep scanners and accidental hits from
 // running detector queries. Mirrors `apps/web/src/app/api/models/up/route.ts`.
 const HEALTH_CHECK_KEY = 'kilo-code-reviews-health-check';
+const DETECTOR_STATEMENT_TIMEOUT_MS = 10_000;
 
 type AlertingDb = Pick<typeof db, 'execute'>;
 
@@ -52,7 +53,12 @@ export async function GET(
   const evaluations = await Promise.all(
     DETECTORS.map(async detector => {
       try {
-        return await detector.evaluate(db);
+        return await db.transaction(async tx => {
+          await tx.execute(
+            sql.raw(`SET LOCAL statement_timeout = '${DETECTOR_STATEMENT_TIMEOUT_MS}'`)
+          );
+          return detector.evaluate(tx);
+        });
       } catch (error) {
         captureException(error, {
           tags: {

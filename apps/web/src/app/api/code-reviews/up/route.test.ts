@@ -102,6 +102,28 @@ describe('GET /api/code-reviews/up', () => {
     });
   });
 
+  it('runs each detector inside its own timed transaction', async () => {
+    const txExecuteCalls: jest.Mock[] = [];
+    const transactionSpy = jest.spyOn(db, 'transaction').mockImplementation(async callback => {
+      const execute = jest.fn().mockResolvedValue({ rows: [] });
+      txExecuteCalls.push(execute);
+      return callback({ execute } as never);
+    });
+
+    try {
+      const response = await GET(makeRequest('kilo-code-reviews-health-check'));
+
+      expect(response.status).toBe(200);
+      expect(transactionSpy).toHaveBeenCalledTimes(4);
+      expect(txExecuteCalls).toHaveLength(4);
+      for (const execute of txExecuteCalls) {
+        expect(execute).toHaveBeenCalledTimes(2);
+      }
+    } finally {
+      transactionSpy.mockRestore();
+    }
+  });
+
   it('returns 503 with failure-rate alert when failure rate trips', async () => {
     await db
       .insert(cloud_agent_code_reviews)
@@ -185,7 +207,9 @@ describe('GET /api/code-reviews/up', () => {
   });
 
   it('fails open and captures every detector error to Sentry when the database is unreachable', async () => {
-    const executeSpy = jest.spyOn(db, 'execute').mockRejectedValue(new Error('DB unavailable'));
+    const transactionSpy = jest
+      .spyOn(db, 'transaction')
+      .mockRejectedValue(new Error('DB unavailable'));
 
     try {
       const response = await GET(makeRequest('kilo-code-reviews-health-check'));
@@ -207,7 +231,7 @@ describe('GET /api/code-reviews/up', () => {
         tags: { endpoint: 'code-reviews/up', source: 'code_review_health_check' },
       });
     } finally {
-      executeSpy.mockRestore();
+      transactionSpy.mockRestore();
     }
   });
 });

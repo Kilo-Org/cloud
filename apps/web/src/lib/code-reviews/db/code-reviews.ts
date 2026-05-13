@@ -614,6 +614,8 @@ export async function cancelSupersededReviewsForPR(
         updated_at = now()
       FROM targets
       WHERE reviews.id = targets.id
+        AND reviews.head_sha != ${excludeSha}
+        AND reviews.status IN ('pending', 'queued', 'running')
       RETURNING
         reviews.id,
         targets.prev_status,

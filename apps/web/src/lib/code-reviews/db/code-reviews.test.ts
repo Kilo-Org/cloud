@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db, pool } from '@/lib/drizzle';
 import { cloud_agent_code_reviews, kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -192,6 +192,53 @@ describe('cancelSupersededReviewsForPR', () => {
       .where(eq(cloud_agent_code_reviews.id, otherRepoId))
       .limit(1);
     expect(otherRepoRow?.status).toBe('pending');
+  });
+
+  it('does not overwrite a review that completes while cancellation waits on the row lock', async () => {
+    const raceRepo = `${repo}-race-${Date.now()}`;
+    const reviewId = await createReview({
+      headSha: 'sha-race',
+      repoFullName: raceRepo,
+      prNumber: 99,
+    });
+    await updateCodeReviewStatus(reviewId, 'running', { sessionId: 'session-race' });
+
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `UPDATE cloud_agent_code_reviews
+         SET status = 'completed', completed_at = now(), updated_at = now()
+         WHERE id = $1`,
+        [reviewId]
+      );
+
+      const cancelPromise = cancelSupersededReviewsForPR(raceRepo, 99, 'sha-latest');
+
+      await new Promise(resolve => setTimeout(resolve, 50));
+      await client.query('COMMIT');
+
+      const cancelled = await cancelPromise;
+      expect(cancelled).toEqual([]);
+
+      const [row] = await db
+        .select({
+          status: cloud_agent_code_reviews.status,
+          terminalReason: cloud_agent_code_reviews.terminal_reason,
+          errorMessage: cloud_agent_code_reviews.error_message,
+        })
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, reviewId))
+        .limit(1);
+
+      expect(row?.status).toBe('completed');
+      expect(row?.terminalReason).toBeNull();
+      expect(row?.errorMessage).toBeNull();
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
+      client.release();
+    }
   });
 });
 

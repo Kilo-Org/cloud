@@ -5,7 +5,6 @@ export type EmbeddingProxyRequest = {
   dimensions?: number;
   safety_identifier?: string;
   provider?: Record<string, unknown>;
-  providerOptions?: Record<string, unknown>;
   input_type?: string;
   // Mistral-specific
   output_dtype?: string;
@@ -22,10 +21,9 @@ export function buildUpstreamBody(
 ): Record<string, unknown> {
   const {
     dimensions: _,
-    encoding_format: __,
-    output_dtype: ___,
-    output_dimension: ____,
-    user: _____,
+    output_dtype: __,
+    output_dimension: ___,
+    user: ____,
     ...upstreamBody
   } = body;
   return upstreamBody;

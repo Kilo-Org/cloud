@@ -1005,22 +1005,22 @@ describe('CodeReviewOrchestrator recovery', () => {
 
     expect(ran).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({
-      status: 'queued',
-      sessionId: undefined,
-      cliSessionId: undefined,
+      status: 'running',
+      sessionId: 'agent-fresh-after-sandbox-500',
+      cliSessionId: 'ses_fresh_after_sandbox_500',
     });
     expect(fetchCalls(fetchMock, '/trpc/getSessionHealth')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/updateSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
-    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
-    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
 
     const stored = await storedReview(stub);
     expect(stored).toMatchObject({
       sandboxRetryAttempted: true,
-      status: 'queued',
-      sessionId: undefined,
-      cliSessionId: undefined,
+      status: 'running',
+      sessionId: 'agent-fresh-after-sandbox-500',
+      cliSessionId: 'ses_fresh_after_sandbox_500',
     });
   });
 
@@ -1066,11 +1066,11 @@ describe('CodeReviewOrchestrator recovery', () => {
 
     expect(ran).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({
-      status: 'queued',
-      terminalReason: undefined,
+      status: 'failed',
+      terminalReason: 'sandbox_error',
     });
     expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
-    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
   });
 

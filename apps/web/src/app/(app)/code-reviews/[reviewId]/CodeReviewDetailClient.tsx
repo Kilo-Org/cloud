@@ -143,6 +143,19 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
   const canRetry = ['failed', 'cancelled', 'interrupted'].includes(status);
   const canCancel = ['pending', 'queued', 'running'].includes(status);
   const prLabel = review.platform === 'gitlab' ? 'MR' : 'PR';
+  const isSupersededCancellation =
+    status === 'cancelled' &&
+    (review.terminal_reason === 'superseded' ||
+      review.error_message?.toLowerCase().includes('superseded'));
+  const reviewMessage = review.error_message
+    ? {
+        label: isSupersededCancellation ? 'Cancelled' : 'Error',
+        message: isSupersededCancellation ? 'Superseded by a newer push.' : review.error_message,
+        className: isSupersededCancellation
+          ? 'border-border bg-muted/30 text-muted-foreground'
+          : 'border-destructive/30 bg-destructive/10 text-destructive',
+      }
+    : null;
 
   return (
     <PageContainer>
@@ -266,10 +279,9 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
             )}
           </dl>
 
-          {/* Error message */}
-          {review.error_message && (
-            <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-              <strong>Error:</strong> {review.error_message}
+          {reviewMessage && (
+            <div className={`mt-4 rounded-md border p-3 text-sm ${reviewMessage.className}`}>
+              <strong>{reviewMessage.label}:</strong> {reviewMessage.message}
             </div>
           )}
 

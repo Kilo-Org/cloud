@@ -330,10 +330,6 @@ export const STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID = getEnvVariable(
 export const STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID = getEnvVariable(
   'STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID'
 );
-export const STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID = getEnvVariable(
-  'STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID'
-);
-
 // Webhook Agent Ingest Worker
 export const WEBHOOK_AGENT_URL =
   getEnvVariable('WEBHOOK_AGENT_URL') || 'https://hooks.kilosessions.ai';

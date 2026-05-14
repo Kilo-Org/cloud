@@ -3,6 +3,9 @@ import { addMonths, format } from 'date-fns';
 
 import type { WorkerDb } from '@kilocode/db';
 import {
+  getKiloClawPlanCostMicrodollars,
+  getKiloClawPricingCatalogEntry,
+  KILOCLAW_PRICE_VERSIONS,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
   getWorkerDb,
   insertKiloClawSubscriptionChangeLog,
@@ -50,14 +53,16 @@ const AUTO_RESUME_INITIAL_BACKOFF_MS = 2 * 60 * 60 * 1000;
 const AUTO_RESUME_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
 const TRIAL_INACTIVITY_BATCH_SIZE = 50;
 const SOFT_DELETED_EMAIL_SUFFIX = '@deleted.invalid';
+const TRIAL_ENDING_SOON_MIN_DURATION_DAYS = 2;
+const TRIAL_INACTIVITY_MIN_DURATION_DAYS = 2;
+const TRIAL_INACTIVITY_PRICE_VERSIONS = KILOCLAW_PRICE_VERSIONS.filter(
+  priceVersion =>
+    getKiloClawPricingCatalogEntry(priceVersion).trialDurationDays >=
+    TRIAL_INACTIVITY_MIN_DURATION_DAYS
+);
 const LIFECYCLE_ACTOR = {
   actorType: 'system',
   actorId: 'billing-lifecycle-job',
-} as const;
-
-const KILOCLAW_PLAN_COST_MICRODOLLARS = {
-  standard: 9_000_000,
-  commit: 48_000_000,
 } as const;
 
 type TemplateName =
@@ -114,6 +119,8 @@ type CreditRenewalRow = {
   instance_destroyed_at: string | null;
   plan: KiloClawPlan;
   status: KiloClawSubscriptionStatus;
+  kiloclaw_price_version: string;
+  stripe_subscription_id: string | null;
   credit_renewal_at: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
@@ -177,6 +184,7 @@ type TrialInactivityCandidateRow = {
   organization_id: string | null;
   instance_destroyed_at: string | null;
   instance_created_at: string;
+  kiloclaw_price_version: string;
 };
 
 type SweepExecutionContext = BillingCorrelationContext & {
@@ -325,18 +333,22 @@ function buildClawUrl(env: BillingWorkerEnv): string {
   return `${env.KILOCODE_BACKEND_BASE_URL}/claw`;
 }
 
-function getKiloClawAffiliateItemCategory(plan: 'commit' | 'standard'): string {
-  return `kiloclaw-${plan}`;
+function getKiloClawAffiliateItemCategory(params: {
+  plan: 'commit' | 'standard';
+  priceVersion: string;
+}): string {
+  return `kiloclaw-${params.plan}-${params.priceVersion}`;
 }
 
 function getKiloClawAffiliateItemName(plan: 'commit' | 'standard'): string {
   return plan === 'commit' ? 'KiloClaw Commit Plan' : 'KiloClaw Standard Plan';
 }
 
-function getKiloClawAffiliateItemSku(env: BillingWorkerEnv, plan: 'commit' | 'standard'): string {
-  return plan === 'commit'
-    ? env.STRIPE_KILOCLAW_COMMIT_PRICE_ID
-    : env.STRIPE_KILOCLAW_STANDARD_PRICE_ID;
+function getKiloClawAffiliateItemSku(params: {
+  plan: 'commit' | 'standard';
+  priceVersion: string;
+}): string {
+  return `kiloclaw-${params.plan}-${params.priceVersion}`;
 }
 
 function formatDateForEmail(date: Date): string {
@@ -382,6 +394,19 @@ function workerInstanceId(
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+// Defence-in-depth check. The trial inactivity SQL queries already restrict to
+// `TRIAL_INACTIVITY_PRICE_VERSIONS`, which is the same set of price versions
+// whose `trialDurationDays >= TRIAL_INACTIVITY_MIN_DURATION_DAYS`. This helper
+// re-validates the catalog entry on each row so that a future SQL change that
+// drops or weakens the `inArray` predicate cannot silently send one-day (or
+// otherwise ineligible) trials through the inactivity-stop pipeline.
+function hasTrialInactivityEligibleDuration(row: { kiloclaw_price_version: string }): boolean {
+  return (
+    getKiloClawPricingCatalogEntry(row.kiloclaw_price_version).trialDurationDays >=
+    TRIAL_INACTIVITY_MIN_DURATION_DAYS
+  );
 }
 
 async function getSubscriptionById(
@@ -1224,6 +1249,13 @@ async function processCreditRenewalRow(
   const { user_id: userId, credit_renewal_at: renewalAt } = row;
   if (!renewalAt) return;
 
+  if (row.stripe_subscription_id) {
+    logSkippedSubscriptionRow('Skipping credit renewal for hybrid subscription row', row, {
+      reason: 'stripe_funded_hybrid',
+    });
+    return;
+  }
+
   if (row.cancel_at_period_end) {
     const before = await getSubscriptionById(database, row.id);
     const [updated] = await database
@@ -1259,7 +1291,10 @@ async function processCreditRenewalRow(
   }
 
   const applyingPlanSwitch = row.scheduled_plan !== null && row.scheduled_plan !== row.plan;
-  const costMicrodollars = KILOCLAW_PLAN_COST_MICRODOLLARS[effectivePlan];
+  const costMicrodollars = getKiloClawPlanCostMicrodollars({
+    priceVersion: row.kiloclaw_price_version,
+    plan: effectivePlan,
+  });
   const periodMonths = effectivePlan === 'commit' ? 6 : 1;
   const rawBalance = row.total_microdollars_acquired - row.microdollars_used;
   const projectedBonus = await projectPendingKiloPassBonusMicrodollars(env, context, {
@@ -1374,9 +1409,15 @@ async function processCreditRenewalRow(
         orderId: deductionCategory,
         amount: costMicrodollars / 1_000_000,
         currencyCode: 'usd',
-        itemCategory: getKiloClawAffiliateItemCategory(effectivePlan),
+        itemCategory: getKiloClawAffiliateItemCategory({
+          plan: effectivePlan,
+          priceVersion: row.kiloclaw_price_version,
+        }),
         itemName: getKiloClawAffiliateItemName(effectivePlan),
-        itemSku: getKiloClawAffiliateItemSku(env, effectivePlan),
+        itemSku: getKiloClawAffiliateItemSku({
+          plan: effectivePlan,
+          priceVersion: row.kiloclaw_price_version,
+        }),
       });
 
       await database
@@ -1427,9 +1468,15 @@ async function processCreditRenewalRow(
       orderId: deductionCategory,
       amount: costMicrodollars / 1_000_000,
       currencyCode: 'usd',
-      itemCategory: getKiloClawAffiliateItemCategory(effectivePlan),
+      itemCategory: getKiloClawAffiliateItemCategory({
+        plan: effectivePlan,
+        priceVersion: row.kiloclaw_price_version,
+      }),
       itemName: getKiloClawAffiliateItemName(effectivePlan),
-      itemSku: getKiloClawAffiliateItemSku(env, effectivePlan),
+      itemSku: getKiloClawAffiliateItemSku({
+        plan: effectivePlan,
+        priceVersion: row.kiloclaw_price_version,
+      }),
     });
 
     summary.credit_renewals++;
@@ -1538,6 +1585,8 @@ async function runCreditRenewalSweep(
       instance_destroyed_at: kiloclaw_instances.destroyed_at,
       plan: kiloclaw_subscriptions.plan,
       status: kiloclaw_subscriptions.status,
+      kiloclaw_price_version: kiloclaw_subscriptions.kiloclaw_price_version,
+      stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
       credit_renewal_at: kiloclaw_subscriptions.credit_renewal_at,
       current_period_end: kiloclaw_subscriptions.current_period_end,
       cancel_at_period_end: kiloclaw_subscriptions.cancel_at_period_end,
@@ -1710,6 +1759,7 @@ async function runTrialExpirySweep(
       instance_destroyed_at: kiloclaw_instances.destroyed_at,
       organization_id: kiloclaw_instances.organization_id,
       email: kilocode_users.google_user_email,
+      trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -1726,6 +1776,13 @@ async function runTrialExpirySweep(
   for (const row of expiredTrials) {
     try {
       if (isSoftDeletedUserEmail(row.email)) continue;
+      if (!row.trial_ends_at || new Date(row.trial_ends_at).getTime() >= Date.now()) {
+        logSkippedSubscriptionRow('Skipping trial expiry for active recorded trial end', row, {
+          reason: 'trial_end_not_elapsed',
+        });
+        continue;
+      }
+
       if (!row.instance_id) {
         logSkippedSubscriptionRow('Skipping trial expiry for detached subscription row', row, {
           reason: 'missing_instance_id',
@@ -2378,6 +2435,7 @@ async function runTrialWarningSweep(
       organization_id: kiloclaw_instances.organization_id,
       email: kilocode_users.google_user_email,
       trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
+      kiloclaw_price_version: kiloclaw_subscriptions.kiloclaw_price_version,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -2431,6 +2489,9 @@ async function runTrialWarningSweep(
       const daysRemaining = Math.ceil(
         (new Date(row.trial_ends_at).getTime() - Date.now()) / MS_PER_DAY
       );
+      const trialDurationDays = getKiloClawPricingCatalogEntry(
+        row.kiloclaw_price_version
+      ).trialDurationDays;
 
       const sent =
         daysRemaining <= 1
@@ -2447,22 +2508,24 @@ async function runTrialWarningSweep(
               undefined,
               { instanceId: row.instance_id ?? undefined }
             )
-          : await trySendEmail(
-              database,
-              env,
-              context,
-              row.user_id,
-              row.email,
-              'claw_trial_5d',
-              'clawTrialEndingSoon',
-              {
-                days_remaining: String(daysRemaining),
-                claw_url: clawUrl,
-              },
-              summary,
-              `Your KiloClaw Trial Ends in ${daysRemaining} Days`,
-              { instanceId: row.instance_id ?? undefined }
-            );
+          : trialDurationDays >= TRIAL_ENDING_SOON_MIN_DURATION_DAYS
+            ? await trySendEmail(
+                database,
+                env,
+                context,
+                row.user_id,
+                row.email,
+                'claw_trial_5d',
+                'clawTrialEndingSoon',
+                {
+                  days_remaining: String(daysRemaining),
+                  claw_url: clawUrl,
+                },
+                summary,
+                `Your KiloClaw Trial Ends in ${daysRemaining} Days`,
+                { instanceId: row.instance_id ?? undefined }
+              )
+            : false;
 
       if (sent) summary.trial_warnings++;
     } catch (error) {
@@ -2785,6 +2848,7 @@ async function loadTrialInactivityCandidateByMessage(
       organization_id: kiloclaw_instances.organization_id,
       instance_destroyed_at: kiloclaw_instances.destroyed_at,
       instance_created_at: kiloclaw_instances.created_at,
+      kiloclaw_price_version: kiloclaw_subscriptions.kiloclaw_price_version,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
@@ -2799,12 +2863,16 @@ async function loadTrialInactivityCandidateByMessage(
         isNull(kiloclaw_instances.organization_id),
         isNull(kiloclaw_instances.destroyed_at),
         lte(kiloclaw_instances.created_at, cutoffIso),
-        isNull(kiloclaw_instances.inactive_trial_stopped_at)
+        isNull(kiloclaw_instances.inactive_trial_stopped_at),
+        inArray(kiloclaw_subscriptions.kiloclaw_price_version, [...TRIAL_INACTIVITY_PRICE_VERSIONS])
       )
     )
     .limit(1);
 
-  return rows[0] ?? null;
+  const candidate = rows[0] ?? null;
+  if (!candidate || !hasTrialInactivityEligibleDuration(candidate)) return null;
+
+  return candidate;
 }
 
 async function runTrialInactivityStopSweep(
@@ -2843,6 +2911,7 @@ async function runTrialInactivityStopSweep(
       organization_id: kiloclaw_instances.organization_id,
       instance_destroyed_at: kiloclaw_instances.destroyed_at,
       instance_created_at: kiloclaw_instances.created_at,
+      kiloclaw_price_version: kiloclaw_subscriptions.kiloclaw_price_version,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
@@ -2854,12 +2923,14 @@ async function runTrialInactivityStopSweep(
         isNull(kiloclaw_instances.organization_id),
         isNull(kiloclaw_instances.destroyed_at),
         lte(kiloclaw_instances.created_at, cutoffIso),
-        isNull(kiloclaw_instances.inactive_trial_stopped_at)
+        isNull(kiloclaw_instances.inactive_trial_stopped_at),
+        inArray(kiloclaw_subscriptions.kiloclaw_price_version, [...TRIAL_INACTIVITY_PRICE_VERSIONS])
       )
     );
+  const eligibleCandidates = candidates.filter(hasTrialInactivityEligibleDuration);
 
-  summary.trial_inactivity_candidates = candidates.length;
-  if (candidates.length === 0) {
+  summary.trial_inactivity_candidates = eligibleCandidates.length;
+  if (eligibleCandidates.length === 0) {
     log('info', 'No trial inactivity candidates found', {
       event: 'trial_inactivity_candidates_loaded',
       outcome: 'completed',
@@ -2869,7 +2940,7 @@ async function runTrialInactivityStopSweep(
     return;
   }
 
-  const candidateBatches = chunkArray(candidates, TRIAL_INACTIVITY_BATCH_SIZE);
+  const candidateBatches = chunkArray(eligibleCandidates, TRIAL_INACTIVITY_BATCH_SIZE);
   for (const batch of candidateBatches) {
     summary.trial_inactivity_batches++;
 

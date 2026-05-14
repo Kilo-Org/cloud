@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import {
+  CURRENT_KILOCLAW_PRICE_VERSION,
+  LEGACY_KILOCLAW_PRICE_VERSION,
+  type KiloClawPriceVersion,
   collapseOrphanPersonalSubscriptionsOnDestroy,
   FundedRowDemotionRefusedError,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
@@ -73,6 +76,7 @@ async function insertPersonalSubscription(params: {
   transferredToSubscriptionId?: string | null;
   trialEndsAt?: string | null;
   trialStartedAt?: string | null;
+  priceVersion?: KiloClawPriceVersion;
   userId: string;
 }) {
   await db.insert(kiloclaw_subscriptions).values({
@@ -82,6 +86,7 @@ async function insertPersonalSubscription(params: {
     plan: params.plan,
     status: params.status,
     payment_source: params.paymentSource ?? (params.plan === 'trial' ? null : 'credits'),
+    kiloclaw_price_version: params.priceVersion ?? LEGACY_KILOCLAW_PRICE_VERSION,
     stripe_subscription_id: params.stripeSubscriptionId ?? null,
     stripe_schedule_id: params.stripeScheduleId ?? null,
     suspended_at: params.suspendedAt ?? null,
@@ -1127,9 +1132,12 @@ describe('personal subscription destroy collapse', () => {
       .update(kilocode_users)
       .set({ total_microdollars_acquired: 50_000_000 })
       .where(eq(kilocode_users.id, user.id));
-    process.env.STRIPE_KILOCLAW_COMMIT_PRICE_ID ||= 'price_commit';
-    process.env.STRIPE_KILOCLAW_STANDARD_PRICE_ID ||= 'price_standard';
-    process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
+    process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID ||=
+      'price_legacy_standard_intro';
+    process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID ||= 'price_legacy_standard';
+    process.env.STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID ||= 'price_legacy_commit';
+    process.env.STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID ||= 'price_current_standard';
+    process.env.STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID ||= 'price_current_commit';
 
     await enrollWithCreditsImpl({
       userId: user.id,
@@ -1211,7 +1219,7 @@ describe('personal subscription destroy collapse', () => {
     await expectCurrentHead({ subscriptionId: successor.id, userId: user.id });
   });
 
-  it('expired trial row + destroyed instance still blocks provision', async () => {
+  it('expired trial row + destroyed instance creates a fresh current trial', async () => {
     const user = await insertTestUser({
       google_user_email: 'destroy-expired-trial-blocks-provision@example.com',
     });
@@ -1242,18 +1250,24 @@ describe('personal subscription destroy collapse', () => {
       trialEndsAt: '2026-04-08T00:00:00.000Z',
     });
 
-    await expect(
-      bootstrapProvisionSubscriptionWithDb({
-        db,
-        input: { userId: user.id, instanceId: newInstanceId, orgId: null },
-        actor: TEST_ACTOR,
+    const created = await bootstrapProvisionSubscriptionWithDb({
+      db,
+      input: { userId: user.id, instanceId: newInstanceId, orgId: null },
+      actor: TEST_ACTOR,
+    });
+
+    expect(created).toEqual(
+      expect.objectContaining({
+        user_id: user.id,
+        instance_id: newInstanceId,
+        plan: 'trial',
+        status: 'trialing',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
       })
-    ).rejects.toThrow(
-      'Cannot bootstrap personal subscription with existing non-access-granting rows'
     );
   });
 
-  it('past-due suspended row still blocks provision', async () => {
+  it('past-due suspended row creates a fresh current trial', async () => {
     const user = await insertTestUser({
       google_user_email: 'destroy-past-due-suspended-blocks-provision@example.com',
     });
@@ -1283,14 +1297,20 @@ describe('personal subscription destroy collapse', () => {
       suspendedAt: '2026-04-08T00:00:00.000Z',
     });
 
-    await expect(
-      bootstrapProvisionSubscriptionWithDb({
-        db,
-        input: { userId: user.id, instanceId: newInstanceId, orgId: null },
-        actor: TEST_ACTOR,
+    const created = await bootstrapProvisionSubscriptionWithDb({
+      db,
+      input: { userId: user.id, instanceId: newInstanceId, orgId: null },
+      actor: TEST_ACTOR,
+    });
+
+    expect(created).toEqual(
+      expect.objectContaining({
+        user_id: user.id,
+        instance_id: newInstanceId,
+        plan: 'trial',
+        status: 'trialing',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
       })
-    ).rejects.toThrow(
-      'Cannot bootstrap personal subscription with existing non-access-granting rows'
     );
   });
 

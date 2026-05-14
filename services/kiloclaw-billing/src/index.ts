@@ -1,5 +1,6 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { z } from 'zod';
+import { KILOCLAW_PRICE_VERSIONS } from '@kilocode/db';
 import { BILLING_FLOW } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
   BILLING_HOURLY_CRON,
@@ -15,11 +16,17 @@ import {
 } from './types.js';
 import { processTrialInactivityStopCandidate, runSweep } from './lifecycle.js';
 import { logger, withLogTags, type BillingLogFields } from './logger.js';
-import { bootstrapProvisionSubscription } from './bootstrap.js';
+import { bootstrapProvisionSubscription, resolveProvisionEntitlement } from './bootstrap.js';
 
 const BootstrapProvisionSubscriptionSchema = z.object({
   userId: z.string().min(1),
   instanceId: z.string().uuid(),
+  orgId: z.string().uuid().nullable().optional(),
+  expectedPriceVersion: z.enum(KILOCLAW_PRICE_VERSIONS).optional(),
+});
+
+const ResolveProvisionEntitlementSchema = z.object({
+  userId: z.string().min(1),
   orgId: z.string().uuid().nullable().optional(),
 });
 
@@ -91,6 +98,7 @@ export class KiloClawBillingService extends WorkerEntrypoint<BillingWorkerEnv> {
     userId: string;
     instanceId: string;
     orgId?: string | null;
+    expectedPriceVersion?: string;
   }): Promise<{ subscriptionId: string }> {
     const parsed = BootstrapProvisionSubscriptionSchema.parse(params);
     const orgId = parsed.orgId ?? null;
@@ -117,6 +125,7 @@ export class KiloClawBillingService extends WorkerEntrypoint<BillingWorkerEnv> {
             userId: parsed.userId,
             instanceId: parsed.instanceId,
             orgId,
+            expectedPriceVersion: parsed.expectedPriceVersion,
           });
 
           log('info', 'bootstrap-subscription completed', {
@@ -132,6 +141,60 @@ export class KiloClawBillingService extends WorkerEntrypoint<BillingWorkerEnv> {
           const errorMessage = error instanceof Error ? error.message : String(error);
           log('error', 'bootstrap-subscription failed', {
             event: 'bootstrap_subscription',
+            outcome: 'failed',
+            orgId,
+            durationMs: Date.now() - start,
+            error: errorMessage,
+          });
+          throw error;
+        }
+      }
+    );
+  }
+
+  async resolveProvisionEntitlement(params: { userId: string; orgId?: string | null }): Promise<{
+    priceVersion: string;
+    selfServiceInstanceType: string;
+  }> {
+    const parsed = ResolveProvisionEntitlementSchema.parse(params);
+    const orgId = parsed.orgId ?? null;
+
+    return await withLogTags(
+      {
+        source: 'rpc',
+        tags: {
+          billingFlow: BILLING_FLOW,
+          billingComponent: 'worker',
+          userId: parsed.userId,
+        },
+      },
+      async () => {
+        const start = Date.now();
+        log('info', 'resolve-provision-entitlement started', {
+          event: 'resolve_provision_entitlement',
+          outcome: 'started',
+          orgId,
+        });
+        try {
+          const entitlement = await resolveProvisionEntitlement(this.env, {
+            userId: parsed.userId,
+            orgId,
+          });
+
+          log('info', 'resolve-provision-entitlement completed', {
+            event: 'resolve_provision_entitlement',
+            outcome: 'completed',
+            orgId,
+            durationMs: Date.now() - start,
+            kiloclawPriceVersion: entitlement.priceVersion,
+            instanceType: entitlement.selfServiceInstanceType,
+          });
+
+          return entitlement;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          log('error', 'resolve-provision-entitlement failed', {
+            event: 'resolve_provision_entitlement',
             outcome: 'failed',
             orgId,
             durationMs: Date.now() - start,

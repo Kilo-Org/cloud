@@ -1,5 +1,5 @@
 {
-  "id": "345cd19c-756c-49f5-878c-940a5402af8f",
+  "id": "a93a0d5a-4c42-4104-ac94-d79d45a91796",
   "prevId": "f1e35802-da14-4ad3-b5ab-498605450be1",
   "version": "7",
   "dialect": "postgresql",
@@ -4512,26 +4512,6 @@
           "type": "bigint",
           "primaryKey": false,
           "notNull": false
-        },
-        "repository_review_instructions_used": {
-          "name": "repository_review_instructions_used",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "repository_review_instructions_ref": {
-          "name": "repository_review_instructions_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "repository_review_instructions_truncated": {
-          "name": "repository_review_instructions_truncated",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "model": {
           "name": "model",
@@ -13805,6 +13785,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "kiloclaw_price_version": {
+          "name": "kiloclaw_price_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "plan": {
           "name": "plan",
           "type": "text",
@@ -13989,6 +13975,21 @@
           "method": "btree",
           "with": {}
         },
+        "IDX_kiloclaw_subscriptions_price_version": {
+          "name": "IDX_kiloclaw_subscriptions_price_version",
+          "columns": [
+            {
+              "expression": "kiloclaw_price_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "IDX_kiloclaw_subscriptions_transferred_to": {
           "name": "IDX_kiloclaw_subscriptions_transferred_to",
           "columns": [
@@ -14142,6 +14143,10 @@
       },
       "policies": {},
       "checkConstraints": {
+        "kiloclaw_subscriptions_price_version_check": {
+          "name": "kiloclaw_subscriptions_price_version_check",
+          "value": "\"kiloclaw_subscriptions\".\"kiloclaw_price_version\" IN ('2026-03-19', '2026-05-10')"
+        },
         "kiloclaw_subscriptions_plan_check": {
           "name": "kiloclaw_subscriptions_plan_check",
           "value": "\"kiloclaw_subscriptions\".\"plan\" IN ('trial', 'commit', 'standard')"

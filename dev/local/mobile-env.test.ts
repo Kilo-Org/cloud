@@ -66,6 +66,7 @@ test('upserts quoted web app URL values in root env', () => {
 
 test('validates IPv4-looking host values', () => {
   assert.equal(isUsableIpv4('192.168.1.10'), true);
+  assert.equal(isUsableIpv4('999.999.999.999'), false);
   assert.equal(isUsableIpv4('localhost'), false);
   assert.equal(isUsableIpv4(undefined), false);
 });

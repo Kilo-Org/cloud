@@ -38,7 +38,11 @@ function parseArgs(args: string[]): { host: string | undefined } {
 }
 
 function isUsableIpv4(value: string | undefined): value is string {
-  return typeof value === 'string' && /^\d{1,3}(?:\.\d{1,3}){3}$/.test(value);
+  if (typeof value !== 'string' || !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)) {
+    return false;
+  }
+
+  return value.split('.').every(part => Number(part) <= 255);
 }
 
 function detectLanIp(): string | undefined {

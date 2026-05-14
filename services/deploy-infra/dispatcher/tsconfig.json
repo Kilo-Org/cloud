@@ -5,7 +5,6 @@
     "lib": ["ES2021"],
     "types": ["./worker-configuration.d.ts", "jest"],
     "strict": true,
-    "moduleResolution": "node",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,

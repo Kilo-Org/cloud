@@ -52,7 +52,7 @@ function createMockDOStub(
     updateMetadata?: ReturnType<typeof vi.fn>;
     deleteSession?: ReturnType<typeof vi.fn>;
   } = {}
-) {
+): any {
   return {
     prepare: overrides.prepare ?? vi.fn().mockResolvedValue({ success: true }),
     tryUpdate: overrides.tryUpdate ?? vi.fn().mockResolvedValue({ success: true }),

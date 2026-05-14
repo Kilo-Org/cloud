@@ -42,6 +42,7 @@ const workerDbCache = new Map<string, ReturnType<typeof drizzle>>();
  * Convenience wrapper for Cloudflare Workers using Hyperdrive.
  * Hyperdrive handles connection pooling at the infrastructure level,
  * so we use max: 1 here. Pass env.HYPERDRIVE.connectionString directly.
+ * Return a fresh wrapper per call so request/DO-bound I/O state never crosses contexts.
  */
 export function getWorkerDb(connectionString: string, options: GetWorkerDbOptions = {}) {
   const cacheKey = JSON.stringify({ connectionString, options });

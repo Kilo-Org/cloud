@@ -736,7 +736,7 @@ describe('tryDispatchPendingReviews', () => {
     );
   });
 
-  it('treats terminal worker dispatch responses as unsuccessful', async () => {
+  it('mirrors terminal worker dispatch responses', async () => {
     const timestamp = minutesAgo(1);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
     await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
@@ -766,12 +766,16 @@ describe('tryDispatchPendingReviews', () => {
     const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
       where: eq(cloud_agent_code_reviews.id, review.id),
     });
+    const storedAttempt = await db.query.cloud_agent_code_review_attempts.findFirst({
+      where: eq(cloud_agent_code_review_attempts.code_review_id, review.id),
+    });
 
     expect(result).toEqual({
-      dispatched: 0,
-      pending: 1,
-      activeCount: 0,
+      dispatched: 1,
+      pending: 0,
+      activeCount: 1,
     });
-    expect(storedReview?.status).toBe('queued');
+    expect(storedReview?.status).toBe('failed');
+    expect(storedAttempt?.status).toBe('failed');
   });
 });

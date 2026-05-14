@@ -110,7 +110,7 @@ export function emitDestroyPendingTelemetry(
   doWarn(state, 'Destroy incomplete, alarm will retry', details);
 }
 
-async function maybeEmitDestroyStuckTelemetry(
+export async function maybeEmitDestroyStuckTelemetry(
   ctx: DurableObjectState,
   state: InstanceMutableState,
   rctx: ReconcileContext

@@ -109,6 +109,7 @@ import {
   reconcileMachineMount,
   markRestartSuccessful,
   emitDestroyPendingTelemetry,
+  maybeEmitDestroyStuckTelemetry,
 } from './reconcile';
 import {
   restoreFromPostgres,
@@ -425,16 +426,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         await this.persistProviderResultWithPatch(result, {
           pendingDestroyMachineId: null,
         });
-        this.s.lastDestroyErrorOp = null;
-        this.s.lastDestroyErrorStatus = null;
-        this.s.lastDestroyErrorMessage = null;
-        this.s.lastDestroyErrorAt = null;
-        await this.persist({
-          lastDestroyErrorOp: null,
-          lastDestroyErrorStatus: null,
-          lastDestroyErrorMessage: null,
-          lastDestroyErrorAt: null,
-        });
+        if (!this.s.pendingDestroyVolumeId) {
+          this.s.lastDestroyErrorOp = null;
+          this.s.lastDestroyErrorStatus = null;
+          this.s.lastDestroyErrorMessage = null;
+          this.s.lastDestroyErrorAt = null;
+          await this.persist({
+            lastDestroyErrorOp: null,
+            lastDestroyErrorStatus: null,
+            lastDestroyErrorMessage: null,
+            lastDestroyErrorAt: null,
+          });
+        }
       } catch (err) {
         this.s.lastDestroyErrorOp = 'machine';
         this.s.lastDestroyErrorStatus = this.providerErrorStatus(err);
@@ -464,16 +467,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         await this.persistProviderResultWithPatch(result, {
           pendingDestroyVolumeId: null,
         });
-        this.s.lastDestroyErrorOp = null;
-        this.s.lastDestroyErrorStatus = null;
-        this.s.lastDestroyErrorMessage = null;
-        this.s.lastDestroyErrorAt = null;
-        await this.persist({
-          lastDestroyErrorOp: null,
-          lastDestroyErrorStatus: null,
-          lastDestroyErrorMessage: null,
-          lastDestroyErrorAt: null,
-        });
+        if (!this.s.pendingDestroyMachineId) {
+          this.s.lastDestroyErrorOp = null;
+          this.s.lastDestroyErrorStatus = null;
+          this.s.lastDestroyErrorMessage = null;
+          this.s.lastDestroyErrorAt = null;
+          await this.persist({
+            lastDestroyErrorOp: null,
+            lastDestroyErrorStatus: null,
+            lastDestroyErrorMessage: null,
+            lastDestroyErrorAt: null,
+          });
+        }
       } catch (err) {
         this.s.lastDestroyErrorOp = 'volume';
         this.s.lastDestroyErrorStatus = this.providerErrorStatus(err);
@@ -4119,13 +4124,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       if (this.s.provider !== 'fly') {
         if (this.s.status === 'destroying') {
           await this.retryNonFlyDestroy();
-          await finalizeDestroyIfComplete(
+          const destroyRctx = createReconcileContext(this.s, this.env, 'alarm_destroy');
+          const result = await finalizeDestroyIfComplete(
             this.ctx,
             this.s,
-            createReconcileContext(this.s, this.env, 'alarm_destroy'),
+            destroyRctx,
             (userId, sandboxId) =>
               markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
           );
+          if (!result.finalized) {
+            await maybeEmitDestroyStuckTelemetry(this.ctx, this.s, destroyRctx);
+          }
         } else {
           await this.reconcileNonFlyRuntimeFromAlarm();
         }

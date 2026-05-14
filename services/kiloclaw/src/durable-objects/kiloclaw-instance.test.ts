@@ -801,6 +801,95 @@ describe('two-phase destroy', () => {
     expect(storage._store.size).toBe(0);
     expect(storage._getAlarm()).toBeNull();
   });
+
+  it('emits throttled destroy_stuck telemetry for aged docker-local pending destroys', async () => {
+    const env = {
+      ...createFakeEnv(),
+      DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750',
+    };
+    const { storage } = createInstance(undefined, env);
+    await seedProvisioned(storage, {
+      provider: 'docker-local',
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: null,
+      flyRegion: null,
+      providerState: {
+        provider: 'docker-local',
+        containerName: null,
+        volumeName: 'kiloclaw-root-sandbox-1',
+        hostPort: null,
+      },
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'kiloclaw-root-sandbox-1',
+      destroyStartedAt: Date.now() - 16 * 60 * 1000,
+    });
+
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
+        return new Response('volume busy', { status: 409 });
+      }
+      throw new Error(`Unhandled Docker API request: ${url}`);
+    });
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    const stuckEvents = analyticsEventsByName(env, 'reconcile.destroy_stuck');
+    expect(stuckEvents).toHaveLength(1);
+    expect(stuckEvents[0]?.blobs).toEqual(expect.arrayContaining(['volume']));
+    expect(storage._store.get('lastDestroyPendingEventAt')).toBeTypeOf('number');
+
+    const { instance: retryInstance } = createInstance(storage, env);
+    await retryInstance.alarm();
+
+    expect(analyticsEventsByName(env, 'reconcile.destroy_stuck')).toHaveLength(1);
+  });
+
+  it('preserves docker-local runtime destroy errors when storage delete succeeds', async () => {
+    const env = {
+      ...createFakeEnv(),
+      DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750',
+    };
+    const { storage } = createInstance(undefined, env);
+    await seedProvisioned(storage, {
+      provider: 'docker-local',
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: null,
+      flyRegion: null,
+      providerState: {
+        provider: 'docker-local',
+        containerName: 'kiloclaw-sandbox-1',
+        volumeName: 'kiloclaw-root-sandbox-1',
+        hostPort: 45001,
+      },
+      pendingDestroyMachineId: 'kiloclaw-sandbox-1',
+      pendingDestroyVolumeId: 'kiloclaw-root-sandbox-1',
+      destroyStartedAt: Date.now() - 16 * 60 * 1000,
+    });
+
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/containers/kiloclaw-sandbox-1?force=true')) {
+        return new Response('container busy', { status: 409 });
+      }
+      if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`Unhandled Docker API request: ${url}`);
+    });
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    expect(storage._store.get('pendingDestroyMachineId')).toBe('kiloclaw-sandbox-1');
+    expect(storage._store.get('pendingDestroyVolumeId')).toBeNull();
+    expect(storage._store.get('lastDestroyErrorOp')).toBe('machine');
+    expect(storage._store.get('lastDestroyErrorStatus')).toBe(409);
+    expect(analyticsEventsByName(env, 'reconcile.destroy_stuck')).toHaveLength(1);
+  });
 });
 
 describe('destroy: recover bound machine from volume', () => {

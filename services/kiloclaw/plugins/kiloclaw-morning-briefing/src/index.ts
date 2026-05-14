@@ -656,13 +656,11 @@ async function gatherGithubEmptyResultContext(
       if (bodyText.trim().length > 0) {
         try {
           const parsed = JSON.parse(bodyText) as unknown;
-          if (
-            typeof parsed === 'object' &&
-            parsed !== null &&
-            'login' in parsed &&
-            typeof (parsed as { login: unknown }).login === 'string'
-          ) {
-            login = (parsed as { login: string }).login;
+          if (typeof parsed === 'object' && parsed !== null && 'login' in parsed) {
+            const loginValue = (parsed as Record<string, unknown>).login;
+            if (typeof loginValue === 'string') {
+              login = loginValue;
+            }
           }
         } catch {
           // Body wasn't JSON; leave login null.
@@ -690,15 +688,14 @@ async function gatherGithubEmptyResultContext(
         { timeoutMs: 15_000 }
       );
       if (code === 0) {
-        // `gh api --paginate --jq` emits one line per page. Sum them.
-        const total = stdout
+        // `gh api --paginate --jq` emits one line per page. Sum them. The
+        // accumulator starts at 0 and only adds finite values, so the total
+        // is guaranteed finite — no post-sum guard needed.
+        accessibleRepoCount = stdout
           .split(/\r?\n/)
           .map(line => Number.parseInt(line.trim(), 10))
           .filter(value => Number.isFinite(value))
           .reduce((sum, value) => sum + value, 0);
-        if (Number.isFinite(total)) {
-          accessibleRepoCount = total;
-        }
       }
     } catch {
       // Leave accessibleRepoCount=0 — the message still reads sensibly.

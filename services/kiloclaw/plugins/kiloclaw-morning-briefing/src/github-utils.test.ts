@@ -126,6 +126,7 @@ describe('buildGithubEmptySectionLines', () => {
     const text = lines.join('\n');
     expect(text).toContain('Authenticated as `astormsocbot` (fine-grained PAT)');
     expect(text).toContain('Token can see 3 repositories');
+    expect(text).toContain('explicitly granted access to');
     expect(text).toContain('switch to a classic PAT with `repo` scope');
     expect(text).toContain('https://github.com/settings/personal-access-tokens');
   });
@@ -180,7 +181,7 @@ describe('buildGithubEmptySummary', () => {
         login: 'astormsocbot',
         accessibleRepoCount: 3,
       })
-    ).toBe('0 issues — fine-grained PAT sees 3 repos owned by astormsocbot');
+    ).toBe('0 issues — fine-grained PAT for astormsocbot sees 3 repos');
   });
 
   it('summarises unknown token', () => {

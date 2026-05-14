@@ -120,9 +120,9 @@ export function buildGithubEmptySectionLines(ctx: GithubEmptyResultContext): str
       return [
         'No open issues involving you were found.',
         '',
-        `Authenticated as \`${ctx.login}\` (fine-grained PAT). Token can see ${ctx.accessibleRepoCount} repositories, all owned by the PAT creator.`,
+        `Authenticated as \`${ctx.login}\` (fine-grained PAT). Token can see ${ctx.accessibleRepoCount} repositories it was explicitly granted access to.`,
         '',
-        'Fine-grained PATs only access repos owned by the PAT creator. To include collaborator repos owned by other users, switch to a classic PAT with `repo` scope, or have the repo owner generate a fine-grained PAT scoped to those repos.',
+        "Fine-grained PATs only access the repositories selected when the token was created (the PAT creator's repos, or an org's repos if the org has enabled fine-grained PATs). To include collaborator repos owned by other users, switch to a classic PAT with `repo` scope, or have the resource owner generate a fine-grained PAT scoped to those repos.",
         '',
         'Manage tokens: https://github.com/settings/personal-access-tokens',
         `Learn more: ${FINE_GRAINED_LEARN_MORE_URL}`,
@@ -152,7 +152,7 @@ export function buildGithubEmptySummary(ctx: GithubEmptyResultContext): string {
       }
       return `0 issues involving ${ctx.login}`;
     case 'fine-grained':
-      return `0 issues — fine-grained PAT sees ${ctx.accessibleRepoCount} repos owned by ${ctx.login}`;
+      return `0 issues — fine-grained PAT for ${ctx.login} sees ${ctx.accessibleRepoCount} repos`;
     case 'app':
     case 'oauth':
     case 'unknown':

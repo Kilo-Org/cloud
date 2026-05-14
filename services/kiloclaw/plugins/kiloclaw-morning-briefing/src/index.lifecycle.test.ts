@@ -1053,7 +1053,7 @@ describe('morning briefing lifecycle', () => {
       expect(sent).toContain('switch to a classic PAT');
 
       expect(await readGithubStatusSummary(harness.stateDir)).toBe(
-        '0 issues — fine-grained PAT sees 3 repos owned by astormsocbot'
+        '0 issues — fine-grained PAT for astormsocbot sees 3 repos'
       );
     });
 

@@ -1,5 +1,5 @@
 {
-  "id": "8849ebdb-c8ff-4e07-bf2c-6c546b96d977",
+  "id": "5ab7fca8-8596-4582-a33e-f7f6e87bc6b6",
   "prevId": "8eaa5c7d-b58b-480b-b64d-ed68a514b2cd",
   "version": "7",
   "dialect": "postgresql",
@@ -14878,25 +14878,25 @@
         },
         "avg_input_tokens": {
           "name": "avg_input_tokens",
-          "type": "integer",
+          "type": "numeric(14, 6)",
           "primaryKey": false,
           "notNull": false
         },
         "avg_output_tokens": {
           "name": "avg_output_tokens",
-          "type": "integer",
+          "type": "numeric(14, 6)",
           "primaryKey": false,
           "notNull": false
         },
         "avg_cache_read_tokens": {
           "name": "avg_cache_read_tokens",
-          "type": "integer",
+          "type": "numeric(14, 6)",
           "primaryKey": false,
           "notNull": false
         },
         "avg_execution_ms": {
           "name": "avg_execution_ms",
-          "type": "integer",
+          "type": "numeric(14, 6)",
           "primaryKey": false,
           "notNull": false
         },

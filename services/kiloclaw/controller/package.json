@@ -3,10 +3,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "hono": "^4.12.18",
-    "zod": "4.3.6"
+    "hono": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": ">=24 <25"
+    "@types/node": "catalog:"
   }
 }

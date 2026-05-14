@@ -58,10 +58,11 @@ source ~/.zshrc
 
 ### pnpm
 
-The project uses [pnpm](https://pnpm.io/) as its package manager (version pinned in `package.json` `packageManager` field).
+The project uses [pnpm](https://pnpm.io/) as its package manager. Use Corepack so the active pnpm version matches the version pinned in `package.json` (`packageManager`).
 
 ```bash
-brew install pnpm
+corepack enable
+corepack prepare pnpm@11.1.1 --activate
 ```
 
 ### Docker

@@ -20,7 +20,7 @@
   "devDependencies": {
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^4.1.0"
+    "vitest": "catalog:"
   },
   "keywords": [
     "kiloclaw",

@@ -24,7 +24,7 @@
     "openclaw": ">=2026.3.24-beta.2"
   },
   "devDependencies": {
-    "esbuild": "^0.25.2",
-    "vitest": "^4.1.0"
+    "esbuild": "0.25.12",
+    "vitest": "catalog:"
   }
 }

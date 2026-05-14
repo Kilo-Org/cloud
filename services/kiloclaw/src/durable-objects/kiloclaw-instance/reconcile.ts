@@ -1323,7 +1323,7 @@ async function retryPendingDestroy(
   // recovery clones, originals that were never associated with the current
   // pendingDestroyVolumeId). Runs after the pending-pointer cleanup so the
   // primary destroy path is unaffected.
-  await tryDeleteOrphanVolumes(flyConfig, state, rctx);
+  await tryDeleteOrphanVolumes(flyConfig, ctx, state, rctx);
   await finalizeDestroyIfComplete(ctx, state, rctx, markDestroyedInPostgres);
 }
 
@@ -1529,22 +1529,29 @@ export async function tryDeleteVolume(
  * Best-effort sweep for volumes the DO has lost track of.
  *
  * `tryDeleteVolume()` only ever targets `state.pendingDestroyVolumeId`. If a
- * volume isn't there — because it was an earlier original whose pointer got
+ * volume isn't there because it was an earlier original whose pointer got
  * overwritten by a recovery clone, or a previous recovery clone that never
- * made it into the state — it survives the destroy flow forever.
+ * made it into the state, it survives the destroy flow forever.
  *
  * This sweep:
  *  - Runs only when the primary destroy pointers are clear (so it doesn't
  *    fight the main destroy path).
  *  - Calls `listVolumes` for the app.
  *  - Filters by exact name match against `volumeNameFromSandboxId(sandboxId)`.
- *    Critical: shared `acct-*` apps host multiple sandboxes; we must NOT touch
- *    volumes belonging to other sandboxes.
- *  - Skips `pending_destroy` (Fly is already reaping) and attached volumes
- *    (those need a machine destroy first, which the normal flow handles).
- *  - Best-effort destroy each. Errors are logged but don't fail the alarm.
+ *    Critical: see the safety assumption below.
+ *  - Destroys unattached matching volumes inline (best-effort).
+ *  - For matching volumes that are still attached to a machine: promotes the
+ *    first one into `pendingDestroyMachineId` / `pendingDestroyVolumeId` so
+ *    the next alarm's machine+volume destroy flow handles it. That promotion
+ *    is what keeps `finalizeDestroyIfComplete` from wiping DO state while
+ *    attached orphans still exist. Without it, attached orphans would be
+ *    skipped, finalize would run, and the DO would forget about them
+ *    permanently. Additional attached orphans get picked up on subsequent
+ *    alarms (one per alarm, since the pending pointers only hold one at a
+ *    time).
+ *  - Errors on individual deletes are logged but do not fail the alarm.
  *
- * Safety assumption — one sandbox per Fly app today:
+ * Safety assumption: one sandbox per Fly app today.
  *  - `ki_*` (instance-keyed) sandboxes route to `inst-{hash(instanceId)}` apps
  *    via `getAppKey()`, which is per-instance by construction.
  *  - Legacy (base64-encoded user UUID) sandboxes route to `acct-{hash(userId)}`
@@ -1563,6 +1570,7 @@ export async function tryDeleteVolume(
  */
 async function tryDeleteOrphanVolumes(
   flyConfig: FlyClientConfig,
+  ctx: DurableObjectState,
   state: InstanceMutableState,
   rctx: ReconcileContext
 ): Promise<void> {
@@ -1581,9 +1589,15 @@ async function tryDeleteOrphanVolumes(
     return;
   }
 
+  // First pass: destroy unattached matching orphans inline, record any
+  // attached orphan for promotion at the end. We want the inline deletes to
+  // happen regardless so we still make forward progress in this alarm.
+  let promoteVolumeId: string | null = null;
+  let promoteMachineId: string | null = null;
+
   for (const vol of volumes) {
     if (vol.name !== expectedName) continue;
-    // Fly is already tearing the volume down — let it finish.
+    // Fly is already tearing the volume down; let it finish.
     if (
       vol.state === 'pending_destroy' ||
       vol.state === 'destroying' ||
@@ -1592,12 +1606,15 @@ async function tryDeleteOrphanVolumes(
       continue;
     }
     if (vol.attached_machine_id) {
-      // Attached volumes need machine-destroy first. Skip here; the normal
-      // pending-destroy flow (or the volume janitor) will pick this up.
-      rctx.log('destroy_orphan_volume_skipped_attached', {
-        volume_id: vol.id,
-        attached_machine_id: vol.attached_machine_id,
-      });
+      // Attached orphan: the pending-destroy path knows how to handle this
+      // (destroy machine then volume, with retry+error tracking), so promote
+      // it into the primary pointers. Only the first attached orphan gets
+      // promoted in this alarm; subsequent ones are picked up after this
+      // pair is resolved.
+      if (!promoteVolumeId) {
+        promoteVolumeId = vol.id;
+        promoteMachineId = vol.attached_machine_id;
+      }
       continue;
     }
     try {
@@ -1610,6 +1627,29 @@ async function tryDeleteOrphanVolumes(
         error: err instanceof Error ? err.message : String(err),
       });
     }
+  }
+
+  if (promoteVolumeId && promoteMachineId) {
+    state.pendingDestroyMachineId = promoteMachineId;
+    state.pendingDestroyVolumeId = promoteVolumeId;
+    state.flyMachineId = promoteMachineId;
+    state.flyVolumeId = promoteVolumeId;
+    state.destroyVolumeAttempts = 0;
+    await ctx.storage.put(
+      storageUpdate(
+        syncProviderStateForStorage(state, {
+          pendingDestroyMachineId: promoteMachineId,
+          pendingDestroyVolumeId: promoteVolumeId,
+          flyMachineId: promoteMachineId,
+          flyVolumeId: promoteVolumeId,
+          destroyVolumeAttempts: 0,
+        })
+      )
+    );
+    rctx.log('destroy_orphan_volume_promoted_to_pending', {
+      volume_id: promoteVolumeId,
+      attached_machine_id: promoteMachineId,
+    });
   }
 }
 

@@ -1087,6 +1087,16 @@ describe('destroy error tracking', () => {
 });
 
 describe('destroy volume: max-retry abandon', () => {
+  // vi.clearAllMocks() in the global beforeEach clears call history but not
+  // implementations. Without this reset, a previous test in the file that
+  // used `.mockResolvedValue([volumes...])` on listVolumes would leak its
+  // mocked volumes into other tests, where the new orphan sweep would then
+  // pick them up and (e.g.) promote one into the pending pointers, preventing
+  // finalize from running.
+  beforeEach(() => {
+    (flyClient.listVolumes as Mock).mockResolvedValue([]);
+  });
+
   it('increments destroyVolumeAttempts on each failure and keeps pending state', async () => {
     const env = createFakeEnv();
     const { storage } = createInstance(createFakeStorage(), env);
@@ -1296,6 +1306,12 @@ describe('destroy volume: max-retry abandon', () => {
 });
 
 describe('orphan volume sweep', () => {
+  // Reset listVolumes so we never bleed into later tests outside this block;
+  // see the matching note in the abandon describe.
+  beforeEach(() => {
+    (flyClient.listVolumes as Mock).mockResolvedValue([]);
+  });
+
   it('destroys volumes that match the sandbox name when pendingDestroyVolumeId is clear', async () => {
     const env = createFakeEnv();
     const { storage } = createInstance(createFakeStorage(), env);
@@ -1338,7 +1354,7 @@ describe('orphan volume sweep', () => {
     expect(storage._store.size).toBe(0);
   });
 
-  it('skips volumes already in pending_destroy or attached to a machine', async () => {
+  it('skips volumes already in pending_destroy / destroying / destroyed states', async () => {
     const env = createFakeEnv();
     const { storage } = createInstance(createFakeStorage(), env);
     await seedProvisioned(storage, {
@@ -1358,10 +1374,10 @@ describe('orphan volume sweep', () => {
         region: 'iad',
       },
       {
-        id: 'vol-attached',
+        id: 'vol-fly-destroying',
         name: 'kiloclaw_sandbox_1',
-        state: 'attached',
-        attached_machine_id: 'machine-x',
+        state: 'destroying',
+        attached_machine_id: null,
         region: 'iad',
       },
     ]);
@@ -1369,9 +1385,83 @@ describe('orphan volume sweep', () => {
     const { instance } = createInstance(storage, env);
     await instance.alarm();
 
-    // Neither volume was destroyed — pending_destroy is being reaped by Fly,
-    // attached volumes are handled by the main destroy path / janitor.
+    // Fly is already tearing both down — no client-side delete needed.
     expect(flyClient.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('promotes the first attached orphan into pendingDestroy* so finalize does not skip it', async () => {
+    // This pins the fix for the gap where attached orphans (volumes that
+    // share our name but are bound to a machine the DO never tracked) were
+    // silently skipped, then finalize wiped DO state and the orphans leaked
+    // permanently. The sweep now promotes attached orphans into the primary
+    // pending pointers so the existing tryDeleteMachine + tryDeleteVolume
+    // flow handles them on the next alarm.
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: null,
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: null,
+    });
+
+    (flyClient.listVolumes as Mock).mockResolvedValue([
+      // Unattached orphan: destroyed inline on this alarm.
+      {
+        id: 'vol-orphan-unattached',
+        name: 'kiloclaw_sandbox_1',
+        state: 'created',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+      // Attached orphan: promoted to pending* for next alarm.
+      {
+        id: 'vol-orphan-attached',
+        name: 'kiloclaw_sandbox_1',
+        state: 'attached',
+        attached_machine_id: 'machine-orphan',
+        region: 'iad',
+      },
+      // Second attached orphan: not yet promoted (only one fits in the
+      // pending pointers); picked up after the first is resolved.
+      {
+        id: 'vol-orphan-attached-2',
+        name: 'kiloclaw_sandbox_1',
+        state: 'attached',
+        attached_machine_id: 'machine-orphan-2',
+        region: 'iad',
+      },
+    ]);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // Unattached orphan was destroyed inline.
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-orphan-unattached');
+    // Attached orphans were NOT destroyed directly (the existing pending
+    // destroy flow will handle them on subsequent alarms).
+    expect(flyClient.deleteVolume).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'vol-orphan-attached'
+    );
+
+    // The first attached orphan was promoted into the pending pointers.
+    // This is what prevents finalize from running and wiping state.
+    expect(storage._store.get('pendingDestroyMachineId')).toBe('machine-orphan');
+    expect(storage._store.get('pendingDestroyVolumeId')).toBe('vol-orphan-attached');
+    expect(storage._store.get('destroyVolumeAttempts')).toBe(0);
+
+    // Storage was NOT wiped (destroy did not finalize this alarm).
+    expect(storage._store.size).toBeGreaterThan(0);
+
+    // The promotion event was emitted with both ids attached.
+    const promoted = analyticsEventsByName(
+      env,
+      'reconcile.destroy_orphan_volume_promoted_to_pending'
+    );
+    expect(promoted).toHaveLength(1);
   });
 
   it('does not run when pendingDestroyVolumeId is still set', async () => {
@@ -7232,11 +7322,12 @@ describe('provision: instance feature flags', () => {
 });
 
 describe('auto-destroy stale provisioned instances', () => {
-  // Reset listMachines to return [] for each test in this block, since
-  // earlier metadata-recovery tests may have set it to return machines
-  // and vi.clearAllMocks() does not reset implementations.
+  // Reset listMachines + listVolumes to return [] for each test in this
+  // block, since earlier tests may have set them to return values and
+  // vi.clearAllMocks() does not reset implementations.
   beforeEach(() => {
     (flyClient.listMachines as Mock).mockResolvedValue([]);
+    (flyClient.listVolumes as Mock).mockResolvedValue([]);
   });
 
   function createInstanceWithPostgres(markImpl: () => Promise<void> = () => Promise.resolve()): {

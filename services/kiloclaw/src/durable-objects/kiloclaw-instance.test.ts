@@ -1248,6 +1248,31 @@ describe('destroy volume: max-retry abandon', () => {
     expect(storage._store.size).toBe(0);
   });
 
+  it('destroy() resets destroyVolumeAttempts so a previous cycles count does not bleed into a new destroy', async () => {
+    // Counter semantics are "consecutive failures on the current
+    // pendingDestroyVolumeId". A fresh destroy() invocation must start at 0
+    // even if the previous cycle's failures left the counter non-zero.
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage, {
+      // Simulate a stale counter from a previous (resolved) destroy cycle.
+      destroyVolumeAttempts: 42,
+    });
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    // First delete attempt fails so we can observe the post-destroy counter.
+    (flyClient.deleteVolume as Mock).mockRejectedValueOnce(
+      new FlyApiError('transient', 503, 'try again')
+    );
+
+    const { instance } = createInstance(storage, env);
+    await instance.destroy();
+
+    // Counter restarted at 0 for the new cycle and bumped to 1 by the single
+    // failed delete attempt — *not* 43.
+    expect(storage._store.get('destroyVolumeAttempts')).toBe(1);
+  });
+
   it('resets destroyVolumeAttempts when volume returns 404 (already gone)', async () => {
     const { storage } = createInstance();
     await seedProvisioned(storage, {

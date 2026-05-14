@@ -1543,6 +1543,23 @@ export async function tryDeleteVolume(
  *  - Skips `pending_destroy` (Fly is already reaping) and attached volumes
  *    (those need a machine destroy first, which the normal flow handles).
  *  - Best-effort destroy each. Errors are logged but don't fail the alarm.
+ *
+ * Safety assumption — one sandbox per Fly app today:
+ *  - `ki_*` (instance-keyed) sandboxes route to `inst-{hash(instanceId)}` apps
+ *    via `getAppKey()`, which is per-instance by construction.
+ *  - Legacy (base64-encoded user UUID) sandboxes route to `acct-{hash(userId)}`
+ *    apps with at most one legacy sandbox per user.
+ *  In both cases the app contains exactly one DO's sandbox, so any volume
+ *  whose name matches `volumeNameFromSandboxId(state.sandboxId)` is ours.
+ *
+ *  TODO(multi-instance): `volumeNameFromSandboxId()` truncates to 30 chars,
+ *  which for `ki_<32 hex>` IDs leaves only the first 18 UUID hex chars in the
+ *  name. If a future change ever places multiple instances inside the same
+ *  Fly app (e.g. a per-user app hosting many instance-keyed sandboxes), two
+ *  instances whose UUIDs share their first 18 hex chars would produce the
+ *  same volume name and this filter could match a sibling instance's volume.
+ *  Revisit this function (or remove the truncation) before such a migration
+ *  ships. Today the routing in `getAppKey()` makes that case unreachable.
  */
 async function tryDeleteOrphanVolumes(
   flyConfig: FlyClientConfig,

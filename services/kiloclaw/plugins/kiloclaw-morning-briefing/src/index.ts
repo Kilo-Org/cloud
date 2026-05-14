@@ -19,6 +19,15 @@ import {
 } from './cron-utils';
 import { extractBriefingArgsFromText } from './command-fallback-utils';
 import { type EnableInput, isValidTimezone, parseEnableArgs } from './enable-input-utils';
+import {
+  buildGithubEmptySectionLines,
+  buildGithubEmptySummary,
+  classifyGithubToken,
+  type GithubEmptyResultContext,
+  missingBriefingScopes,
+  parseOAuthScopesHeader,
+  readGithubTokenFromEnv,
+} from './github-utils';
 import { normalizeLinearIssues, summarizeLinearCallFailure } from './linear-utils';
 import { resolveNextReconcileAction } from './reconcile-queue-utils';
 import { normalizeWebResults } from './web-utils';
@@ -602,7 +611,7 @@ function normalizeGithubIssues(
     .filter(item => item.url.length > 0);
 }
 
-async function collectGithub(api: {
+type GithubApiRunner = {
   runtime: {
     system: {
       runCommandWithTimeout: (
@@ -611,7 +620,103 @@ async function collectGithub(api: {
       ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
     };
   };
-}): Promise<SourceCollectionResult> {
+};
+
+/**
+ * Best-effort diagnostics for the empty-result path. Runs lightweight
+ * `gh api` calls to figure out what token the user is on and what it can
+ * see, so the brief can render an actionable "no issues" message instead
+ * of a generic one. All failures here are absorbed into an 'unknown'
+ * fallback so a broken diagnostic doesn't break the brief.
+ */
+async function gatherGithubEmptyResultContext(
+  api: GithubApiRunner
+): Promise<GithubEmptyResultContext> {
+  const tokenType = classifyGithubToken(readGithubTokenFromEnv());
+
+  // `gh api -i user` returns the raw HTTP response: status line + headers
+  // + blank line + JSON body. We need both the body (for `.login`) and the
+  // `X-OAuth-Scopes` header (only meaningful for classic PATs).
+  let login: string | null = null;
+  let scopes: string[] = [];
+  try {
+    const { stdout, code } = await api.runtime.system.runCommandWithTimeout(
+      ['gh', 'api', '-i', 'user'],
+      { timeoutMs: 10_000 }
+    );
+    if (code === 0) {
+      // Split on the first blank line. The headers blob is everything
+      // before it; the JSON body is everything after.
+      const separatorMatch = /\r?\n\r?\n/.exec(stdout);
+      const headersBlob = separatorMatch ? stdout.slice(0, separatorMatch.index) : stdout;
+      const bodyText = separatorMatch
+        ? stdout.slice(separatorMatch.index + separatorMatch[0].length)
+        : '';
+      scopes = parseOAuthScopesHeader(headersBlob);
+      if (bodyText.trim().length > 0) {
+        try {
+          const parsed = JSON.parse(bodyText) as unknown;
+          if (
+            typeof parsed === 'object' &&
+            parsed !== null &&
+            'login' in parsed &&
+            typeof (parsed as { login: unknown }).login === 'string'
+          ) {
+            login = (parsed as { login: string }).login;
+          }
+        } catch {
+          // Body wasn't JSON; leave login null.
+        }
+      }
+    }
+  } catch {
+    // Network / spawn failure — fall through with login=null, scopes=[].
+  }
+
+  if (tokenType === 'classic' && login !== null) {
+    return {
+      tokenType: 'classic',
+      login,
+      scopes,
+      missingScopes: missingBriefingScopes(scopes),
+    };
+  }
+
+  if (tokenType === 'fine-grained' && login !== null) {
+    let accessibleRepoCount = 0;
+    try {
+      const { stdout, code } = await api.runtime.system.runCommandWithTimeout(
+        ['gh', 'api', 'user/repos', '--paginate', '--jq', '. | length'],
+        { timeoutMs: 15_000 }
+      );
+      if (code === 0) {
+        // `gh api --paginate --jq` emits one line per page. Sum them.
+        const total = stdout
+          .split(/\r?\n/)
+          .map(line => Number.parseInt(line.trim(), 10))
+          .filter(value => Number.isFinite(value))
+          .reduce((sum, value) => sum + value, 0);
+        if (Number.isFinite(total)) {
+          accessibleRepoCount = total;
+        }
+      }
+    } catch {
+      // Leave accessibleRepoCount=0 — the message still reads sensibly.
+    }
+    return {
+      tokenType: 'fine-grained',
+      login,
+      accessibleRepoCount,
+    };
+  }
+
+  return {
+    tokenType: tokenType === 'classic' || tokenType === 'fine-grained' ? 'unknown' : tokenType,
+    login,
+  };
+}
+
+async function collectGithub(api: GithubApiRunner): Promise<SourceCollectionResult> {
   const readiness = await resolveGithubReady(api);
   if (!readiness.configured) {
     return {
@@ -630,7 +735,14 @@ async function collectGithub(api: {
         'gh',
         'search',
         'issues',
-        'is:open sort:updated-desc',
+        '--state',
+        'open',
+        '--involves',
+        '@me',
+        '--sort',
+        'updated',
+        '--order',
+        'desc',
         '--limit',
         '12',
         '--json',
@@ -640,12 +752,13 @@ async function collectGithub(api: {
     );
     const items = normalizeGithubIssues(JSON.parse(stdout));
     if (items.length === 0) {
+      const ctx = await gatherGithubEmptyResultContext(api);
       return {
         source: 'github',
         configured: true,
         ok: true,
-        summary: 'No open issues found in accessible repositories',
-        sectionLines: ['- No open issues found.'],
+        summary: buildGithubEmptySummary(ctx),
+        sectionLines: buildGithubEmptySectionLines(ctx),
       };
     }
     const lines = items.slice(0, 8).map(item => {

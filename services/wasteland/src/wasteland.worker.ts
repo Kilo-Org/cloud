@@ -20,6 +20,16 @@ import { getWastelandDOStub } from './dos/Wasteland.do';
 import { getWastelandContainerStub } from './dos/WastelandContainer.do';
 import * as wantedBoard from './wanted-board/wanted-board-ops';
 import { WantedBoardOpError } from './wanted-board/wanted-board-ops';
+import {
+  handleWasmBrowse,
+  handleWasmClaim,
+  handleWasmUnclaim,
+  handleWasmDone,
+  handleWasmPost,
+  handleWasmAccept,
+  handleWasmReject,
+  handleWasmClose,
+} from './handlers/wasm-browse.handler';
 
 // ── DO Exports ──────────────────────────────────────────────────────────
 // Wrangler requires these exports to match the class_name bindings in wrangler.jsonc.
@@ -244,6 +254,57 @@ app.get('/debug/wastelands/:wastelandId/browse', async c => {
     return c.json({ itemCount: items.length, items });
   } catch (err) {
     return debugErrorResponse(c, err);
+  }
+});
+
+// POC: browse via libwl WASM (bypasses container, runs the Go SDK
+// in-process via syscall/js). userId via query param.
+//
+// NOTE: deliberately mounted under `/poc/wasm/...` (NOT `/debug/...`)
+// so the local CF Access dev bypass isn't on the critical path for
+// POC validation. Move under `/debug/wasm/...` once the POC is
+// validated and we wire up proper auth.
+app.get('/poc/wasm/wastelands/:wastelandId/browse', c => handleWasmBrowse(c, c.req.param()));
+
+// POC mutation endpoints — JSON body { userId, itemId, ...op-specific }.
+// These all proxy to the shared `wantedBoard.*` functions which now run
+// the wasm path. Removed once the production tRPC routes have soaked.
+app.post('/poc/wasm/wastelands/:wastelandId/claim', c => handleWasmClaim(c, c.req.param()));
+app.post('/poc/wasm/wastelands/:wastelandId/unclaim', c => handleWasmUnclaim(c, c.req.param()));
+app.post('/poc/wasm/wastelands/:wastelandId/done', c => handleWasmDone(c, c.req.param()));
+app.post('/poc/wasm/wastelands/:wastelandId/post', c => handleWasmPost(c, c.req.param()));
+app.post('/poc/wasm/wastelands/:wastelandId/accept', c => handleWasmAccept(c, c.req.param()));
+app.post('/poc/wasm/wastelands/:wastelandId/reject', c => handleWasmReject(c, c.req.param()));
+app.post('/poc/wasm/wastelands/:wastelandId/close', c => handleWasmClose(c, c.req.param()));
+
+// POC helper: list members of a wasteland so a tester can pick a
+// userId that has stored credentials. Same auth caveat as above —
+// this is unauthenticated for POC convenience and goes away with the
+// rest of /poc/* once we're done.
+app.get('/poc/wasm/wastelands/:wastelandId/members', async c => {
+  const wastelandId = c.req.param('wastelandId');
+  const doStub = getWastelandDOStub(c.env, wastelandId);
+  const members = await doStub.listMembers();
+  const config = await doStub.getConfig();
+  return c.json({ wastelandId, config, members });
+});
+
+// POC helper: run the existing container-backed browse (same code path
+// the production tRPC router uses). Lets us A/B against
+// /poc/wasm/wastelands/:id/browse to confirm the token + upstream are
+// otherwise valid. Goes away with the rest of /poc/*.
+app.get('/poc/wasm/wastelands/:wastelandId/browse-via-container', async c => {
+  const wastelandId = c.req.param('wastelandId');
+  const userId = c.req.query('userId');
+  if (!userId) return c.json({ error: 'Missing userId query param' }, 400);
+  try {
+    const items = await wantedBoard.browseWantedBoard(c.env, wastelandId, userId);
+    return c.json({ source: 'container', itemCount: items.length, items });
+  } catch (err) {
+    if (err instanceof WantedBoardOpError) {
+      return c.json({ error: err.message, code: err.code }, 502);
+    }
+    throw err;
   }
 });
 

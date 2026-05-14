@@ -14,6 +14,7 @@ import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
 import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.util';
 import { resolveSecret } from '../util/secret.util';
 import { meterEvent } from '../util/billing.util';
+import { fetchFreshDoltHubToken } from '../util/dolthub-token.util';
 import * as wantedBoard from '../wanted-board/wanted-board-ops';
 import { WantedBoardOpError } from '../wanted-board/wanted-board-ops';
 import * as doltApi from '../util/dolthub-api.util';
@@ -118,6 +119,17 @@ function wantedBoardErrorToTRPC(err: unknown): never {
  * and any non-admin procedure that needs a DoltHub REST API call on the
  * caller's behalf (listMyPendingClaims). Admin-only procedures enforce
  * `isUpstreamAdmin` themselves — the name is historical.
+ *
+ * Token resolution order mirrors `wanted-board-ops.loadContext`:
+ *
+ * 1. **Fresh OAuth token from the web app** via the internal token
+ *    endpoint, which transparently refreshes via OAuth refresh_token.
+ * 2. **Locally encrypted credential** as a fallback for users who
+ *    connected via the manual API token path (production), and for
+ *    transient failures of the fresh-token path.
+ *
+ * The local credential row is also the source of `is_upstream_admin`
+ * and `rig_handle`, which are not exposed by the fresh-token endpoint.
  */
 async function loadAdminContext(
   env: Env,
@@ -132,7 +144,34 @@ async function loadAdminContext(
       message: 'Wasteland has no DoltHub upstream configured',
     });
   }
+
+  const fresh = await fetchFreshDoltHubToken(env, { userId });
   const credential = await doStub.getCredential(userId);
+
+  // Resolve the rig handle. Falls back to the DoltHub username (from
+  // either source) so OAuth-only users still get a non-UUID handle.
+  const dolthubOrg =
+    (fresh.status === 'ok' ? fresh.data.dolthubUsername : null) ?? credential?.dolthub_org ?? null;
+  const rigHandle = credential?.rig_handle ?? dolthubOrg ?? userId;
+  const isUpstreamAdmin = credential?.is_upstream_admin ?? false;
+
+  if (fresh.status === 'ok') {
+    return {
+      token: fresh.data.token,
+      upstream: config.dolthub_upstream,
+      isUpstreamAdmin,
+      rigHandle,
+    };
+  }
+
+  if (fresh.status === 'unavailable') {
+    console.warn('[loadAdminContext] fresh DoltHub token unavailable, falling back', {
+      wastelandId,
+      userId,
+      reason: fresh.reason,
+    });
+  }
+
   if (!credential) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
@@ -152,7 +191,7 @@ async function loadAdminContext(
     token,
     upstream: config.dolthub_upstream,
     isUpstreamAdmin: credential.is_upstream_admin,
-    rigHandle: credential.rig_handle ?? credential.dolthub_org,
+    rigHandle,
   };
 }
 

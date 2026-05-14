@@ -2718,8 +2718,8 @@ describe('handleKiloClawSubscriptionCreated', () => {
     expect(row.status).toBe('active');
   });
 
-  it('records the Stripe price version when current checkout reuses a canceled legacy row', async () => {
-    await createWebhookAnchor({ plan: 'standard', status: 'canceled' });
+  it('does not mutate a canceled legacy row when current checkout points at it', async () => {
+    const instance = await createWebhookAnchor({ plan: 'standard', status: 'canceled' });
 
     const subscription = makeStripeSubscription({
       id: 'sub_current_after_legacy_cancel',
@@ -2727,6 +2727,7 @@ describe('handleKiloClawSubscriptionCreated', () => {
         type: 'kiloclaw',
         plan: 'standard',
         kiloUserId: user.id,
+        instanceId: instance.id,
       },
       status: 'active',
       priceId: 'price_current_standard',
@@ -2743,10 +2744,14 @@ describe('handleKiloClawSubscriptionCreated', () => {
       .where(eq(kiloclaw_subscriptions.user_id, user.id))
       .limit(1);
 
-    expect(row.stripe_subscription_id).toBe('sub_current_after_legacy_cancel');
-    expect(row.plan).toBe('standard');
-    expect(row.status).toBe('active');
-    expect(row.kiloclaw_price_version).toBe(CURRENT_KILOCLAW_PRICE_VERSION);
+    expect(row).toEqual(
+      expect.objectContaining({
+        stripe_subscription_id: null,
+        plan: 'standard',
+        status: 'canceled',
+        kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+      })
+    );
   });
 
   it('quarantines subscription.created when Stripe price version conflicts with a live lineage', async () => {

@@ -851,10 +851,23 @@ export async function handleKiloClawSubscriptionCreated(params: {
 
     const existingRow = resolvedTarget.subscription;
 
+    if (existingRow.status === 'canceled') {
+      logQuarantinedStripeEvent('subscription_created_canceled_lineage_target', {
+        stripe_event_id: eventId,
+        stripe_subscription_id: subscription.id,
+        subscription_id: existingRow.id,
+        user_id: kiloUserId,
+        instance_id: existingRow.instance_id,
+        metadata_instance_id: metadata.instanceId,
+        row_price_version: existingRow.kiloclaw_price_version,
+        stripe_price_version: stripePriceVersion,
+      });
+      return;
+    }
+
     if (
       existingRow.stripe_subscription_id !== null &&
-      existingRow.stripe_subscription_id !== subscription.id &&
-      existingRow.status !== 'canceled'
+      existingRow.stripe_subscription_id !== subscription.id
     ) {
       logWarning(
         'Ignoring stale subscription.created — instance already has a different subscription',
@@ -873,7 +886,6 @@ export async function handleKiloClawSubscriptionCreated(params: {
     const incomingPriceVersion = stripePriceVersion ?? existingRow.kiloclaw_price_version;
     if (
       !rowIsHybrid &&
-      existingRow.status !== 'canceled' &&
       stripePriceVersion &&
       stripePriceVersion !== existingRow.kiloclaw_price_version
     ) {
@@ -893,9 +905,7 @@ export async function handleKiloClawSubscriptionCreated(params: {
       existingRow.trial_started_at !== null || existingRow.trial_ends_at !== null;
     convertedFromTrial =
       existingRow.status === 'trialing' ||
-      (existingRow.status !== 'canceled' &&
-        retainsTrialHistory &&
-        existingRow.stripe_subscription_id === subscription.id);
+      (retainsTrialHistory && existingRow.stripe_subscription_id === subscription.id);
     resolvedInstanceId = existingRow.instance_id ?? undefined;
     const [beforeSubscription] = await tx
       .select()

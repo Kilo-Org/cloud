@@ -68,6 +68,36 @@ describe('normalizeLinearIssues', () => {
     expect(issue.dueDate).toBeUndefined();
   });
 
+  it('rejects dueDate values that are not YYYY-MM-DD', () => {
+    const [issue] = normalizeLinearIssues({
+      issues: [
+        {
+          id: 'KIL-9',
+          title: 'Bad date',
+          status: 'Todo',
+          url: 'https://linear.app/x/issue/KIL-9',
+          dueDate: '2026/05/15',
+        },
+      ],
+    });
+    expect(issue.dueDate).toBeUndefined();
+  });
+
+  it('rejects an empty-string dueDate', () => {
+    const [issue] = normalizeLinearIssues({
+      issues: [
+        {
+          id: 'KIL-10',
+          title: 'Empty date',
+          status: 'Todo',
+          url: 'https://linear.app/x/issue/KIL-10',
+          dueDate: '',
+        },
+      ],
+    });
+    expect(issue.dueDate).toBeUndefined();
+  });
+
   it('drops malformed labels and priority entries', () => {
     const [issue] = normalizeLinearIssues({
       issues: [
@@ -196,6 +226,12 @@ describe('formatLinearIssueLine', () => {
     const line = formatLinearIssueLine(buildIssue({ dueDate: '2026-05-15' }), true);
     expect(line).toContain('(due 2026-05-15)');
     expect(line).not.toContain('updated');
+  });
+
+  it('trims a full ISO updatedAt timestamp down to YYYY-MM-DD', () => {
+    const line = formatLinearIssueLine(buildIssue({ updatedAt: '2026-05-14T23:13:00.450Z' }), true);
+    expect(line).toContain('updated 2026-05-14');
+    expect(line).not.toContain('T23:13:00');
   });
 });
 

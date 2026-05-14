@@ -51,7 +51,13 @@ export function normalizeLinearIssues(payload: unknown): LinearIssueSummary[] {
       updatedAt: typeof issue.updatedAt === 'string' ? issue.updatedAt : undefined,
       priority: normalizePriority(issue.priority),
       labels: normalizeLabels(issue.labels),
-      dueDate: typeof issue.dueDate === 'string' ? issue.dueDate : undefined,
+      // dueDate is contracted as YYYY-MM-DD in `LinearIssueSummary`. Enforce
+      // the shape on ingest so malformed values from the API can't leak into
+      // the rendered brief (e.g. "due not-a-date").
+      dueDate:
+        typeof issue.dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(issue.dueDate)
+          ? issue.dueDate
+          : undefined,
     }))
     .filter(issue => issue.id.length > 0);
 }
@@ -104,15 +110,25 @@ export function formatLinearIssueLine(
   briefHasHighSignal: boolean
 ): string {
   const badgeParts: string[] = [];
-  if (shouldShowPriorityBadge(issue, briefHasHighSignal) && issue.priority !== undefined) {
-    badgeParts.push(issue.priority.name);
+  // Bind priority into a local so the narrowing flows through `priority.name`
+  // below without a non-null assertion. shouldShowPriorityBadge already
+  // returns false when priority is undefined, but the local + explicit
+  // check keep the formatter readable on its own.
+  const priority = issue.priority;
+  if (priority !== undefined && shouldShowPriorityBadge(issue, briefHasHighSignal)) {
+    badgeParts.push(priority.name);
   }
   badgeParts.push(...issue.labels);
   const badge = badgeParts.length > 0 ? ` [${badgeParts.join(', ')}]` : '';
 
   const suffixParts: string[] = [];
   if (issue.dueDate) suffixParts.push(`due ${issue.dueDate}`);
-  if (issue.updatedAt) suffixParts.push(`updated ${issue.updatedAt}`);
+  if (issue.updatedAt) {
+    // Linear's API returns full ISO timestamps (e.g. 2026-05-14T23:13:00.450Z).
+    // The brief reads more naturally as a date; slice the first 10 chars.
+    // Already-YYYY-MM-DD inputs pass through unchanged.
+    suffixParts.push(`updated ${issue.updatedAt.slice(0, 10)}`);
+  }
   const suffix = suffixParts.length > 0 ? ` (${suffixParts.join(', ')})` : '';
 
   return `- [${issue.id}](${issue.url})${badge} ${issue.title} - ${issue.status}${suffix}`;

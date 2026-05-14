@@ -1,6 +1,7 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { model_eval_ingest } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { recomputeModelStatsKiloBench } from './recompute.js';
 import { PromotionRecordsSchema, type PromotionRecordInput } from './promotion-record.js';
 
@@ -11,6 +12,8 @@ type PromotionIdentity = {
   model: string;
   variant: string | null;
 };
+
+const PromotionIdentityKeySchema = z.tuple([z.string(), z.string(), z.string().nullable()]);
 
 export type SyncFromBenchResult = {
   inserted: number;
@@ -25,21 +28,8 @@ function encodePromotionIdentity(identity: PromotionIdentity): string {
 }
 
 function decodePromotionIdentity(value: string): PromotionIdentity {
-  const parsed: unknown = JSON.parse(value);
-  if (
-    !Array.isArray(parsed) ||
-    typeof parsed[0] !== 'string' ||
-    typeof parsed[1] !== 'string' ||
-    (parsed[2] !== null && typeof parsed[2] !== 'string')
-  ) {
-    throw new Error('Invalid promotion identity key');
-  }
-
-  return {
-    provider: parsed[0],
-    model: parsed[1],
-    variant: parsed[2],
-  };
+  const [provider, model, variant] = PromotionIdentityKeySchema.parse(JSON.parse(value));
+  return { provider, model, variant };
 }
 
 async function getPromotionWatermark(db: WorkerDb): Promise<number> {

@@ -49,7 +49,7 @@ function createDb(options: {
 
   const execute = vi.fn(async () => ({ rows: options.rows }));
   const updateValues: unknown[] = [];
-  const update = vi.fn(() => ({
+  const updateQuery = vi.fn(() => ({
     set: (values: unknown) => {
       updateValues.push(values);
       return {
@@ -59,10 +59,10 @@ function createDb(options: {
   }));
 
   return {
-    db: { select, execute, update },
+    db: { select, execute, update: updateQuery },
     select,
     execute,
-    update,
+    updateQuery,
     updateValues,
   };
 }
@@ -138,7 +138,7 @@ describe('recomputeModelStatsKiloBench', () => {
     expect(updated).toBe(true);
     expect(db.select).toHaveBeenCalledTimes(1);
     expect(db.execute).toHaveBeenCalledTimes(1);
-    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(db.updateQuery).toHaveBeenCalledTimes(1);
   });
 
   it('normalizes bench kilo model identifiers to OpenRouter ids', async () => {
@@ -155,7 +155,7 @@ describe('recomputeModelStatsKiloBench', () => {
 
     expect(updated).toBe(true);
     expect(db.select).toHaveBeenCalledTimes(1);
-    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(db.updateQuery).toHaveBeenCalledTimes(1);
   });
 
   it('falls back from a missing variant model to the unspecified base model', async () => {
@@ -173,7 +173,7 @@ describe('recomputeModelStatsKiloBench', () => {
     expect(updated).toBe(true);
     expect(db.select).toHaveBeenCalledTimes(2);
     expect(db.execute).toHaveBeenCalledTimes(1);
-    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(db.updateQuery).toHaveBeenCalledTimes(1);
   });
 
   it('logs and skips cache writes when no model stats target exists', async () => {
@@ -187,7 +187,7 @@ describe('recomputeModelStatsKiloBench', () => {
     });
 
     expect(updated).toBe(false);
-    expect(db.update).not.toHaveBeenCalled();
+    expect(db.updateQuery).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledTimes(1);
   });
 });

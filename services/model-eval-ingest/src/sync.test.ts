@@ -36,13 +36,20 @@ function promotion(overrides: Partial<PromotionRecord> = {}): PromotionRecord {
   };
 }
 
-function createEnv(records: PromotionRecord[]): CloudflareEnv {
+function createEnv(records: PromotionRecord[]): {
+  env: CloudflareEnv;
+  listPromotions: ReturnType<typeof vi.fn>;
+} {
+  const listPromotions = vi.fn(async () => records);
   return {
-    HYPERDRIVE: { connectionString: 'postgres://test' },
-    BENCH_DASHBOARD: {
-      listPromotions: vi.fn(async () => records),
-      getPromotion: vi.fn(async () => null),
+    env: {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      BENCH_DASHBOARD: {
+        listPromotions,
+        getPromotion: vi.fn(async () => null),
+      },
     },
+    listPromotions,
   };
 }
 
@@ -98,13 +105,13 @@ describe('syncFromBench', () => {
         task_source: 'swebench-verified',
       }),
     ];
-    const env = createEnv(records);
+    const { env, listPromotions } = createEnv(records);
     const { db, insertedRows } = createDb();
     vi.mocked(getWorkerDb).mockReturnValue(db as unknown as ReturnType<typeof getWorkerDb>);
 
     const result = await syncFromBench(env);
 
-    expect(env.BENCH_DASHBOARD.listPromotions).toHaveBeenCalledWith({
+    expect(listPromotions).toHaveBeenCalledWith({
       sinceMs: 0,
       limit: 1_000,
     });
@@ -115,7 +122,7 @@ describe('syncFromBench', () => {
 
   it('does not duplicate ingest rows during an idempotent rerun', async () => {
     const records = [promotion()];
-    const env = createEnv(records);
+    const { env } = createEnv(records);
     const dbFakes = createDb();
     vi.mocked(getWorkerDb).mockReturnValue(dbFakes.db as unknown as ReturnType<typeof getWorkerDb>);
 
@@ -129,7 +136,7 @@ describe('syncFromBench', () => {
   });
 
   it('preserves fractional score aggregates in the audit row insert', async () => {
-    const env = createEnv([promotion({ total_score: 1.5, overall_score: 0.375 })]);
+    const { env } = createEnv([promotion({ total_score: 1.5, overall_score: 0.375 })]);
     const { db, insertedRows } = createDb();
     vi.mocked(getWorkerDb).mockReturnValue(db as unknown as ReturnType<typeof getWorkerDb>);
 
@@ -145,7 +152,7 @@ describe('syncFromBench', () => {
   });
 
   it('accepts bench legacy promoter placeholders for audit rows', async () => {
-    const env = createEnv([promotion({ promoted_by_email: 'unknown' })]);
+    const { env } = createEnv([promotion({ promoted_by_email: 'unknown' })]);
     const { db, insertedRows } = createDb();
     vi.mocked(getWorkerDb).mockReturnValue(db as unknown as ReturnType<typeof getWorkerDb>);
 
@@ -155,13 +162,13 @@ describe('syncFromBench', () => {
   });
 
   it('requests bench promotions from the persisted promoted_at watermark', async () => {
-    const env = createEnv([]);
+    const { env, listPromotions } = createEnv([]);
     const { db } = createDb({ maxPromotedAtMs: 1_778_620_123_456 });
     vi.mocked(getWorkerDb).mockReturnValue(db as unknown as ReturnType<typeof getWorkerDb>);
 
     const result = await syncFromBench(env);
 
-    expect(env.BENCH_DASHBOARD.listPromotions).toHaveBeenCalledWith({
+    expect(listPromotions).toHaveBeenCalledWith({
       sinceMs: 1_778_620_123_456,
       limit: 1_000,
     });

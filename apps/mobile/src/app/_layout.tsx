@@ -31,6 +31,7 @@ import { Toaster } from 'sonner-native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
+import { shouldStartAppsFlyer } from '@/lib/appsflyer-consent';
 import { initAppsFlyer } from '@/lib/appsflyer';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { hasAcceptedConsent, subscribeToConsentChanges } from '@/lib/consent';
@@ -161,6 +162,27 @@ function RootLayoutNav() {
 
     return unsubscribe;
   }, [token, userId]);
+
+  useEffect(() => {
+    if (
+      !shouldStartAppsFlyer({
+        hasToken: token != null,
+        consentChecked,
+        needsConsent,
+      })
+    ) {
+      return;
+    }
+
+    async function startAppsFlyer() {
+      if (Platform.OS === 'ios') {
+        await requestTrackingPermissionsAsync();
+      }
+      initAppsFlyer();
+    }
+
+    void startAppsFlyer();
+  }, [token, consentChecked, needsConsent]);
 
   useEffect(() => {
     if (isLoading) {
@@ -302,16 +324,6 @@ function RootLayout() {
       navigationIntegration.registerNavigationContainer(ref);
     }
   }, [ref]);
-
-  useEffect(() => {
-    async function startAppsFlyer() {
-      if (Platform.OS === 'ios') {
-        await requestTrackingPermissionsAsync();
-      }
-      initAppsFlyer();
-    }
-    void startAppsFlyer();
-  }, []);
 
   useEffect(() => {
     const subscription = setupNotificationResponseHandler();

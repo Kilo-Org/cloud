@@ -33,14 +33,14 @@ describe('consent storage', () => {
       await import('./consent');
 
     await acceptConsent('user-1');
-    expect(store.get('consent-accepted:user-1')).toBe(String(CURRENT_CONSENT_VERSION));
+    expect(store.get('consent-accepted-user-1')).toBe(String(CURRENT_CONSENT_VERSION));
     expect(await hasAcceptedConsent('user-1')).toBe(true);
   });
 
   it('returns false when the stored consent version is old', async () => {
     const { hasAcceptedConsent } = await import('./consent');
 
-    store.set('consent-accepted:user-1', '0');
+    store.set('consent-accepted-user-1', '0');
 
     expect(await hasAcceptedConsent('user-1')).toBe(false);
   });
@@ -48,7 +48,7 @@ describe('consent storage', () => {
   it('returns false for old unversioned consent records', async () => {
     const { hasAcceptedConsent } = await import('./consent');
 
-    store.set('consent-accepted:user-1', 'true');
+    store.set('consent-accepted-user-1', 'true');
 
     expect(await hasAcceptedConsent('user-1')).toBe(false);
   });
@@ -66,5 +66,33 @@ describe('consent storage', () => {
     await acceptConsent('user-1');
     await revokeConsent('user-1');
     expect(await hasAcceptedConsent('user-1')).toBe(false);
+  });
+
+  it('notifies listeners when consent changes for a user', async () => {
+    const { acceptConsent, revokeConsent, subscribeToConsentChanges } = await import('./consent');
+    const changes: string[] = [];
+
+    subscribeToConsentChanges(change => {
+      changes.push(`${change.userId}:${change.hasAccepted ? 'accepted' : 'revoked'}`);
+    });
+
+    await acceptConsent('user-1');
+    await revokeConsent('user-1');
+
+    expect(changes).toEqual(['user-1:accepted', 'user-1:revoked']);
+  });
+
+  it('stops notifying unsubscribed consent listeners', async () => {
+    const { acceptConsent, subscribeToConsentChanges } = await import('./consent');
+    const changes: string[] = [];
+
+    const unsubscribe = subscribeToConsentChanges(change => {
+      changes.push(change.userId);
+    });
+
+    unsubscribe();
+    await acceptConsent('user-1');
+
+    expect(changes).toEqual([]);
   });
 });

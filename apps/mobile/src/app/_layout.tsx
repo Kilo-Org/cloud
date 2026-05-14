@@ -29,7 +29,7 @@ import { Toaster } from 'sonner-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { initAppsFlyer } from '@/lib/appsflyer';
-import { hasAcceptedConsent } from '@/lib/consent';
+import { hasAcceptedConsent, subscribeToConsentChanges } from '@/lib/consent';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
@@ -132,6 +132,23 @@ function RootLayoutNav() {
     return () => {
       cancelled = true;
     };
+  }, [token, userId]);
+
+  useEffect(() => {
+    if (!token || !userId) {
+      return undefined;
+    }
+
+    const unsubscribe = subscribeToConsentChanges(change => {
+      if (change.userId !== userId) {
+        return;
+      }
+
+      setNeedsConsent(!change.hasAccepted);
+      setConsentChecked(true);
+    });
+
+    return unsubscribe;
   }, [token, userId]);
 
   useEffect(() => {

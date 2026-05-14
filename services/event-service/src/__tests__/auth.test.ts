@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { signKiloToken } from '@kilocode/worker-utils';
-import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
+import { getWorkerDb } from '@kilocode/db/client';
 import { authenticateToken } from '../auth';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 const currentPepperByUserId = new Map<string, string | null>();
 const getWorkerDbMock = vi.mocked(getWorkerDb);
 
-function createPepperDbMock(): WorkerDb {
+function createPepperDbMock(): ReturnType<typeof getWorkerDb> {
   return {
     select: () => ({
       from: () => ({
@@ -16,7 +16,7 @@ function createPepperDbMock(): WorkerDb {
         }),
       }),
     }),
-  };
+  } as unknown as ReturnType<typeof getWorkerDb>;
 }
 
 function makeEnv(): Env {

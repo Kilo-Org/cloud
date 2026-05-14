@@ -882,7 +882,7 @@ export function calculateKiloExclusiveCost_mUsd(
   );
 }
 
-async function processTokenData(
+export async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
 ) {

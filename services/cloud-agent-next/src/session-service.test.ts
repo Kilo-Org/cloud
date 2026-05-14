@@ -355,6 +355,54 @@ describe('SessionService', () => {
       expect(result.context.sessionId).toBe(sessionId);
     });
 
+    it('refreshes upstream branch for warm prepared resumes', async () => {
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ success: true, stdout: 'exists' }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandbox = {
+        createSession: vi.fn().mockResolvedValue(fakeSession),
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      const sessionId: SessionId = 'agent_test_upstream_resume';
+      const metadata: CloudAgentSessionState = {
+        version: 123456789,
+        sessionId,
+        orgId: 'org',
+        userId: 'user',
+        timestamp: 123456789,
+        githubRepo: 'acme/repo',
+        upstreamBranch: 'refs/pull/42/head',
+      };
+      const { env: testEnv } = createMetadataEnv({
+        getMetadata: vi.fn().mockResolvedValue(metadata),
+      });
+
+      const service = new SessionService();
+      await service.resume({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        env: testEnv,
+      });
+
+      expect(mockManageBranch).toHaveBeenCalledWith(
+        fakeSession,
+        `/workspace/org/user/sessions/${sessionId}`,
+        'refs/pull/42/head',
+        true
+      );
+      expect(mockRestoreWorkspace).not.toHaveBeenCalled();
+    });
+
     it('uses a fresh GitHub token for GH_TOKEN when metadata has no token', async () => {
       const fakeSession = {
         exec: vi.fn().mockResolvedValue({ success: true, stdout: 'exists' }),

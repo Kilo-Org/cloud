@@ -13,6 +13,7 @@ const mockFindPreviousCompletedReview = jest.fn();
 const mockUpdateRepositoryReviewInstructionsMetadata = jest.fn();
 const mockGenerateReviewPrompt = jest.fn();
 
+import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import type * as CodeReviewsDb from '@/lib/code-reviews/db/code-reviews';
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
@@ -75,7 +76,9 @@ const baseAgentConfig = {
   custom_instructions: '',
   model_slug: 'test-model',
   max_review_time_minutes: 30,
-} as const;
+  repository_selection_mode: 'all',
+  gate_threshold: 'off',
+} satisfies CodeReviewAgentConfig;
 
 function defineIntegration(
   userId: string,
@@ -117,7 +120,7 @@ function defineReview(
   };
 }
 
-describe('prepareReviewPayload REVIEW.md support', () => {
+describe('prepareReviewPayload', () => {
   let testUser: User;
   let integration: PlatformIntegration;
   let gitlabIntegration: PlatformIntegration;
@@ -175,7 +178,7 @@ describe('prepareReviewPayload REVIEW.md support', () => {
   afterEach(async () => {
     await db
       .delete(cloud_agent_code_reviews)
-      .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
+      .where(eq(cloud_agent_code_reviews.owned_by_user_id, testUser.id));
     mockGenerateGitHubInstallationToken.mockReset();
     mockFindKiloReviewComment.mockReset();
     mockFetchPRInlineComments.mockReset();
@@ -461,5 +464,73 @@ describe('prepareReviewPayload REVIEW.md support', () => {
         ),
       })
     );
+  });
+
+  it('uses the stable GitHub pull ref for agent checkout when the stored head_ref is a branch name', async () => {
+    const prNumber = 1234;
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, null, { pr_number: prNumber }))
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected inserted review');
+    }
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: {
+        type: 'user',
+        id: testUser.id,
+        userId: testUser.id,
+      },
+      agentConfig: {
+        config: baseAgentConfig,
+      },
+      platform: 'github',
+    });
+
+    expect(payload.sessionInput).toMatchObject({
+      githubRepo: REPO,
+      platform: 'github',
+      upstreamBranch: 'refs/pull/1234/head',
+    });
+  });
+
+  it('does not continue previous cloud-agent sessions for GitHub pull-ref reviews', async () => {
+    const prNumber = 1235;
+    mockFindPreviousCompletedReview.mockResolvedValueOnce({
+      head_sha: 'sha-previous',
+      session_id: 'previous-cloud-agent-session',
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, null, { pr_number: prNumber }))
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected inserted review');
+    }
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: {
+        type: 'user',
+        id: testUser.id,
+        userId: testUser.id,
+      },
+      agentConfig: {
+        config: baseAgentConfig,
+      },
+      platform: 'github',
+    });
+
+    expect(payload.previousCloudAgentSessionId).toBeUndefined();
+    expect(payload.sessionInput).toMatchObject({
+      githubRepo: REPO,
+      platform: 'github',
+      upstreamBranch: 'refs/pull/1235/head',
+    });
   });
 });

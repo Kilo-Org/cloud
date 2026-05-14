@@ -50,7 +50,10 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   updateCheckRun: (...args: unknown[]) => mockUpdateCheckRun(...args),
 }));
 
-import { resolvePullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
+import {
+  getGitHubPullRequestCheckoutRef,
+  resolvePullRequestCheckoutRef,
+} from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
 import {
   handlePullRequest,
   shouldSkipSynchronizeForMergeCommit,
@@ -113,7 +116,11 @@ beforeEach(() => {
 });
 
 describe('resolvePullRequestCheckoutRef', () => {
-  it('uses head.ref for same-repo PRs', () => {
+  it('builds GitHub synthetic pull refs', () => {
+    expect(getGitHubPullRequestCheckoutRef(123)).toBe('refs/pull/123/head');
+  });
+
+  it('uses refs/pull/<number>/head for same-repo PRs', () => {
     const result = resolvePullRequestCheckoutRef({
       pull_request: {
         number: 123,
@@ -128,7 +135,7 @@ describe('resolvePullRequestCheckoutRef', () => {
     });
 
     expect(result).toEqual({
-      checkoutRef: 'feature/same-repo',
+      checkoutRef: 'refs/pull/123/head',
       isForkPr: false,
       headRepoFullName: 'acme/widgets',
     });
@@ -155,7 +162,7 @@ describe('resolvePullRequestCheckoutRef', () => {
     });
   });
 
-  it('falls back to head.ref when head.repo is missing', () => {
+  it('uses refs/pull/<number>/head when head.repo is missing', () => {
     const result = resolvePullRequestCheckoutRef({
       pull_request: {
         number: 789,
@@ -169,7 +176,7 @@ describe('resolvePullRequestCheckoutRef', () => {
     });
 
     expect(result).toEqual({
-      checkoutRef: 'feature/missing-head-repo',
+      checkoutRef: 'refs/pull/789/head',
       isForkPr: false,
       headRepoFullName: null,
     });

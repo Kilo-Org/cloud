@@ -1,6 +1,10 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { FEATURE_HEADER, type FeatureValue } from '@/lib/feature-detection';
-import { countAndStoreUsage, logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
+import {
+  countAndStoreUsage,
+  logMicrodollarUsage,
+  processTokenData,
+} from '@/lib/ai-gateway/processUsage';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
@@ -38,6 +42,7 @@ import type {
 import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
+import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.shared';
 export { proxyErrorTypeSchema, ProxyErrorType } from '@/lib/proxy-error-types';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 
@@ -683,6 +688,23 @@ type EmbeddingResponse = {
   usage: EmbeddingUsage;
 };
 
+type TranscriptionUsage = {
+  seconds?: number;
+  total_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  cost?: number;
+  is_byok?: boolean | null;
+  cost_details?: { upstream_inference_cost: number };
+};
+
+type TranscriptionResponse = {
+  id?: string;
+  model?: string;
+  text?: string;
+  usage?: TranscriptionUsage;
+};
+
 export function parseEmbeddingUsageFromResponse(
   responseText: string,
   statusCode: number
@@ -712,6 +734,44 @@ export function parseEmbeddingUsageFromResponse(
     streamed: false,
     cancelled: false,
     status_code: statusCode,
+  };
+}
+
+export function parseTranscriptionUsageFromResponse(
+  responseText: string,
+  statusCode: number,
+  requestedModel: string
+): MicrodollarUsageStats {
+  const json: TranscriptionResponse = JSON.parse(responseText);
+  const base = {
+    messageId: json.id ?? null,
+    model: json.model ?? requestedModel,
+    responseContent: json.text ?? '',
+    hasError: statusCode >= 400 || typeof json.text !== 'string',
+    inference_provider: null,
+    upstream_id: null,
+    finish_reason: null,
+    latency: null,
+    moderation_latency: null,
+    generation_time: json.usage?.seconds ?? null,
+    streamed: false,
+    cancelled: false,
+    status_code: statusCode,
+  };
+  const cost = computeOpenRouterCostFields(
+    json.usage ?? {},
+    base,
+    'transcription_usage_processing'
+  );
+
+  return {
+    ...base,
+    inputTokens: json.usage?.input_tokens ?? 0,
+    outputTokens: json.usage?.output_tokens ?? 0,
+    cacheHitTokens: 0,
+    cacheWriteTokens: 0,
+    cost_mUsd: cost.cost_mUsd,
+    is_byok: cost.is_byok,
   };
 }
 
@@ -766,6 +826,40 @@ export function countAndStoreEmbeddingUsage(
       }
 
       return logMicrodollarUsage(usageStats, usageContext);
+    })
+  );
+}
+
+export function countAndStoreTranscriptionUsage(
+  clonedResponse: Response,
+  usageContext: MicrodollarUsageContext,
+  requestSpan: Span | undefined
+) {
+  debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
+
+  const statusCode = usageContext.status_code ?? 0;
+  const usageStatsPromise = !clonedResponse.body
+    ? Promise.resolve(null)
+    : clonedResponse
+        .text()
+        .then(text =>
+          parseTranscriptionUsageFromResponse(text, statusCode, usageContext.requested_model)
+        )
+        .catch(() => null);
+
+  after(
+    usageStatsPromise.then(usageStats => {
+      requestSpan?.end();
+      if (!usageStats) {
+        captureMessage('SUSPICIOUS: No transcription usage information', {
+          level: 'error',
+          tags: { source: 'transcription_usage_processing' },
+          extra: { usageContext },
+        });
+        return;
+      }
+
+      return processTokenData(usageStats, usageContext);
     })
   );
 }

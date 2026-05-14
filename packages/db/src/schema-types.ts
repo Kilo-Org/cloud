@@ -694,6 +694,7 @@ export const GatewayApiKindSchema = z.enum([
   'fim_completions',
   'messages',
   'responses',
+  'audio_transcriptions',
 ]);
 
 export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;

@@ -182,7 +182,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           repositorySelectionMode: 'all' as const,
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
-          disableReviewMd: false,
+          disableReviewMd: true,
         };
       }
 
@@ -199,7 +199,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         repositorySelectionMode: cfg.repository_selection_mode || 'all',
         selectedRepositoryIds: cfg.selected_repository_ids || [],
         manuallyAddedRepositories: cfg.manually_added_repositories || [],
-        disableReviewMd: cfg.disable_review_md ?? false,
+        disableReviewMd: cfg.disable_review_md ?? true,
       };
     }),
 
@@ -235,7 +235,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             repository_selection_mode: input.repositorySelectionMode || 'all',
             selected_repository_ids: input.selectedRepositoryIds || [],
             manually_added_repositories: input.manuallyAddedRepositories || [],
-            disable_review_md: input.disableReviewMd ?? false,
+            disable_review_md: input.disableReviewMd ?? true,
           },
           createdBy: ctx.user.id,
         });

@@ -294,15 +294,15 @@ describe('review agent config REVIEW.md setting', () => {
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
-  it('returns disableReviewMd false for personal default config', async () => {
+  it('returns disableReviewMd true for personal default config', async () => {
     const caller = await createCallerForUser(testUser.id);
 
     const config = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
 
-    expect(config.disableReviewMd).toBe(false);
+    expect(config.disableReviewMd).toBe(true);
   });
 
-  it('returns disableReviewMd false for organization default config', async () => {
+  it('returns disableReviewMd true for organization default config', async () => {
     const caller = await createCallerForUser(testUser.id);
 
     const config = await caller.organizations.reviewAgent.getReviewConfig({
@@ -310,7 +310,7 @@ describe('review agent config REVIEW.md setting', () => {
       platform: 'github',
     });
 
-    expect(config.disableReviewMd).toBe(false);
+    expect(config.disableReviewMd).toBe(true);
   });
 
   it('persists personal disableReviewMd true as disable_review_md true', async () => {
@@ -369,7 +369,7 @@ describe('review agent config REVIEW.md setting', () => {
     expect(refetched.disableReviewMd).toBe(true);
   });
 
-  it('persists omitted personal disableReviewMd as false for backward compatibility', async () => {
+  it('persists omitted personal disableReviewMd as true by default', async () => {
     const caller = await createCallerForUser(testUser.id);
 
     await caller.personalReviewAgent.saveReviewConfig({
@@ -388,10 +388,10 @@ describe('review agent config REVIEW.md setting', () => {
       ),
     });
 
-    expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: false }));
+    expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
   });
 
-  it('persists omitted organization disableReviewMd as false for backward compatibility', async () => {
+  it('persists omitted organization disableReviewMd as true by default', async () => {
     const caller = await createCallerForUser(testUser.id);
 
     await caller.organizations.reviewAgent.saveReviewConfig({
@@ -411,7 +411,7 @@ describe('review agent config REVIEW.md setting', () => {
       ),
     });
 
-    expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: false }));
+    expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
   });
 });
 

@@ -112,7 +112,7 @@ export async function prepareReviewPayload(
 ): Promise<CodeReviewPayload> {
   const { reviewId, owner, agentConfig, platform = 'github' } = params;
   const config = agentConfig.config as CodeReviewAgentConfig;
-  const shouldUseReviewMd = config.disable_review_md !== true;
+  const shouldUseReviewMd = config.disable_review_md === false;
 
   logExceptInTest('[prepareReviewPayload] Starting payload preparation', {
     reviewId,

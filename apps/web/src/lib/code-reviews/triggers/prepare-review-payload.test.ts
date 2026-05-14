@@ -78,6 +78,7 @@ const baseAgentConfig = {
   max_review_time_minutes: 30,
   repository_selection_mode: 'all',
   gate_threshold: 'off',
+  disable_review_md: false,
 } satisfies CodeReviewAgentConfig;
 
 function defineIntegration(
@@ -203,7 +204,7 @@ describe('prepareReviewPayload', () => {
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
-  it('fetches GitHub REVIEW.md from the base ref and persists used metadata', async () => {
+  it('fetches GitHub REVIEW.md from the base ref when enabled and persists used metadata', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)
       .values(defineReview(testUser.id, integration.id))
@@ -242,7 +243,7 @@ describe('prepareReviewPayload', () => {
     );
   });
 
-  it('fetches GitLab REVIEW.md from the base ref by default', async () => {
+  it('fetches GitLab REVIEW.md from the base ref when enabled', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)
       .values(
@@ -365,7 +366,7 @@ describe('prepareReviewPayload', () => {
     });
   });
 
-  it('skips GitHub REVIEW.md lookup when disabled', async () => {
+  it('skips GitHub REVIEW.md lookup by default', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)
       .values(defineReview(testUser.id, integration.id))
@@ -377,7 +378,7 @@ describe('prepareReviewPayload', () => {
       agentConfig: {
         config: {
           ...baseAgentConfig,
-          disable_review_md: true,
+          disable_review_md: undefined,
         },
       },
       platform: 'github',

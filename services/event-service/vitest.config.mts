@@ -17,6 +17,7 @@ export default defineConfig({
     }),
   ],
   test: {
+    // Disabled to avoid workerd crashes in the connection-ticket suite; revisit when upstream is fixed.
     isolate: false,
     setupFiles: ['./src/__tests__/setup.ts'],
   },

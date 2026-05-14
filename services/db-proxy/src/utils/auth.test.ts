@@ -165,7 +165,7 @@ describe('auth utilities', () => {
       expect(result).toBe(false);
     });
 
-    it('returns false for empty tokens', () => {
+    it('returns true for equal empty tokens', () => {
       const result = verifyToken('', '');
 
       expect(result).toBe(true); // timingSafeEqual returns true for equal empty strings

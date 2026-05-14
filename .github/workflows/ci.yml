@@ -266,9 +266,8 @@ jobs:
       - name: Setup Vercel ENV
         working-directory: apps/web
         run: |
-          pnpm install --global vercel@latest
-          vercel link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-          vercel env pull .env.production.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          pnpm dlx vercel@latest link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+          pnpm dlx vercel@latest env pull .env.production.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build application
         env:

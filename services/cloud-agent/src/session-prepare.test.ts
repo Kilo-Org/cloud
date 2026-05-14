@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import * as schemas from './router/schemas.js';
 import * as schemaLimits from './schema.js';
 
@@ -42,17 +42,19 @@ import { appRouter } from './router.js';
 import type { TRPCContext, SessionId } from './types.js';
 import type { CloudAgentSessionState } from './persistence/types.js';
 
+type MockDOProcedure = Mock<(...args: unknown[]) => Promise<unknown>>;
+
 // Helper to create a mock DO stub
 function createMockDOStub(
   overrides: {
-    prepare?: ReturnType<typeof vi.fn>;
-    tryUpdate?: ReturnType<typeof vi.fn>;
-    tryInitiate?: ReturnType<typeof vi.fn>;
-    getMetadata?: ReturnType<typeof vi.fn>;
-    updateMetadata?: ReturnType<typeof vi.fn>;
-    deleteSession?: ReturnType<typeof vi.fn>;
+    prepare?: MockDOProcedure;
+    tryUpdate?: MockDOProcedure;
+    tryInitiate?: MockDOProcedure;
+    getMetadata?: MockDOProcedure;
+    updateMetadata?: MockDOProcedure;
+    deleteSession?: MockDOProcedure;
   } = {}
-): any {
+) {
   return {
     prepare: overrides.prepare ?? vi.fn().mockResolvedValue({ success: true }),
     tryUpdate: overrides.tryUpdate ?? vi.fn().mockResolvedValue({ success: true }),

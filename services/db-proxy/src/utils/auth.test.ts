@@ -170,7 +170,6 @@ describe('auth utilities', () => {
 
       expect(result).toBe(true); // timingSafeEqual returns true for equal empty strings
     });
-
   });
 
   describe('errorResponse', () => {

@@ -46,12 +46,15 @@ import { getMissingSnowflakeConfig, queryKiloclawActiveUserIds } from './snowfla
 const MS_PER_DAY = 86_400_000;
 const DESTRUCTION_GRACE_DAYS = 7;
 const PAST_DUE_THRESHOLD_DAYS = 14;
+const TRIAL_WARNING_DAYS = 2;
 const DESTRUCTION_WARNING_DAYS = 2;
 const EARLYBIRD_WARNING_DAYS = 14;
 const AUTO_RESUME_INITIAL_BACKOFF_MS = 2 * 60 * 60 * 1000;
 const AUTO_RESUME_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
 const TRIAL_INACTIVITY_BATCH_SIZE = 50;
 const SOFT_DELETED_EMAIL_SUFFIX = '@deleted.invalid';
+const TRIAL_ENDING_SOON_MIN_DURATION_DAYS = 2;
+const TRIAL_EXPIRES_TOMORROW_MIN_DURATION_DAYS = 2;
 const TRIAL_INACTIVITY_MIN_DURATION_DAYS = 2;
 const TRIAL_INACTIVITY_PRICE_VERSIONS = KILOCLAW_PRICE_VERSIONS.filter(
   priceVersion =>
@@ -2414,14 +2417,126 @@ async function runDestructionWarningSweep(
 }
 
 async function runTrialWarningSweep(
-  _database: WorkerDb,
-  _env: BillingWorkerEnv,
-  _context: SweepExecutionContext,
-  _summary: BillingSummary
+  database: WorkerDb,
+  env: BillingWorkerEnv,
+  context: SweepExecutionContext,
+  summary: BillingSummary
 ): Promise<void> {
-  // Trial warning emails (clawTrialEndingSoon, clawTrialExpiresTomorrow) are
-  // disabled: the current pricing tier has a 1-day trial, making these emails
-  // irrelevant for all subscribers.
+  const advisoryNow = new Date().toISOString();
+  const trialWarningCutoff = new Date(Date.now() + TRIAL_WARNING_DAYS * MS_PER_DAY).toISOString();
+  const clawUrl = buildClawUrl(env);
+
+  const trialWarningRows = await database
+    .select({
+      id: kiloclaw_subscriptions.id,
+      user_id: kiloclaw_subscriptions.user_id,
+      instance_id: kiloclaw_subscriptions.instance_id,
+      instance_destroyed_at: kiloclaw_instances.destroyed_at,
+      instance_sandbox_id: kiloclaw_instances.sandbox_id,
+      organization_id: kiloclaw_instances.organization_id,
+      email: kilocode_users.google_user_email,
+      trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
+      kiloclaw_price_version: kiloclaw_subscriptions.kiloclaw_price_version,
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.status, 'trialing'),
+        currentSubscriptionRowFilter(),
+        gte(kiloclaw_subscriptions.trial_ends_at, advisoryNow),
+        lte(kiloclaw_subscriptions.trial_ends_at, trialWarningCutoff),
+        isNull(kiloclaw_subscriptions.suspended_at)
+      )
+    );
+
+  for (const row of trialWarningRows) {
+    try {
+      if (isSoftDeletedUserEmail(row.email)) continue;
+      if (!row.trial_ends_at) continue;
+
+      if (!row.instance_id) {
+        logSkippedSubscriptionRow('Skipping trial warning for detached subscription row', row, {
+          reason: 'missing_instance_id',
+        });
+        continue;
+      }
+
+      if (!row.instance_sandbox_id) {
+        logSkippedSubscriptionRow(
+          'Skipping trial warning for subscription without instance row',
+          row,
+          { reason: 'missing_instance_row' }
+        );
+        continue;
+      }
+
+      if (row.instance_destroyed_at) {
+        logSkippedSubscriptionRow('Skipping trial warning for destroyed instance', row, {
+          reason: 'instance_destroyed',
+        });
+        continue;
+      }
+
+      if (row.organization_id) {
+        logSkippedSubscriptionRow('Skipping trial warning for organization-managed row', row, {
+          reason: 'organization_managed',
+          organizationId: row.organization_id,
+        });
+        continue;
+      }
+
+      const daysRemaining = Math.ceil(
+        (new Date(row.trial_ends_at).getTime() - Date.now()) / MS_PER_DAY
+      );
+      const trialDurationDays = getKiloClawPricingCatalogEntry(
+        row.kiloclaw_price_version
+      ).trialDurationDays;
+
+      const sent =
+        daysRemaining <= 1 && trialDurationDays >= TRIAL_EXPIRES_TOMORROW_MIN_DURATION_DAYS
+          ? await trySendEmail(
+              database,
+              env,
+              context,
+              row.user_id,
+              row.email,
+              'claw_trial_1d',
+              'clawTrialExpiresTomorrow',
+              { claw_url: clawUrl },
+              summary,
+              undefined,
+              { instanceId: row.instance_id ?? undefined }
+            )
+          : trialDurationDays >= TRIAL_ENDING_SOON_MIN_DURATION_DAYS
+            ? await trySendEmail(
+                database,
+                env,
+                context,
+                row.user_id,
+                row.email,
+                'claw_trial_5d',
+                'clawTrialEndingSoon',
+                {
+                  days_remaining: String(daysRemaining),
+                  claw_url: clawUrl,
+                },
+                summary,
+                `Your KiloClaw Trial Ends in ${daysRemaining} Days`,
+                { instanceId: row.instance_id ?? undefined }
+              )
+            : false;
+
+      if (sent) summary.trial_warnings++;
+    } catch (error) {
+      summary.errors++;
+      log('error', 'Trial warning sweep failed for user', {
+        userId: row.user_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 }
 
 async function runEarlybirdWarningSweep(

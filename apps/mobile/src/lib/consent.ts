@@ -4,7 +4,7 @@ import { CONSENT_USER_KEY_PREFIX } from '@/lib/storage-keys';
 
 export const CURRENT_CONSENT_VERSION = 1;
 
-export type ConsentChange = {
+type ConsentChange = {
   readonly userId: string;
   readonly hasAccepted: boolean;
 };

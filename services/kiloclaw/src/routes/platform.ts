@@ -7,6 +7,8 @@
 
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import * as fly from '../fly/client';
+import type { InstanceStatus } from '../durable-objects/kiloclaw-instance/types';
 import type { AppEnv } from '../types';
 import {
   ProvisionRequestSchema,
@@ -707,6 +709,175 @@ function jsonError(message: string, status: number, code?: string): Response {
     status,
     headers: { 'content-type': 'application/json' },
   });
+}
+
+/**
+ * Result of the running-state check used by the polling guards.
+ *
+ * `running: true` means the proxied call is safe to make. `running: false`
+ * carries the best-known instance status label (from DO or, when verified,
+ * the mapped Fly state) so the caller can include it in the sentinel
+ * payload — useful for the frontend's "Instance is {status}…" hint.
+ */
+type InstanceRunningCheck = { running: true } | { running: false; status: InstanceStatus | null };
+
+/**
+ * Decide whether the instance is actually running, for the polling guards.
+ *
+ * Polling endpoints (gateway/status, gateway/ready, controller-version,
+ * morning-briefing/status) proxy to port 18789 on the Fly machine via Fly's
+ * HTTPS edge. Even with `services[0].autostart: false`, Fly's proxy will wake
+ * a stopped machine to serve the request. The check below decides whether to
+ * skip the proxied call so no traffic reaches the machine while it is stopped.
+ *
+ * Two layers, in order:
+ *
+ * 1. **Durable Object cached state.** Cheap (storage read). Handles the
+ *    common case where DO and Fly agree, plus admin-UI-initiated stops where
+ *    the DO has already updated its cached state.
+ *
+ * 2. **Fly Machines REST API state.** Only when DO says `running` and the
+ *    instance is on Fly. The Machines REST API is a separate path from the
+ *    HTTPS edge proxy, so this call does not wake the machine. Catches drift
+ *    where DO cached state lags real Fly state (out-of-band stops: Fly CLI,
+ *    dashboard, health-check kill, platform incidents). Also closes the
+ *    in-flight stop race: while `DO.stop()` is waiting on `Fly.stopMachine`,
+ *    DO state still reads `running` for the duration of that call, so a
+ *    concurrent poll would otherwise fall through. Adds ~50-200ms to each
+ *    poll where DO says running; acceptable given the 5-10s polling cadence
+ *    and the alternative (the wake bug).
+ *
+ * Fail-open on Fly API errors: if we can't reach Fly to verify, trust the DO
+ * state and forward. Logs a warning so the failure mode is visible.
+ */
+async function checkInstanceRunningState(
+  env: AppEnv['Bindings'],
+  userId: string,
+  instanceId: string | undefined
+): Promise<InstanceRunningCheck> {
+  const status = await withResolvedDORetry(
+    env,
+    userId,
+    instanceId,
+    stub => stub.getStatus(),
+    'getStatus'
+  );
+
+  // Layer 1: DO cached state says not running. Trust it (cheapest path).
+  if (status.status !== 'running') {
+    return { running: false, status: status.status };
+  }
+
+  // Layer 2: DO says running. Verify against live Fly state when we can,
+  // because DO state can lag (out-of-band stops, in-flight stops where DO
+  // hasn't yet updated its cached status after the Fly stop call).
+  //
+  // Skip the Fly check when:
+  //   - the instance has no flyMachineId yet (pre-provisioning or non-Fly
+  //     provider — nothing to verify, and forwarding is safe because there
+  //     is nothing for Fly's proxy to wake);
+  //   - FLY_API_TOKEN isn't configured (dev environments without Fly creds).
+  const flyMachineId = status.flyMachineId;
+  const flyAppName = status.flyAppName;
+  if (status.provider !== 'fly' || !flyMachineId || !flyAppName || !env.FLY_API_TOKEN) {
+    return { running: true };
+  }
+
+  try {
+    const machine = await fly.getMachine(
+      { apiToken: env.FLY_API_TOKEN, appName: flyAppName },
+      flyMachineId
+    );
+    if (machine.state !== 'started') {
+      // Drift detected. DO will reconcile its cached state on the next
+      // `maybeDispatchLiveCheck` tick (already dispatched by getStatus()
+      // above), so we don't force a synchronous reconcile here. Return
+      // the sentinel using Fly's reported state so the frontend can show
+      // an accurate label.
+      console.warn('[platform] poll short-circuit: Fly reports machine not started', {
+        userId,
+        instanceId,
+        flyMachineId,
+        doStatus: status.status,
+        flyState: machine.state,
+      });
+      return { running: false, status: mapFlyStateToDoStatus(machine.state) };
+    }
+  } catch (err) {
+    // Fail open: trust DO state when Fly is unreachable. The alternative
+    // (failing closed) would break polling during any Fly API hiccup.
+    console.warn('[platform] poll short-circuit: Fly state check failed, trusting DO', {
+      userId,
+      instanceId,
+      flyMachineId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  return { running: true };
+}
+
+/**
+ * Wrapper around `checkInstanceRunningState` that builds the unified 200
+ * sentinel response (`{ ok: false, reason, status }`) when not running.
+ * Returns `null` when the proxied call is safe to make.
+ *
+ * Routes whose existing response shape is `{ ready, ... }` should call
+ * `checkInstanceRunningState` directly and build a route-shaped sentinel
+ * — see `/gateway/ready` for an example.
+ */
+async function shortCircuitIfNotRunning(
+  env: AppEnv['Bindings'],
+  userId: string,
+  instanceId: string | undefined
+): Promise<Response | null> {
+  const check = await checkInstanceRunningState(env, userId, instanceId);
+  if (check.running) return null;
+  return new Response(
+    JSON.stringify({
+      ok: false,
+      reason: 'instance_not_running',
+      status: check.status,
+    }),
+    {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }
+  );
+}
+
+/**
+ * Map a Fly machine state into the closest equivalent DO status label so
+ * the frontend's "Instance is {status}…" hint reads naturally. We can't
+ * always represent Fly states 1:1 (e.g. Fly has no `restoring`), so
+ * unknown states fall through to `stopped` which is the safer default for
+ * a polling guard.
+ *
+ * Return type is `InstanceStatus` (the worker's canonical DO status enum)
+ * rather than `string`, so adding a new Fly state mapping to a value
+ * outside the DO vocabulary fails to typecheck instead of silently
+ * shipping a label the frontend doesn't understand.
+ */
+function mapFlyStateToDoStatus(state: string): InstanceStatus {
+  switch (state) {
+    case 'started':
+      return 'running';
+    case 'starting':
+    case 'created':
+    case 'replacing':
+    case 'updating':
+      return 'starting';
+    case 'stopping':
+      return 'stopped';
+    case 'stopped':
+    case 'suspended':
+    case 'destroying':
+    case 'destroyed':
+    case 'failed':
+      return 'stopped';
+    default:
+      return 'stopped';
+  }
 }
 
 function kiloCliRunConflictResponse(response: unknown): Response | undefined {
@@ -1698,6 +1869,9 @@ platform.get('/gateway/status', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const sentinel = await shortCircuitIfNotRunning(c.env, userId, iidResult.instanceId);
+    if (sentinel) return sentinel;
+
     const gatewayStatus = await withResolvedDORetry(
       c.env,
       userId,
@@ -1714,7 +1888,12 @@ platform.get('/gateway/status', async c => {
 
 // GET /api/platform/gateway/ready?userId=...
 // Non-fatal polling endpoint — always returns 200 so the frontend poll
-// doesn't generate a wall of errors during startup.
+// doesn't generate a wall of errors during startup. Polled aggressively
+// (every 5s on the user dashboard) so it shares the wake-bug exposure with
+// the other guarded routes; the guard below short-circuits it for the same
+// reason. The response keeps its existing `{ ready, ... }` shape rather
+// than the unified `{ ok, reason }` sentinel so consumers that already
+// check `gatewayReady?.ready` keep working unchanged.
 platform.get('/gateway/ready', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) {
@@ -1725,6 +1904,11 @@ platform.get('/gateway/ready', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const check = await checkInstanceRunningState(c.env, userId, iidResult.instanceId);
+    if (!check.running) {
+      return c.json({ ready: false, reason: 'instance_not_running', status: check.status }, 200);
+    }
+
     const result = await withResolvedDORetry(
       c.env,
       userId,
@@ -1750,6 +1934,9 @@ platform.get('/controller-version', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const sentinel = await shortCircuitIfNotRunning(c.env, userId, iidResult.instanceId);
+    if (sentinel) return sentinel;
+
     const result = await withResolvedDORetry(
       c.env,
       userId,
@@ -2044,6 +2231,9 @@ platform.get('/morning-briefing/status', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const sentinel = await shortCircuitIfNotRunning(c.env, userId, iidResult.instanceId);
+    if (sentinel) return sentinel;
+
     const result = await withResolvedDORetry(
       c.env,
       userId,
@@ -3272,6 +3462,9 @@ platform.get('/debug-status', async c => {
   const { instanceId } = iidResult;
 
   try {
+    // No guard here: getDebugState() reads DO storage only and never proxies
+    // through Fly's edge to the machine. The wake-up bug (services that proxy
+    // to port 18789) does not apply.
     const status = await withResolvedDORetry(
       c.env,
       userId,

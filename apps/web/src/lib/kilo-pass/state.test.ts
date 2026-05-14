@@ -6,12 +6,23 @@ import {
   kilo_pass_pause_events,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { KiloPassCadence } from './enums';
+import { KiloPassCadence, KiloPassPaymentProvider } from './enums';
 import { KiloPassTier } from '@/lib/kilo-pass/enums';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
+
+function stripeSubscriptionFields(prefix: string): {
+  provider_subscription_id: string;
+  stripe_subscription_id: string;
+} {
+  const stripeSubscriptionId = `${prefix}-${crypto.randomUUID()}`;
+  return {
+    provider_subscription_id: stripeSubscriptionId,
+    stripe_subscription_id: stripeSubscriptionId,
+  };
+}
 
 describe('getKiloPassStateForUser', () => {
   afterEach(async () => {
@@ -29,7 +40,7 @@ describe('getKiloPassStateForUser', () => {
     await db.insert(kilo_pass_subscriptions).values([
       {
         kilo_user_id: user.id,
-        stripe_subscription_id: `test-stripe-sub-ended-${crypto.randomUUID()}`,
+        ...stripeSubscriptionFields('test-stripe-sub-ended'),
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'canceled',
@@ -41,7 +52,7 @@ describe('getKiloPassStateForUser', () => {
       },
       {
         kilo_user_id: user.id,
-        stripe_subscription_id: `test-stripe-sub-pending-${crypto.randomUUID()}`,
+        ...stripeSubscriptionFields('test-stripe-sub-pending'),
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Monthly,
         status: 'active',
@@ -53,7 +64,7 @@ describe('getKiloPassStateForUser', () => {
       },
       {
         kilo_user_id: user.id,
-        stripe_subscription_id: `test-stripe-sub-active-old-${crypto.randomUUID()}`,
+        ...stripeSubscriptionFields('test-stripe-sub-active-old'),
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Yearly,
         status: 'active',
@@ -65,7 +76,7 @@ describe('getKiloPassStateForUser', () => {
       },
       {
         kilo_user_id: user.id,
-        stripe_subscription_id: `test-stripe-sub-active-new-${crypto.randomUUID()}`,
+        ...stripeSubscriptionFields('test-stripe-sub-active-new'),
         tier: KiloPassTier.Tier199,
         cadence: KiloPassCadence.Monthly,
         status: 'active',
@@ -98,7 +109,7 @@ describe('getKiloPassStateForUser', () => {
     await db.insert(kilo_pass_subscriptions).values([
       {
         kilo_user_id: user.id,
-        stripe_subscription_id: `test-stripe-sub-ended-${crypto.randomUUID()}`,
+        ...stripeSubscriptionFields('test-stripe-sub-ended'),
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'canceled',
@@ -110,7 +121,7 @@ describe('getKiloPassStateForUser', () => {
       },
       {
         kilo_user_id: user.id,
-        stripe_subscription_id: `test-stripe-sub-pending-old-${crypto.randomUUID()}`,
+        ...stripeSubscriptionFields('test-stripe-sub-pending-old'),
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'active',
@@ -122,7 +133,7 @@ describe('getKiloPassStateForUser', () => {
       },
       {
         kilo_user_id: user.id,
-        stripe_subscription_id: `test-stripe-sub-pending-new-${crypto.randomUUID()}`,
+        ...stripeSubscriptionFields('test-stripe-sub-pending-new'),
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Yearly,
         status: 'active',
@@ -155,6 +166,36 @@ describe('getKiloPassStateForUser', () => {
     expect(state).toBeNull();
   });
 
+  test('keeps stripeSubscriptionId null for App Store subscriptions', async () => {
+    const user = await insertTestUser();
+    const providerSubscriptionId = `test-app-store-original-${crypto.randomUUID()}`;
+
+    await db.insert(kilo_pass_subscriptions).values({
+      kilo_user_id: user.id,
+      payment_provider: KiloPassPaymentProvider.AppStore,
+      provider_subscription_id: providerSubscriptionId,
+      stripe_subscription_id: null,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      status: 'active',
+      cancel_at_period_end: false,
+      started_at: '2025-06-01T00:00:00.000Z',
+      ended_at: null,
+      current_streak_months: 1,
+      next_yearly_issue_at: null,
+    });
+
+    const state = await getKiloPassStateForUser(db, user.id);
+
+    expect(state).toEqual(
+      expect.objectContaining({
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerSubscriptionId,
+        stripeSubscriptionId: null,
+      })
+    );
+  });
+
   test('returns paused status when DB status is active but an open pause event exists', async () => {
     const user = await insertTestUser();
     const stripeSubId = `test-stripe-sub-paused-${crypto.randomUUID()}`;
@@ -163,6 +204,7 @@ describe('getKiloPassStateForUser', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
@@ -198,6 +240,7 @@ describe('getKiloPassStateForUser', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,

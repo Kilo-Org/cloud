@@ -49,7 +49,7 @@ import { writeGogCredentials } from './gog-credentials';
 import { installGogShim } from './gog-shim';
 import { migrateLegacyGoogleCredentialsToBroker } from './legacy-google-migration';
 import { startWatchRenewal, stopWatchRenewal } from './gmail-watch-renewal';
-import { bootstrapCritical, bootstrapNonCritical } from './bootstrap';
+import { bootstrapCritical, bootstrapNonCritical, cleanNpmCache } from './bootstrap';
 import type { ControllerStateRef, ControllerState } from './bootstrap';
 import { getOpenclawVersion } from './openclaw-version';
 import { startCheckin } from './checkin';
@@ -505,6 +505,8 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     );
     return;
   }
+
+  cleanNpmCache(env);
 
   // ── Phase 6: Best-effort pre-gateway setup ──────────────────────────
   try {

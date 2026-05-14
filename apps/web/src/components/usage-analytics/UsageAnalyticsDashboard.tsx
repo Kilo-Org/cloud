@@ -70,8 +70,8 @@ type UsageAnalyticsDashboardProps = {
   title?: string;
 };
 
-/** Sentinel written by the rollup for rows with NULL project_id. */
-const PROJECT_SENTINEL_NONE = 'none';
+/** Sentinel written by DBT rollups for rows with NULL project_id. */
+const PROJECT_SENTINEL_NONE = '';
 const PROJECT_UNATTRIBUTED_LABEL = 'Unattributed';
 
 function labelForProjectValue(value: string): string {
@@ -380,14 +380,15 @@ export function UsageAnalyticsDashboard({
           label: DIMENSION_LABELS[d],
           render: (_v, row) => {
             const dims = (row.dimensions as Record<string, string>) ?? {};
-            const rawVal = dims[d] ?? '';
-            if (!rawVal) return '—';
+            const rawVal = dims[d];
+            if (rawVal == null || (d !== 'project' && rawVal === '')) return '—';
             return labelForDimensionValue(d, rawVal);
           },
           sortAccessor: row => {
             const dims = (row.dimensions as Record<string, string>) ?? {};
-            const rawVal = dims[d] ?? '';
-            return rawVal ? labelForDimensionValue(d, rawVal) : '';
+            const rawVal = dims[d];
+            if (rawVal == null || (d !== 'project' && rawVal === '')) return '';
+            return labelForDimensionValue(d, rawVal);
           },
         })
       ),

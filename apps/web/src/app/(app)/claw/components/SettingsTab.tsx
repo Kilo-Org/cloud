@@ -25,6 +25,7 @@ import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { useUser } from '@/hooks/useUser';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus, MorningBriefingStatusLite } from '@/lib/kiloclaw/types';
+import { morningBriefingStatusOk } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import {
@@ -1697,7 +1698,10 @@ export function SettingsTab({
   } = useClawUpdateAvailable(status);
   const { data: myPin } = useClawMyPin();
   const morningBriefingStatusQuery = useClawMorningBriefingStatus(isRunning);
-  const morningBriefingStatus = morningBriefingStatusQuery.data;
+  // Narrow off the instance-not-running sentinel that the worker returns
+  // when DO state isn't `running`. The MB card only renders meaningfully
+  // when the OK-shape payload is available.
+  const morningBriefingStatus = morningBriefingStatusOk(morningBriefingStatusQuery.data);
   const gatewayReadyQuery = useClawGatewayReady(isRunning);
   const gatewayReady = gatewayReadyQuery.data;
   const [confirmDestroy, setConfirmDestroy] = useState(false);
@@ -1805,8 +1809,13 @@ export function SettingsTab({
   const configuredSecrets = config?.configuredSecrets ?? {};
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
   const braveSearchConfigured = configuredSecrets['brave-search'] ?? false;
+  // Reflects which provider is actually active. Mirrors controller arbitration
+  // in services/kiloclaw/controller/src/config-writer.ts.
   const exaSearchConfigured =
-    supportsExaSearchUi && (kiloExaSearchMode === 'kilo-proxy' || kiloExaSearchMode === null);
+    supportsExaSearchUi &&
+    (kiloExaSearchMode === 'kilo-proxy' || (kiloExaSearchMode === null && !braveSearchConfigured));
+  // Editor reflects stored intent, not the resolved active provider, so users
+  // can persist an explicit choice when their mode is unset.
   const exaSearchDisplayMode =
     supportsExaSearchUi && kiloExaSearchMode === null ? 'kilo-proxy' : kiloExaSearchMode;
   const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;

@@ -1,12 +1,63 @@
 import { describe, expect, test } from '@jest/globals';
 
 import {
+  getKiloPassProviderManagementModel,
   getKiloPassSubscriptionDisplayModel,
   getKiloPassInlineActionModel,
   getKiloPassInlineConfirmationDetails,
 } from './KiloPassDetail.logic';
+import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 
 describe('KiloPassDetail.logic', () => {
+  test('links App Store-managed subscriptions to App Store management', () => {
+    expect(getKiloPassProviderManagementModel(KiloPassPaymentProvider.AppStore)).toEqual({
+      paymentMethodLabel: 'App Store',
+      canUseWebControls: false,
+      canUseStripePortal: false,
+      canChangePlan: false,
+      canUseChurnkeyCancel: false,
+      canResumeInWeb: false,
+      canUseScheduledChanges: false,
+      canViewBillingHistory: false,
+      externalManagementAction: {
+        label: 'Manage in App Store',
+        providerLabel: 'App Store',
+        url: 'https://apps.apple.com/account/subscriptions',
+      },
+      providerManagedCopy: 'Managed in the App Store.',
+    });
+  });
+
+  test('keeps Stripe-managed subscriptions inside the web management flow', () => {
+    expect(getKiloPassProviderManagementModel(KiloPassPaymentProvider.Stripe)).toEqual({
+      paymentMethodLabel: 'Stripe',
+      canUseWebControls: true,
+      canUseStripePortal: true,
+      canChangePlan: true,
+      canUseChurnkeyCancel: true,
+      canResumeInWeb: true,
+      canUseScheduledChanges: true,
+      canViewBillingHistory: true,
+      externalManagementAction: null,
+      providerManagedCopy: null,
+    });
+  });
+
+  test('keeps Google Play subscriptions out of Stripe web management controls', () => {
+    expect(getKiloPassProviderManagementModel(KiloPassPaymentProvider.GooglePlay)).toEqual({
+      paymentMethodLabel: 'Google Play',
+      canUseWebControls: false,
+      canUseStripePortal: false,
+      canChangePlan: false,
+      canUseChurnkeyCancel: false,
+      canResumeInWeb: false,
+      canUseScheduledChanges: false,
+      canViewBillingHistory: false,
+      externalManagementAction: null,
+      providerManagedCopy: 'Managed in Google Play.',
+    });
+  });
+
   test('models pending cancellation display copy', () => {
     const model = getKiloPassSubscriptionDisplayModel({
       status: 'active',

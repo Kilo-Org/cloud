@@ -41,7 +41,7 @@ const FiltersShape = {
   organizationId: z.uuid().optional(),
   /**
    * Personal-scope narrowing:
-   * - 'personal-only' (default) → organization_id IS NULL
+   * - 'personal-only' (default) → organization_id = '' in Snowflake rollups
    * - 'include-orgs'            → any organization (including personal)
    * Ignored when `organizationId` is set (org scope always filters by that org).
    */
@@ -340,7 +340,7 @@ function buildWhereClause(
 // Metric SQL expression
 // ---------------------------------------------------------------------------
 
-function metricExprSql(metric: Metric): string {
+function metricExprSql(metric: Metric, tier: GranularityTier): string {
   switch (metric) {
     case 'cost':
       return 'COALESCE(SUM(total_cost_microdollars), 0)';
@@ -351,22 +351,34 @@ function metricExprSql(metric: Metric): string {
     case 'outputTokens':
       return 'COALESCE(SUM(total_output_tokens), 0)';
     case 'tokens':
-      return 'COALESCE(SUM(total_input_tokens + total_output_tokens), 0)';
+      return 'COALESCE(SUM(total_tokens), 0)';
     case 'errorRate':
       return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(error_count), 0)::FLOAT / SUM(request_count)::FLOAT END';
     case 'avgLatencyMs':
       return 'CASE WHEN COALESCE(SUM(latency_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_latency_ms), 0)::FLOAT / SUM(latency_count)::FLOAT END';
-    case 'avgGenerationTimeMs':
-      return 'CASE WHEN COALESCE(SUM(latency_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_generation_time_ms), 0)::FLOAT / SUM(latency_count)::FLOAT END';
+    case 'avgGenerationTimeMs': {
+      const countExpr = generationTimeCountExprSql(tier);
+      return `CASE WHEN COALESCE(SUM(${countExpr}), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_generation_time_ms), 0)::FLOAT / SUM(${countExpr})::FLOAT END`;
+    }
     case 'costPerRequest':
       return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_cost_microdollars), 0)::FLOAT / SUM(request_count)::FLOAT END';
     case 'tokensPerRequest':
-      return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_input_tokens + total_output_tokens), 0)::FLOAT / SUM(request_count)::FLOAT END';
+      return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_tokens), 0)::FLOAT / SUM(request_count)::FLOAT END';
     case 'cacheHitRatio':
       return 'CASE WHEN COALESCE(SUM(total_input_tokens + total_cache_hit_tokens), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_cache_hit_tokens), 0)::FLOAT / SUM(total_input_tokens + total_cache_hit_tokens)::FLOAT END';
     case 'outputInputRatio':
       return 'CASE WHEN COALESCE(SUM(total_input_tokens), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_output_tokens), 0)::FLOAT / SUM(total_input_tokens)::FLOAT END';
   }
+}
+
+function generationTimeCountExprSql(tier: GranularityTier): string {
+  if (tier === 'hourly') {
+    return 'IFF(total_generation_time_ms IS NOT NULL, 1, 0)';
+  }
+  // Daily rollups do not currently carry a generation-time observation count.
+  // Derive one only for the window backed by hourly rollups so older daily
+  // history does not reuse latency_count as an incorrect denominator.
+  return 'IFF(total_generation_time_ms IS NOT NULL AND usage_date >= DATEADD(day, -7, CURRENT_DATE), 1, 0)';
 }
 
 // ---------------------------------------------------------------------------
@@ -515,6 +527,8 @@ const SummaryOutputSchema = z.object({
   totalLatencyMs: z.number(),
   totalGenerationTimeMs: z.number(),
   latencyCount: z.number(),
+  generationTimeCount: z.number(),
+  totalTokens: z.number(),
   distinctUsers: z.number(),
   errorRate: z.number(),
   avgLatencyMs: z.number(),
@@ -665,6 +679,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
           totalLatencyMs: 0,
           totalGenerationTimeMs: 0,
           latencyCount: 0,
+          generationTimeCount: 0,
+          totalTokens: 0,
           distinctUsers: 0,
           errorRate: 0,
           avgLatencyMs: 0,
@@ -678,6 +694,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       }
       const table = getTableName(meta.tier);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
+      const generationTimeCountExpr = generationTimeCountExprSql(meta.tier);
 
       const statement = `
         SELECT
@@ -694,6 +711,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
           COALESCE(SUM(total_latency_ms), 0),
           COALESCE(SUM(total_generation_time_ms), 0),
           COALESCE(SUM(latency_count), 0),
+          COALESCE(SUM(${generationTimeCountExpr}), 0),
+          COALESCE(SUM(total_tokens), 0),
           COUNT(DISTINCT kilo_user_id)
         FROM ${table}
         WHERE ${where.sql()}
@@ -733,7 +752,9 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const totalLatencyMs = toSafeNumber(row[10]);
       const totalGenerationTimeMs = toSafeNumber(row[11]);
       const latencyCount = toSafeNumber(row[12]);
-      const distinctUsers = toSafeNumber(row[13]);
+      const generationTimeCount = toSafeNumber(row[13]);
+      const totalTokens = toSafeNumber(row[14]);
+      const distinctUsers = toSafeNumber(row[15]);
 
       return {
         costMicrodollars,
@@ -749,12 +770,14 @@ export const usageAnalyticsRouter = createTRPCRouter({
         totalLatencyMs,
         totalGenerationTimeMs,
         latencyCount,
+        generationTimeCount,
+        totalTokens,
         distinctUsers,
         errorRate: ratioSafe(errorCount, requestCount),
         avgLatencyMs: ratioSafe(totalLatencyMs, latencyCount),
-        avgGenerationTimeMs: ratioSafe(totalGenerationTimeMs, latencyCount),
+        avgGenerationTimeMs: ratioSafe(totalGenerationTimeMs, generationTimeCount),
         costPerRequest: ratioSafe(costMicrodollars, requestCount),
-        tokensPerRequest: ratioSafe(inputTokens + outputTokens, requestCount),
+        tokensPerRequest: ratioSafe(totalTokens, requestCount),
         cacheHitRatio: ratioSafe(cacheHitTokens, inputTokens + cacheHitTokens),
         outputInputRatio: ratioSafe(outputTokens, inputTokens),
         effectiveGranularity: meta.effectiveGranularity,
@@ -774,7 +797,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       }
       const table = getTableName(meta.tier);
       const bucketExpr = bucketExprSql(meta.effectiveGranularity, meta.tier);
-      const metricExpr = metricExprSql(input.metric);
+      const metricExpr = metricExprSql(input.metric, meta.tier);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
 
       let statement: string;
@@ -844,7 +867,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       }
       const table = getTableName(meta.tier);
       const dimCol = dimensionColumn(input.dimension);
-      const metricExpr = metricExprSql(input.metric);
+      const metricExpr = metricExprSql(input.metric, meta.tier);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
 
       const statement = `

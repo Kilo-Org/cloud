@@ -2111,31 +2111,61 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.provider
     );
 
-    const startResult = await this.provider().startRuntime({
-      env: this.env,
-      state: this.s,
-      runtimeSpec,
-      minSecretsVersion,
-      preferredRegion: this.env.FLY_REGION,
-      onProviderResult: result => this.persistProviderResult(result),
-      onCapacityRecovery: async err => {
-        const code = err instanceof fly.FlyApiError ? err.status : 0;
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        this.emitStartCapacityRecovery(errorMessage, this.capacityRecoveryLabel(err));
-        doError(this.s, 'Insufficient resources, replacing stranded volume', {
-          statusCode: code,
-          region: this.s.flyRegion ?? 'unknown',
-        });
+    const startRuntime = () =>
+      this.provider().startRuntime({
+        env: this.env,
+        state: this.s,
+        runtimeSpec,
+        minSecretsVersion,
+        preferredRegion: this.env.FLY_REGION,
+        onProviderResult: result => this.persistProviderResult(result),
+        onCapacityRecovery: async err => {
+          const code = err instanceof fly.FlyApiError ? err.status : 0;
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          this.emitStartCapacityRecovery(errorMessage, this.capacityRecoveryLabel(err));
+          doError(this.s, 'Insufficient resources, replacing stranded volume', {
+            statusCode: code,
+            region: this.s.flyRegion ?? 'unknown',
+          });
 
-        if (code === 403 && this.s.flyRegion) {
-          await regionHelpers.evictCapacityRegionFromKV(
-            this.env.KV_CLAW_CACHE,
-            this.env,
-            this.s.flyRegion
-          );
-        }
-      },
-    });
+          if (code === 403 && this.s.flyRegion) {
+            await regionHelpers.evictCapacityRegionFromKV(
+              this.env.KV_CLAW_CACHE,
+              this.env,
+              this.s.flyRegion
+            );
+          }
+        },
+      });
+
+    let startResult: ProviderResult;
+    try {
+      startResult = await startRuntime();
+    } catch (err) {
+      if (!isFlyProvider || this.s.flyMachineId || !fly.isFlyMissingVolume(err)) {
+        throw err;
+      }
+
+      const flyState = getFlyProviderState(this.s);
+      doWarn(this.s, 'Volume not found during machine creation, clearing', {
+        volumeId: flyState.volumeId,
+      });
+      await this.persistProviderResult({
+        providerState: {
+          ...flyState,
+          volumeId: null,
+          region: null,
+        },
+      });
+      await this.persistProviderResult(
+        await this.provider().ensureStorage({
+          env: this.env,
+          state: this.s,
+          reason: 'start_missing_volume_recovery',
+        })
+      );
+      startResult = await startRuntime();
+    }
     await this.persistProviderResult(startResult);
 
     if (getRuntimeId(this.s)) {

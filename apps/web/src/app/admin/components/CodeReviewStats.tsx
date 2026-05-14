@@ -2,16 +2,9 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-type VersionBreakdownRow = {
-  agentVersion: string;
-  total: number;
-  completed: number;
-  failed: number;
-  avgDurationSeconds: number;
-};
-
 type StatsData = {
   totalReviews: number;
+  retryAccountingMode?: 'final_outcome' | 'all_attempts';
   completedCount: number;
   failedCount: number;
   cancelledCount: number;
@@ -23,7 +16,6 @@ type StatsData = {
   failureRate: number;
   cancelledRate: number;
   avgDurationSeconds: number;
-  versionBreakdown?: VersionBreakdownRow[];
 };
 
 export function CodeReviewStats({ data }: { data: StatsData }) {
@@ -34,58 +26,30 @@ export function CodeReviewStats({ data }: { data: StatsData }) {
     return `${(seconds / 3600).toFixed(1)}h`;
   };
 
-  // Build a map for quick version lookup
-  const byVersion = new Map<string, VersionBreakdownRow>();
-  for (const row of data.versionBreakdown ?? []) {
-    byVersion.set(row.agentVersion, row);
-  }
-
-  const showVersionBreakdown = byVersion.size > 0;
+  const unitLabel = data.retryAccountingMode === 'all_attempts' ? 'attempts' : 'reviews';
+  const completedDescription = `${data.completedCount.toLocaleString()} completed ${unitLabel}`;
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Total Reviews</CardTitle>
+          <CardTitle className="text-sm font-medium">
+            {data.retryAccountingMode === 'all_attempts' ? 'Total Attempts' : 'Total Reviews'}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold">{data.totalReviews.toLocaleString()}</div>
-          {showVersionBreakdown && (
-            <div className="text-muted-foreground mt-2 space-y-0.5 text-xs">
-              {['v1', 'v2'].map(v => {
-                const row = byVersion.get(v);
-                if (!row) return null;
-                return (
-                  <div key={v}>
-                    {v.toUpperCase()}: {row.total.toLocaleString()}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <div className="text-muted-foreground mt-2 text-xs">{unitLabel}</div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-          <CardDescription>{data.completedCount.toLocaleString()} completed</CardDescription>
+          <CardDescription>{completedDescription}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold text-green-600">{data.successRate.toFixed(1)}%</div>
-          {showVersionBreakdown && (
-            <div className="text-muted-foreground mt-2 space-y-0.5 text-xs">
-              {['v1', 'v2'].map(v => {
-                const row = byVersion.get(v);
-                if (!row) return null;
-                return (
-                  <div key={v}>
-                    {v.toUpperCase()}: {row.completed.toLocaleString()} completed
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -99,19 +63,6 @@ export function CodeReviewStats({ data }: { data: StatsData }) {
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold text-red-600">{data.failureRate.toFixed(1)}%</div>
-          {showVersionBreakdown && (
-            <div className="text-muted-foreground mt-2 space-y-0.5 text-xs">
-              {['v1', 'v2'].map(v => {
-                const row = byVersion.get(v);
-                if (!row) return null;
-                return (
-                  <div key={v}>
-                    {v.toUpperCase()}: {row.failed.toLocaleString()} failed
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -142,23 +93,10 @@ export function CodeReviewStats({ data }: { data: StatsData }) {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Avg Run Time</CardTitle>
-          <CardDescription>Completed reviews, excludes queue wait</CardDescription>
+          <CardDescription>Completed {unitLabel}, excludes queue wait</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold">{formatDuration(data.avgDurationSeconds)}</div>
-          {showVersionBreakdown && (
-            <div className="text-muted-foreground mt-2 space-y-0.5 text-xs">
-              {['v1', 'v2'].map(v => {
-                const row = byVersion.get(v);
-                if (!row) return null;
-                return (
-                  <div key={v}>
-                    {v.toUpperCase()}: {formatDuration(row.avgDurationSeconds)}
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </CardContent>
       </Card>
 

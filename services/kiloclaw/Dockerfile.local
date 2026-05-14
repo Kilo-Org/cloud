@@ -37,26 +37,14 @@ RUN apt-get update \
     && node --version \
     && npm --version
 
-# Install pnpm globally
-RUN npm install -g pnpm
-
-# Install OpenClaw from local tarball (see openclaw-build/README)
+# Install global CLI tools in a single invocation, then clean cache once.
+# Packages: pnpm (package manager), openclaw (from local tarball; see openclaw-build/README),
+#   clawhub, mcporter, @steipete/summarize, @kilocode/cli (runtime tooling).
 COPY openclaw-build/openclaw-*.tgz /tmp/openclaw.tgz
-RUN npm install -g /tmp/openclaw.tgz \
+RUN npm install -g pnpm /tmp/openclaw.tgz clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
     && rm /tmp/openclaw.tgz \
-    && openclaw --version
-
-# Install ClawHub CLI
-RUN npm install -g clawhub
-
-# Install mcporter (MCP server tooling)
-RUN npm install -g mcporter@0.7.3
-
-# Install summarize (web page summarization CLI)
-RUN npm install -g @steipete/summarize@0.12.0
-
-# Install Kilo CLI (agentic coding assistant for the terminal)
-RUN npm install -g @kilocode/cli@7.2.31
+    && openclaw --version \
+    && npm cache clean --force
 
 # Install Go (available at runtime for users to `go install` additional tools)
 ENV GO_VERSION=1.26.2
@@ -104,6 +92,7 @@ RUN cd /tmp/controller-build \
     && bun build src/index.ts --outfile=/usr/local/bin/kiloclaw-controller.js --target=node --minify \
        --define "KILOCLAW_CONTROLLER_VERSION=\"${CONTROLLER_VERSION}\"" \
        --define "KILOCLAW_CONTROLLER_COMMIT=\"${CONTROLLER_COMMIT}\"" \
+    && bun pm cache rm \
     && rm -rf /tmp/controller-build
 
 # Create OpenClaw directories

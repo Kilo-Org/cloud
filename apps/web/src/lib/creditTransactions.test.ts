@@ -125,11 +125,13 @@ describe('Credit Transactions', () => {
 
       if (!kiloPassPaidCreditTx) throw new Error('Failed to create Kilo Pass credit transaction');
 
+      const stripeSubscriptionId = `sub_${crypto.randomUUID()}`;
       const [subscriptionRow] = await db
         .insert(kilo_pass_subscriptions)
         .values({
           kilo_user_id: user.id,
-          stripe_subscription_id: `sub_${crypto.randomUUID()}`,
+          provider_subscription_id: stripeSubscriptionId,
+          stripe_subscription_id: stripeSubscriptionId,
           tier: KiloPassTier.Tier19,
           cadence: KiloPassCadence.Monthly,
           status: 'active',

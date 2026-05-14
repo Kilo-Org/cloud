@@ -89,6 +89,7 @@ export type SessionInput = {
 
 export type CodeReviewPayload = {
   reviewId: string;
+  attemptId?: string;
   authToken: string;
   sessionInput: SessionInput;
   owner: Owner;

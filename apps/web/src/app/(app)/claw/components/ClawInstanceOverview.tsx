@@ -2,6 +2,7 @@
 
 import { TriangleAlert } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import { gatewayStatusOk } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
 import { useClawServiceDegraded } from '../hooks/useClawHooks';
@@ -35,10 +36,13 @@ export function ClawInstanceOverview({
     !!organizationId && isRunning
   );
   const {
-    data: gatewayStatus,
+    data: gatewayStatusRaw,
     isLoading: gatewayLoading,
     error: gatewayError,
   } = organizationId ? orgGateway : personalGateway;
+  // Narrow off the instance-not-running sentinel returned by the worker
+  // when DO state isn't `running`. Downstream consumers expect the OK shape.
+  const gatewayStatus = gatewayStatusOk(gatewayStatusRaw);
 
   const { data: isServiceDegraded } = useClawServiceDegraded();
 

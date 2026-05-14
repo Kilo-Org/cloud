@@ -1447,6 +1447,16 @@ export async function tryDeleteMachine(
  * Before this cap existed, a single stuck volume could retry on every alarm
  * indefinitely — confirmed in production where 8 sandboxes accumulated 12k+
  * retries each over ~14 days.
+ *
+ * Interaction with the orphan sweep: when this cap is reached, the abandon
+ * branch clears `pendingDestroyVolumeId` and falls through into
+ * `tryDeleteOrphanVolumes` on the same alarm. If the stuck volume still exists
+ * on Fly and matches `volumeNameFromSandboxId(sandboxId)`, the sweep will make
+ * exactly one additional best-effort delete attempt against it. That can mean
+ * `destroy_volume_abandoned_after_max_retries` fires moments before the volume
+ * is actually cleaned up — alerting consumers should treat the event as "this
+ * needs human attention" rather than "this volume is leaked," and re-check
+ * actual Fly state before acting.
  */
 const MAX_DESTROY_VOLUME_ATTEMPTS = 50;
 
@@ -1556,7 +1566,14 @@ async function tryDeleteOrphanVolumes(
 
   for (const vol of volumes) {
     if (vol.name !== expectedName) continue;
-    if (vol.state === 'pending_destroy' || vol.state === 'destroyed') continue;
+    // Fly is already tearing the volume down — let it finish.
+    if (
+      vol.state === 'pending_destroy' ||
+      vol.state === 'destroying' ||
+      vol.state === 'destroyed'
+    ) {
+      continue;
+    }
     if (vol.attached_machine_id) {
       // Attached volumes need machine-destroy first. Skip here; the normal
       // pending-destroy flow (or the volume janitor) will pick this up.

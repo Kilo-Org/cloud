@@ -1165,6 +1165,64 @@ describe('destroy volume: max-retry abandon', () => {
     expect(abandoned[0]?.blobs).toEqual(expect.arrayContaining(['user-1', 'sandbox-1']));
   });
 
+  it('orphan sweep runs on the same alarm as abandon and may complete the cleanup', async () => {
+    // When the abandon branch fires, it clears pendingDestroyVolumeId and the
+    // reconcile loop continues into tryDeleteOrphanVolumes on the same alarm.
+    // If the stuck volume still exists on Fly and matches the sandbox name,
+    // the sweep gets one final best-effort attempt — and in that attempt the
+    // underlying transient condition may have resolved (e.g. a phantom bound
+    // machine has finally been reaped on Fly's side). This test pins that
+    // interaction so consumers of the abandoned event understand the volume
+    // can occasionally be cleaned up immediately after.
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+      destroyVolumeAttempts: 49,
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-1',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    // First delete (pending-destroy path) fails → triggers abandon. Second
+    // delete (orphan sweep) succeeds — same alarm.
+    (flyClient.deleteVolume as Mock)
+      .mockRejectedValueOnce(new FlyApiError('persistent failure', 502, '{}'))
+      .mockResolvedValueOnce(undefined);
+    (flyClient.listVolumes as Mock).mockResolvedValue([
+      {
+        id: 'vol-1',
+        name: 'kiloclaw_sandbox_1',
+        state: 'created',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+    ]);
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // Both events fired on the same alarm: the abandon (for alerting) and the
+    // sweep's success (the actual cleanup).
+    expect(
+      analyticsEventsByName(env, 'reconcile.destroy_volume_abandoned_after_max_retries')
+    ).toHaveLength(1);
+    expect(analyticsEventsByName(env, 'reconcile.destroy_orphan_volume_ok')).toHaveLength(1);
+
+    // deleteVolume was called twice: once from the pending-destroy path, once
+    // from the orphan sweep.
+    expect(flyClient.deleteVolume).toHaveBeenCalledTimes(2);
+
+    // Destroy finalizes cleanly — storage wiped.
+    expect(storage._store.size).toBe(0);
+  });
+
   it('resets destroyVolumeAttempts on successful delete', async () => {
     const { storage } = createInstance();
     await seedProvisioned(storage, {

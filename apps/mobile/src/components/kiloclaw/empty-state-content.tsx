@@ -50,7 +50,7 @@ export function EmptyStateContent({
         action={
           <Button
             variant="outline"
-            onPress={() => void Linking.openURL(WEB_BASE_URL)}
+            onPress={() => void Linking.openURL(`${WEB_BASE_URL}/claw`)}
             accessibilityRole="link"
           >
             <Text>Continue on kilo.ai</Text>

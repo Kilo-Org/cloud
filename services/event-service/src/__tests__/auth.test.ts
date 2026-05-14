@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { signKiloToken } from '@kilocode/worker-utils';
+import { clearSecretCacheForTest, signKiloToken } from '@kilocode/worker-utils';
 import { getWorkerDb } from '@kilocode/db/client';
 import { authenticateToken } from '../auth';
 
@@ -29,6 +29,7 @@ function makeEnv(): Env {
 
 describe('authenticateToken', () => {
   beforeEach(() => {
+    clearSecretCacheForTest();
     currentPepperByUserId.clear();
     currentPepperByUserId.set('user-xyz-789', 'pepper-current');
     getWorkerDbMock.mockReturnValue(createPepperDbMock());

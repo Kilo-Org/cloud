@@ -28,6 +28,8 @@ import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';
 
+import { Button } from '@/components/ui/button';
+import { Text } from '@/components/ui/text';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { initAppsFlyer } from '@/lib/appsflyer';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
@@ -82,7 +84,7 @@ setupNotificationHandler();
 checkInitialNotification();
 
 function RootLayoutNav() {
-  const { token, isLoading: authLoading } = useAuth();
+  const { token, isLoading: authLoading, signOut } = useAuth();
   const { updateRequired, isChecking: updateChecking } = useForceUpdate();
   const [fontsLoaded, fontsError] = useFonts({
     JetBrainsMono_500Medium,
@@ -92,7 +94,12 @@ function RootLayoutNav() {
   const pathname = usePathname();
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
-  const { userId, isLoading: userIdLoading } = useCurrentUserId({ enabled: token != null });
+  const {
+    userId,
+    isLoading: userIdLoading,
+    isError: userIdError,
+    refetch: refetchUserId,
+  } = useCurrentUserId({ enabled: token != null });
   const [consentChecked, setConsentChecked] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
 
@@ -182,6 +189,11 @@ function RootLayoutNav() {
         router.replace('/(auth)/login');
       }
     } else {
+      if (userIdError) {
+        void SplashScreen.hideAsync();
+        return;
+      }
+
       if (userIdLoading || !consentChecked) {
         return;
       }
@@ -215,6 +227,7 @@ function RootLayoutNav() {
     inForceUpdate,
     router,
     userIdLoading,
+    userIdError,
     consentChecked,
     needsConsent,
     onConsentRoute,
@@ -225,6 +238,7 @@ function RootLayoutNav() {
   const showingForceUpdate = updateRequired && inForceUpdate;
   const needsAuth = !token && !inAuthGroup;
   const needsAppRedirect = token != null && inAuthGroup;
+  const hasUserBootstrapError = token != null && userIdError;
   const consentLoading =
     token != null && !consentChecked && !inAuthGroup && !inForceUpdate && !onConsentRoute;
   const needsConsentRedirect = consentChecked && needsConsent && !onConsentRoute;
@@ -238,7 +252,37 @@ function RootLayoutNav() {
   // initialised — returning null unmounts it and breaks router.replace.
   // The native splash screen covers everything during initial load, and
   // opacity 0 hides the wrong screen during redirects.
-  const hidden = isLoading || needsRedirect || consentLoading;
+  const hidden = !hasUserBootstrapError && (isLoading || needsRedirect || consentLoading);
+
+  if (hasUserBootstrapError) {
+    return (
+      <View className="flex-1 items-center justify-center gap-4 bg-background px-6">
+        <View className="gap-2">
+          <Text className="text-center text-lg font-semibold text-foreground">
+            Could not load your account
+          </Text>
+          <Text className="text-center text-sm text-muted-foreground">
+            Check your connection and try again.
+          </Text>
+        </View>
+        <View className="w-full gap-3">
+          <Button size="lg" onPress={refetchUserId} accessibilityLabel="Retry loading account">
+            <Text>Retry</Text>
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onPress={() => {
+              void signOut();
+            }}
+            accessibilityLabel="Sign out"
+          >
+            <Text>Sign out</Text>
+          </Button>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View

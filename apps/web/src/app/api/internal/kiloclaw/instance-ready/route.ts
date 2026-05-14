@@ -17,7 +17,11 @@ import { KILOCLAW_INTERNAL_API_SECRET, NEXTAUTH_URL } from '@/lib/config.server'
 import { send as sendEmail } from '@/lib/email';
 import { findUserById } from '@/lib/user';
 import { db } from '@/lib/drizzle';
-import { kiloclaw_email_log } from '@kilocode/db/schema';
+import {
+  getKiloClawPricingCatalogEntry,
+  CURRENT_KILOCLAW_PRICE_VERSION,
+} from '@kilocode/db';
+import { kiloclaw_email_log, kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { completeAutoResumeIfReady } from '@/lib/kiloclaw/instance-lifecycle';
 
 const BodySchema = z.object({
@@ -28,6 +32,27 @@ const BodySchema = z.object({
 });
 
 const INSTANCE_READY_EMAIL_TYPE = 'claw_instance_ready';
+
+function formatTrialPeriod(days: number): string {
+  return days === 1 ? '1 day' : `${days} days`;
+}
+
+async function resolveTrialPeriod(userId: string, instanceId: string): Promise<string> {
+  const [subscription] = await db
+    .select({ kiloclaw_price_version: kiloclaw_subscriptions.kiloclaw_price_version })
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        eq(kiloclaw_subscriptions.instance_id, instanceId)
+      )
+    )
+    .limit(1);
+
+  const priceVersion = subscription?.kiloclaw_price_version ?? CURRENT_KILOCLAW_PRICE_VERSION;
+  const { trialDurationDays } = getKiloClawPricingCatalogEntry(priceVersion);
+  return formatTrialPeriod(trialDurationDays);
+}
 
 function legacyInstanceReadyEmailType(sandboxId: string): string {
   return `claw_instance_ready:${sandboxId}`;
@@ -154,11 +179,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sent: false, reason: 'already_sent' });
   }
 
+  const trialPeriod = await resolveTrialPeriod(userId, targetInstanceId);
+
   try {
     await sendEmail({
       to: user.google_user_email,
       templateName: 'clawInstanceReady',
-      templateVars: { claw_url: `${NEXTAUTH_URL}/claw` },
+      templateVars: { claw_url: `${NEXTAUTH_URL}/claw`, trial_period: trialPeriod },
     });
   } catch (error) {
     // Roll back the email log entry so the next attempt can retry.

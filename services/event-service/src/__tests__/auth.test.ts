@@ -1,14 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearSecretCacheForTest, signKiloToken } from '@kilocode/worker-utils';
-import { getWorkerDb } from '@kilocode/db/client';
 import { authenticateToken } from '../auth';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
-const currentPepperByUserId = new Map<string, string | null>();
-const getWorkerDbMock = vi.mocked(getWorkerDb);
+const currentPepperByUserId = vi.hoisted(() => new Map<string, string | null>());
 
-function createPepperDbMock(): ReturnType<typeof getWorkerDb> {
-  return {
+vi.mock('@kilocode/db/client', () => ({
+  getWorkerDb: () => ({
     select: () => ({
       from: () => ({
         where: () => ({
@@ -16,8 +14,8 @@ function createPepperDbMock(): ReturnType<typeof getWorkerDb> {
         }),
       }),
     }),
-  } as unknown as ReturnType<typeof getWorkerDb>;
-}
+  }),
+}));
 
 function makeEnv(): Env {
   return {
@@ -32,7 +30,6 @@ describe('authenticateToken', () => {
     clearSecretCacheForTest();
     currentPepperByUserId.clear();
     currentPepperByUserId.set('user-xyz-789', 'pepper-current');
-    getWorkerDbMock.mockReturnValue(createPepperDbMock());
   });
 
   it('authenticates a kilo-chat token with the current pepper', async () => {

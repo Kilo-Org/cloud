@@ -54,6 +54,7 @@ const AUTO_RESUME_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
 const TRIAL_INACTIVITY_BATCH_SIZE = 50;
 const SOFT_DELETED_EMAIL_SUFFIX = '@deleted.invalid';
 const TRIAL_ENDING_SOON_MIN_DURATION_DAYS = 2;
+const TRIAL_EXPIRES_TOMORROW_MIN_DURATION_DAYS = 2;
 const TRIAL_INACTIVITY_MIN_DURATION_DAYS = 2;
 const TRIAL_INACTIVITY_PRICE_VERSIONS = KILOCLAW_PRICE_VERSIONS.filter(
   priceVersion =>
@@ -2494,7 +2495,7 @@ async function runTrialWarningSweep(
       ).trialDurationDays;
 
       const sent =
-        daysRemaining <= 1
+        daysRemaining <= 1 && trialDurationDays >= TRIAL_EXPIRES_TOMORROW_MIN_DURATION_DAYS
           ? await trySendEmail(
               database,
               env,

@@ -505,7 +505,9 @@ export function WelcomePage() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const { data: billing } = useQuery(trpc.kiloclaw.getPersonalBillingSummary.queryOptions());
+  const { data: billing, isPending: billingSummaryPending } = useQuery(
+    trpc.kiloclaw.getPersonalBillingSummary.queryOptions()
+  );
   const checkoutMutation = useMutation(trpc.kiloclaw.createSubscriptionCheckout.mutationOptions());
   const kiloPassUpsell = useMutation(
     trpc.kiloclaw.createKiloPassUpsellCheckout.mutationOptions({
@@ -554,7 +556,10 @@ export function WelcomePage() {
       ? (kiloPassUpsellPreview?.[hostingPlan]?.[cadence]?.[selectedTier] ?? null)
       : null;
   const selectedKiloPassPreviewLoading =
-    selectedTier !== null && hostingPlan !== null && selectedKiloPassPreview === null;
+    billingSummaryPending &&
+    selectedTier !== null &&
+    hostingPlan !== null &&
+    selectedKiloPassPreview === null;
   const selectedKiloPassInsufficient = selectedKiloPassPreview?.eligible === false;
   const selectedCommitPreview =
     selectedTier !== null
@@ -645,7 +650,12 @@ export function WelcomePage() {
     }
   }
 
-  const kiloPassReady = selectedKiloPassPreview?.eligible === true;
+  const kiloPassReady =
+    selectedKiloPassPreview?.eligible === true ||
+    (!billingSummaryPending &&
+      selectedTier !== null &&
+      hostingPlan !== null &&
+      selectedKiloPassPreview === null);
   const kiloPassButtonLabel = selectedKiloPassPreviewLoading
     ? 'Checking credits…'
     : selectedKiloPassInsufficient

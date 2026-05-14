@@ -909,7 +909,7 @@ describe('credit renewal fanout queue processing', () => {
 
   it('treats duplicate item delivery as the same idempotent renewal-boundary outcome', async () => {
     const row = creditRenewalRow();
-    const { db, txUpdates, txInserts } = createMockDb([[row], []], {
+    const { db, txUpdates, txInserts } = createMockDb([[row], [row], []], {
       txInsertRowCounts: [0],
     });
     mockGetWorkerDb.mockReturnValue(db);
@@ -947,6 +947,8 @@ describe('credit renewal fanout queue processing', () => {
     expect(txUpdates).toContainEqual(
       expect.objectContaining({
         status: 'superseded',
+        resolution_actor_type: 'system',
+        resolution_actor_id: 'billing-lifecycle-job',
         resolution_reason: 'subscription_boundary_advanced',
       })
     );
@@ -956,9 +958,9 @@ describe('credit renewal fanout queue processing', () => {
     expect(staleResult.errors).toBe(0);
   });
 
-  it('skips an item when the diagnostic userId does not match the current subscription owner', async () => {
+  it('re-reads an item when the diagnostic userId does not match the current subscription owner', async () => {
     const row = creditRenewalRow({ user_id: 'actual-user' });
-    const { db, txInserts, txUpdates, updates } = createMockDb([[row]]);
+    const { db, txInserts, txUpdates, updates, selectBuilders } = createMockDb([[row]]);
     mockGetWorkerDb.mockReturnValue(db);
     const fetchImpl = vi.fn();
     const { env } = createEnvWithQueueMocks(fetchImpl);
@@ -976,12 +978,25 @@ describe('credit renewal fanout queue processing', () => {
       1
     );
 
-    expect(summary.credit_renewals).toBe(0);
+    expect(summary.credit_renewals).toBe(1);
     expect(summary.credit_renewals_past_due).toBe(0);
     expect(summary.errors).toBe(0);
-    expect(txInserts).toHaveLength(0);
-    expect(txUpdates).toHaveLength(0);
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          credit_category: 'kiloclaw-subscription:22222222-2222-4222-8222-222222222222:2026-06',
+        }),
+      ])
+    );
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          current_period_start: '2026-06-01T00:00:00.000Z',
+        }),
+      ])
+    );
     expect(updates).toHaveLength(0);
+    expect(selectBuilders[0]?.limit).toHaveBeenCalledTimes(1);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -1035,7 +1050,7 @@ describe('credit renewal fanout queue processing', () => {
     const row = creditRenewalRow({
       credit_renewal_at: '2026-06-01T00:00:00.000Z',
     });
-    const { db, updates } = createMockDb([[row], []], {
+    const { db, updates } = createMockDb([[row], [row], []], {
       txInsertRowCounts: [0],
       txUpdateReturningRows: [[]],
     });
@@ -1101,6 +1116,8 @@ describe('credit renewal fanout queue processing', () => {
     };
     const { db, txInserts, txUpdates, txExecutes, updates } = createMockDb([
       [first],
+      [first],
+      [secondAfterFirstDeduction],
       [secondAfterFirstDeduction],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -2564,6 +2581,35 @@ describe('credit renewal Kilo Pass bonus projection', () => {
           user_updated_at: '2026-04-09T09:00:00.000Z',
         },
       ],
+      [
+        {
+          user_id: 'user-1',
+          email: 'user-1@example.com',
+          instance_id: 'instance-1',
+          id: 'sub-1',
+          instance_row_id: 'instance-1',
+          organization_id: null,
+          instance_destroyed_at: null,
+          plan: 'standard',
+          status: 'active',
+          kiloclaw_price_version: '2026-03-19',
+          credit_renewal_at: renewalAt,
+          current_period_end: renewalAt,
+          cancel_at_period_end: false,
+          scheduled_plan: null,
+          commit_ends_at: null,
+          past_due_since: null,
+          suspended_at: null,
+          auto_resume_attempt_count: 0,
+          auto_top_up_triggered_for_period: null,
+          total_microdollars_acquired: 7_000_000,
+          microdollars_used: 0,
+          auto_top_up_enabled: false,
+          kilo_pass_threshold: 8_000_000,
+          next_credit_expiration_at: null,
+          user_updated_at: '2026-04-09T09:00:00.000Z',
+        },
+      ],
       [],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -2690,48 +2736,47 @@ describe('credit renewal Kilo Pass bonus projection', () => {
 
   it('renews when a local Kilo Pass threshold-crossing projection makes the effective balance sufficient', async () => {
     const renewalAt = '2026-04-09T10:00:00.000Z';
+    const renewalRow = {
+      user_id: 'user-1',
+      email: 'user-1@example.com',
+      instance_id: 'instance-1',
+      id: 'sub-1',
+      instance_row_id: 'instance-1',
+      organization_id: null,
+      instance_destroyed_at: null,
+      plan: 'standard',
+      status: 'active',
+      kiloclaw_price_version: '2026-03-19',
+      credit_renewal_at: renewalAt,
+      current_period_end: renewalAt,
+      cancel_at_period_end: false,
+      scheduled_plan: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      total_microdollars_acquired: 17_000_000,
+      microdollars_used: 10_000_000,
+      auto_top_up_enabled: false,
+      kilo_pass_threshold: 20_000_000,
+      next_credit_expiration_at: null,
+      user_updated_at: '2026-04-09T09:00:00.000Z',
+    };
+    const kiloPassSubscription = {
+      id: 'kp-sub-1',
+      tier: 'tier_49',
+      cadence: 'monthly',
+      status: 'active',
+      cancelAtPeriodEnd: false,
+      currentStreakMonths: 1,
+      startedAt: '2026-04-01T00:00:00.000Z',
+      createdAt: '2026-04-01T00:00:00.000Z',
+    };
     const { db, txUpdates } = createMockDb([
-      [
-        {
-          user_id: 'user-1',
-          email: 'user-1@example.com',
-          instance_id: 'instance-1',
-          id: 'sub-1',
-          instance_row_id: 'instance-1',
-          organization_id: null,
-          instance_destroyed_at: null,
-          plan: 'standard',
-          status: 'active',
-          kiloclaw_price_version: '2026-03-19',
-          credit_renewal_at: renewalAt,
-          current_period_end: renewalAt,
-          cancel_at_period_end: false,
-          scheduled_plan: null,
-          commit_ends_at: null,
-          past_due_since: null,
-          suspended_at: null,
-          auto_resume_attempt_count: 0,
-          auto_top_up_triggered_for_period: null,
-          total_microdollars_acquired: 17_000_000,
-          microdollars_used: 10_000_000,
-          auto_top_up_enabled: false,
-          kilo_pass_threshold: 20_000_000,
-          next_credit_expiration_at: null,
-          user_updated_at: '2026-04-09T09:00:00.000Z',
-        },
-      ],
-      [
-        {
-          id: 'kp-sub-1',
-          tier: 'tier_49',
-          cadence: 'monthly',
-          status: 'active',
-          cancelAtPeriodEnd: false,
-          currentStreakMonths: 1,
-          startedAt: '2026-04-01T00:00:00.000Z',
-          createdAt: '2026-04-01T00:00:00.000Z',
-        },
-      ],
+      [renewalRow],
+      [renewalRow],
+      [kiloPassSubscription],
       [],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -4035,6 +4080,8 @@ describe('credit renewal sweep affiliate tracking', () => {
         }),
         expect.objectContaining({
           status: 'superseded',
+          resolution_actor_type: 'system',
+          resolution_actor_id: 'billing-lifecycle-job',
           resolution_reason: 'subscription_boundary_advanced',
         }),
       ])
@@ -4173,6 +4220,77 @@ describe('credit renewal sweep affiliate tracking', () => {
         },
       },
     ]);
+  });
+
+  it('preserves the auto-top-up marker when trigger failure is ambiguous', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const beforeRow = creditRenewalRow({
+      id: 'sub-1',
+      credit_renewal_at: renewalAt,
+      current_period_end: renewalAt,
+      total_microdollars_acquired: 1_000_000,
+      microdollars_used: 900_000,
+      auto_top_up_enabled: true,
+      kilo_pass_threshold: null,
+      user_updated_at: '2026-04-09T09:00:00.000Z',
+    });
+    const afterRow = {
+      ...beforeRow,
+      auto_top_up_triggered_for_period: renewalAt,
+    };
+    const { db, updates, inserts } = createMockDb([[beforeRow]], {
+      updateReturningRows: [[afterRow]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_request, init) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+      };
+
+      if (body.action === 'project_pending_kilo_pass_bonus') {
+        return new Response(JSON.stringify({ projectedBonusMicrodollars: 0 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      if (body.action === 'trigger_user_auto_top_up') {
+        return new Response(JSON.stringify({ error: 'auto top-up unavailable' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      throw new Error(`Unexpected side effect action: ${body.action}`);
+    });
+
+    await expect(
+      processCreditRenewalItem(
+        createEnv(vi.fn()),
+        creditRenewalItemMessage({
+          runId: 'cececece-cece-4ece-8ece-cececececece',
+          renewalBoundary: renewalAt,
+        }),
+        1
+      )
+    ).rejects.toThrow('Billing side effect failed (500): {"error":"auto top-up unavailable"}');
+
+    expect(updates).toEqual([{ auto_top_up_triggered_for_period: renewalAt }]);
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason: 'credit_renewal_auto_top_up_marked',
+        }),
+      ])
+    );
+    expect(inserts).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason: 'credit_renewal_auto_top_up_trigger_failed',
+        }),
+      ])
+    );
   });
 
   it('skips auto-top-up trigger when marker update loses concurrent race', async () => {

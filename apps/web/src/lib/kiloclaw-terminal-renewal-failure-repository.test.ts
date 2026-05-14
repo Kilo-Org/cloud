@@ -144,6 +144,44 @@ describe('kiloclaw terminal renewal failure repository', () => {
       expect(new Date(second.last_failure_at).toISOString()).toBe(laterObservedAt);
       expect(new Date(second.first_failure_at).toISOString()).toBe(laterObservedAt);
     });
+
+    it('does not mutate resolved rows when a late duplicate terminal-failure message arrives', async () => {
+      const boundary = '2026-06-01T00:00:00.000Z';
+      const observedAt = '2026-06-01T00:30:00.000Z';
+      const resolvedAt = '2026-06-01T01:00:00.000Z';
+
+      await recordTerminalRenewalFailure(db, {
+        subscriptionId: subscription.id,
+        renewalBoundary: boundary,
+        attempts: 3,
+        failureCode: 'renewal_transaction_failed',
+        failureMessage: 'original error',
+        observedAt,
+      });
+      await markTerminalRenewalFailureResolved(db, {
+        subscriptionId: subscription.id,
+        renewalBoundary: boundary,
+        actor: { type: 'operator', id: 'ops-user-1' },
+        reason: 'operator retry succeeded',
+        resolvedAt,
+      });
+
+      const lateDuplicate = await recordTerminalRenewalFailure(db, {
+        subscriptionId: subscription.id,
+        renewalBoundary: boundary,
+        attempts: 9,
+        failureCode: 'queue_delivery_exhausted',
+        failureMessage: 'late duplicate after resolution',
+        observedAt: '2026-06-01T02:00:00.000Z',
+      });
+
+      expect(lateDuplicate.status).toBe('resolved');
+      expect(lateDuplicate.attempt_count).toBe(3);
+      expect(new Date(lateDuplicate.last_failure_at).toISOString()).toBe(observedAt);
+      expect(lateDuplicate.last_failure_code).toBe('renewal_transaction_failed');
+      expect(lateDuplicate.last_failure_message).toBe('original error');
+      expect(lateDuplicate.resolution_reason).toBe('operator retry succeeded');
+    });
   });
 
   describe('findUnresolvedTerminalRenewalFailure', () => {
@@ -376,6 +414,7 @@ describe('kiloclaw terminal renewal failure repository', () => {
       const transitioned = await supersedeTerminalRenewalFailuresForBoundary(db, {
         subscriptionId: subscription.id,
         currentBoundary: '2026-06-01T00:00:00.000Z',
+        actor: { type: 'system', id: 'billing-lifecycle-job' },
         supersededAt: '2026-06-01T01:00:00.000Z',
       });
 
@@ -384,6 +423,8 @@ describe('kiloclaw terminal renewal failure repository', () => {
       expect(boundaries.sort()).toEqual(['2026-04-01T00:00:00.000Z', '2026-05-01T00:00:00.000Z']);
       for (const row of transitioned) {
         expect(row.status).toBe('superseded');
+        expect(row.resolution_actor_type).toBe('system');
+        expect(row.resolution_actor_id).toBe('billing-lifecycle-job');
         expect(row.resolution_reason).toBe('subscription_boundary_advanced');
       }
 
@@ -428,6 +469,7 @@ describe('kiloclaw terminal renewal failure repository', () => {
       const transitioned = await supersedeTerminalRenewalFailuresForBoundary(db, {
         subscriptionId: subscription.id,
         currentBoundary: '2026-06-01T00:00:00.000Z',
+        actor: { type: 'system', id: 'billing-lifecycle-job' },
         supersededAt: '2026-06-01T01:00:00.000Z',
       });
       expect(transitioned).toHaveLength(0);
@@ -463,6 +505,7 @@ describe('kiloclaw terminal renewal failure repository', () => {
       await supersedeTerminalRenewalFailuresForBoundary(db, {
         subscriptionId: subscription.id,
         currentBoundary: '2026-06-01T00:00:00.000Z',
+        actor: { type: 'system', id: 'billing-lifecycle-job' },
         supersededAt: '2026-06-01T01:00:00.000Z',
       });
 

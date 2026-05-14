@@ -77,6 +77,10 @@ export type SupersedeTerminalRenewalFailuresInput = {
    * because they still represent the active credit-renewal decision.
    */
   currentBoundary: string;
+  actor: {
+    type: KiloClawTerminalRenewalFailureResolutionActorType;
+    id: string;
+  };
   supersededAt: string;
 };
 
@@ -125,10 +129,31 @@ export async function recordTerminalRenewalFailure(
         last_failure_message: input.failureMessage ?? null,
         updated_at: sql`now()`,
       },
+      setWhere: eq(
+        kiloclaw_terminal_renewal_failures.status,
+        KiloClawTerminalRenewalFailureStatus.Unresolved
+      ),
     })
     .returning();
 
-  return row;
+  if (row) return row;
+
+  const [existing] = await database
+    .select()
+    .from(kiloclaw_terminal_renewal_failures)
+    .where(
+      and(
+        eq(kiloclaw_terminal_renewal_failures.subscription_id, input.subscriptionId),
+        eq(kiloclaw_terminal_renewal_failures.renewal_boundary, input.renewalBoundary)
+      )
+    )
+    .limit(1);
+
+  if (!existing) {
+    throw new Error('terminal_renewal_failure_conflict_row_missing');
+  }
+
+  return existing;
 }
 
 /**
@@ -300,6 +325,8 @@ export async function supersedeTerminalRenewalFailuresForBoundary(
     .update(kiloclaw_terminal_renewal_failures)
     .set({
       status: KiloClawTerminalRenewalFailureStatus.Superseded,
+      resolution_actor_type: input.actor.type,
+      resolution_actor_id: input.actor.id,
       resolution_at: input.supersededAt,
       resolution_reason: 'subscription_boundary_advanced',
     })

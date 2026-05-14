@@ -1571,6 +1571,10 @@ async function processCreditRenewalRow(
           await supersedeTerminalRenewalFailuresForBoundary(tx, {
             subscriptionId: current.id,
             currentBoundary: newPeriodEnd,
+            actor: {
+              type: LIFECYCLE_ACTOR.actorType,
+              id: LIFECYCLE_ACTOR.actorId,
+            },
             supersededAt: new Date().toISOString(),
           });
         }
@@ -1619,6 +1623,10 @@ async function processCreditRenewalRow(
       await supersedeTerminalRenewalFailuresForBoundary(tx, {
         subscriptionId: current.id,
         currentBoundary: newPeriodEnd,
+        actor: {
+          type: LIFECYCLE_ACTOR.actorType,
+          id: LIFECYCLE_ACTOR.actorId,
+        },
         supersededAt: new Date().toISOString(),
       });
 
@@ -1784,6 +1792,7 @@ async function processCreditRenewalRow(
         userId: outcome.row.user_id,
         error: error instanceof Error ? error.message : String(error),
       });
+      throw error;
     }
 
     if (shouldResolveTerminalFailure) {
@@ -2131,13 +2140,7 @@ export async function processCreditRenewalItem(
     async () => {
       const database = getDb(env);
       const summary = createSummary();
-      const row = message.userId
-        ? {
-            id: message.subscriptionId,
-            user_id: message.userId,
-            credit_renewal_at: message.renewalBoundary,
-          }
-        : await fetchCreditRenewalItemRow(database, message);
+      const row = await fetchCreditRenewalItemRow(database, message);
 
       if (!row) {
         log('info', 'Skipping stale or ineligible credit-renewal item', {

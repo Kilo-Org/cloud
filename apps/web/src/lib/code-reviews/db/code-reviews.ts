@@ -912,6 +912,36 @@ export async function updateCodeReviewUsage(
 }
 
 /**
+ * Updates REVIEW.md usage metadata for a code review.
+ */
+export async function updateRepositoryReviewInstructionsMetadata(
+  reviewId: string,
+  metadata: {
+    used: boolean;
+    ref: string | null;
+    truncated: boolean;
+  }
+): Promise<void> {
+  try {
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        repository_review_instructions_used: metadata.used,
+        repository_review_instructions_ref: metadata.ref,
+        repository_review_instructions_truncated: metadata.truncated,
+        updated_at: new Date().toISOString(),
+      })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'updateRepositoryReviewInstructionsMetadata' },
+      extra: { reviewId, metadata },
+    });
+    throw error;
+  }
+}
+
+/**
  * Lists code reviews for an owner (org or user)
  * Supports filtering by status and repository
  * Returns reviews sorted by creation date (newest first)

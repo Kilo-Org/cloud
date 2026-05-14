@@ -3146,7 +3146,7 @@ platform.post('/destroy', async c => {
 
   try {
     const destroyOptions = result.data.reason ? { reason: result.data.reason } : undefined;
-    await withResolvedDORetry(
+    const destroyResult = await withResolvedDORetry(
       c.env,
       userId,
       instanceId,
@@ -3196,7 +3196,7 @@ platform.post('/destroy', async c => {
       console.error('[platform] Registry destroy failed (non-fatal):', registryErr);
     }
 
-    return c.json({ ok: true });
+    return c.json({ ok: true, ...destroyResult });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'destroy');
     return jsonError(message, status);

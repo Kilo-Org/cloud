@@ -285,6 +285,18 @@ type StopInstanceResponse = {
   stoppedAt: number | null;
 };
 
+type DestroyInstanceResponse = {
+  ok: true;
+  finalized: boolean;
+  destroyedUserId: string | null;
+  destroyedSandboxId: string | null;
+  pendingMachineId: string | null;
+  pendingVolumeId: string | null;
+  lastDestroyErrorOp: 'machine' | 'volume' | 'recover' | null;
+  lastDestroyErrorStatus: number | null;
+  lastDestroyErrorAt: number | null;
+};
+
 function createSummary(): BillingSummary {
   return {
     credit_renewals: 0,
@@ -837,11 +849,11 @@ async function destroyInstance(
   userId: string,
   instanceId?: string,
   reason?: KiloclawDestroyReason
-): Promise<void> {
+): Promise<DestroyInstanceResponse | null> {
   const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
   const path = `/api/platform/destroy${params}`;
   try {
-    await requestKiloClaw<{ ok: true }>(
+    return await requestKiloClaw<DestroyInstanceResponse>(
       env,
       context,
       path,
@@ -864,7 +876,7 @@ async function destroyInstance(
         userId,
         instanceId,
       });
-      return;
+      return null;
     }
 
     throw error;
@@ -1720,25 +1732,51 @@ async function destroyInstanceForEnforcement(
     instance_id: string | null;
     sandbox_id: string | null;
   }
-): Promise<void> {
-  if (!row.instance_id) return;
+): Promise<DestroyInstanceResponse | null> {
+  if (!row.instance_id) return null;
 
   try {
-    await destroyInstance(
+    const result = await destroyInstance(
       env,
       context,
       row.user_id,
       workerInstanceId({ id: row.instance_id, sandbox_id: row.sandbox_id }),
       'destruction_deadline_elapsed'
     );
+    if (!result) return null;
+
+    if (result.finalized) {
+      log('info', 'Destroy instance during billing enforcement confirmed cleanup', {
+        event: 'instance_destroy_confirmed',
+        outcome: 'completed',
+        userId: row.user_id,
+        instanceId: row.instance_id,
+      });
+    } else {
+      log('warn', 'Destroy instance during billing enforcement still has pending cleanup', {
+        event: 'instance_destroy_pending',
+        outcome: 'retry',
+        userId: row.user_id,
+        instanceId: row.instance_id,
+        pendingMachineId: result.pendingMachineId,
+        pendingVolumeId: result.pendingVolumeId,
+        lastDestroyErrorOp: result.lastDestroyErrorOp,
+        lastDestroyErrorStatus: result.lastDestroyErrorStatus,
+        lastDestroyErrorAt: result.lastDestroyErrorAt,
+      });
+    }
+    return result;
   } catch (error) {
     const isExpected = error instanceof KiloClawApiError && error.statusCode === 409;
     log(isExpected ? 'info' : 'error', 'Destroy instance during billing enforcement failed', {
+      event: 'instance_destroy_request_failed',
+      outcome: isExpected ? 'skipped' : 'failed',
       userId: row.user_id,
       instanceId: row.instance_id,
       statusCode: error instanceof KiloClawApiError ? error.statusCode : null,
       error: error instanceof Error ? error.message : String(error),
     });
+    return null;
   }
 }
 

@@ -8,8 +8,10 @@ export function verifyGitHubWebhookSignature(_payload: string, _signature: strin
   return true;
 }
 
-export async function generateGitHubInstallationToken(_installationId: string): Promise<string> {
-  return `mock-token-${_installationId}`;
+export async function generateGitHubInstallationToken(
+  _installationId: string
+): Promise<{ token: string; expires_at: string }> {
+  return { token: `mock-token-${_installationId}`, expires_at: '2099-01-01T00:00:00.000Z' };
 }
 
 export async function deleteGitHubInstallation(_installationId: string): Promise<void> {
@@ -113,5 +115,15 @@ export async function fetchPullRequestReviewDecision(_args: {
   number: number;
   appType?: GitHubAppType;
 }): Promise<ReviewDecision | null> {
+  return null;
+}
+
+export async function fetchGitHubRootTextFileAtRef(_params: {
+  token: string;
+  owner: string;
+  repo: string;
+  path: string;
+  ref: string;
+}): Promise<string | null> {
   return null;
 }

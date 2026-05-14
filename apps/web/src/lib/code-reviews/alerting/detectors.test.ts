@@ -173,22 +173,23 @@ describe('code review alert detectors', () => {
     await expect(evaluateSlowReviews(db)).resolves.toEqual({ tripped: false });
   });
 
-  it('trips error-spike alerts at 5% of recently started reviews', async () => {
+  it('trips error-spike alerts at 10% of recently started reviews', async () => {
     await insertReviews([
       reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
-      ...Array.from({ length: 19 }, () => reviewValues()),
+      reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
+      ...Array.from({ length: 18 }, () => reviewValues()),
     ]);
 
     await expect(evaluateErrorSpike(db)).resolves.toMatchObject({
       tripped: true,
       details: {
         kind: 'error_spike',
-        rate: 0.05,
+        rate: 0.1,
         startedCount: 20,
-        errorCount: 1,
+        errorCount: 2,
         windowMinutes: 30,
         topReason: 'timeout',
-        topReasonCount: 1,
+        topReasonCount: 2,
       },
     });
   });
@@ -199,7 +200,7 @@ describe('code review alert detectors', () => {
     await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });
   });
 
-  it('does not trip error-spike alerts below 5%', async () => {
+  it('does not trip error-spike alerts below 10%', async () => {
     await insertReviews([
       reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
       ...Array.from({ length: 20 }, () => reviewValues()),
@@ -239,19 +240,22 @@ describe('code review alert detectors', () => {
     await insertReviews([
       reviewValues({ status: 'interrupted', terminal_reason: 'interrupted' }),
       reviewValues({ status: 'cancelled', terminal_reason: 'interrupted' }),
-      ...Array.from({ length: 38 }, () => reviewValues()),
+      reviewValues({ status: 'interrupted', terminal_reason: 'interrupted' }),
+      reviewValues({ status: 'cancelled', terminal_reason: 'interrupted' }),
+      ...Array.from({ length: 36 }, () => reviewValues()),
     ]);
 
     await expect(evaluateErrorSpike(db)).resolves.toMatchObject({
       tripped: true,
-      details: { kind: 'error_spike', startedCount: 40, errorCount: 2, topReason: 'interrupted' },
+      details: { kind: 'error_spike', startedCount: 40, errorCount: 4, topReason: 'interrupted' },
     });
   });
 
   it('counts failed reviews with missing terminal reasons as unknown errors', async () => {
     await insertReviews([
       reviewValues({ status: 'failed', terminal_reason: null }),
-      ...Array.from({ length: 19 }, () => reviewValues()),
+      reviewValues({ status: 'failed', terminal_reason: null }),
+      ...Array.from({ length: 18 }, () => reviewValues()),
     ]);
 
     await expect(evaluateErrorSpike(db)).resolves.toMatchObject({
@@ -259,9 +263,9 @@ describe('code review alert detectors', () => {
       details: {
         kind: 'error_spike',
         startedCount: 20,
-        errorCount: 1,
+        errorCount: 2,
         topReason: 'unknown',
-        topReasonCount: 1,
+        topReasonCount: 2,
       },
     });
   });

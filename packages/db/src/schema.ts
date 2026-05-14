@@ -3152,6 +3152,11 @@ export const cloud_agent_code_reviews = pgTable(
     // GitHub Check Run ID; null for GitLab or pre-feature reviews
     check_run_id: bigint({ mode: 'number' }),
 
+    // REVIEW.md usage metadata
+    repository_review_instructions_used: boolean().notNull().default(false),
+    repository_review_instructions_ref: text(),
+    repository_review_instructions_truncated: boolean().notNull().default(false),
+
     // Usage tracking (populated on completion by orchestrator)
     model: text(), // LLM model slug used (e.g., 'anthropic/claude-sonnet-4.6')
     total_tokens_in: integer(), // Total input tokens across all LLM calls

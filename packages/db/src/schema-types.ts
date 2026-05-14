@@ -756,6 +756,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   selected_repository_ids: z.array(z.number()).optional(),
   // Manually added repositories (for GitLab where pagination limits results)
   manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
+  disable_review_md: z.boolean().optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.
   //   'off'      — gate only fails on system errors (timeout, crash)

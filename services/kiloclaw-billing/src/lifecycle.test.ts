@@ -25,6 +25,21 @@ import type { BillingWorkerEnv } from './types.js';
 
 let loggedValues: unknown[] = [];
 
+function destroyResponse(overrides: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    finalized: true,
+    destroyedUserId: 'user-1',
+    destroyedSandboxId: 'ki_11111111111141118111111111111111',
+    pendingMachineId: null,
+    pendingVolumeId: null,
+    lastDestroyErrorOp: null,
+    lastDestroyErrorStatus: null,
+    lastDestroyErrorAt: null,
+    ...overrides,
+  };
+}
+
 type SelectBuilder = {
   from: ReturnType<typeof vi.fn>;
   innerJoin: ReturnType<typeof vi.fn>;
@@ -240,7 +255,7 @@ describe('interrupted auto-resume sweep', () => {
           reason: 'interrupted_auto_resume',
         });
       }
-      return new Response(JSON.stringify({ ok: true }), {
+      return new Response(JSON.stringify(destroyResponse()), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
@@ -1051,7 +1066,7 @@ describe('instance destruction sweep', () => {
           reason: 'destruction_deadline_elapsed',
         });
       }
-      return new Response(JSON.stringify({ ok: true }), {
+      return new Response(JSON.stringify(destroyResponse()), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
@@ -1088,6 +1103,15 @@ describe('instance destruction sweep', () => {
     expect(txUpdates[0]?.destroyed_at).toEqual(expect.any(String));
     expect(updates).toEqual([{ destruction_deadline: null }]);
     expect(deletes).toHaveLength(1);
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: 'instance_destroy_confirmed',
+          outcome: 'completed',
+          instanceId,
+        }),
+      ])
+    );
   });
 
   it('treats platform destroy 404 as already gone and continues with later rows', async () => {
@@ -1149,7 +1173,7 @@ describe('instance destruction sweep', () => {
         })
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ ok: true }), {
+        new Response(JSON.stringify(destroyResponse({ destroyedUserId: 'user-2' })), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })
@@ -1200,6 +1224,91 @@ describe('instance destruction sweep', () => {
     expect(txUpdates[1]?.destroyed_at).toEqual(expect.any(String));
     expect(updates).toEqual([{ destruction_deadline: null }, { destruction_deadline: null }]);
     expect(deletes).toHaveLength(2);
+  });
+
+  it('logs pending platform cleanup and still preserves billing state transition', async () => {
+    const instanceId = '11111111-1111-4111-8111-111111111111';
+    const { db, updates, txUpdates, inserts, deletes } = createMockDb([
+      [
+        {
+          id: 'sub-1',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          sandbox_id: 'ki_11111111111141118111111111111111',
+          status: 'canceled',
+          email: 'user-1@example.com',
+        },
+      ],
+      [
+        {
+          id: instanceId,
+          userId: 'user-1',
+          sandboxId: 'ki_11111111111141118111111111111111',
+          organizationId: null,
+          name: null,
+          inboundEmailEnabled: false,
+          destroyedAt: null,
+        },
+      ],
+      [],
+      [{ id: 'sub-1', user_id: 'user-1', instance_id: instanceId }],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify(
+            destroyResponse({
+              finalized: false,
+              pendingVolumeId: 'vol-1',
+              lastDestroyErrorOp: 'volume',
+              lastDestroyErrorStatus: 412,
+              lastDestroyErrorAt: 1_777_777_777,
+            })
+          ),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
+    );
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '10101010-1010-4010-8010-101010101010',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(1);
+    expect(txUpdates).toHaveLength(1);
+    expect(txUpdates[0]?.destroyed_at).toEqual(expect.any(String));
+    expect(updates).toEqual([{ destruction_deadline: null }]);
+    expect(deletes).toHaveLength(1);
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          email_type: 'claw_instance_destroyed',
+        },
+      ])
+    );
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: 'instance_destroy_pending',
+          outcome: 'retry',
+          instanceId,
+          pendingVolumeId: 'vol-1',
+          lastDestroyErrorOp: 'volume',
+          lastDestroyErrorStatus: 412,
+        }),
+      ])
+    );
   });
 
   it('logs non-404 platform destroy failures and preserves billing state transition', async () => {
@@ -1277,6 +1386,8 @@ describe('instance destruction sweep', () => {
         }),
         expect.objectContaining({
           message: 'Destroy instance during billing enforcement failed',
+          event: 'instance_destroy_request_failed',
+          outcome: 'failed',
           statusCode: 500,
         }),
       ])

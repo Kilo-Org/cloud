@@ -17,6 +17,7 @@ import {
   findKiloReviewComment,
   fetchPRInlineComments,
   getPRHeadCommit,
+  fetchGitHubRootTextFileAtRef,
 } from '@/lib/integrations/platforms/github/adapter';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import {
@@ -25,6 +26,7 @@ import {
   getMRHeadCommit,
   getMRDiffRefs,
   GitLabProjectAccessTokenPermissionError,
+  fetchGitLabRootTextFileAtRef,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   getOrCreateProjectAccessToken,
@@ -36,13 +38,21 @@ import type {
   GitLabDiffContext,
 } from '../prompts/generate-prompt';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
-import { getCodeReviewById, findPreviousCompletedReview } from '../db/code-reviews';
+import {
+  getCodeReviewById,
+  findPreviousCompletedReview,
+  updateRepositoryReviewInstructionsMetadata,
+} from '../db/code-reviews';
 import { DEFAULT_CODE_REVIEW_MODEL, DEFAULT_CODE_REVIEW_MODE } from '../core/constants';
 import type { Owner } from '../core';
 import { generateReviewPrompt } from '../prompts/generate-prompt';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import type { CodeReviewPlatform } from '../core/schemas';
+import {
+  normalizeRepositoryReviewInstructions,
+  REVIEW_INSTRUCTIONS_FILE,
+} from '../prompts/repository-review-instructions';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
 
@@ -101,6 +111,8 @@ export async function prepareReviewPayload(
   params: PreparePayloadParams
 ): Promise<CodeReviewPayload> {
   const { reviewId, owner, agentConfig, platform = 'github' } = params;
+  const config = agentConfig.config as CodeReviewAgentConfig;
+  const shouldUseReviewMd = config.disable_review_md === false;
 
   logExceptInTest('[prepareReviewPayload] Starting payload preparation', {
     reviewId,
@@ -121,6 +133,7 @@ export async function prepareReviewPayload(
       repoFullName: review.repo_full_name,
       prNumber: review.pr_number,
       platformIntegrationId: review.platform_integration_id,
+      baseRef: review.base_ref,
       headRef: review.head_ref,
     });
 
@@ -141,51 +154,64 @@ export async function prepareReviewPayload(
     let gitlabInstanceUrl: string | undefined;
     let existingReviewState: ExistingReviewState | null = null;
     let gitlabContext: GitLabDiffContext | undefined;
+    let repositoryReviewInstructionsLookup = unusedRepositoryReviewInstructionsLookup();
 
     if (review.platform_integration_id) {
       const integration = await getIntegrationById(review.platform_integration_id);
 
       if (platform === 'github' && integration?.platform_installation_id) {
+        const installationId = integration.platform_installation_id;
         // Use the stored app type (defaults to 'standard' for existing integrations)
         const appType: GitHubAppType = integration.github_app_type || 'standard';
         // GitHub: Use installation token. Auth failures here (e.g. IP allow list
         // blocking, suspended/uninstalled app) are hard failures: without a token
         // we cannot clone private repos or post review comments. Let the error
         // propagate so the user sees a meaningful failure on the review.
-        const tokenData = await generateGitHubInstallationToken(
-          integration.platform_installation_id,
-          appType
-        );
-        githubToken = tokenData.token;
+        const tokenData = await generateGitHubInstallationToken(installationId, appType);
+        const installationToken = tokenData.token;
+        githubToken = installationToken;
+        const [repoOwner, repoName] = review.repo_full_name.split('/');
+
+        const repositoryReviewInstructionsPromise =
+          shouldUseReviewMd && repoOwner && repoName
+            ? fetchRepositoryReviewInstructions({
+                platform,
+                repoFullName: review.repo_full_name,
+                baseRef: review.base_ref,
+                fetchInstructions: () =>
+                  fetchGitHubRootTextFileAtRef({
+                    token: installationToken,
+                    owner: repoOwner,
+                    repo: repoName,
+                    path: REVIEW_INSTRUCTIONS_FILE,
+                    ref: review.base_ref,
+                  }),
+              })
+            : undefined;
+
+        if (shouldUseReviewMd && (!repoOwner || !repoName)) {
+          warnExceptInTest(
+            '[prepareReviewPayload] Cannot fetch REVIEW.md for invalid GitHub repo',
+            {
+              platform,
+              repoFullName: review.repo_full_name,
+              baseRef: review.base_ref,
+            }
+          );
+        }
 
         // Build complete review state for intelligent update/create decisions
         try {
-          const [repoOwner, repoName] = review.repo_full_name.split('/');
-
           // Fetch all state in parallel for efficiency
-          const [summaryComment, inlineComments, headCommitSha] = await Promise.all([
-            findKiloReviewComment(
-              integration.platform_installation_id,
-              repoOwner,
-              repoName,
-              review.pr_number,
-              appType
-            ),
-            fetchPRInlineComments(
-              integration.platform_installation_id,
-              repoOwner,
-              repoName,
-              review.pr_number,
-              appType
-            ),
-            getPRHeadCommit(
-              integration.platform_installation_id,
-              repoOwner,
-              repoName,
-              review.pr_number,
-              appType
-            ),
-          ]);
+          const [summaryComment, inlineComments, headCommitSha, reviewInstructions] =
+            await Promise.all([
+              findKiloReviewComment(installationId, repoOwner, repoName, review.pr_number, appType),
+              fetchPRInlineComments(installationId, repoOwner, repoName, review.pr_number, appType),
+              getPRHeadCommit(installationId, repoOwner, repoName, review.pr_number, appType),
+              repositoryReviewInstructionsPromise ??
+                Promise.resolve(repositoryReviewInstructionsLookup),
+            ]);
+          repositoryReviewInstructionsLookup = reviewInstructions;
 
           existingReviewState = buildReviewState(summaryComment, inlineComments, headCommitSha);
 
@@ -197,13 +223,16 @@ export async function prepareReviewPayload(
             headCommitSha: headCommitSha.substring(0, 8),
           });
         } catch (stateLookupError) {
+          if (repositoryReviewInstructionsPromise) {
+            repositoryReviewInstructionsLookup = await repositoryReviewInstructionsPromise;
+          }
           // Non-critical - continue without state info
           logExceptInTest('[prepareReviewPayload] Failed to build GitHub review state:', {
             reviewId,
             error: stateLookupError,
           });
         }
-      } else if (platform === PLATFORM.GITLAB && integration) {
+      } else if (platform === 'gitlab' && integration) {
         // GitLab: Use Project Access Token (PrAT) for all operations
         // PrAT is required for cloning private repos and for the glab CLI.
         // Unlike GitHub, we cannot fall back to no-token for GitLab private repos,
@@ -247,6 +276,23 @@ export async function prepareReviewPayload(
               `Error: ${pratError instanceof Error ? pratError.message : String(pratError)}`
           );
         }
+        const projectAccessToken = gitlabToken;
+
+        const repositoryReviewInstructionsPromise = shouldUseReviewMd
+          ? fetchRepositoryReviewInstructions({
+              platform,
+              repoFullName: review.repo_full_name,
+              baseRef: review.base_ref,
+              fetchInstructions: () =>
+                fetchGitLabRootTextFileAtRef(
+                  projectAccessToken,
+                  review.repo_full_name,
+                  REVIEW_INSTRUCTIONS_FILE,
+                  review.base_ref,
+                  instanceUrl
+                ),
+            })
+          : undefined;
 
         // Build complete review state for GitLab (using PrAT for reading)
         try {
@@ -255,12 +301,16 @@ export async function prepareReviewPayload(
           const repoPath = review.repo_full_name;
 
           // Fetch all state in parallel for efficiency (using PrAT)
-          const [summaryNote, inlineComments, headCommitSha, diffRefs] = await Promise.all([
-            findKiloReviewNote(gitlabToken, repoPath, mrIid, instanceUrl),
-            fetchMRInlineComments(gitlabToken, repoPath, mrIid, instanceUrl),
-            getMRHeadCommit(gitlabToken, repoPath, mrIid, instanceUrl),
-            getMRDiffRefs(gitlabToken, repoPath, mrIid, instanceUrl),
-          ]);
+          const [summaryNote, inlineComments, headCommitSha, diffRefs, reviewInstructions] =
+            await Promise.all([
+              findKiloReviewNote(gitlabToken, repoPath, mrIid, instanceUrl),
+              fetchMRInlineComments(gitlabToken, repoPath, mrIid, instanceUrl),
+              getMRHeadCommit(gitlabToken, repoPath, mrIid, instanceUrl),
+              getMRDiffRefs(gitlabToken, repoPath, mrIid, instanceUrl),
+              repositoryReviewInstructionsPromise ??
+                Promise.resolve(repositoryReviewInstructionsLookup),
+            ]);
+          repositoryReviewInstructionsLookup = reviewInstructions;
 
           // Convert GitLab note format to common format
           const summaryComment = summaryNote
@@ -297,6 +347,9 @@ export async function prepareReviewPayload(
             headCommitSha: headCommitSha.substring(0, 8),
           });
         } catch (stateLookupError) {
+          if (repositoryReviewInstructionsPromise) {
+            repositoryReviewInstructionsLookup = await repositoryReviewInstructionsPromise;
+          }
           // Non-critical - continue without state info
           logExceptInTest('[prepareReviewPayload] Failed to build GitLab review state:', {
             reviewId,
@@ -363,12 +416,18 @@ export async function prepareReviewPayload(
       );
     }
 
+    await updateRepositoryReviewInstructionsMetadata(reviewId, {
+      used: repositoryReviewInstructionsLookup.used,
+      ref: repositoryReviewInstructionsLookup.ref,
+      truncated: repositoryReviewInstructionsLookup.truncated,
+    });
+
     // 5. Generate auth token for cloud agent with bot identifier
     const authToken = generateApiToken(user, { botId: 'reviewer' });
 
     // 6. Generate dynamic review prompt
     const { prompt, version, source } = await generateReviewPrompt(
-      agentConfig.config as CodeReviewAgentConfig,
+      config,
       review.repo_full_name,
       review.pr_number,
       {
@@ -377,6 +436,7 @@ export async function prepareReviewPayload(
         platform,
         gitlabContext,
         previousHeadSha,
+        repositoryReviewInstructions: repositoryReviewInstructionsLookup.content,
       }
     );
 
@@ -386,12 +446,11 @@ export async function prepareReviewPayload(
       version,
       source,
       promptLength: prompt.length,
+      hasRepositoryReviewInstructions: repositoryReviewInstructionsLookup.used,
     });
 
     // 7. Prepare session input
     // Note: cloud-agent automatically sets GH_TOKEN/GITLAB_TOKEN from token parameters
-    const config = agentConfig.config as CodeReviewAgentConfig;
-
     // Build platform-specific session input
     // GitHub: uses githubRepo (owner/repo format) + githubToken
     // GitLab: uses gitUrl (full HTTPS URL) + gitToken
@@ -399,7 +458,7 @@ export async function prepareReviewPayload(
     const gateThreshold = config.gate_threshold ?? 'off';
     const githubCheckoutRef = getGitHubPullRequestCheckoutRef(review.pr_number);
     const sessionInput: SessionInput =
-      platform === PLATFORM.GITLAB
+      platform === 'gitlab'
         ? {
             // GitLab: use full git URL for cloning
             gitUrl: `${gitlabInstanceUrl || 'https://gitlab.com'}/${review.repo_full_name}.git`,
@@ -428,7 +487,7 @@ export async function prepareReviewPayload(
           };
 
     // Log the session input for GitLab
-    if (platform === PLATFORM.GITLAB) {
+    if (platform === 'gitlab') {
       logExceptInTest('[prepareReviewPayload] GitLab session input prepared', {
         gitUrl: sessionInput.gitUrl,
         hasGitToken: !!sessionInput.gitToken,
@@ -474,6 +533,78 @@ export async function prepareReviewPayload(
     });
     throw error;
   }
+}
+
+type RepositoryReviewInstructionsLookup = {
+  content: string | null;
+  used: boolean;
+  ref: string | null;
+  truncated: boolean;
+};
+
+function unusedRepositoryReviewInstructionsLookup(): RepositoryReviewInstructionsLookup {
+  return { content: null, used: false, ref: null, truncated: false };
+}
+
+async function fetchRepositoryReviewInstructions(params: {
+  platform: CodeReviewPlatform;
+  repoFullName: string;
+  baseRef: string;
+  fetchInstructions: () => Promise<string | null>;
+}): Promise<RepositoryReviewInstructionsLookup> {
+  try {
+    const rawInstructions = await params.fetchInstructions();
+    const normalized = normalizeRepositoryReviewInstructions(rawInstructions);
+
+    logExceptInTest('[prepareReviewPayload] REVIEW.md lookup complete', {
+      platform: params.platform,
+      repoFullName: params.repoFullName,
+      baseRef: params.baseRef,
+      found: !!normalized,
+      truncated: normalized?.truncated ?? false,
+    });
+
+    if (!normalized) {
+      return unusedRepositoryReviewInstructionsLookup();
+    }
+
+    return {
+      content: normalized.content,
+      used: true,
+      ref: params.baseRef,
+      truncated: normalized.truncated,
+    };
+  } catch (error) {
+    warnExceptInTest('[prepareReviewPayload] REVIEW.md lookup failed; using default guidance', {
+      platform: params.platform,
+      repoFullName: params.repoFullName,
+      baseRef: params.baseRef,
+      error: getReviewInstructionsFetchErrorMetadata(error),
+    });
+    return unusedRepositoryReviewInstructionsLookup();
+  }
+}
+
+function getReviewInstructionsFetchErrorMetadata(error: unknown): {
+  name?: string;
+  message?: string;
+  status?: number;
+} {
+  const metadata: { name?: string; message?: string; status?: number } = {};
+
+  if (error instanceof Error) {
+    metadata.name = error.name;
+    metadata.message = error.message;
+  }
+
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    const { status } = error;
+    if (typeof status === 'number') {
+      metadata.status = status;
+    }
+  }
+
+  return metadata;
 }
 
 /**

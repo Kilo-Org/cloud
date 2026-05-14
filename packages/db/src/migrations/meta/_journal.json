@@ -897,6 +897,13 @@
       "when": 1778756048556,
       "tag": "0127_silky_legion",
       "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1778768873847,
+      "tag": "0128_regular_vulcan",
+      "breakpoints": true
     }
   ]
 }

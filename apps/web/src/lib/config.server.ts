@@ -334,6 +334,9 @@ export const STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID = getEnvVariable(
 export const WEBHOOK_AGENT_URL =
   getEnvVariable('WEBHOOK_AGENT_URL') || 'https://hooks.kilosessions.ai';
 
+// Model eval ingest Worker
+export const MODEL_EVAL_INGEST_URL = getEnvVariable('MODEL_EVAL_INGEST_URL') || '';
+
 // Session ingest worker (public share proxy)
 export const SESSION_INGEST_WORKER_URL = getEnvVariable('SESSION_INGEST_WORKER_URL') || '';
 

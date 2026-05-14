@@ -2874,6 +2874,28 @@ export const ModelStatsBenchmarksSchema = z
         lastUpdated: z.string().optional(),
       })
       .optional(),
+    kiloBench: z
+      .object({
+        overallScore: z.number(),
+        evals: z.record(
+          z.string(),
+          z.object({
+            taskSource: z.string(),
+            displayName: z.string().optional(),
+            overallScore: z.number(),
+            totalScore: z.number(),
+            avgCostUsd: z.number().nullable(),
+            avgInputTokens: z.number().nullable(),
+            avgOutputTokens: z.number().nullable(),
+            avgCacheReadTokens: z.number().nullable(),
+            avgExecutionMs: z.number().nullable(),
+            nTotalTrials: z.number(),
+            nErrored: z.number(),
+            lastPromotedAt: z.string(),
+          })
+        ),
+      })
+      .optional(),
   })
   .optional();
 
@@ -2974,6 +2996,52 @@ export const modelStats = pgTable(
 
 export type ModelStats = typeof modelStats.$inferSelect;
 export type NewModelStats = typeof modelStats.$inferInsert;
+
+export const model_eval_ingest = pgTable(
+  'model_eval_ingest',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bench_eval_name: text('bench_eval_name').notNull().unique(),
+    bench_eval_url: text('bench_eval_url').notNull(),
+    provider: text('provider').notNull(),
+    model: text('model').notNull(),
+    model_stats_id: uuid('model_stats_id').references(() => modelStats.id),
+    variant: text('variant'),
+    task_source: text('task_source').notNull(),
+    n_total_trials: integer('n_total_trials').notNull(),
+    total_score: decimal('total_score', { precision: 14, scale: 6, mode: 'number' }).notNull(),
+    overall_score: decimal('overall_score', { precision: 12, scale: 8, mode: 'number' }).notNull(),
+    n_errored: integer('n_errored').notNull(),
+    avg_cost_usd: decimal('avg_cost_usd', { precision: 14, scale: 8, mode: 'number' }),
+    avg_input_tokens: decimal('avg_input_tokens', { precision: 16, scale: 6, mode: 'number' }),
+    avg_output_tokens: decimal('avg_output_tokens', { precision: 16, scale: 6, mode: 'number' }),
+    avg_cache_read_tokens: decimal('avg_cache_read_tokens', {
+      precision: 16,
+      scale: 6,
+      mode: 'number',
+    }),
+    avg_execution_ms: decimal('avg_execution_ms', { precision: 16, scale: 6, mode: 'number' }),
+    promoted_at: timestamp('promoted_at', { withTimezone: true, mode: 'string' }).notNull(),
+    promoted_by_email: text('promoted_by_email').notNull(),
+    promotion_note: text('promotion_note'),
+    ingested_at: timestamp('ingested_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+  },
+  table => [
+    index('IDX_model_eval_ingest_lookup').on(
+      table.provider,
+      table.model,
+      table.variant,
+      table.task_source,
+      table.promoted_at
+    ),
+    index('IDX_model_eval_ingest_model_stats').on(table.model_stats_id),
+  ]
+);
+
+export type ModelEvalIngest = typeof model_eval_ingest.$inferSelect;
+export type NewModelEvalIngest = typeof model_eval_ingest.$inferInsert;
 
 export const MODELS_BY_PROVIDER_ADMIN_URL = '/admin/sync-providers';
 

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Info, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,8 +23,14 @@ import {
   useWastelandTRPC,
   createWastelandTRPCClient,
 } from '@/lib/wasteland/trpc';
+import {
+  UpstreamIntentPicker,
+  isUpstreamIntentValid,
+  resolveUpstreamFromIntent,
+  useUpstreamVerification,
+  type UpstreamIntent,
+} from '@/components/wasteland/UpstreamIntent';
 
-const DOLTHUB_UPSTREAM_PATTERN = /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/;
 const NAME_MAX_LENGTH = 128;
 
 type OwnershipType = 'personal' | 'organization';
@@ -45,19 +51,63 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
     lockedOrgId ? 'organization' : 'personal'
   );
   const [selectedOrgId, setSelectedOrgId] = useState<string>(lockedOrgId ?? '');
-  const [dolthubUpstream, setDolthubUpstream] = useState('');
+  const [intent, setIntent] = useState<UpstreamIntent>({
+    kind: 'commons',
+    isUpstreamAdmin: false,
+  });
   const [visibility, setVisibility] = useState<Visibility>('private');
 
   const orgsQuery = useQuery(mainTrpc.organizations.list.queryOptions());
 
+  // Empty `selectedOrgId` (the placeholder before the user picks an
+  // org) is coerced to `undefined` so we don't ship `''` through the
+  // Zod uuid check on the verify / resolveUsername procedures.
+  const verifyOrgId = ownership === 'organization' ? selectedOrgId || undefined : undefined;
+
+  // Pre-resolve the DoltHub username when the OAuth integration is
+  // installed so Card 3's input prefills as `<username>/...`. Best-effort
+  // — the picker still works without it.
+  const dolthubUsernameQuery = useQuery({
+    ...mainTrpc.dolthub.resolveUsername.queryOptions(
+      verifyOrgId ? { organizationId: verifyOrgId } : undefined
+    ),
+    // No need to refetch on focus — the username doesn't change mid-session.
+    staleTime: Infinity,
+  });
+
+  // Verify the typed upstream against DoltHub. Reused so the submit
+  // button refuses to advance while the probe is pending, or when the
+  // result contradicts the intent (`connect` needs exists=true,
+  // `create` needs exists=false).
+  const connectVerification = useUpstreamVerification({
+    upstream: intent.kind === 'connect' ? intent.upstream : '',
+    organizationId: verifyOrgId,
+    enabled: intent.kind === 'connect',
+  });
+  const createVerification = useUpstreamVerification({
+    upstream: intent.kind === 'create' ? intent.upstream : '',
+    organizationId: verifyOrgId,
+    enabled: intent.kind === 'create',
+  });
+
   const createMutation = useMutation(
     trpc.wasteland.createWasteland.mutationOptions({
       onSuccess: data => {
-        if (lockedOrgId) {
-          router.push(`/organizations/${lockedOrgId}/wasteland/${data.wasteland_id}`);
-          return;
+        const wastelandPath = lockedOrgId
+          ? `/organizations/${lockedOrgId}/wasteland/${data.wasteland_id}`
+          : `/wasteland/${data.wasteland_id}`;
+        // For the `create` intent we don't have credentials yet — surface
+        // a one-time toast pointing the user to the settings page where
+        // the OAuth-connect + createUpstream flow lives.
+        if (intent.kind === 'create') {
+          toast.message(
+            'Wasteland created. Connect DoltHub on the settings page to bootstrap the upstream.',
+            {
+              duration: 8000,
+            }
+          );
         }
-        router.push(`/wasteland/${data.wasteland_id}`);
+        router.push(wastelandPath);
       },
       onError: err => {
         toast.error(err.message);
@@ -67,10 +117,20 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
 
   // Validation
   const nameError = getNameError(name);
-  const dolthubError = getDolthubError(dolthubUpstream);
   const orgError = getOrgError(ownership, selectedOrgId, orgsQuery.data);
+  const intentValid = isUpstreamIntentValid(intent);
+  // For `connect` we need the upstream to exist (so the wasteland points at
+  // a real repo); for `create` we need it NOT to exist (otherwise the
+  // eventual `createUpstream` will fail with "repository already exists"
+  // when the user wires up credentials from the settings page).
+  const upstreamProbeBlocked =
+    (intent.kind === 'connect' &&
+      (connectVerification.status === 'pending' || connectVerification.status === 'missing')) ||
+    (intent.kind === 'create' &&
+      (createVerification.status === 'pending' || createVerification.status === 'exists'));
 
-  const isValid = !nameError && !dolthubError && !orgError && name.trim().length > 0;
+  const isValid =
+    !nameError && !orgError && intentValid && !upstreamProbeBlocked && name.trim().length > 0;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -80,7 +140,7 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
       name: name.trim(),
       ownerType: ownership === 'organization' ? 'org' : 'user',
       organizationId: ownership === 'organization' ? selectedOrgId : undefined,
-      dolthubUpstream: dolthubUpstream.trim() || undefined,
+      dolthubUpstream: resolveUpstreamFromIntent(intent),
       visibility,
     });
   }
@@ -174,21 +234,25 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
           )}
         </div>
 
-        {/* DoltHub Upstream */}
+        {/* DoltHub upstream */}
         <div className="space-y-2">
-          <Label htmlFor="dolthub-upstream">
-            DoltHub upstream <span className="text-muted-foreground font-normal">(optional)</span>
-          </Label>
-          <Input
-            id="dolthub-upstream"
-            placeholder="org/repo"
-            value={dolthubUpstream}
-            onChange={e => setDolthubUpstream(e.target.value)}
+          <Label>DoltHub upstream</Label>
+          <UpstreamIntentPicker
+            value={intent}
+            onChange={setIntent}
+            organizationId={ownership === 'organization' ? selectedOrgId || undefined : undefined}
+            dolthubUsername={dolthubUsernameQuery.data?.username ?? null}
+            disabled={createMutation.isPending}
           />
-          <p className="text-muted-foreground text-xs">
-            The DoltHub repository path. Can be configured later in settings.
-          </p>
-          {dolthubError && <p className="text-destructive text-xs">{dolthubError}</p>}
+          {intent.kind === 'create' && (
+            <div className="flex items-start gap-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11px] text-white/55">
+              <Info className="mt-0.5 size-3 shrink-0 text-white/35" />
+              <span>
+                We&apos;ll save this intent on your wasteland. Connect DoltHub on the settings page
+                to actually bootstrap the upstream.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Visibility */}
@@ -236,14 +300,6 @@ function getNameError(name: string): string | null {
   if (name.trim().length === 0) return 'Name cannot be blank';
   if (name.trim().length > NAME_MAX_LENGTH)
     return `Name must be ${NAME_MAX_LENGTH} characters or fewer`;
-  return null;
-}
-
-function getDolthubError(value: string): string | null {
-  if (!value.trim()) return null;
-  if (!DOLTHUB_UPSTREAM_PATTERN.test(value.trim())) {
-    return 'Must be in the format org/repo';
-  }
   return null;
 }
 

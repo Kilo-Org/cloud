@@ -647,30 +647,56 @@ export const wastelandRouter = router({
       // collected here — the container's `configureDolt` falls back to
       // sensible defaults derived from DOLTHUB_ORG, and pushes use the
       // OAuth-issued token rather than a per-user JWK.
+      //
+      // Only the wasteland's *creator* drives container init from this
+      // call site; secondary members (rigs joining a wasteland someone
+      // else owns) get their credentials stored but don't repurpose the
+      // shared container's env vars.
       const config = await stub.getConfig();
       if (config && config.owner_user_id === ctx.userId) {
         const container = getWastelandContainerStub(ctx.env, input.wastelandId);
         await container.setEnvVar('DOLTHUB_TOKEN', input.dolthubToken);
         await container.setEnvVar('DOLTHUB_ORG', input.dolthubOrg);
         if (config.dolthub_upstream) {
-          await container.setEnvVar('WL_UPSTREAM', config.dolthub_upstream);
-
-          // Tell the (possibly already running) container to init now.
-          // Surface failures so the user knows init didn't work.
-          const initRes = await container.fetch(
-            new Request('http://container/wl/init', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                upstream: config.dolthub_upstream,
-                token: input.dolthubToken,
-                dolthubOrg: input.dolthubOrg,
-              }),
-            })
+          // Don't push WL_UPSTREAM (or trigger /wl/init) until the repo
+          // actually exists on DoltHub. The wasteland config can hold an
+          // upstream string ahead of the repo being created — the
+          // standalone "create new wasteland" wizard records the user's
+          // intended upstream before `createUpstream` runs `wl create`,
+          // and the Gastown wizard calls storeCredential before
+          // createUpstream too. If we eagerly push WL_UPSTREAM, the
+          // container's selfInit kicks off a `wl join` against a
+          // non-existent repo and crash-loops. We let `createUpstream`
+          // (whose own `/wl/create` invocation populates the repo and
+          // then sets the env vars correctly) handle it instead.
+          const upstreamReady = await doltApi.upstreamExistsOnDolthub(
+            config.dolthub_upstream,
+            input.dolthubToken
           );
-          if (!initRes.ok) {
-            const body = await initRes.text().catch(() => '');
-            console.warn(`[storeCredential] container init returned ${initRes.status}: ${body}`);
+          if (upstreamReady) {
+            await container.setEnvVar('WL_UPSTREAM', config.dolthub_upstream);
+
+            // Tell the (possibly already running) container to init now.
+            // Surface failures so the user knows init didn't work.
+            const initRes = await container.fetch(
+              new Request('http://container/wl/init', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  upstream: config.dolthub_upstream,
+                  token: input.dolthubToken,
+                  dolthubOrg: input.dolthubOrg,
+                }),
+              })
+            );
+            if (!initRes.ok) {
+              const body = await initRes.text().catch(() => '');
+              console.warn(`[storeCredential] container init returned ${initRes.status}: ${body}`);
+            }
+          } else {
+            console.info(
+              `[storeCredential] upstream ${config.dolthub_upstream} not yet on DoltHub — deferring WL_UPSTREAM push until createUpstream runs`
+            );
           }
         }
       }

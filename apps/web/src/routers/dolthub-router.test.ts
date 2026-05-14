@@ -9,6 +9,18 @@ jest.mock('@/lib/config.server', () => {
   };
 });
 
+// Don't actually send Sentry events from the test suite — `getDoltHubUser`
+// emits warnings when DoltHub is unreachable / returns malformed payloads,
+// and the resolveUsername / verifyUpstream tests exercise both happy and
+// unhappy paths. We only override the two capture helpers — the rest of
+// the module (notably `trpcMiddleware`) must come through actual so the
+// trpc init at `lib/trpc/init.ts` keeps working.
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<object>('@sentry/nextjs'),
+  captureMessage: jest.fn(),
+  captureException: jest.fn(),
+}));
+
 import { describe, test, expect, beforeAll, afterEach } from '@jest/globals';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
@@ -261,6 +273,174 @@ describe('dolthubRouter', () => {
       await expect(caller.dolthub.rememberUsername({ username: 'foo/bar' })).rejects.toThrow(
         /Invalid DoltHub username/
       );
+    });
+  });
+
+  describe('resolveUsername', () => {
+    test('returns null in production', async () => {
+      setNodeEnv('production');
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.dolthub.resolveUsername();
+      expect(result).toBeNull();
+    });
+
+    test('returns null when no integration exists', async () => {
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.dolthub.resolveUsername();
+      expect(result).toBeNull();
+    });
+
+    test('returns the cached username when present', async () => {
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: user.id,
+        owned_by_organization_id: null,
+        platform: PLATFORM.DOLTHUB,
+        integration_type: 'oauth',
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        metadata: { access_token: 'tok', dolthub_username: 'cached-user' },
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.dolthub.resolveUsername();
+      expect(result).toEqual({ username: 'cached-user' });
+    });
+
+    test('fetches /user when no cached username and persists the result', async () => {
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: user.id,
+        owned_by_organization_id: null,
+        platform: PLATFORM.DOLTHUB,
+        integration_type: 'oauth',
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        metadata: { access_token: 'tok' },
+      });
+
+      globalThis.fetch = jest.fn(
+        async () => new Response(JSON.stringify({ username: 'fresh-user' }), { status: 200 })
+      ) as unknown as typeof fetch;
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.dolthub.resolveUsername();
+      expect(result).toEqual({ username: 'fresh-user' });
+    });
+  });
+
+  describe('verifyUpstream', () => {
+    test('public-repo probe runs unauthenticated even when an OAuth token is installed', async () => {
+      // Regression: forwarding the token directly trips DoltHub's
+      // "Calls authenticated with a token must include a refName"
+      // 400. The router resolves an installation but the service runs
+      // a public probe first, escalating to auth only if needed.
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: user.id,
+        owned_by_organization_id: null,
+        platform: PLATFORM.DOLTHUB,
+        integration_type: 'oauth',
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        metadata: { access_token: 'oauth-token-1' },
+      });
+
+      const seenAuth: (string | null)[] = [];
+      globalThis.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        seenAuth.push(new Headers(init?.headers).get('authorization'));
+        expect(String(input)).toContain('/api/v1alpha1/foo/bar');
+        return new Response(
+          JSON.stringify({ query_execution_status: 'Success', commit_ref: 'main' }),
+          { status: 200 }
+        );
+      }) as unknown as typeof fetch;
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.dolthub.verifyUpstream({ upstream: 'foo/bar' });
+      expect(result).toEqual({ exists: true, defaultBranch: 'main' });
+      // Stage 1 is the only call that fires for a public hit, and it
+      // must be unauthenticated.
+      expect(seenAuth).toEqual([null]);
+    });
+
+    test('escalates to authenticated /main probe for private repos', async () => {
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: user.id,
+        owned_by_organization_id: null,
+        platform: PLATFORM.DOLTHUB,
+        integration_type: 'oauth',
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        metadata: { access_token: 'oauth-token-1' },
+      });
+
+      let call = 0;
+      const seen: { url: string; auth: string | null }[] = [];
+      globalThis.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        call += 1;
+        seen.push({
+          url: String(input),
+          auth: new Headers(init?.headers).get('authorization'),
+        });
+        if (call === 1) {
+          // Stage 1: anonymous probe sees private repo as missing.
+          return new Response(
+            JSON.stringify({
+              query_execution_status: 'Error',
+              query_execution_message: 'no such repository',
+            }),
+            { status: 400 }
+          );
+        }
+        // Stage 2: authenticated /main probe resolves.
+        return new Response(
+          JSON.stringify({ query_execution_status: 'Success', commit_ref: 'main' }),
+          { status: 200 }
+        );
+      }) as unknown as typeof fetch;
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.dolthub.verifyUpstream({ upstream: 'me/private' });
+      expect(result).toEqual({ exists: true, defaultBranch: 'main' });
+      expect(seen[0]?.auth).toBeNull();
+      expect(seen[1]?.auth).toBe('token oauth-token-1');
+      expect(seen[1]?.url).toContain('/me/private/main?');
+    });
+
+    test('still works without an installation (public-repo probe with no token)', async () => {
+      const seenAuth: (string | null)[] = [];
+      const fetchCalls = jest.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const headers = new Headers(init?.headers);
+        seenAuth.push(headers.get('authorization'));
+        return new Response(
+          JSON.stringify({
+            query_execution_status: 'Error',
+            query_execution_message: 'no such repository',
+          }),
+          { status: 400 }
+        );
+      });
+      globalThis.fetch = fetchCalls as unknown as typeof fetch;
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.dolthub.verifyUpstream({ upstream: 'never/exists' });
+      expect(result).toEqual({ exists: false, reason: 'no such repository' });
+      // No installation → only the unauthenticated probe runs; no
+      // authenticated fallback because we have no token to escalate
+      // with.
+      expect(fetchCalls).toHaveBeenCalledTimes(1);
+      expect(seenAuth).toEqual([null]);
+    });
+
+    test('rejects malformed upstream input', async () => {
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.dolthub.verifyUpstream({ upstream: 'no-slash' })).rejects.toThrow(
+        /Must be in the format owner\/repo/
+      );
+    });
+
+    test('returns exists=false with a dev-only message in production', async () => {
+      setNodeEnv('production');
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.dolthub.verifyUpstream({ upstream: 'foo/bar' });
+      expect(result).toEqual({
+        exists: false,
+        reason: 'DoltHub integration unavailable in production',
+      });
     });
   });
 });

@@ -18,6 +18,12 @@ import * as dolthubService from '@/lib/integrations/dolthub-service';
  */
 const DOLTHUB_USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
+/**
+ * `{owner}/{repo}` upstream — same regex shape as `dolthubUpstream` on the
+ * wasteland service input, kept in sync intentionally.
+ */
+const DOLTHUB_UPSTREAM_PATTERN = /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/;
+
 export const dolthubRouter = createTRPCRouter({
   getInstallation: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
     if (process.env.NODE_ENV === 'production') {
@@ -109,6 +115,68 @@ export const dolthubRouter = createTRPCRouter({
 
       await dolthubService.rememberDoltHubUsername(integration, input.username);
       return { success: true };
+    }),
+
+  /**
+   * Resolve the DoltHub username associated with the OAuth installation.
+   * Returns the cached value when present, otherwise calls
+   * `GET /api/v1alpha1/user` to fetch and cache it. Returns `null` when the
+   * integration isn't installed or when the API call fails — callers
+   * should fall back to asking the user to type their username.
+   */
+  resolveUsername: baseProcedure
+    .input(optionalOrgInput)
+    .query(async ({ ctx, input }): Promise<{ username: string } | null> => {
+      if (process.env.NODE_ENV === 'production') return null;
+
+      const owner = await resolveAuthorizedOwner(ctx, input?.organizationId);
+      const integration = await dolthubService.getInstallation(owner);
+      if (!integration || integration.integration_status !== INTEGRATION_STATUS.ACTIVE) {
+        return null;
+      }
+
+      return dolthubService.getDoltHubUser(integration);
+    }),
+
+  /**
+   * Probes DoltHub to confirm `{owner}/{repo}` exists. Used by the
+   * upstream picker to block submission of typo'd or non-existent
+   * upstreams before the wasteland worker tries to fork or push.
+   *
+   * The verify call uses the OAuth-issued token when available so private
+   * repos the OAuth user can read also resolve; without a token the probe
+   * still works for public repos.
+   */
+  verifyUpstream: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        upstream: z.string().regex(DOLTHUB_UPSTREAM_PATTERN, 'Must be in the format owner/repo'),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      if (process.env.NODE_ENV === 'production') {
+        return { exists: false as const, reason: 'DoltHub integration unavailable in production' };
+      }
+
+      const owner = await resolveAuthorizedOwner(ctx, input.organizationId);
+      const integration = await dolthubService.getInstallation(owner);
+      const token =
+        integration && integration.integration_status === INTEGRATION_STATUS.ACTIVE
+          ? await dolthubService.getValidDoltHubToken(integration)
+          : null;
+
+      try {
+        return await dolthubService.verifyDoltHubUpstreamExists(input.upstream, token);
+      } catch (err) {
+        // Transport failures are explicitly NOT exists=false — surface
+        // them so the UI can distinguish "doesn't exist" from "couldn't
+        // tell" (which shouldn't block the user).
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: err instanceof Error ? err.message : 'Failed to verify upstream',
+        });
+      }
     }),
 
   disconnect: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {

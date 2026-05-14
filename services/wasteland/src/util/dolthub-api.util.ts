@@ -40,6 +40,82 @@ export function buildPullWebUrl(upstream: string, pullId: string): string {
   return `https://www.dolthub.com/repositories/${owner}/${db}/pulls/${pullId}`;
 }
 
+/**
+ * Probes a DoltHub upstream (`{owner}/{db}`) to confirm the repo exists.
+ * Two-stage probe so we don't trip DoltHub's "Calls authenticated with a
+ * token must include a refName" 400 on token-authed branchless calls:
+ *
+ *   1. Anonymous `SELECT 1` against `/{owner}/{db}` — works for any
+ *      public repo, no refName required.
+ *   2. Only when stage 1 says "no such repository" AND a token is
+ *      provided: authenticated `SELECT 1` against `/{owner}/{db}/main`.
+ *      A `200 Error "branch not found"` here also proves the repo
+ *      exists (just with a non-`main` default branch).
+ *
+ * Returns `false` for both genuine misses and any unexpected response.
+ * Callers should treat `false` as "do not push WL_UPSTREAM yet" rather
+ * than as a hard failure — repos can come into existence asynchronously
+ * (e.g. immediately after `wl create`).
+ */
+const UpstreamProbeResponse = z
+  .object({
+    query_execution_status: z.string().optional(),
+    query_execution_message: z.string().optional(),
+  })
+  .passthrough();
+
+export async function upstreamExistsOnDolthub(
+  upstream: string,
+  token: string | null
+): Promise<boolean> {
+  const { owner, db } = parseUpstream(upstream);
+
+  // Stage 1: anonymous probe. Transport failures resolve to false rather
+  // than throw — callers (storeCredential, container selfInit) treat
+  // false as "skip the WL_UPSTREAM push" and shouldn't propagate
+  // network errors as an init crash.
+  const anonUrl = `${DOLTHUB_API_BASE}/${encodeURIComponent(owner)}/${encodeURIComponent(db)}?q=${encodeURIComponent('SELECT 1')}`;
+  let anonRes: Response | null = null;
+  try {
+    anonRes = await fetch(anonUrl, { headers: { 'cache-control': 'no-cache' } });
+  } catch {
+    anonRes = null;
+  }
+  if (anonRes && anonRes.ok) {
+    const anonParsed = UpstreamProbeResponse.safeParse(await anonRes.json().catch(() => null));
+    if (anonParsed.success && anonParsed.data.query_execution_status === 'Success') {
+      return true;
+    }
+  }
+  if (!token) return false;
+
+  // Stage 2: authenticated /main probe (only fires when we have a token
+  // and stage 1 didn't already resolve).
+  const authUrl = `${DOLTHUB_API_BASE}/${encodeURIComponent(owner)}/${encodeURIComponent(db)}/main?q=${encodeURIComponent('SELECT 1')}`;
+  let authRes: Response | null = null;
+  try {
+    authRes = await fetch(authUrl, {
+      headers: { authorization: `token ${token}`, 'cache-control': 'no-cache' },
+    });
+  } catch {
+    return false;
+  }
+  if (!authRes.ok) return false;
+  const authParsed = UpstreamProbeResponse.safeParse(await authRes.json().catch(() => null));
+  if (!authParsed.success) return false;
+  const data = authParsed.data;
+  if (data.query_execution_status === 'Success') return true;
+  // 200 with status=Error and "branch not found" — repo exists, just on
+  // a different default branch.
+  if (
+    data.query_execution_status === 'Error' &&
+    /branch not found/i.test(data.query_execution_message ?? '')
+  ) {
+    return true;
+  }
+  return false;
+}
+
 type DoltFetchInit = Omit<RequestInit, 'headers'> & { headers?: Record<string, string> };
 
 async function doltFetch(

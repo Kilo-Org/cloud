@@ -413,6 +413,62 @@ async function dolthubSql(
   }
 }
 
+/**
+ * Probes DoltHub to confirm `{owner}/{db}` exists before we attempt
+ * `wl join` against it. Used as a defensive check during selfInit so a
+ * mis-configured `WL_UPSTREAM` (typo, repo deleted, intent recorded
+ * before `wl create` ran, …) doesn't push the container into a
+ * crash-loop.
+ *
+ * Two-stage to avoid DoltHub's "Calls authenticated with a token must
+ * include a refName" 400: anonymous probe at `/{owner}/{db}` first,
+ * authenticated `/{owner}/{db}/main` fallback only when the anonymous
+ * probe says missing AND we have a token. `200 Error "branch not found"`
+ * on the auth fallback also counts as exists (non-`main` default branch).
+ */
+async function upstreamExistsOnDolthub(upstream: string, token: string | null): Promise<boolean> {
+  const parsed = parseUpstream(upstream);
+  if (!parsed) return false;
+  const { org, db } = parsed;
+
+  const anonRes = await fetch(
+    `${DOLTHUB_API_BASE}/${org}/${db}?q=${encodeURIComponent('SELECT 1')}`,
+    { cache: 'no-store', headers: { 'cache-control': 'no-cache' } }
+  ).catch(() => null);
+  if (anonRes?.ok) {
+    const data = await anonRes.json().catch(() => null);
+    if (
+      data &&
+      typeof data === 'object' &&
+      (data as Record<string, unknown>).query_execution_status === 'Success'
+    ) {
+      return true;
+    }
+  }
+  if (!token) return false;
+
+  const authRes = await fetch(
+    `${DOLTHUB_API_BASE}/${org}/${db}/main?q=${encodeURIComponent('SELECT 1')}`,
+    {
+      cache: 'no-store',
+      headers: { authorization: `token ${token}`, 'cache-control': 'no-cache' },
+    }
+  ).catch(() => null);
+  if (!authRes?.ok) return false;
+  const data = await authRes.json().catch(() => null);
+  if (!data || typeof data !== 'object') return false;
+  const obj = data as Record<string, unknown>;
+  if (obj.query_execution_status === 'Success') return true;
+  if (
+    obj.query_execution_status === 'Error' &&
+    typeof obj.query_execution_message === 'string' &&
+    /branch not found/i.test(obj.query_execution_message)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 async function configureDolt(): Promise<void> {
   const userName = process.env.DOLT_USER_NAME || process.env.DOLTHUB_ORG || 'wasteland';
   const userEmail = process.env.DOLT_USER_EMAIL || `${userName}@wasteland.kilo.ai`;
@@ -606,6 +662,20 @@ async function selfInit(): Promise<void> {
 
   if (!upstream || !token || !dolthubOrg) {
     log.warn('selfInit skipped: missing env vars');
+    return;
+  }
+
+  // Defensive: if the configured upstream isn't on DoltHub yet (typo,
+  // repo deleted, or selfInit racing ahead of `wl create`), don't run
+  // `wl join` against it — it'll exit 1 with "Fork required" and crash
+  // the container. We log loudly and return so the next explicit
+  // `/wl/init` call (after the repo has been created) can retry.
+  const upstreamReady = await upstreamExistsOnDolthub(upstream, token).catch(() => false);
+  if (!upstreamReady) {
+    log.warn('selfInit deferred: upstream not present on DoltHub yet', {
+      upstream,
+      hint: 'Will retry on next /wl/init request once the repo is created via /wl/create.',
+    });
     return;
   }
 
@@ -1081,6 +1151,12 @@ async function handleCreate(req: Request): Promise<Response> {
   const body = await parseBody(req, CreateBodySchema);
   if ('error' in body) return body.error;
 
+  // Ensure dolt has a global identity before `wl create` invokes
+  // `dolt init` — without it `dolt init` errors with "Author identity
+  // unknown". `joinUpstream` runs the same setup; create-mode skips
+  // that path so we have to call it here directly.
+  await configureDolt();
+
   // `wl create` initializes a new DoltHub repo with the commons schema,
   // registers the creator as the first rig (trust_level 3), and pushes.
   // We do NOT pass --local-only — in hosted mode the container pushes
@@ -1103,6 +1179,35 @@ async function handleCreate(req: Request): Promise<Response> {
     });
     return errorResponse(`wl create failed: ${result.stderr || result.stdout}`, 502);
   }
+
+  // After `wl create` succeeds, set up the same local state
+  // `joinUpstream` writes after a successful `wl join`: synthetic
+  // wasteland config + `joined` flag + `WL_UPSTREAM` env var. Without
+  // this, every subsequent request would call `ensureInit` →
+  // `selfInit`, which would either re-run `wl join` (now redundant
+  // and slow) or skip with "missing env vars" (because we never set
+  // WL_UPSTREAM from `storeCredential` for not-yet-existing repos).
+  // Mirroring `joinUpstream`'s post-success state keeps the create
+  // path's container in the exact shape downstream handlers expect.
+  const handle = body.data.handle ?? process.env.DOLTHUB_ORG ?? '';
+  const email =
+    body.data.email || process.env.DOLT_USER_EMAIL || `${handle || 'wasteland'}@wasteland.kilo.ai`;
+  if (handle) {
+    try {
+      await writeJoinedConfig(body.data.upstream, handle, email);
+    } catch (err) {
+      // Non-fatal — `wl create` already succeeded on DoltHub. Worst
+      // case the next request triggers `joinUpstream` which writes
+      // the config itself. Log so we notice if this becomes common.
+      log.warn('post-create writeJoinedConfig failed', {
+        upstream: body.data.upstream,
+        handle,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  process.env.WL_UPSTREAM = body.data.upstream;
+  joined = true;
 
   lastOperationTimestamp = new Date().toISOString();
   log.info('wl create completed', { upstream: body.data.upstream });
@@ -1289,7 +1394,15 @@ log.info('wasteland control server started', { port: server.port });
 
 // Kick off self-init (non-blocking — server is already listening).
 // Handlers that need wl will await ensureInit() which shares this promise.
-void ensureInit();
+// We catch rejection here so a transient init failure doesn't surface as
+// an unhandled promise rejection (which Bun terminates the process on by
+// default, producing a crash-loop). The error has already been logged
+// inside `selfInit`; subsequent /wl/init requests will retry.
+ensureInit().catch(err => {
+  log.error('boot-time ensureInit rejected (will retry on next /wl/init)', {
+    error: err instanceof Error ? err.message : String(err),
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Heartbeat — log status every 60 seconds

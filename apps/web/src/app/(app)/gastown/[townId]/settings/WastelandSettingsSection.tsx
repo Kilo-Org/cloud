@@ -34,8 +34,14 @@ import {
   Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
-
-const DEFAULT_UPSTREAM = 'hop/wl-commons';
+import {
+  KILO_COMMONS_UPSTREAM,
+  UpstreamIntentPicker,
+  isUpstreamIntentValid,
+  resolveUpstreamFromIntent,
+  useUpstreamVerification,
+  type UpstreamIntent,
+} from '@/components/wasteland/UpstreamIntent';
 
 type WastelandConnection = {
   connection_id: string;
@@ -235,9 +241,14 @@ function ConnectWastelandDialog({
   const wastelands = wastelandsQuery.data ?? [];
   const [selectedWastelandId, setSelectedWastelandId] = useState<string | null>(null);
 
-  // Create-mode details
+  // Create-mode details. Defaults to "Join the Kilo Commons" so the
+  // common case is a single click: pick Create, leave the default,
+  // confirm credentials, done.
   const [newWastelandName, setNewWastelandName] = useState('');
-  const [upstreamInput, setUpstreamInput] = useState(DEFAULT_UPSTREAM);
+  const [intent, setIntent] = useState<UpstreamIntent>({
+    kind: 'commons',
+    isUpstreamAdmin: false,
+  });
 
   // Step: Credentials
   // OAuth path — hydrated from the dolthub integration when it's installed.
@@ -247,15 +258,16 @@ function ConnectWastelandDialog({
   const [manualOpen, setManualOpen] = useState(false);
   const [dolthubToken, setDolthubToken] = useState('');
   const [dolthubOrg, setDolthubOrg] = useState('');
-  // User explicitly attests they own the upstream. Create mode implies
-  // this is true (they're creating the repo) but keep it toggleable so
-  // they can opt back out.
-  const [isUpstreamAdmin, setIsUpstreamAdmin] = useState(false);
+  // Join-mode "I own this upstream" attestation — only relevant when
+  // joining an existing wasteland the caller didn't create. For create
+  // mode this is sourced from `intent.isUpstreamAdmin` (the picker owns
+  // the toggle there).
+  const [joinIsUpstreamAdmin, setJoinIsUpstreamAdmin] = useState(false);
 
   // Step: Identity
   const [rigHandle, setRigHandle] = useState('');
 
-  const [connectedUpstream, setConnectedUpstream] = useState(DEFAULT_UPSTREAM);
+  const [connectedUpstream, setConnectedUpstream] = useState(KILO_COMMONS_UPSTREAM);
   /** wastelandId that just got connected — used to offer a "Visit wasteland"
    *  link in the success step. */
   const [connectedWastelandId, setConnectedWastelandId] = useState<string | null>(null);
@@ -274,6 +286,17 @@ function ConnectWastelandDialog({
   const dolthubCredentialsQuery = useQuery({
     ...mainTrpc.dolthub.getInstallationCredentials.queryOptions(undefined),
     enabled: open && step === 'credentials' && installationQuery.data?.installed === true,
+  });
+  // Auto-resolve the DoltHub username while the user is on the
+  // create-mode `new-details` step so the picker can prefill Card 3's
+  // input as `<username>/...`. We use the dedicated `resolveUsername`
+  // procedure (which calls `/api/v1alpha1/user` and caches) rather than
+  // the credentials query above, because that one only returns the
+  // *cached* username — first-time users wouldn't get a prefill.
+  const resolveUsernameQuery = useQuery({
+    ...mainTrpc.dolthub.resolveUsername.queryOptions(undefined),
+    enabled: open && step === 'new-details' && installationQuery.data?.installed === true,
+    staleTime: Infinity,
   });
   const isDolthubInstalled = installationQuery.data?.installed === true;
   const oauthDolthubToken = dolthubCredentialsQuery.data?.token ?? null;
@@ -306,14 +329,14 @@ function ConnectWastelandDialog({
       setStep('intent');
       setMode('join');
       setSelectedWastelandId(null);
-      setConnectedUpstream(DEFAULT_UPSTREAM);
+      setConnectedUpstream(KILO_COMMONS_UPSTREAM);
       setConnectedWastelandId(null);
-      setUpstreamInput(DEFAULT_UPSTREAM);
+      setIntent({ kind: 'commons', isUpstreamAdmin: false });
       setNewWastelandName('');
       setManualOpen(false);
       setDolthubToken('');
       setDolthubOrg('');
-      setIsUpstreamAdmin(false);
+      setJoinIsUpstreamAdmin(false);
       setRigHandle('');
       setError(null);
     }
@@ -322,7 +345,6 @@ function ConnectWastelandDialog({
 
   const handlePickMode = (next: Mode) => {
     setMode(next);
-    setIsUpstreamAdmin(next === 'create');
     setStep(next === 'join' ? 'select' : 'new-details');
   };
 
@@ -362,7 +384,7 @@ function ConnectWastelandDialog({
 
     try {
       const selectedWasteland = wastelands.find(w => w.wasteland_id === wastelandId);
-      const upstream = selectedWasteland?.dolthub_upstream ?? DEFAULT_UPSTREAM;
+      const upstream = selectedWasteland?.dolthub_upstream ?? KILO_COMMONS_UPSTREAM;
       setConnectedUpstream(upstream);
       setConnectedWastelandId(wastelandId);
 
@@ -413,7 +435,7 @@ function ConnectWastelandDialog({
     try {
       const wastelandId = selectedWastelandId;
       const selectedWasteland = wastelands.find(w => w.wasteland_id === wastelandId);
-      const upstream = selectedWasteland?.dolthub_upstream ?? DEFAULT_UPSTREAM;
+      const upstream = selectedWasteland?.dolthub_upstream ?? KILO_COMMONS_UPSTREAM;
       setConnectedUpstream(upstream);
 
       // Brand-new wasteland record is only created when the user picked
@@ -435,7 +457,7 @@ function ConnectWastelandDialog({
         dolthubToken: tokenToStore,
         dolthubOrg,
         rigHandle,
-        isUpstreamAdmin,
+        isUpstreamAdmin: joinIsUpstreamAdmin,
       });
 
       await wastelandClient.wasteland.connectKiloTown.mutate({
@@ -474,7 +496,7 @@ function ConnectWastelandDialog({
     setError(null);
 
     try {
-      const upstream = upstreamInput.trim();
+      const upstream = resolveUpstreamFromIntent(intent);
       setConnectedUpstream(upstream);
 
       const name =
@@ -494,21 +516,28 @@ function ConnectWastelandDialog({
       const wastelandId = created.wasteland_id;
       setConnectedWastelandId(wastelandId);
 
-      // 2. Store credentials with admin flag (required for createUpstream)
+      // 2. Store credentials. For "create new upstream" the user is the
+      // admin by definition; for the other intents we honour the
+      // checkbox the user set in the picker.
+      const isUpstreamAdmin = intent.kind === 'create' ? true : intent.isUpstreamAdmin;
       await wastelandClient.wasteland.storeCredential.mutate({
         wastelandId,
         dolthubToken: tokenToStore,
         dolthubOrg,
         rigHandle,
-        isUpstreamAdmin: true,
+        isUpstreamAdmin,
       });
 
-      // 3. Bootstrap the DoltHub repo + register the creator as the first rig.
-      await wastelandClient.wasteland.createUpstream.mutate({
-        wastelandId,
-        upstream,
-        rigHandle,
-      });
+      // 3. Bootstrap the DoltHub repo + register the creator as the first
+      // rig — only when the user actually wants a brand-new upstream. For
+      // the commons/connect intents the upstream already exists.
+      if (intent.kind === 'create') {
+        await wastelandClient.wasteland.createUpstream.mutate({
+          wastelandId,
+          upstream,
+          rigHandle,
+        });
+      }
 
       // 4. Persist the town↔wasteland association on the Town DO.
       //    createWasteland already added the user as a wasteland member,
@@ -546,8 +575,25 @@ function ConnectWastelandDialog({
     return handleConnectJoin();
   };
 
-  const upstreamValid = /^[^/\s]+\/[^/\s]+$/.test(upstreamInput.trim());
-  const newDetailsValid = upstreamValid && newWastelandName.trim().length > 0;
+  // Verify Card 2's typed upstream against DoltHub. Reused so the "Next"
+  // button refuses to advance while the probe is pending or "missing".
+  const connectVerification = useUpstreamVerification({
+    upstream: intent.kind === 'connect' ? intent.upstream : '',
+    enabled: intent.kind === 'connect',
+  });
+  const createVerification = useUpstreamVerification({
+    upstream: intent.kind === 'create' ? intent.upstream : '',
+    enabled: intent.kind === 'create',
+  });
+  // For create mode we want exists=false (the repo shouldn't already
+  // exist) — block the Next button while the probe says exists=true.
+  const upstreamProbeBlocked =
+    (intent.kind === 'connect' &&
+      (connectVerification.status === 'pending' || connectVerification.status === 'missing')) ||
+    (intent.kind === 'create' &&
+      (createVerification.status === 'pending' || createVerification.status === 'exists'));
+  const newDetailsValid =
+    isUpstreamIntentValid(intent) && newWastelandName.trim().length > 0 && !upstreamProbeBlocked;
   // The credentials step accepts either:
   //   - the OAuth-issued token (when the dolthub integration is installed
   //     and the user hasn't toggled the manual fallback open), plus a
@@ -687,35 +733,32 @@ function ConnectWastelandDialog({
         {step === 'new-details' && (
           <>
             <DialogHeader>
-              <DialogTitle className="text-white/90">Create a Wasteland</DialogTitle>
+              <DialogTitle className="text-white/90">Create a wasteland</DialogTitle>
               <DialogDescription className="text-white/50">
-                Name your wasteland and pick the DoltHub repo to bootstrap. We'll create the repo
-                for you and register your first rig.
+                Name your wasteland and pick the upstream it should target.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <FieldGroup
-                label="Wasteland Name"
+                label="Wasteland name"
                 hint="Display name shown in the UI; doesn't have to match the DoltHub repo."
               >
                 <Input
                   value={newWastelandName}
                   onChange={e => setNewWastelandName(e.target.value)}
-                  placeholder="My Wasteland"
+                  placeholder="My wasteland"
                   className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85 placeholder:text-white/20"
                 />
               </FieldGroup>
-              <FieldGroup
-                label="DoltHub Upstream"
-                hint="New repo to create. Format: org/db. The org must already exist on DoltHub."
-              >
-                <Input
-                  value={upstreamInput}
-                  onChange={e => setUpstreamInput(e.target.value)}
-                  placeholder="my-org/my-wasteland"
-                  className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
-                />
-              </FieldGroup>
+              <UpstreamIntentPicker
+                value={intent}
+                onChange={setIntent}
+                dolthubUsername={
+                  resolveUsernameQuery.data?.username ??
+                  dolthubCredentialsQuery.data?.dolthubUsername ??
+                  null
+                }
+              />
             </div>
             <DialogFooter>
               <Button
@@ -833,25 +876,29 @@ function ConnectWastelandDialog({
                 </CollapsibleContent>
               </Collapsible>
 
-              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
-                <input
-                  type="checkbox"
-                  checked={isUpstreamAdmin}
-                  onChange={e => setIsUpstreamAdmin(e.target.checked)}
-                  className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-500"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-white/70">I own this upstream</p>
-                  <p className="mt-0.5 text-[11px] text-white/30">
-                    Unlocks admin mode — direct writes, PR merge controls, and the ability to accept
-                    contributions from others.{' '}
-                    {mode === 'create'
-                      ? "Enabled by default since you're creating this repo."
-                      : 'Only check this if your DoltHub account has push access to the upstream repo.'}
-                    You can toggle this later in settings.
-                  </p>
-                </div>
-              </label>
+              {/* Create-mode owns the upstream-admin toggle on the picker
+                  itself (it's per-card in the new-details step). The
+                  credentials step keeps the toggle for join-mode where
+                  the user is opting in to direct writes on a wasteland
+                  someone else originally bootstrapped. */}
+              {mode === 'join' && (
+                <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={joinIsUpstreamAdmin}
+                    onChange={e => setJoinIsUpstreamAdmin(e.target.checked)}
+                    className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-500"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-white/70">I own this upstream</p>
+                    <p className="mt-0.5 text-[11px] text-white/30">
+                      Unlocks admin mode — direct writes, PR merge controls, and the ability to
+                      accept contributions from others. Only check this if your DoltHub account has
+                      push access to the upstream repo. You can toggle this later in settings.
+                    </p>
+                  </div>
+                </label>
+              )}
             </div>
             <DialogFooter>
               <Button
@@ -929,12 +976,24 @@ function ConnectWastelandDialog({
               </DialogTitle>
               <DialogDescription className="text-white/50">
                 {mode === 'create' ? (
-                  <>
-                    Bootstrapping{' '}
-                    <span className="font-mono text-white/70">{upstreamInput.trim()}</span> on
-                    DoltHub and registering{' '}
-                    <span className="font-mono text-white/70">{rigHandle}</span> as the first rig.
-                  </>
+                  intent.kind === 'create' ? (
+                    <>
+                      Bootstrapping{' '}
+                      <span className="font-mono text-white/70">
+                        {resolveUpstreamFromIntent(intent)}
+                      </span>{' '}
+                      on DoltHub and registering{' '}
+                      <span className="font-mono text-white/70">{rigHandle}</span> as the first rig.
+                    </>
+                  ) : (
+                    <>
+                      Connecting your wasteland to{' '}
+                      <span className="font-mono text-white/70">
+                        {resolveUpstreamFromIntent(intent)}
+                      </span>
+                      .
+                    </>
+                  )
                 ) : (
                   <>
                     Setting up credentials, forking the commons, and joining as{' '}

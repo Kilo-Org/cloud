@@ -10,8 +10,6 @@ import type { PromotionIdentity } from './promotion-identity.js';
 
 type ModelStatsTarget = {
   id: string;
-  openrouterId: string;
-  usedFallback: boolean;
 };
 
 type LatestPromotionRow = {
@@ -52,14 +50,14 @@ async function findTargetModelStats(
 ): Promise<ModelStatsTarget | null> {
   const exactOpenrouterId = openrouterIdForIdentity(identity);
   const exactRows = await db
-    .select({ id: modelStats.id, openrouterId: modelStats.openrouterId })
+    .select({ id: modelStats.id })
     .from(modelStats)
     .where(eq(modelStats.openrouterId, exactOpenrouterId))
     .limit(1);
 
   const exact = exactRows[0];
   if (exact) {
-    return { ...exact, usedFallback: false };
+    return exact;
   }
 
   if (!identity.variant) {
@@ -68,42 +66,19 @@ async function findTargetModelStats(
 
   const baseOpenrouterId = baseOpenrouterIdForIdentity(identity);
   const fallbackRows = await db
-    .select({ id: modelStats.id, openrouterId: modelStats.openrouterId })
+    .select({ id: modelStats.id })
     .from(modelStats)
     .where(eq(modelStats.openrouterId, baseOpenrouterId))
     .limit(1);
 
   const fallback = fallbackRows[0];
-  return fallback ? { ...fallback, usedFallback: true } : null;
+  return fallback ?? null;
 }
 
 async function getLatestPromotionsForTarget(
   db: WorkerDb,
-  identity: PromotionIdentity,
-  usedFallback: boolean
+  identity: PromotionIdentity
 ): Promise<LatestPromotionRow[]> {
-  if (usedFallback) {
-    const result = await db.execute<LatestPromotionRow>(sql`
-      SELECT DISTINCT ON (${model_eval_ingest.task_source})
-        ${model_eval_ingest.task_source} AS task_source,
-        ${model_eval_ingest.total_score} AS total_score,
-        ${model_eval_ingest.overall_score} AS overall_score,
-        ${model_eval_ingest.n_total_trials} AS n_total_trials,
-        ${model_eval_ingest.avg_cost_usd} AS avg_cost_usd,
-        ${model_eval_ingest.avg_input_tokens} AS avg_input_tokens,
-        ${model_eval_ingest.avg_output_tokens} AS avg_output_tokens,
-        ${model_eval_ingest.avg_cache_read_tokens} AS avg_cache_read_tokens,
-        ${model_eval_ingest.avg_execution_ms} AS avg_execution_ms,
-        ${model_eval_ingest.promoted_at} AS promoted_at
-      FROM ${model_eval_ingest}
-      WHERE ${model_eval_ingest.provider} = ${identity.provider}
-        AND ${model_eval_ingest.model} = ${identity.model}
-      ORDER BY ${model_eval_ingest.task_source}, ${model_eval_ingest.promoted_at} DESC
-    `);
-
-    return result.rows;
-  }
-
   const result = await db.execute<LatestPromotionRow>(sql`
     SELECT DISTINCT ON (${model_eval_ingest.task_source})
       ${model_eval_ingest.task_source} AS task_source,
@@ -184,7 +159,7 @@ export async function recomputeModelStatsKiloBench(
     return false;
   }
 
-  const rows = await getLatestPromotionsForTarget(db, identity, target.usedFallback);
+  const rows = await getLatestPromotionsForTarget(db, identity);
   if (rows.length === 0) {
     return false;
   }

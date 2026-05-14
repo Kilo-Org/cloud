@@ -1528,6 +1528,8 @@ export class SessionService {
         freshGitToken,
         onProgress: options.onProgress,
       });
+    } else if (metadata?.upstreamBranch) {
+      await manageBranch(session, context.workspacePath, metadata.upstreamBranch, true);
     }
 
     return {

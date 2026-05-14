@@ -895,6 +895,16 @@ export async function manageBranch(
   // Fetch latest refs from remote
   await gitFetch(session, workspacePath);
 
+  if (
+    isUpstreamBranch &&
+    (GITHUB_PULL_REF_PATTERN.test(branchName) || GITLAB_MR_REF_PATTERN.test(branchName))
+  ) {
+    await fetchPullRefAndCheckout(session, workspacePath, branchName);
+    logger.withTags({ pullRef: branchName }).info('Checked out pull/merge-request ref');
+    logger.debug('Successfully on branch');
+    return branchName;
+  }
+
   // Check branch existence in parallel
   const [existsLocally, existsRemotely] = await Promise.all([
     branchExistsLocally(session, workspacePath, branchName),
@@ -922,13 +932,6 @@ export async function manageBranch(
   } else {
     // Case 4: Doesn't exist anywhere
     if (isUpstreamBranch) {
-      if (GITHUB_PULL_REF_PATTERN.test(branchName) || GITLAB_MR_REF_PATTERN.test(branchName)) {
-        await fetchPullRefAndCheckout(session, workspacePath, branchName);
-        logger.withTags({ pullRef: branchName }).info('Checked out pull/merge-request ref');
-        logger.debug('Successfully on branch');
-        return branchName;
-      }
-
       throw new BranchNotFoundError(branchName);
     }
     await createNewBranch(session, workspacePath, branchName);

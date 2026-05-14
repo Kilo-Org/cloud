@@ -709,7 +709,7 @@ describe('credit renewal fanout queue processing', () => {
     expect(JSON.stringify(loggedValues)).not.toContain('second-user@example.com');
   });
 
-  it('enqueues a continuation message after reaching the discovery wall-clock budget', async () => {
+  it('does not enqueue a continuation after wall-clock budget when no additional page exists', async () => {
     const first = creditRenewalRow({
       id: '11111111-1111-4111-8111-111111111111',
       credit_renewal_at: '2026-06-01T00:00:00.000Z',
@@ -734,13 +734,12 @@ describe('credit renewal fanout queue processing', () => {
       1
     );
 
-    expect(lifecycleSend).toHaveBeenCalledTimes(2);
-    expect(lifecycleSend).toHaveBeenLastCalledWith(
+    expect(lifecycleSend).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith(
       expect.objectContaining({
-        kind: 'credit_renewal_discovery_continuation',
-        cursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
-        cursorRenewalBoundary: '2026-06-01T00:00:00.000Z',
-        wallClockBudgetMs: 1,
+        kind: 'credit_renewal_item',
+        subscriptionId: '11111111-1111-4111-8111-111111111111',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
       })
     );
   });
@@ -878,7 +877,7 @@ describe('credit renewal fanout queue processing', () => {
       renewal_boundary: '2026-05-01T00:00:00.000Z',
       first_failure_at: '2026-05-01T00:05:00.000Z',
     };
-    const { db } = createMockDb([[oldestFailure]], {
+    const { db } = createMockDb([[{ count: 2 }], [oldestFailure]], {
       insertReturningRows: [[terminalFailure]],
     });
     mockGetWorkerDb.mockReturnValue(db);
@@ -900,7 +899,7 @@ describe('credit renewal fanout queue processing', () => {
       renewalBoundary: '2026-06-01T00:00:00.000Z',
       attempts: 3,
       terminalFailureStatus: 'unresolved',
-      terminalFailureCount: 1,
+      terminalFailureCount: 2,
       oldestUnresolvedTerminalFailureAt: '2026-05-01T00:05:00.000Z',
       oldestUnresolvedTerminalFailureSubscriptionId: '22222222-2222-4222-8222-222222222222',
       oldestUnresolvedTerminalFailureRenewalBoundary: '2026-05-01T00:00:00.000Z',
@@ -1028,6 +1027,55 @@ describe('credit renewal fanout queue processing', () => {
         resolution_actor_type: 'system',
         resolution_actor_id: 'billing-lifecycle-job',
         resolution_reason: 'credit_renewal_insufficient_credits_finalized',
+      })
+    );
+  });
+
+  it('resolves a terminal failure when an operator retry finalizes a duplicate boundary', async () => {
+    const row = creditRenewalRow({
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    });
+    const { db, updates } = createMockDb([[row], []], {
+      txInsertRowCounts: [0],
+      txUpdateReturningRows: [[]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_request, init) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action?: string;
+      };
+      if (body.action === 'process_paid_conversion') {
+        return Response.json({
+          affiliateSaleEnqueued: false,
+          winningTouchType: null,
+          conversionId: null,
+          disqualificationReason: 'no_touch',
+        });
+      }
+      return Response.json({ ok: true });
+    });
+
+    const summary = await processCreditRenewalItem(
+      createEnvWithQueueMocks(vi.fn()).env,
+      {
+        kind: 'credit_renewal_item',
+        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        sweep: 'credit_renewal_item',
+        subscriptionId: row.id,
+        userId: row.user_id,
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+        resolveTerminalFailureOnExpectedOutcome: true,
+      },
+      1
+    );
+
+    expect(summary.credit_renewals_skipped_duplicate).toBe(1);
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        status: 'resolved',
+        resolution_actor_type: 'system',
+        resolution_actor_id: 'billing-lifecycle-job',
+        resolution_reason: 'credit_renewal_duplicate_idempotency_reconciled',
       })
     );
   });
@@ -3313,9 +3361,7 @@ describe('credit renewal sweep affiliate tracking', () => {
         }),
       ])
     );
-    expect(txInserts).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ credit_category: expect.any(String) })])
-    );
+    expect(txInserts.some(insert => typeof insert.credit_category === 'string')).toBe(false);
     expect(txUpdates).toEqual([
       {
         status: 'canceled',

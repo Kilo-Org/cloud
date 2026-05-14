@@ -1,4 +1,4 @@
-import { and, eq, lt, sql } from 'drizzle-orm';
+import { and, count, eq, lt, sql } from 'drizzle-orm';
 
 import type { WorkerDb } from './client';
 import { kiloclaw_terminal_renewal_failures, type KiloClawTerminalRenewalFailure } from './schema';
@@ -49,6 +49,10 @@ export type FindUnresolvedTerminalRenewalFailureKey = {
 export type ListUnresolvedTerminalRenewalFailuresOptions = {
   subscriptionId?: string;
   limit?: number;
+};
+
+export type CountUnresolvedTerminalRenewalFailuresOptions = {
+  subscriptionId?: string;
 };
 
 export type ResolveTerminalRenewalFailureInput = {
@@ -166,29 +170,44 @@ export async function listUnresolvedTerminalRenewalFailures(
   database: TerminalRenewalFailureRepository,
   options: ListUnresolvedTerminalRenewalFailuresOptions = {}
 ): Promise<KiloClawTerminalRenewalFailure[]> {
-  const predicate = options.subscriptionId
-    ? and(
-        eq(
-          kiloclaw_terminal_renewal_failures.status,
-          KiloClawTerminalRenewalFailureStatus.Unresolved
-        ),
-        eq(kiloclaw_terminal_renewal_failures.subscription_id, options.subscriptionId)
-      )
-    : eq(
-        kiloclaw_terminal_renewal_failures.status,
-        KiloClawTerminalRenewalFailureStatus.Unresolved
-      );
-
   const ordered = database
     .select()
     .from(kiloclaw_terminal_renewal_failures)
-    .where(predicate)
+    .where(unresolvedTerminalRenewalFailuresPredicate(options.subscriptionId))
     .orderBy(kiloclaw_terminal_renewal_failures.first_failure_at);
 
   if (options.limit !== undefined) {
     return await ordered.limit(options.limit);
   }
   return await ordered;
+}
+
+export async function countUnresolvedTerminalRenewalFailures(
+  database: TerminalRenewalFailureRepository,
+  options: CountUnresolvedTerminalRenewalFailuresOptions = {}
+): Promise<number> {
+  const [row] = await database
+    .select({ count: count() })
+    .from(kiloclaw_terminal_renewal_failures)
+    .where(unresolvedTerminalRenewalFailuresPredicate(options.subscriptionId));
+
+  return row?.count ?? 0;
+}
+
+function unresolvedTerminalRenewalFailuresPredicate(subscriptionId: string | undefined) {
+  const statusPredicate = eq(
+    kiloclaw_terminal_renewal_failures.status,
+    KiloClawTerminalRenewalFailureStatus.Unresolved
+  );
+
+  if (!subscriptionId) {
+    return statusPredicate;
+  }
+
+  return and(
+    statusPredicate,
+    eq(kiloclaw_terminal_renewal_failures.subscription_id, subscriptionId)
+  );
 }
 
 /**

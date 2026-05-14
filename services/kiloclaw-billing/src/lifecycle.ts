@@ -3,6 +3,7 @@ import { addMonths, format } from 'date-fns';
 
 import type { WorkerDb } from '@kilocode/db';
 import {
+  countUnresolvedTerminalRenewalFailures,
   findUnresolvedTerminalRenewalFailure,
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
@@ -1289,6 +1290,7 @@ type CreditRenewalTransactionOutcome =
       effectivePlan: 'commit' | 'standard';
       priceVersion: string;
       costMicrodollars: number;
+      row: CreditRenewalRow;
       newPeriodEnd: string;
     }
   | {
@@ -1581,6 +1583,7 @@ async function processCreditRenewalRow(
           effectivePlan,
           priceVersion: current.kiloclaw_price_version,
           costMicrodollars,
+          row: current,
           newPeriodEnd,
         } satisfies CreditRenewalTransactionOutcome;
       }
@@ -1672,6 +1675,16 @@ async function processCreditRenewalRow(
         priceVersion: outcome.priceVersion,
       }),
     });
+
+    if (shouldResolveTerminalFailure) {
+      await resolveTerminalRenewalFailureForFinalizedBoundary(database, {
+        subscriptionId: outcome.row.id,
+        renewalBoundary: outcome.renewalAt,
+        reason: 'credit_renewal_duplicate_idempotency_reconciled',
+        userId: outcome.userId,
+        instanceId: outcome.row.instance_id,
+      });
+    }
 
     summary.credit_renewals_skipped_duplicate++;
     return;
@@ -2065,7 +2078,7 @@ export async function processCreditRenewalDiscovery(
         lastEmitted = row;
       }
 
-      const shouldContinue = rows.length > emitted;
+      const shouldContinue = rows.length > pageBudget;
       if (shouldContinue && lastEmitted?.credit_renewal_at) {
         await env.LIFECYCLE_QUEUE.send({
           kind: 'credit_renewal_discovery_continuation',
@@ -2171,8 +2184,11 @@ export async function recordCreditRenewalTerminalFailure(
     failureMessage: message.failureMessage ?? null,
     observedAt: new Date().toISOString(),
   });
-  const unresolvedFailures = await listUnresolvedTerminalRenewalFailures(database);
-  const oldestFailure = unresolvedFailures[0];
+  const [terminalFailureCount, oldestFailures] = await Promise.all([
+    countUnresolvedTerminalRenewalFailures(database),
+    listUnresolvedTerminalRenewalFailures(database, { limit: 1 }),
+  ]);
+  const oldestFailure = oldestFailures[0];
 
   log('error', 'Recorded credit-renewal terminal failure', {
     event: 'credit_renewal_terminal_failure',
@@ -2181,7 +2197,7 @@ export async function recordCreditRenewalTerminalFailure(
     renewalBoundary: message.renewalBoundary,
     attempts: message.attempts,
     terminalFailureStatus: failure.status,
-    terminalFailureCount: unresolvedFailures.length,
+    terminalFailureCount,
     oldestUnresolvedTerminalFailureAt: oldestFailure?.first_failure_at,
     oldestUnresolvedTerminalFailureSubscriptionId: oldestFailure?.subscription_id,
     oldestUnresolvedTerminalFailureRenewalBoundary: oldestFailure?.renewal_boundary,

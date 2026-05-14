@@ -6,12 +6,7 @@ import {
   type ModelStatsKiloBenchEval,
 } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
-
-type PromotionIdentity = {
-  provider: string;
-  model: string;
-  variant: string | null;
-};
+import type { PromotionIdentity } from './promotion-identity.js';
 
 type ModelStatsTarget = {
   id: string;

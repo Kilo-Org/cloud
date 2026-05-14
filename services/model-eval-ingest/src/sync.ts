@@ -3,15 +3,10 @@ import { model_eval_ingest } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { recomputeModelStatsKiloBench } from './recompute.js';
+import type { PromotionIdentity } from './promotion-identity.js';
 import { PromotionRecordsSchema, type PromotionRecordInput } from './promotion-record.js';
 
 const PROMOTION_PULL_LIMIT = 1_000;
-
-type PromotionIdentity = {
-  provider: string;
-  model: string;
-  variant: string | null;
-};
 
 const PromotionIdentityKeySchema = z.tuple([z.string(), z.string(), z.string().nullable()]);
 
@@ -113,8 +108,11 @@ export async function syncFromBench(
     }
   }
 
+  let recomputed = 0;
   for (const identityKey of touchedIdentities) {
-    await recomputeModelStatsKiloBench(db, decodePromotionIdentity(identityKey));
+    if (await recomputeModelStatsKiloBench(db, decodePromotionIdentity(identityKey))) {
+      recomputed += 1;
+    }
   }
 
   if (promotions.length === PROMOTION_PULL_LIMIT) {
@@ -127,7 +125,7 @@ export async function syncFromBench(
     inserted,
     alreadyHad,
     fetched: promotions.length,
-    recomputed: touchedIdentities.size,
+    recomputed,
     sinceMs,
   };
 }

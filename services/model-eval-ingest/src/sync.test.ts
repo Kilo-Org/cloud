@@ -120,6 +120,17 @@ describe('syncFromBench', () => {
     expect(recomputeModelStatsKiloBench).toHaveBeenCalledTimes(1);
   });
 
+  it('counts only successful model cache recomputes', async () => {
+    vi.mocked(recomputeModelStatsKiloBench).mockResolvedValueOnce(false);
+    const { env } = createEnv([promotion()]);
+    const { db } = createDb();
+    vi.mocked(getWorkerDb).mockReturnValue(db as unknown as ReturnType<typeof getWorkerDb>);
+
+    const result = await syncFromBench(env);
+
+    expect(result.recomputed).toBe(0);
+  });
+
   it('does not duplicate ingest rows during an idempotent rerun', async () => {
     const records = [promotion()];
     const { env } = createEnv(records);

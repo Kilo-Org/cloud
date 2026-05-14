@@ -25,6 +25,7 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
   }
 
   const pool = new pg.Pool({
+    options: '-c timezone=UTC',
     ...baseConfig,
     ...poolConfig,
   });
@@ -43,7 +44,12 @@ export type GetWorkerDbOptions = Omit<pg.PoolConfig, 'connectionString' | 'max'>
  * Return a fresh wrapper per call so request/DO-bound I/O state never crosses contexts.
  */
 export function getWorkerDb(connectionString: string, options: GetWorkerDbOptions = {}) {
-  const pool = new pg.Pool({ connectionString, max: 1, ...options });
+  const pool = new pg.Pool({
+    connectionString,
+    max: 1,
+    options: '-c timezone=UTC',
+    ...options,
+  });
   return drizzle(pool, { schema });
 }
 

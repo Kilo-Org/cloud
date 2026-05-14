@@ -861,7 +861,7 @@ describe('trial warning sweep', () => {
     });
   });
 
-  it('sends only the urgent warning for current one-day trials', async () => {
+  it('does not send clawTrialExpiresTomorrow for current one-day trials at daysRemaining <= 1', async () => {
     const instanceId = '46464646-4646-4646-8646-464646464646';
     const { db, inserts } = createMockDb([
       [
@@ -890,11 +890,46 @@ describe('trial warning sweep', () => {
     );
 
     expect(summary.errors).toBe(0);
+    expect(summary.trial_warnings).toBe(0);
+    expect(summary.emails_sent).toBe(0);
+    expect(inserts).toEqual([]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('sends clawTrialExpiresTomorrow for legacy seven-day trials at daysRemaining <= 1', async () => {
+    const instanceId = '47474747-4747-4747-8747-474747474747';
+    const { db, inserts } = createMockDb([
+      [
+        {
+          id: 'sub-legacy-urgent',
+          user_id: 'user-legacy-urgent',
+          instance_id: instanceId,
+          instance_destroyed_at: null,
+          instance_sandbox_id: 'ki_47474747474747478747474747474747',
+          organization_id: null,
+          email: 'legacy-urgent@example.com',
+          trial_ends_at: new Date(Date.now() + 86_400_000).toISOString(),
+          kiloclaw_price_version: '2026-03-19',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '47474747-4747-4747-8747-474747474740',
+        sweep: 'trial_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
     expect(summary.trial_warnings).toBe(1);
     expect(summary.emails_sent).toBe(1);
     expect(inserts).toEqual([
       {
-        user_id: 'user-current-urgent',
+        user_id: 'user-legacy-urgent',
         instance_id: instanceId,
         email_type: 'claw_trial_1d',
       },
@@ -908,10 +943,10 @@ describe('trial warning sweep', () => {
     expect(body).toEqual({
       action: 'send_email',
       input: {
-        to: 'urgent@example.com',
+        to: 'legacy-urgent@example.com',
         templateName: 'clawTrialExpiresTomorrow',
         templateVars: { claw_url: 'https://app.kilo.ai/claw' },
-        userId: 'user-current-urgent',
+        userId: 'user-legacy-urgent',
         instanceId,
       },
     });

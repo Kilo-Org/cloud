@@ -12,7 +12,7 @@ if (missing.length > 0) {
 }
 
 const config: ExpoConfig = {
-  name: 'KiloClaw',
+  name: 'Kilo',
   owner: 'kilocode',
   slug: 'kilo-app',
   version: '1.0.0',

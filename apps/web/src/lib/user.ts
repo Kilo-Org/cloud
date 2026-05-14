@@ -15,6 +15,8 @@ import {
   user_affiliate_events,
   user_admin_notes,
   user_auth_provider,
+  kilo_pass_store_events,
+  kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   cloud_agent_webhook_triggers,
   enrichment_data,
@@ -63,6 +65,16 @@ import {
   contributor_champion_memberships,
   contributor_champion_contributors,
   credit_campaigns,
+  kiloclaw_attribution_touches,
+  impact_advocate_participants,
+  kiloclaw_referrals,
+  kiloclaw_referral_conversions,
+  kiloclaw_referral_reward_decisions,
+  kiloclaw_referral_rewards,
+  kiloclaw_referral_reward_applications,
+  impact_advocate_reward_redemptions,
+  impact_conversion_reports,
+  github_branch_pull_requests,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from './constants';
@@ -82,6 +94,19 @@ import {
 import { normalizeEmail } from '@/lib/utils';
 import { extractEmailDomain } from '@/lib/email-domain';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
+import { logImpactReferralDebug } from '@/lib/impact-debug';
+import {
+  createDeletedUserEmailTombstone,
+  queueImpactAdvocateParticipantRegistration,
+  recordImpactAffiliateTouch,
+  recordImpactReferralTouch,
+} from '@/lib/impact-referral';
+import {
+  redactLandingPathForLogs,
+  type ParsedImpactAffiliateTouch,
+  type ParsedImpactReferralTouch,
+} from '@/lib/impact-referral-utils';
+import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -223,6 +248,14 @@ export type CreateOrUpdateUserArgs = {
   display_name?: string | null;
 };
 
+export type CreateOrUpdateUserTrackingContext = {
+  affiliateTouch?: ParsedImpactAffiliateTouch | null;
+  referralTouch?: ParsedImpactReferralTouch | null;
+  anonymousId?: string | null;
+  locale?: string | null;
+  countryCode?: string | null;
+};
+
 export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
   const timer = createTimer();
   const existing_kilo_user_id = await findUserIdByAuthProvider(
@@ -298,7 +331,8 @@ export async function createOrUpdateUser(
   turnstile_guid: UUID | undefined,
   autoLinkToExistingUser: boolean = false,
   requestHeaders?: Headers,
-  affiliateTrackingId?: string | null
+  affiliateTrackingId?: string | null,
+  trackingContext?: CreateOrUpdateUserTrackingContext
 ): Promise<Result<{ user: User; isNew: boolean }, AuthErrorType>> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
@@ -444,14 +478,93 @@ export async function createOrUpdateUser(
       });
 
       if (affiliateTrackingId?.trim()) {
-        await recordAffiliateAttributionAndQueueParentEvent({
-          database: tx,
-          userId: inserted.id,
-          provider: 'impact',
-          trackingId: affiliateTrackingId,
-          customerEmail: inserted.google_user_email,
-          eventDate: new Date(inserted.created_at),
-        });
+        try {
+          logImpactReferralDebug('Signup recording Impact affiliate attribution and parent event', {
+            userId: inserted.id,
+            trackingIdLength: affiliateTrackingId.trim().length,
+          });
+          await recordAffiliateAttributionAndQueueParentEvent({
+            database: tx,
+            userId: inserted.id,
+            provider: 'impact',
+            trackingId: affiliateTrackingId,
+            customerEmail: inserted.google_user_email,
+            eventDate: new Date(inserted.created_at),
+          });
+        } catch (error) {
+          console.error('[user] failed to persist affiliate attribution during signup', {
+            userId: inserted.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      if (trackingContext?.affiliateTouch) {
+        try {
+          logImpactReferralDebug('Signup recording Impact affiliate touch', {
+            userId: inserted.id,
+            anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
+            landingPath: redactLandingPathForLogs(trackingContext.affiliateTouch.landingPath),
+            trackingValueLength: trackingContext.affiliateTouch.trackingValueLength,
+            isTrackingValueAccepted: trackingContext.affiliateTouch.isTrackingValueAccepted,
+          });
+          await recordImpactAffiliateTouch({
+            database: tx,
+            userId: inserted.id,
+            anonymousId: trackingContext.anonymousId ?? null,
+            touch: trackingContext.affiliateTouch,
+          });
+        } catch (error) {
+          console.error('[user] failed to record affiliate touch during signup', {
+            userId: inserted.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      if (trackingContext?.referralTouch) {
+        try {
+          logImpactReferralDebug('Signup recording Impact Advocate referral touch', {
+            userId: inserted.id,
+            anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
+            landingPath: redactLandingPathForLogs(trackingContext.referralTouch.landingPath),
+            rsCodePresent: Boolean(trackingContext.referralTouch.rsCode?.trim()),
+            trackingValueLength: trackingContext.referralTouch.trackingValueLength,
+            isTrackingValueAccepted: trackingContext.referralTouch.isTrackingValueAccepted,
+          });
+          await recordImpactReferralTouch({
+            database: tx,
+            userId: inserted.id,
+            anonymousId: trackingContext.anonymousId ?? null,
+            touch: trackingContext.referralTouch,
+          });
+        } catch (error) {
+          console.error('[user] failed to record referral touch during signup', {
+            userId: inserted.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+
+        try {
+          logImpactReferralDebug('Signup queueing Impact Advocate participant registration', {
+            userId: inserted.id,
+            landingPath: redactLandingPathForLogs(trackingContext.referralTouch.landingPath),
+            localePresent: Boolean(trackingContext.locale?.trim()),
+            countryCode: trackingContext.countryCode ?? null,
+          });
+          await queueImpactAdvocateParticipantRegistration({
+            database: tx,
+            user: inserted,
+            referralTouch: trackingContext.referralTouch,
+            locale: trackingContext.locale,
+            countryCode: trackingContext.countryCode,
+          });
+        } catch (error) {
+          console.error('[user] failed to enqueue Impact Advocate registration during signup', {
+            userId: inserted.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
 
       return successResult({ user: inserted });
@@ -593,6 +706,10 @@ export class SoftDeletePreconditionError extends Error {
  * - stytch_fingerprints (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
  * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
+ * - kiloclaw_scheduled_action_targets (retained operational records;
+ * - transactional_email_log (retained outbox marker, financial record;
+ *   user_id FK references the anonymized kilocode_users row and optional
+ *   organization_id references the organization — no direct PII)
  *
  * What is scrubbed/deleted:
  * - PII on the user row (email, name, avatar, urls)
@@ -609,6 +726,7 @@ export class SoftDeletePreconditionError extends Error {
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
  * - credit_campaigns (created_by_kilo_user_id anonymized)
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
+ * - App Store account token and retained Kilo Pass store purchase/event token fields
  * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
@@ -619,6 +737,11 @@ export class SoftDeletePreconditionError extends Error {
  *   cloud_agent_code_reviews, device_auth_requests, auto_top_up_configs,
  *   kiloclaw_instances/inbound_email_aliases/access_codes, user_period_cache,
  *   kilo_pass_scheduled_changes)
+ * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
+ *   + free-form reason; cleared on the deleted user's retained destroyed
+ *   instances, AND on any other instances where this user was the admin
+ *   actor — since their email and any reason text they wrote is their PII
+ *   regardless of which instance the override targeted)
  */
 export async function softDeleteUser(userId: string) {
   const user = await findUserById(userId);
@@ -627,6 +750,7 @@ export async function softDeleteUser(userId: string) {
   // Grab the original email before we anonymize — needed for cleanup of
   // magic_link_tokens and organization_invitations addressed to this user.
   const originalEmail = user.google_user_email;
+  const originalAppStoreAccountToken = user.app_store_account_token;
 
   await db.transaction(async tx => {
     // ── Precondition checks (inside tx to avoid TOCTOU races) ──────────
@@ -678,6 +802,15 @@ export async function softDeleteUser(userId: string) {
       );
     }
 
+    // Pre-0090 users can have NULL normalized_email but a real google_user_email.
+    // Fall back to google_user_email so the tombstone hash still gets recorded
+    // before the row below anonymizes both columns; otherwise a previously
+    // deleted user could re-register and qualify as a referee.
+    await createDeletedUserEmailTombstone({
+      database: tx,
+      normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
+    });
+
     // ── 1. Anonymize the user row ────────────────────────────────────────
     await tx
       .update(kilocode_users)
@@ -693,6 +826,7 @@ export async function softDeleteUser(userId: string) {
         discord_server_membership_verified_at: null,
         api_token_pepper: randomUUID(),
         web_session_pepper: randomUUID(),
+        app_store_account_token: randomUUID(),
         default_model: null,
         blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
         blocked_at: null,
@@ -714,6 +848,46 @@ export async function softDeleteUser(userId: string) {
       .delete(user_affiliate_attributions)
       .where(eq(user_affiliate_attributions.user_id, userId));
     await tx.delete(user_affiliate_events).where(eq(user_affiliate_events.user_id, userId));
+    await tx
+      .delete(kiloclaw_attribution_touches)
+      .where(eq(kiloclaw_attribution_touches.user_id, userId));
+    await tx
+      .delete(impact_advocate_participants)
+      .where(eq(impact_advocate_participants.user_id, userId));
+    await tx
+      .delete(kiloclaw_referral_reward_applications)
+      .where(eq(kiloclaw_referral_reward_applications.beneficiary_user_id, userId));
+    await tx
+      .delete(impact_advocate_reward_redemptions)
+      .where(eq(impact_advocate_reward_redemptions.beneficiary_user_id, userId));
+    await tx
+      .delete(kiloclaw_referral_rewards)
+      .where(eq(kiloclaw_referral_rewards.beneficiary_user_id, userId));
+    await tx
+      .delete(kiloclaw_referral_reward_decisions)
+      .where(eq(kiloclaw_referral_reward_decisions.beneficiary_user_id, userId));
+    await tx.delete(impact_conversion_reports).where(
+      sql`${impact_conversion_reports.conversion_id} IN (
+          SELECT c.id FROM ${kiloclaw_referral_conversions} c
+          WHERE c.referee_user_id = ${userId} OR c.referrer_user_id = ${userId}
+        )`
+    );
+    await tx
+      .delete(kiloclaw_referral_conversions)
+      .where(
+        or(
+          eq(kiloclaw_referral_conversions.referee_user_id, userId),
+          eq(kiloclaw_referral_conversions.referrer_user_id, userId)
+        )
+      );
+    await tx
+      .delete(kiloclaw_referrals)
+      .where(
+        or(
+          eq(kiloclaw_referrals.referee_user_id, userId),
+          eq(kiloclaw_referrals.referrer_user_id, userId)
+        )
+      );
     await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
     await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
 
@@ -813,6 +987,9 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(kilo_pass_scheduled_changes)
       .where(eq(kilo_pass_scheduled_changes.kilo_user_id, userId));
+    await tx
+      .delete(github_branch_pull_requests)
+      .where(eq(github_branch_pull_requests.owned_by_user_id, userId));
 
     // Code indexing data
     await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));
@@ -820,6 +997,64 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(code_indexing_manifest).where(eq(code_indexing_manifest.kilo_user_id, userId));
 
     // ── 3. Anonymize PII in retained tables ──────────────────────────────
+
+    const storePurchases = await tx
+      .select({
+        id: kilo_pass_store_purchases.id,
+        rawPayloadJson: kilo_pass_store_purchases.raw_payload_json,
+      })
+      .from(kilo_pass_store_purchases)
+      .where(eq(kilo_pass_store_purchases.kilo_user_id, userId));
+
+    for (const purchase of storePurchases) {
+      await tx
+        .update(kilo_pass_store_purchases)
+        .set({
+          app_account_token: null,
+          purchase_token: null,
+          raw_payload_json: redactStoreAccountLinkedJson(purchase.rawPayloadJson),
+        })
+        .where(eq(kilo_pass_store_purchases.id, purchase.id));
+    }
+
+    const storeEvents = await tx
+      .select({
+        id: kilo_pass_store_events.id,
+        payloadJson: kilo_pass_store_events.payload_json,
+      })
+      .from(kilo_pass_store_events)
+      .where(eq(kilo_pass_store_events.app_account_token, originalAppStoreAccountToken));
+
+    for (const event of storeEvents) {
+      await tx
+        .update(kilo_pass_store_events)
+        .set({
+          app_account_token: null,
+          payload_json: redactStoreAccountLinkedJson(event.payloadJson),
+        })
+        .where(eq(kilo_pass_store_events.id, event.id));
+    }
+
+    // kiloclaw_instances.admin_size_override JSONB carries actorEmail (an
+    // admin's address) and a free-form reason (often referencing a ticket
+    // or the customer scenario). Clear it on:
+    //   (a) this user's retained destroyed instances — keeping the user's
+    //       deletion clean of any reason text written about their incident;
+    //   (b) ANY instance where this user was the admin actor — their email
+    //       and reason text are their PII regardless of whose instance it
+    //       targeted, so they need to be scrubbed when the actor is deleted.
+    // The denormalized read-cache loses the audit trail, but the canonical
+    // record lives in `kiloclaw_admin_audit_logs` (whose actor PII is
+    // anonymized below by the same flow).
+    await tx
+      .update(kiloclaw_instances)
+      .set({ admin_size_override: null })
+      .where(
+        or(
+          eq(kiloclaw_instances.user_id, userId),
+          sql`${kiloclaw_instances.admin_size_override}->>'actorId' = ${userId}`
+        )
+      );
 
     // Organization audit logs: keep the log entries, strip actor PII
     await tx

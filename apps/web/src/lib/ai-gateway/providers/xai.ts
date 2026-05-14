@@ -3,9 +3,9 @@ import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types
 
 export const grok_code_fast_1_optimized_free_model: KiloExclusiveModel = {
   public_id: 'x-ai/grok-code-fast-1:optimized:free',
-  display_name: 'xAI: Grok Code Fast 1 Optimized (free)',
+  display_name: 'xAI: Grok Code Fast 1, retiring May 15 (free)',
   description:
-    'An optimized variant of Grok Code Fast 1, provided free of charge for a limited time. **Note:** All prompts and completions for this model are logged by the provider and may be used to improve their services.',
+    'An optimized variant of Grok Code Fast 1, provided free of charge for a limited time. Going away May 15, 2026. **Note:** All prompts and completions for this model are logged by the provider and may be used to improve their services.',
   context_length: 256_000,
   max_completion_tokens: 10_000,
   status: 'public',
@@ -14,14 +14,19 @@ export const grok_code_fast_1_optimized_free_model: KiloExclusiveModel = {
   internal_id: 'x-ai/grok-code-fast-1:optimized',
   pricing: null,
   exclusive_to: [],
+  inference_provider_restriction: [],
 };
 
-export function isXaiModel(requestedModel: string) {
-  return requestedModel.startsWith('x-ai/');
+export function isGrokModel(requestedModel: string) {
+  return requestedModel.includes('grok');
 }
 
 export function isGrok4Model(model: string) {
-  return model.startsWith('x-ai/grok-4');
+  return model.includes('grok-4');
+}
+
+export function isGrokToggleableReasoningModel(model: string) {
+  return model.includes('grok-4.1') || model.includes('grok-4.2');
 }
 
 export function applyXaiModelSettings(

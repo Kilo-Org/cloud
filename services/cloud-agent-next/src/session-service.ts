@@ -9,6 +9,7 @@ import type {
 } from './types.js';
 import type { ExecutionParams as _ExecutionParams } from './schema.js';
 import { generateSandboxId } from './sandbox-id.js';
+import { normalizeKilocodeModel } from './persistence/model-utils.js';
 import {
   checkDiskAndCleanBeforeSetup,
   cloneGitHubRepo,
@@ -27,11 +28,16 @@ import type {
   PersistenceEnv,
   CloudAgentSessionState,
   MCPServerConfig,
+  RuntimeSkill,
+  RuntimeAgent,
 } from './persistence/types.js';
 import { MetadataSchema } from './persistence/schemas.js';
 import { withDORetry } from './utils/do-retry.js';
-import { mergeEnvVarsWithSecrets } from './utils/encryption.js';
-import type { EncryptedSecrets } from './router/schemas.js';
+import { decryptWithPrivateKey, mergeEnvVarsWithSecrets } from './utils/encryption.js';
+import type { MCPSecretValue } from './router/schemas.js';
+import type { SessionProfileBundle } from './session-profile.js';
+import { readProfileBundle } from './session-profile.js';
+import { destroySandboxAfterInternalServerError } from './sandbox-recovery.js';
 
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
 const SANDBOX_RETRY_DEFAULTS = {
@@ -245,9 +251,14 @@ export class SetupCommandFailedError extends Error {
   constructor(
     public readonly command: string,
     public readonly exitCode: number,
-    public readonly stderr: string
+    public readonly stderr: string,
+    public readonly stdout: string = ''
   ) {
-    const details = [`exit code ${exitCode}`, ...(stderr ? [stderr.trim()] : [])].join(': ');
+    const details = [
+      `exit code ${exitCode}`,
+      ...(stderr ? [`stderr: ${stderr.trim()}`] : []),
+      ...(stdout ? [`stdout: ${stdout.trim()}`] : []),
+    ].join(': ');
     super(`Setup command failed: ${command} (${details})`);
     this.name = 'SetupCommandFailedError';
   }
@@ -299,12 +310,13 @@ export async function runSetupCommands(
           .withFields({
             command,
             exitCode: result.exitCode,
+            stdout: result.stdout,
             stderr: result.stderr,
           })
           .warn('Setup command failed');
 
         if (failFast) {
-          throw new SetupCommandFailedError(command, result.exitCode, result.stderr);
+          throw new SetupCommandFailedError(command, result.exitCode, result.stderr, result.stdout);
         }
       }
     } catch (error) {
@@ -352,6 +364,92 @@ export async function writeAuthFile(
   logger.info('Wrote kilo auth file for session ingest');
 }
 
+/**
+ * CLI-native MCP config shape (env/header values as plain strings), ready to
+ * JSON-encode into KILO_CONFIG_CONTENT.mcp.
+ */
+type CliMcpServer =
+  | {
+      type: 'local';
+      command: string[];
+      environment?: Record<string, string>;
+      enabled?: boolean;
+      timeout?: number;
+    }
+  | {
+      type: 'remote';
+      url: string;
+      headers?: Record<string, string>;
+      enabled?: boolean;
+      timeout?: number;
+    };
+
+/**
+ * Materialize each MCP env/header value into its plaintext form for the CLI.
+ * Plain strings pass through verbatim; encrypted envelopes are decrypted
+ * per key. Throws only if at least one envelope is present and
+ * AGENT_ENV_VARS_PRIVATE_KEY is missing — records of pure plain strings
+ * never require the key.
+ */
+function materializeMcpServers(
+  mcpServers: Record<string, MCPServerConfig>,
+  privateKey: string | undefined
+): Record<string, CliMcpServer> {
+  const out: Record<string, CliMcpServer> = {};
+  for (const [name, server] of Object.entries(mcpServers)) {
+    if (server.type === 'local') {
+      const environment = materializeSecretValueRecord(
+        server.environment,
+        privateKey,
+        `MCP server "${name}" environment`
+      );
+      out[name] = {
+        type: 'local',
+        command: server.command,
+        ...(environment !== undefined && { environment }),
+        ...(server.enabled !== undefined && { enabled: server.enabled }),
+        ...(server.timeout !== undefined && { timeout: server.timeout }),
+      };
+    } else {
+      const headers = materializeSecretValueRecord(
+        server.headers,
+        privateKey,
+        `MCP server "${name}" headers`
+      );
+      out[name] = {
+        type: 'remote',
+        url: server.url,
+        ...(headers !== undefined && { headers }),
+        ...(server.enabled !== undefined && { enabled: server.enabled }),
+        ...(server.timeout !== undefined && { timeout: server.timeout }),
+      };
+    }
+  }
+  return out;
+}
+
+function materializeSecretValueRecord(
+  values: Record<string, MCPSecretValue> | undefined,
+  privateKey: string | undefined,
+  label: string
+): Record<string, string> | undefined {
+  if (!values || Object.keys(values).length === 0) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (typeof value === 'string') {
+      out[key] = value;
+      continue;
+    }
+    if (!privateKey) {
+      throw new Error(
+        `${label} contains encrypted values but AGENT_ENV_VARS_PRIVATE_KEY is not configured on the worker`
+      );
+    }
+    out[key] = decryptWithPrivateKey(value, privateKey);
+  }
+  return out;
+}
+
 // Write global rules file so the CLI injects cloud-agent-specific instructions.
 // The CLI's RulesMigrator discovers ~/.kilocode/rules/*.md and appends them
 // to the system prompt automatically.
@@ -380,6 +478,115 @@ export async function writeGlobalRules(
   ].join('\n');
 
   await sandbox.writeFile(rulesPath, content);
+}
+
+/**
+ * Simple djb2 hash for logging a short, non-reversible fingerprint of skill
+ * content without exposing the content itself.
+ */
+function shortHash(input: string): string {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) + hash + input.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(16);
+}
+
+/**
+ * Write each runtime skill to `${sessionHome}/.kilocode/skills/<name>/SKILL.md`.
+ * The CLI auto-discovers skills under `~/.kilocode/skills/<name>/SKILL.md`; `HOME`
+ * is set to `sessionHome` when the execution session is created so the default
+ * discovery path resolves here.
+ *
+ * Logs name, size, and a short content hash — never the raw content.
+ */
+/**
+ * Build the `KILO_CONFIG_CONTENT.agent.<slug>` entry for a profile agent.
+ * The stored `config` already matches the CLI's AgentConfig shape, so this
+ * is essentially a pass-through with a default `mode: 'primary'` when the
+ * user didn't specify one.
+ */
+export function buildAgentEntryFromRuntimeAgent(agent: RuntimeAgent): Record<string, unknown> {
+  const { config } = agent;
+  const entry: Record<string, unknown> = {
+    mode: config.mode ?? 'primary',
+  };
+  if (config.prompt !== undefined) entry.prompt = config.prompt;
+  if (config.description !== undefined) entry.description = config.description;
+  if (config.model !== undefined) entry.model = normalizeKilocodeModel(config.model);
+  if (config.variant !== undefined) entry.variant = config.variant;
+  if (config.temperature !== undefined) entry.temperature = config.temperature;
+  if (config.top_p !== undefined) entry.top_p = config.top_p;
+  if (config.steps !== undefined) entry.steps = config.steps;
+  if (config.hidden !== undefined) entry.hidden = config.hidden;
+  if (config.disable !== undefined) entry.disable = config.disable;
+  if (config.color !== undefined) entry.color = config.color;
+  if (config.permission !== undefined) entry.permission = config.permission;
+  if (config.options !== undefined) entry.options = config.options;
+  return entry;
+}
+
+/**
+ * Defensive check on a companion file path before we exec `mkdir -p`/`writeFile`.
+ * Schema-level validation already enforces these rules, but re-check at the
+ * sandbox boundary to prevent any stray input from escaping the skill dir.
+ */
+function isSafeSkillFilePath(relativePath: string): boolean {
+  if (relativePath.length === 0 || relativePath.length > 200) return false;
+  if (relativePath.startsWith('/')) return false;
+  if (relativePath.includes('..')) return false;
+  if (relativePath.includes('\\') || relativePath.includes('\0')) return false;
+  if (relativePath.toLowerCase() === 'skill.md') return false;
+  return /^[a-zA-Z0-9._\-/]+$/.test(relativePath);
+}
+
+export async function writeRuntimeSkills(
+  sandbox: SandboxInstance,
+  sessionHome: string,
+  skills: readonly RuntimeSkill[] | undefined
+): Promise<void> {
+  if (!skills || skills.length === 0) return;
+
+  const baseDir = `${sessionHome}/.kilocode/skills`;
+  await timedExec(sandbox, `mkdir -p ${baseDir}`, 'session.writeRuntimeSkills.mkdir');
+
+  const summaries: { name: string; bytes: number; hash: string; fileCount: number }[] = [];
+  for (const skill of skills) {
+    const skillDir = `${baseDir}/${skill.name}`;
+    const skillPath = `${skillDir}/SKILL.md`;
+    await timedExec(sandbox, `mkdir -p ${skillDir}`, 'session.writeRuntimeSkills.mkdir');
+    await sandbox.writeFile(skillPath, skill.rawMarkdown);
+
+    let fileCount = 0;
+    if (skill.files) {
+      for (const [relativePath, content] of Object.entries(skill.files)) {
+        if (!isSafeSkillFilePath(relativePath)) {
+          logger
+            .withFields({ skill: skill.name, relativePath })
+            .warn('Rejected unsafe skill companion file path');
+          continue;
+        }
+        const filePath = `${skillDir}/${relativePath}`;
+        const parent = filePath.substring(0, filePath.lastIndexOf('/'));
+        if (parent && parent !== skillDir) {
+          await timedExec(sandbox, `mkdir -p ${parent}`, 'session.writeRuntimeSkills.mkdir');
+        }
+        await sandbox.writeFile(filePath, content);
+        fileCount += 1;
+      }
+    }
+
+    summaries.push({
+      name: skill.name,
+      bytes: skill.rawMarkdown.length,
+      hash: shortHash(skill.rawMarkdown),
+      fileCount,
+    });
+  }
+
+  logger
+    .withFields({ skillCount: summaries.length, skills: summaries })
+    .info('Wrote runtime skills');
 }
 
 /**
@@ -523,25 +730,29 @@ export class SessionService {
     };
   }
 
-  private getSaferEnvVars(
-    userEnvVars: Record<string, string> | undefined,
-    sessionHome: string,
-    sessionId: string,
-    workspacePath: string,
-    env: PersistenceEnv,
-    originalToken: string,
-    kilocodeModel: string | undefined,
-    originalOrgId?: string,
-    githubToken?: string,
-    githubRepo?: string,
-    encryptedSecrets?: EncryptedSecrets,
-    createdOnPlatform?: string,
-    appendSystemPrompt?: string,
-    gitUrl?: string,
-    gitToken?: string,
-    platform?: 'github' | 'gitlab',
-    mcpServers?: Record<string, MCPServerConfig>
-  ): Record<string, string> {
+  private getSaferEnvVars(opts: GetSaferEnvVarsOptions): Record<string, string> {
+    const {
+      sessionHome,
+      sessionId,
+      workspacePath,
+      env,
+      originalToken,
+      kilocodeModel,
+      originalOrgId,
+      githubToken,
+      githubRepo,
+      createdOnPlatform,
+      appendSystemPrompt,
+      gitUrl,
+      gitToken,
+      platform,
+      profile,
+    } = opts;
+    const userEnvVars = profile?.envVars;
+    const encryptedSecrets = profile?.encryptedSecrets;
+    const mcpServers = profile?.mcpServers;
+    const runtimeAgents = profile?.runtimeAgents;
+
     // Use override if available, otherwise use original values from API
     const kilocodeToken = env.KILOCODE_TOKEN_OVERRIDE ?? originalToken;
     const kilocodeOrganizationId = env.KILOCODE_ORG_ID_OVERRIDE ?? originalOrgId;
@@ -597,6 +808,7 @@ export class SessionService {
         '*': 'deny',
         [`/tmp/${sessionId}/**`]: 'allow',
         [`${workspacePath}/**`]: 'allow',
+        [`${sessionHome}/.kilocode/skills/**`]: 'allow',
       },
       ...(!isInteractive && { question: 'deny' }),
       read: 'allow',
@@ -663,12 +875,14 @@ export class SessionService {
       },
       autoupdate: false,
     };
-    // MCP configs are already in CLI-native format — pass through directly
+    // Decrypt each env/header envelope into its plaintext value and emit the
+    // CLI-native shape the runtime consumes under `KILO_CONFIG_CONTENT.mcp`.
     if (mcpServers && Object.keys(mcpServers).length > 0) {
-      configContent.mcp = mcpServers;
+      const materialized = materializeMcpServers(mcpServers, env.AGENT_ENV_VARS_PRIVATE_KEY);
+      configContent.mcp = materialized;
       logger.info('MCP config merged into KILO_CONFIG_CONTENT', {
-        mcpServerNames: Object.keys(mcpServers),
-        mcpServerCount: Object.keys(mcpServers).length,
+        mcpServerNames: Object.keys(materialized),
+        mcpServerCount: Object.keys(materialized).length,
       });
     }
     if (kilocodeModel && kilocodeModel.trim()) {
@@ -677,13 +891,24 @@ export class SessionService {
         : `kilo/${kilocodeModel}`;
       configContent.model = normalizedModel;
     }
-    // Add custom agent config if appendSystemPrompt is provided (from prepareSession)
+    // Merge custom-prompt (appendSystemPrompt) and profile-provided runtimeAgents
+    // under a single `agent` map keyed by slug. The CLI looks up the mode by
+    // slug and applies its prompt + per-tool permission map.
+    const agentConfig: Record<string, unknown> = {};
     if (appendSystemPrompt && appendSystemPrompt.trim()) {
-      configContent.agent = {
-        custom: {
-          prompt: appendSystemPrompt,
-        },
-      };
+      agentConfig.custom = { prompt: appendSystemPrompt };
+    }
+    if (runtimeAgents && runtimeAgents.length > 0) {
+      for (const agent of runtimeAgents) {
+        agentConfig[agent.slug] = buildAgentEntryFromRuntimeAgent(agent);
+      }
+      logger.info('Runtime agents merged into KILO_CONFIG_CONTENT', {
+        agentSlugs: runtimeAgents.map(a => a.slug),
+        agentCount: runtimeAgents.length,
+      });
+    }
+    if (Object.keys(agentConfig).length > 0) {
+      configContent.agent = agentConfig;
     }
     const configJson = JSON.stringify(configContent);
     envVars.OPENCODE_CONFIG_CONTENT = configJson;
@@ -696,7 +921,16 @@ export class SessionService {
     // Determine effective platform: use explicit platform param, or infer from gitUrl as fallback
     const effectivePlatform = platform ?? (gitUrl?.includes('gitlab') ? 'gitlab' : undefined);
 
-    // Set GITLAB_TOKEN for GitLab repos, respecting user overrides
+    // Set GITLAB_TOKEN for GitLab repos, respecting user overrides.
+    //
+    // We also set GLAB_IS_OAUTH2=true unconditionally so that `glab` (>=1.82.0)
+    // sends `Authorization: Bearer $token` instead of `PRIVATE-TOKEN: $token`.
+    // This is required for OAuth access tokens (which GitLab rejects with 401
+    // when sent via PRIVATE-TOKEN) and is also valid for PATs — per GitLab
+    // REST API docs, personal/project/group access tokens accept OAuth-compliant
+    // headers (https://docs.gitlab.com/api/rest/authentication/). Treating both
+    // token types uniformly avoids threading the auth type through the session
+    // request/DO/metadata stack.
     if (gitToken && effectivePlatform === 'gitlab' && !baseEnvVars.GITLAB_TOKEN) {
       envVars.GITLAB_TOKEN = gitToken;
       if (!baseEnvVars.GITLAB_HOST) {
@@ -711,13 +945,16 @@ export class SessionService {
           envVars.GITLAB_HOST = 'gitlab.com';
         }
       }
+      if (!baseEnvVars.GLAB_IS_OAUTH2) {
+        envVars.GLAB_IS_OAUTH2 = 'true';
+      }
       logger
         .withFields({
           gitUrl,
           gitlabHost: envVars.GITLAB_HOST,
           gitTokenLength: gitToken.length,
         })
-        .info('[GITLAB] Setting GITLAB_TOKEN and GITLAB_HOST for GitLab session');
+        .info('[GITLAB] Setting GITLAB_TOKEN, GITLAB_HOST, and GLAB_IS_OAUTH2 for GitLab session');
     }
 
     // Only add KILOCODE_ORG_ID if we have an org (personal accounts don't have one)
@@ -743,24 +980,37 @@ export class SessionService {
    *
    * Sessions within a sandbox maintain isolated shell state (environment variables,
    * working directory) but share the filesystem.
+   *
+   * Profile-derived configuration (envVars, encryptedSecrets, MCP servers,
+   * runtime skills/agents) comes through as a single `profile` bundle so
+   * adding a new profile field is one-line change here instead of threading
+   * yet another positional argument through every caller.
    */
-  async getOrCreateSession(
-    sandbox: SandboxInstance,
-    context: SessionContext,
-    env: PersistenceEnv,
-    originalToken: string,
-    kilocodeModel: string | undefined,
-    originalOrgId?: string,
-    encryptedSecrets?: EncryptedSecrets,
-    createdOnPlatform?: string,
-    appendSystemPrompt?: string,
-    mcpServers?: Record<string, MCPServerConfig>
-  ) {
-    const { sessionId, sessionHome, workspacePath, envVars } = context;
+  async getOrCreateSession(opts: GetOrCreateSessionOptions) {
+    const {
+      sandbox,
+      context,
+      env,
+      originalToken,
+      kilocodeModel,
+      originalOrgId,
+      createdOnPlatform,
+      appendSystemPrompt,
+      profile,
+    } = opts;
+    const { sessionId, sessionHome, workspacePath, envVars: contextEnvVars } = context;
+
+    // The pre-refactor code threaded `context.envVars` into `getSaferEnvVars`
+    // (set by callers from metadata on resume, profile on prepare). Merge
+    // with the profile bundle's envVars — profile wins when both are set
+    // since the bundle is the authoritative snapshot during prepare/initiate.
+    const effectiveProfile: SessionProfileBundle | undefined =
+      profile === undefined && contextEnvVars === undefined
+        ? undefined
+        : { ...profile, envVars: profile?.envVars ?? contextEnvVars };
 
     // Decrypt secrets and merge with env vars (just-in-time decryption)
-    const saferEnvVars = this.getSaferEnvVars(
-      envVars,
+    const saferEnvVars = this.getSaferEnvVars({
       sessionHome,
       sessionId,
       workspacePath,
@@ -768,22 +1018,30 @@ export class SessionService {
       originalToken,
       kilocodeModel,
       originalOrgId,
-      context.githubToken,
-      context.githubRepo,
-      encryptedSecrets,
+      githubToken: context.githubToken,
+      githubRepo: context.githubRepo,
       createdOnPlatform,
       appendSystemPrompt,
-      context.gitUrl,
-      context.gitToken,
-      context.platform,
-      mcpServers
-    );
+      gitUrl: context.gitUrl,
+      gitToken: context.gitToken,
+      platform: context.platform,
+      profile: effectiveProfile,
+    });
 
     const session = await sandbox.createSession({
       name: sessionId,
       env: saferEnvVars,
       cwd: workspacePath,
     });
+
+    // Materialize runtime skills on disk so the CLI picks them up from its
+    // default discovery path under HOME/.kilocode/skills. Done once per
+    // session creation — for idempotent re-runs we overwrite files in place.
+    const runtimeSkills = profile?.runtimeSkills;
+    if (runtimeSkills && runtimeSkills.length > 0) {
+      await writeRuntimeSkills(sandbox, sessionHome, runtimeSkills);
+    }
+
     return session;
   }
 
@@ -822,16 +1080,14 @@ export class SessionService {
       gitUrl,
       gitToken,
       env,
-      envVars,
-      encryptedSecrets,
-      setupCommands,
-      mcpServers,
+      profile,
       upstreamBranch,
       botId,
       githubAppType,
       createdOnPlatform,
       shallow,
     } = options;
+    const setupCommands = profile?.setupCommands;
 
     logger.setTags({
       sessionId,
@@ -866,23 +1122,23 @@ export class SessionService {
       platform: options.platform,
     });
 
-    // Inject env vars into context for session creation
-    if (envVars) {
-      context.envVars = envVars;
+    // Inject env vars into context for session creation (profile snapshot
+    // is the source of truth on initiate). Consumers also read this off the
+    // returned `context`, so keep it populated — the tests rely on it.
+    if (profile?.envVars) {
+      context.envVars = profile.envVars;
     }
 
-    const session = await this.getOrCreateSession(
+    const session = await this.getOrCreateSession({
       sandbox,
       context,
       env,
-      kilocodeToken,
+      originalToken: kilocodeToken,
       kilocodeModel,
-      orgId,
-      encryptedSecrets,
+      originalOrgId: orgId,
       createdOnPlatform,
-      undefined, // appendSystemPrompt
-      mcpServers
-    );
+      profile,
+    });
 
     // Clone repository using appropriate method
     // Shallow clone (depth: 1) can be enabled for faster checkout and reduced disk usage
@@ -942,9 +1198,7 @@ export class SessionService {
         githubToken,
         gitUrl,
         gitToken,
-        envVars,
-        setupCommands,
-        mcpServers,
+        profile,
         upstreamBranch,
       },
       existingMetadata ?? undefined
@@ -989,14 +1243,12 @@ export class SessionService {
       gitUrl,
       gitToken,
       env,
-      envVars,
-      encryptedSecrets,
-      setupCommands,
-      mcpServers,
+      profile,
       botId,
       githubAppType,
       existingMetadata,
     } = options;
+    const setupCommands = profile?.setupCommands;
 
     logger.setTags({
       sessionId,
@@ -1039,22 +1291,35 @@ export class SessionService {
       platform: existingMetadata?.platform,
     });
 
-    if (envVars) {
-      context.envVars = envVars;
+    if (profile?.envVars) {
+      context.envVars = profile.envVars;
     }
 
-    const session = await this.getOrCreateSession(
+    // Merge caller-provided bundle with fallbacks from existingMetadata: for
+    // fields the caller didn't resupply (skills/agents on a resume), reuse
+    // the snapshot captured at prepare time. `readProfileBundle` handles the
+    // nested-vs-legacy-flat lookup and copies arrays into mutable form.
+    const existingProfile = existingMetadata ? readProfileBundle(existingMetadata) : undefined;
+    const mergedProfile: SessionProfileBundle = {
+      envVars: profile?.envVars,
+      encryptedSecrets: profile?.encryptedSecrets,
+      setupCommands,
+      mcpServers: profile?.mcpServers,
+      runtimeSkills: profile?.runtimeSkills ?? existingProfile?.runtimeSkills,
+      runtimeAgents: profile?.runtimeAgents ?? existingProfile?.runtimeAgents,
+    };
+
+    const session = await this.getOrCreateSession({
       sandbox,
       context,
       env,
-      kilocodeToken,
+      originalToken: kilocodeToken,
       kilocodeModel,
-      orgId,
-      encryptedSecrets,
-      options.createdOnPlatform ?? existingMetadata?.createdOnPlatform,
-      existingMetadata?.appendSystemPrompt,
-      mcpServers
-    );
+      originalOrgId: orgId,
+      createdOnPlatform: options.createdOnPlatform ?? existingMetadata?.createdOnPlatform,
+      appendSystemPrompt: existingMetadata?.appendSystemPrompt,
+      profile: mergedProfile,
+    });
 
     // Clone repository using appropriate method
     if (gitUrl) {
@@ -1124,9 +1389,7 @@ export class SessionService {
         githubToken,
         gitUrl,
         gitToken,
-        envVars,
-        setupCommands,
-        mcpServers,
+        profile: mergedProfile,
         kiloSessionId,
       },
       metadataToPreserve
@@ -1201,6 +1464,8 @@ export class SessionService {
     // Session home directory
 
     const metadata = await this.loadSessionMetadata(env, { userId, sessionId } as SessionContext);
+    const githubToken = freshGithubToken ?? metadata?.githubToken;
+    const gitToken = freshGitToken ?? metadata?.gitToken;
 
     const context = this.buildContext({
       sandboxId,
@@ -1212,31 +1477,32 @@ export class SessionService {
       upstreamBranch: metadata?.upstreamBranch,
       botId: metadata?.botId,
       githubRepo: metadata?.githubRepo,
-      githubToken: metadata?.githubToken,
+      githubToken,
       gitUrl: metadata?.gitUrl,
-      gitToken: metadata?.gitToken,
+      gitToken,
       platform: metadata?.platform,
     });
 
+    const resumeProfile = metadata ? readProfileBundle(metadata) : undefined;
+
     // Inject env vars from metadata into context (before creating session)
-    if (metadata?.envVars) {
-      context.envVars = metadata.envVars;
+    if (resumeProfile?.envVars) {
+      context.envVars = resumeProfile.envVars;
     }
 
     // Create session first so we can use it for all operations
     // Note: encryptedSecrets come from metadata for resume - they were stored during prepare/initiate
-    const session = await this.getOrCreateSession(
+    const session = await this.getOrCreateSession({
       sandbox,
       context,
       env,
-      kilocodeToken,
+      originalToken: kilocodeToken,
       kilocodeModel,
-      orgId,
-      metadata?.encryptedSecrets,
-      metadata?.createdOnPlatform,
-      metadata?.appendSystemPrompt,
-      metadata?.mcpServers
-    );
+      originalOrgId: orgId,
+      createdOnPlatform: metadata?.createdOnPlatform,
+      appendSystemPrompt: metadata?.appendSystemPrompt,
+      profile: resumeProfile,
+    });
 
     // Check if workspace repo exists - if not, we may need to reclone
     const repoCheck = await timedExec(
@@ -1405,24 +1671,39 @@ export class SessionService {
       }
 
       // Re-run setup commands (fresh clone, need to reinstall)
-      if (metadata.setupCommands && metadata.setupCommands.length > 0) {
+      const coldStartSetupCommands = readProfileBundle(metadata).setupCommands;
+      if (coldStartSetupCommands && coldStartSetupCommands.length > 0) {
         onProgress?.('setup_commands', 'Running setup commands…');
         logger.info('Re-running setup commands after fresh clone');
-        await runSetupCommands(session, context, metadata.setupCommands, false); // lenient
+        await runSetupCommands(session, context, coldStartSetupCommands, false); // lenient
       }
 
       // Wrapper will be (re)started by the orchestrator after we return
       onProgress?.('kilo_server', 'Starting Kilo…');
     } catch (error) {
-      // Remove the workspace and sessionHome so the next retry sees a true
-      // cold start and re-runs the full restore from scratch.
-      logger
-        .withFields({
+      const sandboxDestroyed = await destroySandboxAfterInternalServerError(
+        {
+          sandbox,
+          sandboxId: context.sandboxId,
           sessionId,
-          error: error instanceof Error ? error.message : String(error),
-        })
-        .warn('Cold-start resume step failed; removing workspace for clean retry');
-      await cleanupWorkspace(session, context.workspacePath, context.sessionHome);
+          phase: 'coldStartResume',
+        },
+        error
+      );
+
+      // If we destroyed the sandbox, the workspace is gone with it and the next
+      // retry will start from a fresh container. Otherwise, remove the workspace
+      // and sessionHome so the next retry sees a true cold start and re-runs the
+      // full restore from scratch.
+      if (!sandboxDestroyed) {
+        logger
+          .withFields({
+            sessionId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          .warn('Cold-start resume step failed; removing workspace for clean retry');
+        await cleanupWorkspace(session, context.workspacePath, context.sessionHome);
+      }
 
       throw error;
     }
@@ -1658,9 +1939,7 @@ export class SessionService {
       githubToken?: string;
       gitUrl?: string;
       gitToken?: string;
-      envVars?: Record<string, string>;
-      setupCommands?: string[];
-      mcpServers?: Record<string, MCPServerConfig>;
+      profile?: SessionProfileBundle;
       upstreamBranch?: string;
       kiloSessionId?: string;
     },
@@ -1669,11 +1948,13 @@ export class SessionService {
     const { orgId, userId, sessionId, botId, platform, sandboxId } = context;
     const doKey = `${userId}:${sessionId}`;
 
-    // Build metadata, preserving prepared session fields from existing if provided
+    // Legacy flat profile fields on `existing` are harmless leftovers —
+    // `readProfileBundle` always prefers `profile` so they are never read.
+    // They are left in place and will be dropped naturally when `profile`
+    // is removed alongside the fallback branch.
     const metadata: CloudAgentSessionState = {
-      // Start with existing metadata if provided (preserves preparedAt, initiatedAt, prompt, mode, model, autoCommit)
+      // Preserves preparedAt, initiatedAt, prompt, mode, model, autoCommit, etc.
       ...(existing ?? {}),
-      // Always update these core fields
       version: Date.now(),
       sessionId,
       orgId,
@@ -1682,14 +1963,11 @@ export class SessionService {
       platform,
       sandboxId,
       timestamp: Date.now(),
-      // Apply the new data (may override some existing fields, which is intentional)
       githubRepo: data.githubRepo,
       githubToken: data.githubToken,
       gitUrl: data.gitUrl,
       gitToken: data.gitToken,
-      envVars: data.envVars,
-      setupCommands: data.setupCommands,
-      mcpServers: data.mcpServers,
+      profile: data.profile,
       upstreamBranch: data.upstreamBranch,
       kiloSessionId: data.kiloSessionId,
     };
@@ -1857,6 +2135,48 @@ export interface PreparedSession {
   session: Awaited<ReturnType<SessionService['getOrCreateSession']>>;
 }
 
+/**
+ * Options for `SessionService.getOrCreateSession`.
+ *
+ * Profile-derived fields live inside `profile` so adding a new field is a
+ * single-line change here plus the corresponding entry in `SessionProfileBundle`.
+ */
+export type GetOrCreateSessionOptions = {
+  sandbox: SandboxInstance;
+  context: SessionContext;
+  env: PersistenceEnv;
+  /** Kilocode token used for API calls (overridden by KILOCODE_TOKEN_OVERRIDE). */
+  originalToken: string;
+  kilocodeModel?: string;
+  originalOrgId?: string;
+  createdOnPlatform?: string;
+  appendSystemPrompt?: string;
+  profile?: SessionProfileBundle;
+};
+
+/**
+ * Options for the private `getSaferEnvVars` helper. Kept as a named type so
+ * the grouping mirrors `GetOrCreateSessionOptions` and call-site params stay
+ * discoverable.
+ */
+type GetSaferEnvVarsOptions = {
+  sessionHome: string;
+  sessionId: string;
+  workspacePath: string;
+  env: PersistenceEnv;
+  originalToken: string;
+  kilocodeModel?: string;
+  originalOrgId?: string;
+  githubToken?: string;
+  githubRepo?: string;
+  createdOnPlatform?: string;
+  appendSystemPrompt?: string;
+  gitUrl?: string;
+  gitToken?: string;
+  platform?: 'github' | 'gitlab';
+  profile?: SessionProfileBundle;
+};
+
 export interface InitiateOptions {
   sandbox: SandboxInstance;
   sandboxId: SessionContext['sandboxId'];
@@ -1870,10 +2190,12 @@ export interface InitiateOptions {
   gitUrl?: string;
   gitToken?: string;
   env: PersistenceEnv;
-  envVars?: Record<string, string>;
-  encryptedSecrets?: EncryptedSecrets;
-  setupCommands?: string[];
-  mcpServers?: Record<string, MCPServerConfig>;
+  /**
+   * Profile-derived configuration snapshot. Contains envVars, encryptedSecrets,
+   * setupCommands, mcpServers, runtimeSkills, runtimeAgents. Adding a new
+   * profile field means extending `SessionProfileBundle`, not this interface.
+   */
+  profile?: SessionProfileBundle;
   upstreamBranch?: string;
   botId?: string;
   /** GitHub App type for selecting correct slug/bot identity */
@@ -1920,10 +2242,8 @@ type InitiateFromKiloSessionBaseOptions = {
   kilocodeModel: string;
   kiloSessionId: string;
   env: PersistenceEnv;
-  envVars?: Record<string, string>;
-  encryptedSecrets?: EncryptedSecrets;
-  setupCommands?: string[];
-  mcpServers?: Record<string, MCPServerConfig>;
+  /** Profile-derived configuration snapshot — see {@link SessionProfileBundle}. */
+  profile?: SessionProfileBundle;
   botId?: string;
   /** GitHub App type for selecting correct slug/bot identity */
   githubAppType?: 'standard' | 'lite';

@@ -1,15 +1,19 @@
-import type {
-  ContentBlock,
-  ActionsBlock,
-  Message,
-  ReactionSummary,
-  ExecApprovalDecision,
-  actionExecutedWebhookSchema,
+import {
+  buildReplyToMessageSnapshot,
+  type ContentBlock,
+  type ActionsBlock,
+  type Message,
+  type ReactionSummary,
+  type ExecApprovalDecision,
 } from '@kilocode/kilo-chat';
-import type { z } from 'zod';
 import { DurableObject } from 'cloudflare:workers';
 import { logger } from '../util/logger';
-import { deliverToBot, deliverActionExecutedToBot, type WebhookMessage } from '../webhook/deliver';
+import {
+  deliverToBot,
+  deliverActionExecutedToBot,
+  type ActionExecutedWebhookMessage,
+  type WebhookMessage,
+} from '../webhook/deliver';
 
 /**
  * Parses stored message content JSON. Content was validated by Zod at write
@@ -30,13 +34,73 @@ function parseStoredContent(rawContent: string, messageId: string): ContentBlock
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { eq, lt, desc, and, sql, inArray } from 'drizzle-orm';
-import { conversation, members, messages, reactions } from '../db/conversation-schema';
+import {
+  botMessageNotifications,
+  conversation,
+  members,
+  messages,
+  reactions,
+} from '../db/conversation-schema';
+import {
+  BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS,
+  BOT_MESSAGE_NOTIFICATION_TIMEOUT_MS,
+  botMessageNotificationTextLength,
+  sendConversationMessagePush,
+} from '../services/push-notifications';
 import migrations from '../../drizzle/conversation/migrations';
 import { monotonicFactory } from 'ulid';
+
+type StoredMessageRow = typeof messages.$inferSelect;
+type BotMessageNotificationReason = 'length' | 'typing_stop' | 'timeout';
+
+function buildReplySnapshot(
+  messageId: string,
+  parent: StoredMessageRow | undefined
+): Message['replyTo'] {
+  return buildReplyToMessageSnapshot(
+    messageId,
+    parent
+      ? {
+          senderId: parent.sender_id,
+          deleted: parent.deleted === 1,
+          content: parent.deleted === 1 ? [] : parseStoredContent(parent.content, parent.id),
+        }
+      : null
+  );
+}
+
+function storedMessageRowToMessage(
+  row: StoredMessageRow,
+  replyParentById: Map<string, StoredMessageRow>,
+  reactionsByMessage: Map<string, ReactionSummary[]>
+): Message {
+  return {
+    id: row.id,
+    senderId: row.sender_id,
+    content: row.deleted === 1 ? [] : parseStoredContent(row.content, row.id),
+    inReplyToMessageId: row.in_reply_to_message_id,
+    replyTo: row.in_reply_to_message_id
+      ? buildReplySnapshot(
+          row.in_reply_to_message_id,
+          replyParentById.get(row.in_reply_to_message_id)
+        )
+      : null,
+    updatedAt: row.updated_at,
+    clientUpdatedAt: row.client_updated_at,
+    deleted: row.deleted === 1,
+    deliveryFailed: row.delivery_failed === 1,
+    reactions: reactionsByMessage.get(row.id) ?? [],
+  };
+}
 
 export type MemberContext = {
   humanMemberIds: string[];
   sandboxId: string | null;
+};
+
+type ActiveMemberRow = {
+  id: string;
+  kind: 'user' | 'bot';
 };
 
 export type InitializeParams = {
@@ -78,7 +142,7 @@ export type CreateMessageParams = {
 };
 
 export type CreateMessageResult =
-  | { ok: true; messageId: string; info: ConversationInfo }
+  | { ok: true; messageId: string; message: MessageRow; info: ConversationInfo }
   | { ok: false; code: 'forbidden' | 'internal'; error: string };
 
 export type ListMessagesParams = {
@@ -95,10 +159,20 @@ export type GetMessageResult = {
   deleted: boolean;
 } | null;
 
+export type ResolveMarkReadResult =
+  | {
+      ok: true;
+      sandboxId: string | null;
+      latestNonDeletedMessageId: string | null;
+    }
+  | { ok: false; code: 'forbidden' | 'invalid'; error: string };
+
 export type MessageRow = Message;
 
 export type ListMessagesResult = {
   messages: MessageRow[];
+  hasMore: boolean;
+  nextCursor: string | null;
 };
 
 export type EditMessageParams = {
@@ -130,7 +204,19 @@ export type ExecuteActionParams = {
 };
 
 export type ExecuteActionResult =
-  | { ok: true; content: ContentBlock[]; messageSenderId: string }
+  | {
+      ok: true;
+      content: ContentBlock[];
+      messageSenderId: string;
+      memberContext: MemberContext;
+      targetBotId: string | null;
+      resolved: {
+        groupId: string;
+        value: ExecApprovalDecision;
+        resolvedBy: string;
+        resolvedAt: number;
+      };
+    }
   | {
       ok: false;
       code: 'not_found' | 'forbidden' | 'already_resolved' | 'invalid_value';
@@ -138,7 +224,11 @@ export type ExecuteActionResult =
     };
 
 export type RevertActionResolutionResult =
-  | { ok: true }
+  | { ok: true; reverted: boolean }
+  | { ok: false; code: 'not_found'; error: string };
+
+export type NotifyDeliveryFailedResult =
+  | { ok: true; changed: boolean }
   | { ok: false; code: 'not_found'; error: string };
 
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
@@ -149,7 +239,7 @@ export type AddReactionResult =
 export type RemoveReactionParams = { messageId: string; memberId: string; emoji: string };
 export type RemoveReactionResult =
   | { ok: true; removed: true; removed_id: string; memberContext: MemberContext }
-  | { ok: true; removed: false }
+  | { ok: true; removed: false; removed_id: string | null }
   | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 
 export class ConversationDO extends DurableObject<Env> {
@@ -184,17 +274,25 @@ export class ConversationDO extends DurableObject<Env> {
     this.ctx.waitUntil(this.webhookChain);
   }
 
-  async enqueueActionExecutedWebhook(
-    msg: z.infer<typeof actionExecutedWebhookSchema> & { targetBotId: string }
-  ): Promise<void> {
+  async enqueueActionExecutedWebhook(msg: ActionExecutedWebhookMessage): Promise<void> {
     this.webhookChain = this.webhookChain
       .catch(() => {})
       .then(() => deliverActionExecutedToBot(this.env, msg));
     this.ctx.waitUntil(this.webhookChain);
   }
 
-  notifyDeliveryFailed(messageId: string): void {
+  notifyDeliveryFailed(messageId: string): NotifyDeliveryFailedResult {
+    const row = this.db.select().from(messages).where(eq(messages.id, messageId)).get();
+    if (!row || row.deleted === 1) {
+      return { ok: false, code: 'not_found', error: 'Message not found' };
+    }
+
+    if (row.delivery_failed === 1) {
+      return { ok: true, changed: false };
+    }
+
     this.db.update(messages).set({ delivery_failed: 1 }).where(eq(messages.id, messageId)).run();
+    return { ok: true, changed: true };
   }
 
   revertActionResolution(params: {
@@ -214,7 +312,7 @@ export class ConversationDO extends DurableObject<Env> {
     }
     // Idempotent: already unresolved is a no-op success.
     if (!actionsBlock.resolved) {
-      return { ok: true };
+      return { ok: true, reverted: false };
     }
     actionsBlock.resolved = undefined;
     const newVersion = row.version + 1;
@@ -227,7 +325,7 @@ export class ConversationDO extends DurableObject<Env> {
       })
       .where(eq(messages.id, params.messageId))
       .run();
-    return { ok: true };
+    return { ok: true, reverted: true };
   }
 
   initialize(params: InitializeParams): { ok: true } | { ok: false; error: string } {
@@ -269,18 +367,14 @@ export class ConversationDO extends DurableObject<Env> {
     const convRow = this.db.select().from(conversation).get();
     if (!convRow) return null;
 
-    const memberRows = this.db
-      .select()
-      .from(members)
-      .where(sql`${members.left_at} IS NULL`)
-      .all();
+    const memberRows = this.getActiveMemberRows();
 
     return {
       id: convRow.id,
       title: convRow.title,
       createdBy: convRow.created_by,
       createdAt: convRow.created_at,
-      members: memberRows.map(m => ({ id: m.id, kind: m.kind as 'user' | 'bot' })),
+      members: memberRows,
     };
   }
 
@@ -293,13 +387,16 @@ export class ConversationDO extends DurableObject<Env> {
     return row !== undefined;
   }
 
-  private getMemberContext(): MemberContext {
-    const activeMembers = this.db
+  private getActiveMemberRows(): ActiveMemberRow[] {
+    return this.db
       .select({ id: members.id, kind: members.kind })
       .from(members)
       .where(sql`${members.left_at} IS NULL`)
-      .all();
+      .all()
+      .map(member => ({ id: member.id, kind: member.kind === 'user' ? 'user' : 'bot' }));
+  }
 
+  private getMemberContextFromRows(activeMembers: ActiveMemberRow[]): MemberContext {
     const humanMemberIds = activeMembers.filter(m => m.kind === 'user').map(m => m.id);
     const botMember = activeMembers.find(m => m.kind === 'bot');
     const sandboxId = botMember ? (botMember.id.match(/^bot:kiloclaw:(.+)$/)?.[1] ?? null) : null;
@@ -307,8 +404,143 @@ export class ConversationDO extends DurableObject<Env> {
     return { humanMemberIds, sandboxId };
   }
 
+  private getMemberContextIfActive(memberId: string): MemberContext | null {
+    const activeMembers = this.getActiveMemberRows();
+    if (!activeMembers.some(member => member.id === memberId)) {
+      return null;
+    }
+    return this.getMemberContextFromRows(activeMembers);
+  }
+
+  private getMemberContext(): MemberContext {
+    return this.getMemberContextFromRows(this.getActiveMemberRows());
+  }
+
+  private isBotMember(memberId: string): boolean {
+    return this.getActiveMemberRows().some(
+      member => member.id === memberId && member.kind === 'bot'
+    );
+  }
+
+  private scheduleBotNotificationAlarm(notifyAfter: number): void {
+    this.ctx.waitUntil(
+      (async () => {
+        const currentAlarm = await this.ctx.storage.getAlarm();
+        if (currentAlarm === null || notifyAfter < currentAlarm) {
+          await this.ctx.storage.setAlarm(notifyAfter);
+        }
+      })()
+    );
+  }
+
+  private registerBotMessageNotification(
+    messageId: string,
+    botId: string,
+    content: ContentBlock[]
+  ): void {
+    const createdAt = Date.now();
+    const notifyAfter = createdAt + BOT_MESSAGE_NOTIFICATION_TIMEOUT_MS;
+
+    this.db
+      .insert(botMessageNotifications)
+      .values({
+        message_id: messageId,
+        bot_id: botId,
+        content: JSON.stringify(content),
+        created_at: createdAt,
+        notify_after: notifyAfter,
+      })
+      .run();
+
+    this.scheduleBotNotificationAlarm(notifyAfter);
+  }
+
+  private claimBotMessageNotification(
+    messageId: string,
+    reason: BotMessageNotificationReason
+  ): { messageId: string; botId: string; content: ContentBlock[] } | null {
+    const row = this.db
+      .select()
+      .from(botMessageNotifications)
+      .where(eq(botMessageNotifications.message_id, messageId))
+      .get();
+
+    if (!row || row.notified_at !== null) return null;
+
+    const notifiedAt = Date.now();
+    this.db
+      .update(botMessageNotifications)
+      .set({ notified_at: notifiedAt, notified_reason: reason })
+      .where(
+        and(
+          eq(botMessageNotifications.message_id, messageId),
+          sql`${botMessageNotifications.notified_at} IS NULL`
+        )
+      )
+      .run();
+
+    const claimed = this.db
+      .select()
+      .from(botMessageNotifications)
+      .where(eq(botMessageNotifications.message_id, messageId))
+      .get();
+
+    if (!claimed || claimed.notified_at !== notifiedAt) return null;
+
+    return {
+      messageId: claimed.message_id,
+      botId: claimed.bot_id,
+      content: parseStoredContent(claimed.content, claimed.message_id),
+    };
+  }
+
+  private dispatchClaimedBotMessageNotification(
+    claimed: { messageId: string; botId: string; content: ContentBlock[] },
+    reason: BotMessageNotificationReason
+  ): void {
+    const info = this.getInfo();
+    if (!info) return;
+    const memberContext = this.getMemberContext();
+    if (!memberContext.sandboxId) return;
+
+    const logContext =
+      reason === 'length'
+        ? 'bot.length'
+        : reason === 'typing_stop'
+          ? 'bot.typing_stop'
+          : 'bot.timeout';
+
+    this.ctx.waitUntil(
+      sendConversationMessagePush(this.env, {
+        conversationId: info.id,
+        sandboxId: memberContext.sandboxId,
+        title: info.title,
+        humanMemberIds: memberContext.humanMemberIds,
+        senderId: claimed.botId,
+        senderIsHuman: false,
+        messageId: claimed.messageId,
+        content: claimed.content,
+        recipientMode: 'all-human-members',
+        logContext,
+      })
+    );
+  }
+
+  private notifyBotMessageIfClaimable(
+    messageId: string,
+    reason: BotMessageNotificationReason
+  ): boolean {
+    const claimed = this.claimBotMessageNotification(messageId, reason);
+    if (!claimed) return false;
+    this.dispatchClaimedBotMessageNotification(claimed, reason);
+    return true;
+  }
+
   createMessage(params: CreateMessageParams): CreateMessageResult {
-    if (!this.isMember(params.senderId)) {
+    const info = this.getInfo();
+    if (!info) return { ok: false, code: 'internal', error: 'Conversation not initialized' };
+
+    if (!info.members.some(member => member.id === params.senderId)) {
       return {
         ok: false,
         code: 'forbidden',
@@ -337,9 +569,33 @@ export class ConversationDO extends DurableObject<Env> {
       throw err;
     }
 
-    const info = this.getInfo();
-    if (!info) return { ok: false, code: 'internal', error: 'Conversation not initialized' };
-    return { ok: true, messageId, info };
+    const row = this.db.select().from(messages).where(eq(messages.id, messageId)).get();
+    if (!row) {
+      return { ok: false, code: 'internal', error: `Message ${messageId} was not created` };
+    }
+
+    const replyParentRow = row.in_reply_to_message_id
+      ? this.db.select().from(messages).where(eq(messages.id, row.in_reply_to_message_id)).get()
+      : undefined;
+    const replyParentById = replyParentRow
+      ? new Map([[replyParentRow.id, replyParentRow]])
+      : new Map<string, StoredMessageRow>();
+
+    if (this.isBotMember(params.senderId)) {
+      this.registerBotMessageNotification(messageId, params.senderId, params.content);
+      if (
+        botMessageNotificationTextLength(params.content) >= BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS
+      ) {
+        this.notifyBotMessageIfClaimable(messageId, 'length');
+      }
+    }
+
+    return {
+      ok: true,
+      messageId,
+      message: storedMessageRowToMessage(row, replyParentById, new Map()),
+      info,
+    };
   }
 
   getMessage(messageId: string): GetMessageResult {
@@ -353,22 +609,74 @@ export class ConversationDO extends DurableObject<Env> {
     };
   }
 
+  getLatestNonDeletedMessageId(): string | null {
+    const row = this.db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(eq(messages.deleted, 0))
+      .orderBy(desc(messages.id))
+      .limit(1)
+      .get();
+    return row?.id ?? null;
+  }
+
+  resolveMarkRead(memberId: string, lastSeenMessageId: string): ResolveMarkReadResult {
+    const activeMembers = this.getActiveMemberRows();
+    if (!activeMembers.some(member => member.id === memberId)) {
+      return { ok: false, code: 'forbidden', error: 'Forbidden' };
+    }
+
+    const marker = this.db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(eq(messages.id, lastSeenMessageId))
+      .get();
+    if (!marker) {
+      return {
+        ok: false,
+        code: 'invalid',
+        error: 'Message does not belong to conversation',
+      };
+    }
+
+    return {
+      ok: true,
+      sandboxId: this.getMemberContextFromRows(activeMembers).sandboxId,
+      latestNonDeletedMessageId: this.getLatestNonDeletedMessageId(),
+    };
+  }
+
   listMessages(params: ListMessagesParams): ListMessagesResult {
     const query = this.db.select().from(messages);
 
-    const rows = params.before
+    const rowsWithSentinel = params.before
       ? query
           .where(lt(messages.id, params.before))
           .orderBy(desc(messages.id))
-          .limit(params.limit)
+          .limit(params.limit + 1)
           .all()
-      : query.orderBy(desc(messages.id)).limit(params.limit).all();
+      : query
+          .orderBy(desc(messages.id))
+          .limit(params.limit + 1)
+          .all();
 
+    const hasMore = rowsWithSentinel.length > params.limit;
+    const rows = rowsWithSentinel.slice(0, params.limit);
+    const nextCursor = hasMore ? (rows[rows.length - 1]?.id ?? null) : null;
     if (rows.length === 0) {
-      return { messages: [] };
+      return { messages: [], hasMore: false, nextCursor: null };
     }
 
     const ids = rows.map(r => r.id);
+    const replyParentIds = [
+      ...new Set(rows.flatMap(r => (r.in_reply_to_message_id ? [r.in_reply_to_message_id] : []))),
+    ];
+    const replyParentRows =
+      replyParentIds.length > 0
+        ? this.db.select().from(messages).where(inArray(messages.id, replyParentIds)).all()
+        : [];
+    const replyParentById = new Map(replyParentRows.map(row => [row.id, row]));
+
     const reactionRows = this.db
       .select()
       .from(reactions)
@@ -389,17 +697,11 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     return {
-      messages: rows.map(row => ({
-        id: row.id,
-        senderId: row.sender_id,
-        content: row.deleted === 1 ? [] : parseStoredContent(row.content, row.id),
-        inReplyToMessageId: row.in_reply_to_message_id,
-        updatedAt: row.updated_at,
-        clientUpdatedAt: row.client_updated_at,
-        deleted: row.deleted === 1,
-        deliveryFailed: row.delivery_failed === 1,
-        reactions: reactionsByMessage.get(row.id) ?? [],
-      })),
+      messages: rows.map(row =>
+        storedMessageRowToMessage(row, replyParentById, reactionsByMessage)
+      ),
+      hasMore,
+      nextCursor,
     };
   }
 
@@ -430,6 +732,15 @@ export class ConversationDO extends DurableObject<Env> {
       };
     }
 
+    const memberContext = this.getMemberContextIfActive(params.senderId);
+    if (!memberContext) {
+      return {
+        ok: false,
+        code: 'forbidden',
+        error: `Sender ${params.senderId} is not a member of this conversation`,
+      };
+    }
+
     // Discard out-of-order edits: if the client's timestamp is older than the
     // last accepted edit, silently drop it.
     if (row.client_updated_at != null && params.clientTimestamp <= row.client_updated_at) {
@@ -448,21 +759,98 @@ export class ConversationDO extends DurableObject<Env> {
       .where(eq(messages.id, params.messageId))
       .run();
 
+    if (this.isBotMember(params.senderId)) {
+      this.db
+        .update(botMessageNotifications)
+        .set({ content: JSON.stringify(params.content) })
+        .where(
+          and(
+            eq(botMessageNotifications.message_id, params.messageId),
+            sql`${botMessageNotifications.notified_at} IS NULL`
+          )
+        )
+        .run();
+
+      if (
+        botMessageNotificationTextLength(params.content) >= BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS
+      ) {
+        this.notifyBotMessageIfClaimable(params.messageId, 'length');
+      }
+    }
+
     return {
       ok: true,
       stale: false,
       messageId: params.messageId,
-      memberContext: this.getMemberContext(),
+      memberContext,
     };
+  }
+
+  notifyLatestBotMessageOnTypingStop(
+    botId: string
+  ): { ok: true; notified: boolean } | { ok: false; error: string } {
+    if (!this.isBotMember(botId)) {
+      return { ok: false, error: 'Not a bot member' };
+    }
+
+    const row = this.db
+      .select({ messageId: botMessageNotifications.message_id })
+      .from(botMessageNotifications)
+      .where(
+        and(
+          eq(botMessageNotifications.bot_id, botId),
+          sql`${botMessageNotifications.notified_at} IS NULL`
+        )
+      )
+      .orderBy(desc(botMessageNotifications.created_at))
+      .limit(1)
+      .get();
+
+    if (!row) {
+      return { ok: true, notified: false };
+    }
+
+    return { ok: true, notified: this.notifyBotMessageIfClaimable(row.messageId, 'typing_stop') };
+  }
+
+  override async alarm(): Promise<void> {
+    const now = Date.now();
+    const dueRows = this.db
+      .select()
+      .from(botMessageNotifications)
+      .where(
+        and(
+          sql`${botMessageNotifications.notified_at} IS NULL`,
+          sql`${botMessageNotifications.notify_after} <= ${now}`
+        )
+      )
+      .all();
+
+    for (const row of dueRows) {
+      this.notifyBotMessageIfClaimable(row.message_id, 'timeout');
+    }
+
+    const next = this.db
+      .select({ notifyAfter: botMessageNotifications.notify_after })
+      .from(botMessageNotifications)
+      .where(sql`${botMessageNotifications.notified_at} IS NULL`)
+      .orderBy(botMessageNotifications.notify_after)
+      .limit(1)
+      .get();
+
+    if (next) {
+      await this.ctx.storage.setAlarm(next.notifyAfter);
+    }
   }
 
   setTyping(
     memberId: string
   ): { ok: true; memberContext: MemberContext } | { ok: false; error: string } {
-    if (!this.isMember(memberId)) {
+    const memberContext = this.getMemberContextIfActive(memberId);
+    if (!memberContext) {
       return { ok: false, error: 'Not a member' };
     }
-    return { ok: true, memberContext: this.getMemberContext() };
+    return { ok: true, memberContext };
   }
 
   deleteMessage(params: DeleteMessageParams): DeleteMessageResult {
@@ -483,22 +871,45 @@ export class ConversationDO extends DurableObject<Env> {
       };
     }
 
-    // Already deleted — idempotent success (only for the original sender)
-    if (row.deleted === 1) {
-      return { ok: true, memberContext: this.getMemberContext() };
+    const memberContext = this.getMemberContextIfActive(params.senderId);
+    if (!memberContext) {
+      return {
+        ok: false,
+        code: 'forbidden',
+        error: `Sender ${params.senderId} is not a member of this conversation`,
+      };
     }
 
-    this.db
-      .update(messages)
-      .set({ deleted: 1, updated_at: Date.now() })
-      .where(eq(messages.id, params.messageId))
-      .run();
+    // Already deleted — idempotent success (only for the original sender)
+    if (row.deleted === 1) {
+      return { ok: true, memberContext };
+    }
 
-    return { ok: true, memberContext: this.getMemberContext() };
+    const clearPendingBotNotification = this.isBotMember(params.senderId);
+    this.db.transaction(tx => {
+      tx.update(messages)
+        .set({ deleted: 1, updated_at: Date.now() })
+        .where(eq(messages.id, params.messageId))
+        .run();
+
+      if (clearPendingBotNotification) {
+        tx.delete(botMessageNotifications)
+          .where(
+            and(
+              eq(botMessageNotifications.message_id, params.messageId),
+              sql`${botMessageNotifications.notified_at} IS NULL`
+            )
+          )
+          .run();
+      }
+    });
+
+    return { ok: true, memberContext };
   }
 
   executeAction(params: ExecuteActionParams): ExecuteActionResult {
-    if (!this.isMember(params.memberId)) {
+    const activeMembers = this.getActiveMemberRows();
+    if (!activeMembers.some(member => member.id === params.memberId)) {
       return { ok: false, code: 'forbidden', error: 'Not a member' };
     }
 
@@ -521,11 +932,12 @@ export class ConversationDO extends DurableObject<Env> {
       return { ok: false, code: 'invalid_value', error: 'Value does not match any offered action' };
     }
 
-    actionsBlock.resolved = {
+    const resolved = {
       value: params.value,
       resolvedBy: params.memberId,
       resolvedAt: Date.now(),
     };
+    actionsBlock.resolved = resolved;
 
     const newVersion = row.version + 1;
     this.db
@@ -538,11 +950,23 @@ export class ConversationDO extends DurableObject<Env> {
       .where(eq(messages.id, params.messageId))
       .run();
 
-    return { ok: true, content, messageSenderId: row.sender_id };
+    return {
+      ok: true,
+      content,
+      messageSenderId: row.sender_id,
+      memberContext: this.getMemberContextFromRows(activeMembers),
+      targetBotId: activeMembers.some(
+        member => member.id === row.sender_id && member.kind === 'bot'
+      )
+        ? row.sender_id
+        : null,
+      resolved: { groupId: params.groupId, ...resolved },
+    };
   }
 
   addReaction(params: AddReactionParams): AddReactionResult {
-    if (!this.isMember(params.memberId)) {
+    const memberContext = this.getMemberContextIfActive(params.memberId);
+    if (!memberContext) {
       return { ok: false, code: 'forbidden' as const, error: 'Not a member' };
     }
     const message = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
@@ -579,7 +1003,7 @@ export class ConversationDO extends DurableObject<Env> {
             removed_id: null,
           })
           .run();
-        return { ok: true, added: true, id, memberContext: this.getMemberContext() };
+        return { ok: true, added: true, id, memberContext };
       }
 
       if (existing.deleted_at === null) {
@@ -599,7 +1023,7 @@ export class ConversationDO extends DurableObject<Env> {
           )
         )
         .run();
-      return { ok: true, added: true, id, memberContext: this.getMemberContext() };
+      return { ok: true, added: true, id, memberContext };
     } catch (err) {
       if (err instanceof Error && /constraint/i.test(err.message)) {
         return { ok: false, code: 'internal', error: err.message };
@@ -609,7 +1033,8 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   removeReaction(params: RemoveReactionParams): RemoveReactionResult {
-    if (!this.isMember(params.memberId)) {
+    const memberContext = this.getMemberContextIfActive(params.memberId);
+    if (!memberContext) {
       return { ok: false, code: 'forbidden' as const, error: 'Not a member' };
     }
     const message = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
@@ -618,20 +1043,29 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     try {
-      const live = this.db
+      const existing = this.db
         .select()
         .from(reactions)
         .where(
           and(
             eq(reactions.message_id, params.messageId),
             eq(reactions.member_id, params.memberId),
-            eq(reactions.emoji, params.emoji),
-            sql`${reactions.deleted_at} IS NULL`
+            eq(reactions.emoji, params.emoji)
           )
         )
         .get();
 
-      if (!live) return { ok: true, removed: false };
+      if (!existing) return { ok: true, removed: false, removed_id: null };
+      if (existing.deleted_at !== null) {
+        if (existing.removed_id === null) {
+          return {
+            ok: false,
+            code: 'internal',
+            error: 'Deleted reaction is missing remove operation id',
+          };
+        }
+        return { ok: true, removed: false, removed_id: existing.removed_id };
+      }
 
       const removedId = this.nextUlid();
       this.db
@@ -649,7 +1083,7 @@ export class ConversationDO extends DurableObject<Env> {
         ok: true,
         removed: true,
         removed_id: removedId,
-        memberContext: this.getMemberContext(),
+        memberContext,
       };
     } catch (err) {
       if (err instanceof Error && /constraint/i.test(err.message)) {
@@ -660,14 +1094,18 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   /**
-   * Writes the conversation title without a membership check. Used only by
-   * internal code paths that have already authorized the change (e.g. the
-   * auto-title flow after the first bot reply commits). Human-initiated
-   * renames must go through updateTitleIfMember.
+   * Writes the auto-title without a membership check only when the conversation
+   * is still untitled. Human-initiated renames must go through
+   * updateTitleIfMember.
    */
-  updateTitleInternal(title: string): { ok: true } {
+  updateTitleIfNullInternal(title: string): { ok: true; applied: boolean } {
+    const row = this.db.select({ title: conversation.title }).from(conversation).get();
+    if (!row || row.title !== null) {
+      return { ok: true, applied: false };
+    }
+
     this.db.update(conversation).set({ title }).run();
-    return { ok: true };
+    return { ok: true, applied: true };
   }
 
   leaveMember(memberId: string): {
@@ -712,10 +1150,19 @@ export class ConversationDO extends DurableObject<Env> {
       .from(members)
       .where(sql`${members.left_at} IS NULL`)
       .all();
+    const remainingUsers = active.filter(m => m.kind === 'user');
+    const botMembers = active.filter(m => m.kind === 'bot');
+    if (remainingUsers.length === 0 && botMembers.length > 0) {
+      this.db
+        .update(members)
+        .set({ left_at: Date.now() })
+        .where(and(eq(members.kind, 'bot'), sql`${members.left_at} IS NULL`))
+        .run();
+    }
     return {
       ok: true,
-      remainingUsers: active.filter(m => m.kind === 'user'),
-      botMembers: active.filter(m => m.kind === 'bot'),
+      remainingUsers,
+      botMembers,
     };
   }
 
@@ -725,6 +1172,7 @@ export class ConversationDO extends DurableObject<Env> {
     const membersCopy = info.members;
     this.db.transaction(tx => {
       tx.delete(reactions).run();
+      tx.delete(botMessageNotifications).run();
       tx.delete(messages).run();
       tx.delete(conversation).run();
       tx.delete(members).run();

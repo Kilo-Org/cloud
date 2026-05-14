@@ -1,7 +1,7 @@
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
-export function isStepFunModel(requestedModel: string) {
-  return requestedModel.startsWith('stepfun/');
+export function isStepModel(requestedModel: string) {
+  return requestedModel.includes('step-');
 }
 
 export const stepfun_35_flash_free_model: KiloExclusiveModel = {
@@ -17,4 +17,5 @@ export const stepfun_35_flash_free_model: KiloExclusiveModel = {
   internal_id: 'stepfun/step-3.5-flash',
   pricing: null,
   exclusive_to: [],
+  inference_provider_restriction: ['stepfun'],
 };

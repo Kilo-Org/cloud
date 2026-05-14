@@ -43,6 +43,10 @@ const ProductTelemetrySchema = z.object({
 
 const INSTANCE_READY_LOAD_THRESHOLD = 0.1;
 
+function isReadyCheckin(data: { loadAvg5m: number }, workerEnv: string | undefined): boolean {
+  return workerEnv !== 'production' || data.loadAvg5m <= INSTANCE_READY_LOAD_THRESHOLD;
+}
+
 const DiskBytesSchema = z
   .number()
   .int()
@@ -438,18 +442,14 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
   // Instance readiness detection: when load drops below threshold, notify the
   // backend so it can send the one-time "instance ready" email and finalize
   // any pending async auto-resume state for this instance.
-  if (data.loadAvg5m <= INSTANCE_READY_LOAD_THRESHOLD) {
+  const readyCheckin = isReadyCheckin(data, c.env.WORKER_ENV);
+
+  if (readyCheckin) {
     try {
       const apiOrigin = backendApiOrigin(c.env.BACKEND_API_URL);
       const { shouldNotify } = await stub.tryMarkInstanceReady();
 
       if (c.env.INTERNAL_API_SECRET) {
-        console.log('[controller] instance-ready: dispatching notification', {
-          userId,
-          sandboxId: data.sandboxId,
-          instanceId: isInstanceKeyedSandboxId(data.sandboxId) ? doKey : null,
-          shouldNotify,
-        });
         waitUntil(
           notifyInstanceReady(
             apiOrigin,

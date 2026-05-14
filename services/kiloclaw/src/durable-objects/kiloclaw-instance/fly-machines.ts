@@ -16,15 +16,24 @@ import {
   resolveRegions,
   evictCapacityRegionFromKV,
 } from '../regions';
-import { guestFromSize, volumeNameFromSandboxId, METADATA_KEY_SANDBOX_ID } from '../machine-config';
+import {
+  effectiveMachineSize,
+  guestFromSize,
+  parseMachineSizeFromFlyGuest,
+  volumeNameFromSandboxId,
+  METADATA_KEY_SANDBOX_ID,
+} from '../machine-config';
 import type { InstanceMutableState } from './types';
 import { reconcileLog, doError, doWarn, toLoggable } from './log';
+import { resolveInstanceTypeLabel } from '@kilocode/kiloclaw-instance-tiers';
 
 type FlyRuntimeState = Pick<
   InstanceMutableState,
   | 'userId'
   | 'sandboxId'
   | 'machineSize'
+  | 'adminMachineSizeOverride'
+  | 'volumeSizeGb'
   | 'lastStartedAt'
   | 'flyAppName'
   | 'flyMachineId'
@@ -84,8 +93,8 @@ export async function ensureVolume(
     flyConfig,
     {
       name: volumeNameFromSandboxId(state.sandboxId),
-      size_gb: DEFAULT_VOLUME_SIZE_GB,
-      compute: guestFromSize(state.machineSize),
+      size_gb: state.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB,
+      compute: guestFromSize(effectiveMachineSize(state)),
     },
     regions,
     {
@@ -129,7 +138,7 @@ export async function replaceStrandedVolume(
   const hasUserData = state.lastStartedAt !== null;
   const allRegions = await resolveRegions(env.KV_CLAW_CACHE, env.FLY_REGION);
   const regions = deprioritizeRegion(allRegions, oldRegion);
-  const compute = guestFromSize(state.machineSize);
+  const compute = guestFromSize(effectiveMachineSize(state));
   let machineGone = false;
 
   // Destroy existing machine if any — it's stuck on the constrained host.
@@ -205,7 +214,7 @@ export async function replaceStrandedVolume(
       flyConfig,
       {
         name: volumeNameFromSandboxId(state.sandboxId),
-        size_gb: DEFAULT_VOLUME_SIZE_GB,
+        size_gb: state.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB,
         compute,
       },
       regions,
@@ -307,19 +316,35 @@ export async function startExistingMachine(
   try {
     const machine = await fly.getMachine(flyConfig, providerState.machineId);
 
-    // Backfill machineSize from live Fly machine config for legacy instances
+    // Backfill machineSize from live Fly machine config for legacy instances.
+    // Skipped when an admin override is active — the live guest reflects the
+    // override, not the billable tier, so writing it back would mislabel the
+    // instance.
     let machineConfig = initialMachineConfig;
     let machineSizePatch: InstanceMutableState['machineSize'] | undefined;
-    if (state.machineSize === null && machine.config?.guest) {
-      const { cpus, memory_mb, cpu_kind } = machine.config.guest;
-      machineSizePatch = { cpus, memory_mb, cpu_kind };
-      machineConfig = { ...machineConfig, guest: guestFromSize(machineSizePatch) };
-      await persistProviderResult({
-        providerState,
-        corePatch: {
-          machineSize: machineSizePatch,
-        },
-      });
+    if (
+      state.machineSize === null &&
+      state.adminMachineSizeOverride === null &&
+      machine.config?.guest
+    ) {
+      const parsedSize = parseMachineSizeFromFlyGuest(machine.config.guest);
+      if (parsedSize) {
+        machineSizePatch = parsedSize;
+        const instanceTypePatch = resolveInstanceTypeLabel(machineSizePatch, state.volumeSizeGb);
+        machineConfig = { ...machineConfig, guest: guestFromSize(machineSizePatch) };
+        await persistProviderResult({
+          providerState,
+          corePatch: {
+            machineSize: machineSizePatch,
+            instanceType: instanceTypePatch,
+          },
+        });
+      } else {
+        doWarn(state, 'Skipping machineSize backfill: live Fly guest failed schema validation', {
+          source: 'startExistingMachine',
+          guest: machine.config.guest,
+        });
+      }
     }
 
     // failed machines are restartable via updateMachine (Fly re-launches on the next available host)

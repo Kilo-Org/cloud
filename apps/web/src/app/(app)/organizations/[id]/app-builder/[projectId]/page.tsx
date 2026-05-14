@@ -1,6 +1,7 @@
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { AppBuilderPage } from '@/components/app-builder/AppBuilderPage';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { signInUrlWithCallbackPath } from '@/lib/user.server';
 
 type Props = {
@@ -17,6 +18,16 @@ export default async function OrgAppBuilderProjectPage({ params }: Props) {
       redirect(await signInUrlWithCallbackPath());
     }
     redirect('/profile');
+  }
+
+  const isAppBuilderEnabled = await isFeatureFlagEnabled(
+    'app-builder-feature',
+    result.data.user.id
+  );
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  if (!isAppBuilderEnabled && !isDevelopment) {
+    return notFound();
   }
 
   return <AppBuilderPage organizationId={organizationId} projectId={projectId} />;

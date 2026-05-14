@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
@@ -82,7 +83,12 @@ function ErrorSessionsModal({
     <Dialog open onOpenChange={open => !open && onClose()}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Recent Sessions — {error.category}</DialogTitle>
+          <DialogTitle>
+            {filterParams.retryAccountingMode === 'all_attempts'
+              ? 'Recent Failed Attempts'
+              : 'Recent Sessions'}{' '}
+            — {error.category}
+          </DialogTitle>
           <DialogDescription className="max-w-full truncate font-mono text-xs">
             {error.errorType}
           </DialogDescription>
@@ -104,9 +110,11 @@ function ErrorSessionsModal({
               <TableHeader>
                 <TableRow>
                   <TableHead>Session ID</TableHead>
+                  {filterParams.retryAccountingMode === 'all_attempts' && (
+                    <TableHead>Attempt</TableHead>
+                  )}
                   <TableHead>User / Org</TableHead>
                   <TableHead>Repo</TableHead>
-                  <TableHead>Version</TableHead>
                   <TableHead>Timestamp</TableHead>
                 </TableRow>
               </TableHeader>
@@ -124,6 +132,11 @@ function ErrorSessionsModal({
                         );
                       })()}
                     </TableCell>
+                    {filterParams.retryAccountingMode === 'all_attempts' && (
+                      <TableCell className="text-xs">
+                        {session.attemptNumber ? `Attempt ${session.attemptNumber}` : '—'}
+                      </TableCell>
+                    )}
                     <TableCell className="text-xs">
                       {session.orgId ? (
                         <span title={`Org: ${session.orgId}`}>org:{session.orgId.slice(0, 8)}</span>
@@ -136,9 +149,13 @@ function ErrorSessionsModal({
                       )}
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate text-xs">
-                      {session.repoFullName}#{session.prNumber}
+                      <Link
+                        href={`/code-reviews/${session.reviewId}${session.attemptId ? `?attemptId=${session.attemptId}` : ''}`}
+                        className="hover:text-foreground text-muted-foreground transition-colors"
+                      >
+                        {session.repoFullName}#{session.prNumber}
+                      </Link>
                     </TableCell>
-                    <TableCell className="text-xs">{session.agentVersion ?? '—'}</TableCell>
                     <TableCell className="text-muted-foreground text-xs">
                       {formatDate(session.createdAt)}
                     </TableCell>
@@ -184,8 +201,8 @@ export function CodeReviewErrorAnalysis({ data, filterParams }: Props) {
         <CardHeader>
           <CardTitle>Error Analysis</CardTitle>
           <CardDescription>
-            {data.categories.length} error categories, {totalCategoryErrors.toLocaleString()} total
-            failures
+            {data.categories.length} error categories, {totalCategoryErrors.toLocaleString()} total{' '}
+            {filterParams.retryAccountingMode === 'all_attempts' ? 'attempt failures' : 'failures'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

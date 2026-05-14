@@ -6,6 +6,7 @@ import {
   type DockerLocalProviderState,
   type NorthflankProviderState,
 } from '../../schemas/instance-config';
+import { LIFECYCLE_NOTIFICATION_RESET } from './lifecycle-push';
 import type { InstanceMutableState } from './types';
 
 /**
@@ -289,6 +290,10 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
       applyProviderState(s, s.providerState);
     }
     s.machineSize = d.machineSize;
+    s.instanceType = d.instanceType;
+    s.volumeSizeGb = d.volumeSizeGb;
+    s.adminMachineSizeOverride = d.adminMachineSizeOverride;
+    s.adminMachineSizeOverrideMetadata = d.adminMachineSizeOverrideMetadata;
     s.healthCheckFailCount = d.healthCheckFailCount;
     s.pendingDestroyMachineId = d.pendingDestroyMachineId;
     s.pendingDestroyVolumeId = d.pendingDestroyVolumeId;
@@ -313,6 +318,7 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.lastRecoveryErrorAt = d.lastRecoveryErrorAt;
     s.lastBoundMachineRecoveryAt = d.lastBoundMachineRecoveryAt;
     s.instanceFeatures = d.instanceFeatures;
+    s.controllerCapabilitiesVersion = d.controllerCapabilitiesVersion;
     s.gmailNotificationsEnabled = d.gmailNotificationsEnabled;
     s.gmailLastHistoryId = d.gmailLastHistoryId;
     s.gmailPushOidcEmail = d.gmailPushOidcEmail;
@@ -330,13 +336,14 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.preRestoreStatus = d.preRestoreStatus;
     s.pendingRestoreVolumeId = d.pendingRestoreVolumeId;
     // Legacy instances pre-dating this field treat absence as already-sent
-    // to avoid spurious emails after deploy.
+    // to avoid spurious emails/pushes after deploy.
     s.instanceReadyEmailSent = 'instanceReadyEmailSent' in raw ? d.instanceReadyEmailSent : true;
+    // Legacy instances with an in-flight `starting` attempt at deploy time
+    // should not emit a retroactive `start_failed` push for that attempt.
+    // startAsync() re-arms this flag for every subsequent attempt.
+    s.startFailurePushSentForAttempt =
+      'startFailurePushSentForAttempt' in raw ? d.startFailurePushSentForAttempt : true;
     s.customSecretMeta = d.customSecretMeta;
-    s.streamChatApiKey = d.streamChatApiKey;
-    s.streamChatBotUserId = d.streamChatBotUserId;
-    s.streamChatBotUserToken = d.streamChatBotUserToken;
-    s.streamChatChannelId = d.streamChatChannelId;
     s.vectorMemoryEnabled = d.vectorMemoryEnabled;
     s.vectorMemoryModel = d.vectorMemoryModel;
     s.dreamingEnabled = d.dreamingEnabled;
@@ -391,6 +398,10 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.flyVolumeId = null;
   s.flyRegion = null;
   s.machineSize = null;
+  s.instanceType = null;
+  s.volumeSizeGb = null;
+  s.adminMachineSizeOverride = null;
+  s.adminMachineSizeOverrideMetadata = null;
   s.healthCheckFailCount = 0;
   s.pendingDestroyMachineId = null;
   s.pendingDestroyVolumeId = null;
@@ -415,6 +426,7 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.lastRecoveryErrorAt = null;
   s.lastBoundMachineRecoveryAt = null;
   s.instanceFeatures = [];
+  s.controllerCapabilitiesVersion = null;
   s.gmailNotificationsEnabled = false;
   s.gmailLastHistoryId = null;
   s.gmailPushOidcEmail = null;
@@ -431,11 +443,7 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.restoreStartedAt = null;
   s.preRestoreStatus = null;
   s.pendingRestoreVolumeId = null;
-  s.instanceReadyEmailSent = false;
-  s.streamChatApiKey = null;
-  s.streamChatBotUserId = null;
-  s.streamChatBotUserToken = null;
-  s.streamChatChannelId = null;
+  Object.assign(s, LIFECYCLE_NOTIFICATION_RESET);
   s.vectorMemoryEnabled = false;
   s.vectorMemoryModel = null;
   s.dreamingEnabled = false;
@@ -484,6 +492,10 @@ export function createMutableState(): InstanceMutableState {
     flyVolumeId: null,
     flyRegion: null,
     machineSize: null,
+    instanceType: null,
+    volumeSizeGb: null,
+    adminMachineSizeOverride: null,
+    adminMachineSizeOverrideMetadata: null,
     healthCheckFailCount: 0,
     pendingDestroyMachineId: null,
     pendingDestroyVolumeId: null,
@@ -508,6 +520,7 @@ export function createMutableState(): InstanceMutableState {
     lastRecoveryErrorAt: null,
     lastBoundMachineRecoveryAt: null,
     instanceFeatures: [],
+    controllerCapabilitiesVersion: null,
     gmailNotificationsEnabled: false,
     gmailLastHistoryId: null,
     gmailPushOidcEmail: null,
@@ -524,12 +537,8 @@ export function createMutableState(): InstanceMutableState {
     restoreStartedAt: null,
     preRestoreStatus: null,
     pendingRestoreVolumeId: null,
-    instanceReadyEmailSent: false,
+    ...LIFECYCLE_NOTIFICATION_RESET,
     customSecretMeta: null,
-    streamChatApiKey: null,
-    streamChatBotUserId: null,
-    streamChatBotUserToken: null,
-    streamChatChannelId: null,
     vectorMemoryEnabled: false,
     vectorMemoryModel: null,
     dreamingEnabled: false,

@@ -329,6 +329,8 @@ describe('POST /api/exa/[...path]', () => {
         costMicrodollars: 7000,
         chargedToBalance: false,
         freeAllowanceMicrodollars: EXA_MONTHLY_ALLOWANCE_MICRODOLLARS,
+        featureId: undefined,
+        type: undefined,
       });
     });
 
@@ -351,6 +353,8 @@ describe('POST /api/exa/[...path]', () => {
         costMicrodollars: 5000,
         chargedToBalance: true,
         freeAllowanceMicrodollars: 10_000_000,
+        featureId: undefined,
+        type: undefined,
       });
     });
 
@@ -408,6 +412,56 @@ describe('POST /api/exa/[...path]', () => {
       await flushAfterCallbacks();
 
       expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+    });
+
+    it('passes featureId from header and type from body to recordExaUsage', async () => {
+      setUserAuth();
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 0, freeAllowance: null });
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ results: [], costDollars: { total: 0.007 } })
+      );
+
+      const { POST } = await import('./route');
+      await POST(
+        makeRequest(
+          '/search',
+          { query: 'test', type: 'deep' },
+          { 'x-kilocode-feature': 'kiloclaw' }
+        ) as never
+      );
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          featureId: 'kiloclaw',
+          type: 'deep',
+        })
+      );
+    });
+
+    it('ignores invalid feature header values', async () => {
+      setUserAuth();
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 0, freeAllowance: null });
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ results: [], costDollars: { total: 0.007 } })
+      );
+
+      const { POST } = await import('./route');
+      await POST(
+        makeRequest(
+          '/search',
+          { query: 'test', type: 'deep' },
+          { 'x-kilocode-feature': 'not-a-real-feature' }
+        ) as never
+      );
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          featureId: undefined,
+          type: 'deep',
+        })
+      );
     });
 
     it('handles malformed upstream JSON without throwing or recording usage', async () => {

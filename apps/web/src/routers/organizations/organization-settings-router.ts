@@ -93,9 +93,7 @@ function createDefaultModelDiffMessage(
 
 const UpdateAllowListsInputSchema = OrganizationIdInputSchema.extend({
   provider_allow_list: z.array(z.string()).optional(),
-  provider_policy_mode: z.literal('allow').optional(),
   model_deny_list: z.array(z.string()).optional(),
-  provider_deny_list: z.array(z.string()).optional(),
 });
 
 function dedupeModels(values: string[]): string[] {
@@ -168,13 +166,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
     .input(UpdateAllowListsInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
-      const {
-        organizationId,
-        provider_allow_list,
-        provider_policy_mode,
-        model_deny_list,
-        provider_deny_list,
-      } = input;
+      const { organizationId, provider_allow_list, model_deny_list } = input;
 
       const existingOrg = await getOrganizationById(organizationId);
       if (!existingOrg) {
@@ -201,32 +193,19 @@ export const organizationsSettingsRouter = createTRPCRouter({
       if (provider_allow_list !== undefined) {
         settingsUpdate.provider_allow_list = dedupeStrings(provider_allow_list);
       }
-      if (provider_policy_mode !== undefined) {
-        settingsUpdate.provider_policy_mode = provider_policy_mode;
-      }
 
       if (model_deny_list !== undefined) {
         settingsUpdate.model_deny_list = dedupeModels(model_deny_list);
       }
-      if (provider_allow_list === undefined && provider_deny_list !== undefined) {
-        settingsUpdate.provider_deny_list = dedupeStrings(provider_deny_list);
-      }
 
       // Check if default_model needs to be cleared when access lists change
       if (
-        (provider_allow_list !== undefined ||
-          provider_policy_mode !== undefined ||
-          model_deny_list !== undefined ||
-          provider_deny_list !== undefined) &&
+        (provider_allow_list !== undefined || model_deny_list !== undefined) &&
         currentSettings.default_model
       ) {
         const isAllowed = createAllowPredicateFromRestrictions({
-          providerAllowList:
-            settingsUpdate.provider_policy_mode === 'allow'
-              ? settingsUpdate.provider_allow_list
-              : undefined,
+          providerAllowList: settingsUpdate.provider_allow_list,
           modelDenyList: settingsUpdate.model_deny_list ?? [],
-          providerDenyList: settingsUpdate.provider_deny_list ?? [],
         });
 
         if (!(await isAllowed(currentSettings.default_model))) {

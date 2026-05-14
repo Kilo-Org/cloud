@@ -8,7 +8,16 @@ import {
   editMessageRequestSchema,
   CONVERSATION_TITLE_MAX_CHARS,
   MESSAGE_TEXT_MAX_CHARS,
+  typingRequestSchema,
+  botStatusRecordSchema,
+  botStatusRequestSchema,
+  conversationStatusRecordSchema,
+  conversationStatusRequestSchema,
 } from '../src/schemas';
+
+const validConversationId = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+const validClientId = '01HXYZ00000ABCDEFGHJKMNPQV';
+const uuidClientId = '8bb5a00b-98a3-4910-bda3-2669bcde23bc';
 
 describe('title schemas — trim and reject empty', () => {
   describe('renameConversationRequestSchema', () => {
@@ -96,8 +105,6 @@ describe('title schemas — trim and reject empty', () => {
 });
 
 describe('text content blocks — trim and reject empty', () => {
-  const validConvId = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
-
   describe('textBlockSchema', () => {
     it('rejects empty text', () => {
       const res = textBlockSchema.safeParse({ type: 'text', text: '' });
@@ -144,9 +151,27 @@ describe('text content blocks — trim and reject empty', () => {
   });
 
   describe('createMessageRequestSchema', () => {
+    it('accepts ULID client ids and rejects UUID client ids', () => {
+      const content = [{ type: 'text', text: 'hello' }];
+      expect(
+        createMessageRequestSchema.safeParse({
+          conversationId: validConversationId,
+          content,
+          clientId: validClientId,
+        }).success
+      ).toBe(true);
+      expect(
+        createMessageRequestSchema.safeParse({
+          conversationId: validConversationId,
+          content,
+          clientId: uuidClientId,
+        }).success
+      ).toBe(false);
+    });
+
     it('rejects whitespace-only text block', () => {
       const res = createMessageRequestSchema.safeParse({
-        conversationId: validConvId,
+        conversationId: validConversationId,
         content: [{ type: 'text', text: '   ' }],
       });
       expect(res.success).toBe(false);
@@ -154,7 +179,7 @@ describe('text content blocks — trim and reject empty', () => {
 
     it('trims text on create', () => {
       const res = createMessageRequestSchema.safeParse({
-        conversationId: validConvId,
+        conversationId: validConversationId,
         content: [{ type: 'text', text: '  hi  ' }],
       });
       expect(res.success).toBe(true);
@@ -164,12 +189,39 @@ describe('text content blocks — trim and reject empty', () => {
         if (block.type === 'text') expect(block.text).toBe('hi');
       }
     });
+
+    it('rejects caller-supplied action resolution metadata', () => {
+      const res = createMessageRequestSchema.safeParse({
+        conversationId: validConversationId,
+        content: [
+          {
+            type: 'actions',
+            groupId: 'approval',
+            actions: [{ label: 'Allow', style: 'primary', value: 'allow-once' }],
+            resolved: {
+              value: 'allow-once',
+              resolvedBy: 'user-alice',
+              resolvedAt: Date.now(),
+            },
+          },
+        ],
+      });
+      expect(res.success).toBe(false);
+    });
+
+    it('rejects empty action input blocks', () => {
+      const res = createMessageRequestSchema.safeParse({
+        conversationId: validConversationId,
+        content: [{ type: 'actions', groupId: 'approval', actions: [] }],
+      });
+      expect(res.success).toBe(false);
+    });
   });
 
   describe('editMessageRequestSchema', () => {
     it('rejects whitespace-only text block on edit', () => {
       const res = editMessageRequestSchema.safeParse({
-        conversationId: validConvId,
+        conversationId: validConversationId,
         content: [{ type: 'text', text: '   ' }],
         timestamp: Date.now(),
       });
@@ -178,7 +230,7 @@ describe('text content blocks — trim and reject empty', () => {
 
     it('trims text on edit', () => {
       const res = editMessageRequestSchema.safeParse({
-        conversationId: validConvId,
+        conversationId: validConversationId,
         content: [{ type: 'text', text: '  edited  ' }],
         timestamp: Date.now(),
       });
@@ -188,5 +240,110 @@ describe('text content blocks — trim and reject empty', () => {
         if (block.type === 'text') expect(block.text).toBe('edited');
       }
     });
+
+    it('rejects caller-supplied action resolution metadata', () => {
+      const res = editMessageRequestSchema.safeParse({
+        conversationId: validConversationId,
+        content: [
+          {
+            type: 'actions',
+            groupId: 'approval',
+            actions: [{ label: 'Deny', style: 'danger', value: 'deny' }],
+            resolved: {
+              value: 'deny',
+              resolvedBy: 'user-alice',
+              resolvedAt: Date.now(),
+            },
+          },
+        ],
+        timestamp: Date.now(),
+      });
+      expect(res.success).toBe(false);
+    });
+  });
+});
+
+describe('status schemas', () => {
+  it('rejects negative and fractional bot status timestamps', () => {
+    expect(botStatusRequestSchema.safeParse({ online: true, at: -1 }).success).toBe(false);
+    expect(botStatusRequestSchema.safeParse({ online: true, at: 1.5 }).success).toBe(false);
+    expect(botStatusRecordSchema.safeParse({ online: true, at: -1, updatedAt: 1000 }).success).toBe(
+      false
+    );
+    expect(
+      botStatusRecordSchema.safeParse({ online: true, at: 1000, updatedAt: 1000.5 }).success
+    ).toBe(false);
+  });
+
+  it('rejects negative and fractional conversation status numbers', () => {
+    expect(
+      conversationStatusRequestSchema.safeParse({
+        contextTokens: -1,
+        contextWindow: 4096,
+        model: null,
+        provider: null,
+        at: 1000,
+      }).success
+    ).toBe(false);
+    expect(
+      conversationStatusRequestSchema.safeParse({
+        contextTokens: 0,
+        contextWindow: 4096.5,
+        model: null,
+        provider: null,
+        at: 1000,
+      }).success
+    ).toBe(false);
+    expect(
+      conversationStatusRequestSchema.safeParse({
+        contextTokens: 0,
+        contextWindow: 4096,
+        model: null,
+        provider: null,
+        at: 1000.5,
+      }).success
+    ).toBe(false);
+    expect(
+      conversationStatusRecordSchema.safeParse({
+        conversationId: validConversationId,
+        contextTokens: 0,
+        contextWindow: 4096,
+        model: null,
+        provider: null,
+        at: 1000,
+        updatedAt: -1,
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts zero token and window counts', () => {
+    expect(
+      conversationStatusRequestSchema.safeParse({
+        contextTokens: 0,
+        contextWindow: 0,
+        model: null,
+        provider: null,
+        at: 0,
+      }).success
+    ).toBe(true);
+    expect(
+      conversationStatusRecordSchema.safeParse({
+        conversationId: validConversationId,
+        contextTokens: 0,
+        contextWindow: 0,
+        model: null,
+        provider: null,
+        at: 0,
+        updatedAt: 0,
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('plugin client request schemas', () => {
+  it('requires a non-empty conversationId for typing requests', () => {
+    expect(typingRequestSchema.safeParse({ conversationId: 'c1' }).success).toBe(true);
+    expect(typingRequestSchema.safeParse({ conversationId: '' }).success).toBe(false);
+    expect(typingRequestSchema.safeParse({}).success).toBe(false);
   });
 });

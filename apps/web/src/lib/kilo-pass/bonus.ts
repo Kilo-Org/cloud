@@ -36,9 +36,13 @@ export const computeMonthlyCadenceBonusPercent = (params: {
     throw new Error('streakMonths must be >= 1');
   }
 
-  // Limited-time promo: first-time subscribers who started strictly before the cutoff
-  // get a 50% bonus for streak months 1 and 2.
-  if (streakMonths <= 2 && isFirstTimeSubscriberEver) {
+  if (streakMonths === 1 && isFirstTimeSubscriberEver) {
+    return KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
+  }
+
+  // Limited-time grandfathered promo: first-time subscribers who started strictly before the
+  // cutoff keep the 50% bonus for streak month 2.
+  if (streakMonths === 2 && isFirstTimeSubscriberEver) {
     const startedAt = subscriptionStartedAtIso ?? null;
     if (startedAt != null) {
       const startedAtUtc = dayjs(startedAt).utc();
@@ -49,11 +53,6 @@ export const computeMonthlyCadenceBonusPercent = (params: {
       ) {
         return KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT;
       }
-    }
-
-    // Back-compat: if we don't have a start timestamp, still show the first month promo.
-    if (streakMonths === 1) {
-      return KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
     }
   }
 

@@ -31,6 +31,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Command,
@@ -46,6 +57,8 @@ import {
   Loader2,
   AlertTriangle,
   ChevronsUpDown,
+  ChevronUp,
+  ChevronDown,
   X,
   Rocket,
   Anchor,
@@ -54,6 +67,7 @@ import {
   Plus,
   Minus,
   Ban,
+  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { toastPinMutationResult } from '@/lib/kiloclaw/pin-sync-toast';
@@ -360,11 +374,51 @@ function StartRolloutButton({
   );
 }
 
+type SortColumn = 'openclaw_version' | 'image_tag' | 'status' | 'published_at';
+type SortDir = 'asc' | 'desc';
+
+function SortableHeader({
+  column,
+  label,
+  activeSort,
+  activeDir,
+  onSort,
+  className,
+}: {
+  column: SortColumn;
+  label: string;
+  activeSort: SortColumn;
+  activeDir: SortDir;
+  onSort: (column: SortColumn) => void;
+  className?: string;
+}) {
+  const active = activeSort === column;
+  const Icon = active ? (activeDir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown;
+  return (
+    <TableHead className={className}>
+      <button
+        type="button"
+        className={`hover:text-foreground inline-flex items-center gap-1 transition-colors ${
+          active ? 'text-foreground' : 'text-muted-foreground'
+        }`}
+        onClick={() => onSort(column)}
+      >
+        {label}
+        <Icon className={`h-3 w-3 ${active ? 'opacity-100' : 'opacity-50'}`} />
+      </button>
+    </TableHead>
+  );
+}
+
 export function VersionsTab() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'disabled'>('all');
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<SortColumn>('published_at');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const limit = 25;
 
   const { data, isLoading } = useQuery(
@@ -372,8 +426,18 @@ export function VersionsTab() {
       offset: page * limit,
       limit,
       status: statusFilter === 'all' ? undefined : statusFilter,
+      sortBy,
+      sortDir,
     })
   );
+
+  // Rows that are eligible for bulk disable on the current page. Excludes
+  // :latest (kiloclaw service refuses to disable it) and already-disabled
+  // rows (idempotent). Active candidates ARE eligible — disabling clears
+  // their rollout percent.
+  const eligibleRows = (data?.items ?? []).filter(v => v.status === 'available' && !v.is_latest);
+  const allEligibleSelected =
+    eligibleRows.length > 0 && eligibleRows.every(v => selectedTags.has(v.image_tag));
 
   // After any mutation that changes catalog state, invalidate both the
   // paginated list (table view) AND the active rollout query (hero panel).
@@ -397,6 +461,52 @@ export function VersionsTab() {
       },
     })
   );
+
+  const { mutateAsync: bulkDisable, isPending: isBulkDisabling } = useMutation(
+    trpc.admin.kiloclawVersions.bulkDisableVersions.mutationOptions({
+      onSuccess: result => {
+        const parts: string[] = [];
+        if (result.disabled.length) parts.push(`${result.disabled.length} disabled`);
+        if (result.skippedLatest.length)
+          parts.push(`${result.skippedLatest.length} skipped (:latest)`);
+        if (result.skippedAlreadyDisabled.length)
+          parts.push(`${result.skippedAlreadyDisabled.length} already disabled`);
+        if (result.notFound.length) parts.push(`${result.notFound.length} not found`);
+        if (result.errors.length) parts.push(`${result.errors.length} errored`);
+        const summary = parts.length > 0 ? parts.join(', ') : 'no changes';
+        if (result.errors.length > 0) {
+          toast.error(`Bulk disable: ${summary}`);
+        } else {
+          toast.success(`Bulk disable: ${summary}`);
+        }
+        invalidateRolloutState();
+        setSelectedTags(new Set());
+        setBulkConfirmOpen(false);
+      },
+      onError: err => {
+        toast.error(`Bulk disable failed: ${err.message}`);
+      },
+    })
+  );
+
+  // Clear selection when the page or filter changes — selected tags may no
+  // longer be in the visible list, and silently carrying them through a
+  // pagination click would be confusing.
+  const resetSelection = () => setSelectedTags(new Set());
+
+  // Click a sort header: same column flips direction, new column starts in
+  // the column's natural direction (desc for date/numericish, asc for text).
+  // Resets pagination + selection because the visible row set changes.
+  const handleSort = (column: SortColumn) => {
+    setPage(0);
+    resetSelection();
+    if (sortBy === column) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(column);
+      setSortDir(column === 'published_at' ? 'desc' : 'asc');
+    }
+  };
 
   const { mutateAsync: setRolloutPercent } = useMutation(
     trpc.admin.kiloclawVersions.setRolloutPercent.mutationOptions({
@@ -514,6 +624,7 @@ export function VersionsTab() {
             if (v === 'all' || v === 'available' || v === 'disabled') {
               setStatusFilter(v);
               setPage(0);
+              resetSelection();
             }
           }}
         >
@@ -531,17 +642,86 @@ export function VersionsTab() {
         </Button>
       </div>
 
+      {/* Bulk action bar — always rendered so the affordance is discoverable.
+          Empty state shows a muted hint; active state shows count + buttons. */}
+      {selectedTags.size === 0 ? (
+        <div className="text-muted-foreground border-border/60 flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-xs">
+          <Info className="h-3 w-3 opacity-60" />
+          <span>Use the checkboxes to select rows for bulk actions.</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2">
+          <span className="text-muted-foreground text-sm">{selectedTags.size} selected</span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 border-red-500/30 text-xs text-red-400 hover:bg-red-500/10"
+            onClick={() => setBulkConfirmOpen(true)}
+            disabled={isBulkDisabling}
+          >
+            <Ban className="mr-1 h-3 w-3" />
+            Disable selected
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs"
+            onClick={resetSelection}
+            disabled={isBulkDisabling}
+          >
+            Clear
+          </Button>
+        </div>
+      )}
+
       {/* Reference catalog table — :latest and candidate rows are accent-bordered */}
       <div className="overflow-hidden rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[1px]"></TableHead>
-              <TableHead>OpenClaw</TableHead>
-              <TableHead>Image Tag</TableHead>
+              <TableHead className="w-[40px]">
+                <Checkbox
+                  checked={allEligibleSelected}
+                  disabled={eligibleRows.length === 0}
+                  onCheckedChange={() => {
+                    if (allEligibleSelected) {
+                      resetSelection();
+                    } else {
+                      setSelectedTags(new Set(eligibleRows.map(v => v.image_tag)));
+                    }
+                  }}
+                  aria-label="Select all eligible versions"
+                />
+              </TableHead>
+              <SortableHeader
+                column="openclaw_version"
+                label="OpenClaw"
+                activeSort={sortBy}
+                activeDir={sortDir}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                column="image_tag"
+                label="Image Tag"
+                activeSort={sortBy}
+                activeDir={sortDir}
+                onSort={handleSort}
+              />
               <TableHead>Digest</TableHead>
-              <TableHead>State</TableHead>
-              <TableHead>Published</TableHead>
+              <SortableHeader
+                column="status"
+                label="State"
+                activeSort={sortBy}
+                activeDir={sortDir}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                column="published_at"
+                label="Published"
+                activeSort={sortBy}
+                activeDir={sortDir}
+                onSort={handleSort}
+              />
               <TableHead className="w-[140px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -565,6 +745,8 @@ export function VersionsTab() {
                   !isLatest && version.status === 'available' && version.rollout_percent > 0;
                 const isAvailable = version.status === 'available';
                 const isDisabled = version.status === 'disabled';
+                const isSelectable = isAvailable && !isLatest;
+                const isSelected = selectedTags.has(version.image_tag);
                 const accent = isLatest
                   ? 'border-l-4 border-l-blue-600'
                   : isCandidate
@@ -572,8 +754,25 @@ export function VersionsTab() {
                     : 'border-l-4 border-l-transparent';
                 return (
                   <TableRow key={version.id} className={accent}>
-                    {/* Spacer for the accent bar */}
-                    <TableCell className="p-0"></TableCell>
+                    <TableCell className="py-2">
+                      {isSelectable ? (
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => {
+                            setSelectedTags(prev => {
+                              const next = new Set(prev);
+                              if (next.has(version.image_tag)) {
+                                next.delete(version.image_tag);
+                              } else {
+                                next.add(version.image_tag);
+                              }
+                              return next;
+                            });
+                          }}
+                          aria-label={`Select ${version.image_tag}`}
+                        />
+                      ) : null}
+                    </TableCell>
                     <TableCell className="font-medium">
                       <div className="flex flex-col">
                         <span>{version.openclaw_version}</span>
@@ -751,7 +950,10 @@ export function VersionsTab() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage(p => p - 1)}
+              onClick={() => {
+                setPage(p => p - 1);
+                resetSelection();
+              }}
               disabled={page === 0}
             >
               Previous
@@ -759,7 +961,10 @@ export function VersionsTab() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage(p => p + 1)}
+              onClick={() => {
+                setPage(p => p + 1);
+                resetSelection();
+              }}
               disabled={page + 1 >= data.pagination.totalPages}
             >
               Next
@@ -767,6 +972,60 @@ export function VersionsTab() {
           </div>
         </div>
       )}
+
+      {/* Bulk disable confirmation. AlertDialog wraps Radix Dialog, which
+          fires onOpenChange for both Escape and overlay clicks. The wrapper
+          handler suppresses our own state flip while the mutation is in
+          flight, but Radix still processes the underlying event and would
+          flip its internal open state out from under React. Pass through
+          onEscapeKeyDown and onPointerDownOutside guards so Radix never
+          gets the chance.
+
+          AlertDialogAction is a plain Button (no DialogClose wrapper), so
+          the dialog dismisses through the mutation's onSuccess / onError
+          handlers calling setBulkConfirmOpen(false). */}
+      <AlertDialog
+        open={bulkConfirmOpen}
+        onOpenChange={open => {
+          if (!open && !isBulkDisabling) setBulkConfirmOpen(false);
+        }}
+      >
+        <AlertDialogContent
+          onEscapeKeyDown={e => {
+            if (isBulkDisabling) e.preventDefault();
+          }}
+          onPointerDownOutside={e => {
+            if (isBulkDisabling) e.preventDefault();
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Disable {selectedTags.size} version{selectedTags.size === 1 ? '' : 's'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedTags.size === 1 ? 'This image' : `These ${selectedTags.size} images`} will be
+              marked <code>status=&apos;disabled&apos;</code> and any in flight rollout on{' '}
+              {selectedTags.size === 1 ? 'it' : 'them'} will be cleared. New instances and unpinned
+              upgrades won&apos;t pick {selectedTags.size === 1 ? 'it' : 'them'} up. Already pinned
+              instances continue running their pinned image untouched.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkDisabling}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isBulkDisabling}
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={() => {
+                void bulkDisable({ imageTags: Array.from(selectedTags) });
+              }}
+            >
+              {isBulkDisabling
+                ? 'Disabling…'
+                : `Disable ${selectedTags.size} version${selectedTags.size === 1 ? '' : 's'}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

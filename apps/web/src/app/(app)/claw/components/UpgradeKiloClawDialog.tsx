@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowUpCircle, RotateCw } from 'lucide-react';
+import { ArrowUpCircle, Pin, RotateCw } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AnimatedDots } from './AnimatedDots';
 
@@ -20,11 +21,20 @@ export function UpgradeKiloClawDialog({
   onOpenChange,
   isPending,
   onConfirm,
+  pinnedImageTag,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isPending: boolean;
   onConfirm: () => void;
+  /**
+   * If the instance has a version pin, surface the override warning so the
+   * user understands clicking Upgrade will clear the pin. Pass `null` /
+   * `undefined` when there is no pin. Pin attribution (user vs admin) is
+   * intentionally not surfaced to end users — the consent action is the
+   * same either way.
+   */
+  pinnedImageTag?: string | null;
 }) {
   return (
     <Dialog open={open} onOpenChange={isPending ? undefined : onOpenChange}>
@@ -41,6 +51,15 @@ export function UpgradeKiloClawDialog({
             </DialogDescription>
           </div>
         </DialogHeader>
+        {pinnedImageTag && (
+          <Alert className="border-blue-500/50">
+            <Pin className="h-4 w-4 text-blue-500" />
+            <AlertDescription>
+              This instance has a version pin to <code className="text-xs">{pinnedImageTag}</code>
+              {'. Upgrading will remove the pin.'}
+            </AlertDescription>
+          </Alert>
+        )}
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
             Cancel

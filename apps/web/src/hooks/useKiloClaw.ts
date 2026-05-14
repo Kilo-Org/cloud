@@ -61,16 +61,6 @@ export function useRefreshDevicePairing() {
   };
 }
 
-export function useStreamChatCredentials(enabled: boolean) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
-      enabled,
-      staleTime: 5 * 60_000, // credentials don't change; avoid redundant refetches
-    })
-  );
-}
-
 export function useKiloClawGatewayStatus(enabled: boolean) {
   const trpc = useTRPC();
   return useQuery(
@@ -406,6 +396,15 @@ export function useKiloClawMutations() {
         },
       })
     ),
+    updateBriefingInterests: useMutation(
+      trpc.kiloclaw.updateBriefingInterests.mutationOptions({
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey(),
+          });
+        },
+      })
+    ),
     rename: useMutation(
       trpc.kiloclaw.renameInstance.mutationOptions({ onSuccess: invalidateStatus })
     ),
@@ -436,11 +435,13 @@ export function useKiloClawAvailableVersions(offset = 0, limit = 25) {
   );
 }
 
-export function useKiloClawMyPin() {
+export function useKiloClawMyPin(opts: { enabled?: boolean } = {}) {
+  const { enabled = true } = opts;
   const trpc = useTRPC();
   return useQuery(
     trpc.kiloclaw.getMyPin.queryOptions(undefined, {
       staleTime: 60_000, // pins don't change frequently
+      enabled,
     })
   );
 }

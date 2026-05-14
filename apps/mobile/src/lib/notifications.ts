@@ -2,7 +2,10 @@ import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { type Href, router } from 'expo-router';
 import { Platform } from 'react-native';
-import { z } from 'zod';
+
+import { type PushData, pushDataSchema } from '@kilocode/notifications';
+
+import { notificationPathForData } from './notification-path';
 
 function getProjectId(): string {
   const eas = expoConstants.expoConfig?.extra?.eas as { projectId?: string } | undefined;
@@ -13,30 +16,24 @@ function getProjectId(): string {
   return projectId;
 }
 
-// Tracks which chat instance screen is currently focused.
+// Tracks which conversation screen is currently focused.
 // Read by the foreground notification handler to suppress notifications
-// when the user is already viewing that chat.
+// when the user is already viewing that conversation.
 // A module-level variable (not React state) because the notification handler
 // is registered once and must always read the latest value without stale closures.
-let activeChatInstanceId: string | null = null;
+let activeChatLocation: { sandboxId: string; conversationId: string } | null = null;
 
-export function setActiveChatInstance(instanceId: string | null) {
-  activeChatInstanceId = instanceId;
+export function setActiveChatLocation(
+  location: { sandboxId: string; conversationId: string } | null
+) {
+  activeChatLocation = location;
 }
-
-// Keep in sync with data field in services/notifications/src/dos/NotificationChannelDO.ts
-const notificationDataSchema = z.object({
-  type: z.literal('chat'),
-  instanceId: z.string().min(1),
-});
-
-type NotificationData = z.infer<typeof notificationDataSchema>;
 
 // Runtime-validates that an arbitrary notification `data` payload matches the
 // shape we care about. Push producers can evolve independently of the app, so
 // always parse before reading fields from the OS-provided notification content.
-export function parseNotificationData(data: unknown): NotificationData | null {
-  const parsed = notificationDataSchema.safeParse(data);
+export function parseNotificationData(data: unknown): PushData | null {
+  const parsed = pushDataSchema.safeParse(data);
   return parsed.success ? parsed.data : null;
 }
 
@@ -62,8 +59,11 @@ export function setupNotificationHandler() {
     handleNotification: async notification => {
       const data = parseNotificationData(notification.request.content.data);
 
-      // Suppress only if the user is already viewing this exact chat
-      if (data && data.instanceId === activeChatInstanceId) {
+      if (
+        data?.type === 'chat.message' &&
+        activeChatLocation?.sandboxId === data.sandboxId &&
+        activeChatLocation.conversationId === data.conversationId
+      ) {
         return suppressed;
       }
 
@@ -82,19 +82,27 @@ export function getPendingNotificationLink(): string | null {
   return link;
 }
 
+function instanceChatPath(data: PushData | null): string | null {
+  if (!data) {
+    return null;
+  }
+  return notificationPathForData(data);
+}
+
 export function setupNotificationResponseHandler() {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
     const data = parseNotificationData(response.notification.request.content.data);
+    const path = instanceChatPath(data);
+    if (!path) {
+      return;
+    }
 
-    if (data) {
-      const path = `/(app)/chat/${data.instanceId}`;
-      // If the router is ready (has segments), navigate immediately.
-      // Otherwise store as pending for consumption after auth completes.
-      try {
-        router.replace(path as Href);
-      } catch {
-        pendingNotificationLink = path;
-      }
+    // If the router is ready (has segments), navigate immediately.
+    // Otherwise store as pending for consumption after auth completes.
+    try {
+      router.replace(path as Href);
+    } catch {
+      pendingNotificationLink = path;
     }
   });
 
@@ -108,9 +116,11 @@ export function checkInitialNotification(): void {
     return;
   }
   const data = parseNotificationData(response.notification.request.content.data);
-  if (data) {
-    pendingNotificationLink = `/(app)/chat/${data.instanceId}`;
+  const path = instanceChatPath(data);
+  if (path) {
+    pendingNotificationLink = path;
   }
+  Notifications.clearLastNotificationResponse();
 }
 
 export async function registerForPushNotifications(): Promise<string | null> {

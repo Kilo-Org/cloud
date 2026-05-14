@@ -74,7 +74,7 @@ brew install --cask docker
 
 **Important:** Open Docker Desktop at least once after installation — it configures the CLI tools needed for `docker compose`.
 
-### Vercel CLI
+### Vercel CLI (recommended if you have access)
 
 Used to pull environment variables from the Vercel project:
 
@@ -83,6 +83,8 @@ pnpm add -g vercel
 ```
 
 ### Stripe CLI (optional, for payment testing)
+
+Install it to enable local Stripe webhook forwarding. `pnpm dev:start` skips the Stripe forwarder when the CLI is not installed.
 
 ```bash
 brew install stripe/stripe-cli/stripe
@@ -108,6 +110,8 @@ git lfs pull
 
 ### 3. Set up environment variables
 
+#### a. Set up using Vercel
+
 The project pulls environment variables from Vercel. Run these commands interactively (each will prompt for browser-based authentication):
 
 ```bash
@@ -124,6 +128,20 @@ The KiloClaw pages (`/claw/*`) render the Pylon support chat widget, which requi
 - `PYLON_IDENTITY_SECRET` — the identity verification secret used to HMAC-sign user emails
 
 Both are already present in Vercel and pulled by `vercel env pull`. If either is missing the widget is silently skipped, so local dev continues to work without Pylon configured.
+
+#### b. Set up manually
+
+If you do not have Vercel access (typical for non-Kilo-employees), you will need to set up the `.env.local` file manually.
+
+Copy `.env.local.example` to `.env.local`, then update the following variables in `.env.local`:
+
+- `NEXTAUTH_SECRET`: Generate a random secret with `openssl rand -base64 32`
+- `INTERNAL_API_SECRET`: Generate a random secret with `openssl rand -base64 32`
+- `STRIPE_SECRET_KEY` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`: These must be set to create a fake account. You can use an existing Stripe account or create a new one, and use the keys from Sandbox Mode (formerly Test Mode) here.
+
+Then copy `.env.development.local.example` to `.env.development.local`.
+
+These changes will allow you to do local testing with a fake account.
 
 ### 4. Start the database
 
@@ -147,13 +165,26 @@ pnpm drizzle migrate
 
 You need to re-run this every time you pull new migrations from the repository.
 
+If you want to fully reset the local dev database first, use:
+
+```bash
+pnpm dev:db:reset
+pnpm drizzle migrate
+```
+
+To smoke-test that migrations still bootstrap correctly from a fresh empty database, run:
+
+```bash
+pnpm drizzle:verify-bootstrap
+```
+
 ### 6. Start the development server
 
 ```bash
 pnpm dev:start
 ```
 
-This launches a tmux dashboard with the Next.js app and related services. The web app will be available at http://localhost:3000.
+This launches a tmux dashboard with the Next.js app and local infrastructure. When the Stripe CLI is installed, it also starts the Stripe webhook forwarder. The web app will be available at http://localhost:3000.
 
 To stop all services:
 
@@ -173,21 +204,23 @@ All tests should pass against the local PostgreSQL database.
 
 ## Common Development Commands
 
-| Command                    | Description                                                                                       |
-| -------------------------- | ------------------------------------------------------------------------------------------------- |
-| `pnpm dev:start`           | Start all local services in a tmux dashboard                                                      |
-| `pnpm dev:stop`            | Stop the tmux session and all services                                                            |
-| `pnpm dev:env`             | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
-| `pnpm test`                | Run the Jest test suite                                                                           |
-| `pnpm typecheck`           | Run the TypeScript type checker                                                                   |
-| `pnpm lint`                | Lint all source files                                                                             |
-| `pnpm format`              | Format all supported files with oxfmt                                                             |
-| `pnpm format:changed`      | Format only files changed since `main`                                                            |
-| `pnpm validate`            | Run typecheck, lint, and tests                                                                    |
-| `pnpm drizzle migrate`     | Apply pending database migrations                                                                 |
-| `pnpm drizzle generate`    | Generate a new migration after schema changes                                                     |
-| `pnpm --filter web stripe` | Start Stripe webhook forwarding to localhost                                                      |
-| `pnpm test:e2e`            | Run Playwright end-to-end tests                                                                   |
+| Command                         | Description                                                                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev:start`                | Start all local services in a tmux dashboard                                                                              |
+| `pnpm dev:stop`                 | Stop the tmux session and all services                                                                                    |
+| `pnpm dev:env`                  | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup))                         |
+| `pnpm test`                     | Run the Jest test suite                                                                                                   |
+| `pnpm typecheck`                | Run the TypeScript type checker                                                                                           |
+| `pnpm lint`                     | Lint all source files                                                                                                     |
+| `pnpm format`                   | Format all supported files with oxfmt                                                                                     |
+| `pnpm format:changed`           | Format only files changed since `main`                                                                                    |
+| `pnpm validate`                 | Run typecheck, lint, and tests                                                                                            |
+| `pnpm drizzle migrate`          | Apply pending database migrations                                                                                         |
+| `pnpm drizzle generate`         | Generate a new migration after schema changes                                                                             |
+| `pnpm drizzle:verify-bootstrap` | Create a temporary empty database and verify `pnpm drizzle migrate` bootstraps it cleanly                                 |
+| `pnpm dev:db:reset`             | Drop all app-owned schemas in the local dev database, recreate `public`, and leave the DB truly empty before re-migrating |
+| `pnpm --filter web stripe`      | Start Stripe webhook forwarding to localhost                                                                              |
+| `pnpm test:e2e`                 | Run Playwright end-to-end tests                                                                                           |
 
 ## Git Workflow
 
@@ -198,13 +231,11 @@ All tests should pass against the local PostgreSQL database.
 
 To test Stripe integration locally:
 
-1. Log in to Stripe CLI: `stripe login`
-2. Start the webhook forwarder: `pnpm stripe`
-3. Copy the webhook signing secret from the CLI output
-4. Add it to `.env.development.local`:
-   ```
-   STRIPE_WEBHOOK_SECRET="whsec_..."
-   ```
+1. Install and log in to Stripe CLI: `stripe login`
+2. Start local development: `pnpm dev:start`
+3. The dev launcher starts the webhook forwarder and writes `STRIPE_WEBHOOK_SECRET` to `apps/web/.env.development.local`.
+
+If the Stripe CLI is not installed, `pnpm dev:start` skips webhook forwarding. To run only the webhook forwarder manually, use `pnpm --filter web stripe`.
 
 ## Database Schema Changes
 

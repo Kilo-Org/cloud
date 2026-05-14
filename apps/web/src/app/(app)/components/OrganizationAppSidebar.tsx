@@ -25,7 +25,6 @@ import {
   Webhook,
   Settings,
   MessageSquare,
-  MessagesSquare,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -58,7 +57,7 @@ export default function OrganizationAppSidebar({
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
-  const isKiloChatEnabled = useFeatureFlagEnabled('kilo-chat-feature');
+  const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Get current organization role and data
@@ -142,15 +141,6 @@ export default function OrganizationAppSidebar({
       icon: MessageSquare,
       url: `/organizations/${organizationId}/claw/chat`,
     },
-    ...(isKiloChatEnabled || isDevelopment
-      ? [
-          {
-            title: 'Kilo Chat',
-            icon: MessagesSquare,
-            url: `/organizations/${organizationId}/claw/kilo-chat`,
-          },
-        ]
-      : []),
     {
       title: 'Settings',
       icon: Settings,
@@ -170,11 +160,15 @@ export default function OrganizationAppSidebar({
     url: string;
     className?: string;
   }> = [
-    {
-      title: 'App Builder',
-      icon: Plus,
-      url: `/organizations/${organizationId}/app-builder`,
-    },
+    ...(isAppBuilderEnabled || isDevelopment
+      ? [
+          {
+            title: 'App Builder',
+            icon: Plus,
+            url: `/organizations/${organizationId}/app-builder`,
+          },
+        ]
+      : []),
     {
       title: 'Cloud Agent',
       icon: Cloud,
@@ -210,13 +204,15 @@ export default function OrganizationAppSidebar({
       icon: Shield,
       url: `/organizations/${organizationId}/security-agent`,
     },
-    {
-      title: 'Auto Triage',
-      icon: ListChecks,
-      url: `/organizations/${organizationId}/auto-triage`,
-    },
     ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [{ title: 'Auto Fix', icon: Wrench, url: `/organizations/${organizationId}/auto-fix` }]
+      ? [
+          {
+            title: 'Auto Triage',
+            icon: ListChecks,
+            url: `/organizations/${organizationId}/auto-triage`,
+          },
+          { title: 'Auto Fix', icon: Wrench, url: `/organizations/${organizationId}/auto-fix` },
+        ]
       : []),
     ...(ENABLE_DEPLOY_FEATURE
       ? [

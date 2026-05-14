@@ -35,6 +35,11 @@ export function createMockEnv(overrides: Partial<KiloClawEnv> = {}): KiloClawEnv
     } as unknown as KiloClawEnv['KILOCLAW_CONTROLLER_AE'],
     HYPERDRIVE: {} as unknown as KiloClawEnv['HYPERDRIVE'],
     KV_CLAW_CACHE: createMockKV(),
+    // Per-instance virtual-hosting config defaults. Tests that want to
+    // exercise the "missing config" path should explicitly set these to
+    // undefined via the overrides.
+    KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+    KILOCLAW_INSTANCE_URL_SCHEME: 'https',
     ...overrides,
   };
 }

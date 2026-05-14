@@ -15,12 +15,14 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 import { getCookie, deleteCookie } from 'hono/cookie';
+import type { z } from 'zod';
+import { sandboxIdSchema, type chatWebhookSchema } from '@kilocode/kilo-chat';
 
-import { chatWebhookRpcSchema } from '@kilocode/kilo-chat';
 import type { AppEnv, KiloClawEnv, ChatWebhookPayload } from './types';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform, controller } from './routes';
 import { handleSnapshotRestoreQueue } from './queue/snapshot-restore';
+import { runScheduledActionNoticesSweep } from './scheduled/scheduled-action-notices';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { deriveGatewayToken } from './auth/gateway-token';
@@ -36,9 +38,14 @@ import { registerVersionIfNeeded } from './lib/image-version';
 import { resolveDoKeyForUser } from './lib/instance-routing';
 import { startingUpPage } from './pages/starting-up';
 import { buildForwardHeaders } from './utils/proxy-headers';
+import {
+  hostMatchesInstanceSuffix,
+  parseInstanceHost,
+  sandboxIdFromHostnameLabel,
+} from './auth/hostname-label';
+import { WORKER_CONTROLLER_CAPABILITIES_VERSION } from './config';
 import { KILOCLAW_ACTIVE_INSTANCE_COOKIE } from './config';
 import { timingMiddleware } from './middleware/analytics';
-import { writeEvent } from './utils/analytics';
 import type { RegistryEntry } from './durable-objects/kiloclaw-registry';
 import type { ProviderRoutingTarget } from './providers/types';
 
@@ -125,6 +132,11 @@ function validateRequiredEnv(env: KiloClawEnv): string[] {
   const missing: string[] = [];
   if (!env.NEXTAUTH_SECRET) missing.push('NEXTAUTH_SECRET');
   if (!env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
+  // Per-instance virtual-hosting config. Canonical values live in
+  // wrangler.jsonc `vars`; when unset (e.g. a misconfigured preview),
+  // reject requests rather than silently fall back to prod defaults.
+  if (!env.KILOCLAW_INSTANCE_HOST_SUFFIX) missing.push('KILOCLAW_INSTANCE_HOST_SUFFIX');
+  if (!env.KILOCLAW_INSTANCE_URL_SCHEME) missing.push('KILOCLAW_INSTANCE_URL_SCHEME');
   return missing;
 }
 
@@ -144,6 +156,153 @@ function missingGoogleBrokerEnv(env: KiloClawEnv): string[] {
 
 function routingTargetUrl(target: ProviderRoutingTarget, pathname: string, search = ''): string {
   return `${target.origin}${pathname}${search}`;
+}
+
+/**
+ * Forward an HTTP or WebSocket request through to a provider-routed target.
+ *
+ * Shared by all four catch-all proxy branches (`/i/:instanceId/*`, host-based,
+ * cookie-routed, and default personal). `logTag` is prepended to console logs
+ * so failing requests can be traced back to their originating branch.
+ *
+ * Optional `unreachableHint` / `startingUpHint` are attached to the 503 JSON
+ * bodies the helper emits when the upstream fetch fails or the container is
+ * still booting. Only the default-personal branch surfaces hints today (tests
+ * assert the specific strings); branches that prefer the bare error
+ * (`{ "error": "Instance not reachable" }`) just omit them.
+ */
+async function proxyThroughTarget(opts: {
+  request: Request;
+  targetUrl: string;
+  forwardHeaders: Headers;
+  logTag: string;
+  unreachableHint?: string;
+  startingUpHint?: string;
+}): Promise<Response> {
+  const { request, targetUrl, forwardHeaders, logTag, unreachableHint, startingUpHint } = opts;
+  const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
+
+  const unreachableBody: Record<string, string> = { error: 'Instance not reachable' };
+  if (unreachableHint) unreachableBody.hint = unreachableHint;
+  const startingUpBody: Record<string, string> = { error: 'Instance is starting up' };
+  if (startingUpHint) startingUpBody.hint = startingUpHint;
+
+  if (isWebSocketRequest) {
+    let containerResponse: Response;
+    try {
+      containerResponse = await fetch(targetUrl, { headers: forwardHeaders });
+    } catch (err) {
+      console.error(`${logTag} WS fetch failed:`, err);
+      return Response.json(unreachableBody, {
+        status: 503,
+        headers: { 'Retry-After': '5' },
+      });
+    }
+
+    if (containerResponse.status === 502) {
+      return Response.json(startingUpBody, {
+        status: 503,
+        headers: { 'Retry-After': '5' },
+      });
+    }
+
+    const containerWs = containerResponse.webSocket;
+    if (!containerWs) {
+      // Upstream returned a non-upgrade response to a WebSocket request.
+      // Normalize to 502 JSON rather than leaking the raw upstream body —
+      // this path is only hit when the container is in a bad state
+      // (gateway crash, proxy misconfig) and the raw response may contain
+      // provider/controller error details we don't want to surface to
+      // the Control UI.
+      console.warn(`${logTag} upstream did not upgrade (status ${containerResponse.status})`);
+      return Response.json({ error: 'WebSocket upgrade failed' }, { status: 502 });
+    }
+
+    const [clientWs, serverWs] = Object.values(new WebSocketPair());
+    serverWs.accept();
+    containerWs.accept();
+
+    let droppedToContainer = 0;
+    let droppedToClient = 0;
+
+    serverWs.addEventListener('message', event => {
+      if (containerWs.readyState === WebSocket.OPEN) {
+        containerWs.send(event.data as string | ArrayBuffer);
+      } else {
+        droppedToContainer++;
+        if (droppedToContainer === 1) {
+          console.warn(
+            `${logTag} First dropped client->container message (readyState:`,
+            containerWs.readyState,
+            ')'
+          );
+        }
+      }
+    });
+    containerWs.addEventListener('message', event => {
+      const data = transformWsMessage(event.data as string | ArrayBuffer);
+      if (serverWs.readyState === WebSocket.OPEN) {
+        serverWs.send(data);
+      } else {
+        droppedToClient++;
+        if (droppedToClient === 1) {
+          console.warn(
+            `${logTag} First dropped container->client message (readyState:`,
+            serverWs.readyState,
+            ')'
+          );
+        }
+      }
+    });
+
+    const logDropSummary = () => {
+      const totalDropped = droppedToClient + droppedToContainer;
+      if (totalDropped > 0) {
+        console.warn(
+          `${logTag} Connection closed with`,
+          totalDropped,
+          'dropped messages (toClient:',
+          droppedToClient,
+          'toContainer:',
+          droppedToContainer,
+          ')'
+        );
+      }
+    };
+
+    serverWs.addEventListener('close', event => {
+      logDropSummary();
+      safeClose(containerWs, event.code, event.reason);
+    });
+    containerWs.addEventListener('close', event => {
+      logDropSummary();
+      safeClose(serverWs, event.code, sanitizeCloseReason(event.reason));
+    });
+    serverWs.addEventListener('error', () => safeClose(containerWs, 1011, 'Client error'));
+    containerWs.addEventListener('error', () => safeClose(serverWs, 1011, 'Container error'));
+
+    return new Response(null, { status: 101, webSocket: clientWs });
+  }
+
+  // HTTP proxy. Buffer body upfront so streams aren't consumed mid-retry.
+  const requestBody = request.body ? await request.arrayBuffer() : null;
+  try {
+    const httpResponse = await fetch(targetUrl, {
+      method: request.method,
+      headers: forwardHeaders,
+      body: requestBody,
+    });
+    if (httpResponse.status === 502) {
+      return startingUpPage();
+    }
+    return httpResponse;
+  } catch (err) {
+    console.error(`${logTag} HTTP fetch failed:`, err);
+    return Response.json(unreachableBody, {
+      status: 503,
+      headers: { 'Retry-After': '5' },
+    });
+  }
 }
 
 // =============================================================================
@@ -367,117 +526,12 @@ app.all('/i/:instanceId/*', async c => {
     status.runtimeId
   );
 
-  const isWebSocketRequest = c.req.raw.headers.get('Upgrade')?.toLowerCase() === 'websocket';
-
-  if (isWebSocketRequest) {
-    let containerResponse: Response;
-    try {
-      containerResponse = await fetch(targetUrl, { headers: forwardHeaders });
-    } catch (err) {
-      console.error('[PROXY /i] Fly Proxy fetch failed:', err);
-      return c.json(
-        { error: 'Instance not reachable' },
-        { status: 503, headers: { 'Retry-After': '5' } }
-      );
-    }
-
-    if (containerResponse.status === 502) {
-      return c.json(
-        { error: 'Instance is starting up' },
-        { status: 503, headers: { 'Retry-After': '5' } }
-      );
-    }
-
-    const containerWs = containerResponse.webSocket;
-    if (!containerWs) {
-      return containerResponse;
-    }
-
-    const [clientWs, serverWs] = Object.values(new WebSocketPair());
-    serverWs.accept();
-    containerWs.accept();
-
-    let droppedToContainer = 0;
-    let droppedToClient = 0;
-
-    serverWs.addEventListener('message', event => {
-      if (containerWs.readyState === WebSocket.OPEN) {
-        containerWs.send(event.data as string | ArrayBuffer);
-      } else {
-        droppedToContainer++;
-        if (droppedToContainer === 1) {
-          console.warn(
-            '[WS /i] First dropped client->container message (readyState:',
-            containerWs.readyState,
-            ')'
-          );
-        }
-      }
-    });
-    containerWs.addEventListener('message', event => {
-      const data = transformWsMessage(event.data as string | ArrayBuffer);
-      if (serverWs.readyState === WebSocket.OPEN) {
-        serverWs.send(data);
-      } else {
-        droppedToClient++;
-        if (droppedToClient === 1) {
-          console.warn(
-            '[WS /i] First dropped container->client message (readyState:',
-            serverWs.readyState,
-            ')'
-          );
-        }
-      }
-    });
-
-    const logDropSummary = () => {
-      const totalDropped = droppedToClient + droppedToContainer;
-      if (totalDropped > 0) {
-        console.warn(
-          '[WS /i] Connection closed with',
-          totalDropped,
-          'dropped messages (toClient:',
-          droppedToClient,
-          'toContainer:',
-          droppedToContainer,
-          ')'
-        );
-      }
-    };
-
-    serverWs.addEventListener('close', event => {
-      logDropSummary();
-      safeClose(containerWs, event.code, event.reason);
-    });
-    containerWs.addEventListener('close', event => {
-      logDropSummary();
-      safeClose(serverWs, event.code, sanitizeCloseReason(event.reason));
-    });
-    serverWs.addEventListener('error', () => safeClose(containerWs, 1011, 'Client error'));
-    containerWs.addEventListener('error', () => safeClose(serverWs, 1011, 'Container error'));
-
-    return new Response(null, { status: 101, webSocket: clientWs });
-  }
-
-  // HTTP proxy
-  const requestBody = c.req.raw.body ? await c.req.raw.arrayBuffer() : null;
-  try {
-    const httpResponse = await fetch(targetUrl, {
-      method: c.req.raw.method,
-      headers: forwardHeaders,
-      body: requestBody,
-    });
-    if (httpResponse.status === 502) {
-      return startingUpPage();
-    }
-    return httpResponse;
-  } catch (err) {
-    console.error('[PROXY /i] HTTP fetch failed:', err);
-    return c.json(
-      { error: 'Instance not reachable' },
-      { status: 503, headers: { 'Retry-After': '5' } }
-    );
-  }
+  return proxyThroughTarget({
+    request: c.req.raw,
+    targetUrl,
+    forwardHeaders,
+    logTag: '[PROXY /i]',
+  });
 });
 
 // =============================================================================
@@ -535,70 +589,6 @@ async function resolveRegistryEntry(c: Context<AppEnv>) {
 }
 
 /**
- * Attempt crash recovery: if the user's instance has status 'running' but
- * the machine is dead, call start() to restart it transparently.
- */
-async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
-  const userId = c.get('userId');
-  if (!userId) return false;
-  const startedAt = performance.now();
-
-  try {
-    const resolved = await resolveRegistryEntry(c);
-    if (!resolved) return false;
-    const { entry } = resolved;
-    const getStub = () =>
-      c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(entry.doKey));
-    const status = await withDORetry(
-      getStub,
-      stub => stub.getStatus(),
-      'KiloClawInstance.getStatus'
-    );
-
-    if (status.status !== 'running') {
-      return false;
-    }
-
-    // Machine dead despite running status -- restart
-    console.log('[PROXY] Instance status is running but machine unreachable, restarting');
-    const { started } = await withDORetry(
-      getStub,
-      stub => stub.start(userId, { reason: 'crash_recovery' }),
-      'KiloClawInstance.start'
-    );
-    if (started) {
-      const freshStatus = await withDORetry(
-        getStub,
-        stub => stub.getStatus(),
-        'KiloClawInstance.getStatus'
-      );
-      writeEvent(c.env, {
-        event: 'instance.crash_recovery_succeeded',
-        delivery: 'http',
-        userId,
-        sandboxId: freshStatus.sandboxId ?? undefined,
-        flyMachineId: freshStatus.flyMachineId ?? undefined,
-        flyAppName: freshStatus.flyAppName ?? undefined,
-        status: freshStatus.status ?? undefined,
-        durationMs: performance.now() - startedAt,
-      });
-    }
-    return true;
-  } catch (err) {
-    writeEvent(c.env, {
-      event: 'instance.crash_recovery_failed',
-      delivery: 'http',
-      userId,
-      sandboxId: c.get('sandboxId') ?? undefined,
-      error: err instanceof Error ? err.message : String(err),
-      durationMs: performance.now() - startedAt,
-    });
-    console.error('[PROXY] Crash recovery failed:', err);
-  }
-  return false;
-}
-
-/**
  * Resolve the active provider runtime id, sandboxId, and status for the current user from their DO.
  * Returns null runtimeId if the instance is destroying (blocks proxy during teardown).
  * Routes through the user registry, which triggers lazy migration on first access.
@@ -636,6 +626,185 @@ async function resolveInstance(c: Context<AppEnv>): Promise<{
   };
 }
 
+/**
+ * Reserved hostname labels under the instance-host suffix that are NOT
+ * per-instance virtual hosts. Requests to these land on the worker via
+ * the `*.kiloclaw.ai/*` wildcard route but must be served by
+ * earlier-registered routes (controller check-in, future platform
+ * endpoints) rather than the host-based proxy branch.
+ *
+ * Keeping this set small and explicit prevents accidental routing: a
+ * request to `claw.kiloclaw.ai/someuserpath` will fall through the
+ * host-based branch to cookie/default routing instead of 404ing with an
+ * "instance not found" that's actually a configuration misunderstanding.
+ */
+const RESERVED_INSTANCE_HOST_LABELS = new Set<string>(['claw']);
+
+/**
+ * Resolve the DO key that a host-routed request should proxy to.
+ *
+ *   `i-<32hex>.<suffix>` → key the DO by the decoded instanceId (UUID).
+ *   `u-<base32hex>.<suffix>` → key the DO by the decoded userId (legacy).
+ *
+ * Returns null when the label can't be parsed — caller returns 404 so we
+ * don't accidentally proxy to something like `marketing.kiloclaw.ai`.
+ */
+function resolveHostRouteDoKey(label: string): { doKey: string; sandboxId: string } | null {
+  const sandboxId = sandboxIdFromHostnameLabel(label);
+  if (!sandboxId) return null;
+  if (isInstanceKeyedSandboxId(sandboxId)) {
+    return { doKey: instanceIdFromSandboxId(sandboxId), sandboxId };
+  }
+  return { doKey: userIdFromSandboxId(sandboxId), sandboxId };
+}
+
+/**
+ * Host-based proxy branch. Runs before the cookie check. Returns the final
+ * response when the request host matches the configured instance suffix, or
+ * `null` to let subsequent routing (cookie/default) handle it.
+ *
+ * Behaviour:
+ *   - host doesn't match suffix → null (fall through to cookie branch)
+ *   - label unparseable → 404
+ *   - DO resolves to an instance owned by another user → 403
+ *   - instance destroyed / restoring / recovering → 409
+ *   - instance not provisioned / no runtime → 404
+ *   - capability version < current (v1 machines lack the per-instance origin
+ *     in their openclaw allowlist, so WS upgrades would fail origin check)
+ *     → 404 with a restart hint so the user knows the per-instance host
+ *     needs a machine restart; the legacy host keeps working meanwhile
+ *   - otherwise → proxy via `proxyThroughTarget`
+ */
+async function handleHostBasedRoute(c: Context<AppEnv>): Promise<Response | null> {
+  const request = c.req.raw;
+  const url = new URL(request.url);
+  if (!hostMatchesInstanceSuffix(url.host, c.env)) return null;
+
+  // Within the instance-host space. Anything the label parser rejects
+  // (bare suffix, multi-label, unparseable label) 404s here rather than
+  // falling through to default-personal routing — users on `*.kiloclaw.ai`
+  // are bound to a specific instance by the URL.
+  const label = parseInstanceHost(url.host, c.env);
+  if (!label) {
+    return c.json({ error: 'Instance not found' }, 404);
+  }
+
+  // Reserved labels (e.g. `claw` for controller check-in, platform health
+  // probes) are served by earlier-registered routes. If we've reached the
+  // catch-all on a reserved label the path wasn't a controller/platform
+  // route — return null so the cookie/default branches handle it rather
+  // than 404ing with a misleading "instance not found".
+  if (RESERVED_INSTANCE_HOST_LABELS.has(label)) {
+    return null;
+  }
+
+  const userId = c.get('userId');
+  if (!userId) {
+    return c.json({ error: 'Authentication required' }, 401);
+  }
+
+  const resolved = resolveHostRouteDoKey(label);
+  if (!resolved) {
+    return c.json({ error: 'Instance not found' }, 404);
+  }
+
+  if (!c.env.GATEWAY_TOKEN_SECRET) {
+    return c.json(
+      { error: 'Configuration error' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
+
+  const getHostStub = () =>
+    c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(resolved.doKey));
+  const status = await withDORetry(
+    getHostStub,
+    stub => stub.getStatus(),
+    'KiloClawInstance.getStatus'
+  );
+
+  // Non-existent instance (DO was never populated) — 404 to avoid leaking
+  // existence via 403/404 distinction.
+  if (!status.userId) {
+    return c.json({ error: 'Instance not found' }, 404);
+  }
+
+  if (status.userId !== userId) {
+    return c.json({ error: 'Access denied' }, 403);
+  }
+
+  // Capability gate. v1 machines don't have `<label>.<suffix>` in their
+  // OPENCLAW_ALLOWED_ORIGINS, so WebSocket upgrades from this host would be
+  // rejected by openclaw's exact-match origin check. Refuse the request on
+  // the per-instance host so broken-at-runtime traffic never reaches the
+  // machine; the user can continue via the legacy host
+  // (`claw.kilosessions.ai`) and the instance rolls onto v2 on its next
+  // restart.
+  const version = status.controllerCapabilitiesVersion ?? 1;
+  if (version < WORKER_CONTROLLER_CAPABILITIES_VERSION) {
+    return c.json(
+      {
+        error: 'Instance not available on this host',
+        hint: 'This instance needs a restart before it can be reached at its per-instance hostname. Use the legacy URL for now.',
+      },
+      404
+    );
+  }
+
+  if (status.status === 'destroying') {
+    return c.json({ error: 'Instance is being destroyed' }, 409);
+  }
+  if (status.status === 'restoring') {
+    return c.json({ error: 'Instance is restoring from a snapshot' }, 409);
+  }
+  if (status.status === 'recovering') {
+    return c.json({ error: 'Instance is recovering from an unexpected stop' }, 409);
+  }
+  if (!status.runtimeId) {
+    return c.json({ error: 'Instance not provisioned' }, 404);
+  }
+  if (!status.sandboxId) {
+    return c.json({ error: 'Instance has no sandboxId' }, 500);
+  }
+
+  const routingTarget = await withDORetry(
+    getHostStub,
+    stub => stub.getRoutingTarget(),
+    'KiloClawInstance.getRoutingTarget'
+  );
+  if (!routingTarget) {
+    return c.json(
+      { error: 'Instance not routable' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
+
+  const targetUrl = routingTargetUrl(routingTarget, url.pathname, url.search);
+  const forwardHeaders = await buildForwardHeaders({
+    requestHeaders: request.headers,
+    sandboxId: status.sandboxId,
+    gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+    providerHeaders: routingTarget.headers,
+  });
+
+  console.log(
+    '[PROXY host]',
+    'Handling request:',
+    url.pathname,
+    'label:',
+    label,
+    'runtime:',
+    status.runtimeId
+  );
+
+  return proxyThroughTarget({
+    request,
+    targetUrl,
+    forwardHeaders,
+    logTag: '[PROXY host]',
+  });
+}
+
 app.all('*', async c => {
   // Auth gate: middleware-derived sandboxId proves the user is authenticated.
   if (!c.get('sandboxId')) {
@@ -644,6 +813,14 @@ app.all('*', async c => {
       401
     );
   }
+
+  // Host-based routing: when the request arrives on a configured per-instance
+  // virtual host (e.g. `i-<hex>.kiloclaw.ai`), resolve the owning DO from the
+  // label rather than from the active-instance cookie. Takes precedence over
+  // the cookie-based branch — users on `<label>.kiloclaw.ai` are bound to
+  // that instance by the URL, not by cookie state.
+  const hostRouteResponse = await handleHostBasedRoute(c);
+  if (hostRouteResponse) return hostRouteResponse;
 
   // Cookie-based instance routing: when the user opened an instance-keyed
   // instance via the access gateway, the active-instance cookie is set.
@@ -737,117 +914,12 @@ app.all('*', async c => {
             providerHeaders: routingTarget.headers,
           });
 
-          const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
-
-          if (isWebSocketRequest) {
-            let containerResponse: Response;
-            try {
-              containerResponse = await fetch(targetUrl, { headers: forwardHeaders });
-            } catch (err) {
-              console.error('[PROXY] Cookie-routed WS fetch failed:', err);
-              return c.json(
-                { error: 'Instance not reachable' },
-                { status: 503, headers: { 'Retry-After': '5' } }
-              );
-            }
-
-            if (containerResponse.status === 502) {
-              return c.json(
-                { error: 'Instance is starting up' },
-                { status: 503, headers: { 'Retry-After': '5' } }
-              );
-            }
-
-            const containerWs = containerResponse.webSocket;
-            if (!containerWs) {
-              return c.json({ error: 'WebSocket upgrade failed' }, 502);
-            }
-            containerWs.accept();
-            const [clientWs, serverWs] = Object.values(new WebSocketPair());
-            serverWs.accept();
-
-            let cookieDroppedToContainer = 0;
-            let cookieDroppedToClient = 0;
-
-            serverWs.addEventListener('message', event => {
-              if (containerWs.readyState === WebSocket.OPEN) {
-                containerWs.send(event.data as string | ArrayBuffer);
-              } else {
-                cookieDroppedToContainer++;
-                if (cookieDroppedToContainer === 1) {
-                  console.warn(
-                    '[WS cookie] First dropped client->container message (readyState:',
-                    containerWs.readyState,
-                    ')'
-                  );
-                }
-              }
-            });
-            containerWs.addEventListener('message', event => {
-              const data = transformWsMessage(event.data as string | ArrayBuffer);
-              if (serverWs.readyState === WebSocket.OPEN) {
-                serverWs.send(data);
-              } else {
-                cookieDroppedToClient++;
-                if (cookieDroppedToClient === 1) {
-                  console.warn(
-                    '[WS cookie] First dropped container->client message (readyState:',
-                    serverWs.readyState,
-                    ')'
-                  );
-                }
-              }
-            });
-
-            const logCookieDropSummary = () => {
-              const totalDropped = cookieDroppedToClient + cookieDroppedToContainer;
-              if (totalDropped > 0) {
-                console.warn(
-                  '[WS cookie] Connection closed with',
-                  totalDropped,
-                  'dropped messages (toClient:',
-                  cookieDroppedToClient,
-                  'toContainer:',
-                  cookieDroppedToContainer,
-                  ')'
-                );
-              }
-            };
-
-            serverWs.addEventListener('close', event => {
-              logCookieDropSummary();
-              safeClose(containerWs, event.code, event.reason);
-            });
-            containerWs.addEventListener('close', event => {
-              logCookieDropSummary();
-              safeClose(serverWs, event.code, sanitizeCloseReason(event.reason));
-            });
-            serverWs.addEventListener('error', () => safeClose(containerWs, 1011, 'Client error'));
-            containerWs.addEventListener('error', () =>
-              safeClose(serverWs, 1011, 'Container error')
-            );
-            return new Response(null, { status: 101, webSocket: clientWs });
-          }
-
-          // HTTP proxy
-          const requestBody = request.body ? await request.arrayBuffer() : null;
-          try {
-            const httpResponse = await fetch(targetUrl, {
-              method: request.method,
-              headers: forwardHeaders,
-              body: requestBody,
-            });
-            if (httpResponse.status === 502) {
-              return startingUpPage();
-            }
-            return httpResponse;
-          } catch (err) {
-            console.error('[PROXY] Cookie-routed HTTP fetch failed:', err);
-            return c.json(
-              { error: 'Instance not reachable' },
-              { status: 503, headers: { 'Retry-After': '5' } }
-            );
-          }
+          return proxyThroughTarget({
+            request,
+            targetUrl,
+            forwardHeaders,
+            logTag: '[PROXY cookie]',
+          });
         }
       }
     }
@@ -911,11 +983,9 @@ app.all('*', async c => {
   if (!routingTarget) {
     return c.json({ error: 'Instance not routable' }, 503);
   }
-  let targetUrl = routingTargetUrl(routingTarget, url.pathname, url.search);
+  const targetUrl = routingTargetUrl(routingTarget, url.pathname, url.search);
 
   console.log('[PROXY] Handling request:', url.pathname, 'runtime:', runtimeId);
-
-  const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
 
   if (!c.env.GATEWAY_TOKEN_SECRET) {
     console.error('[CONFIG] Missing required environment variables: GATEWAY_TOKEN_SECRET');
@@ -929,266 +999,21 @@ app.all('*', async c => {
   // This is critical: instance-keyed DOs derive sandboxId from instanceId (ki_ prefix),
   // which differs from the middleware-derived value (sandboxIdFromUserId). The gateway
   // token must match what the machine expects.
-  let forwardHeaders = await buildForwardHeaders({
+  const forwardHeaders = await buildForwardHeaders({
     requestHeaders: request.headers,
     sandboxId,
     gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
     providerHeaders: routingTarget.headers,
   });
 
-  // WebSocket proxy
-  if (isWebSocketRequest) {
-    console.log('[WS] Proxying WebSocket connection to OpenClaw via Fly Proxy');
-
-    let containerResponse: Response;
-    try {
-      containerResponse = await fetch(targetUrl, {
-        headers: forwardHeaders,
-      });
-    } catch (err) {
-      console.error('[WS] Fly Proxy fetch failed:', err);
-
-      const recovered = await attemptCrashRecovery(c);
-      if (recovered) {
-        // Machine may have been recreated — refresh the instance routing header
-        const refreshedInstance = await resolveInstance(c);
-        if (
-          !refreshedInstance.runtimeId ||
-          !refreshedInstance.doKey ||
-          !refreshedInstance.sandboxId
-        ) {
-          return c.json(
-            { error: 'Instance not reachable after restart' },
-            { status: 503, headers: { 'Retry-After': '5' } }
-          );
-        }
-        const refreshedDoKey = refreshedInstance.doKey;
-        const getRefreshedStub = () =>
-          c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(refreshedDoKey));
-        const refreshedRoutingTarget = await withDORetry(
-          getRefreshedStub,
-          stub => stub.getRoutingTarget(),
-          'KiloClawInstance.getRoutingTarget'
-        );
-        if (!refreshedRoutingTarget) {
-          return c.json(
-            { error: 'Instance not reachable after restart' },
-            { status: 503, headers: { 'Retry-After': '5' } }
-          );
-        }
-        targetUrl = routingTargetUrl(refreshedRoutingTarget, url.pathname, url.search);
-        forwardHeaders = await buildForwardHeaders({
-          requestHeaders: request.headers,
-          sandboxId: refreshedInstance.sandboxId,
-          gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
-          providerHeaders: refreshedRoutingTarget.headers,
-        });
-
-        try {
-          containerResponse = await fetch(targetUrl, {
-            headers: forwardHeaders,
-          });
-        } catch (retryErr) {
-          console.error('[WS] Retry after recovery failed:', retryErr);
-          return c.json(
-            { error: 'Instance not reachable after restart attempt' },
-            { status: 503, headers: { 'Retry-After': '5' } }
-          );
-        }
-      } else {
-        return c.json(
-          {
-            error: 'Instance not reachable',
-            hint: 'Your instance may not be running. Start it from the dashboard.',
-          },
-          { status: 503, headers: { 'Retry-After': '5' } }
-        );
-      }
-    }
-    console.log('[WS] Fly Proxy response status:', containerResponse.status);
-
-    // Gateway not ready yet — return a clear JSON error for WebSocket clients
-    if (containerResponse.status === 502) {
-      return c.json(
-        {
-          error: 'Instance is starting up',
-          hint: 'The gateway process is still initializing. Please retry shortly.',
-        },
-        { status: 503, headers: { 'Retry-After': '5' } }
-      );
-    }
-
-    const containerWs = containerResponse.webSocket;
-    if (!containerWs) {
-      console.error('[WS] No WebSocket in response - returning direct response');
-      return containerResponse;
-    }
-
-    const [clientWs, serverWs] = Object.values(new WebSocketPair());
-
-    serverWs.accept();
-    containerWs.accept();
-
-    let catchAllDroppedToContainer = 0;
-    let catchAllDroppedToClient = 0;
-
-    // Client -> Container relay
-    serverWs.addEventListener('message', event => {
-      if (containerWs.readyState === WebSocket.OPEN) {
-        containerWs.send(event.data as string | ArrayBuffer);
-      } else {
-        catchAllDroppedToContainer++;
-        if (catchAllDroppedToContainer === 1) {
-          console.warn(
-            '[WS] First dropped client->container message (readyState:',
-            containerWs.readyState,
-            ')'
-          );
-        }
-      }
-    });
-
-    // Container -> Client relay with error transformation
-    containerWs.addEventListener('message', event => {
-      const data = transformWsMessage(event.data as string | ArrayBuffer);
-      if (serverWs.readyState === WebSocket.OPEN) {
-        serverWs.send(data);
-      } else {
-        catchAllDroppedToClient++;
-        if (catchAllDroppedToClient === 1) {
-          console.warn(
-            '[WS] First dropped container->client message (readyState:',
-            serverWs.readyState,
-            ')'
-          );
-        }
-      }
-    });
-
-    const logCatchAllDropSummary = () => {
-      const totalDropped = catchAllDroppedToClient + catchAllDroppedToContainer;
-      if (totalDropped > 0) {
-        console.warn(
-          '[WS] Connection closed with',
-          totalDropped,
-          'dropped messages (toClient:',
-          catchAllDroppedToClient,
-          'toContainer:',
-          catchAllDroppedToContainer,
-          ')'
-        );
-      }
-    };
-
-    // Close relay
-    serverWs.addEventListener('close', event => {
-      logCatchAllDropSummary();
-      safeClose(containerWs, event.code, event.reason);
-    });
-
-    containerWs.addEventListener('close', event => {
-      logCatchAllDropSummary();
-      safeClose(serverWs, event.code, sanitizeCloseReason(event.reason));
-    });
-
-    // Error relay
-    serverWs.addEventListener('error', event => {
-      console.error('[WS] Client error:', event);
-      safeClose(containerWs, 1011, 'Client error');
-    });
-
-    containerWs.addEventListener('error', event => {
-      console.error('[WS] Container error:', event);
-      safeClose(serverWs, 1011, 'Container error');
-    });
-
-    return new Response(null, {
-      status: 101,
-      webSocket: clientWs,
-    });
-  }
-
-  // HTTP proxy
-  // Buffer body upfront so it can be replayed on crash-recovery retry (streams are one-shot).
-  const requestBody = request.body ? await request.arrayBuffer() : null;
-  console.log('[HTTP] Proxying:', url.pathname + url.search);
-  let httpResponse: Response;
-  try {
-    httpResponse = await fetch(targetUrl, {
-      method: request.method,
-      headers: forwardHeaders,
-      body: requestBody,
-    });
-  } catch (err) {
-    console.error('[HTTP] Fly Proxy fetch failed:', err);
-
-    const recovered = await attemptCrashRecovery(c);
-    if (recovered) {
-      // Machine may have been recreated — refresh the instance routing header
-      const refreshedInstance = await resolveInstance(c);
-      if (
-        !refreshedInstance.runtimeId ||
-        !refreshedInstance.doKey ||
-        !refreshedInstance.sandboxId
-      ) {
-        return c.json(
-          { error: 'Instance not reachable after restart' },
-          { status: 503, headers: { 'Retry-After': '5' } }
-        );
-      }
-      const refreshedHttpDoKey = refreshedInstance.doKey;
-      const getRefreshedHttpStub = () =>
-        c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(refreshedHttpDoKey));
-      const refreshedRoutingTarget = await withDORetry(
-        getRefreshedHttpStub,
-        stub => stub.getRoutingTarget(),
-        'KiloClawInstance.getRoutingTarget'
-      );
-      if (!refreshedRoutingTarget) {
-        return c.json(
-          { error: 'Instance not reachable after restart' },
-          { status: 503, headers: { 'Retry-After': '5' } }
-        );
-      }
-      targetUrl = routingTargetUrl(refreshedRoutingTarget, url.pathname, url.search);
-      forwardHeaders = await buildForwardHeaders({
-        requestHeaders: request.headers,
-        sandboxId: refreshedInstance.sandboxId,
-        gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
-        providerHeaders: refreshedRoutingTarget.headers,
-      });
-
-      try {
-        httpResponse = await fetch(targetUrl, {
-          method: request.method,
-          headers: forwardHeaders,
-          body: requestBody,
-        });
-      } catch (retryErr) {
-        console.error('[HTTP] Retry after recovery failed:', retryErr);
-        return c.json(
-          { error: 'Instance not reachable after restart attempt' },
-          { status: 503, headers: { 'Retry-After': '5' } }
-        );
-      }
-    } else {
-      return c.json(
-        {
-          error: 'Instance not reachable',
-          hint: 'Your instance may not be running. Start it from the dashboard.',
-        },
-        { status: 503, headers: { 'Retry-After': '5' } }
-      );
-    }
-  }
-  console.log('[HTTP] Response status:', httpResponse.status);
-
-  // Gateway not ready yet — show friendly "starting up" page instead of raw 502
-  if (httpResponse.status === 502) {
-    return startingUpPage();
-  }
-
-  return httpResponse;
+  return proxyThroughTarget({
+    request,
+    targetUrl,
+    forwardHeaders,
+    logTag: '[PROXY default]',
+    unreachableHint: 'Your instance may not be running. Start it from the dashboard.',
+    startingUpHint: 'The gateway process is still initializing. Please retry shortly.',
+  });
 });
 
 export default class extends WorkerEntrypoint<KiloClawEnv> {
@@ -1229,6 +1054,26 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
   }
 
   /**
+   * Cron handler. Currently runs the scheduled-action notice sweep
+   * (1-minute cadence per wrangler.jsonc). Wrap each sweep call in
+   * its own try/catch so a failing sweep doesn't poison subsequent
+   * crons or any other handler running on this entrypoint.
+   */
+  async scheduled(_event: ScheduledController): Promise<void> {
+    try {
+      const result = await runScheduledActionNoticesSweep(this.env);
+      if (result.processed > 0 || result.recovered > 0 || result.voidedStale > 0) {
+        console.log(
+          `[scheduled] action-notices: processed=${result.processed} sent=${result.sent} failed=${result.failed} recovered=${result.recovered} voidedStale=${result.voidedStale}`
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[scheduled] action-notices sweep failed:', msg);
+    }
+  }
+
+  /**
    * RPC method called by kilo-chat service via service binding.
    * Routes the webhook payload to the correct kiloclaw Fly machine
    * based on the targetBotId (bot:kiloclaw:{sandboxId}).
@@ -1245,12 +1090,16 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
    * stale-online until staleness inference catches up, ~poll interval).
    */
   async deliverChatWebhook(payload: ChatWebhookPayload): Promise<void> {
-    const parsed = chatWebhookRpcSchema.parse(payload);
+    const { targetBotId, ...rpcPayload } = payload;
+    const webhookPayload = rpcPayload satisfies z.infer<typeof chatWebhookSchema>;
     const botPrefix = 'bot:kiloclaw:';
-    if (!parsed.targetBotId.startsWith(botPrefix)) {
-      throw new Error(`Invalid targetBotId: ${parsed.targetBotId}`);
+    if (!targetBotId.startsWith(botPrefix)) {
+      throw new Error(`Invalid targetBotId: ${targetBotId}`);
     }
-    const sandboxId = parsed.targetBotId.slice(botPrefix.length);
+    const sandboxId = targetBotId.slice(botPrefix.length);
+    if (!sandboxIdSchema.safeParse(sandboxId).success) {
+      throw new Error(`Invalid sandboxId derived from targetBotId: ${targetBotId}`);
+    }
 
     const { doKey, label } = await this.resolveChatWebhookDoKey(sandboxId);
     const getWebhookStub = () =>
@@ -1291,7 +1140,6 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
     );
 
     // Forward the webhook payload (without targetBotId) to the controller
-    const { targetBotId: _, ...webhookPayload } = parsed;
     const body = JSON.stringify(webhookPayload);
 
     const controller = new AbortController();

@@ -8,6 +8,7 @@ type UseTextHeightOptions = {
   textContentWidth: number;
   fontSize: number;
   lineHeight: number;
+  initialText?: string;
 };
 
 /**
@@ -21,8 +22,9 @@ export function useTextHeight({
   textContentWidth,
   fontSize,
   lineHeight,
+  initialText = '',
 }: UseTextHeightOptions) {
-  const [text, setMeasuredText] = useState('');
+  const [text, setMeasuredText] = useState(initialText);
   const [height, setHeight] = useState(minHeight);
   const measuredText = text.length === 0 || text.endsWith('\n') ? `${text} ` : text;
   const measurementWidth = Math.max(textContentWidth, 0);

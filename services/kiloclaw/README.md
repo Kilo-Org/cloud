@@ -116,6 +116,12 @@ pnpm start            # wrangler dev
 
    New provisions without an explicit provider use `KILOCLAW_DEFAULT_PROVIDER`. You can also pass `provider: "fly"` to the platform provision endpoint if you need Fly for a specific test.
 
+To run the full local stack over stable Cloudflare Tunnel hostnames, set
+`TUNNEL_CONFIG`, `TUNNEL_APP_HOSTNAME`, `TUNNEL_KILOCLAW_HOSTNAME`, and
+optionally `TUNNEL_KILOCHAT_HOSTNAME` in `services/kiloclaw/scripts/.dev-start.conf`
+or `~/.config/kiloclaw/dev-start.conf`, then run `pnpm dev:start kiloclaw`. See
+`DEVELOPMENT.md` for the ingress example and generated env vars.
+
 Rebuild the image after controller or Dockerfile changes, then restart or redeploy the instance so the container is recreated with the new image/env/config. A plain `start` leaves an already-running docker-local container intact.
 
 ## Fly Provider

@@ -1,15 +1,15 @@
-import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel, isOpusModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
-import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
-import { isMoonshotModel } from '@/lib/ai-gateway/providers/moonshotai';
+import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import { isAlibabaDirectModel } from '@/lib/ai-gateway/providers/qwen';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
-import { isGrok4Model, isXaiModel } from '@/lib/ai-gateway/providers/xai';
-import { isZaiModel } from '@/lib/ai-gateway/providers/zai';
+import { isGrokModel, isGrokToggleableReasoningModel } from '@/lib/ai-gateway/providers/xai';
+import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import type {
   CustomLlmProvider,
   OpenClawModelSettings,
+  OpenCodePrompt,
   OpenCodeSettings,
 } from '@kilocode/db/schema-types';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
@@ -19,15 +19,24 @@ export const REASONING_VARIANTS_BINARY = {
   thinking: { reasoning: { enabled: true, effort: 'medium' } },
 } as const;
 
-export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
-  minimal: { reasoning: { enabled: true, effort: 'minimal' } },
+export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
   low: { reasoning: { enabled: true, effort: 'low' } },
   medium: { reasoning: { enabled: true, effort: 'medium' } },
   high: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
+export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
+  minimal: { reasoning: { enabled: true, effort: 'minimal' } },
+  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
+} as const;
+
+export const REASONING_VARIANTS_NONE_LOW_MEDIUM_HIGH = {
+  none: { reasoning: { enabled: false, effort: 'none' } },
+  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
+} as const;
+
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
-  if (modelStartsWith(model, 'anthropic/claude-opus-4.7')) {
+  if (isOpusModel(model) && model.includes('4.7')) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },
       low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
@@ -37,7 +46,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
       max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
     };
   }
-  if (isAnthropicModel(model)) {
+  if (isClaudeModel(model)) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },
       low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
@@ -61,9 +70,10 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
     );
   }
   if (
-    isMoonshotModel(model) ||
-    isZaiModel(model) ||
-    model === qwen36_plus_model.public_id ||
+    isKimiModel(model) ||
+    isGlmModel(model) ||
+    isGrokToggleableReasoningModel(model) ||
+    isAlibabaDirectModel(model) ||
     isGemmaModel(model)
   ) {
     return REASONING_VARIANTS_BINARY;
@@ -84,17 +94,11 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
       high: { reasoning: { enabled: true, effort: 'high' } },
     };
   }
-  if (isGrok4Model(model)) {
-    return {
-      'non-reasoning': { reasoning: { enabled: false, effort: 'none' } },
-      reasoning: { reasoning: { enabled: true, effort: 'medium' } },
-    };
-  }
   return undefined;
 }
 
 function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
-  if (qwen36_plus_model.public_id === model) {
+  if (isAlibabaDirectModel(model)) {
     // with 'openai' (Responses) prompt caching doesn't work
     // with 'openai-compatible' (Chat Completions) cost is wrong (cache writes are not counted)
     return 'alibaba';
@@ -103,11 +107,11 @@ function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
     // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';
   }
-  if (isAnthropicModel(model)) {
+  if (isClaudeModel(model)) {
     // on Vercel AI Gateway, this is necessary to support document attachments
     return 'anthropic';
   }
-  if (isOpenAiModel(model) || isXaiModel(model)) {
+  if (isOpenAiModel(model) || isGrokModel(model)) {
     // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects.""
     // xAI: "The Responses API is the recommended way to interact with xAI models."
     return 'openai';
@@ -115,18 +119,26 @@ function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
   return undefined;
 }
 
+function getOpenCodePrompt(model: string): OpenCodePrompt | undefined {
+  if (model.includes('gpt-5.5')) {
+    return 'gpt55';
+  }
+  return undefined;
+}
+
 export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined {
   const ai_sdk_provider = getAiSdkProvider(model);
   const variants = getModelVariants(model);
-  return { ai_sdk_provider, variants };
+  const prompt = getOpenCodePrompt(model);
+  return { ai_sdk_provider, variants, prompt };
 }
 
 export function getOpenClawSettings(model: string): OpenClawModelSettings | undefined {
   // 2026-04-28: this is aspirational, the OpenClaw Kilo provider does not respect this
-  if (isAnthropicModel(model)) {
+  if (isClaudeModel(model)) {
     return { api_adapter: 'anthropic-messages' };
   }
-  if (isOpenAiModel(model) || isXaiModel(model)) {
+  if (isOpenAiModel(model) || isGrokModel(model)) {
     return { api_adapter: 'openai-responses' };
   }
   return undefined;

@@ -1,7 +1,7 @@
 /**
  * Hook for managing sidebar session list
  *
- * Fetches sessions from the unified sessions router and maintains them in Jotai atoms
+ * Fetches sessions from the CLI sessions v2 router and maintains them in Jotai atoms
  * for reactive updates across the UI. Supports search and platform filtering.
  */
 
@@ -43,15 +43,44 @@ function dbSessionToStoredSession(session: DbSession | DbSessionV2): StoredSessi
     mode: v1?.last_mode ?? 'code',
     model: v1?.last_model ?? '',
     status: session.cloud_agent_session_id ? 'active' : 'completed',
-    createdAt: session.created_at.toISOString(),
-    updatedAt: session.updated_at.toISOString(),
+    createdAt: session.created_at,
+    updatedAt: session.updated_at,
     messages: [],
     cloudAgentSessionId: session.cloud_agent_session_id,
     createdOnPlatform: v1?.created_on_platform ?? null,
     sessionStatus: session.status,
-    sessionStatusUpdatedAt: session.status_updated_at?.toISOString() ?? null,
+    sessionStatusUpdatedAt: session.status_updated_at ?? null,
+    associatedPr: v1?.associatedPr ?? null,
   };
 }
+
+/**
+ * Stable string key for a single session list entry.
+ * Used to detect changes that should trigger a Jotai atom update, including
+ * PR state changes that arrive via webhook without modifying the session row.
+ */
+function sessionCacheKey(s: {
+  session_id: string;
+  updated_at: string;
+  status: string | null;
+  status_updated_at: string | null;
+  associatedPr?: {
+    state: string;
+    lastSyncedAt: string;
+    reviewDecision: string | null;
+    reviewDecisionPending: boolean;
+  } | null;
+}): string {
+  return `${s.session_id}-${s.updated_at}-${s.status ?? ''}-${s.status_updated_at ?? ''}-${s.associatedPr?.state ?? ''}-${s.associatedPr?.lastSyncedAt ?? ''}-${s.associatedPr?.reviewDecision ?? ''}-${s.associatedPr?.reviewDecisionPending ?? false}`;
+}
+
+/**
+ * Polling cadence used while any row in the list reports
+ * `associatedPr.reviewDecisionPending`. The server's batched GraphQL fetch
+ * typically lands within a few seconds, so we re-query at this interval until
+ * the flag clears, then stop.
+ */
+const REVIEW_DECISION_POLL_INTERVAL_MS = 5_000;
 
 type UseSidebarSessionsOptions = {
   organizationId?: string | null;
@@ -85,20 +114,30 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     organizationId,
     createdOnPlatform,
     gitUrl,
+    fetchReviewDecision: true,
   };
-  const listQueryKey = trpc.unifiedSessions.list.queryKey(listInput);
+  const listQueryKey = trpc.cliSessionsV2.list.queryKey(listInput);
 
   const { data: listData, isLoading: isListLoading } = useQuery({
-    ...trpc.unifiedSessions.list.queryOptions(listInput),
+    ...trpc.cliSessionsV2.list.queryOptions(listInput),
     staleTime: 5000,
     enabled: !isSearchActive,
+    // While the server has flagged any PR for an async review-decision fetch,
+    // poll the list so the badge updates without a manual refresh. The poll
+    // self-terminates once every row reports `reviewDecisionPending: false`.
+    refetchInterval: query => {
+      const hasPending = query.state.data?.cliSessions?.some(
+        s => s.associatedPr?.reviewDecisionPending === true
+      );
+      return hasPending ? REVIEW_DECISION_POLL_INTERVAL_MS : false;
+    },
   });
 
   // --- Search query ---
   const searchInput = { search_string: searchQuery, createdOnPlatform, organizationId, gitUrl };
 
   const { data: searchData, isLoading: isSearchLoading } = useQuery({
-    ...trpc.unifiedSessions.search.queryOptions(searchInput),
+    ...trpc.cliSessionsV2.search.queryOptions(searchInput),
     staleTime: 5000,
     enabled: isSearchActive,
   });
@@ -106,13 +145,13 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
   // Track last processed data key to avoid unnecessary atom updates
   const lastDataKeyRef = useRef<string | null>(null);
 
-  // Populate Jotai atom when list query data actually changes (NOT for search)
+  // Populate Jotai atom when list query data actually changes (NOT for search).
+  // Include `associatedPr` signals so a PR webhook or manual refresh updates
+  // the atom even when the session row itself is unchanged.
   useEffect(() => {
     if (isSearchActive) return;
     if (listData?.cliSessions) {
-      const dataKey = listData.cliSessions
-        .map(s => `${s.session_id}-${s.updated_at}-${s.status ?? ''}-${s.status_updated_at ?? ''}`)
-        .join('|');
+      const dataKey = listData.cliSessions.map(sessionCacheKey).join('|');
 
       if (lastDataKeyRef.current !== dataKey) {
         lastDataKeyRef.current = dataKey;
@@ -135,8 +174,8 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       repository: extractRepoDisplay(row.git_url),
       branch: row.git_branch,
       prompt: row.title || `Session ${row.session_id.substring(0, 8)}`,
-      mode: row.last_mode ?? 'code',
-      model: row.last_model ?? '',
+      mode: 'code',
+      model: '',
       status: row.cloud_agent_session_id ? ('active' as const) : ('completed' as const),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -145,6 +184,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       createdOnPlatform: row.created_on_platform,
       sessionStatus: row.status,
       sessionStatusUpdatedAt: row.status_updated_at,
+      associatedPr: row.associatedPr ?? null,
     }));
   }, [searchData?.results]);
 

@@ -66,6 +66,40 @@ export const messages = sqliteTable(
   })
 );
 
+export const botMessageNotifications = sqliteTable(
+  'bot_message_notifications',
+  {
+    message_id: text('message_id').primaryKey(),
+    bot_id: text('bot_id').notNull(),
+    content: text('content').notNull(),
+    created_at: integer('created_at').notNull(),
+    notify_after: integer('notify_after').notNull(),
+    notified_at: integer('notified_at'),
+    notified_reason: text('notified_reason'),
+  },
+  table => ({
+    messageFk: foreignKey({
+      columns: [table.message_id],
+      foreignColumns: [messages.id],
+    }),
+    botFk: foreignKey({
+      columns: [table.bot_id],
+      foreignColumns: [members.id],
+    }),
+    pendingByNotifyAfter: index('bot_message_notifications_pending_by_notify_after_idx')
+      .on(table.notify_after)
+      .where(sql`${table.notified_at} IS NULL`),
+    pendingByBot: index('bot_message_notifications_pending_by_bot_idx')
+      .on(table.bot_id, table.created_at)
+      .where(sql`${table.notified_at} IS NULL`),
+    notifiedReasonCheck: check(
+      'bot_message_notifications_notified_reason_check',
+      sql`${table.notified_reason} IS NULL
+          OR ${table.notified_reason} IN ('length', 'typing_stop', 'timeout')`
+    ),
+  })
+);
+
 export const reactions = sqliteTable(
   'reactions',
   {

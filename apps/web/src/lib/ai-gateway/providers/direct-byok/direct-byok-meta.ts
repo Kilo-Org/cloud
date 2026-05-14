@@ -3,8 +3,10 @@ import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/provide
 // Client-safe display names for direct BYOK providers.
 export const DIRECT_BYOK_PROVIDERS_META = {
   'byteplus-coding': 'BytePlus Coding Plan',
+  'chutes-byok': 'Chutes BYOK',
   'kimi-coding': 'Kimi Code',
   neuralwatt: 'Neuralwatt',
+  'ollama-cloud': 'Ollama Cloud',
   'zai-coding': 'Z.ai Coding Plan',
 } as const satisfies Record<Exclude<DirectUserByokInferenceProviderId, 'codestral'>, string>;
 

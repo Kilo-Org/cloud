@@ -1,6 +1,9 @@
+import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as schemas from './router/schemas.js';
 import * as schemaLimits from './schema.js';
+import type * as WorkspaceModule from './workspace.js';
+import type * as SessionServiceModule from './session-service.js';
 
 // Create a mock execution session
 const createMockExecutionSession = () => ({
@@ -26,6 +29,8 @@ const createMockSandbox = () => {
     createSession: vi.fn().mockResolvedValue(mockSession),
     listProcesses: vi.fn().mockResolvedValue([]),
     mkdir: vi.fn().mockResolvedValue(undefined),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    destroy: vi.fn().mockResolvedValue(undefined),
   };
 };
 
@@ -34,16 +39,25 @@ vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(() => createMockSandbox()),
 }));
 
-// Mock workspace functions
-vi.mock('./workspace.js', () => ({
-  checkDiskAndCleanBeforeSetup: vi.fn().mockResolvedValue(undefined),
-  setupWorkspace: vi.fn().mockResolvedValue({
-    workspacePath: '/workspace/test',
-    sessionHome: '/home/test',
-  }),
-  cloneGitHubRepo: vi.fn().mockResolvedValue(undefined),
-  cloneGitRepo: vi.fn().mockResolvedValue(undefined),
-  manageBranch: vi.fn().mockResolvedValue(undefined),
+// Mock workspace functions, but keep the real exported error classes so
+// `instanceof` checks in the handler work against the same constructors.
+vi.mock('./workspace.js', async importOriginal => {
+  const actual = await importOriginal<typeof WorkspaceModule>();
+  return {
+    ...actual,
+    checkDiskAndCleanBeforeSetup: vi.fn().mockResolvedValue(undefined),
+    setupWorkspace: vi.fn().mockResolvedValue({
+      workspacePath: '/workspace/test',
+      sessionHome: '/home/test',
+    }),
+    cloneGitHubRepo: vi.fn().mockResolvedValue(undefined),
+    cloneGitRepo: vi.fn().mockResolvedValue(undefined),
+    manageBranch: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
+vi.mock('./utils/kilo-session-id.js', () => ({
+  generateKiloSessionId: () => generateKiloSessionIdMock(),
 }));
 
 // Mock WrapperClient.ensureWrapper (wrapper now starts kilo server in-process)
@@ -60,51 +74,62 @@ vi.mock('./kilo/wrapper-client.js', () => ({
 // vi.hoisted() ensures these are available when the mock factory runs
 const {
   generateSessionIdMock,
+  generateKiloSessionIdMock,
   createCliSessionViaSessionIngestMock,
   deleteCliSessionViaSessionIngestMock,
 } = vi.hoisted(() => ({
   generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
+  generateKiloSessionIdMock: vi.fn(() => 'ses_mock-kilo-session-id'),
   createCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
   deleteCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Mock session-service to isolate router tests
-vi.mock('./session-service.js', () => ({
-  generateSessionId: () => generateSessionIdMock(),
-  fetchSessionMetadata: vi.fn(),
-  determineBranchName: vi.fn(
-    (sessionId: string, upstreamBranch?: string) => upstreamBranch || `session/${sessionId}`
-  ),
-  runSetupCommands: vi.fn().mockResolvedValue(undefined),
-  writeAuthFile: vi.fn().mockResolvedValue(undefined),
-  InvalidSessionMetadataError: class InvalidSessionMetadataError extends Error {
-    constructor(
-      public readonly userId: string,
-      public readonly sessionId: string,
-      public readonly details?: string
-    ) {
-      super(`Invalid session metadata for session ${sessionId}`);
-      this.name = 'InvalidSessionMetadataError';
-    }
-  },
-  SessionService: class SessionService {
-    createCliSessionViaSessionIngest = createCliSessionViaSessionIngestMock;
-    deleteCliSessionViaSessionIngest = deleteCliSessionViaSessionIngestMock;
-    getOrCreateSession = vi.fn().mockResolvedValue(createMockExecutionSession());
-    buildContext = vi.fn().mockReturnValue({
-      sandboxId: 'test-sandbox',
-      orgId: 'test-org',
-      userId: 'test-user',
-      sessionId: 'test-session',
-      workspacePath: '/workspace/test',
-      sessionHome: '/home/test',
-    });
-  },
-}));
+// Mock session-service to isolate router tests, but keep the real exported
+// error classes (`SetupCommandFailedError`, `InvalidSessionMetadataError`)
+// so `instanceof` checks in the handler resolve to the same constructors
+// the production code throws.
+vi.mock('./session-service.js', async importOriginal => {
+  const actual = await importOriginal<typeof SessionServiceModule>();
+  return {
+    ...actual,
+    generateSessionId: () => generateSessionIdMock(),
+    fetchSessionMetadata: vi.fn(),
+    determineBranchName: vi.fn(
+      (sessionId: string, upstreamBranch?: string) => upstreamBranch || `session/${sessionId}`
+    ),
+    runSetupCommands: vi.fn().mockResolvedValue(undefined),
+    writeAuthFile: vi.fn().mockResolvedValue(undefined),
+    writeGlobalRules: vi.fn().mockResolvedValue(undefined),
+    writeRuntimeSkills: vi.fn().mockResolvedValue(undefined),
+    SessionService: class SessionService {
+      createCliSessionViaSessionIngest = createCliSessionViaSessionIngestMock;
+      deleteCliSessionViaSessionIngest = deleteCliSessionViaSessionIngestMock;
+      getOrCreateSession = vi.fn().mockResolvedValue(createMockExecutionSession());
+      buildContext = vi.fn().mockReturnValue({
+        sandboxId: 'test-sandbox',
+        orgId: 'test-org',
+        userId: 'test-user',
+        sessionId: 'test-session',
+        workspacePath: '/workspace/test',
+        sessionHome: '/home/test',
+      });
+    },
+  };
+});
 
 import { appRouter } from './router.js';
 import type { TRPCContext, SessionId } from './types.js';
 import type { CloudAgentSessionState } from './persistence/types.js';
+import {
+  BranchNotFoundError,
+  GitRepositoryNotFoundError,
+  cloneGitHubRepo as mockedCloneGitHubRepo,
+  manageBranch as mockedManageBranch,
+} from './workspace.js';
+import {
+  SetupCommandFailedError,
+  runSetupCommands as mockedRunSetupCommands,
+} from './session-service.js';
 
 // Helper to create a mock DO stub
 function createMockDOStub(
@@ -299,12 +324,12 @@ describe('prepareSession endpoint', () => {
       });
 
       expect(result.cloudAgentSessionId).toMatch(/^agent_[0-9a-f-]+$/);
-      expect(result.kiloSessionId).toBe('cli-session-abc123');
+      expect(result.kiloSessionId).toBe('ses_mock-kilo-session-id');
       expect(doStub.prepare).toHaveBeenCalledWith(
         expect.objectContaining({
           sessionId: expect.stringMatching(/^agent_/) as unknown,
           userId: 'test-user-123',
-          kiloSessionId: 'cli-session-abc123',
+          kiloSessionId: 'ses_mock-kilo-session-id',
           prompt: 'Test prompt',
           mode: 'code',
           model: 'claude-3',
@@ -330,7 +355,7 @@ describe('prepareSession endpoint', () => {
       });
 
       expect(result.cloudAgentSessionId).toBeDefined();
-      expect(result.kiloSessionId).toBe('cli-session-abc123');
+      expect(result.kiloSessionId).toBe('ses_mock-kilo-session-id');
       expect(doStub.prepare).toHaveBeenCalledWith(
         expect.objectContaining({
           gitUrl: 'https://gitlab.com/org/repo.git',
@@ -464,6 +489,125 @@ describe('prepareSession endpoint', () => {
     // NOTE: CLI session creation (createCliSessionViaSessionIngest) is handled via session-ingest.
     // The kiloSessionId now comes from the kilo CLI server's POST /session API.
     // Tests for backend session creation error handling and rollback have been removed.
+
+    it('marks sandbox 500 preparation failures as retryable', async () => {
+      const sandbox = createMockSandbox();
+      const sandboxError = new Error('HTTP error! status: 500');
+      Object.assign(sandboxError, { name: 'SandboxError' });
+      vi.mocked(mockedCloneGitHubRepo).mockRejectedValueOnce(sandboxError);
+      const { getSandbox } = await import('@cloudflare/sandbox');
+      vi.mocked(getSandbox).mockReturnValueOnce(
+        sandbox as unknown as ReturnType<typeof getSandbox>
+      );
+
+      const doStub = createMockDOStub();
+      const ctx = createInternalApiContext({ doStub });
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          githubToken: 'ghp_test_token',
+        });
+        expect.unreachable('should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(TRPCError);
+        const trpcError = error as TRPCError;
+        expect(trpcError.code).toBe('INTERNAL_SERVER_ERROR');
+        expect(trpcError.message).toBe('Sandbox returned 500 during workspace preparation');
+        expect(trpcError.cause).toMatchObject({
+          error: 'sandbox_internal_server_error',
+          retryable: true,
+        });
+      }
+
+      expect(sandbox.destroy).toHaveBeenCalledOnce();
+      expect(doStub.prepare).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('user-error mapping (HTTP 400)', () => {
+    it('returns BAD_REQUEST when the repository is not found', async () => {
+      const doStub = createMockDOStub();
+      vi.mocked(mockedCloneGitHubRepo).mockRejectedValueOnce(
+        new GitRepositoryNotFoundError('https://github.com/acme/missing.git')
+      );
+
+      const ctx = createInternalApiContext({ doStub });
+      const caller = appRouter.createCaller(ctx);
+
+      await expect(
+        caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/missing',
+          githubToken: 'ghp_test_token',
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Repository not found') as unknown as string,
+      });
+
+      expect(doStub.prepare).not.toHaveBeenCalled();
+    });
+
+    it('returns BAD_REQUEST when the upstream branch is missing', async () => {
+      const doStub = createMockDOStub();
+      vi.mocked(mockedManageBranch).mockRejectedValueOnce(
+        new BranchNotFoundError('feature/does-not-exist')
+      );
+
+      const ctx = createInternalApiContext({ doStub });
+      const caller = appRouter.createCaller(ctx);
+
+      await expect(
+        caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          githubToken: 'ghp_test_token',
+          upstreamBranch: 'feature/does-not-exist',
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining(
+          'Branch "feature/does-not-exist" not found'
+        ) as unknown as string,
+      });
+
+      expect(doStub.prepare).not.toHaveBeenCalled();
+    });
+
+    it('returns BAD_REQUEST when a setup command fails', async () => {
+      const doStub = createMockDOStub();
+      vi.mocked(mockedRunSetupCommands).mockRejectedValueOnce(
+        new SetupCommandFailedError('npm install', 1, 'ENOENT')
+      );
+
+      const ctx = createInternalApiContext({ doStub });
+      const caller = appRouter.createCaller(ctx);
+
+      await expect(
+        caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          githubToken: 'ghp_test_token',
+          setupCommands: ['npm install'],
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Setup command failed') as unknown as string,
+      });
+
+      expect(doStub.prepare).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -977,11 +1121,36 @@ describe('UpdateSessionInput schema validation', () => {
       expect(result.success).toBe(true);
     }
 
-    const result = schemas.UpdateSessionInput.safeParse({
+    // Non-built-in slugs pass schema validation as long as they look like a
+    // slug — the handler cross-checks them against the session's
+    // stored runtimeAgents. Reject only malformed slugs at the schema layer.
+    const badSlug = schemas.UpdateSessionInput.safeParse({
       cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-      mode: 'invalid-mode',
+      mode: 'Invalid Mode!',
     });
-    expect(result.success).toBe(false);
+    expect(badSlug.success).toBe(false);
+
+    // A well-formed custom slug is allowed, but when runtimeAgents is provided
+    // in the same payload the slug must match one of them.
+    const unknownWithRuntimeAgents = schemas.UpdateSessionInput.safeParse({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      mode: 'my-custom',
+      runtimeAgents: [],
+    });
+    expect(unknownWithRuntimeAgents.success).toBe(false);
+
+    const knownWithRuntimeAgents = schemas.UpdateSessionInput.safeParse({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      mode: 'my-custom',
+      runtimeAgents: [
+        {
+          slug: 'my-custom',
+          name: 'My Custom',
+          config: { prompt: 'Do things' },
+        },
+      ],
+    });
+    expect(knownWithRuntimeAgents.success).toBe(true);
   });
 
   it('requires appendSystemPrompt for custom mode updates', () => {

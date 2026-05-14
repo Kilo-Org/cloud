@@ -25,6 +25,7 @@ import {
   GUPP_FORCE_STOP_MS,
   AGENT_GC_RETENTION_MS,
   TRIAGE_LABEL_LIKE,
+  HELD_LABEL_LIKE,
   createTriageRequest,
 } from './patrol';
 import { MAX_DISPATCH_ATTEMPTS } from './scheduling';
@@ -116,6 +117,13 @@ const ORPHANED_PR_REVIEW_TIMEOUT_MS = 30 * 60_000; // 30 min
  * to avoid racing with the idle-timer → agentCompleted → reconciler flow. */
 const STALE_IN_PROGRESS_TIMEOUT_MS = 5 * 60_000; // 5 min
 
+/** Time in 'stalled' before auto-transitioning to idle.
+ * Today, stalled agents are only cleared via container_status: exited|not_found
+ * events. If the container crashed hard or /status keeps returning
+ * running/unknown, the stalled row persists indefinitely. This time-based
+ * cleanup closes the loop. */
+const STALLED_AUTO_IDLE_MS = 2.5 * 60 * 60_000; // 2h 30min
+
 // ── Helper: staleness check ─────────────────────────────────────────
 
 function staleMs(timestamp: string | null, thresholdMs: number): boolean {
@@ -152,6 +160,7 @@ const AgentRow = AgentMetadataRecord.pick({
   last_event_type: true,
   last_event_at: true,
   active_tools: true,
+  stalled_at: true,
 }).extend({
   // Joined from beads table
   rig_id: BeadRecord.shape.rig_id,
@@ -278,6 +287,17 @@ export function applyEvent(
     case 'bead_cancelled': {
       if (!event.bead_id) {
         console.warn(`${LOG} applyEvent: bead_cancelled missing bead_id`);
+        return;
+      }
+      // Tolerate the bead having been deleted after the event was enqueued.
+      // Without this guard updateBeadStatus throws `Bead <id> not found`,
+      // the drain loop can't mark the event processed, and the error
+      // recurs on every alarm tick forever.
+      const existing = beadOps.getBead(sql, event.bead_id);
+      if (!existing) {
+        console.warn(
+          `${LOG} applyEvent: bead_cancelled target bead ${event.bead_id} no longer exists — skipping`
+        );
         return;
       }
       const cancelStatus =
@@ -723,6 +743,57 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
     }
   }
 
+  // Stalled agents that have been stuck past STALLED_AUTO_IDLE_MS —
+  // transition to idle and unhook. Without this, a stalled row persists
+  // indefinitely if its container crashed hard or its /status keeps
+  // returning running/unknown (so the container_status → exited|not_found
+  // cleanup path never fires). Skip during drain to match working-agent
+  // handling above.
+  if (!opts?.draining) {
+    const longStalledAgents = AgentRow.array().parse([
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT ${agent_metadata.bead_id}, ${agent_metadata.role},
+                 ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
+                 ${agent_metadata.dispatch_attempts},
+                 ${agent_metadata.last_activity_at},
+                 ${agent_metadata.stalled_at},
+                 b.${beads.columns.rig_id}
+          FROM ${agent_metadata}
+          LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
+          WHERE ${agent_metadata.status} = 'stalled'
+        `,
+        []
+      ),
+    ]);
+
+    for (const agent of longStalledAgents) {
+      // Measure stalled duration from when the agent entered `stalled`,
+      // not from last_activity_at. Heartbeats keep arriving after GUPP
+      // force-stops a stalled container, which would otherwise collapse
+      // the 2.5h recovery window down to ~30min.
+      if (!agent.stalled_at) continue;
+      const stalledMs = Date.now() - new Date(agent.stalled_at).getTime();
+      if (stalledMs <= STALLED_AUTO_IDLE_MS) continue;
+
+      actions.push({
+        type: 'transition_agent',
+        agent_id: agent.bead_id,
+        from: 'stalled',
+        to: 'idle',
+        reason: 'stalled_timeout (exceeded 2h 30min)',
+      });
+      if (agent.current_hook_bead_id) {
+        actions.push({
+          type: 'unhook_agent',
+          agent_id: agent.bead_id,
+          reason: 'stalled_timeout (exceeded 2h 30min)',
+        });
+      }
+    }
+  }
+
   // Auto-reset dispatch_attempts after 30-minute cooldown
   const staleAgents = AgentRow.array().parse([
     ...query(
@@ -880,6 +951,7 @@ export function reconcileBeads(
           AND b.${beads.columns.assignee_agent_bead_id} IS NULL
           AND b.${beads.columns.rig_id} IS NOT NULL
           AND b.${beads.columns.labels} NOT LIKE ?
+          AND b.${beads.columns.labels} NOT LIKE ?
           AND NOT EXISTS (
             SELECT 1 FROM ${bead_dependencies} bd
             INNER JOIN ${beads} blocker ON blocker.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
@@ -895,7 +967,7 @@ export function reconcileBeads(
               AND cm.${convoy_metadata.columns.staged} = 1
           )
       `,
-      [TRIAGE_LABEL_LIKE]
+      [TRIAGE_LABEL_LIKE, HELD_LABEL_LIKE]
     ),
   ]);
 
@@ -1395,6 +1467,10 @@ export function reconcileReviewQueue(
       mr.pr_url &&
       staleMs(mr.updated_at, ORPHANED_PR_REVIEW_TIMEOUT_MS)
     ) {
+      const mrMeta: Record<string, unknown> = mr.metadata ?? {};
+      if (mrMeta.awaiting_approval === 1 || mrMeta.awaiting_approval === true) {
+        continue;
+      }
       const workingAgent = hasWorkingAgentHooked(sql, mr.bead_id);
       if (!workingAgent) {
         actions.push({
@@ -1737,6 +1813,7 @@ export function reconcileReviewQueue(
           rig_id: z.string().nullable(),
           dispatch_attempts: z.number(),
           last_dispatch_attempt_at: z.string().nullable(),
+          metadata: z.string(),
         })
         .array()
         .parse([
@@ -1744,7 +1821,8 @@ export function reconcileReviewQueue(
             sql,
             /* sql */ `
           SELECT ${beads.status}, ${beads.type}, ${beads.rig_id},
-                 ${beads.dispatch_attempts}, ${beads.last_dispatch_attempt_at}
+                 ${beads.dispatch_attempts}, ${beads.last_dispatch_attempt_at},
+                 ${beads.columns.metadata}
           FROM ${beads}
           WHERE ${beads.bead_id} = ?
         `,
@@ -1755,6 +1833,16 @@ export function reconcileReviewQueue(
       if (mrRows.length === 0) continue;
       const mr = mrRows[0];
       if (mr.type !== 'merge_request' || mr.status !== 'in_progress') continue;
+
+      let mrMeta: Record<string, unknown> = {};
+      try {
+        mrMeta = JSON.parse(mr.metadata ?? '{}') as Record<string, unknown>;
+      } catch {
+        /* ignore */
+      }
+      if (mrMeta.awaiting_approval === 1 || mrMeta.awaiting_approval === true) {
+        continue;
+      }
 
       if (draining) {
         console.log(
@@ -1971,13 +2059,13 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
       if (parsedMeta.ready_to_land) {
         // Check if a landing MR already exists (any status)
         const landingMrs = z
-          .object({ status: z.string() })
+          .object({ status: z.string(), metadata: z.string() })
           .array()
           .parse([
             ...query(
               sql,
               /* sql */ `
-                SELECT mr.${beads.columns.status}
+                SELECT mr.${beads.columns.status}, mr.${beads.columns.metadata}
                 FROM ${bead_dependencies} bd
                 INNER JOIN ${beads} mr ON mr.${beads.columns.bead_id} = bd.${bead_dependencies.columns.bead_id}
                 WHERE bd.${bead_dependencies.columns.depends_on_bead_id} = ?
@@ -2003,6 +2091,27 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
           mr => mr.status === 'open' || mr.status === 'in_progress'
         );
         if (hasActiveLanding) continue;
+
+        const hasPendingExternalReview = landingMrs.some(mr => {
+          if (mr.status !== 'failed') return false;
+          try {
+            const meta = JSON.parse(mr.metadata ?? '{}') as Record<string, unknown>;
+            return meta.awaiting_approval === 1 || meta.awaiting_approval === true;
+          } catch {
+            return false;
+          }
+        });
+        if (hasPendingExternalReview) {
+          actions.push({
+            type: 'emit_event',
+            event_name: 'reconciler.respawn_suppressed',
+            data: {
+              convoyId: convoy.bead_id,
+              suppressedAttempt: landingMrAttempts + 1,
+            },
+          });
+          continue;
+        }
 
         // Fix 2 (#2260): If max landing MR attempts exceeded and no landing MR is
         // active or merged, fail the convoy. Checked after landing MR status lookup
@@ -2130,6 +2239,7 @@ export function reconcileGUPP(sql: SqlStorage, opts?: { draining?: boolean }): A
                ${agent_metadata.last_event_type},
                ${agent_metadata.last_event_at},
                ${agent_metadata.active_tools},
+               ${agent_metadata.stalled_at},
                b.${beads.columns.rig_id}
         FROM ${agent_metadata}
         LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
@@ -2149,6 +2259,28 @@ export function reconcileGUPP(sql: SqlStorage, opts?: { draining?: boolean }): A
 
     const elapsed = Date.now() - new Date(activityTimestamp).getTime();
     if (Number.isNaN(elapsed) || elapsed < 0) continue;
+
+    // Stalled agents past the auto-idle threshold are owned by
+    // reconcileAgents (stalled → idle + unhook). Skip them here so the
+    // later GUPP force-stop action (stalled → stalled) doesn't overwrite
+    // the earlier auto-idle transition in the same reconcile pass.
+    // applyAction('transition_agent') ignores `from`, so action order
+    // decides the final state.
+    //
+    // Mirror reconcileAgents' auto-idle eligibility check, which measures
+    // from `stalled_at` (when the agent entered `stalled`), not from
+    // heartbeats. Heartbeats keep arriving after GUPP force-stops a
+    // container, so `last_activity_at` stays fresh and wouldn't trigger
+    // this skip — leaving GUPP to re-stall an agent that reconcileAgents
+    // is about to auto-idle in the same pass. Fall back to
+    // `last_activity_at` only for rows from before `stalled_at` was
+    // populated, so legacy stalled rows can still escape this loop.
+    if (agent.status === 'stalled') {
+      const stalledSince = agent.stalled_at ?? agent.last_activity_at;
+      if (stalledSince && Date.now() - new Date(stalledSince).getTime() > STALLED_AUTO_IDLE_MS) {
+        continue;
+      }
+    }
 
     if (elapsed > GUPP_FORCE_STOP_MS) {
       actions.push({

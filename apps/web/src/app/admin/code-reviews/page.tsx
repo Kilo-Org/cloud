@@ -9,14 +9,18 @@ import { CodeReviewDailyChart } from '@/app/admin/components/CodeReviewDailyChar
 import { CodeReviewCancellationAnalysis } from '@/app/admin/components/CodeReviewCancellationAnalysis';
 import { CodeReviewErrorAnalysis } from '@/app/admin/components/CodeReviewErrorAnalysis';
 import { CodeReviewPerformanceChart } from '@/app/admin/components/CodeReviewPerformanceChart';
+import { CodeReviewWaitTimeChart } from '@/app/admin/components/CodeReviewWaitTimeChart';
+import { CodeReviewWaitTimeSummary } from '@/app/admin/components/CodeReviewWaitTimeSummary';
 import { CodeReviewUserSegmentation } from '@/app/admin/components/CodeReviewUserSegmentation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { RefreshCw, Download, X, Search, User, Building2 } from 'lucide-react';
 import {
   useCodeReviewOverviewStats,
   useCodeReviewDailyStats,
   useCodeReviewPerformanceStats,
+  useCodeReviewWaitTimeStats,
   useCodeReviewCancellationAnalysis,
   useCodeReviewErrorAnalysis,
   useCodeReviewUserSegmentation,
@@ -35,7 +39,7 @@ const breadcrumbs = (
 
 type RangeType = '7d' | '30d' | '90d';
 type OwnershipType = 'all' | 'personal' | 'organization';
-type AgentVersionType = 'all' | 'v1' | 'v2';
+type RetryAccountingModeType = 'final_outcome' | 'all_attempts';
 
 type SelectedUser = {
   id: string;
@@ -59,7 +63,8 @@ export default function CodeReviewsPage() {
 
   // Filter state
   const [ownershipType, setOwnershipType] = useState<OwnershipType>('all');
-  const [agentVersion, setAgentVersion] = useState<AgentVersionType>('all');
+  const [retryAccountingMode, setRetryAccountingMode] =
+    useState<RetryAccountingModeType>('final_outcome');
   const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null);
   const [selectedOrg, setSelectedOrg] = useState<SelectedOrg | null>(null);
 
@@ -98,15 +103,16 @@ export default function CodeReviewsPage() {
       userId: selectedUser?.id,
       organizationId: selectedOrg?.id,
       ownershipType: selectedUser || selectedOrg ? undefined : ownershipType,
-      agentVersion,
+      retryAccountingMode,
     }),
-    [startDate, endDate, selectedUser, selectedOrg, ownershipType, agentVersion]
+    [startDate, endDate, selectedUser, selectedOrg, ownershipType, retryAccountingMode]
   );
 
   // Queries
   const overviewQuery = useCodeReviewOverviewStats(filterParams);
   const dailyQuery = useCodeReviewDailyStats(filterParams);
   const performanceQuery = useCodeReviewPerformanceStats(filterParams);
+  const waitTimeQuery = useCodeReviewWaitTimeStats(filterParams);
   const cancellationQuery = useCodeReviewCancellationAnalysis(filterParams);
   const errorQuery = useCodeReviewErrorAnalysis(filterParams);
   const segmentationQuery = useCodeReviewUserSegmentation(filterParams);
@@ -115,6 +121,7 @@ export default function CodeReviewsPage() {
     void overviewQuery.refetch();
     void dailyQuery.refetch();
     void performanceQuery.refetch();
+    void waitTimeQuery.refetch();
     void cancellationQuery.refetch();
     void errorQuery.refetch();
     void segmentationQuery.refetch();
@@ -122,6 +129,7 @@ export default function CodeReviewsPage() {
     overviewQuery,
     dailyQuery,
     performanceQuery,
+    waitTimeQuery,
     cancellationQuery,
     errorQuery,
     segmentationQuery,
@@ -160,13 +168,27 @@ export default function CodeReviewsPage() {
     setSelectedUser(null);
     setSelectedOrg(null);
     setOwnershipType('all');
-    setAgentVersion('all');
+    setRetryAccountingMode('final_outcome');
     setUserSearchQuery('');
     setOrgSearchQuery('');
   };
 
   const hasActiveFilter =
-    selectedUser || selectedOrg || ownershipType !== 'all' || agentVersion !== 'all';
+    selectedUser ||
+    selectedOrg ||
+    ownershipType !== 'all' ||
+    retryAccountingMode !== 'final_outcome';
+
+  const splitWaitTimeByOwnership = !selectedUser && !selectedOrg && ownershipType === 'all';
+  const waitTimeSeriesLabel = selectedUser
+    ? `User: ${selectedUser.name || selectedUser.email || selectedUser.id}`
+    : selectedOrg
+      ? `Org: ${selectedOrg.name || selectedOrg.id}`
+      : ownershipType === 'personal'
+        ? 'Personal'
+        : ownershipType === 'organization'
+          ? 'Organizations'
+          : undefined;
 
   // Handle CSV export
   const handleExport = useCallback(async () => {
@@ -185,11 +207,16 @@ export default function CodeReviewsPage() {
     }
   }, [trpcClient, filterParams, startDate, endDate, isExporting]);
 
-  const isLoading = overviewQuery.isLoading || dailyQuery.isLoading || performanceQuery.isLoading;
+  const isLoading =
+    overviewQuery.isLoading ||
+    dailyQuery.isLoading ||
+    performanceQuery.isLoading ||
+    waitTimeQuery.isLoading;
   const isRefreshing =
     overviewQuery.isFetching ||
     dailyQuery.isFetching ||
     performanceQuery.isFetching ||
+    waitTimeQuery.isFetching ||
     cancellationQuery.isFetching ||
     errorQuery.isFetching ||
     segmentationQuery.isFetching;
@@ -272,22 +299,25 @@ export default function CodeReviewsPage() {
             ))}
           </div>
 
-          {/* Agent Version Filter */}
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="text-sm font-medium">Agent Version:</span>
-            {(['all', 'v1', 'v2'] as AgentVersionType[]).map(version => (
-              <label key={version} className="flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="agentVersion"
-                  value={version}
-                  checked={agentVersion === version}
-                  onChange={() => setAgentVersion(version)}
-                  className="h-4 w-4"
-                />
-                {version === 'all' ? 'All Versions' : version.toUpperCase()}
+          {/* Retry Accounting Mode */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="retry-aware-metrics"
+                checked={retryAccountingMode === 'final_outcome'}
+                onCheckedChange={checked =>
+                  setRetryAccountingMode(checked ? 'final_outcome' : 'all_attempts')
+                }
+              />
+              <label htmlFor="retry-aware-metrics" className="cursor-pointer text-sm font-medium">
+                Retry-aware metrics
               </label>
-            ))}
+            </div>
+            <span className="text-muted-foreground text-xs">
+              {retryAccountingMode === 'final_outcome'
+                ? 'Recovered infra retries count as the final review outcome.'
+                : 'Every session attempt is counted separately.'}
+            </span>
           </div>
 
           {/* User/Org Search Filters */}
@@ -440,14 +470,26 @@ export default function CodeReviewsPage() {
             {/* KPI Cards */}
             {overviewQuery.data && <CodeReviewStats data={overviewQuery.data} />}
 
+            {/* Queue Wait Summary */}
+            {overviewQuery.data && <CodeReviewWaitTimeSummary data={overviewQuery.data} />}
+
             {/* Daily Chart */}
             {dailyQuery.data && <CodeReviewDailyChart data={dailyQuery.data} />}
+
+            {/* Queue Wait Trend */}
+            {waitTimeQuery.data && (
+              <CodeReviewWaitTimeChart
+                data={waitTimeQuery.data}
+                splitByOwnership={splitWaitTimeByOwnership}
+                filteredSeriesLabel={waitTimeSeriesLabel}
+              />
+            )}
 
             {/* Performance Trend */}
             {performanceQuery.data && (
               <CodeReviewPerformanceChart
                 data={performanceQuery.data}
-                agentVersion={agentVersion}
+                retryAccountingMode={retryAccountingMode}
               />
             )}
 
@@ -476,6 +518,7 @@ export default function CodeReviewsPage() {
         {(overviewQuery.error ||
           dailyQuery.error ||
           performanceQuery.error ||
+          waitTimeQuery.error ||
           cancellationQuery.error ||
           errorQuery.error ||
           segmentationQuery.error) && (
@@ -485,6 +528,7 @@ export default function CodeReviewsPage() {
               {overviewQuery.error?.message ||
                 dailyQuery.error?.message ||
                 performanceQuery.error?.message ||
+                waitTimeQuery.error?.message ||
                 cancellationQuery.error?.message ||
                 errorQuery.error?.message ||
                 segmentationQuery.error?.message ||

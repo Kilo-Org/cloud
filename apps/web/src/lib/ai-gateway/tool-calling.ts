@@ -77,7 +77,7 @@ function deduplicateToolUses(assistantMessage: OpenAI.ChatCompletionAssistantMes
   const toolCallIds = new Set<string>();
   assistantMessage.tool_calls = assistantMessage.tool_calls.filter(toolCall => {
     if (toolCallIds.has(toolCall.id)) {
-      const toolName = toolCall.type === 'function' ? toolCall.function.name : 'unknown';
+      const toolName = toolCall.type === 'function' ? toolCall.function?.name : 'unknown';
       console.warn(
         `[repairTools] removing duplicate use of tool ${toolName} with tool call id ${toolCall.id}`
       );
@@ -107,7 +107,7 @@ export function repairTools(requestToMutate: OpenRouterChatCompletionRequest) {
       ) {
         continue;
       }
-      const toolName = toolCall.type === 'function' ? toolCall.function.name : 'unknown';
+      const toolName = toolCall.type === 'function' ? toolCall.function?.name : 'unknown';
       console.warn(
         `[repairTools] inserting missing result for tool ${toolName} with tool call id ${toolCall.id}`
       );
@@ -179,7 +179,7 @@ function sanitizeChatCompletionsToolResults(body: OpenRouterChatCompletionReques
   for (const msg of body.messages) {
     if (msg.role !== 'assistant') continue;
     for (const call of msg.tool_calls ?? []) {
-      if (call.type === 'function') {
+      if (call.type === 'function' && call.function?.name) {
         toolNameById.set(call.id, call.function.name);
       }
     }

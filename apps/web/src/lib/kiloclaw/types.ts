@@ -1,4 +1,5 @@
 import type { EncryptedEnvelope } from '@/lib/encryption';
+import type { InstanceTierKey, InstanceType } from '@kilocode/kiloclaw-instance-tiers';
 import type { SecretFieldKey } from '@kilocode/kiloclaw-secret-catalog';
 
 /** Mirrors the worker's ImageVersionEntry schema (KV stored version metadata) */
@@ -34,6 +35,7 @@ export type ProvisionInput = {
   userTimezone?: string | null;
   userLocation?: string | null;
   pinnedImageTag?: string;
+  instanceType?: InstanceTierKey;
 };
 
 export type KiloCodeConfigPatchInput = {
@@ -204,6 +206,8 @@ export type PlatformStatusResponse = {
   flyVolumeId: string | null;
   flyRegion: string | null;
   machineSize: MachineSize | null;
+  instanceType: InstanceType | null;
+  volumeSizeGb: number | null;
   openclawVersion: string | null;
   imageVariant: string | null;
   trackedImageTag: string | null;
@@ -225,6 +229,15 @@ export type PlatformStatusResponse = {
   botNature: string | null;
   botVibe: string | null;
   botEmoji: string | null;
+  /**
+   * Version of the controller-configuration contract the running machine
+   * was started with. Bumped by the worker whenever the set of env vars /
+   * config it writes into a machine changes in a way callers care about.
+   * `null` means the instance has never been started under a versioned
+   * contract (treat as pre-v1 / legacy). See
+   * `services/kiloclaw/src/config.ts` (`WORKER_CONTROLLER_CAPABILITIES_VERSION`).
+   */
+  controllerCapabilitiesVersion: number | null;
 };
 
 /** A single registry DO's entries + migration status. */
@@ -248,6 +261,14 @@ export type RegistryEntriesResponse = {
 /** Response from GET /api/platform/debug-status (internal/admin only). */
 export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   orgId: string | null;
+  /**
+   * Active admin CPU/RAM override (admin-only). When non-null, the
+   * runtime spec uses this instead of `machineSize`. Customer dashboard
+   * (`PlatformStatusResponse`) deliberately does not expose this — billing
+   * stays on the tier.
+   */
+  adminMachineSizeOverride: MachineSize | null;
+  adminMachineSizeOverrideMetadata: AdminMachineSizeOverrideMetadata | null;
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
   pendingPostgresMarkOnFinalize: boolean;
@@ -328,6 +349,35 @@ export type DoctorResponse = {
   output: string;
 };
 
+export type DoctorControllerStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'timed_out';
+
+/** Response from POST /api/platform/doctor-controller/start */
+export type DoctorControllerStartResponse = {
+  ok: boolean;
+  runId: string;
+  startedAt: string;
+};
+
+/** Response from GET /api/platform/doctor-controller/status */
+export type DoctorControllerStatusResponse = {
+  hasRun: boolean;
+  runId: string | null;
+  status: DoctorControllerStatus | null;
+  fix: boolean | null;
+  output: string | null;
+  outputBytes: number;
+  outputTruncated: boolean;
+  exitCode: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  timedOut: boolean;
+};
+
+/** Response from POST /api/platform/doctor-controller/cancel */
+export type DoctorControllerCancelResponse = {
+  ok: boolean;
+};
+
 export type OpenclawWorkspaceImportFailure = {
   path: string;
   operation: 'write' | 'delete';
@@ -370,8 +420,48 @@ export type RestartMachineResponse = {
   error?: string;
 };
 
-/** Response from GET /api/platform/gateway/status */
-export type GatewayProcessStatusResponse = {
+// The sentinel type + predicate live in a dep-free module so apps/mobile
+// can pick them up via tsconfig path alias (mirroring the existing
+// `@/lib/images-schema` cross-package import pattern). Re-exported here so
+// existing imports from `@/lib/kiloclaw/types` keep working.
+import {
+  isInstanceNotRunningSentinel,
+  type InstanceNotRunningSentinel,
+} from './instance-not-running-sentinel';
+export { isInstanceNotRunningSentinel };
+export type { InstanceNotRunningSentinel };
+
+/**
+ * Narrowing helper: returns the OK-shape variant of a polling-endpoint
+ * response, or `undefined` if the worker short-circuited with the
+ * instance-not-running sentinel. Use this when a caller only cares about
+ * the "instance running" payload (e.g. computing a controller version
+ * gate). Caller pattern: `controllerVersionOk(data)?.version`.
+ */
+export function controllerVersionOk(
+  value: ControllerVersionResponse | undefined | null
+): Exclude<ControllerVersionResponse, InstanceNotRunningSentinel> | undefined {
+  if (!value || isInstanceNotRunningSentinel(value)) return undefined;
+  return value;
+}
+
+export function gatewayStatusOk(
+  value: GatewayProcessStatusResponse | undefined | null
+): GatewayProcessStatusOkResponse | undefined {
+  if (!value || isInstanceNotRunningSentinel(value)) return undefined;
+  return value;
+}
+
+export function morningBriefingStatusOk(
+  value: MorningBriefingStatusResponse | undefined | null
+): MorningBriefingStatusOkResponse | undefined {
+  if (!value || isInstanceNotRunningSentinel(value)) return undefined;
+  return value;
+}
+
+/** OK-shape payload of GET /api/platform/gateway/status (i.e. the worker
+ *  did not short-circuit with the not-running sentinel). */
+export type GatewayProcessStatusOkResponse = {
   state: 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed' | 'shutting_down';
   pid: number | null;
   uptime: number;
@@ -382,6 +472,11 @@ export type GatewayProcessStatusResponse = {
     at: string;
   } | null;
 };
+
+/** Response from GET /api/platform/gateway/status */
+export type GatewayProcessStatusResponse =
+  | GatewayProcessStatusOkResponse
+  | InstanceNotRunningSentinel;
 
 /** Response from POST /api/platform/gateway/{start|stop|restart} */
 export type GatewayProcessActionResponse = {
@@ -398,12 +493,14 @@ export type ConfigRestoreResponse = {
 export type GatewayReadyResponse = Record<string, unknown>;
 
 /** Response from GET /api/platform/controller-version. Null fields = old controller. */
-export type ControllerVersionResponse = {
-  version: string | null;
-  commit: string | null;
-  openclawVersion?: string | null;
-  openclawCommit?: string | null;
-};
+export type ControllerVersionResponse =
+  | {
+      version: string | null;
+      commit: string | null;
+      openclawVersion?: string | null;
+      openclawCommit?: string | null;
+    }
+  | InstanceNotRunningSentinel;
 
 /** Response from GET /api/platform/openclaw-config */
 export type OpenclawConfigResponse = {
@@ -426,7 +523,7 @@ export type MorningBriefingDeliveryResult = {
 };
 
 export type MorningBriefingStatusLite = Pick<
-  MorningBriefingStatusResponse,
+  MorningBriefingStatusOkResponse,
   | 'enabled'
   | 'desiredEnabled'
   | 'observedEnabled'
@@ -438,9 +535,14 @@ export type MorningBriefingStatusLite = Pick<
   | 'lastGeneratedDate'
   | 'sourceReadiness'
   | 'lastDelivery'
+  | 'interestTopics'
 >;
 
-export type MorningBriefingStatusResponse = {
+export type MorningBriefingStatusResponse =
+  | MorningBriefingStatusOkResponse
+  | InstanceNotRunningSentinel;
+
+export type MorningBriefingStatusOkResponse = {
   ok: boolean;
   enabled?: boolean;
   cron?: string;
@@ -460,6 +562,11 @@ export type MorningBriefingStatusResponse = {
     web: MorningBriefingSourceReadiness;
   };
   lastDelivery?: MorningBriefingDeliveryResult[];
+  // Selected morning-briefing interest topics, sourced from the
+  // `kiloclaw_morning_briefing_configs` Postgres row. Empty array when no
+  // topics are selected; omitted when the instance pre-dates the table or
+  // Postgres was unavailable for this request.
+  interestTopics?: string[];
   code?: string;
   retryAfterSec?: number;
   error?: string;
@@ -477,6 +584,13 @@ export type MorningBriefingActionResponse = {
   delivery?: MorningBriefingDeliveryResult[];
   code?: string;
   retryAfterSec?: number;
+  error?: string;
+};
+
+export type MorningBriefingInterestsResponse = {
+  ok: boolean;
+  interestTopics?: string[];
+  code?: string;
   error?: string;
 };
 
@@ -550,10 +664,34 @@ export type ReassociateVolumeResponse = {
   newRegion: string;
 };
 
+/** Metadata persisted alongside an active admin size override. */
+export type AdminMachineSizeOverrideMetadata = {
+  reason: string;
+  actorId: string;
+  actorEmail: string;
+  setAt: number;
+};
+
 /** Response from POST /api/platform/resize-machine */
 export type ResizeMachineResponse = {
-  previousSize: { cpus: number; memory_mb: number; cpu_kind?: string } | null;
-  newSize: { cpus: number; memory_mb: number; cpu_kind?: string };
+  previousTier: InstanceType | null;
+  newTier: InstanceTierKey;
+  previousVolumeSizeGb: number | null;
+  newVolumeSizeGb: number;
+  machineSize: MachineSize;
+  /** When the resize cleared a pre-existing admin override, captured for audit. */
+  clearedOverride: { size: MachineSize; metadata: AdminMachineSizeOverrideMetadata } | null;
+};
+
+/** Response from POST /api/platform/admin-size-override/set */
+export type SetAdminMachineSizeOverrideResponse = {
+  previousOverride: MachineSize | null;
+  newOverride: MachineSize;
+};
+
+/** Response from POST /api/platform/admin-size-override/clear */
+export type ClearAdminMachineSizeOverrideResponse = {
+  previousOverride: MachineSize | null;
 };
 
 /** Response from GET /api/platform/regions */
@@ -584,17 +722,16 @@ export type UpdateProviderRolloutResponse = {
   availability: ProviderRolloutAvailability;
 };
 
-/** Stream Chat credentials for a user's KiloClaw channel */
-export type ChatCredentials = {
-  apiKey: string;
-  userId: string;
-  userToken: string;
-  channelId: string;
-} | null;
-
 /** Combined status returned by tRPC getStatus */
 export type KiloClawDashboardStatus = PlatformStatusResponse & {
-  /** Worker base URL for constructing the "Open" link. Falls back to claw.kilo.ai. */
+  /**
+   * Worker base URL for constructing the "Open" link.
+   *
+   * When `KILOCLAW_INSTANCE_URL_TEMPLATE` is configured and the instance
+   * is on `controllerCapabilitiesVersion >= 2`, this is the per-instance
+   * virtual host (e.g. `https://i-<hex>.kiloclaw.ai`). Otherwise it falls
+   * back to `KILOCLAW_API_URL` (production: `https://claw.kilo.ai`).
+   */
   workerUrl: string;
   name: string | null;
   /** Postgres row ID. Used to construct /i/{instanceId} proxy paths for instance-keyed instances. */
@@ -602,4 +739,21 @@ export type KiloClawDashboardStatus = PlatformStatusResponse & {
   /** Copyable inbound email address for routing messages into this instance. */
   inboundEmailAddress: string | null;
   inboundEmailEnabled: boolean;
+  /**
+   * Soonest upcoming scheduled action targeting this instance, or null
+   * if none. Drives the in-workspace banner. Cancelled or completed
+   * actions are excluded — a banner that says "your upgrade was
+   * cancelled" comes through email/push, not the live status field.
+   */
+  scheduledAction: KiloClawScheduledActionStatusBlock | null;
+};
+
+export type KiloClawScheduledActionStatusBlock = {
+  scheduledActionId: string;
+  actionType: 'scheduled_restart' | 'version_change';
+  /** When the action will fire (ISO 8601). */
+  scheduledAt: string;
+  /** version_change only — the tag the worker will redeploy on. */
+  targetImageTag: string | null;
+  targetOpenclawVersion: string | null;
 };

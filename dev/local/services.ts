@@ -41,6 +41,7 @@ const groups: ServiceGroup[] = [
   { id: 'auto-fix', label: 'Auto Fix', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
+  { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
   { id: 'storybook', label: 'Storybook', alwaysOn: false, sectionBreakBefore: true },
 ];
 
@@ -64,9 +65,10 @@ type ServiceMeta = {
 
 const serviceMeta: Record<string, ServiceMeta> = {
   // core
-  nextjs: { group: 'core', dependsOn: ['postgres', 'redis'] },
+  nextjs: { group: 'core', dependsOn: ['postgres', 'redis', 'stripe'] },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
+  stripe: { group: 'core', dependsOn: [] },
   // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
@@ -134,11 +136,15 @@ const serviceMeta: Record<string, ServiceMeta> = {
   },
   // kiloclaw
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
-  'kiloclaw-stripe': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-docker-tcp': { group: 'kiloclaw', dependsOn: [] },
+  notifications: {
+    group: 'kiloclaw',
+    dependsOn: ['postgres'],
+    dir: 'services/notifications',
+  },
   kiloclaw: {
     group: 'kiloclaw',
-    dependsOn: ['postgres', 'kiloclaw-tunnel'],
+    dependsOn: ['postgres', 'kiloclaw-tunnel', 'notifications'],
     dir: 'services/kiloclaw',
   },
   'kiloclaw-inbound-email': {
@@ -173,6 +179,8 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/ai-attribution',
   },
   grafana: { group: 'observability', dependsOn: [] },
+  // mobile
+  mobile: { group: 'mobile', dependsOn: [], dir: 'apps/mobile' },
   // storybook
   storybook: { group: 'storybook', dependsOn: [] },
   // gastown
@@ -214,6 +222,20 @@ function getPortOffset(): number {
 }
 
 export const portOffset = getPortOffset();
+
+function getNextjsTargetPort(): number {
+  const explicit = process.env.PORT;
+  if (explicit === undefined || explicit === '') return 3000 + portOffset;
+
+  const port = Number(explicit);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid PORT: ${explicit}`);
+  }
+
+  return port;
+}
+
+const nextjsTargetPort = getNextjsTargetPort();
 
 // ---------------------------------------------------------------------------
 // Wrangler config discovery
@@ -298,7 +320,7 @@ function buildServiceDefs(): ServiceDef[] {
         name,
         type: 'nextjs',
         dir: 'apps/web',
-        port: 3000 + portOffset,
+        port: nextjsTargetPort,
         dependsOn: meta.dependsOn,
         command: ['pnpm', 'run', 'dev'],
         group: meta.group,
@@ -319,6 +341,20 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
+    if (name === 'mobile') {
+      const port = 8081 + portOffset;
+      defs.push({
+        name,
+        type: 'process',
+        dir: 'apps/mobile',
+        port,
+        dependsOn: meta.dependsOn,
+        command: ['pnpm', 'run', 'start', '--', '--port', String(port)],
+        group: meta.group,
+      });
+      continue;
+    }
+
     if (name in INFRA_PORTS) {
       defs.push({
         name,
@@ -333,7 +369,6 @@ function buildServiceDefs(): ServiceDef[] {
     }
 
     if (name === 'kiloclaw-tunnel') {
-      const nextjsPort = 3000 + portOffset;
       const kiloclawPort = readWranglerPort(path.join(repoRoot, 'services/kiloclaw')) + portOffset;
       const kiloChatPort = readWranglerPort(path.join(repoRoot, 'services/kilo-chat')) + portOffset;
       defs.push({
@@ -345,7 +380,7 @@ function buildServiceDefs(): ServiceDef[] {
         command: [
           'tsx',
           'dev/local/scripts/start-tunnel.ts',
-          String(nextjsPort),
+          String(nextjsTargetPort),
           String(kiloclawPort),
           String(kiloChatPort),
         ],
@@ -354,14 +389,14 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
-    if (name === 'kiloclaw-stripe') {
+    if (name === 'stripe') {
       defs.push({
         name,
         type: 'process',
         dir: '.',
         port: 0,
         dependsOn: meta.dependsOn,
-        command: ['tsx', 'dev/local/scripts/start-stripe.ts'],
+        command: ['tsx', 'dev/local/scripts/start-stripe.ts', String(nextjsTargetPort)],
         group: meta.group,
       });
       continue;

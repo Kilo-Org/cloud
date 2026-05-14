@@ -4,6 +4,7 @@ import type { KiloClawRegistry } from './durable-objects/kiloclaw-registry';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 import type { KiloClawBillingBinding } from './kiloclaw-billing-binding';
 import type { KiloChatBinding } from './kilo-chat-binding';
+import type { NotificationsBinding } from './notifications-binding';
 
 /**
  * Environment bindings for the KiloClaw Worker
@@ -13,6 +14,7 @@ export type KiloClawEnv = {
   KILOCLAW_APP: DurableObjectNamespace<KiloClawApp>;
   KILOCLAW_REGISTRY: DurableObjectNamespace<KiloClawRegistry>;
   KILOCLAW_BILLING?: KiloClawBillingBinding;
+  NOTIFICATIONS?: NotificationsBinding;
   KILOCLAW_AE?: AnalyticsEngineDataset;
   KILOCLAW_CONTROLLER_AE: AnalyticsEngineDataset;
   HYPERDRIVE?: Hyperdrive;
@@ -60,6 +62,9 @@ export type KiloClawEnv = {
   NF_TEAM_ID?: string;
   NF_REGION?: string;
   NF_DEPLOYMENT_PLAN?: string;
+  NF_DEPLOYMENT_PLAN_PERF_1_3?: string;
+  NF_DEPLOYMENT_PLAN_PERF_4_8?: string;
+  NF_DEPLOYMENT_PLAN_PERF_4_16?: string;
   NF_STORAGE_CLASS_NAME?: string;
   NF_STORAGE_ACCESS_MODE?: string;
   NF_VOLUME_SIZE_MB?: string;
@@ -76,14 +81,20 @@ export type KiloClawEnv = {
   // Developer identity (development only, auto-populated by dev-start from `fly auth whoami`)
   DEV_CREATOR?: string;
 
-  // Stream Chat (default channel for new instances)
-  STREAM_CHAT_API_KEY?: string;
-  STREAM_CHAT_API_SECRET?: string;
-
   // OpenClaw gateway configuration
   OPENCLAW_ALLOWED_ORIGINS?: string;
   KILOCLAW_CHECKIN_URL?: string;
   REQUIRE_PROXY_TOKEN?: string;
+
+  /**
+   * Host suffix for per-instance virtual hosting. Default `.kiloclaw.ai`.
+   * Dev parity: set to `.kiloclaw.localhost:8795` (or similar) to emulate
+   * per-instance hostnames without /etc/hosts edits. See
+   * `src/auth/hostname-label.ts` for the full rationale.
+   */
+  KILOCLAW_INSTANCE_HOST_SUFFIX?: string;
+  /** URL scheme paired with `KILOCLAW_INSTANCE_HOST_SUFFIX`. Default `https`. */
+  KILOCLAW_INSTANCE_URL_SCHEME?: string;
 
   /** Base URL of the kilo-chat worker for bot HTTP routes. */
   KILOCHAT_BASE_URL?: string;

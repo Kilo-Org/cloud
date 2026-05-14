@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { CodeReviewPayload } from '../triggers/prepare-review-payload';
 import { CODE_REVIEW_WORKER_AUTH_TOKEN } from '@/lib/config.server';
+import * as z from 'zod';
 
 // Fetch timeout in milliseconds
 const FETCH_TIMEOUT_MS = 10000;
@@ -36,8 +37,9 @@ async function fetchWithTimeout(
 
 // Types for API responses
 export type DispatchReviewResponse = {
-  success: boolean;
   reviewId: string;
+  attemptId?: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 };
 
 /**
@@ -61,6 +63,35 @@ export type CancelReviewResponse = {
   success: boolean;
   reviewId: string;
 };
+
+export type RetryReviewFreshResponse = {
+  success: boolean;
+  reviewId: string;
+};
+
+const DispatchReviewResponseSchema = z.object({
+  reviewId: z.string(),
+  attemptId: z.string().optional(),
+  status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
+});
+
+const ReviewStatusResponseSchema = z.object({
+  reviewId: z.string(),
+  attemptId: z.string().optional(),
+  status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
+  sessionId: z.string().optional(),
+  cliSessionId: z.string().optional(),
+  startedAt: z.string().optional(),
+  completedAt: z.string().optional(),
+  model: z.string().optional(),
+  totalTokensIn: z.number().optional(),
+  totalTokensOut: z.number().optional(),
+  totalCost: z.number().optional(),
+  errorMessage: z.string().optional(),
+  terminalReason: z.string().optional(),
+});
+
+export type ReviewStatusResponse = z.infer<typeof ReviewStatusResponseSchema>;
 
 /**
  * Code Review Worker API Client
@@ -89,6 +120,14 @@ class CodeReviewWorkerClient {
     };
   }
 
+  private buildReviewUrl(reviewId: string, suffix: string, attemptId?: string): string {
+    const url = new URL(`${this.baseUrl}/reviews/${reviewId}/${suffix}`);
+    if (attemptId) {
+      url.searchParams.set('attemptId', attemptId);
+    }
+    return url.toString();
+  }
+
   /**
    * Dispatch a code review to the worker
    * Creates a CodeReviewOrchestrator Durable Object and starts the review
@@ -107,15 +146,20 @@ class CodeReviewWorkerClient {
       throw new Error(`Worker returned ${response.status}: ${errorText}`);
     }
 
-    const data: DispatchReviewResponse = await response.json();
+    const data = DispatchReviewResponseSchema.parse(await response.json());
+    if (data.status !== 'queued' && data.status !== 'running') {
+      throw new Error(
+        `Dispatch returned terminal status '${data.status}' for review ${data.reviewId}`
+      );
+    }
     return data;
   }
 
   /**
    * Get events for a code review (used by SSE/cloud-agent flow for polling)
    */
-  async getReviewEvents(reviewId: string): Promise<ReviewEvent[]> {
-    const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/events`, {
+  async getReviewEvents(reviewId: string, attemptId?: string): Promise<ReviewEvent[]> {
+    const response = await fetchWithTimeout(this.buildReviewUrl(reviewId, 'events', attemptId), {
       headers: this.getHeaders(),
     });
 
@@ -131,13 +175,17 @@ class CodeReviewWorkerClient {
    * Cancel a running or queued code review
    * Signals the orchestrator to stop processing and marks the review as cancelled
    */
-  async cancelReview(reviewId: string, reason?: string): Promise<CancelReviewResponse> {
-    const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/cancel`, {
+  async cancelReview(
+    reviewId: string,
+    reason?: string,
+    attemptId?: string
+  ): Promise<CancelReviewResponse> {
+    const response = await fetchWithTimeout(this.buildReviewUrl(reviewId, 'cancel', attemptId), {
       method: 'POST',
       headers: this.getHeaders({
         'Content-Type': 'application/json',
       }),
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ reason, attemptId }),
     });
 
     if (!response.ok) {
@@ -146,6 +194,51 @@ class CodeReviewWorkerClient {
     }
 
     return response.json() as Promise<CancelReviewResponse>;
+  }
+
+  async retryReviewFresh(
+    reviewId: string,
+    input: {
+      sessionId?: string;
+      reason: string;
+      failedAttemptId?: string;
+      retryAttemptId?: string;
+    }
+  ): Promise<RetryReviewFreshResponse> {
+    const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/retry-fresh`, {
+      method: 'POST',
+      headers: this.getHeaders({
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify(input),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Worker returned ${response.status}: ${errorText}`);
+    }
+
+    return response.json() as Promise<RetryReviewFreshResponse>;
+  }
+
+  async getReviewStatus(
+    reviewId: string,
+    attemptId?: string
+  ): Promise<ReviewStatusResponse | null> {
+    const response = await fetchWithTimeout(this.buildReviewUrl(reviewId, 'status', attemptId), {
+      headers: this.getHeaders(),
+    });
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch review status: ${response.status} ${errorText}`);
+    }
+
+    return ReviewStatusResponseSchema.parse(await response.json());
   }
 }
 

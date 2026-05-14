@@ -28,6 +28,9 @@ import type {
   DevicePairingApproveResponse,
   VolumeSnapshotsResponse,
   DoctorResponse,
+  DoctorControllerStartResponse,
+  DoctorControllerStatusResponse,
+  DoctorControllerCancelResponse,
   OpenclawWorkspaceImportResponse,
   KiloCliRunStartResponse,
   KiloCliRunStatusResponse,
@@ -39,6 +42,7 @@ import type {
   OpenclawConfigResponse,
   MorningBriefingStatusResponse,
   MorningBriefingActionResponse,
+  MorningBriefingInterestsResponse,
   MorningBriefingReadResponse,
   GoogleCredentialsInput,
   GoogleCredentialsResponse,
@@ -48,6 +52,8 @@ import type {
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
   ResizeMachineResponse,
+  SetAdminMachineSizeOverrideResponse,
+  ClearAdminMachineSizeOverrideResponse,
   RestoreVolumeSnapshotResponse,
   CleanupRecoveryPreviousVolumeResponse,
   RegionsResponse,
@@ -56,6 +62,7 @@ import type {
   UpdateProviderRolloutResponse,
   ProviderRolloutConfig,
 } from './types';
+import type { InstanceTierKey } from '@kilocode/kiloclaw-instance-tiers';
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
 export interface FileNode {
@@ -213,6 +220,46 @@ export class KiloClawInternalClient {
     );
   }
 
+  /**
+   * Wake the target instance's DO so it re-arms its alarm after a new
+   * scheduled action has been persisted. Best-effort — failures are
+   * acceptable (the wedge in alarm() will eventually pick up the action
+   * the next time the DO ticks for any other reason). See
+   * services/kiloclaw/src/routes/platform.ts for the route comment
+   * explaining why this is required in dev and merely defensive in
+   * production.
+   */
+  async wakeScheduledAction(userId: string, instanceId: string): Promise<{ ok: true }> {
+    return this.request(
+      '/api/platform/scheduled-action/wake',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, instanceId }),
+      },
+      { userId }
+    );
+  }
+
+  /**
+   * Synchronously runs the notification notice sweep that the cron
+   * normally drives. Used by the admin Scheduler tab "Run notice sweep
+   * now" button so admins can verify notice copy locally (where wrangler
+   * does not fire scheduled() on cadence) and on demand in production.
+   * No userId routing — sweep is fleet-wide.
+   */
+  async runScheduledActionNoticeSweep(): Promise<{
+    processed: number;
+    sent: number;
+    failed: number;
+    recovered: number;
+    voidedStale: number;
+  }> {
+    return this.request('/api/platform/scheduled-action/run-notice-sweep', {
+      method: 'POST',
+      body: '{}',
+    });
+  }
+
   async setUserKiloclawEarlyAccess(
     userId: string,
     value: boolean
@@ -326,37 +373,6 @@ export class KiloClawInternalClient {
     });
   }
 
-  async getStreamChatCredentials(
-    userId: string,
-    instanceId?: string
-  ): Promise<{
-    apiKey: string;
-    userId: string;
-    userToken: string;
-    channelId: string;
-  } | null> {
-    const params = new URLSearchParams({ userId });
-    if (instanceId) params.set('instanceId', instanceId);
-    return this.request(`/api/platform/stream-chat-credentials?${params.toString()}`, undefined, {
-      userId,
-    });
-  }
-
-  async sendChatMessage(
-    userId: string,
-    message: string,
-    instanceId?: string
-  ): Promise<{ success: boolean; channelId: string }> {
-    return this.request(
-      '/api/platform/send-chat-message',
-      {
-        method: 'POST',
-        body: JSON.stringify({ userId, message, instanceId }),
-      },
-      { userId }
-    );
-  }
-
   async getMorningBriefingStatus(
     userId: string,
     instanceId?: string
@@ -409,6 +425,22 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async updateBriefingInterests(
+    userId: string,
+    topics: string[],
+    instanceId?: string
+  ): Promise<MorningBriefingInterestsResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/interests${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, topics }),
       },
       { userId }
     );
@@ -605,6 +637,48 @@ export class KiloClawInternalClient {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/doctor${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async startDoctorViaController(
+    userId: string,
+    fix: boolean,
+    instanceId?: string
+  ): Promise<DoctorControllerStartResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/doctor-controller/start${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, fix }),
+      },
+      { userId }
+    );
+  }
+
+  async getDoctorViaControllerStatus(
+    userId: string,
+    instanceId?: string
+  ): Promise<DoctorControllerStatusResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/doctor-controller/status?${params.toString()}`, undefined, {
+      userId,
+    });
+  }
+
+  async cancelDoctorViaController(
+    userId: string,
+    instanceId?: string
+  ): Promise<DoctorControllerCancelResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/doctor-controller/cancel${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
@@ -965,7 +1039,8 @@ export class KiloClawInternalClient {
 
   async resizeMachine(
     userId: string,
-    machineSize: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' },
+    instanceType: InstanceTierKey,
+    actor: { actorId: string; actorEmail: string },
     instanceId?: string
   ): Promise<ResizeMachineResponse> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
@@ -973,7 +1048,44 @@ export class KiloClawInternalClient {
       `/api/platform/resize-machine${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, machineSize }),
+        body: JSON.stringify({ userId, instanceType, ...actor }),
+      },
+      { userId }
+    );
+  }
+
+  async setAdminMachineSizeOverride(
+    userId: string,
+    payload: {
+      size: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' };
+      reason: string;
+      actorId: string;
+      actorEmail: string;
+    },
+    instanceId?: string
+  ): Promise<SetAdminMachineSizeOverrideResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/admin-size-override/set${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, ...payload }),
+      },
+      { userId }
+    );
+  }
+
+  async clearAdminMachineSizeOverride(
+    userId: string,
+    payload: { reason: string; actorId: string; actorEmail: string },
+    instanceId?: string
+  ): Promise<ClearAdminMachineSizeOverrideResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/admin-size-override/clear${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, ...payload }),
       },
       { userId }
     );
@@ -1016,6 +1128,7 @@ export class KiloClawInternalClient {
     userId: string,
     appName: string,
     volumeId: string,
+    targetSizeGb: number,
     instanceId?: string
   ): Promise<{ ok: true; needsRestart: boolean }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
@@ -1023,7 +1136,7 @@ export class KiloClawInternalClient {
       `/api/platform/extend-volume${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, appName, volumeId }),
+        body: JSON.stringify({ userId, appName, volumeId, targetSizeGb }),
       },
       { userId }
     );

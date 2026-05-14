@@ -5,7 +5,7 @@
 
 import type { StoredMessage } from '@/components/cloud-agent-next/types';
 import type { Images } from '@/lib/images-schema';
-import type { SessionDisplayInfo, WorkerVersion } from '@/lib/app-builder/types';
+import type { SessionDisplayInfo } from '@/lib/app-builder/types';
 import type { AppTRPCClient } from '../../types';
 import type { V2Session } from '../types';
 import { createV2SessionStore } from './store';
@@ -23,11 +23,7 @@ export type CreateV2SessionConfig = {
   organizationId?: string | null;
   trpcClient?: AppTRPCClient;
   onStreamComplete?: () => void;
-  onSessionChanged?: (
-    newSessionId: string,
-    workerVersion: WorkerVersion,
-    userMessage: SessionChangedUserMessage
-  ) => void;
+  onSessionChanged?: (newSessionId: string, userMessage: SessionChangedUserMessage) => void;
 };
 
 /**

@@ -1,11 +1,32 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { ExternalLink, CreditCard, Coins, Loader2 } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ExternalLink, Loader2 } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
+
 import { useTRPC } from '@/lib/trpc/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import KiloCrabIcon from '@/components/KiloCrabIcon';
+import { DetailRow } from '@/components/subscriptions/DetailRow';
+import { formatPaymentSummary } from '@/components/subscriptions/helpers';
+import { SubscriptionStatusBadge } from '@/components/subscriptions/SubscriptionStatusBadge';
+import { useInvalidateKiloClawBilling } from '@/components/subscriptions/kiloclaw/useKiloClawBillingQueries';
+import { cn } from '@/lib/utils';
+
 import {
   COMMIT_PERIOD_MONTHS,
   formatBillingDate,
@@ -14,34 +35,28 @@ import {
   planLabel,
   type ClawBillingStatus,
 } from './billing-types';
+import { ReferralRewardsSummary } from './ReferralRewardsSummary';
 
 type SubscriptionCardProps = {
   billing: ClawBillingStatus;
   onCancelClick: () => void;
 };
 
-function PaymentSourceBadge({
-  subscription,
-}: {
-  subscription: NonNullable<ClawBillingStatus['subscription']>;
-}) {
-  if (subscription.hasStripeFunding) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-2 py-0.5 text-xs font-medium text-indigo-400">
-        <CreditCard className="h-3 w-3" />
-        Stripe
-      </span>
-    );
-  }
-  if (subscription.paymentSource === 'credits') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-400">
-        <Coins className="h-3 w-3" />
-        Credits
-      </span>
-    );
-  }
-  return null;
+type ShellStatus = 'active' | 'pending_settlement' | 'past_due' | 'unpaid' | 'pending_cancellation';
+
+function KiloClawCardShell({ status, children }: { status: ShellStatus; children: ReactNode }) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <KiloCrabIcon className="size-5" />
+          KiloClaw subscription
+        </CardTitle>
+        <SubscriptionStatusBadge status={status} />
+      </CardHeader>
+      <CardContent className="space-y-6">{children}</CardContent>
+    </Card>
+  );
 }
 
 function PendingSettlementSubscriptionCard({ billing }: { billing: ClawBillingStatus }) {
@@ -49,29 +64,27 @@ function PendingSettlementSubscriptionCard({ billing }: { billing: ClawBillingSt
   if (!sub) return null;
 
   return (
-    <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🦀</span>
-          <span className="text-foreground text-sm font-semibold">KiloClaw Subscription</span>
-        </div>
-        <PaymentSourceBadge subscription={sub} />
-      </div>
-
-      <div className="flex items-start gap-3">
-        <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-blue-400" />
-        <div className="text-muted-foreground space-y-1 text-sm">
-          <div>
-            <span>Status:</span> <span className="text-blue-300">Processing payment</span>
-          </div>
-          <p className="text-blue-300">
-            Hosting activates after invoice settlement. This usually takes just a moment.
-          </p>
-        </div>
-      </div>
-    </div>
+    <KiloClawCardShell status="pending_settlement">
+      <Alert variant="notice">
+        <Loader2 className="animate-spin" aria-hidden="true" />
+        <AlertTitle>Processing payment</AlertTitle>
+        <AlertDescription>
+          Hosting activates after invoice settlement. This usually takes just a moment.
+        </AlertDescription>
+      </Alert>
+    </KiloClawCardShell>
   );
 }
+
+type ActiveConfirmationAction = 'switchPlan' | 'cancelPlanSwitch' | 'switchToCredits';
+
+type ActiveConfirmation = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  pendingLabel: string;
+  run: () => Promise<unknown>;
+};
 
 function ActiveSubscriptionCard({
   billing,
@@ -81,8 +94,9 @@ function ActiveSubscriptionCard({
   onCancelClick: () => void;
 }) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const instanceId = billing.instance?.id ?? null;
+  const invalidate = useInvalidateKiloClawBilling(instanceId);
+
   const switchPlanMutation = useMutation(trpc.kiloclaw.switchPlanAtInstance.mutationOptions());
   const portalMutation = useMutation(trpc.kiloclaw.getCustomerPortalUrl.mutationOptions());
   const cancelSwitchMutation = useMutation(
@@ -91,6 +105,12 @@ function ActiveSubscriptionCard({
   const acceptConversionMutation = useMutation(
     trpc.kiloclaw.acceptConversionAtInstance.mutationOptions()
   );
+
+  const [confirmationAction, setConfirmationAction] = useState<ActiveConfirmationAction | null>(
+    null
+  );
+  const [pendingAction, setPendingAction] = useState<ActiveConfirmationAction | null>(null);
+
   const CONVERSION_DISMISSED_KEY = 'kiloclaw-conversion-dismissed';
   const [conversionDismissed, setConversionDismissed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -98,43 +118,27 @@ function ActiveSubscriptionCard({
   });
 
   const sub = billing.subscription;
+
+  useEffect(() => {
+    if (sub && !sub.showConversionPrompt && conversionDismissed) {
+      localStorage.removeItem(CONVERSION_DISMISSED_KEY);
+      setConversionDismissed(false);
+    }
+  }, [sub, conversionDismissed]);
+
   if (!sub) return null;
 
   const isCommit = sub.plan === 'commit';
-  const currentPlanLabel = planLabel(sub.plan);
+  const otherPlan = isCommit ? 'standard' : 'commit';
   const otherPlanLabel = isCommit
     ? `Standard ($${PLAN_DISPLAY.standard.monthlyDollars}/mo)`
     : `Commit ($${PLAN_DISPLAY.commit.monthlyDollars}/mo · ${COMMIT_PERIOD_MONTHS}-mo term)`;
 
   const hasUserRequestedSwitch = sub.scheduledBy === 'user';
-
-  async function invalidateBillingQueries() {
-    if (!instanceId) return;
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.getSubscriptionDetail.queryKey({ instanceId }),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.getBillingHistory.queryKey({ instanceId }),
-      }),
-    ]);
-  }
-
-  async function handleSwitchPlan() {
-    if (!instanceId) return;
-    const toPlan = isCommit ? 'standard' : 'commit';
-    await switchPlanMutation.mutateAsync({ instanceId, toPlan });
-    await invalidateBillingQueries();
-  }
+  const isCreditFunded = !sub.hasStripeFunding && sub.paymentSource === 'credits';
+  const renewalDate =
+    isCreditFunded && sub.creditRenewalAt ? sub.creditRenewalAt : sub.currentPeriodEnd;
+  const showConversion = sub.showConversionPrompt && !conversionDismissed;
 
   async function handleManageBilling() {
     if (!instanceId) return;
@@ -145,154 +149,205 @@ function ActiveSubscriptionCard({
     window.location.href = result.url;
   }
 
-  async function handleCancelSwitch() {
-    if (!instanceId) return;
-    await cancelSwitchMutation.mutateAsync({ instanceId });
-    await invalidateBillingQueries();
+  const confirmations: Record<ActiveConfirmationAction, ActiveConfirmation> = {
+    switchPlan: {
+      title: `Switch to ${isCommit ? 'Standard' : 'Commit'}?`,
+      description: `Schedules your KiloClaw subscription to switch plans at the next renewal. Your current plan stays active until then.`,
+      confirmLabel: `Switch to ${otherPlan}`,
+      pendingLabel: `Switching to ${otherPlan}`,
+      run: async () => {
+        if (!instanceId) return;
+        await switchPlanMutation.mutateAsync({ instanceId, toPlan: otherPlan });
+      },
+    },
+    cancelPlanSwitch: {
+      title: 'Cancel scheduled plan switch?',
+      description:
+        'Keeps your KiloClaw subscription on its current plan and removes the pending change.',
+      confirmLabel: 'Cancel plan switch',
+      pendingLabel: 'Canceling plan switch',
+      run: async () => {
+        if (!instanceId) return;
+        await cancelSwitchMutation.mutateAsync({ instanceId });
+      },
+    },
+    switchToCredits: {
+      title: 'Switch hosting billing to credits?',
+      description:
+        'Stripe billing stays active through the current period, then this subscription renews against your credit balance.',
+      confirmLabel: 'Switch to Credits',
+      pendingLabel: 'Switching to credits',
+      run: async () => {
+        if (!instanceId) return;
+        await acceptConversionMutation.mutateAsync({ instanceId });
+      },
+    },
+  };
+
+  const activeConfirmation = confirmationAction ? confirmations[confirmationAction] : null;
+  const isPending = pendingAction !== null;
+
+  function confirmCurrentAction() {
+    if (!confirmationAction || !activeConfirmation) return;
+    setPendingAction(confirmationAction);
+    void (async () => {
+      try {
+        await activeConfirmation.run();
+        setConfirmationAction(null);
+        try {
+          await invalidate();
+        } catch (error) {
+          console.error('[kiloclaw-billing] failed to refresh after confirmation action', error);
+          toast.error('Action completed, but billing did not refresh. Refresh the page.');
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Action failed. Try again.');
+      } finally {
+        setPendingAction(null);
+      }
+    })();
   }
-
-  async function handleAcceptConversion() {
-    if (!instanceId) return;
-    await acceptConversionMutation.mutateAsync({ instanceId });
-    await invalidateBillingQueries();
-  }
-
-  // Clear the persisted dismiss when the prompt is no longer relevant
-  // (e.g. user converted, subscription changed) so it doesn't stay hidden forever.
-  useEffect(() => {
-    if (!sub.showConversionPrompt && conversionDismissed) {
-      localStorage.removeItem(CONVERSION_DISMISSED_KEY);
-      setConversionDismissed(false);
-    }
-  }, [sub.showConversionPrompt, conversionDismissed]);
-
-  const showConversion = sub.showConversionPrompt && !conversionDismissed;
-
-  // Credit-funded renewal info
-  const isCreditFunded = !sub.hasStripeFunding && sub.paymentSource === 'credits';
-  const renewalDate =
-    isCreditFunded && sub.creditRenewalAt ? sub.creditRenewalAt : sub.currentPeriodEnd;
 
   return (
-    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🦀</span>
-          <span className="text-foreground text-sm font-semibold">KiloClaw Subscription</span>
-        </div>
-        <PaymentSourceBadge subscription={sub} />
+    <KiloClawCardShell status="active">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <DetailRow label="Plan" value={planLabel(sub.plan)} numeric />
+        <DetailRow
+          label={isCommit ? 'Commit period ends' : 'Next billing'}
+          value={formatBillingDate(renewalDate)}
+          numeric
+        />
+        <DetailRow
+          label="Payment source"
+          value={formatPaymentSummary({
+            paymentSource: sub.paymentSource,
+            hasStripeFunding: sub.hasStripeFunding,
+          })}
+        />
+        {isCommit ? (
+          <DetailRow label="Auto-renew" value={`Yes — every ${COMMIT_PERIOD_MONTHS} months`} />
+        ) : null}
+        {isCreditFunded && sub.renewalCostMicrodollars != null ? (
+          <DetailRow
+            label="Renewal cost"
+            value={`${formatMicrodollars(sub.renewalCostMicrodollars)} from credits`}
+            numeric
+          />
+        ) : null}
       </div>
 
-      <div className="text-muted-foreground space-y-1 text-sm">
-        <div>
-          <span>Plan:</span> <span className="text-foreground">{currentPlanLabel}</span>
-        </div>
-        <div>
-          <span>Status:</span> <span className="text-emerald-400">Active</span>
-        </div>
-        {isCommit && sub.commitEndsAt ? (
-          <>
-            <div>
-              <span>Commit period ends:</span>{' '}
-              <span className="text-foreground">{formatBillingDate(sub.commitEndsAt)}</span>
-            </div>
-            <div className="text-xs">(Auto-renews for another {COMMIT_PERIOD_MONTHS} months)</div>
-          </>
-        ) : (
-          <div>
-            <span>Next billing:</span>{' '}
-            <span className="text-foreground">{formatBillingDate(renewalDate)}</span>
-          </div>
-        )}
-        {isCreditFunded && sub.renewalCostMicrodollars != null && (
-          <div>
-            <span>Renewal cost:</span>{' '}
-            <span className="text-foreground">
-              {formatMicrodollars(sub.renewalCostMicrodollars)} from credit balance
-            </span>
-          </div>
-        )}
-        {hasUserRequestedSwitch && (
-          <div className="mt-1 text-amber-400">
+      {hasUserRequestedSwitch ? (
+        <Alert variant="warning">
+          <AlertDescription>
             Switching to {isCommit ? 'Standard' : 'Commit'} on{' '}
-            {formatBillingDate(sub.currentPeriodEnd)}
-          </div>
-        )}
-      </div>
+            <span className="tabular-nums">{formatBillingDate(sub.currentPeriodEnd)}</span>.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
-      {showConversion && (
-        <div className="mt-3 rounded-lg border border-blue-500/30 bg-blue-500/10 p-3">
-          <p className="text-sm text-blue-300">
-            You have an active Kilo Pass. Switch hosting to credit-funded billing to stop the
-            separate Stripe charge — your current period continues as-is.
-          </p>
-          <div className="mt-2 flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAcceptConversion}
-              disabled={acceptConversionMutation.isPending || !instanceId}
-            >
-              Switch to Credits
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                localStorage.setItem(CONVERSION_DISMISSED_KEY, '1');
-                setConversionDismissed(true);
-              }}
-            >
-              Dismiss
-            </Button>
-          </div>
-        </div>
-      )}
+      {showConversion ? (
+        <Alert variant="notice">
+          <AlertDescription>
+            <p>
+              You have an active Kilo Pass. Switch hosting to credit-funded billing to stop the
+              separate Stripe charge — your current period continues as-is.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button
+                size="sm"
+                onClick={() => setConfirmationAction('switchToCredits')}
+                disabled={!instanceId}
+              >
+                Switch to Credits
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  localStorage.setItem(CONVERSION_DISMISSED_KEY, '1');
+                  setConversionDismissed(true);
+                }}
+              >
+                Dismiss
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <ReferralRewardsSummary rewards={sub.referralRewards} variant="section" />
+
+      <div className="flex flex-wrap gap-2 pt-1">
         {hasUserRequestedSwitch ? (
           <Button
             variant="outline"
             size="sm"
-            onClick={handleCancelSwitch}
-            disabled={cancelSwitchMutation.isPending || !instanceId}
+            onClick={() => setConfirmationAction('cancelPlanSwitch')}
+            disabled={!instanceId}
           >
-            {cancelSwitchMutation.isPending ? (
-              <>
-                <Loader2 className="animate-spin" />
-                Canceling...
-              </>
-            ) : (
-              'Cancel Switch'
-            )}
+            Cancel plan switch
           </Button>
         ) : (
           <Button
             variant="outline"
             size="sm"
-            onClick={handleSwitchPlan}
-            disabled={switchPlanMutation.isPending || !instanceId}
+            onClick={() => setConfirmationAction('switchPlan')}
+            disabled={!instanceId}
           >
-            {switchPlanMutation.isPending ? (
-              <>
-                <Loader2 className="animate-spin" />
-                Switching...
-              </>
-            ) : (
-              `Switch to ${otherPlanLabel}`
-            )}
+            Switch to {otherPlanLabel}
           </Button>
         )}
-        <Button variant="outline" size="sm" onClick={onCancelClick}>
-          Cancel
+        {sub.hasStripeFunding ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleManageBilling}
+            disabled={portalMutation.isPending}
+            aria-busy={portalMutation.isPending}
+          >
+            {portalMutation.isPending ? (
+              <Loader2 className="animate-spin" aria-hidden="true" />
+            ) : null}
+            Manage payment <ExternalLink className="ml-1 size-3" aria-hidden="true" />
+          </Button>
+        ) : null}
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            'text-destructive hover:bg-destructive/10 hover:text-destructive',
+            'ml-auto'
+          )}
+          onClick={onCancelClick}
+        >
+          Cancel subscription
         </Button>
-        {sub.hasStripeFunding && (
-          <Button variant="ghost" size="sm" onClick={handleManageBilling}>
-            Manage Payment <ExternalLink className="ml-1 h-3 w-3" />
-          </Button>
-        )}
       </div>
-    </div>
+
+      <AlertDialog
+        open={confirmationAction !== null}
+        onOpenChange={open => {
+          if (!open && !isPending) setConfirmationAction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{activeConfirmation?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{activeConfirmation?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmCurrentAction}
+              disabled={isPending}
+              aria-busy={isPending}
+            >
+              {isPending ? activeConfirmation?.pendingLabel : activeConfirmation?.confirmLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </KiloClawCardShell>
   );
 }
 
@@ -309,47 +364,39 @@ function ConvertingSubscriptionCard({
   if (!sub) return null;
 
   return (
-    <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🦀</span>
-          <span className="text-foreground text-sm font-semibold">KiloClaw Subscription</span>
-        </div>
-        <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-xs font-medium text-blue-400">
-          <Coins className="h-3 w-3" />
-          Switching to Credits
-        </span>
+    <KiloClawCardShell status="pending_cancellation">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <DetailRow label="Plan" value={planLabel(sub.plan)} numeric />
+        <DetailRow
+          label="Switches to credits on"
+          value={formatBillingDate(sub.currentPeriodEnd)}
+          numeric
+        />
+        <DetailRow label="Payment source" value="Stripe" />
       </div>
 
-      <div className="text-muted-foreground space-y-1 text-sm">
-        <div>
-          <span>Plan:</span> <span className="text-foreground">{planLabel(sub.plan)}</span>
-        </div>
-        <div>
-          <span>Status:</span>{' '}
-          <span className="text-blue-400">
-            Switches to credit billing on {formatBillingDate(sub.currentPeriodEnd)}
-          </span>
-        </div>
-        <p className="text-muted-foreground text-xs">
+      <Alert variant="notice">
+        <AlertDescription>
           Your Stripe charge ends at the current period. After that, hosting renews from your credit
           balance.
-        </p>
-      </div>
+        </AlertDescription>
+      </Alert>
 
-      <div className="mt-4">
-        <Button variant="outline" size="sm" onClick={onReactivateClick} disabled={isReactivating}>
+      <ReferralRewardsSummary rewards={sub.referralRewards} variant="section" />
+
+      <div className="flex flex-wrap gap-2 pt-1">
+        <Button onClick={onReactivateClick} disabled={isReactivating} aria-busy={isReactivating}>
           {isReactivating ? (
             <>
-              <Loader2 className="animate-spin" />
-              Reactivating...
+              <Loader2 className="animate-spin" aria-hidden="true" />
+              Reactivating…
             </>
           ) : (
-            'Keep Stripe Billing'
+            'Keep Stripe billing'
           )}
         </Button>
       </div>
-    </div>
+    </KiloClawCardShell>
   );
 }
 
@@ -366,40 +413,42 @@ function CancelingSubscriptionCard({
   if (!sub) return null;
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🦀</span>
-          <span className="text-foreground text-sm font-semibold">KiloClaw Subscription</span>
-        </div>
-        <PaymentSourceBadge subscription={sub} />
+    <KiloClawCardShell status="pending_cancellation">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <DetailRow label="Plan" value={planLabel(sub.plan)} numeric />
+        <DetailRow label="Cancels on" value={formatBillingDate(sub.currentPeriodEnd)} numeric />
+        <DetailRow
+          label="Payment source"
+          value={formatPaymentSummary({
+            paymentSource: sub.paymentSource,
+            hasStripeFunding: sub.hasStripeFunding,
+          })}
+        />
       </div>
 
-      <div className="text-muted-foreground space-y-1 text-sm">
-        <div>
-          <span>Plan:</span> <span className="text-foreground">{planLabel(sub.plan)}</span>
-        </div>
-        <div>
-          <span>Status:</span>{' '}
-          <span className="text-amber-400">
-            Cancels on {formatBillingDate(sub.currentPeriodEnd)}
-          </span>
-        </div>
-      </div>
+      <Alert variant="warning">
+        <AlertDescription>
+          Your subscription cancels on{' '}
+          <span className="tabular-nums">{formatBillingDate(sub.currentPeriodEnd)}</span>.
+          Reactivate to keep it renewing.
+        </AlertDescription>
+      </Alert>
 
-      <div className="mt-4">
-        <Button variant="outline" onClick={onReactivateClick} disabled={isReactivating}>
+      <ReferralRewardsSummary rewards={sub.referralRewards} variant="section" />
+
+      <div className="flex flex-wrap gap-2 pt-1">
+        <Button onClick={onReactivateClick} disabled={isReactivating} aria-busy={isReactivating}>
           {isReactivating ? (
             <>
-              <Loader2 className="animate-spin" />
-              Reactivating...
+              <Loader2 className="animate-spin" aria-hidden="true" />
+              Reactivating…
             </>
           ) : (
             'Reactivate'
           )}
         </Button>
       </div>
-    </div>
+    </KiloClawCardShell>
   );
 }
 
@@ -414,72 +463,56 @@ function PastDueSubscriptionCard({
   if (!sub) return null;
 
   const isCreditFunded = !sub.hasStripeFunding && sub.paymentSource === 'credits';
+  const status: ShellStatus = sub.status === 'unpaid' ? 'unpaid' : 'past_due';
 
   return (
-    <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🦀</span>
-          <span className="text-foreground text-sm font-semibold">KiloClaw Subscription</span>
-        </div>
-        <PaymentSourceBadge subscription={sub} />
+    <KiloClawCardShell status={status}>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <DetailRow label="Plan" value={planLabel(sub.plan)} numeric />
+        <DetailRow
+          label="Payment source"
+          value={formatPaymentSummary({
+            paymentSource: sub.paymentSource,
+            hasStripeFunding: sub.hasStripeFunding,
+          })}
+        />
       </div>
 
-      <div className="text-muted-foreground space-y-1 text-sm">
-        <div>
-          <span>Status:</span> <span className="text-red-400">Payment Failed</span>
-        </div>
-        <p className="text-red-400">
+      <Alert variant="destructive">
+        <AlertTitle>Payment failed</AlertTitle>
+        <AlertDescription>
           {isCreditFunded
             ? 'Your credit balance is insufficient for the next renewal. Add credits to avoid service interruption.'
             : 'Your last payment failed. Update your payment method to avoid service interruption.'}
-        </p>
-      </div>
+        </AlertDescription>
+      </Alert>
 
-      <div className="mt-4">
+      <ReferralRewardsSummary rewards={sub.referralRewards} variant="section" />
+
+      <div className="flex flex-wrap gap-2 pt-1">
         {isCreditFunded ? (
           <Button variant="destructive" asChild>
-            <Link href="/credits">Add Credits</Link>
+            <Link href="/credits">Add credits</Link>
           </Button>
         ) : (
           <Button variant="destructive" onClick={onUpdatePaymentClick}>
-            Update Payment Method
+            Update payment method
           </Button>
         )}
       </div>
-    </div>
+    </KiloClawCardShell>
   );
 }
 
 export function SubscriptionCard({ billing, onCancelClick }: SubscriptionCardProps) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const instanceId = billing.instance?.id ?? null;
+  const invalidate = useInvalidateKiloClawBilling(instanceId);
+
   const reactivateMutation = useMutation(
     trpc.kiloclaw.reactivateSubscriptionAtInstance.mutationOptions()
   );
   const portalMutation = useMutation(trpc.kiloclaw.getCustomerPortalUrl.mutationOptions());
-
-  async function invalidateBillingQueries() {
-    if (!instanceId) return;
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.getSubscriptionDetail.queryKey({ instanceId }),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.getBillingHistory.queryKey({ instanceId }),
-      }),
-    ]);
-  }
 
   function handleReactivate() {
     if (!instanceId || reactivateMutation.isPending) return;
@@ -487,7 +520,7 @@ export function SubscriptionCard({ billing, onCancelClick }: SubscriptionCardPro
       { instanceId },
       {
         onSuccess: () => {
-          void invalidateBillingQueries();
+          void invalidate();
         },
       }
     );

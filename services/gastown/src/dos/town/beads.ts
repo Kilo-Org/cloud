@@ -41,6 +41,7 @@ import {
   createTableConvoyMetadata,
   migrateConvoyMetadata,
 } from '../../db/tables/convoy-metadata.table';
+import { town_events } from '../../db/tables/town-events.table';
 import { query } from '../../util/query.util';
 import type {
   CreateBeadInput,
@@ -903,6 +904,17 @@ export function deleteBead(sql: SqlStorage, beadId: string, rigId?: string): boo
     beadId,
   ]);
 
+  // Remove any pending/processed reconciler events targeting this bead or
+  // this agent (agents are themselves beads, so deleteBead is used for both).
+  // Without this, bead_cancelled / container_status / … events that reference
+  // a deleted bead make applyEvent throw forever on every alarm tick.
+  query(
+    sql,
+    /* sql */ `DELETE FROM ${town_events}
+               WHERE ${town_events.bead_id} = ? OR ${town_events.agent_id} = ?`,
+    [beadId, beadId]
+  );
+
   query(sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.bead_id} = ?`, [beadId]);
   return true;
 }
@@ -1000,6 +1012,16 @@ export function deleteBeads(sql: SqlStorage, beadIds: string[], rigId?: string):
   );
   sql.exec(
     /* sql */ `DELETE FROM ${convoy_metadata} WHERE ${convoy_metadata.bead_id} IN (${placeholders})`,
+    ...allIdsArr
+  );
+
+  // Remove any reconciler events referencing these beads/agents. See
+  // deleteBead above for rationale.
+  sql.exec(
+    /* sql */ `DELETE FROM ${town_events}
+               WHERE ${town_events.bead_id} IN (${placeholders})
+                  OR ${town_events.agent_id} IN (${placeholders})`,
+    ...allIdsArr,
     ...allIdsArr
   );
 

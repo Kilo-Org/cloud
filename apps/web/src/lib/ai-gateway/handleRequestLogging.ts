@@ -9,6 +9,7 @@ import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-e
 const users = [
   '992891e9fe987b8960a05ed0bc9cc456979d1d71410d467f212e6233dbc0a523', // christiaan
   'a8cd59cc6df67645c2f509948ee9a579582a7593db43fbad9bcf37cce38f2d87', // https://kilo-code.slack.com/archives/C09H2GDAJ75/p1776149178143169
+  'de30ace080f1ea4d269c0d37b68fd41f3e6895751ce032a713fe6e07eb314dfb', // https://kilo-code.slack.com/archives/C090U1NLQUC/p1778487038443649?thread_ts=1778480356.436739&cid=C090U1NLQUC
 ];
 
 const organizations = [
@@ -61,31 +62,10 @@ export async function handleRequestLogging(params: {
         apiRequestLogId[0].id
       );
     } catch (e) {
+      const cause = e instanceof Error ? e.cause : undefined;
       logExceptInTest(
-        `[handleRequestLogging] failed to insert api_request_log (user=${user?.id}, status=${clonedResponse.status}, model=${model})`
+        `[handleRequestLogging] failed to insert api_request_log (user=${user?.id}, status=${clonedResponse.status}, model=${model}) cause (truncated): ${String(cause).substring(0, 4000)} error (truncated): ${String(e).substring(0, 4000)}`
       );
-      try {
-        logExceptInTest(
-          '[handleRequestLogging] error (truncated): ' + String(e).substring(0, 4000)
-        );
-      } catch {
-        //ignore
-      }
-      try {
-        logExceptInTest(
-          '[handleRequestLogging] request (truncated): ' +
-            JSON.stringify(request.body).substring(0, 4000)
-        );
-      } catch {
-        //ignore
-      }
-      try {
-        logExceptInTest(
-          '[handleRequestLogging] response (truncated): ' + response?.substring(0, 4000)
-        );
-      } catch {
-        //ignore
-      }
     }
   });
 }

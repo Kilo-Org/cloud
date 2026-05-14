@@ -1,8 +1,7 @@
-import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
-export function isMoonshotModel(model: string) {
-  return modelStartsWith(model, 'moonshotai/');
+export function isKimiModel(model: string) {
+  return model.includes('kimi');
 }
 
 export function applyMoonshotModelSettings(requestToMutate: GatewayRequest) {
@@ -14,4 +13,4 @@ export function applyMoonshotModelSettings(requestToMutate: GatewayRequest) {
 
 export const KIMI_CURRENT_MODEL_ID = 'moonshotai/kimi-k2.6';
 
-export const KIMI_CURRENT_MODEL_NAME = 'Kimi K2.6';
+export const KIMI_CURRENT_VERCEL_MODEL_ID = KIMI_CURRENT_MODEL_ID;

@@ -21,6 +21,7 @@ import {
   kiloclaw_subscription_change_log,
   kilocode_users,
   credit_transactions,
+  kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   user_affiliate_attributions,
   user_affiliate_events,
@@ -31,7 +32,8 @@ import { createOrganization } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import type Stripe from 'stripe';
-import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { KiloPassTier, KiloPassCadence, KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { differenceInCalendarMonths } from 'date-fns';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
@@ -305,14 +307,38 @@ async function insertPersonalSubscriptionFixture(params: PersonalSubscriptionFix
   });
 }
 
-async function seedDeliveredImpactSignupEvent(userId: string, email: string) {
+async function seedDeliveredImpactSignupEvent(
+  userId: string,
+  email: string,
+  conversionDate = new Date()
+) {
   const { recordAffiliateAttributionAndQueueParentEvent } = await import('@/lib/affiliate-events');
+  const { recordImpactAffiliateTouch } = await import('@/lib/impact-referral');
+  const eventDate = new Date(conversionDate.getTime() - 10 * 60_000);
+
   const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
     userId,
     provider: 'impact',
     trackingId: 'impact-click-123',
     customerEmail: email,
-    eventDate: new Date('2026-04-09T10:00:00.000Z'),
+    eventDate,
+  });
+
+  await recordImpactAffiliateTouch({
+    userId,
+    touch: {
+      trackingId: 'impact-click-123',
+      trackingValueLength: 'impact-click-123'.length,
+      isTrackingValueAccepted: true,
+      landingPath: '/pricing?im_ref=impact-click-123',
+      utmSource: null,
+      utmMedium: null,
+      utmCampaign: null,
+      utmTerm: null,
+      utmContent: null,
+      touchedAt: eventDate,
+      expiresAt: new Date(conversionDate.getTime() + 30 * 86_400_000),
+    },
   });
 
   expect(parentEvent).not.toBeNull();
@@ -1419,9 +1445,11 @@ describe('subscription center procedures', () => {
         status: 'active',
       },
     ]);
+    const kiloPassStripeSubscriptionId = `kp-target-convert-${crypto.randomUUID()}`;
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
-      stripe_subscription_id: `kp-target-convert-${crypto.randomUUID()}`,
+      provider_subscription_id: kiloPassStripeSubscriptionId,
+      stripe_subscription_id: kiloPassStripeSubscriptionId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,
       status: 'active',
@@ -1514,9 +1542,11 @@ describe('subscription center procedures', () => {
       plan: 'standard',
       status: 'active',
     });
+    const kiloPassStripeSubscriptionId = `kp-target-convert-rollback-${crypto.randomUUID()}`;
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
-      stripe_subscription_id: `kp-target-convert-rollback-${crypto.randomUUID()}`,
+      provider_subscription_id: kiloPassStripeSubscriptionId,
+      stripe_subscription_id: kiloPassStripeSubscriptionId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,
       status: 'active',
@@ -2774,7 +2804,8 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
   });
 
   it('enqueues sale affiliate events for delivered attributed users', async () => {
-    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+    const paidAt = new Date('2026-04-09T10:00:00.000Z');
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email, paidAt);
 
     const [instance] = await db
       .insert(kiloclaw_instances)
@@ -2831,7 +2862,7 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
           ],
         },
         status_transitions: {
-          paid_at: Math.floor(new Date('2026-04-09T10:00:00.000Z').getTime() / 1000),
+          paid_at: Math.floor(paidAt.getTime() / 1000),
         },
       } as unknown as Stripe.Invoice,
     });
@@ -5062,11 +5093,9 @@ describe('enrollWithCredits', () => {
     expect(sub.payment_source).toBe('credits');
     expect(sub.commit_ends_at).not.toBeNull();
 
-    // commit_ends_at should be ~6 months from now
+    // commit_ends_at should be 6 calendar months from now.
     const commitEnd = new Date(sub.commit_ends_at!);
-    const diffDays = (commitEnd.getTime() - Date.now()) / 86_400_000;
-    expect(diffDays).toBeGreaterThanOrEqual(178);
-    expect(diffDays).toBeLessThanOrEqual(184);
+    expect(differenceInCalendarMonths(commitEnd, new Date())).toBe(6);
   });
 
   it('rejects enrollment when balance is insufficient', async () => {
@@ -5409,19 +5438,41 @@ describe('getBillingStatus with credits', () => {
     status: Stripe.Subscription.Status;
     cancelAtPeriodEnd?: boolean;
     endedAt?: string | null;
+    paymentProvider?: KiloPassPaymentProvider;
+    providerSubscriptionId?: string | null;
   }) {
-    await db.insert(kilo_pass_subscriptions).values({
-      kilo_user_id: params.userId,
-      stripe_subscription_id: `kp-stripe-sub-${crypto.randomUUID()}`,
-      tier: KiloPassTier.Tier19,
-      cadence: KiloPassCadence.Monthly,
-      status: params.status,
-      cancel_at_period_end: params.cancelAtPeriodEnd ?? false,
-      started_at: new Date().toISOString(),
-      ended_at: params.endedAt ?? null,
-      current_streak_months: 1,
-      next_yearly_issue_at: null,
-    });
+    const paymentProvider = params.paymentProvider ?? KiloPassPaymentProvider.Stripe;
+    const stripeSubscriptionId =
+      paymentProvider === KiloPassPaymentProvider.Stripe
+        ? (params.providerSubscriptionId ?? `kp-stripe-sub-${crypto.randomUUID()}`)
+        : null;
+    const providerSubscriptionId =
+      paymentProvider === KiloPassPaymentProvider.Stripe
+        ? stripeSubscriptionId
+        : (params.providerSubscriptionId ?? null);
+    const [subscription] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: params.userId,
+        payment_provider: paymentProvider,
+        provider_subscription_id: providerSubscriptionId,
+        stripe_subscription_id: stripeSubscriptionId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: params.status,
+        cancel_at_period_end: params.cancelAtPeriodEnd ?? false,
+        started_at: new Date().toISOString(),
+        ended_at: params.endedAt ?? null,
+        current_streak_months: 1,
+        next_yearly_issue_at: null,
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+
+    if (!subscription) {
+      throw new Error('Failed to create Kilo Pass subscription');
+    }
+
+    return subscription;
   }
 
   it('includes hasStripeFunding=true for Stripe-funded subscription', async () => {
@@ -5573,6 +5624,66 @@ describe('getBillingStatus with credits', () => {
     expect(result.hasActiveKiloPass).toBe(false);
   });
 
+  it('reports hasActiveKiloPass=false for an active App Store subscription whose latest purchase expired', async () => {
+    const providerSubscriptionId = 'orig_kiloclaw_app_store_expired';
+    const subscription = await createKiloPassSubscription({
+      userId: user.id,
+      status: 'active',
+      paymentProvider: KiloPassPaymentProvider.AppStore,
+      providerSubscriptionId,
+    });
+
+    await db.insert(kilo_pass_store_purchases).values({
+      kilo_pass_subscription_id: subscription.id,
+      kilo_user_id: user.id,
+      payment_provider: KiloPassPaymentProvider.AppStore,
+      product_id: 'kilo_pass_tier_19_monthly',
+      provider_subscription_id: providerSubscriptionId,
+      provider_transaction_id: 'tx_kiloclaw_app_store_expired',
+      provider_original_transaction_id: providerSubscriptionId,
+      app_account_token: user.app_store_account_token,
+      environment: 'Sandbox',
+      purchased_at: '2020-01-31T00:00:00.000Z',
+      expires_at: '2020-02-28T00:00:00.000Z',
+      raw_payload_json: {},
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingStatus();
+
+    expect(result.hasActiveKiloPass).toBe(false);
+  });
+
+  it('reports hasActiveKiloPass=true for an active App Store subscription whose latest purchase has not expired', async () => {
+    const providerSubscriptionId = 'orig_kiloclaw_app_store_future_expiry';
+    const subscription = await createKiloPassSubscription({
+      userId: user.id,
+      status: 'active',
+      paymentProvider: KiloPassPaymentProvider.AppStore,
+      providerSubscriptionId,
+    });
+
+    await db.insert(kilo_pass_store_purchases).values({
+      kilo_pass_subscription_id: subscription.id,
+      kilo_user_id: user.id,
+      payment_provider: KiloPassPaymentProvider.AppStore,
+      product_id: 'kilo_pass_tier_19_monthly',
+      provider_subscription_id: providerSubscriptionId,
+      provider_transaction_id: 'tx_kiloclaw_app_store_future_expiry',
+      provider_original_transaction_id: providerSubscriptionId,
+      app_account_token: user.app_store_account_token,
+      environment: 'Sandbox',
+      purchased_at: '2099-02-01T00:00:00.000Z',
+      expires_at: '2099-03-01T00:00:00.000Z',
+      raw_payload_json: {},
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingStatus();
+
+    expect(result.hasActiveKiloPass).toBe(true);
+  });
+
   it('includes plan-specific effective balance previews with projected Kilo Pass bonus', async () => {
     await db
       .update(kilocode_users)
@@ -5583,9 +5694,11 @@ describe('getBillingStatus with credits', () => {
       })
       .where(eq(kilocode_users.id, user.id));
 
+    const stripeSubscriptionId = `kp-stripe-sub-${crypto.randomUUID()}`;
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
-      stripe_subscription_id: `kp-stripe-sub-${crypto.randomUUID()}`,
+      provider_subscription_id: stripeSubscriptionId,
+      stripe_subscription_id: stripeSubscriptionId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Yearly,
       status: 'active',
@@ -5791,9 +5904,11 @@ describe('pure credit cancel/reactivate', () => {
 
 describe('acceptConversion', () => {
   async function createActiveKiloPass(userId: string) {
+    const stripeSubscriptionId = `kp-stripe-sub-${crypto.randomUUID()}`;
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: userId,
-      stripe_subscription_id: `kp-stripe-sub-${crypto.randomUUID()}`,
+      provider_subscription_id: stripeSubscriptionId,
+      stripe_subscription_id: stripeSubscriptionId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,
       status: 'active',

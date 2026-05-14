@@ -8,15 +8,16 @@ export const minimax_m25_free_model: KiloExclusiveModel = {
   context_length: 204800,
   max_completion_tokens: 131072,
   status: 'disabled',
-  flags: ['reasoning'],
+  flags: ['reasoning', 'vercel-routing'],
   gateway: 'openrouter',
   internal_id: 'minimax/minimax-m2.5',
   pricing: null,
   exclusive_to: [],
+  inference_provider_restriction: [],
 };
 
 export function isMinimaxModel(model: string) {
-  return model.startsWith('minimax/');
+  return model.includes('minimax');
 }
 
 export const MINIMAX_CURRENT_MODEL_ID = 'minimax/minimax-m2.7';

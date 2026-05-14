@@ -9,6 +9,10 @@ import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import {
+  MORNING_BRIEFING_INTERESTS_MAX_TOPICS,
+  MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH,
+} from '@/lib/kiloclaw/morning-briefing-interests';
+import {
   ALL_SECRET_FIELD_KEYS,
   FIELD_KEY_TO_ENTRY,
   MAX_CUSTOM_SECRET_VALUE_LENGTH,
@@ -17,7 +21,8 @@ import {
   isValidCustomSecretKey,
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
-import { KILOCLAW_API_URL } from '@/lib/config.server';
+import { KILOCLAW_API_URL, KILOCLAW_INSTANCE_URL_TEMPLATE } from '@/lib/config.server';
+import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
 import { sentryLogger } from '@/lib/utils.server';
 import { db } from '@/lib/drizzle';
 import {
@@ -309,7 +314,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   getStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-    const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
+    const legacyWorkerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
 
     // No org instance → return a "no instance" sentinel so the frontend
     // renders setup entry points. Without this guard, workerInstanceId(null)
@@ -335,6 +340,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
         flyVolumeId: null,
         flyRegion: null,
         machineSize: null,
+        instanceType: null,
+        volumeSizeGb: null,
         openclawVersion: null,
         imageVariant: null,
         trackedImageTag: null,
@@ -351,11 +358,13 @@ export const organizationKiloclawRouter = createTRPCRouter({
         botNature: null,
         botVibe: null,
         botEmoji: null,
-        workerUrl,
+        workerUrl: legacyWorkerUrl,
+        controllerCapabilitiesVersion: null,
         name: null,
         instanceId: null,
         inboundEmailAddress: null,
         inboundEmailEnabled: false,
+        scheduledAction: null,
       } satisfies KiloClawDashboardStatus;
     }
 
@@ -365,6 +374,13 @@ export const organizationKiloclawRouter = createTRPCRouter({
       getInboundEmailAddressForInstance(instance.id),
     ]);
 
+    const workerUrl = workerUrlForInstance({
+      sandboxId: status.sandboxId,
+      controllerCapabilitiesVersion: status.controllerCapabilitiesVersion,
+      template: KILOCLAW_INSTANCE_URL_TEMPLATE,
+      fallback: legacyWorkerUrl,
+    });
+
     return {
       ...status,
       name: instance.name ?? null,
@@ -372,6 +388,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
       instanceId: instance.id,
       inboundEmailAddress,
       inboundEmailEnabled: instance.inboundEmailEnabled,
+      // Org instances don't surface scheduled actions yet — the
+      // banner reads from kiloclaw.getStatus on the personal path,
+      // not org. Set null to satisfy the type. Lighting up the org
+      // banner is a follow-up.
+      scheduledAction: null,
     } satisfies KiloClawDashboardStatus;
   }),
 
@@ -814,10 +835,69 @@ export const organizationKiloclawRouter = createTRPCRouter({
           .max(128)
           .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/)
           .optional(),
+        // Mirrors kiloclaw-router.restartMachine: when the redeploy targets a
+        // specific image tag, any existing pin is treated as a consent gate.
+        // The frontend dialog click flips this to true; backend deletes the
+        // pin row and pushes the clear to DO state before redeploying.
+        acknowledgePinRemoval: z.boolean().default(false),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+
+      // Pin consent gate. Symmetric with the personal user path: any pin
+      // (set by org member or admin) requires explicit acknowledgement
+      // before a version-changing redeploy proceeds. See the personal
+      // kiloclaw-router for the residual concurrency note: a pin written
+      // between this SELECT and the worker call is not consulted by the
+      // worker on restart, by design.
+      if (input.imageTag) {
+        const [pin] = await db
+          .select({
+            id: kiloclaw_version_pins.id,
+            image_tag: kiloclaw_version_pins.image_tag,
+            updated_at: kiloclaw_version_pins.updated_at,
+          })
+          .from(kiloclaw_version_pins)
+          .where(eq(kiloclaw_version_pins.instance_id, instance.id))
+          .limit(1);
+
+        if (pin && !input.acknowledgePinRemoval) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'PIN_EXISTS',
+          });
+        }
+
+        if (pin) {
+          // Conditional delete tied to both the row id and the updated_at
+          // we observed. setMyPin uses onConflictDoUpdate which keeps the
+          // same row id but bumps updated_at, so checking id alone would
+          // miss in-place edits. Pinning updated_at catches both
+          // replacement (different id) and update (same id, newer
+          // updated_at). Empty returning() means the row changed.
+          const deleted = await db
+            .delete(kiloclaw_version_pins)
+            .where(
+              and(
+                eq(kiloclaw_version_pins.instance_id, instance.id),
+                eq(kiloclaw_version_pins.id, pin.id),
+                eq(kiloclaw_version_pins.updated_at, pin.updated_at)
+              )
+            )
+            .returning({ id: kiloclaw_version_pins.id });
+
+          if (deleted.length === 0) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'PIN_EXISTS',
+            });
+          }
+
+          await pushPinToWorker(ctx.user.id, instance.id, null);
+        }
+      }
+
       const token = generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
       const client = new KiloClawUserClient(token);
       return client.restartMachine(input.imageTag ? { imageTag: input.imageTag } : undefined, {
@@ -1046,20 +1126,12 @@ export const organizationKiloclawRouter = createTRPCRouter({
         });
       }
 
-      const [existingPin] = await db
-        .select({ pinned_by: kiloclaw_version_pins.pinned_by })
-        .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
-        .limit(1);
-
-      if (existingPin && existingPin.pinned_by !== ctx.user.id) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message:
-            'Your version is pinned by an admin. Contact your Kilo admin to change or remove the pin.',
-        });
-      }
-
+      // Pins are advisory consent metadata. Either an org member or an
+      // admin can write/replace/delete the pin at any time — overrides
+      // happen through explicit upgrade/downgrade actions where the
+      // consent dialog enforces awareness, not through this metadata
+      // mutation. The upsert below handles overwriting any existing pin
+      // (including admin-set) with the caller's pin.
       let result: typeof kiloclaw_version_pins.$inferSelect | undefined;
       try {
         [result] = await db
@@ -1103,72 +1175,19 @@ export const organizationKiloclawRouter = createTRPCRouter({
   removeMyPin: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
 
+    // Pins are advisory consent metadata — any org member or admin can
+    // clear it at any time. Idempotent: if no row exists, we still push
+    // the clear to the DO so a previously-failed worker sync can be
+    // retried by simply calling removeMyPin again.
     const [deleted] = await db
       .delete(kiloclaw_version_pins)
-      .where(
-        and(
-          eq(kiloclaw_version_pins.instance_id, instance.id),
-          eq(kiloclaw_version_pins.pinned_by, ctx.user.id)
-        )
-      )
+      .where(eq(kiloclaw_version_pins.instance_id, instance.id))
       .returning();
-
-    if (!deleted) {
-      // No self-set pin was deleted. Either an admin pin exists (forbid),
-      // or no pin exists at all. In the latter case we still push the
-      // clear to the DO so a previously-failed worker sync can be retried
-      // by simply calling removeMyPin again.
-      const [existingPin] = await db
-        .select({ pinned_by: kiloclaw_version_pins.pinned_by })
-        .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
-        .limit(1);
-
-      if (existingPin) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Your version is pinned by an admin. Contact your Kilo admin to remove the pin.',
-        });
-      }
-    }
 
     const workerSync = await pushPinToWorker(ctx.user.id, instance.id, null);
 
     return { success: true, deleted: !!deleted, worker_sync: workerSync };
   }),
-
-  // ── Stream Chat ────────────────────────────────────────────────
-
-  getStreamChatCredentials: organizationMemberProcedure.query(async ({ ctx, input }) => {
-    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-    const client = new KiloClawInternalClient();
-    return client.getStreamChatCredentials(ctx.user.id, workerInstanceId(instance));
-  }),
-
-  sendChatMessage: organizationMemberMutationProcedure
-    .input(z.object({ organizationId: z.uuid(), message: z.string().min(1).max(32_000) }))
-    .mutation(async ({ ctx, input }) => {
-      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
-      const client = new KiloClawInternalClient();
-      try {
-        return await client.sendChatMessage(ctx.user.id, input.message, instance.id);
-      } catch (err) {
-        if (err instanceof KiloClawApiError) {
-          const { message } = getKiloClawApiErrorPayload(err);
-          const code =
-            err.statusCode === 404
-              ? 'NOT_FOUND'
-              : err.statusCode === 503
-                ? 'PRECONDITION_FAILED'
-                : 'INTERNAL_SERVER_ERROR';
-          throw new TRPCError({
-            code,
-            message: message ?? 'Failed to send chat message',
-          });
-        }
-        throw err;
-      }
-    }),
 
   getMorningBriefingStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
@@ -1211,6 +1230,35 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
       return client.runMorningBriefing(ctx.user.id, workerInstanceId(instance));
+    }),
+
+  updateBriefingInterests: organizationMemberMutationProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid(),
+        // Caps come from the shared `morning-briefing-interests`
+        // module; the worker (`services/kiloclaw/src/routes/platform.ts`)
+        // keeps its own copy across the service boundary.
+        topics: z
+          .array(z.string().trim().min(1).max(MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH))
+          .max(MORNING_BRIEFING_INTERESTS_MAX_TOPICS),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Morning briefing is admin-only today (matches the UI gate in
+      // SettingsTab.tsx and ClawOnboardingFlow.tsx). The Kilo internal
+      // admin flag is checked here, not org-role membership, since the
+      // UI gate uses `user?.is_admin` regardless of whether the
+      // instance is personal or org-owned.
+      if (!ctx.user.is_admin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Morning briefing is admin-only',
+        });
+      }
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.updateBriefingInterests(ctx.user.id, input.topics, workerInstanceId(instance));
     }),
 
   readMorningBriefing: organizationMemberProcedure

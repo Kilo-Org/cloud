@@ -30,6 +30,48 @@ describe('impact affiliate utils', () => {
       });
     });
 
+    it('can ignore URL im_ref when it belongs to the current referral touch', () => {
+      expect(
+        resolveImpactAffiliateTrackingId({
+          imRefParam: 'impact-click-from-referral-url',
+          sharedImpactCookieValue: null,
+          appTrackedImpactCookieValue: null,
+          ignoreImRefParam: true,
+        })
+      ).toEqual({
+        affiliateTrackingId: null,
+        impactCookieValue: null,
+      });
+    });
+
+    it('falls back to a prior shared cookie when ignoring the current URL im_ref', () => {
+      expect(
+        resolveImpactAffiliateTrackingId({
+          imRefParam: 'impact-click-from-referral-url',
+          sharedImpactCookieValue: 'impact-click-from-cookie',
+          appTrackedImpactCookieValue: null,
+          ignoreImRefParam: true,
+        })
+      ).toEqual({
+        affiliateTrackingId: 'impact-click-from-cookie',
+        impactCookieValue: 'impact-click-from-cookie',
+      });
+    });
+
+    it('does not recover the ignored URL im_ref from the shared cookie', () => {
+      expect(
+        resolveImpactAffiliateTrackingId({
+          imRefParam: 'impact-click-from-referral-url',
+          sharedImpactCookieValue: 'impact-click-from-referral-url',
+          appTrackedImpactCookieValue: null,
+          ignoreImRefParam: true,
+        })
+      ).toEqual({
+        affiliateTrackingId: null,
+        impactCookieValue: null,
+      });
+    });
+
     it('suppresses the shared cookie when the app already tracked that exact value', () => {
       expect(
         resolveImpactAffiliateTrackingId({

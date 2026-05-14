@@ -8,16 +8,20 @@
     "dev": "wrangler dev",
     "tail": "wrangler tail",
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/code-review-infra/src"
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/code-review-infra/src",
+    "test": "vitest run --config vitest.workers.config.ts"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.21",
     "@cloudflare/workers-types": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
+    "vitest": "^3.2.4",
     "wrangler": "catalog:"
   },
   "dependencies": {
     "@kilocode/worker-utils": "workspace:*",
-    "hono": "catalog:"
+    "hono": "catalog:",
+    "zod": "catalog:"
   }
 }

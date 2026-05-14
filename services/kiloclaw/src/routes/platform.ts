@@ -7,6 +7,8 @@
 
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import * as fly from '../fly/client';
+import type { InstanceStatus } from '../durable-objects/kiloclaw-instance/types';
 import type { AppEnv } from '../types';
 import {
   ProvisionRequestSchema,
@@ -15,10 +17,15 @@ import {
   ChannelsPatchSchema,
   GoogleCredentialsSchema,
   GoogleOAuthConnectionSchema,
+  MachineSizeSchema,
   SecretsPatchSchema,
   InstanceIdParam,
-  MachineSizeSchema,
 } from '../schemas/instance-config';
+import {
+  DEFAULT_INSTANCE_TIER,
+  InstanceTierKeySchema,
+  isOfferedTier,
+} from '@kilocode/kiloclaw-instance-tiers';
 import { ImageVersionEntrySchema, imageVersionKey } from '../schemas/image-version';
 import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
 import {
@@ -29,6 +36,7 @@ import {
 } from '../lib/version-rollout';
 import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
+import { runScheduledActionNoticesSweep } from '../scheduled/scheduled-action-notices';
 import { flattenError, z } from 'zod';
 import {
   KiloclawStartReasonSchema,
@@ -49,7 +57,6 @@ import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
-import { sendMessage } from '../stream-chat/client';
 import { assertAvailableProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
 import {
@@ -106,6 +113,17 @@ const KiloCliRunConflictSchema = z.object({
       'kilo_cli_run_instance_not_running',
       'kilo_cli_run_already_active',
       'kilo_cli_run_no_active_run',
+    ]),
+    error: z.string().min(1),
+  }),
+});
+
+const DoctorRunConflictSchema = z.object({
+  conflict: z.object({
+    code: z.enum([
+      'openclaw_doctor_instance_not_running',
+      'openclaw_doctor_already_active',
+      'openclaw_doctor_no_active_run',
     ]),
     error: z.string().min(1),
   }),
@@ -389,6 +407,7 @@ async function insertProvisionedInstanceRecord(params: {
   sandboxId: string;
   orgId: string | null;
   provider: ProviderId;
+  instanceType: string;
 }): Promise<ProvisionedInstanceRecord> {
   const connectionString = params.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
@@ -425,6 +444,7 @@ async function insertProvisionedInstanceRecord(params: {
           sandbox_id: params.sandboxId,
           provider: params.provider,
           organization_id: params.orgId,
+          instance_type: params.instanceType,
         })
         .onConflictDoNothing({ target: kiloclaw_instances.id })
         .returning({
@@ -691,6 +711,175 @@ function jsonError(message: string, status: number, code?: string): Response {
   });
 }
 
+/**
+ * Result of the running-state check used by the polling guards.
+ *
+ * `running: true` means the proxied call is safe to make. `running: false`
+ * carries the best-known instance status label (from DO or, when verified,
+ * the mapped Fly state) so the caller can include it in the sentinel
+ * payload — useful for the frontend's "Instance is {status}…" hint.
+ */
+type InstanceRunningCheck = { running: true } | { running: false; status: InstanceStatus | null };
+
+/**
+ * Decide whether the instance is actually running, for the polling guards.
+ *
+ * Polling endpoints (gateway/status, gateway/ready, controller-version,
+ * morning-briefing/status) proxy to port 18789 on the Fly machine via Fly's
+ * HTTPS edge. Even with `services[0].autostart: false`, Fly's proxy will wake
+ * a stopped machine to serve the request. The check below decides whether to
+ * skip the proxied call so no traffic reaches the machine while it is stopped.
+ *
+ * Two layers, in order:
+ *
+ * 1. **Durable Object cached state.** Cheap (storage read). Handles the
+ *    common case where DO and Fly agree, plus admin-UI-initiated stops where
+ *    the DO has already updated its cached state.
+ *
+ * 2. **Fly Machines REST API state.** Only when DO says `running` and the
+ *    instance is on Fly. The Machines REST API is a separate path from the
+ *    HTTPS edge proxy, so this call does not wake the machine. Catches drift
+ *    where DO cached state lags real Fly state (out-of-band stops: Fly CLI,
+ *    dashboard, health-check kill, platform incidents). Also closes the
+ *    in-flight stop race: while `DO.stop()` is waiting on `Fly.stopMachine`,
+ *    DO state still reads `running` for the duration of that call, so a
+ *    concurrent poll would otherwise fall through. Adds ~50-200ms to each
+ *    poll where DO says running; acceptable given the 5-10s polling cadence
+ *    and the alternative (the wake bug).
+ *
+ * Fail-open on Fly API errors: if we can't reach Fly to verify, trust the DO
+ * state and forward. Logs a warning so the failure mode is visible.
+ */
+async function checkInstanceRunningState(
+  env: AppEnv['Bindings'],
+  userId: string,
+  instanceId: string | undefined
+): Promise<InstanceRunningCheck> {
+  const status = await withResolvedDORetry(
+    env,
+    userId,
+    instanceId,
+    stub => stub.getStatus(),
+    'getStatus'
+  );
+
+  // Layer 1: DO cached state says not running. Trust it (cheapest path).
+  if (status.status !== 'running') {
+    return { running: false, status: status.status };
+  }
+
+  // Layer 2: DO says running. Verify against live Fly state when we can,
+  // because DO state can lag (out-of-band stops, in-flight stops where DO
+  // hasn't yet updated its cached status after the Fly stop call).
+  //
+  // Skip the Fly check when:
+  //   - the instance has no flyMachineId yet (pre-provisioning or non-Fly
+  //     provider — nothing to verify, and forwarding is safe because there
+  //     is nothing for Fly's proxy to wake);
+  //   - FLY_API_TOKEN isn't configured (dev environments without Fly creds).
+  const flyMachineId = status.flyMachineId;
+  const flyAppName = status.flyAppName;
+  if (status.provider !== 'fly' || !flyMachineId || !flyAppName || !env.FLY_API_TOKEN) {
+    return { running: true };
+  }
+
+  try {
+    const machine = await fly.getMachine(
+      { apiToken: env.FLY_API_TOKEN, appName: flyAppName },
+      flyMachineId
+    );
+    if (machine.state !== 'started') {
+      // Drift detected. DO will reconcile its cached state on the next
+      // `maybeDispatchLiveCheck` tick (already dispatched by getStatus()
+      // above), so we don't force a synchronous reconcile here. Return
+      // the sentinel using Fly's reported state so the frontend can show
+      // an accurate label.
+      console.warn('[platform] poll short-circuit: Fly reports machine not started', {
+        userId,
+        instanceId,
+        flyMachineId,
+        doStatus: status.status,
+        flyState: machine.state,
+      });
+      return { running: false, status: mapFlyStateToDoStatus(machine.state) };
+    }
+  } catch (err) {
+    // Fail open: trust DO state when Fly is unreachable. The alternative
+    // (failing closed) would break polling during any Fly API hiccup.
+    console.warn('[platform] poll short-circuit: Fly state check failed, trusting DO', {
+      userId,
+      instanceId,
+      flyMachineId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  return { running: true };
+}
+
+/**
+ * Wrapper around `checkInstanceRunningState` that builds the unified 200
+ * sentinel response (`{ ok: false, reason, status }`) when not running.
+ * Returns `null` when the proxied call is safe to make.
+ *
+ * Routes whose existing response shape is `{ ready, ... }` should call
+ * `checkInstanceRunningState` directly and build a route-shaped sentinel
+ * — see `/gateway/ready` for an example.
+ */
+async function shortCircuitIfNotRunning(
+  env: AppEnv['Bindings'],
+  userId: string,
+  instanceId: string | undefined
+): Promise<Response | null> {
+  const check = await checkInstanceRunningState(env, userId, instanceId);
+  if (check.running) return null;
+  return new Response(
+    JSON.stringify({
+      ok: false,
+      reason: 'instance_not_running',
+      status: check.status,
+    }),
+    {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }
+  );
+}
+
+/**
+ * Map a Fly machine state into the closest equivalent DO status label so
+ * the frontend's "Instance is {status}…" hint reads naturally. We can't
+ * always represent Fly states 1:1 (e.g. Fly has no `restoring`), so
+ * unknown states fall through to `stopped` which is the safer default for
+ * a polling guard.
+ *
+ * Return type is `InstanceStatus` (the worker's canonical DO status enum)
+ * rather than `string`, so adding a new Fly state mapping to a value
+ * outside the DO vocabulary fails to typecheck instead of silently
+ * shipping a label the frontend doesn't understand.
+ */
+function mapFlyStateToDoStatus(state: string): InstanceStatus {
+  switch (state) {
+    case 'started':
+      return 'running';
+    case 'starting':
+    case 'created':
+    case 'replacing':
+    case 'updating':
+      return 'starting';
+    case 'stopping':
+      return 'stopped';
+    case 'stopped':
+    case 'suspended':
+    case 'destroying':
+    case 'destroyed':
+    case 'failed':
+      return 'stopped';
+    default:
+      return 'stopped';
+  }
+}
+
 function kiloCliRunConflictResponse(response: unknown): Response | undefined {
   const result = KiloCliRunConflictSchema.safeParse(response);
   if (result.success) {
@@ -700,6 +889,20 @@ function kiloCliRunConflictResponse(response: unknown): Response | undefined {
 
   if (isRecord(response) && 'conflict' in response) {
     return jsonError('Invalid Kilo CLI conflict response', 502, 'upstream_invalid_response');
+  }
+
+  return undefined;
+}
+
+function doctorRunConflictResponse(response: unknown): Response | undefined {
+  const result = DoctorRunConflictSchema.safeParse(response);
+  if (result.success) {
+    const { code, error } = result.data.conflict;
+    return jsonError(error, 409, code);
+  }
+
+  if (isRecord(response) && 'conflict' in response) {
+    return jsonError('Invalid doctor conflict response', 502, 'upstream_invalid_response');
   }
 
   return undefined;
@@ -871,13 +1074,25 @@ platform.post('/provision', async c => {
     kilocodeDefaultModel,
     userTimezone,
     userLocation,
-    machineSize,
+    instanceType: requestedInstanceType,
     region,
     pinnedImageTag,
   } = result.data;
+  if (requestedInstanceType && !isOfferedTier(requestedInstanceType)) {
+    return c.json({ error: 'instanceType must be an offered tier' }, 400);
+  }
   const provisionedInstanceId = instanceId ?? crypto.randomUUID();
   const shouldInsertInstanceRecord = !instanceId;
   const shouldBootstrapSubscription = !instanceId || bootstrapSubscription === true;
+  // Only default to the catalog tier on FRESH inserts. On re-provision (config
+  // updates with an existing instanceId), pass `undefined` so the DO's
+  // `inferredInstanceType` path preserves existing tier / machineSize /
+  // volumeSizeGb. `provision()` is overloaded as the entrypoint for both
+  // fresh-create and config-update flows; defaulting unconditionally would
+  // silently overwrite custom (e.g. extend-volume) and legacy tiers on the
+  // next config change.
+  const instanceType =
+    requestedInstanceType ?? (shouldInsertInstanceRecord ? DEFAULT_INSTANCE_TIER : undefined);
   const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
   const provisionRoute = '/api/platform/provision';
   const provisionStartedAt = performance.now();
@@ -914,7 +1129,7 @@ platform.post('/provision', async c => {
             kilocodeDefaultModel,
             userTimezone,
             userLocation,
-            machineSize,
+            instanceType,
             region,
             pinnedImageTag,
           },
@@ -954,6 +1169,11 @@ platform.post('/provision', async c => {
         sandboxId: provision.sandboxId,
         orgId: orgId ?? null,
         provider: selectedProvider ?? 'fly',
+        // Inside this branch `shouldInsertInstanceRecord` is true, so the
+        // worker-side tier default has already been applied to `instanceType`
+        // — but TS can't narrow `string | undefined` from the broader scope.
+        // Re-derive locally so the helper signature stays `string`.
+        instanceType: requestedInstanceType ?? DEFAULT_INSTANCE_TIER,
       });
       writeEvent(c.env, {
         event: 'instance.record_inserted',
@@ -1649,6 +1869,9 @@ platform.get('/gateway/status', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const sentinel = await shortCircuitIfNotRunning(c.env, userId, iidResult.instanceId);
+    if (sentinel) return sentinel;
+
     const gatewayStatus = await withResolvedDORetry(
       c.env,
       userId,
@@ -1665,7 +1888,12 @@ platform.get('/gateway/status', async c => {
 
 // GET /api/platform/gateway/ready?userId=...
 // Non-fatal polling endpoint — always returns 200 so the frontend poll
-// doesn't generate a wall of errors during startup.
+// doesn't generate a wall of errors during startup. Polled aggressively
+// (every 5s on the user dashboard) so it shares the wake-bug exposure with
+// the other guarded routes; the guard below short-circuits it for the same
+// reason. The response keeps its existing `{ ready, ... }` shape rather
+// than the unified `{ ok, reason }` sentinel so consumers that already
+// check `gatewayReady?.ready` keep working unchanged.
 platform.get('/gateway/ready', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) {
@@ -1676,6 +1904,11 @@ platform.get('/gateway/ready', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const check = await checkInstanceRunningState(c.env, userId, iidResult.instanceId);
+    if (!check.running) {
+      return c.json({ ready: false, reason: 'instance_not_running', status: check.status }, 200);
+    }
+
     const result = await withResolvedDORetry(
       c.env,
       userId,
@@ -1701,6 +1934,9 @@ platform.get('/controller-version', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const sentinel = await shortCircuitIfNotRunning(c.env, userId, iidResult.instanceId);
+    if (sentinel) return sentinel;
+
     const result = await withResolvedDORetry(
       c.env,
       userId,
@@ -1920,6 +2156,15 @@ const MorningBriefingSetupSchema = z.object({
   timezone: z.string().min(1).optional(),
 });
 
+// Caps protect both the plugin (config.json size) and the eventual
+// web-search query (PR-4c) from runaway input.
+const MAX_INTEREST_TOPICS = 20;
+const MAX_INTEREST_TOPIC_LENGTH = 64;
+const MorningBriefingInterestsSchema = z.object({
+  userId: z.string().min(1),
+  topics: z.array(z.string().trim().min(1).max(MAX_INTEREST_TOPIC_LENGTH)).max(MAX_INTEREST_TOPICS),
+});
+
 type MorningBriefingWarmupRetryPolicy = {
   includeTimeout: boolean;
 };
@@ -1938,6 +2183,7 @@ function isMorningBriefingWarmupError(
   const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
   if (
     normalized.includes('Gateway not running') ||
+    normalized.includes('Instance is not running') ||
     normalized.includes('Failed to reach gateway')
   ) {
     return true;
@@ -1985,6 +2231,9 @@ platform.get('/morning-briefing/status', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const sentinel = await shortCircuitIfNotRunning(c.env, userId, iidResult.instanceId);
+    if (sentinel) return sentinel;
+
     const result = await withResolvedDORetry(
       c.env,
       userId,
@@ -1993,10 +2242,21 @@ platform.get('/morning-briefing/status', async c => {
       'getMorningBriefingStatus'
     );
     if (!result) {
-      return jsonError(
-        'Morning Briefing unavailable (controller too old)',
-        404,
-        'controller_route_unavailable'
+      // Controller predates this route. The dashboard polls status every 30s,
+      // so a 404 here would generate continuous user-facing errors. Return a
+      // typed "unavailable" payload at 200 instead — same shape pattern as
+      // the gateway_warming_up branch below.
+      return c.json(
+        {
+          ok: false,
+          enabled: false,
+          desiredEnabled: false,
+          observedEnabled: false,
+          reconcileState: 'idle',
+          code: 'controller_route_unavailable',
+          error: 'Morning Briefing unavailable (controller too old)',
+        },
+        200
       );
     }
     return c.json(result, 200);
@@ -2085,6 +2345,45 @@ platform.post('/morning-briefing/disable', async c => {
       return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
     }
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/disable');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/morning-briefing/interests
+platform.post('/morning-briefing/interests', async c => {
+  const result = await parseBody(c, MorningBriefingInterestsSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, topics } = result.data;
+  try {
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
+        stub => stub.updateBriefingInterests({ topics }),
+        'updateBriefingInterests'
+      )
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'morning-briefing/interests'
+    );
     return jsonError(message, status, code);
   }
 });
@@ -2358,6 +2657,120 @@ platform.post('/doctor', async c => {
     return c.json(doctor, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'doctor');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/doctor-controller/start
+//
+// Starts `openclaw doctor` via the machine's controller HTTP API (NOT the Fly
+// Machines exec API). The run is async and status/output is polled separately.
+// Intended to replace /api/platform/doctor once validated; both paths are live
+// in parallel during the migration.
+const DoctorControllerRunSchema = z.object({
+  userId: z.string().min(1),
+  fix: z.boolean().optional(),
+});
+
+platform.post('/doctor-controller/start', async c => {
+  const result = await parseBody(c, DoctorControllerRunSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    // The DO returns a discriminated union: success | { conflict } | null.
+    // `.then(r => r)` collapses CF Workers' RPC Promise wrapping back to a
+    // plain Promise union (same pattern as startKiloCliRun).
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      // Default is `true` to match the Fly-exec flow (which always passed
+      // --fix) and the admin UI checkbox default. Explicit `false` opts into
+      // read-only diagnostics.
+      stub => stub.startDoctorViaController(result.data.fix ?? true).then(r => r),
+      'startDoctorViaController'
+    );
+    if (!response) {
+      return jsonError(
+        'Doctor runner not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    const conflictResponse = doctorRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'doctor-controller/start');
+    return jsonError(message, status);
+  }
+});
+
+// GET /api/platform/doctor-controller/status?userId=...
+platform.get('/doctor-controller/status', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.getDoctorViaControllerStatus().then(r => r),
+      'getDoctorViaControllerStatus'
+    );
+    if (!response) {
+      return jsonError(
+        'Doctor runner not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    const conflictResponse = doctorRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'doctor-controller/status');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/doctor-controller/cancel
+platform.post('/doctor-controller/cancel', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub => stub.cancelDoctorViaController().then(r => r),
+      'cancelDoctorViaController'
+    );
+    if (!response) {
+      return jsonError(
+        'Doctor runner not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    const conflictResponse = doctorRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'doctor-controller/cancel');
     return jsonError(message, status);
   }
 });
@@ -2747,31 +3160,6 @@ platform.get('/status', async c => {
   }
 });
 
-// GET /api/platform/stream-chat-credentials?userId=...&instanceId=...
-platform.get('/stream-chat-credentials', async c => {
-  const userId = setValidatedQueryUserId(c);
-  if (!userId) {
-    return c.json({ error: 'userId query parameter is required' }, 400);
-  }
-  const iidResult = parseInstanceIdQuery(c);
-  if ('error' in iidResult) return iidResult.error;
-  const { instanceId } = iidResult;
-
-  try {
-    const creds = await withResolvedDORetry(
-      c.env,
-      userId,
-      instanceId,
-      stub => stub.getStreamChatCredentials(),
-      'getStreamChatCredentials'
-    );
-    return c.json(creds);
-  } catch (err) {
-    const { message, status } = sanitizeError(err, 'stream-chat-credentials');
-    return jsonError(message, status);
-  }
-});
-
 const MAX_INBOUND_EMAIL_TITLE_SLUG_LENGTH = 80;
 
 const InboundEmailSchema = z.object({
@@ -3024,12 +3412,23 @@ platform.post('/inbound-email', async c => {
     }
 
     const error = await response.text().catch(() => '');
+    let controllerErrorMessage: string | undefined;
+    try {
+      const parsed: unknown = JSON.parse(error);
+      if (parsed && typeof parsed === 'object' && 'error' in parsed) {
+        const candidate = (parsed as { error: unknown }).error;
+        if (typeof candidate === 'string') controllerErrorMessage = candidate;
+      }
+    } catch {
+      // body wasn't JSON; the raw `error` field below preserves it
+    }
     const controllerFailure = {
       ...logContext,
       userId: instance.userId,
       doKey,
       status: response.status,
-      error: error.slice(0, 500),
+      error: error.slice(0, 2000),
+      controllerErrorMessage,
       durationMs: performance.now() - startedAt,
     };
     if (response.status >= 500) {
@@ -3051,74 +3450,6 @@ platform.post('/inbound-email', async c => {
   }
 });
 
-// POST /api/platform/send-chat-message
-// Send a message to a KiloClaw instance's Stream Chat channel as the human user.
-// The OpenClaw bot picks it up and responds as if the user typed it.
-const SendChatMessageSchema = z.object({
-  userId: z.string().min(1),
-  instanceId: z.string().uuid().optional(),
-  message: z.string().min(1).max(32_000),
-});
-
-platform.post('/send-chat-message', async c => {
-  const body: unknown = await c.req.json().catch(() => null);
-  const parsed = SendChatMessageSchema.safeParse(body);
-  if (!parsed.success) {
-    return jsonError('Invalid request body: userId and message are required', 400);
-  }
-
-  const { userId, instanceId, message } = parsed.data;
-  c.set('userId', userId);
-
-  const apiKey = c.env.STREAM_CHAT_API_KEY;
-  const apiSecret = c.env.STREAM_CHAT_API_SECRET;
-  if (!apiKey || !apiSecret) {
-    return jsonError('Stream Chat is not configured', 503);
-  }
-
-  try {
-    // Use instanceId as the DO key when available (matches how other endpoints resolve DOs).
-    // Falls back to userId for backward compatibility with triggers that predate instanceId.
-    const creds = await withResolvedDORetry(
-      c.env,
-      userId,
-      instanceId,
-      stub => stub.getStreamChatCredentials(),
-      'getStreamChatCredentials'
-    );
-
-    if (!creds) {
-      return jsonError('Stream Chat is not set up for this instance', 404);
-    }
-
-    await sendMessage(apiKey, apiSecret, creds.channelId, creds.userId, message);
-
-    writeEvent(c.env, {
-      event: 'instance.webhook_chat_message_sent',
-      delivery: 'http',
-      route: '/api/platform/send-chat-message',
-      userId,
-      instanceId: instanceId ?? undefined,
-      channelId: creds.channelId,
-    });
-
-    return c.json({ success: true, channelId: creds.channelId });
-  } catch (err) {
-    const { message: errMsg, status } = sanitizeError(err, 'send-chat-message');
-
-    writeEvent(c.env, {
-      event: 'instance.webhook_chat_message_failed',
-      delivery: 'http',
-      route: '/api/platform/send-chat-message',
-      userId,
-      instanceId: instanceId ?? undefined,
-      error: errMsg,
-    });
-
-    return jsonError(errMsg, status);
-  }
-});
-
 // GET /api/platform/debug-status?userId=...&instanceId=...
 // Internal/admin-only debug status that includes DO destroy internals.
 platform.get('/debug-status', async c => {
@@ -3131,6 +3462,9 @@ platform.get('/debug-status', async c => {
   const { instanceId } = iidResult;
 
   try {
+    // No guard here: getDebugState() reads DO storage only and never proxies
+    // through Fly's edge to the machine. The wake-up bug (services that proxy
+    // to port 18789) does not apply.
     const status = await withResolvedDORetry(
       c.env,
       userId,
@@ -3340,7 +3674,9 @@ platform.post('/reassociate-volume', async c => {
 // Updates the machine size for an instance. Takes effect on next start/restart.
 const ResizeMachineSchema = z.object({
   userId: z.string().min(1),
-  machineSize: MachineSizeSchema,
+  instanceType: InstanceTierKeySchema,
+  actorId: z.string().min(1),
+  actorEmail: z.string().email(),
 });
 
 platform.post('/resize-machine', async c => {
@@ -3355,12 +3691,92 @@ platform.post('/resize-machine', async c => {
       c.env,
       result.data.userId,
       iidResult.instanceId,
-      stub => stub.resizeMachine(result.data.machineSize),
+      stub =>
+        stub.resizeMachine({
+          targetTierKey: result.data.instanceType,
+          actorId: result.data.actorId,
+          actorEmail: result.data.actorEmail,
+        }),
       'resizeMachine'
     );
     return c.json(response);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'resize-machine');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/admin-size-override/set
+// Admin-only: set a temporary CPU/RAM override that wins over the
+// tier-derived machineSize until cleared. Does NOT change instanceType
+// or volumeSizeGb (billing stays on the tier). Stopped-machine-only.
+const SetAdminSizeOverrideSchema = z.object({
+  userId: z.string().min(1),
+  size: MachineSizeSchema,
+  reason: z.string().min(10).max(500),
+  actorId: z.string().min(1),
+  actorEmail: z.string().email(),
+});
+
+platform.post('/admin-size-override/set', async c => {
+  const result = await parseBody(c, SetAdminSizeOverrideSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub =>
+        stub.setAdminMachineSizeOverride({
+          size: result.data.size,
+          reason: result.data.reason,
+          actorId: result.data.actorId,
+          actorEmail: result.data.actorEmail,
+        }),
+      'setAdminMachineSizeOverride'
+    );
+    return c.json(response);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'admin-size-override-set');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/admin-size-override/clear
+const ClearAdminSizeOverrideSchema = z.object({
+  userId: z.string().min(1),
+  reason: z.string().min(10).max(500),
+  actorId: z.string().min(1),
+  actorEmail: z.string().email(),
+});
+
+platform.post('/admin-size-override/clear', async c => {
+  const result = await parseBody(c, ClearAdminSizeOverrideSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub =>
+        stub.clearAdminMachineSizeOverride({
+          reason: result.data.reason,
+          actorId: result.data.actorId,
+          actorEmail: result.data.actorEmail,
+        }),
+      'clearAdminMachineSizeOverride'
+    );
+    return c.json(response);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'admin-size-override-clear');
     return jsonError(message, status);
   }
 });
@@ -3880,8 +4296,10 @@ platform.post('/destroy-fly-machine', async c => {
 });
 
 // POST /api/platform/extend-volume
-// Temporary workaround: extend a Fly volume to exactly 15 GB.
-const EXTEND_VOLUME_TARGET_SIZE_GB = 15;
+// Admin workaround for granting users temporary additional storage.
+// Fly volumes can grow but cannot shrink, so once extended an instance
+// is effectively pinned to the larger size — flips DO instanceType to
+// 'custom' to reflect that.
 const ExtendVolumeSchema = z.object({
   userId: z.string().min(1),
   appName: z
@@ -3893,6 +4311,7 @@ const ExtendVolumeSchema = z.object({
     .string()
     .min(1)
     .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+  targetSizeGb: z.number().int().min(1).max(500),
 });
 
 const FlyExtendVolumeResponseSchema = z.object({
@@ -3906,7 +4325,7 @@ platform.post('/extend-volume', async c => {
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
 
-  const { appName, volumeId } = result.data;
+  const { appName, volumeId, targetSizeGb, userId } = result.data;
   const apiToken = c.env.FLY_API_TOKEN;
   if (!apiToken) {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
@@ -3917,13 +4336,13 @@ platform.post('/extend-volume', async c => {
     const resp = await fetch(url, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ size_gb: EXTEND_VOLUME_TARGET_SIZE_GB }),
+      body: JSON.stringify({ size_gb: targetSizeGb }),
     });
 
     if (!resp.ok) {
       const body = await resp.text();
       console.error(
-        `[platform] extend-volume failed (${resp.status}) volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}:`,
+        `[platform] extend-volume failed (${resp.status}) volume=${volumeId} size=${targetSizeGb}:`,
         body
       );
       return jsonError(`Fly API error (${resp.status}): ${body}`, resp.status);
@@ -3939,12 +4358,102 @@ platform.post('/extend-volume', async c => {
     }
     // Default to true so the admin always sees the redeploy warning when Fly omits the flag
     const needsRestart = extendParsed.data.needs_restart ?? true;
+
+    // Catch the DO up to the new on-disk size so resize-policy comparisons stay honest.
+    try {
+      await withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
+        stub => stub.recordVolumeExtend(targetSizeGb),
+        'recordVolumeExtend'
+      );
+    } catch (err) {
+      // Don't fail the whole request — Fly is already extended; the request
+      // would have to be retried anyway and the Fly extend is idempotent
+      // (re-extending to the same size is a no-op on Fly).
+      //
+      // RECOVERY: there is no alarm-driven volume-size observation today
+      // (the alarm reconciles `machineSize` from `getMachine` but does not
+      // call `getVolume`), so this divergence does NOT auto-heal. The
+      // admin re-runs `/extend-volume` with the same target size — both
+      // calls are idempotent on retry. The "Has size override" / list
+      // tooling is not affected because volumeSizeGb is not surfaced in
+      // those filters.
+      //
+      // FOLLOW-UP: a later PR could add `getVolume`-driven volume-size
+      // reconciliation to `backfillMachineSizeFromFlyConfig` so this
+      // self-heals on the next alarm tick.
+      console.error(
+        `[platform] extend-volume: Fly extended succeeded but DO recordVolumeExtend failed for ` +
+          `volume=${volumeId} targetSizeGb=${targetSizeGb}. ` +
+          `DO state will lag until admin re-runs this route.`,
+        err
+      );
+    }
+
     console.log(
-      `[platform] extend-volume ok: volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}GB (target total) needsRestart=${needsRestart}`
+      `[platform] extend-volume ok: volume=${volumeId} size=${targetSizeGb}GB needsRestart=${needsRestart}`
     );
     return c.json({ ok: true as const, needsRestart });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'extend-volume');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/scheduled-action/wake
+//
+// Called by the web's scheduleAction tRPC right after persisting a new
+// scheduled-action row in Postgres. Resolves the target instance's DO
+// and calls notifyScheduledActionPending() — which just re-arms the
+// existing reconcile alarm so the next alarm tick picks up the new
+// row via the existing wedge in alarm().
+//
+// In production this is belt-and-suspenders (the platform proactively
+// fires past-due alarms anyway). In `wrangler dev`, stale alarm
+// timestamps don't auto-fire — this route is what prevents the dev
+// scheduler from sitting forever with a never-firing pre-existing
+// alarm.
+const ScheduledActionWakeSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().uuid(),
+});
+
+platform.post('/scheduled-action/wake', async c => {
+  const result = await parseBody(c, ScheduledActionWakeSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, instanceId } = result.data;
+
+  try {
+    const woken = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.notifyScheduledActionPending(),
+      'notifyScheduledActionPending'
+    );
+    return c.json(woken);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'scheduled-action-wake');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/scheduled-action/run-notice-sweep
+//
+// Synchronously runs the notice sweep that the cron normally drives.
+// Useful for local dev (where wrangler does not fire scheduled() on
+// the cron cadence) and for ad-hoc admin testing in production. The
+// sweep is idempotent and bounded (MAX_NOTIFICATIONS_PER_TICK), so
+// invoking it on demand is safe.
+platform.post('/scheduled-action/run-notice-sweep', async c => {
+  try {
+    const result = await runScheduledActionNoticesSweep(c.env);
+    return c.json(result);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'scheduled-action-run-notice-sweep');
     return jsonError(message, status);
   }
 });

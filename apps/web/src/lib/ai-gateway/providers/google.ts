@@ -1,17 +1,16 @@
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 
 export function isGeminiModel(model: string) {
-  return modelStartsWith(model, 'google/gemini');
+  return model.includes('gemini');
 }
 
 export function isGemmaModel(model: string) {
-  return modelStartsWith(model, 'google/gemma');
+  return model.includes('gemma');
 }
 
-export const GEMMA_4_31B_IT_ID = 'google/gemma-4-31b-it';
+export const GEMMA_4_26B_A4B_IT_ID = 'google/gemma-4-26b-a4b-it';
 
 export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   public_id: 'google/gemma-4-26b-a4b-it:free',
@@ -21,15 +20,16 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   context_length: 262144,
   max_completion_tokens: 32768,
   status: 'hidden', // usable through kilo-auto
-  flags: ['vision'],
+  flags: ['vision', 'vercel-routing'],
   gateway: 'openrouter',
-  internal_id: 'google/gemma-4-26b-a4b-it',
+  internal_id: GEMMA_4_26B_A4B_IT_ID,
   pricing: null,
   exclusive_to: [],
+  inference_provider_restriction: [],
 };
 
 export function isGemini3Model(model: string) {
-  return modelStartsWith(model, 'google/gemini-3');
+  return model.includes('gemini-3');
 }
 
 type ReadFileParametersSchema = {
@@ -55,7 +55,7 @@ export function applyGoogleModelSettings(provider: ProviderId, requestToMutate: 
   }
 
   const readFileTool = requestToMutate.body.tools?.find(
-    tool => tool.type === 'function' && tool.function.name === 'read_file'
+    tool => tool.type === 'function' && tool.function?.name === 'read_file'
   );
   if (!readFileTool || readFileTool.type !== 'function') {
     return;
@@ -69,3 +69,11 @@ export function applyGoogleModelSettings(provider: ProviderId, requestToMutate: 
     delete lineRanges.items;
   }
 }
+
+export const GEMINI_PRO_CURRENT_MODEL_ID = 'google/gemini-3.1-pro-preview';
+
+export const GEMINI_PRO_CURRENT_VERCEL_MODEL_ID = GEMINI_PRO_CURRENT_MODEL_ID;
+
+export const GEMINI_FLASH_CURRENT_MODEL_ID = 'google/gemini-3-flash';
+
+export const GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID = GEMINI_FLASH_CURRENT_MODEL_ID;

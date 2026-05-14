@@ -66,7 +66,11 @@ import {
   restoreWorkspace as mockRestoreWorkspace,
   cleanupWorkspace as mockCleanupWorkspace,
 } from './workspace.js';
-import { InvalidSessionMetadataError, SessionService } from './session-service.js';
+import {
+  buildAgentEntryFromRuntimeAgent,
+  InvalidSessionMetadataError,
+  SessionService,
+} from './session-service.js';
 import type { SandboxInstance, SessionId, SessionContext, ExecutionSession } from './types.js';
 import type { PersistenceEnv, CloudAgentSessionState } from './persistence/types.js';
 
@@ -184,8 +188,8 @@ describe('SessionService', () => {
           KILO_PLATFORM: 'cloud-agent',
           KILO_DISABLE_AUTOUPDATE: 'true',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
@@ -341,14 +345,113 @@ describe('SessionService', () => {
           KILO_PLATFORM: 'cloud-agent',
           KILO_DISABLE_AUTOUPDATE: 'true',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
       // manageBranch should NOT be called when repo exists (warm start)
       expect(mockManageBranch).not.toHaveBeenCalled();
       expect(result.context.sessionId).toBe(sessionId);
+    });
+
+    it('uses a fresh GitHub token for GH_TOKEN when metadata has no token', async () => {
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ success: true, stdout: 'exists' }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
+      const sandbox = {
+        createSession: sandboxCreateSession,
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      const metadata = {
+        version: 123456789,
+        sessionId: 'agent_resume_fresh_gh_token',
+        orgId: 'org',
+        userId: 'user',
+        timestamp: 123456789,
+        githubRepo: 'acme/repo',
+      };
+      const { env: testEnv } = createMetadataEnv({
+        getMetadata: vi.fn().mockResolvedValue(metadata),
+      });
+
+      const service = new SessionService();
+      const result = await service.resume({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId: 'agent_resume_fresh_gh_token',
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        env: testEnv,
+        githubToken: 'fresh-github-token',
+      });
+
+      expect(result.context.githubToken).toBe('fresh-github-token');
+      expect(sandboxCreateSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          env: expect.objectContaining({
+            GH_TOKEN: 'fresh-github-token',
+          }) as unknown,
+        })
+      );
+    });
+
+    it('keeps metadata GH_TOKEN env override when a fresh GitHub token is provided', async () => {
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ success: true, stdout: 'exists' }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
+      const sandbox = {
+        createSession: sandboxCreateSession,
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      const metadata = {
+        version: 123456789,
+        sessionId: 'agent_resume_gh_token_override',
+        orgId: 'org',
+        userId: 'user',
+        timestamp: 123456789,
+        githubRepo: 'acme/repo',
+        envVars: { GH_TOKEN: 'user-provided-token' },
+      };
+      const { env: testEnv } = createMetadataEnv({
+        getMetadata: vi.fn().mockResolvedValue(metadata),
+      });
+
+      const service = new SessionService();
+      const result = await service.resume({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId: 'agent_resume_gh_token_override',
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        env: testEnv,
+        githubToken: 'fresh-github-token',
+      });
+
+      expect(result.context.githubToken).toBe('fresh-github-token');
+      expect(sandboxCreateSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          env: expect.objectContaining({
+            GH_TOKEN: 'user-provided-token',
+          }) as unknown,
+        })
+      );
     });
   });
 
@@ -1226,7 +1329,7 @@ describe('SessionService', () => {
         kilocodeModel: 'test-model',
         githubRepo: 'acme/repo',
         env: mockEnv,
-        envVars,
+        profile: { envVars },
       });
 
       expect(sandboxCreateSession).toHaveBeenCalledWith({
@@ -1240,8 +1343,8 @@ describe('SessionService', () => {
           KILO_PLATFORM: 'cloud-agent',
           KILO_DISABLE_AUTOUPDATE: 'true',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
           API_KEY: 'test-key-123',
           DATABASE_URL: 'postgres://localhost:5432/test',
           NODE_ENV: 'development',
@@ -1287,7 +1390,7 @@ describe('SessionService', () => {
         kilocodeModel: 'test-model',
         githubRepo: 'acme/repo',
         env: mockEnv,
-        envVars,
+        profile: { envVars },
       });
 
       expect(sandboxCreateSession).toHaveBeenCalledWith({
@@ -1346,8 +1449,8 @@ describe('SessionService', () => {
           KILO_PLATFORM: 'cloud-agent',
           KILO_DISABLE_AUTOUPDATE: 'true',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
@@ -1562,8 +1665,10 @@ describe('SessionService', () => {
         kilocodeModel: 'test-model',
         githubRepo: 'acme/repo',
         githubToken,
-        envVars: {
-          GH_TOKEN: userProvidedToken,
+        profile: {
+          envVars: {
+            GH_TOKEN: userProvidedToken,
+          },
         },
         env: mockEnv,
       });
@@ -1697,6 +1802,102 @@ describe('SessionService', () => {
     });
   });
 
+  describe('GITLAB_TOKEN / GLAB_IS_OAUTH2 Auto-Setting', () => {
+    function setupSandbox(sessionId: SessionId) {
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
+      const sandbox = {
+        createSession: sandboxCreateSession,
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      mockedSetupWorkspace.mockResolvedValue({
+        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
+        sessionHome: `/home/${sessionId}`,
+      });
+      return { sandbox, sandboxCreateSession };
+    }
+
+    // glab >=1.82.0 sends GITLAB_TOKEN as `Authorization: Bearer $token` when
+    // GLAB_IS_OAUTH2=true, otherwise as `PRIVATE-TOKEN: $token`. GitLab rejects
+    // OAuth tokens sent via PRIVATE-TOKEN with 401; PATs accept both. Setting
+    // GLAB_IS_OAUTH2=true unconditionally works for every token type we inject.
+    it('sets GITLAB_TOKEN, GITLAB_HOST, and GLAB_IS_OAUTH2 for GitLab sessions', async () => {
+      const sessionId: SessionId = 'agent_gitlab_token';
+      const { sandbox, sandboxCreateSession } = setupSandbox(sessionId);
+
+      await new SessionService().initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        gitToken: 'access-token',
+        platform: 'gitlab',
+        env: mockEnv,
+      });
+
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      expect(callArgs.env.GITLAB_TOKEN).toBe('access-token');
+      expect(callArgs.env.GITLAB_HOST).toBe('gitlab.com');
+      expect(callArgs.env.GLAB_IS_OAUTH2).toBe('true');
+    });
+
+    it('does not overwrite user-provided GLAB_IS_OAUTH2 env var', async () => {
+      const sessionId: SessionId = 'agent_gitlab_user_override';
+      const { sandbox, sandboxCreateSession } = setupSandbox(sessionId);
+
+      await new SessionService().initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        gitToken: 'access-token',
+        platform: 'gitlab',
+        profile: { envVars: { GLAB_IS_OAUTH2: 'false' } },
+        env: mockEnv,
+      });
+
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      expect(callArgs.env.GLAB_IS_OAUTH2).toBe('false');
+    });
+
+    it('picks up self-managed GitLab host from the gitUrl', async () => {
+      const sessionId: SessionId = 'agent_gitlab_selfhosted';
+      const { sandbox, sandboxCreateSession } = setupSandbox(sessionId);
+
+      await new SessionService().initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        gitUrl: 'https://gitlab.acme.internal/team/repo.git',
+        gitToken: 'access-token',
+        platform: 'gitlab',
+        env: mockEnv,
+      });
+
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      expect(callArgs.env.GITLAB_HOST).toBe('gitlab.acme.internal');
+    });
+  });
+
   describe('Setup Commands Execution', () => {
     it('should continue executing commands when one fails during resume (lenient)', async () => {
       const metadata = {
@@ -1799,7 +2000,11 @@ describe('SessionService', () => {
           .fn()
           .mockResolvedValueOnce({ exitCode: 0, stdout: 'installed', stderr: '' }) // git checkout -b succeeds
           .mockResolvedValueOnce({ exitCode: 0, stdout: 'installed', stderr: '' }) // npm install succeeds
-          .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'ERR! 404 Not Found' }), // npm install -g fails
+          .mockResolvedValueOnce({
+            exitCode: 1,
+            stdout: 'npm output before failure',
+            stderr: 'ERR! 404 Not Found',
+          }), // npm install -g fails
         gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
         writeFile: vi.fn().mockResolvedValue(undefined),
         deleteFile: vi.fn().mockResolvedValue(undefined),
@@ -1831,13 +2036,14 @@ describe('SessionService', () => {
           kilocodeModel: 'test-model',
           githubRepo: 'acme/repo',
           env: mockEnv,
-          setupCommands,
+          profile: { setupCommands },
         })
       ).rejects.toMatchObject({
         name: 'SetupCommandFailedError',
         command: 'npm install -g fake-package',
         exitCode: 1,
         stderr: 'ERR! 404 Not Found',
+        stdout: 'npm output before failure',
       });
 
       // Verify only three calls: git checkout -b + first setup command + second setup command that failed
@@ -1876,7 +2082,7 @@ describe('SessionService', () => {
         kilocodeModel: 'test-model',
         githubRepo: 'acme/repo',
         env: mockEnv,
-        setupCommands: ['pwd', 'ls -la'],
+        profile: { setupCommands: ['pwd', 'ls -la'] },
       });
 
       expect(fakeSession.exec).toHaveBeenCalledWith(
@@ -1920,7 +2126,7 @@ describe('SessionService', () => {
         kilocodeModel: 'test-model',
         githubRepo: 'acme/repo',
         env: mockEnv,
-        setupCommands: [], // Empty array
+        profile: { setupCommands: [] }, // Empty array
       });
 
       // exec should only be called once for git checkout -b, not for setup commands
@@ -1971,7 +2177,7 @@ describe('SessionService', () => {
         kilocodeModel: 'test-model',
         githubRepo: 'acme/repo',
         env: mockEnv,
-        mcpServers,
+        profile: { mcpServers },
       });
 
       const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
@@ -2016,7 +2222,7 @@ describe('SessionService', () => {
         kilocodeModel: 'test-model',
         githubRepo: 'acme/repo',
         env: mockEnv,
-        mcpServers: {}, // Empty object
+        profile: { mcpServers: {} }, // Empty object
       });
 
       const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
@@ -2051,12 +2257,10 @@ describe('SessionService', () => {
         'server-1': {
           type: 'local' as const,
           command: ['node', 'server.js'],
-          environment: { FOO: 'bar' },
         },
         'server-2': {
           type: 'remote' as const,
           url: 'https://example.com/mcp',
-          headers: { Authorization: 'Bearer tok' },
         },
       };
 
@@ -2070,23 +2274,20 @@ describe('SessionService', () => {
         kilocodeModel: 'test-model',
         githubRepo: 'acme/repo',
         env: mockEnv,
-        mcpServers,
+        profile: { mcpServers },
       });
 
       const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
       const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
         mcp: Record<string, unknown>;
       };
-      // MCP configs are passed through directly — no conversion
       expect(configContent.mcp['server-1']).toEqual({
         type: 'local',
         command: ['node', 'server.js'],
-        environment: { FOO: 'bar' },
       });
       expect(configContent.mcp['server-2']).toEqual({
         type: 'remote',
         url: 'https://example.com/mcp',
-        headers: { Authorization: 'Bearer tok' },
       });
     });
 
@@ -2130,7 +2331,7 @@ describe('SessionService', () => {
         kilocodeModel: 'test-model',
         githubRepo: 'acme/repo',
         env: mockEnv,
-        mcpServers,
+        profile: { mcpServers },
       });
 
       const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
@@ -2142,6 +2343,70 @@ describe('SessionService', () => {
         command: ['test'],
         enabled: false,
         timeout: 30000,
+      });
+    });
+
+    it('passes plain-string MCP env values straight through without requiring a private key', async () => {
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
+      const sandbox = {
+        createSession: sandboxCreateSession,
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      const sessionId: SessionId = 'agent_mcp_plain_env';
+      mockedSetupWorkspace.mockResolvedValue({
+        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
+        sessionHome: `/home/${sessionId}`,
+      });
+
+      const service = new SessionService();
+      const mcpServers = {
+        config: {
+          type: 'local' as const,
+          command: ['node', 'server.js'],
+          environment: { LOCALE: 'en-US', PORT: '4000' },
+        },
+        publicRemote: {
+          type: 'remote' as const,
+          url: 'https://example.com/mcp',
+          headers: { 'X-Region': 'eu-west-1' },
+        },
+      };
+
+      // No AGENT_ENV_VARS_PRIVATE_KEY in env — must still succeed because no envelopes are present.
+      await service.initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        githubRepo: 'acme/repo',
+        env: mockEnv,
+        profile: { mcpServers },
+      });
+
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
+        mcp: Record<string, unknown>;
+      };
+      expect(configContent.mcp.config).toEqual({
+        type: 'local',
+        command: ['node', 'server.js'],
+        environment: { LOCALE: 'en-US', PORT: '4000' },
+      });
+      expect(configContent.mcp.publicRemote).toEqual({
+        type: 'remote',
+        url: 'https://example.com/mcp',
+        headers: { 'X-Region': 'eu-west-1' },
       });
     });
   });
@@ -2188,23 +2453,24 @@ describe('SessionService', () => {
         kilocodeModel: 'test-model',
         githubRepo: 'acme/repo',
         env: testEnv,
-        envVars,
-        setupCommands,
-        mcpServers,
+        profile: { envVars, setupCommands, mcpServers },
       });
 
-      // Verify metadata was saved
+      // Verify metadata was saved with profile-derived fields nested
+      // under `profile` (the flat form is no longer written).
       expect(updateMetadata).toHaveBeenCalledWith(
         expect.objectContaining({
           sessionId,
           orgId: 'org',
           userId: 'user',
           githubRepo: 'acme/repo',
-          envVars: { API_KEY: 'test-123' },
-          setupCommands: ['npm install', 'npm build'],
-          mcpServers: {
-            test: { type: 'local', command: ['test-server'] },
-          },
+          profile: expect.objectContaining({
+            envVars: { API_KEY: 'test-123' },
+            setupCommands: ['npm install', 'npm build'],
+            mcpServers: {
+              test: { type: 'local', command: ['test-server'] },
+            },
+          }) as unknown,
         })
       );
     });
@@ -2305,7 +2571,7 @@ describe('SessionService', () => {
         kilocodeModel: 'test-model',
         githubRepo: 'acme/repo',
         env: testEnv,
-        ...originalData,
+        profile: originalData,
       });
 
       // Load
@@ -2320,11 +2586,14 @@ describe('SessionService', () => {
         env: testEnv,
       });
 
-      // Verify round-trip
+      // Verify round-trip — writers now emit the nested profile form
       expect(result.context.envVars).toEqual(originalData.envVars);
       expect(savedMetadata).toBeDefined();
-      expect(savedMetadata?.setupCommands).toEqual(originalData.setupCommands);
-      expect(savedMetadata?.mcpServers?.server1).toEqual({ type: 'local', command: ['test'] });
+      expect(savedMetadata?.profile?.setupCommands).toEqual(originalData.setupCommands);
+      expect(savedMetadata?.profile?.mcpServers?.server1).toEqual({
+        type: 'local',
+        command: ['test'],
+      });
     });
   });
 
@@ -3126,7 +3395,7 @@ describe('SessionService', () => {
         kiloSessionId,
         githubRepo: 'acme/repo',
         env: testEnv,
-        setupCommands: ['npm install', 'npm run build'],
+        profile: { setupCommands: ['npm install', 'npm run build'] },
       });
 
       // Verify setup commands were run
@@ -3655,5 +3924,60 @@ describe('SessionService', () => {
       // git checkout -b should NOT be called (legacy CLI manages its own branch)
       expect(fakeSession.exec).not.toHaveBeenCalledWith(expect.stringContaining('git checkout -b'));
     });
+  });
+});
+
+describe('buildAgentEntryFromRuntimeAgent', () => {
+  it('normalizes model with kilo/ prefix when not already prefixed', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: { model: 'anthropic/claude-opus-4.7', mode: 'subagent' },
+    });
+    expect(result.model).toBe('kilo/anthropic/claude-opus-4.7');
+  });
+
+  it('does not double-prefix models that already have kilo/', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: { model: 'kilo/code', mode: 'subagent' },
+    });
+    expect(result.model).toBe('kilo/code');
+  });
+
+  it('handles null model', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: { model: null, mode: 'subagent' },
+    });
+    expect(result.model).toBeUndefined();
+  });
+
+  it('handles undefined model', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: { mode: 'subagent' },
+    });
+    expect(result.model).toBeUndefined();
+  });
+
+  it('passes through other config fields unchanged', () => {
+    const result = buildAgentEntryFromRuntimeAgent({
+      slug: 'test-agent',
+      name: 'Test Agent',
+      config: {
+        model: 'anthropic/claude-sonnet-4',
+        mode: 'subagent',
+        temperature: 0.7,
+        prompt: 'You are a test agent',
+      },
+    });
+    expect(result.model).toBe('kilo/anthropic/claude-sonnet-4');
+    expect(result.temperature).toBe(0.7);
+    expect(result.prompt).toBe('You are a test agent');
+    expect(result.mode).toBe('subagent');
   });
 });

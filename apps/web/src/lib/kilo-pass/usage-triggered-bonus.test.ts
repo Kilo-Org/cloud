@@ -47,11 +47,13 @@ async function seedBaseIssuance(params: {
     startedAtIso,
   } = params;
 
+  const stripeSubscriptionId = `sub_${Math.random()}`;
   const subscriptionRow = await db
     .insert(kilo_pass_subscriptions)
     .values({
       kilo_user_id: kiloUserId,
-      stripe_subscription_id: `sub_${Math.random()}`,
+      provider_subscription_id: stripeSubscriptionId,
+      stripe_subscription_id: stripeSubscriptionId,
       tier,
       cadence,
       status: 'active',
@@ -436,9 +438,11 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     });
 
     // Prior subscription makes the user ineligible for the first-month promo.
+    const priorStripeSubscriptionId = `sub_prior_${Math.random()}`;
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
-      stripe_subscription_id: `sub_prior_${Math.random()}`,
+      provider_subscription_id: priorStripeSubscriptionId,
+      stripe_subscription_id: priorStripeSubscriptionId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,
       status: 'canceled',

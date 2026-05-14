@@ -1,20 +1,23 @@
 import type { SandboxId, SessionId, SessionContext, ExecutionSession } from '../types.js';
 import type { Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './CloudAgentSession.js';
-import type { EncryptedSecrets } from '../router/schemas.js';
+import type { EncryptedSecrets, MCPSecretValue } from '../router/schemas.js';
 import type { CallbackTarget } from '../callbacks/index.js';
-import type { Images } from './schemas.js';
+import type { Images, SessionProfileBundle } from './schemas.js';
 import type { SessionIngestBinding } from '../session-ingest-binding.js';
 
 /**
- * Local MCP server configuration (runs a command)
+ * Local MCP server configuration (runs a command).
+ * Each env value is a plain string or an encrypted envelope; the worker
+ * decrypts envelope-shaped values per key when materializing
+ * `KILO_CONFIG_CONTENT.mcp` for the sandbox session.
  */
 export type MCPLocalServerConfig = {
   type: 'local';
   /** Command to execute — first element is the binary, rest are args */
   command: string[];
-  /** Environment variables for the command */
-  environment?: Record<string, string>;
+  /** Env values: plain strings pass through, envelopes are decrypted per key. */
+  environment?: Record<string, MCPSecretValue>;
   /** Whether this server is enabled (default true) */
   enabled?: boolean;
   /** Timeout in milliseconds */
@@ -22,14 +25,17 @@ export type MCPLocalServerConfig = {
 };
 
 /**
- * Remote MCP server configuration (connects to a URL)
+ * Remote MCP server configuration (connects to a URL).
+ * Each header value is a plain string or an encrypted envelope; the worker
+ * decrypts envelope-shaped values per key when materializing
+ * `KILO_CONFIG_CONTENT.mcp` for the sandbox session.
  */
 export type MCPRemoteServerConfig = {
   type: 'remote';
   /** Server URL */
   url: string;
-  /** HTTP headers */
-  headers?: Record<string, string>;
+  /** Header values: plain strings pass through, envelopes are decrypted per key. */
+  headers?: Record<string, MCPSecretValue>;
   /** Whether this server is enabled (default true) */
   enabled?: boolean;
   /** Timeout in milliseconds */
@@ -40,6 +46,48 @@ export type MCPRemoteServerConfig = {
  * MCP Server configuration — CLI-native local/remote discriminated union
  */
 export type MCPServerConfig = MCPLocalServerConfig | MCPRemoteServerConfig;
+
+/**
+ * Runtime skill injected from the web app's merged profile stack. `rawMarkdown`
+ * is materialized to `${SESSION_HOME}/.kilocode/skills/<name>/SKILL.md`; each
+ * entry in `files` is written under the same directory.
+ */
+export type RuntimeSkill = {
+  name: string;
+  rawMarkdown: string;
+  files?: Record<string, string>;
+};
+
+/**
+ * Runtime agent injected from the web app's merged profile stack. Stored in
+ * the CLI's AgentConfig shape and passed through to
+ * `KILO_CONFIG_CONTENT.agent.<slug>` at session preparation time.
+ *
+ * Permission is typed loosely here to match the zod schema — the web-app
+ * service layer does the tight validation before values land in the DO.
+ */
+export type PermissionAction = 'allow' | 'ask' | 'deny';
+export type PermissionConfig = PermissionAction | Record<string, unknown>;
+
+export type RuntimeAgent = {
+  slug: string;
+  name: string;
+  config: {
+    prompt?: string;
+    description?: string;
+    mode?: 'subagent' | 'primary' | 'all';
+    model?: string | null;
+    variant?: string;
+    temperature?: number;
+    top_p?: number;
+    steps?: number;
+    hidden?: boolean;
+    disable?: boolean;
+    color?: string;
+    permission?: PermissionConfig;
+    options?: Record<string, unknown>;
+  };
+};
 
 export type CloudAgentSessionState = {
   /** Current version timestamp (for cache invalidation) */
@@ -74,18 +122,26 @@ export type CloudAgentSessionState = {
   platform?: 'github' | 'gitlab';
   /** Whether the GitLab token was auto-looked up via git-token-service (enables refresh on resume) */
   gitlabTokenManaged?: boolean;
-  /** Environment variables to inject into sandbox execution sessions (plaintext) */
-  envVars?: Record<string, string>;
   /**
-   * Encrypted secret env vars from agent environment profiles.
-   * Stored encrypted in DO, decrypted only at execution time when injected into CLI.
-   * Keys are env var names, values are encrypted envelopes.
+   * Profile-derived configuration (envVars, encryptedSecrets, setupCommands,
+   * mcpServers, runtimeSkills, runtimeAgents). Always written in this nested
+   * form; the legacy flat fields below are a read-only compatibility surface
+   * for sessions stored before nesting landed. Never access these fields
+   * directly — go through `readProfileBundle` to get a normalized bundle.
    */
+  profile?: SessionProfileBundle;
+  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).envVars`. */
+  envVars?: Record<string, string>;
+  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).encryptedSecrets`. */
   encryptedSecrets?: EncryptedSecrets;
-  /** Installation commands to run on init/resume */
+  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).setupCommands`. */
   setupCommands?: string[];
-  /** MCP server configurations injected via KILO_CONFIG_CONTENT env var */
+  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).mcpServers`. */
   mcpServers?: Record<string, MCPServerConfig>;
+  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).runtimeSkills`. */
+  runtimeSkills?: readonly RuntimeSkill[];
+  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).runtimeAgents`. */
+  runtimeAgents?: readonly RuntimeAgent[];
   /** Upstream branch to checkout when cloning the repo */
   upstreamBranch?: string;
   /** Kilo CLI session ID for continuation (from session_created event) */

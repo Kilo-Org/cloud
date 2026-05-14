@@ -418,30 +418,6 @@ export function useClawGoogleSetupCommand(enabled: boolean) {
   return organizationId ? org : personal;
 }
 
-// Stream Chat
-
-export function useClawStreamChatCredentials(enabled: boolean) {
-  const trpc = useTRPC();
-  const { organizationId } = useClawContext();
-
-  const personal = useQuery({
-    ...trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
-      staleTime: 5 * 60_000,
-    }),
-    enabled: enabled && !organizationId,
-  });
-
-  const org = useQuery({
-    ...trpc.organizations.kiloclaw.getStreamChatCredentials.queryOptions(
-      { organizationId: organizationId ?? '' },
-      { staleTime: 5 * 60_000 }
-    ),
-    enabled: enabled && !!organizationId,
-  });
-
-  return organizationId ? org : personal;
-}
-
 // Kilo CLI Run
 
 export function useClawKiloCliRunStatus(runId: string | null) {

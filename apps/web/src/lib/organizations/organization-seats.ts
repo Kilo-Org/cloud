@@ -27,6 +27,7 @@ import {
   billingCycleToDb,
 } from '@/lib/organizations/organization-types';
 import { client as stripeClient } from '@/lib/stripe-client';
+import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
 
 const sentryError = sentryLogger('organization_seats', 'error');
 
@@ -209,32 +210,35 @@ async function handleSubscriptionEventInternal(
   }
 
   const lineItems = subscription.items.data ?? [];
-  const firstLineItem = lineItems[0];
-  if (!firstLineItem?.current_period_end) {
-    throw new Error(`No period end found in invoice line items subscription ${subscription.id}`);
-  }
 
-  // Sum quantities from ALL line items in the subscription.
+  // Filter to only seat-related line items, excluding non-seat products (KiloPass, KiloClaw, etc.).
   // When a subscription has multiple prices for Kilo Teams (e.g., paid seats at one price
   // and free seats at another), Stripe stores them as separate line items.
-  const seatCount = lineItems.reduce((total, item) => total + (item.quantity ?? 0), 0);
+  const seatLineItems = lineItems.filter(isSeatLineItem);
 
-  // Calculate total amount from all line items (stripe amounts are in cents)
-  const amountUsd = lineItems.reduce((total, item) => {
+  const firstSeatLineItem = seatLineItems[0];
+  if (!firstSeatLineItem?.current_period_end) {
+    throw new Error(`No seat line items with period end found in subscription ${subscription.id}`);
+  }
+
+  const seatCount = seatLineItems.reduce((total, item) => total + (item.quantity ?? 0), 0);
+
+  // Calculate total amount from seat line items only (stripe amounts are in cents)
+  const amountUsd = seatLineItems.reduce((total, item) => {
     const itemQuantity = item.quantity ?? 0;
     const unitAmount = item.price?.unit_amount ?? 0;
     return total + (unitAmount / 100) * itemQuantity;
   }, 0);
 
-  // use the start & end date of the line item (which is in seconds, not millis)
-  const startDate = new Date(firstLineItem.current_period_start * 1000);
-  const endDate = new Date(firstLineItem.current_period_end * 1000);
+  // Use the billing period from the first seat line item (in seconds, not millis)
+  const startDate = new Date(firstSeatLineItem.current_period_start * 1000);
+  const endDate = new Date(firstSeatLineItem.current_period_end * 1000);
 
   // Extract billing cycle from the paid seat item's recurring interval.
-  // In mixed subscriptions, items[0] can be a free promotional item with a
-  // different cadence, so we prefer the first item with unit_amount > 0.
-  const paidLineItem = lineItems.find(item => (item.price?.unit_amount ?? 0) > 0);
-  const billingCycleItem = paidLineItem ?? firstLineItem;
+  // In mixed subscriptions, seatLineItems[0] can be a free promotional seat with a
+  // different cadence, so we prefer the first seat item with unit_amount > 0.
+  const paidLineItem = seatLineItems.find(item => (item.price?.unit_amount ?? 0) > 0);
+  const billingCycleItem = paidLineItem ?? firstSeatLineItem;
   const stripeInterval = billingCycleItem.price?.recurring?.interval;
   let billingCycleDb: 'monthly' | 'yearly';
   if (stripeInterval === 'month' || stripeInterval === 'year') {

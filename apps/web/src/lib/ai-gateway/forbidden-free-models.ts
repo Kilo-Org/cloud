@@ -1,7 +1,9 @@
 import { claude_sonnet_clawsetup_model } from '@/lib/ai-gateway/providers/anthropic.constants';
 
 const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
+  'auto:free', // this is not a free model, OpenRouter can map it to a paid model
   'arcee-ai/trinity-large-preview:free',
+  'arcee-ai/trinity-large-thinking:free',
   'corethink:free',
   'arcee-ai/trinity-mini:free',
   'bytedance-seed/dola-seed-2.0-pro:free',

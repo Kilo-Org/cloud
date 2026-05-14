@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { Plus } from 'lucide-react';
+import { AlertTriangle, Loader2, Plus } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
 import { ConversationItem } from './ConversationItem';
@@ -48,17 +48,58 @@ type ConversationListProps = {
   isLoading: boolean;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
+  isCreatingConversation?: boolean;
+  newConversationError?: string | null;
   onLoadMore?: () => void;
   onNewConversation: () => void;
   onRename: (id: string, title: string) => void;
   onLeave: (id: string) => void;
 };
 
+type NewConversationUiState = {
+  buttonLabel: string;
+  buttonTitle: string;
+  disabled: boolean;
+  emptyText: string;
+  showError: boolean;
+};
+
+export function buildNewConversationUiState({
+  isCreatingConversation,
+  newConversationError,
+}: {
+  isCreatingConversation: boolean;
+  newConversationError: string | null;
+}): NewConversationUiState {
+  if (isCreatingConversation) {
+    return {
+      buttonLabel: 'Creating conversation',
+      buttonTitle: 'Creating conversation',
+      disabled: true,
+      emptyText: 'Creating conversation...',
+      showError: false,
+    };
+  }
+
+  return {
+    buttonLabel: 'New conversation',
+    buttonTitle: 'New conversation',
+    disabled: false,
+    emptyText:
+      newConversationError === null
+        ? 'No conversations yet'
+        : 'No conversations yet. Create one to start chatting.',
+    showError: newConversationError !== null,
+  };
+}
+
 export function ConversationList({
   conversations,
   isLoading,
   hasNextPage,
   isFetchingNextPage,
+  isCreatingConversation = false,
+  newConversationError = null,
   onLoadMore,
   onNewConversation,
   onRename,
@@ -67,6 +108,10 @@ export function ConversationList({
   const params = useParams<{ conversationId?: string }>();
   const activeId = params?.conversationId;
   const groups = useMemo(() => groupConversations(conversations), [conversations]);
+  const newConversationUi = buildNewConversationUiState({
+    isCreatingConversation,
+    newConversationError,
+  });
 
   const handleScroll = useCallback(
     (e: React.UIEvent<HTMLDivElement>) => {
@@ -85,21 +130,34 @@ export function ConversationList({
         <span className="text-muted-foreground text-xs font-medium uppercase">Conversations</span>
         <button
           type="button"
+          disabled={newConversationUi.disabled}
           onClick={onNewConversation}
-          aria-label="New conversation"
-          title="New conversation"
-          className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+          aria-busy={isCreatingConversation}
+          aria-label={newConversationUi.buttonLabel}
+          title={newConversationUi.buttonTitle}
+          className="hover:bg-muted focus-visible:ring-ring rounded p-1 cursor-pointer transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Plus className="h-4 w-4" />
+          {isCreatingConversation ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="h-4 w-4" />
+          )}
         </button>
       </div>
+
+      {newConversationUi.showError && (
+        <div className="text-destructive mx-3 mb-2 flex gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-xs">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{newConversationError}</span>
+        </div>
+      )}
 
       <div className="flex-1 space-y-0.5 overflow-y-auto px-2" onScroll={handleScroll}>
         {isLoading ? (
           <div className="text-muted-foreground px-3 py-4 text-center text-xs">Loading...</div>
         ) : conversations.length === 0 ? (
           <div className="text-muted-foreground px-3 py-4 text-center text-xs">
-            No conversations yet
+            {newConversationUi.emptyText}
           </div>
         ) : (
           <>

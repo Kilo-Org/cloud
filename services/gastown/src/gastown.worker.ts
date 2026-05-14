@@ -8,6 +8,7 @@ import { getTownContainerStub } from './dos/TownContainer.do';
 import { getTownDOStub } from './dos/Town.do';
 import { TownConfigUpdateSchema } from './types';
 import { resError } from './util/res.util';
+import { writeEvent } from './util/analytics.util';
 import {
   authMiddleware,
   agentOnlyMiddleware,
@@ -146,6 +147,8 @@ import {
   handleContainerReady,
   handleDrainStatus,
 } from './handlers/town-eviction.handler';
+import { handleRefreshGitToken } from './handlers/refresh-git-token.handler';
+import { handleRefreshContainerToken } from './handlers/town-container-token.handler';
 
 export { GastownUserDO } from './dos/GastownUser.do';
 export { GastownOrgDO } from './dos/GastownOrg.do';
@@ -497,6 +500,16 @@ app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/nudge-delivered', c =>
 // Agent-to-agent nudge: any authenticated agent can nudge another agent in the rig
 app.post('/api/towns/:townId/rigs/:rigId/nudge', c => handleNudge(c, c.req.param()));
 
+// ── Refresh Git Token ──────────────────────────────────────────────────
+// Called by the container when a GIT_TOKEN (GitHub App installation token,
+// 1h TTL) expires mid-task. Returns a fresh token resolved via the
+// standard chain. Authenticated with the container-scoped JWT.
+app.post('/api/towns/:townId/rigs/:rigId/refresh-git-token', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/refresh-git-token', () =>
+    handleRefreshGitToken(c, c.req.param())
+  )
+);
+
 // ── Agent Events ─────────────────────────────────────────────────────────
 
 app.post('/api/towns/:townId/rigs/:rigId/agent-events', c =>
@@ -585,6 +598,12 @@ app.post('/api/towns/:townId/container-ready', c =>
   )
 );
 
+app.post('/api/towns/:townId/refresh-container-token', c =>
+  instrumented(c, 'POST /api/towns/:townId/refresh-container-token', () =>
+    handleRefreshContainerToken(c, c.req.param())
+  )
+);
+
 app.get('/api/towns/:townId/drain-status', c =>
   instrumented(c, 'GET /api/towns/:townId/drain-status', () => handleDrainStatus(c, c.req.param()))
 );
@@ -641,6 +660,56 @@ app.delete('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c
   return c.json({ success: true });
 });
 
+// ── Mayor Agent ID ──────────────────────────────────────────────────────
+// Returns the mayor's agent ID for a town so the container can prewarm
+// the mayor's SDK server during bootHydration. Protected by authMiddleware
+// (accepts container JWTs), not kiloAuthMiddleware.
+
+app.use('/api/towns/:townId/mayor-id', async (c: Context<GastownEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : authMiddleware(c, next)
+);
+
+app.get('/api/towns/:townId/mayor-id', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  const agentId = await town.getMayorAgentId();
+  return c.json({ success: true, agentId });
+});
+
+// ── Container Events ─────────────────────────────────────────────────────
+// Container-to-worker event proxy. The container can't call writeEvent
+// directly (it's worker-side), so it POSTs events here. Protected by
+// authMiddleware (accepts container JWTs), not kiloAuthMiddleware.
+
+app.use('/api/towns/:townId/container-events', async (c: Context<GastownEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : authMiddleware(c, next)
+);
+
+app.post('/api/towns/:townId/container-events', async c => {
+  const townId = c.req.param('townId');
+  const body: unknown = await c.req.json();
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('event' in body) ||
+    typeof (body as { event: unknown }).event !== 'string'
+  ) {
+    return c.json({ success: false, error: 'Missing event name' }, 400);
+  }
+  const data = body as { event: string; [key: string]: unknown };
+  writeEvent(c.env, {
+    event: data.event,
+    townId,
+    agentId: typeof data.agentId === 'string' ? data.agentId : undefined,
+    durationMs: typeof data.durationMs === 'number' ? data.durationMs : undefined,
+    role: typeof data.role === 'string' ? data.role : undefined,
+    label: typeof data.label === 'string' ? data.label : undefined,
+    double3: typeof data.phaseMs === 'number' ? data.phaseMs : undefined,
+    double4: typeof data.elapsedMs === 'number' ? data.elapsedMs : undefined,
+  });
+  return c.json({ success: true });
+});
+
 // ── Kilo User Auth ──────────────────────────────────────────────────────
 // Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for dashboard/user
 // routes. Container→worker routes use the agent JWT middleware instead
@@ -653,7 +722,12 @@ app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
 // Skip for container-registry and db-snapshot routes which use authMiddleware with container JWT support.
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
   const path = c.req.path;
-  if (path.includes('/container-registry') || path.includes('/db-snapshot')) {
+  if (
+    path.includes('/container-registry') ||
+    path.includes('/db-snapshot') ||
+    path.includes('/mayor-id') ||
+    path.includes('/container-events')
+  ) {
     return next();
   }
   await kiloAuthMiddleware(c, async () => {
@@ -1043,6 +1117,7 @@ app.use(
     endpoint: '/trpc',
     createContext: (_opts: unknown, c: Context<GastownEnv>) => ({
       env: c.env,
+      executionCtx: c.executionCtx,
       userId: c.get('kiloUserId') ?? '',
       isAdmin: c.get('kiloIsAdmin') ?? false,
       apiTokenPepper: c.get('kiloApiTokenPepper') ?? null,

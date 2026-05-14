@@ -22,6 +22,8 @@ const baseStatus: KiloClawDashboardStatus = {
   flyVolumeId: null,
   flyRegion: null,
   machineSize: null,
+  instanceType: null,
+  volumeSizeGb: null,
   openclawVersion: null,
   imageVariant: null,
   trackedImageTag: null,
@@ -39,9 +41,11 @@ const baseStatus: KiloClawDashboardStatus = {
   botVibe: null,
   botEmoji: null,
   workerUrl: 'https://claw.kilo.ai',
+  controllerCapabilitiesVersion: null,
   instanceId: 'instance-1',
   inboundEmailAddress: 'amber-river-quiet-maple@kiloclaw.ai',
   inboundEmailEnabled: true,
+  scheduledAction: null,
 };
 
 function createStatus(instanceId: string | null = 'instance-1'): KiloClawDashboardStatus {

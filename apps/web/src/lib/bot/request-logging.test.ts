@@ -1,5 +1,6 @@
 import { db } from '@/lib/drizzle';
 import {
+  createBotRequest as createBotRequestRow,
   linkBotRequestToSession,
   markBotRequestCloudAgentSessionTerminal,
   recordBotRequestCloudAgentSession,
@@ -305,5 +306,20 @@ describe('bot request logging', () => {
     );
 
     expect(row.cloud_agent_session_id).toBe(cloudAgentSessionId);
+  });
+
+  it('throws when the insert fails so callers can surface the error', async () => {
+    await expect(
+      createBotRequestRow({
+        createdBy: `nonexistent-user-${randomUUID()}`,
+        organizationId: null,
+        platformIntegrationId: randomUUID(),
+        platform: 'slack',
+        platformThreadId: `slack:T123:C456:${randomUUID()}`,
+        platformMessageId: `message-${randomUUID()}`,
+        userMessage: 'Please make a change',
+        modelUsed: undefined,
+      })
+    ).rejects.toThrow();
   });
 });

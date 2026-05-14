@@ -1,6 +1,7 @@
 /** Identity-agnostic typing indicators. See services/messages.ts for rationale. */
 
-import { withDORetry } from '@kilocode/worker-utils';
+import { formatError, withDORetry } from '@kilocode/worker-utils';
+import { logger } from '../util/logger';
 import { pushEventToHumanMembers } from './event-push';
 
 export type TypingParams = { conversationId: string };
@@ -20,7 +21,28 @@ export async function stopTypingFor(
   callerId: string,
   params: TypingParams
 ): Promise<TypingResult> {
-  return pushTypingEvent(env, callerId, params, 'typing.stop');
+  const result = await pushTypingEvent(env, callerId, params, 'typing.stop');
+  if (!result.ok) return result;
+
+  if (callerId.startsWith('bot:')) {
+    try {
+      await withDORetry(
+        () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId)),
+        async stub => {
+          await stub.notifyLatestBotMessageOnTypingStop(callerId);
+        },
+        'ConversationDO.notifyLatestBotMessageOnTypingStop'
+      );
+    } catch (err) {
+      logger.error('Failed to process bot typing.stop notification trigger', {
+        conversationId: params.conversationId,
+        botId: callerId,
+        ...formatError(err),
+      });
+    }
+  }
+
+  return result;
 }
 
 async function pushTypingEvent(

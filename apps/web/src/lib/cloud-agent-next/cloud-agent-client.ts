@@ -1,6 +1,7 @@
 import 'server-only';
 import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
+import type { AgentConfig } from '@kilocode/db/schema-types';
 import type { EncryptedEnvelope } from '@/lib/encryption';
 import type { Images } from '@/lib/images-schema';
 import { getEnvVariable } from '@/lib/dotenvx';
@@ -19,11 +20,17 @@ import { INTERNAL_API_SECRET } from '@/lib/config.server';
 // TODO: Update this URL when the new cloud-agent-next worker is deployed
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
 
-// MCP server config types — CLI-native local/remote format
+// MCP server config types — CLI-native local/remote format.
+// Each env/header value is either a plain string (passed through verbatim)
+// or an RSA+AES envelope (decrypted per-value by the worker when
+// materializing `KILO_CONFIG_CONTENT.mcp`). Callers mix the two per key:
+// secrets travel as envelopes, non-sensitive config as plain strings.
+type MCPSecretValue = string | EncryptedEnvelope;
+
 type MCPLocalServerConfig = {
   type: 'local';
   command: string[];
-  environment?: Record<string, string>;
+  environment?: Record<string, MCPSecretValue>;
   enabled?: boolean;
   timeout?: number;
 };
@@ -31,12 +38,30 @@ type MCPLocalServerConfig = {
 type MCPRemoteServerConfig = {
   type: 'remote';
   url: string;
-  headers?: Record<string, string>;
+  headers?: Record<string, MCPSecretValue>;
   enabled?: boolean;
   timeout?: number;
 };
 
 type MCPServerConfig = MCPLocalServerConfig | MCPRemoteServerConfig;
+
+/** Runtime skill materialized into the sandbox. `rawMarkdown` is written verbatim to SKILL.md;
+ * `files` holds companion files keyed by relative path (excluding SKILL.md). */
+export type RuntimeSkillInput = {
+  name: string;
+  rawMarkdown: string;
+  files?: Record<string, string>;
+};
+
+/**
+ * Custom kilo agent materialized into `KILO_CONFIG_CONTENT.agent.<slug>`.
+ * Mirrors the CLI's AgentConfig shape from `@kilocode/db/schema-types`.
+ */
+export type RuntimeAgentInput = {
+  slug: string;
+  name: string;
+  config: AgentConfig;
+};
 
 /**
  * Type definitions for cloud-agent-next API procedures
@@ -49,20 +74,18 @@ export type CallbackTarget = {
 };
 
 /**
- * Agent modes accepted by the API.
- * - code, plan, debug, orchestrator, ask: CLI agent modes
+ * Agent slug selected for a session. Built-in slugs plus `custom` plus any
+ * custom slug defined in the session's `runtimeAgents`.
+ *
+ * - code, plan, debug, orchestrator, ask: built-in agents
  * - build, architect: Backward-compatible aliases (build → code, architect → plan)
- * - custom: Custom mode (requires appendSystemPrompt)
+ * - custom: one-off mode (requires appendSystemPrompt)
+ * - any other slug: must match a slug in this session's runtimeAgents
+ *
+ * Kept as `AgentMode` rather than `AgentSlug` to avoid a cross-cutting rename
+ * of the API-level `mode` field.
  */
-export type AgentMode =
-  | 'code'
-  | 'plan'
-  | 'debug'
-  | 'orchestrator'
-  | 'ask'
-  | 'build'
-  | 'architect'
-  | 'custom';
+export type AgentMode = string;
 
 /** Input for prepareSession procedure */
 export type PrepareSessionInput = {
@@ -81,10 +104,20 @@ export type PrepareSessionInput = {
   platform?: 'github' | 'gitlab';
   // Common params
   kilocodeOrganizationId?: string;
+  /** Profile ID forwarded to cloud-agent-next for server-side merge. */
+  profileId?: string;
   envVars?: Record<string, string>;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   setupCommands?: string[];
   mcpServers?: Record<string, MCPServerConfig>;
+  /**
+   * Runtime skills materialized from the merged profile stack. The worker
+   * writes each entry's SKILL.md (and any companion files) to
+   * `${SESSION_HOME}/.kilocode/skills/<name>/`.
+   */
+  runtimeSkills?: RuntimeSkillInput[];
+  /** Custom agents materialized from the merged profile stack. */
+  runtimeAgents?: RuntimeAgentInput[];
   upstreamBranch?: string;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
@@ -119,7 +152,8 @@ export type InitiateFromPreparedSessionInput = {
 export type SendMessageInput = {
   cloudAgentSessionId: string;
   prompt: string;
-  mode: 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
+  /** Built-in slug or a slug in the session's runtimeAgents. `custom` is rejected here. */
+  mode: AgentMode;
   model: string;
   variant?: string;
   autoCommit?: boolean;
@@ -187,10 +221,8 @@ export type GetSessionOutput = {
   autoCommit?: boolean;
   upstreamBranch?: string;
 
-  // Configuration metadata (counts only, no values)
-  envVarCount?: number;
-  setupCommandCount?: number;
-  mcpServerCount?: number;
+  /** Custom agents stored on this session (slug + name, plus optional model and thinking-effort overrides). */
+  runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
 
   // Execution status (grouped for cleaner API)
   execution: ExecutionStatus;
@@ -235,6 +267,8 @@ export type UpdateSessionInput = {
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   setupCommands?: string[];
   mcpServers?: Record<string, MCPServerConfig>;
+  runtimeSkills?: RuntimeSkillInput[];
+  runtimeAgents?: RuntimeAgentInput[];
   callbackTarget?: CallbackTarget | null;
 };
 

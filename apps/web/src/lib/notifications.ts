@@ -7,8 +7,6 @@ import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { hasOrganizationEverPaid, hasUserEverPaid } from '@/lib/creditTransactions';
 import { cachedPosthogQuery } from '@/lib/posthog-query';
 import * as z from 'zod';
-import { subDays } from 'date-fns';
-import { hasReceivedPromotion } from '@/lib/promotionalCredits';
 
 import { fromMicrodollars } from '@/lib/utils';
 
@@ -109,7 +107,6 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateAutoTopUpNotification,
     generateAutoTopUpOrgsNotification,
     generateByokProvidersNotification,
-    generateFirstDayWelcomeNotification,
     generateKiloPassNotification,
   ];
 
@@ -253,11 +250,16 @@ async function generateByokProvidersNotification(
 
     const names = {
       anthropic: 'Claude API Key',
-      bedrock: 'Amazon Bedrock',
+      bedrock: 'Amazon Bedrock API Key',
+      chutes: 'Chutes API Key',
+      deepseek: 'DeepSeek API Key',
+      fireworks: 'Fireworks API Key',
       gemini: 'Google AI API Key',
       'openai-native': 'OpenAI API Key',
+      moonshot: 'Moonshot AI API Key',
       minimax: 'MiniMax Coding Plan',
       mistral: 'Mistral AI API Key',
+      novita: 'Novita AI API Key',
       xai: 'xAI API Key',
       zai: 'GLM Coding Plan',
     } as Record<string, string>;
@@ -281,41 +283,6 @@ async function generateByokProvidersNotification(
     console.error('[generateByokProvidersNotification]', e);
     return [];
   }
-}
-
-async function generateFirstDayWelcomeNotification(
-  user: User,
-  ctx: NotificationContext
-): Promise<KiloNotification[]> {
-  // Check if user was created within the last day
-  if (new Date(user.created_at) < subDays(new Date(), 1)) {
-    return [];
-  }
-
-  // Check if user has received the signup bonus
-  const hasReceivedBonus = await hasReceivedPromotion(user.id, 'automatic-welcome-credits');
-  if (!hasReceivedBonus) {
-    return [];
-  }
-
-  // Check if user still has credit balance
-  if (ctx.balance.balance <= 1) {
-    return [];
-  }
-
-  return [
-    {
-      id: 'first-day-welcome-jan-8',
-      title: 'Welcome to Kilo Code!',
-      message:
-        'We added $1.25 to your balance to get started! If you want something to try, try asking Kilo to clone Kilo-Org/KiloMan and run it.',
-      action: {
-        actionText: 'Open Kilo-Org/KiloMan',
-        actionURL: 'https://github.com/Kilo-Org/kiloman',
-      },
-      showIn: ['cli', 'extension'],
-    },
-  ];
 }
 
 async function generateKiloPassNotification(

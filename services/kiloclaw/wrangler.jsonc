@@ -19,6 +19,15 @@
       "zone_name": "kilosessions.ai",
       "custom_domain": true,
     },
+    // Wildcard route for per-instance name-based virtual hosting.
+    // Custom Domains do not support wildcard hostnames, so we use a route
+    // pattern instead. Requires a proxied wildcard DNS record on
+    // `*.kiloclaw.ai` and a cert whose SAN covers `*.kiloclaw.ai`.
+    // See .plans/namebasedrouting.md for rollout strategy.
+    {
+      "pattern": "*.kiloclaw.ai/*",
+      "zone_name": "kiloclaw.ai",
+    },
   ],
 
   "durable_objects": {
@@ -107,7 +116,19 @@
       "entrypoint": "KiloClawBillingService",
     },
     { "binding": "KILO_CHAT", "service": "kilo-chat", "entrypoint": "KiloChatService" },
+    {
+      "binding": "NOTIFICATIONS",
+      "service": "notifications",
+      "entrypoint": "NotificationsService",
+    },
   ],
+  "triggers": {
+    // 1-minute cadence sweep for the scheduled-action notice fan-out.
+    // Selects pending notification rows whose dispatch window has
+    // opened and POSTs each to the backend's internal side-effects
+    // endpoint. See services/kiloclaw/src/scheduled/scheduled-action-notices.ts.
+    "crons": ["* * * * *"],
+  },
   "vars": {
     "FLY_APP_NAME": "kiloclaw-machines", // Legacy fallback for existing instances
     "FLY_REGISTRY_APP": "kiloclaw-machines", // Shared Docker image registry
@@ -117,12 +138,41 @@
     "NF_TEAM_ID": "kilo-prod",
     "NF_REGION": "us-central",
     "NF_DEPLOYMENT_PLAN": "nf-compute-200",
+    // getNorthflankConfig has source-level defaults for tier compute plans:
+    // perf-1-3=nf-compute-200, perf-4-8=nf-compute-400,
+    // perf-4-16=nf-compute-400-16. Override NF_DEPLOYMENT_PLAN_PERF_*
+    // only if an environment needs different Northflank plan slugs.
     "NF_EDGE_HEADER_NAME": "x-kiloclaw-northflank-edge-prod",
     "NF_IMAGE_PATH_TEMPLATE": "ghcr.io/kilo-org/kiloclaw:{tag}",
     "NF_IMAGE_CREDENTIALS_ID": "kiloclaw",
     "BACKEND_API_URL": "https://app.kilo.ai",
+    // Shared, non-per-instance origins. OpenClaw's origin check
+    // (src/gateway/origin-check.ts) does exact string matching only —
+    // wildcard host patterns like `https://*.kiloclaw.ai` would be stored
+    // as literals and never match. For per-instance virtual hosting,
+    // `buildEnvVars` in src/gateway/env.ts appends
+    // `https://<instanceId>.kiloclaw.ai` per-instance at machine build time.
     "OPENCLAW_ALLOWED_ORIGINS": "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai",
-    "KILOCLAW_CHECKIN_URL": "https://claw.kilosessions.ai/api/controller/checkin",
+    // Controller check-in URL baked into newly-provisioned / restarted
+    // machines. Points at a single canonical hostname under
+    // `kiloclaw.ai` so the legacy `claw.kilosessions.ai` custom domain
+    // can be retired once the fleet rolls over. Both hostnames resolve
+    // to the same worker, so in-flight machines on the old URL keep
+    // working through the transition. Apex is not routed, so we use a
+    // dedicated `claw` subdomain (covered by the `*.kiloclaw.ai/*`
+    // wildcard route).
+    "KILOCLAW_CHECKIN_URL": "https://claw.kiloclaw.ai/api/controller/checkin",
+    // Per-instance virtual hosting. Three call sites share this suffix:
+    //   1. `parseInstanceHost` (catch-all proxy, PR2) routes `<label>.kiloclaw.ai`
+    //      requests by `Host` header.
+    //   2. `instanceUrl` injects `https://<label>.kiloclaw.ai` into each
+    //      machine's `OPENCLAW_ALLOWED_ORIGINS` (see `gateway/env.ts`).
+    //   3. (PR3) Next.js dashboard link generator builds "Open instance" URLs
+    //      using the same template.
+    // Dev parity: override in `.dev.vars` to `.kiloclaw.localhost:8795` +
+    // scheme `http` to emulate per-instance hosts locally.
+    "KILOCLAW_INSTANCE_HOST_SUFFIX": ".kiloclaw.ai",
+    "KILOCLAW_INSTANCE_URL_SCHEME": "https",
     "KILOCHAT_BASE_URL": "https://chat.kiloapps.io",
     "REQUIRE_PROXY_TOKEN": "true",
     // Proactive API key refresh: trigger when key expires within this many hours. Default: 72 (3 days).

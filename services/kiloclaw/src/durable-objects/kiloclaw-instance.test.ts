@@ -47,6 +47,7 @@ vi.mock('../fly/client', async () => {
     updateMachine: vi.fn(),
     createVolume: vi.fn(),
     createVolumeWithFallback: vi.fn(),
+    extendVolume: vi.fn().mockResolvedValue({ id: 'vol-1', size_gb: 20, region: 'iad' }),
     deleteVolume: vi.fn(),
     getVolume: vi.fn(),
     listMachines: vi.fn().mockResolvedValue([]),
@@ -99,6 +100,8 @@ vi.mock('../db', () => ({
     api_token_pepper: 'pepper-1',
   }),
   markInstanceDestroyed: vi.fn().mockResolvedValue(undefined),
+  syncInstanceType: vi.fn().mockResolvedValue(undefined),
+  syncAdminSizeOverride: vi.fn().mockResolvedValue(undefined),
 }));
 
 // -- Mock gateway/env --
@@ -138,18 +141,6 @@ vi.mock('../utils/encryption', async () => {
   };
 });
 
-// -- Mock stream-chat client --
-vi.mock('../stream-chat/client', () => ({
-  setupDefaultStreamChatChannel: vi.fn().mockResolvedValue({
-    apiKey: 'sc-api-key',
-    botUserId: 'bot-sandbox-1',
-    botUserToken: 'sc-bot-token',
-    channelId: 'default-sandbox-1',
-  }),
-  createShortLivedUserToken: vi.fn().mockResolvedValue('short-lived-token'),
-  deactivateStreamChatUsers: vi.fn().mockResolvedValue(undefined),
-}));
-
 import { KiloClawInstance } from './kiloclaw-instance';
 import { buildChannelConfigPatch } from './kiloclaw-instance/channel-config';
 import * as flyClient from '../fly/client';
@@ -160,7 +151,6 @@ import * as regions from './regions';
 import { resolveLatestVersion, resolveVersionByTag } from '../lib/image-version';
 import { lookupCatalogVersion } from '../lib/catalog-registration';
 import { selectImageVersionForInstance } from '../lib/version-rollout';
-import { setupDefaultStreamChatChannel } from '../stream-chat/client';
 import { verifyKiloToken } from '@kilocode/worker-utils';
 import {
   ALARM_INTERVAL_RUNNING_MS,
@@ -174,6 +164,7 @@ import {
   RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
   STALE_PROVISION_THRESHOLD_MS,
+  WORKER_CONTROLLER_CAPABILITIES_VERSION,
 } from '../config';
 
 // ============================================================================
@@ -226,6 +217,9 @@ function createFakeStorage() {
     },
     setAlarm(time: number): void {
       alarmTime = time;
+    },
+    getAlarm(): number | null {
+      return alarmTime;
     },
     deleteAlarm(): void {
       alarmTime = null;
@@ -1106,7 +1100,10 @@ describe('reconciliation: machine status sync', () => {
       const { instance: inst, waitUntilPromises } = createInstance(storage);
       await inst.alarm();
       if (i === SELF_HEAL_THRESHOLD - 1) {
-        expect(waitUntilPromises).toHaveLength(1);
+        // 3 = recovery launch + tracked_image_tag Postgres sync + scheduled-action
+        // apply pass. instance_type Postgres sync is no longer unconditional —
+        // it now only fires when DO state actually changes (backfill or resize).
+        expect(waitUntilPromises).toHaveLength(3);
       }
     }
 
@@ -1124,7 +1121,10 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    expect(waitUntilPromises).toHaveLength(0);
+    // 2 = tracked_image_tag sync + scheduled-action apply pass; no recovery
+    // launched. instance_type Postgres sync no longer fires unconditionally —
+    // only when backfill or resize changes DO state.
+    expect(waitUntilPromises).toHaveLength(2);
     expect(storage._store.get('status')).toBe('running');
     expect(storage._store.get('healthCheckFailCount')).toBe(0);
     expect(storage._store.get('recoveryStartedAt')).toBeUndefined();
@@ -1138,7 +1138,9 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    expect(waitUntilPromises).toHaveLength(0);
+    // 2 = tracked_image_tag sync + scheduled-action apply pass; no fresh
+    // recovery launched, no instance_type sync (state unchanged).
+    expect(waitUntilPromises).toHaveLength(2);
   });
 
   it('does not clean up a pending recovery volume while recovery is still in progress', async () => {
@@ -2016,6 +2018,25 @@ describe('buildUserEnvVars API key refresh', () => {
     expect(db.findPepperByUserId).not.toHaveBeenCalled();
     expect(gatewayEnv.buildEnvVars).not.toHaveBeenCalled();
   });
+
+  it('does NOT persist controllerCapabilitiesVersion during env build', async () => {
+    // The capabilities version must only be bumped atomically with the
+    // final `status = running` transition, inside the DO's ownership guard.
+    // Persisting here would let the DO report a version the running machine
+    // may not actually have yet if the subsequent provider update fails or
+    // is raced by a concurrent destroy().
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      kilocodeApiKey: 'stale-key',
+      kilocodeApiKeyExpiresAt: '2026-12-01T00:00:00.000Z',
+    });
+
+    expect(storage._store.get('controllerCapabilitiesVersion')).toBeUndefined();
+
+    await callBuildUserEnvVars(instance);
+
+    expect(storage._store.get('controllerCapabilitiesVersion')).toBeUndefined();
+  });
 });
 
 describe('alarm cadence', () => {
@@ -2171,6 +2192,30 @@ describe('startExistingMachine: transient vs 404 errors', () => {
 
     expect(flyClient.createMachine).toHaveBeenCalled();
     expect(storage._store.get('flyMachineId')).toBe('machine-new');
+  });
+
+  it('persists controllerCapabilitiesVersion atomically with the running transition', async () => {
+    // The version bump must land in the same persist call that flips status
+    // to `running`, inside the post-start ownership guard. This keeps it in
+    // sync with what the running machine actually has, and prevents a stale
+    // write recreating partial DO storage after a concurrent destroy.
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'stopped' });
+
+    (flyClient.getMachine as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+    (flyClient.createMachine as Mock).mockResolvedValue({
+      id: 'machine-new',
+      region: 'iad',
+    });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.start('user-1');
+
+    expect(storage._store.get('status')).toBe('running');
+    expect(storage._store.get('controllerCapabilitiesVersion')).toBe(
+      WORKER_CONTROLLER_CAPABILITIES_VERSION
+    );
   });
 
   it('destroys stale machine and recreates it when updateMachine reports a missing volume', async () => {
@@ -2341,7 +2386,7 @@ describe('createNewMachine: persist ID before waitForState', () => {
 });
 
 describe('gateway process control via controller', () => {
-  it('allows gateway status calls when machine ID exists even if DO status is stale', async () => {
+  it('rejects gateway status calls when DO status is stopped even if machine ID exists', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
       status: 'stopped',
@@ -2349,22 +2394,18 @@ describe('gateway process control via controller', () => {
       flyAppName: 'acct-test',
     });
 
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          state: 'running',
-          pid: 123,
-          uptime: 42,
-          restarts: 1,
-          lastExit: null,
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
-    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
-    const status = await instance.getGatewayProcessStatus();
-    expect(status.state).toBe('running');
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    await expect(instance.getGatewayProcessStatus()).rejects.toSatisfy((err: unknown) => {
+      if (typeof err !== 'object' || err === null) return false;
+      return (
+        'status' in err &&
+        (err as { status: number }).status === 409 &&
+        'message' in err &&
+        (err as { message: string }).message.includes('Instance is not running')
+      );
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
 
@@ -4255,6 +4296,57 @@ describe('start: volume region validation', () => {
     expect(storage._store.get('flyVolumeId')).toBe('vol-new');
     expect(storage._store.get('flyRegion')).toBe('dfw');
     expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('handles volume gone during createMachine by clearing stale volume and retrying once', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyMachineId: null,
+      flyVolumeId: 'vol-stale',
+      flyRegion: 'iad',
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-stale', region: 'iad' });
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'dfw',
+    });
+    (flyClient.createMachine as Mock)
+      .mockRejectedValueOnce(
+        new FlyApiError(
+          'Fly API createMachine failed (400): {"error":"volume not found"}',
+          400,
+          '{"error":"volume not found"}'
+        )
+      )
+      .mockResolvedValueOnce({ id: 'machine-1', region: 'dfw' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(flyClient.createMachine).toHaveBeenCalledTimes(2);
+    expect(flyClient.createVolumeWithFallback).toHaveBeenCalledTimes(1);
+    expect((flyClient.createMachine as Mock).mock.calls[0][1]).toEqual(
+      expect.objectContaining({
+        mounts: [{ volume: 'vol-stale', path: '/root' }],
+      })
+    );
+    expect((flyClient.createMachine as Mock).mock.calls[1][1]).toEqual(
+      expect.objectContaining({
+        mounts: [{ volume: 'vol-new', path: '/root' }],
+      })
+    );
+    expect(storage._store.get('flyVolumeId')).toBe('vol-new');
+    expect(storage._store.get('flyRegion')).toBe('dfw');
+    expect(storage._store.get('flyMachineId')).toBe('machine-1');
+    expect(storage._store.get('status')).toBe('running');
+
+    const warnCall = (console.warn as Mock).mock.calls.find(
+      call =>
+        typeof call[0] === 'string' &&
+        call[0].includes('Volume not found during machine creation, clearing')
+    );
+    expect(warnCall).toBeDefined();
   });
 
   it('performs region check even when machine already exists', async () => {
@@ -6749,7 +6841,7 @@ describe('start failure analytics events', () => {
   });
 });
 
-describe('manual and crash recovery analytics events', () => {
+describe('manual lifecycle analytics events', () => {
   it('can record manual start success events through Analytics Engine payloads', () => {
     const env = createFakeEnv();
     const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
@@ -6778,37 +6870,6 @@ describe('manual and crash recovery analytics events', () => {
     expect(successEvents).toHaveLength(1);
     expect(successEvents[0].blobs).toEqual(
       expect.arrayContaining(['instance.manual_start_succeeded', 'user-1', 'http'])
-    );
-  });
-
-  it('can record crash recovery failure events through Analytics Engine payloads', () => {
-    const env = createFakeEnv();
-    const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
-
-    dataset.writeDataPoint({
-      blobs: [
-        'instance.crash_recovery_failed',
-        'user-1',
-        'http',
-        '',
-        'restart failed',
-        'acct-test',
-        'machine-1',
-        'sandbox-1',
-        'running',
-        '',
-        '',
-        '',
-        '',
-      ],
-      doubles: [34, 0],
-      indexes: ['instance.crash_recovery_failed'],
-    });
-
-    const failureEvents = analyticsEventsByName(env, 'instance.crash_recovery_failed');
-    expect(failureEvents).toHaveLength(1);
-    expect(failureEvents[0].blobs).toEqual(
-      expect.arrayContaining(['instance.crash_recovery_failed', 'user-1', 'http', 'restart failed'])
     );
   });
 });
@@ -7286,9 +7347,9 @@ describe('applyPinnedVersion', () => {
     });
 
     (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
-      openclawVersion: '2026.4.15',
+      openclawVersion: '2026.4.23',
       variant: 'default',
-      imageTag: '2026-04-15',
+      imageTag: '2026-04-23',
       imageDigest: 'sha256:latest',
       publishedAt: new Date().toISOString(),
       rolloutPercent: 100,
@@ -7297,11 +7358,11 @@ describe('applyPinnedVersion', () => {
 
     const applied = await instance.applyPinnedVersion(null);
 
-    expect(applied.imageTag).toBe('2026-04-15');
-    expect(applied.openclawVersion).toBe('2026.4.15');
+    expect(applied.imageTag).toBe('2026-04-23');
+    expect(applied.openclawVersion).toBe('2026.4.23');
     expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
     expect(resolveVersionByTag).not.toHaveBeenCalled();
-    expect(storage._store.get('trackedImageTag')).toBe('2026-04-15');
+    expect(storage._store.get('trackedImageTag')).toBe('2026-04-23');
   });
 
   it('when cleared, passes currentImageTag=null to the selector so non-cohort users can fall off the pinned candidate', async () => {
@@ -7318,7 +7379,7 @@ describe('applyPinnedVersion', () => {
     // ignoreCurrentImageTag, it should instead be invoked with
     // currentImageTag=null and return :latest.
     (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
-      openclawVersion: '2026.4.15',
+      openclawVersion: '2026.4.23',
       variant: 'default',
       imageTag: 'latest-tag',
       imageDigest: 'sha256:latest',
@@ -7657,6 +7718,40 @@ describe("provision: async start sets status to 'starting'", () => {
 
     expect(flyClient.createMachine).not.toHaveBeenCalled();
     expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('preserves custom tier and machine size on re-provision', async () => {
+    const { instance, storage } = createInstance();
+    const customMachineSize = { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' };
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'custom',
+      machineSize: customMachineSize,
+      volumeSizeGb: 15,
+    });
+
+    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
+
+    expect(storage._store.get('instanceType')).toBe('custom');
+    expect(storage._store.get('machineSize')).toEqual(customMachineSize);
+    expect(storage._store.get('volumeSizeGb')).toBe(15);
+  });
+
+  it('preserves unknown legacy machine size on re-provision instead of defaulting to perf-1-3', async () => {
+    const { instance, storage } = createInstance();
+    const legacyMachineSize = { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' };
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: null,
+      machineSize: legacyMachineSize,
+      volumeSizeGb: 15,
+    });
+
+    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
+
+    expect(storage._store.get('instanceType')).toBeNull();
+    expect(storage._store.get('machineSize')).toEqual(legacyMachineSize);
+    expect(storage._store.get('volumeSizeGb')).toBe(15);
   });
 });
 
@@ -8718,6 +8813,250 @@ describe('reassociateVolume', () => {
 });
 
 // ============================================================================
+// instanceType resolution (getStatus self-heal)
+// ============================================================================
+
+describe('getStatus instanceType resolution', () => {
+  it('drops a stale custom label when machineSize is null', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      instanceType: 'custom',
+      machineSize: null,
+      volumeSizeGb: null,
+    });
+
+    const result = await instance.getStatus();
+
+    expect(result.instanceType).toBeNull();
+  });
+
+  it('preserves custom when backed by a non-catalog machineSize', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      instanceType: 'custom',
+      machineSize: { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    const result = await instance.getStatus();
+
+    expect(result.instanceType).toBe('custom');
+  });
+
+  it('does not propagate a stale custom label on re-provision', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      instanceType: 'custom',
+      machineSize: null,
+      volumeSizeGb: null,
+    });
+
+    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
+
+    expect(storage._store.get('instanceType')).not.toBe('custom');
+  });
+});
+
+// ============================================================================
+// instanceType backfill from live Fly machine config
+// ============================================================================
+
+describe('instanceType alarm-driven backfill', () => {
+  it('backfills machineSize and instanceType during alarm reconcile when DO state is legacy', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: null,
+      instanceType: null,
+      volumeSizeGb: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.alarm();
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(dbModule.syncInstanceType).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      'perf-1-3'
+    );
+  });
+
+  it('skips backfill when an admin override is active even on a legacy null-machineSize instance', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: null,
+      instanceType: null,
+      volumeSizeGb: null,
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'override active',
+        actorId: 'admin-1',
+        actorEmail: 'a@e.com',
+        setAt: 1,
+      },
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      // Live Fly guest reflects the override, not the (unobserved) tier hardware.
+      config: { guest: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.alarm();
+    await Promise.allSettled(waitUntilPromises);
+
+    // machineSize / instanceType remain null — backfill correctly refused to
+    // mistake the override-shape for tier hardware.
+    expect(storage._store.get('machineSize')).toBeNull();
+    expect(storage._store.get('instanceType')).toBeNull();
+    expect(dbModule.syncInstanceType).not.toHaveBeenCalled();
+  });
+
+  it('does not touch DO state or Postgres when machineSize is already populated', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      instanceType: 'perf-1-3',
+      volumeSizeGb: 10,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.alarm();
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+    expect(dbModule.syncInstanceType).not.toHaveBeenCalled();
+  });
+
+  it('writes custom and syncs Postgres when the live Fly guest does not match any catalog tier', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: null,
+      instanceType: null,
+      volumeSizeGb: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.alarm();
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(storage._store.get('instanceType')).toBe('custom');
+    expect(dbModule.syncInstanceType).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      'custom'
+    );
+  });
+});
+
+describe('getDebugState live-check dispatch', () => {
+  it('dispatches a Fly live check on getDebugState when running and past the throttle, and syncs Postgres on backfill', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: null,
+      instanceType: null,
+      volumeSizeGb: null,
+      lastLiveCheckAt: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.getDebugState();
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(flyClient.getMachine).toHaveBeenCalledWith(
+      { apiToken: 'test-token', appName: 'acct-test' },
+      'machine-1'
+    );
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(dbModule.syncInstanceType).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      'perf-1-3'
+    );
+  });
+
+  it('does not sync Postgres on getDebugState when state is already populated (no-op alarm)', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      instanceType: 'perf-1-3',
+      volumeSizeGb: 10,
+      lastLiveCheckAt: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.getDebugState();
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(dbModule.syncInstanceType).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
 // resizeMachine
 // ============================================================================
 
@@ -8725,7 +9064,11 @@ describe('resizeMachine', () => {
   it('rejects when instance is not provisioned', async () => {
     const { instance } = createInstance();
     await expect(
-      instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' })
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
     ).rejects.toThrow('Instance is not provisioned');
   });
 
@@ -8734,7 +9077,11 @@ describe('resizeMachine', () => {
     await seedProvisioned(storage, { status: 'destroying' });
 
     await expect(
-      instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' })
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
     ).rejects.toThrow('Cannot resize: instance is being destroyed');
   });
 
@@ -8743,7 +9090,11 @@ describe('resizeMachine', () => {
     await seedProvisioned(storage, { status: 'restoring' });
 
     await expect(
-      instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' })
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
     ).rejects.toThrow('Cannot resize: instance is restoring from snapshot');
   });
 
@@ -8752,59 +9103,683 @@ describe('resizeMachine', () => {
     await seedProvisioned(storage, { status: 'recovering' });
 
     await expect(
-      instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' })
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
     ).rejects.toThrow('Cannot resize: instance is recovering');
   });
 
-  it('persists new machine size and returns previous', async () => {
+  it('persists new tier and returns previous tier', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
       machineSize: { cpus: 2, memory_mb: 3072, cpu_kind: 'shared' },
+      instanceType: 'shared-2-3',
+      volumeSizeGb: 10,
+      status: 'stopped',
     });
-
-    const result = await instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' });
-
-    expect(result.previousSize).toEqual({ cpus: 2, memory_mb: 3072, cpu_kind: 'shared' });
-    expect(result.newSize).toEqual({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' });
-    const stored = storage._store.get('machineSize') as { cpus: number; memory_mb: number };
-    expect(stored.cpus).toBe(4);
-    expect(stored.memory_mb).toBe(3072);
-  });
-
-  it('returns null previousSize when no prior size set', async () => {
-    const { instance, storage } = createInstance();
-    await seedProvisioned(storage);
 
     const result = await instance.resizeMachine({
-      cpus: 1,
-      memory_mb: 3072,
-      cpu_kind: 'performance',
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
     });
 
-    expect(result.previousSize).toBeNull();
-    expect(result.newSize).toEqual({ cpus: 1, memory_mb: 3072, cpu_kind: 'performance' });
+    expect(result.previousTier).toBe('shared-2-3');
+    expect(result.newTier).toBe('perf-4-8');
+    const stored = storage._store.get('machineSize') as { cpus: number; memory_mb: number };
+    expect(stored.cpus).toBe(4);
+    expect(stored.memory_mb).toBe(8192);
   });
 
-  it('allows resize when instance is running', async () => {
-    const { instance, storage } = createInstance();
-    await seedRunning(storage);
-
-    const result = await instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' });
-
-    expect(result.newSize.cpus).toBe(4);
-  });
-
-  it('allows resize when instance is stopped', async () => {
+  it('returns inferred previous tier when no prior tier is set', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'stopped' });
 
     const result = await instance.resizeMachine({
-      cpus: 2,
-      memory_mb: 4096,
-      cpu_kind: 'performance',
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
     });
 
-    expect(result.newSize).toEqual({ cpus: 2, memory_mb: 4096, cpu_kind: 'performance' });
+    expect(result.previousTier).toBeNull();
+    expect(result.machineSize).toEqual({ cpus: 4, memory_mb: 8192, cpu_kind: 'performance' });
+  });
+
+  it('rejects resize when instance is running', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+    });
+
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Instance must be stopped before resizing machine tier');
+  });
+
+  it('allows resize when instance is stopped', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
+
+    expect(result.newTier).toBe('perf-4-8');
+    expect(result.machineSize).toEqual({ cpus: 4, memory_mb: 8192, cpu_kind: 'performance' });
+  });
+
+  it('rejects offered-tier downgrades', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-4-8',
+      machineSize: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      volumeSizeGb: 20,
+    });
+
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-1-3',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('downgrades and sidegrades are not allowed');
+  });
+
+  it('rejects offered-tier sidegrades', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-1-3',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('downgrades and sidegrades are not allowed');
+  });
+
+  it('rejects legacy tiers as resize targets', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { status: 'stopped' });
+
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'shared-2-3',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('is not an offerable resize target');
+  });
+
+  it('extends volume and persists volume size before tier state', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      flyVolumeId: 'vol-1',
+    });
+
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-16',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
+
+    expect(flyClient.extendVolume).toHaveBeenCalledWith(
+      { apiToken: 'test-token', appName: 'test-app' },
+      'vol-1',
+      40
+    );
+    expect(result.newVolumeSizeGb).toBe(40);
+    expect(storage._store.get('volumeSizeGb')).toBe(40);
+    expect(storage._store.get('instanceType')).toBe('perf-4-16');
+  });
+
+  it('keeps DO state unchanged when Fly volume extend fails', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      flyVolumeId: 'vol-1',
+    });
+    (flyClient.extendVolume as Mock).mockRejectedValueOnce(new Error('extend failed'));
+
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('extend failed');
+
+    expect(storage._store.get('volumeSizeGb')).toBe(10);
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+  });
+
+  it('persists tier when Postgres sync fails', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      flyVolumeId: 'vol-1',
+    });
+    const db = await import('../db');
+    (db.syncInstanceType as Mock).mockRejectedValueOnce(new Error('postgres down'));
+
+    await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(storage._store.get('instanceType')).toBe('perf-4-8');
+  });
+
+  it('persists docker-local resize without calling Fly volume APIs', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      provider: 'docker-local',
+      providerState: {
+        provider: 'docker-local',
+        containerName: 'kiloclaw-test',
+        volumeName: 'kiloclaw-root-test',
+        hostPort: 45001,
+      },
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      flyVolumeId: null,
+      flyMachineId: null,
+    });
+
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
+
+    expect(result.newTier).toBe('perf-4-8');
+    expect(flyClient.extendVolume).not.toHaveBeenCalled();
+    expect(storage._store.get('instanceType')).toBe('perf-4-8');
+  });
+
+  it('persists Northflank resize after volume and deployment plan updates are accepted', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, {
+      provider: 'northflank',
+      providerState: northflankProviderState(),
+      status: 'running',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/volumes/volume-1')) {
+        return new Response(JSON.stringify({ data: {} }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/services/deployment/service-1')) {
+        return new Response(JSON.stringify({ data: { id: 'service-1', name: 'kc-ki-test' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`Unhandled Northflank API request: ${url}`);
+    });
+
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
+
+    expect(result.newTier).toBe('perf-4-8');
+    expect(storage._store.get('instanceType')).toBe('perf-4-8');
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 4,
+      memory_mb: 8192,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('volumeSizeGb')).toBe(20);
+    expect(storage._store.get('providerState')).toEqual(
+      expect.objectContaining({ ingressHost: 'kc-ki-test.code.run' })
+    );
+  });
+
+  it('leaves Northflank tier state unchanged when provider resize fails', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, {
+      status: 'running',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/volumes/volume-1')) {
+        return new Response(JSON.stringify({ data: {} }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/services/deployment/service-1')) {
+        return new Response(JSON.stringify({ error: 'deployment patch failed' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`Unhandled Northflank API request: ${url}`);
+    });
+
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Northflank API patchDeploymentService failed (500)');
+
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('volumeSizeGb')).toBe(10);
+  });
+
+  it('clears any active admin size override and reports it in the response', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      flyVolumeId: 'vol-1',
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'OOM ticket #1',
+        actorId: 'admin-1',
+        actorEmail: 'alice@example.com',
+        setAt: 1234567890,
+      },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncAdminSizeOverride as Mock).mockClear();
+
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.clearedOverride).toEqual({
+      size: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
+      metadata: {
+        reason: 'OOM ticket #1',
+        actorId: 'admin-1',
+        actorEmail: 'alice@example.com',
+        setAt: 1234567890,
+      },
+    });
+    expect(storage._store.get('adminMachineSizeOverride')).toBeNull();
+    expect(storage._store.get('adminMachineSizeOverrideMetadata')).toBeNull();
+    expect(dbModule.syncAdminSizeOverride).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      null
+    );
+  });
+});
+
+// ============================================================================
+// adminMachineSizeOverride
+// ============================================================================
+
+describe('setAdminMachineSizeOverride', () => {
+  const overrideArgs = {
+    size: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' as const },
+    reason: 'OOM recovery for ticket #1234',
+    actorId: 'admin-1',
+    actorEmail: 'alice@example.com',
+  };
+
+  it('persists the override and metadata, syncs Postgres', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncAdminSizeOverride as Mock).mockClear();
+
+    const result = await instance.setAdminMachineSizeOverride(overrideArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousOverride).toBeNull();
+    expect(result.newOverride).toEqual(overrideArgs.size);
+    expect(storage._store.get('adminMachineSizeOverride')).toEqual(overrideArgs.size);
+    const stored = storage._store.get('adminMachineSizeOverrideMetadata') as Record<
+      string,
+      unknown
+    >;
+    expect(stored).toMatchObject({
+      reason: overrideArgs.reason,
+      actorId: 'admin-1',
+      actorEmail: 'alice@example.com',
+    });
+    expect(typeof stored.setAt).toBe('number');
+    expect(dbModule.syncAdminSizeOverride).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      expect.objectContaining({
+        size: overrideArgs.size,
+        reason: overrideArgs.reason,
+      })
+    );
+    // Tier hardware untouched.
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(storage._store.get('volumeSizeGb')).toBe(10);
+  });
+
+  it('persists override on a running instance — applies on next restart', async () => {
+    // Set is a pure DO state write; the Fly `updateMachine(guest=...)` call
+    // doesn't happen until the next stop/start cycle. The current container
+    // keeps running on tier hardware in the meantime.
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    const result = await instance.setAdminMachineSizeOverride(overrideArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.newOverride).toEqual(overrideArgs.size);
+    expect(storage._store.get('adminMachineSizeOverride')).toEqual(overrideArgs.size);
+    // Tier hardware untouched.
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('rejects on Northflank instances', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      provider: 'northflank',
+      providerState: { provider: 'northflank' },
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    await expect(instance.setAdminMachineSizeOverride(overrideArgs)).rejects.toThrow(
+      'Admin size override is not yet supported on Northflank instances'
+    );
+  });
+
+  it('rejects when machineSize is null (legacy instance — wait for backfill first)', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: null,
+      machineSize: null,
+      volumeSizeGb: null,
+    });
+
+    await expect(instance.setAdminMachineSizeOverride(overrideArgs)).rejects.toThrow(
+      'machineSize has not been observed yet'
+    );
+  });
+
+  it('overwrites a prior override and reports the previous value', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'previous reason xx',
+        actorId: 'admin-0',
+        actorEmail: 'bob@example.com',
+        setAt: 1,
+      },
+    });
+
+    const result = await instance.setAdminMachineSizeOverride({
+      ...overrideArgs,
+      size: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
+    });
+
+    expect(result.previousOverride).toEqual({ cpus: 4, memory_mb: 8192, cpu_kind: 'performance' });
+    expect(result.newOverride).toEqual({ cpus: 4, memory_mb: 16384, cpu_kind: 'performance' });
+    expect(storage._store.get('adminMachineSizeOverride')).toEqual({
+      cpus: 4,
+      memory_mb: 16384,
+      cpu_kind: 'performance',
+    });
+  });
+});
+
+describe('clearAdminMachineSizeOverride', () => {
+  const clearArgs = {
+    reason: 'cleanup after recovery',
+    actorId: 'admin-1',
+    actorEmail: 'alice@example.com',
+  };
+
+  it('clears persisted override and metadata, syncs Postgres', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'OOM ticket #1',
+        actorId: 'admin-2',
+        actorEmail: 'bob@example.com',
+        setAt: 1,
+      },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncAdminSizeOverride as Mock).mockClear();
+
+    const result = await instance.clearAdminMachineSizeOverride(clearArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousOverride).toEqual({
+      cpus: 4,
+      memory_mb: 8192,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('adminMachineSizeOverride')).toBeNull();
+    expect(storage._store.get('adminMachineSizeOverrideMetadata')).toBeNull();
+    expect(dbModule.syncAdminSizeOverride).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      null
+    );
+  });
+
+  it('is a DO no-op when no override is active but still fires Postgres sync to repair the denormalized cache', async () => {
+    // The Postgres `admin_size_override` column is a best-effort denormalized
+    // read cache for the admin "Has size override" list filter. If a prior
+    // best-effort sync failed (or DO state was restored without an override
+    // while Postgres held a stale payload), the admin list would show a
+    // phantom override forever. An admin firing "Clear Size Override" must
+    // repair the cache even when the DO is already null.
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncAdminSizeOverride as Mock).mockClear();
+
+    const result = await instance.clearAdminMachineSizeOverride(clearArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousOverride).toBeNull();
+    // Postgres sync still fires with null payload (idempotent via IS DISTINCT FROM
+    // — SQL no-op when the column is already null, repair when stale).
+    expect(dbModule.syncAdminSizeOverride).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      null
+    );
+  });
+
+  it('clears override on a running instance — revert applies on next restart', async () => {
+    // Mirror of the running-instance set test: clear is a DO state write;
+    // the running container keeps the override hardware until next restart.
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'reason xx',
+        actorId: 'admin-0',
+        actorEmail: 'b@e.com',
+        setAt: 1,
+      },
+    });
+
+    const result = await instance.clearAdminMachineSizeOverride(clearArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousOverride).toEqual({
+      cpus: 4,
+      memory_mb: 8192,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('adminMachineSizeOverride')).toBeNull();
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('is a no-op even on a destroying instance when no override is active', async () => {
+    // Idempotent clear bypasses the guard so admins triaging incidents
+    // can fire it from a list-page action without inspecting status first.
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    const result = await instance.clearAdminMachineSizeOverride(clearArgs);
+
+    expect(result.previousOverride).toBeNull();
+  });
+});
+
+// ============================================================================
+// recordVolumeExtend
+// ============================================================================
+
+describe('recordVolumeExtend', () => {
+  it('persists the new volume size, marks the instance custom, and syncs Postgres', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      instanceType: 'perf-1-3',
+      volumeSizeGb: 10,
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    const result = await instance.recordVolumeExtend(15);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousVolumeSizeGb).toBe(10);
+    expect(result.newVolumeSizeGb).toBe(15);
+    expect(result.instanceType).toBe('custom');
+    expect(storage._store.get('volumeSizeGb')).toBe(15);
+    expect(storage._store.get('instanceType')).toBe('custom');
+    expect(dbModule.syncInstanceType).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      'custom'
+    );
+  });
+
+  it('rejects invalid sizes', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage);
+
+    await expect(instance.recordVolumeExtend(0)).rejects.toThrow('Invalid volume size');
+    await expect(instance.recordVolumeExtend(501)).rejects.toThrow('Invalid volume size');
+    await expect(instance.recordVolumeExtend(10.5)).rejects.toThrow('Invalid volume size');
+  });
+
+  it('rejects when not provisioned', async () => {
+    const { instance } = createInstance();
+    await expect(instance.recordVolumeExtend(20)).rejects.toThrow('Instance is not provisioned');
   });
 });
 
@@ -9388,213 +10363,356 @@ describe('tryMarkInstanceReady', () => {
 });
 
 // ============================================================================
-// Stream Chat backfill
+// Lifecycle push notifications
 // ============================================================================
 
-describe('Stream Chat backfill on provision', () => {
-  beforeEach(() => {
-    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
-      id: 'vol-1',
-      region: 'iad',
-    });
-    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
-    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
-    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
-    (setupDefaultStreamChatChannel as Mock).mockClear();
-  });
+type LifecyclePushCall = {
+  userId: string;
+  sandboxId: string;
+  event: 'ready' | 'start_failed';
+  instanceName: string | null;
+  errorMessage?: string;
+};
 
-  it('provisions Stream Chat on first provision when env vars are present', async () => {
+type LifecyclePushResult = {
+  tokenCount: number;
+  sent: number;
+  staleTokens: number;
+  receiptCount: number;
+  ticketErrors: {
+    total: number;
+    retryable: number;
+    terminal: number;
+  };
+};
+
+const cleanLifecyclePushResult = {
+  tokenCount: 1,
+  sent: 1,
+  staleTokens: 0,
+  receiptCount: 1,
+  ticketErrors: { total: 0, retryable: 0, terminal: 0 },
+} satisfies LifecyclePushResult;
+
+function createFakeNotificationsBinding(result: LifecyclePushResult = cleanLifecyclePushResult): {
+  binding: {
+    sendInstanceLifecycleNotification: (params: LifecyclePushCall) => Promise<LifecyclePushResult>;
+  };
+  calls: LifecyclePushCall[];
+} {
+  const calls: LifecyclePushCall[] = [];
+  return {
+    binding: {
+      sendInstanceLifecycleNotification: async (params: LifecyclePushCall) => {
+        calls.push(params);
+        return result;
+      },
+    },
+    calls,
+  };
+}
+
+describe('instance ready push', () => {
+  it('dispatches a ready push when tryMarkInstanceReady flips the flag', async () => {
     const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
-    });
-    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
 
-    await instance.provision('user-1', {});
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
+
+    const result = await instance.tryMarkInstanceReady();
     await Promise.all(waitUntilPromises);
 
-    expect(setupDefaultStreamChatChannel).toHaveBeenCalledOnce();
-    expect(storage._store.get('streamChatApiKey')).toBe('sc-api-key');
-    expect(storage._store.get('streamChatBotUserId')).toBe('bot-sandbox-1');
-    expect(storage._store.get('streamChatBotUserToken')).toBe('sc-bot-token');
-    expect(storage._store.get('streamChatChannelId')).toBe('default-sandbox-1');
+    expect(result).toEqual({ shouldNotify: true, userId: 'user-1' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('ready');
+    expect(calls[0].userId).toBe('user-1');
+    expect(calls[0].sandboxId).toBe('sandbox-1');
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
   });
 
-  it('backfills Stream Chat on re-provision when DO state has no credentials', async () => {
+  it('does not dispatch when the flag is already set', async () => {
     const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
-    });
-    const { instance, storage } = createInstance(undefined, env);
-    await seedRunning(storage);
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
 
-    (setupDefaultStreamChatChannel as Mock).mockClear();
-    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: true });
 
-    expect(setupDefaultStreamChatChannel).toHaveBeenCalledOnce();
-    expect(storage._store.get('streamChatApiKey')).toBe('sc-api-key');
-    expect(storage._store.get('streamChatBotUserId')).toBe('bot-sandbox-1');
-    expect(storage._store.get('streamChatBotUserToken')).toBe('sc-bot-token');
-    expect(storage._store.get('streamChatChannelId')).toBe('default-sandbox-1');
-  });
-
-  it('skips Stream Chat setup on re-provision when credentials already exist', async () => {
-    const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
-    });
-    const { instance, storage } = createInstance(undefined, env);
-    await seedRunning(storage, {
-      streamChatApiKey: 'existing-key',
-      streamChatBotUserId: 'existing-bot',
-      streamChatBotUserToken: 'existing-token',
-      streamChatChannelId: 'existing-channel',
-    });
-
-    (setupDefaultStreamChatChannel as Mock).mockClear();
-    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
-
-    expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
-    expect(storage._store.get('streamChatApiKey')).toBe('existing-key');
-  });
-
-  it('skips Stream Chat when worker env vars are missing', async () => {
-    const { instance, storage, waitUntilPromises } = createInstance();
-    // Default env does not have STREAM_CHAT_API_KEY / STREAM_CHAT_API_SECRET
-
-    await instance.provision('user-1', {});
+    await instance.tryMarkInstanceReady();
     await Promise.all(waitUntilPromises);
 
-    expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
-    expect(storage._store.get('streamChatApiKey')).toBeUndefined();
+    expect(calls).toHaveLength(0);
   });
 
-  it('continues provisioning when Stream Chat setup fails (non-fatal)', async () => {
+  it('logs ticket-error ready dispatches as warnings instead of clean completions', async () => {
     const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
+    const { binding } = createFakeNotificationsBinding({
+      tokenCount: 2,
+      sent: 1,
+      staleTokens: 0,
+      receiptCount: 1,
+      ticketErrors: { total: 1, retryable: 0, terminal: 1 },
     });
-    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    Object.assign(env, { NOTIFICATIONS: binding });
 
-    (setupDefaultStreamChatChannel as Mock).mockRejectedValueOnce(
-      new Error('Stream Chat API down')
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
+
+    await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
+
+    const warningCall = (console.warn as Mock).mock.calls.find(
+      (c: unknown[]) =>
+        typeof c[0] === 'string' &&
+        c[0].includes('ready push dispatch completed with ticket errors')
     );
+    if (!warningCall) throw new Error('Expected ready push ticket-error warning');
+    const payload = JSON.parse(warningCall[0] as string) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      level: 'warn',
+      message: 'ready push dispatch completed with ticket errors',
+      tokenCount: 2,
+      sent: 1,
+      staleTokens: 0,
+      receiptCount: 1,
+      ticketErrors: 1,
+      retryableTicketErrors: 0,
+      terminalTicketErrors: 1,
+    });
+  });
 
+  it('does not dispatch when provisioned > 6h ago', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, {
+      instanceReadyEmailSent: false,
+      provisionedAt: Date.now() - 7 * 60 * 60 * 1000,
+    });
+
+    const result = await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
+
+    expect(result.shouldNotify).toBe(false);
+    expect(calls).toHaveLength(0);
+    // Flag still flips so future checkins don't keep retrying.
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
+  });
+
+  it('no-ops cleanly when NOTIFICATIONS binding is unavailable', async () => {
+    const env = createFakeEnv();
+    // No NOTIFICATIONS binding assigned.
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
+
+    const result = await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
+
+    expect(result).toEqual({ shouldNotify: true, userId: 'user-1' });
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
+  });
+
+  it('initializes startFailurePushSentForAttempt to false on initial provision()', async () => {
+    const env = createFakeEnv();
+    const { binding } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    const { instance, storage, waitUntilPromises } = createInstance(createFakeStorage(), env);
     await instance.provision('user-1', {});
     await Promise.all(waitUntilPromises);
 
-    // Provision succeeded despite Stream Chat failure
-    expect(storage._store.get('status')).toBeTruthy();
-    expect(storage._store.get('streamChatApiKey')).toBeUndefined();
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(false);
   });
 });
 
-describe('Stream Chat backfill on restartMachine', () => {
-  beforeEach(() => {
-    (flyClient.updateMachine as Mock).mockResolvedValue({ instance_id: 'inst-1' });
-    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
-    (flyClient.getMachine as Mock).mockResolvedValue({
-      id: 'machine-1',
-      state: 'started',
-      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
-    });
-    (setupDefaultStreamChatChannel as Mock).mockClear();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation((url: string) => {
-        if (typeof url === 'string' && url.includes('/_kilo/gateway/status')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: () => Promise.resolve({ state: 'running' }),
-          });
-        }
-        return Promise.resolve({ ok: true, status: 200 });
-      })
-    );
-  });
-
+describe('instance start-failed push', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('backfills Stream Chat on restart when DO state has no credentials', async () => {
+  it('dispatches one push when start times out without a machine', async () => {
     const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: null,
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1000,
+      startFailurePushSentForAttempt: false,
     });
-    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
-    await seedRunning(storage);
 
-    const result = await instance.restartMachine();
-    expect(result.success).toBe(true);
-    await Promise.all(waitUntilPromises);
+    await instance.alarm();
 
-    expect(setupDefaultStreamChatChannel).toHaveBeenCalledOnce();
-    expect(storage._store.get('streamChatApiKey')).toBe('sc-api-key');
-    expect(storage._store.get('streamChatBotUserId')).toBe('bot-sandbox-1');
-    expect(storage._store.get('streamChatBotUserToken')).toBe('sc-bot-token');
-    expect(storage._store.get('streamChatChannelId')).toBe('default-sandbox-1');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(calls[0].sandboxId).toBe('sandbox-1');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
   });
 
-  it('skips Stream Chat backfill on restart when credentials already exist', async () => {
+  it('dispatches one push when the machine is gone (404) during start', async () => {
     const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
-    });
-    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
-    await seedRunning(storage, {
-      streamChatApiKey: 'existing-key',
-      streamChatBotUserId: 'existing-bot',
-      streamChatBotUserToken: 'existing-token',
-      streamChatChannelId: 'existing-channel',
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: 'machine-1',
+      startFailurePushSentForAttempt: false,
     });
 
-    const result = await instance.restartMachine();
-    expect(result.success).toBe(true);
-    await Promise.all(waitUntilPromises);
+    (flyClient.getMachine as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
 
-    expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
-    expect(storage._store.get('streamChatApiKey')).toBe('existing-key');
+    await instance.alarm();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
   });
 
-  it('continues restart when Stream Chat backfill fails (non-fatal)', async () => {
+  it('dispatches one push when the machine enters a failed state', async () => {
     const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: 'machine-1',
+      startFailurePushSentForAttempt: false,
     });
-    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
-    await seedRunning(storage);
 
-    (setupDefaultStreamChatChannel as Mock).mockRejectedValueOnce(
-      new Error('Stream Chat API down')
-    );
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'failed',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
 
-    const result = await instance.restartMachine();
-    expect(result.success).toBe(true);
-    await Promise.all(waitUntilPromises);
+    await instance.alarm();
 
-    // Restart still completes — Stream Chat failure is non-fatal
-    expect(storage._store.get('streamChatApiKey')).toBeUndefined();
-    // Machine was still updated
-    expect(flyClient.updateMachine).toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
   });
 
-  it('skips Stream Chat backfill when worker env vars are missing', async () => {
+  it('does not dispatch a second push for the same attempt', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: null,
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1000,
+      startFailurePushSentForAttempt: true,
+    });
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it('re-arms the flag on each startAsync attempt', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
-    await seedRunning(storage);
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      startFailurePushSentForAttempt: true,
+      flyMachineId: null,
+    });
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
 
-    const result = await instance.restartMachine();
-    expect(result.success).toBe(true);
+    await instance.startAsync('user-1');
     await Promise.all(waitUntilPromises);
 
-    expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(false);
+  });
+});
+
+describe('non-Fly lifecycle push dispatch', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('dispatches a start-failed push when the docker-local alarm detects a timeout', async () => {
+    const env = { ...createFakeEnv(), DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750' };
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedDockerInstance(storage, {
+      status: 'starting',
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1000,
+      startFailurePushSentForAttempt: false,
+    });
+
+    vi.mocked(fetch).mockResolvedValue(new Response('', { status: 404 }));
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(calls[0].errorMessage).toBe('Start failed.');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+
+  it('dispatches a start-failed push when docker-local inline start throws', async () => {
+    const env = {
+      ...createFakeEnv(),
+      DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750',
+      DOCKER_LOCAL_PORT_RANGE: '45000-45010',
+    };
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage, waitUntilPromises } = createInstance(createFakeStorage(), env);
+    await seedDockerInstance(storage, {
+      status: 'provisioned',
+      providerState: dockerProviderState({ hostPort: null }),
+      startFailurePushSentForAttempt: false,
+    });
+
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
+        return new Response(JSON.stringify({ Name: 'kiloclaw-root-sandbox-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/containers/json?all=1')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/containers/kiloclaw-sandbox-1/json')) {
+        return new Response('', { status: 404 });
+      }
+      if (url.includes('/containers/create?name=kiloclaw-sandbox-1')) {
+        return new Response('create failed', { status: 500 });
+      }
+      throw new Error(`Unhandled Docker API request: ${url}`);
+    });
+
+    await instance.startAsync();
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(calls[0].errorMessage).toBe('Start failed.');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
   });
 });

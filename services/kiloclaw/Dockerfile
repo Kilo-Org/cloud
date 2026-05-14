@@ -1,12 +1,18 @@
 # Global build args — declared before any FROM so they're available to all stages.
 ARG CONTROLLER_COMMIT=unknown
 ARG CONTROLLER_CACHE_BUST=1
+# Bump APT_CACHE_BUST (any value change) to invalidate the base apt layer and
+# pick up the latest chromium / 1password-cli / etc. from Debian + vendor repos.
+# Last bumped 2026-05-08 to pull chromium 148.x (CVE-2026-7908, CVE-2026-7910).
+ARG APT_CACHE_BUST=2026-05-08
 
-FROM debian:bookworm-slim AS runtime
+FROM debian:trixie-slim AS runtime
 
 # Install Node.js 24 (required by OpenClaw)
-ENV NODE_VERSION=24.14.1
-RUN apt-get update \
+ENV NODE_VERSION=24.15.0
+ARG APT_CACHE_BUST
+RUN echo "apt cache bust: ${APT_CACHE_BUST}" \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
        ca-certificates curl gnupg git xz-utils unzip jq ripgrep rsync zstd \
        build-essential python3 ffmpeg tmux chromium \
@@ -47,15 +53,13 @@ RUN apt-get update \
 # build-only config does not ship in the runtime image.
 RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.com/"
 
-# Install pnpm globally
-RUN npm install -g pnpm
-
-# Install OpenClaw
-# Pin to specific version for reproducible builds
+# Install global CLI tools in a single invocation, then patch openclaw and clean cache once.
+# Packages: pnpm (package manager), openclaw (pinned for reproducible builds; patched below),
+#   clawhub, mcporter, @steipete/summarize, @kilocode/cli (runtime tooling).
 # Patch: bump model discovery timeout from 5s to 60s — shared-cpu machines
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Remove this sed patch once openclaw exposes a configurable timeout.
-RUN npm install -g openclaw@2026.4.15 \
+RUN npm install -g pnpm openclaw@2026.4.23 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && FOUND_FILES=$(find "$OC_DIST" -name 'provider-models-*.js' | wc -l | tr -d ' ') \
     && if [ "$FOUND_FILES" -eq 0 ]; then echo "ERROR: provider-models-*.js not found in openclaw dist" >&2; exit 1; fi \
@@ -72,7 +76,8 @@ RUN npm install -g openclaw@2026.4.15 \
     && sed -i 's/MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"/\(MESSAGE_ACTION_TARGET_MODE[action] ?? "none"\) !== "none"/' "$CT_FILE" \
     && if grep -q 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$CT_FILE"; then echo "ERROR: actionRequiresTarget patch failed" >&2; exit 1; fi \
     && echo "OK: patched actionRequiresTarget in $(basename "$CT_FILE")" \
-    && openclaw --version
+    && openclaw --version \
+    && npm cache clean --force
 
 # Bake bundled plugin runtime deps into the image so first boot is pure
 # startup — no npm install from `openclaw doctor` on shared-cpu Fly machines.
@@ -91,24 +96,8 @@ RUN cd /usr/local/lib/node_modules/openclaw \
     && rm -f /tmp/bundled-plugin-specs.raw /tmp/bundled-plugin-specs.txt \
     && rm -rf /root/.npm
 
-# Install ClawHub CLI
-RUN npm install -g clawhub
-
-# Install mcporter (MCP server tooling)
-RUN npm install -g mcporter@0.7.3
-
-# Install Stream Chat channel plugin for OpenClaw (installed from GitHub, not npm)
-ARG STREAM_CHAT_CACHE_BUSTER=1
-RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#fix/plugin-name-resolution
-
-# Install summarize (web page summarization CLI)
-RUN npm install -g @steipete/summarize@0.12.0
-
-# Install Kilo CLI (agentic coding assistant for the terminal)
-RUN npm install -g @kilocode/cli@7.2.22
-
 # Install Go (available at runtime for users to `go install` additional tools)
-ENV GO_VERSION=1.26.0
+ENV GO_VERSION=1.26.2
 RUN ARCH="$(dpkg --print-architecture)" \
     && curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz -o /tmp/go.tar.gz \
     && EXPECTED_SHA256="$(curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz.sha256)" \
@@ -122,11 +111,13 @@ RUN ARCH="$(dpkg --print-architecture)" \
 #   so user-installed tools persist across restarts and are included in snapshots.
 # - npm/Node (installed to /usr/local) and apt packages (/usr/bin) are unaffected.
 ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
-RUN GOBIN=/usr/local/bin go install github.com/steipete/gogcli/cmd/gog@v0.12.0 \
+RUN ARCH="$(dpkg --print-architecture)" \
+    && curl -fsSL "https://github.com/steipete/gogcli/releases/download/v0.14.0/gogcli_0.14.0_linux_${ARCH}.tar.gz" \
+       | tar xz -C /usr/local/bin gog \
     && mv /usr/local/bin/gog /usr/local/bin/gog.real \
     && GOBIN=/usr/local/bin go install github.com/steipete/goplaces/cmd/goplaces@v0.3.0 \
     && GOBIN=/usr/local/bin go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@v0.0.2 \
-    && GOBIN=/usr/local/bin go install github.com/xdevplatform/xurl@v1.0.3 \
+    && GOBIN=/usr/local/bin go install github.com/xdevplatform/xurl@v1.1.0 \
     && GOBIN=/usr/local/bin go install github.com/steipete/gifgrep/cmd/gifgrep@v0.2.3 \
     && go clean -cache -modcache
 
@@ -176,11 +167,11 @@ RUN cd /tmp/kiloclaw-morning-briefing \
 # file. By building in a separate stage, Bun (~100MB) stays out of the
 # final image. Bun installed to /root/.bun/ which gets shadowed by the
 # Fly Volume mount at /root, so it was unreachable at runtime anyway.
-FROM debian:bookworm-slim AS controller-builder
+FROM debian:trixie-slim AS controller-builder
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl unzip \
-    && curl -fsSL https://bun.sh/install | bash -s "bun-v1.2.4" \
+    && curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.13" \
     && rm -rf /var/lib/apt/lists/*
 ENV PATH="/root/.bun/bin:$PATH"
 
@@ -190,10 +181,11 @@ ARG CONTROLLER_CACHE_BUST
 COPY controller/ /tmp/controller-build/
 RUN cd /tmp/controller-build \
     && bun install --frozen-lockfile \
-    && CONTROLLER_VERSION="$(date -u +'%Y.%-m.%-d')" \
+    && CONTROLLER_VERSION="$(date -u +'%Y.%-m.%-d.%H%M')" \
     && bun build src/index.ts --outfile=/usr/local/bin/kiloclaw-controller.js --target=node --minify \
        --define "KILOCLAW_CONTROLLER_VERSION=\"${CONTROLLER_VERSION}\"" \
        --define "KILOCLAW_CONTROLLER_COMMIT=\"${CONTROLLER_COMMIT}\"" \
+    && bun pm cache rm \
     && rm -rf /tmp/controller-build
 
 # ── Final stage: runtime image ────────────────────────────────────────
@@ -226,8 +218,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-04-24-v66-openclaw-2026.4.15-add-kilo-chat-plugin
-RUN echo "12"
+# Build cache bust: 2026-05-01-v67-openclaw-2026.4.23
+RUN echo "13"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

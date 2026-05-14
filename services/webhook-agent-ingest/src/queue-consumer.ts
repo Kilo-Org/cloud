@@ -4,8 +4,10 @@ import { renderPromptTemplate } from './util/prompt-template';
 import { logger } from './util/logger';
 import { withDORetry } from './util/do-retry';
 import { getTokenMintingService } from './services/token-minting-service.js';
-import { getProfileResolutionService } from './services/profile-resolution-service.js';
 import { classifyInitiateResponse } from './initiate-response';
+import { findActiveSandboxIdForInstance, getWorkerDb } from './db/queries';
+import { getKiloChat } from './kilo-chat-binding';
+import type { PostMessageAsUserResult } from '@kilocode/kilo-chat';
 import { z } from 'zod';
 
 // Token cache TTL: 30 minutes. Token validity is 1 hour, so 30 min gives safety margin.
@@ -93,11 +95,13 @@ async function getOrMintToken(
 
 /**
  * Process a webhook message targeting a KiloClaw Chat instance.
- * Renders the prompt template with the webhook payload, then calls the
- * KiloClaw worker's send-chat-message endpoint. The KiloClaw worker
- * handles instance resolution, destroyed check, and Stream Chat delivery.
+ * Renders the prompt template with the webhook payload, resolves the
+ * trigger's instanceId to a sandboxId, and delivers the message into the
+ * user-bot conversation via the kilo-chat service-binding RPC. kilo-chat
+ * auto-creates the conversation on first delivery so triggers work even
+ * before the user opens chat for the first time.
  */
-async function processKiloclawChatMessage(
+export async function processKiloclawChatMessage(
   stub: DurableObjectStub<TriggerDO>,
   webhook: WebhookDeliveryMessage,
   request: {
@@ -156,13 +160,26 @@ async function processKiloclawChatMessage(
     promptLength: renderedPrompt.length,
   });
 
-  const internalApiSecret = await env.INTERNAL_API_SECRET.get();
+  const sandboxId = await findActiveSandboxIdForInstance(
+    getWorkerDb(env.HYPERDRIVE.connectionString),
+    triggerConfig.kiloclawInstanceId,
+    userId
+  );
+  if (!sandboxId) {
+    await failRequest(
+      stub,
+      webhook.requestId,
+      'KiloClaw Chat delivery failed: instance not found or destroyed'
+    );
+    return;
+  }
 
-  // Mark as inprogress immediately before the fetch to prevent duplicate delivery on retry.
-  // This is placed after all preparatory work (template rendering, secret fetch) so that
-  // failures in those steps leave the status as 'captured' and allow normal retries.
-  // On retry after this point, the outer guard in processWebhookMessage sees
-  // processStatus === 'inprogress' without a cloudAgentSessionId and acks the message.
+  // Mark as inprogress immediately before delivery to prevent duplicate work
+  // on queue retry. Placed after preparatory work (template render, sandbox
+  // lookup) so failures in those steps leave the status as 'captured' and
+  // allow normal retries. On retry after this point, the outer guard in
+  // processWebhookMessage sees 'inprogress' without a cloudAgentSessionId
+  // and acks the message.
   await withDORetry(
     () => stub,
     doStub =>
@@ -173,40 +190,52 @@ async function processKiloclawChatMessage(
     'updateRequest'
   );
 
-  const response = await fetch(`${env.KILOCLAW_API_URL}/api/platform/send-chat-message`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-internal-api-key': internalApiSecret,
-    },
-    body: JSON.stringify({
+  // The request is now `inprogress` in the DO. Any path out of this
+  // function from here on must either flip it to `success` or `failed`,
+  // because the outer guard in processWebhookMessage skips inprogress
+  // requests on retry. A thrown RPC error (e.g. service-binding outage,
+  // an exception inside postMessageAsUser) would otherwise leave the
+  // request stuck. The inner if-block handles `{ ok: false }`; the
+  // try/catch handles thrown errors.
+  let result: PostMessageAsUserResult;
+  try {
+    result = await getKiloChat(env).postMessageAsUser({
       userId,
-      instanceId: triggerConfig.kiloclawInstanceId,
+      sandboxId,
       message: renderedPrompt,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => '(unreadable)');
-    let errorMessage: string;
-    try {
-      const parsed = JSON.parse(errorBody) as { error?: string };
-      errorMessage = parsed.error ?? errorBody;
-    } catch {
-      errorMessage = errorBody;
-    }
-    logger.error('KiloClaw Chat message delivery failed', {
+      source: 'webhook',
+      autoCreateConversation: true,
+      correlation: {
+        triggerId: webhook.triggerId,
+        webhookRequestId: webhook.requestId,
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error('KiloClaw Chat message delivery threw', {
       requestId: webhook.requestId,
-      status: response.status,
       error: errorMessage,
     });
     await failRequest(stub, webhook.requestId, `KiloClaw Chat delivery failed: ${errorMessage}`);
     return;
   }
 
+  if (!result.ok) {
+    logger.error('KiloClaw Chat message delivery failed', {
+      requestId: webhook.requestId,
+      code: result.code,
+      error: result.error,
+    });
+    await failRequest(stub, webhook.requestId, `KiloClaw Chat delivery failed: ${result.error}`);
+    return;
+  }
+
   logger.info('KiloClaw Chat message delivered', {
     requestId: webhook.requestId,
     kiloclawInstanceId: triggerConfig.kiloclawInstanceId,
+    conversationId: result.conversationId,
+    conversationCreated: result.conversationCreated,
+    messageId: result.messageId,
   });
 
   await withDORetry(
@@ -355,7 +384,10 @@ async function processWebhookMessage(
         },
       };
 
-      // Resolve profile at runtime via Hyperdrive if profileId is set
+      // Profile resolution (repo binding + default + explicit override) happens
+      // inside cloud-agent-next. A trigger must still have a profile assigned;
+      // cloud-agent-next returns 404 if the id is stale/revoked and we let that
+      // flow through the existing non-5xx failure path below.
       if (!triggerProfileId) {
         logger.error('No Agent Env Profile found.', {
           triggerId: triggerConfig.triggerId,
@@ -366,30 +398,6 @@ async function processWebhookMessage(
         return;
       }
 
-      logger.debug('Resolving profile for trigger', {
-        triggerId: triggerConfig.triggerId,
-        profileId: triggerProfileId,
-      });
-
-      const profileService = getProfileResolutionService(env);
-      const resolvedProfile = await profileService.resolveProfileConfig({
-        profileId: triggerProfileId,
-        userId: triggerConfig.userId,
-        orgId: triggerConfig.orgId,
-      });
-
-      if (!resolvedProfile) {
-        logger.error('No Agent Env Profile found.', {
-          triggerId: triggerConfig.triggerId,
-          profileId: triggerProfileId,
-          requestId: webhook.requestId,
-        });
-        await failRequest(stub, webhook.requestId, 'No Agent Env Profile found.');
-        message.ack();
-        return;
-      }
-
-      // Build prepareSession body with resolved profile values
       const prepareSessionBody: {
         prompt: string;
         mode: string;
@@ -397,12 +405,7 @@ async function processWebhookMessage(
         githubRepo: string;
         kilocodeOrganizationId?: string;
         callbackTarget: { url: string; headers: Record<string, string> };
-        envVars?: Record<string, string>;
-        encryptedSecrets?: Record<
-          string,
-          { encryptedData: string; encryptedDEK: string; algorithm: string; version: number }
-        >;
-        setupCommands?: string[];
+        profileId: string;
         autoCommit?: boolean;
         condenseOnComplete?: boolean;
         createdOnPlatform: string;
@@ -412,22 +415,12 @@ async function processWebhookMessage(
         model: triggerModel,
         githubRepo: triggerGithubRepo,
         callbackTarget,
+        profileId: triggerProfileId,
         createdOnPlatform: request.method === 'SCHEDULED' ? 'scheduled' : 'webhook',
       };
 
       if (triggerConfig.orgId) {
         prepareSessionBody.kilocodeOrganizationId = triggerConfig.orgId;
-      }
-
-      // Pass resolved profile values to cloud-agent
-      if (Object.keys(resolvedProfile.envVars).length > 0) {
-        prepareSessionBody.envVars = resolvedProfile.envVars;
-      }
-      if (Object.keys(resolvedProfile.encryptedSecrets).length > 0) {
-        prepareSessionBody.encryptedSecrets = resolvedProfile.encryptedSecrets;
-      }
-      if (resolvedProfile.setupCommands.length > 0) {
-        prepareSessionBody.setupCommands = resolvedProfile.setupCommands;
       }
 
       // Behavior flags from trigger config (not profile-related)

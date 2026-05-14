@@ -87,7 +87,7 @@ export function ConversationItem({
     setIsConfirmingLeave(false);
   }, []);
 
-  const title = conversation.title ?? 'Untitled';
+  const title = conversation.title ?? 'New chat';
 
   const isUnread =
     !isActive &&

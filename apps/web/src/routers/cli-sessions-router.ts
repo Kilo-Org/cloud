@@ -16,6 +16,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
+import { isValidGitUrl, sanitizeGitUrl } from '@kilocode/worker-utils/git-url';
 import { cliSessions, sharedCliSessions } from '@kilocode/db/schema';
 import { CliSessionSharedState } from '@/types/cli-session-shared-state';
 import {
@@ -77,42 +78,14 @@ export function sanitizeForPostgres(str: string): string {
 
 const titleField = z.string().transform(sanitizeForPostgres);
 
-export function isValidGitUrl(url: string): boolean {
-  if (url.startsWith('git@') && url.includes(':')) return true;
-  try {
-    const parsed = new URL(url);
-    return ['http:', 'https:'].includes(parsed.protocol);
-  } catch {
-    return false;
-  }
-}
+// Re-export the shared git URL helpers for callers within apps/web that
+// currently import them from this router module.
+export { isValidGitUrl, sanitizeGitUrl };
 
-export function sanitizeGitUrl(url: string): string {
-  const sshMatch = url.match(/^git@([^:]+):(.+)$/);
-  if (sshMatch) {
-    const host = sshMatch[1];
-    const path = sshMatch[2].split('?')[0];
-    return `git@${host}:${path}`;
-  }
-
-  try {
-    const parsed = new URL(url);
-    parsed.username = '';
-    parsed.password = '';
-    parsed.search = '';
-    parsed.hash = '';
-    return parsed.toString();
-  } catch {
-    return url;
-  }
-}
-
-export function parseGitUrl(url: string): string | undefined {
-  if (!isValidGitUrl(url)) return undefined;
-  return sanitizeGitUrl(url);
-}
-
-const gitUrlField = z.string().transform(parseGitUrl).optional();
+const gitUrlField = z
+  .string()
+  .transform(url => (isValidGitUrl(url) ? sanitizeGitUrl(url) : undefined))
+  .optional();
 
 const createdOnPlatformField = z.string().min(1).max(100);
 

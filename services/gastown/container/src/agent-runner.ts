@@ -372,6 +372,10 @@ async function verifyGitCredentials(
  * kilo serve requires a git repo in the working directory, so we init
  * a bare local repo with an empty initial commit.
  */
+export function mayorWorkdirForTown(townId: string): string {
+  return `/workspace/rigs/mayor-${townId}/mayor-workspace`;
+}
+
 async function createLightweightWorkspace(label: string, rigId: string): Promise<string> {
   const { mkdir: mkdirAsync } = await import('node:fs/promises');
   const { existsSync } = await import('node:fs');
@@ -565,6 +569,8 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
       branch: request.branch,
       startPoint: request.startPoint,
       defaultBranch: request.defaultBranch,
+      envVars,
+      gitUrl: request.gitUrl,
     });
 
     // Set up git credentials so the agent can push

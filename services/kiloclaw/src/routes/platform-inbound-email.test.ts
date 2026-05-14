@@ -102,6 +102,7 @@ describe('POST /inbound-email', () => {
       orgId: null,
       inboundEmailEnabled: true,
       provider: 'fly',
+      instanceType: null,
     });
   });
 
@@ -232,6 +233,7 @@ describe('POST /inbound-email', () => {
       orgId: null,
       inboundEmailEnabled: false,
       provider: 'fly',
+      instanceType: null,
     });
     const { env } = makeEnv();
 
@@ -292,6 +294,7 @@ describe('POST /inbound-email', () => {
       orgId: '22222222-2222-4222-8222-222222222222',
       inboundEmailEnabled: true,
       provider: 'fly',
+      instanceType: null,
     });
     const { env, resolveDoKey } = makeEnv();
 

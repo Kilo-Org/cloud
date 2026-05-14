@@ -2765,6 +2765,113 @@ describe('start: metadata recovery re-arms alarm', () => {
     // Alarm must have been scheduled (not null)
     expect(storage._getAlarm()).not.toBeNull();
   });
+
+  it('creates a new machine on the canonical volume when metadata lookup finds no live machine', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyMachineId: null,
+      status: 'stopped',
+      lastStartedAt: Date.now() - 60_000,
+    });
+
+    (flyClient.listMachines as Mock).mockResolvedValue([]);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(flyClient.createMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ mounts: [{ volume: 'vol-1', path: '/root' }] }),
+      expect.objectContaining({ region: 'iad' })
+    );
+    expect(storage._store.get('flyMachineId')).toBe('machine-new');
+    expect(storage._store.get('flyVolumeId')).toBe('vol-1');
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('fails closed when metadata recovery is inconclusive before replacement creation', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyMachineId: null,
+      status: 'stopped',
+      lastMetadataRecoveryAt: Date.now(),
+    });
+
+    await expect(instance.start('user-1')).rejects.toThrow(
+      'Metadata recovery failed; aborting start to avoid creating a duplicate machine'
+    );
+
+    expect(flyClient.listMachines).not.toHaveBeenCalled();
+    expect(flyClient.createMachine).not.toHaveBeenCalled();
+  });
+
+  it('does not create an empty volume when a previously-started active volume is missing', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyMachineId: null,
+      status: 'stopped',
+      lastStartedAt: Date.now() - 60_000,
+    });
+
+    (flyClient.listMachines as Mock).mockResolvedValue([]);
+    (flyClient.getVolume as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+
+    await expect(instance.start('user-1')).rejects.toThrow(
+      'Active volume missing; operator intervention required'
+    );
+
+    expect(flyClient.createVolumeWithFallback).not.toHaveBeenCalled();
+    expect(flyClient.createMachine).not.toHaveBeenCalled();
+    expect(storage._store.get('flyVolumeId')).toBe('vol-1');
+  });
+
+  it('cleans abandoned pending recovery volume before starting on the canonical volume', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyMachineId: null,
+      flyVolumeId: 'vol-source',
+      flyRegion: 'iad',
+      pendingRecoveryVolumeId: 'vol-pending',
+      status: 'stopped',
+      lastStartedAt: Date.now() - 60_000,
+    });
+
+    (flyClient.listMachines as Mock).mockResolvedValue([]);
+    (flyClient.getVolume as Mock).mockImplementation(async (_config: unknown, volumeId: string) => {
+      if (volumeId === 'vol-pending') {
+        return {
+          id: 'vol-pending',
+          name: 'sandbox-1',
+          state: 'detached',
+          size_gb: 10,
+          region: 'ord',
+          attached_machine_id: null,
+          created_at: new Date().toISOString(),
+        };
+      }
+      if (volumeId === 'vol-source') {
+        return { id: 'vol-source', region: 'iad' };
+      }
+      throw new Error(`unexpected volume lookup ${volumeId}`);
+    });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-pending');
+    expect(storage._store.get('pendingRecoveryVolumeId')).toBeNull();
+    expect(flyClient.createMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ mounts: [{ volume: 'vol-source', path: '/root' }] }),
+      expect.anything()
+    );
+    expect(storage._store.get('flyVolumeId')).toBe('vol-source');
+    expect(storage._store.get('flyMachineId')).toBe('machine-new');
+  });
 });
 
 // ============================================================================
@@ -4277,9 +4384,9 @@ describe('start: volume region validation', () => {
     );
   });
 
-  it('handles volume gone (404) during region check by creating a new volume', async () => {
+  it('handles volume gone (404) before first start by creating a new volume', async () => {
     const { instance, storage } = createInstance();
-    await seedProvisioned(storage, { flyMachineId: null });
+    await seedProvisioned(storage, { flyMachineId: null, lastStartedAt: null });
 
     // Volume is gone
     (flyClient.getVolume as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));

@@ -93,7 +93,7 @@ import {
   syncProviderStateForStorage,
 } from './state';
 import { nextAlarmTime, doLog, doError, doWarn, toLoggable, createReconcileContext } from './log';
-import { attemptMetadataRecovery } from './reconcile';
+import { attemptMetadataRecoveryDetailed } from './reconcile';
 import { buildUserEnvVars, resolveImageTag, resolveRuntimeImageRef } from './config';
 import * as gateway from './gateway';
 import { buildChannelConfigPatch } from './channel-config';
@@ -1965,17 +1965,27 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       const machineIntentionallyDestroyed =
         !this.s.flyMachineId && this.s.previousVolumeId !== null && this.s.status === 'stopped';
       if (!this.s.flyMachineId && !machineIntentionallyDestroyed) {
-        const recovered = await attemptMetadataRecovery(
+        const recovery = await attemptMetadataRecoveryDetailed(
           flyConfig,
           this.ctx,
           this.s,
           createReconcileContext(this.s, this.env, 'start_recovery'),
           options?.skipCooldown
         );
-        if (!recovered && !this.s.flyMachineId) {
+        if (recovery.kind === 'inconclusive' && !this.s.flyMachineId) {
           throw new Error(
             'Metadata recovery failed; aborting start to avoid creating a duplicate machine'
           );
+        }
+      }
+
+      if (!this.s.flyMachineId) {
+        await cleanupPendingRecoveryVolumeIfNeeded(
+          this.recoveryRuntime(),
+          'start_cleanup_pending_recovery'
+        );
+        if (!this.s.flyVolumeId && this.s.lastStartedAt !== null) {
+          throw new Error('Active volume missing; operator intervention required');
         }
       }
 
@@ -2010,6 +2020,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           }
         } catch (err) {
           if (!fly.isFlyNotFound(err)) throw err;
+          if (!this.s.flyMachineId && this.s.lastStartedAt !== null) {
+            throw new Error('Active volume missing; operator intervention required');
+          }
 
           doWarn(this.s, 'Volume not found during region check, clearing');
           await this.persistProviderResult({

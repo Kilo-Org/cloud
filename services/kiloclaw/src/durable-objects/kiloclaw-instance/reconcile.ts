@@ -823,21 +823,26 @@ async function backfillMachineSizeFromFlyConfig(
 /**
  * Attempt to recover machine (and optionally volume) from Fly metadata.
  */
-export async function attemptMetadataRecovery(
+export type MetadataRecoveryResult =
+  | { kind: 'recovered'; machineId: string }
+  | { kind: 'no-live-machine' }
+  | { kind: 'inconclusive'; reason: 'missing-user' | 'cooldown' | 'error'; error?: string };
+
+export async function attemptMetadataRecoveryDetailed(
   flyConfig: FlyClientConfig,
   ctx: DurableObjectState,
   state: InstanceMutableState,
   rctx: ReconcileContext,
   skipCooldown?: boolean
-): Promise<boolean> {
-  if (!state.userId) return false;
+): Promise<MetadataRecoveryResult> {
+  if (!state.userId) return { kind: 'inconclusive', reason: 'missing-user' };
 
   if (
     !skipCooldown &&
     state.lastMetadataRecoveryAt &&
     Date.now() - state.lastMetadataRecoveryAt < METADATA_RECOVERY_COOLDOWN_MS
   ) {
-    return false;
+    return { kind: 'inconclusive', reason: 'cooldown' };
   }
 
   state.lastMetadataRecoveryAt = Date.now();
@@ -859,7 +864,13 @@ export async function attemptMetadataRecovery(
     }
 
     const candidate = selectRecoveryCandidate(machines);
-    if (!candidate) return true;
+    if (!candidate) {
+      rctx.log('metadata_recovery_no_live_machine', {
+        durationMs: performance.now() - recoveryStart,
+        label: 'metadata lookup found no live machine',
+      });
+      return { kind: 'no-live-machine' };
+    }
 
     state.flyMachineId = candidate.id;
     state.flyRegion = candidate.region;
@@ -910,14 +921,26 @@ export async function attemptMetadataRecovery(
       durationMs: performance.now() - recoveryStart,
       label: `recovered machine ${candidate.id} (fly: ${candidate.state})`,
     });
-    return true;
+    return { kind: 'recovered', machineId: candidate.id };
   } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
     rctx.log('metadata_recovery_failed', {
-      error: err instanceof Error ? err.message : String(err),
+      error,
     });
     doError(state, 'metadata recovery failed', { error: toLoggable(err) });
-    return false;
+    return { kind: 'inconclusive', reason: 'error', error };
   }
+}
+
+export async function attemptMetadataRecovery(
+  flyConfig: FlyClientConfig,
+  ctx: DurableObjectState,
+  state: InstanceMutableState,
+  rctx: ReconcileContext,
+  skipCooldown?: boolean
+): Promise<boolean> {
+  const result = await attemptMetadataRecoveryDetailed(flyConfig, ctx, state, rctx, skipCooldown);
+  return result.kind !== 'inconclusive';
 }
 
 /**

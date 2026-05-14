@@ -86,17 +86,17 @@ autoInstallPeers: false
 allowBuilds:
   '@swc/core': true
   '@tailwindcss/oxide': true
-  core-js-pure: true
-  es5-ext: true
   esbuild: true
   libpq: true
   workerd: true
   '@sentry/cli': false
+  bufferutil: false
   core-js: false
+  core-js-pure: false
+  es5-ext: false
+  msgpackr-extract: false
   oxc-resolver: false
+  protobufjs: false
   sharp: false
   unrs-resolver: false
-  bufferutil: true
-  protobufjs: true
-  utf-8-validate: true
-  msgpackr-extract: true
+  utf-8-validate: false

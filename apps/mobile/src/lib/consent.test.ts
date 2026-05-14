@@ -72,12 +72,13 @@ describe('consent storage', () => {
     const { acceptConsent, revokeConsent, subscribeToConsentChanges } = await import('./consent');
     const changes: string[] = [];
 
-    subscribeToConsentChanges(change => {
+    const unsubscribe = subscribeToConsentChanges(change => {
       changes.push(`${change.userId}:${change.hasAccepted ? 'accepted' : 'revoked'}`);
     });
 
     await acceptConsent('user-1');
     await revokeConsent('user-1');
+    unsubscribe();
 
     expect(changes).toEqual(['user-1:accepted', 'user-1:revoked']);
   });

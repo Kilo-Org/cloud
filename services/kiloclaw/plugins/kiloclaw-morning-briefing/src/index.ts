@@ -655,11 +655,12 @@ async function gatherGithubEmptyResultContext(
       scopes = parseOAuthScopesHeader(headersBlob);
       if (bodyText.trim().length > 0) {
         try {
-          const parsed = JSON.parse(bodyText) as unknown;
+          const parsed: unknown = JSON.parse(bodyText);
           if (typeof parsed === 'object' && parsed !== null && 'login' in parsed) {
-            const loginValue = (parsed as Record<string, unknown>).login;
-            if (typeof loginValue === 'string') {
-              login = loginValue;
+            // After the `'login' in parsed` check TS narrows parsed.login
+            // to `unknown`; the inner typeof guard is enough — no `as` cast.
+            if (typeof parsed.login === 'string') {
+              login = parsed.login;
             }
           }
         } catch {
@@ -707,8 +708,15 @@ async function gatherGithubEmptyResultContext(
     };
   }
 
+  // Fallback branch: either tokenType is already 'app' / 'oauth' / 'unknown'
+  // (those flow through as-is), OR tokenType is 'classic' / 'fine-grained' but
+  // login is null because the `gh api user` call failed earlier. In the
+  // failed-auth case we degrade to 'unknown' rather than claim a classic /
+  // fine-grained context we never confirmed.
+  const authFailedClassicOrFineGrained =
+    (tokenType === 'classic' || tokenType === 'fine-grained') && login === null;
   return {
-    tokenType: tokenType === 'classic' || tokenType === 'fine-grained' ? 'unknown' : tokenType,
+    tokenType: authFailedClassicOrFineGrained ? 'unknown' : tokenType,
     login,
   };
 }

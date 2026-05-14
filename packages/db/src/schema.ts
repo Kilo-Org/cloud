@@ -2706,6 +2706,37 @@ export type WebhookEvent = typeof webhook_events.$inferSelect;
 // Cached model data from OpenRouter and external benchmarks
 
 // Zod schemas for runtime validation of JSONB data
+
+// Per-eval cache entry for benchmarks.kiloBench, keyed by task_source.
+// This shape is the public contract returned via GET /api/models/stats —
+// it intentionally omits bench_eval_url, bench_eval_name, promoter email,
+// promotion notes, ingest IDs, and errored-trial counts. Audit data lives only
+// in model_eval_ingest.
+export const ModelStatsKiloBenchEvalSchema = z.object({
+  taskSource: z.string(),
+  overallScore: z.number(),
+  totalScore: z.number(),
+  nTotalTrials: z.number().int(),
+  avgCostUsd: z.number().nullable(),
+  avgInputTokens: z.number().nullable(),
+  avgOutputTokens: z.number().nullable(),
+  avgCacheReadTokens: z.number().nullable(),
+  avgExecutionMs: z.number().nullable(),
+  // ISO-8601 timestamp of when the bench operator promoted this eval.
+  lastPromotedAt: z.string(),
+});
+
+// Top-level kiloBench JSONB shape stored on modelStats.benchmarks.
+// overallScore is trial-weighted across the eval set:
+//   SUM(eval.totalScore) / SUM(eval.nTotalTrials)
+// which preserves fractional-reward semantics across heterogeneous evals
+// (a 100-trial benchmark outweighs a 4-trial smoke run).
+export const ModelStatsKiloBenchSchema = z.object({
+  overallScore: z.number(),
+  evals: z.record(z.string(), ModelStatsKiloBenchEvalSchema),
+  lastUpdated: z.string(),
+});
+
 export const ModelStatsBenchmarksSchema = z
   .object({
     artificialAnalysis: z
@@ -2719,6 +2750,11 @@ export const ModelStatsBenchmarksSchema = z
         lastUpdated: z.string().optional(),
       })
       .optional(),
+    // Scores produced by the kilo-bench platform (operator-promoted evals
+    // synced from the kilo-bench dashboard). Sibling source-namespace to
+    // artificialAnalysis. Each eval (terminal-bench, swebench-verified, etc.)
+    // is keyed by task_source under .evals.
+    kiloBench: ModelStatsKiloBenchSchema.optional(),
   })
   .optional();
 
@@ -2750,6 +2786,8 @@ export const ModelStatsChartDataSchema = z
 
 // TypeScript types inferred from Zod schemas
 export type ModelStatsBenchmarks = z.infer<typeof ModelStatsBenchmarksSchema>;
+export type ModelStatsKiloBench = z.infer<typeof ModelStatsKiloBenchSchema>;
+export type ModelStatsKiloBenchEval = z.infer<typeof ModelStatsKiloBenchEvalSchema>;
 export type ModelStatsChartData = z.infer<typeof ModelStatsChartDataSchema>;
 
 export const modelStats = pgTable(
@@ -2819,6 +2857,75 @@ export const modelStats = pgTable(
 
 export type ModelStats = typeof modelStats.$inferSelect;
 export type NewModelStats = typeof modelStats.$inferInsert;
+
+// ============ MODEL EVAL INGEST ============
+// Append-only audit log of evals promoted on the kilo-bench dashboard.
+// One row per promoted bench eval (bench_eval_name UNIQUE), pulled by
+// services/model-eval-ingest cron via Service Binding to bench. Latest
+// promoted_at per (provider, model, variant, task_source) feeds the
+// public modelStats.benchmarks.kiloBench JSONB cache.
+//
+// total_score and overall_score use numeric (not integer) so fractional
+// verifier rewards round-trip cleanly: e.g. total_score = 1.5 across 4
+// trials produces overall_score = 0.375.
+export const model_eval_ingest = pgTable(
+  'model_eval_ingest',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+
+    // Idempotency / natural key — exactly one row per promoted bench eval.
+    // bench_eval_name is the eval's R2 prefix and bench-D1 primary key,
+    // operator-chosen, format like `kilo__<model>__<dataset>__<date>`.
+    bench_eval_name: text('bench_eval_name').notNull().unique(),
+    bench_eval_url: text('bench_eval_url').notNull(),
+
+    // Identity. Bench refuses to promote multi-axis evals (>1 model or
+    // >1 dataset), so these are scalars on the cloud side.
+    provider: text('provider').notNull(),
+    model: text('model').notNull(),
+    variant: text('variant'),
+    task_source: text('task_source').notNull(),
+
+    // Aggregates. See header comment on numeric precision rationale.
+    n_total_trials: integer('n_total_trials').notNull(),
+    total_score: decimal('total_score', { precision: 14, scale: 6 }).notNull(),
+    overall_score: decimal('overall_score', { precision: 8, scale: 6 }).notNull(),
+    n_errored: integer('n_errored').notNull(),
+
+    avg_cost_usd: decimal('avg_cost_usd', { precision: 12, scale: 6 }),
+    avg_input_tokens: integer('avg_input_tokens'),
+    avg_output_tokens: integer('avg_output_tokens'),
+    avg_cache_read_tokens: integer('avg_cache_read_tokens'),
+    avg_execution_ms: integer('avg_execution_ms'),
+
+    // Bench-side audit metadata.
+    // promoted_by_email is the kilocode operator (CF Access SSO), not customer PII.
+    promoted_at: timestamp('promoted_at', { withTimezone: true, mode: 'string' }).notNull(),
+    promoted_by_email: text('promoted_by_email').notNull(),
+    promotion_note: text('promotion_note'),
+
+    // Cloud-side ingest metadata.
+    ingested_at: timestamp('ingested_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+  },
+  t => [
+    // "Latest by promoted_at per (provider, model, variant, task_source)" —
+    // shape of the recompute query.
+    index('IDX_model_eval_ingest_lookup').on(
+      t.provider,
+      t.model,
+      t.variant,
+      t.task_source,
+      t.promoted_at
+    ),
+    // Watermark advance: max(promoted_at).
+    index('IDX_model_eval_ingest_promoted_at').on(t.promoted_at),
+  ]
+);
+
+export type ModelEvalIngest = typeof model_eval_ingest.$inferSelect;
+export type NewModelEvalIngest = typeof model_eval_ingest.$inferInsert;
 
 export const MODELS_BY_PROVIDER_ADMIN_URL = '/admin/sync-providers';
 

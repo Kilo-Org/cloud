@@ -1,0 +1,7 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "model-eval-ingest-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-02-26",
+  "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
+}

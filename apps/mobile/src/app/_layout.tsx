@@ -14,6 +14,7 @@ import { useFonts } from 'expo-font';
 import {
   type Href,
   Slot,
+  useGlobalSearchParams,
   useNavigationContainerRef,
   usePathname,
   useRouter,
@@ -29,6 +30,7 @@ import { Toaster } from 'sonner-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { initAppsFlyer } from '@/lib/appsflyer';
+import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { hasAcceptedConsent, subscribeToConsentChanges } from '@/lib/consent';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -88,6 +90,7 @@ function RootLayoutNav() {
   });
   const segments = useSegments();
   const pathname = usePathname();
+  const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
   const { userId, isLoading: userIdLoading } = useCurrentUserId({ enabled: token != null });
   const [consentChecked, setConsentChecked] = useState(false);
@@ -108,6 +111,7 @@ function RootLayoutNav() {
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
+  const onConsentReviewRoute = onConsentRoute && consentModeForSearchParam(mode) === 'review';
 
   useEffect(() => {
     let cancelled = false;
@@ -191,7 +195,7 @@ function RootLayoutNav() {
         return;
       }
 
-      if (onConsentRoute || inAuthGroup) {
+      if ((onConsentRoute && !onConsentReviewRoute) || inAuthGroup) {
         router.replace('/(app)');
         return;
       }
@@ -214,6 +218,7 @@ function RootLayoutNav() {
     consentChecked,
     needsConsent,
     onConsentRoute,
+    onConsentReviewRoute,
   ]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;

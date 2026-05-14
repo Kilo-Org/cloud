@@ -6,28 +6,39 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { ConsentRow } from '@/components/consent/consent-row';
+import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
-import { acceptConsent } from '@/lib/consent';
+import { acceptConsent, revokeConsent } from '@/lib/consent';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 const PRIVACY_URL = 'https://kilo.ai/privacy';
 
-export function ConsentCard() {
+type ConsentCardProps = {
+  readonly mode?: ConsentMode;
+};
+
+export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom, top } = useSafeAreaInsets();
   const { signOut } = useAuth();
   const { userId } = useCurrentUserId();
+  const actions = getConsentActions(mode);
   const rootStyle = { paddingTop: top };
   const contentContainerStyle = {
     paddingTop: 24,
     paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
   };
 
-  const handleAccept = async () => {
+  const handlePrimaryAction = async () => {
+    if (mode === 'review') {
+      router.back();
+      return;
+    }
+
     if (!userId) {
       toast.error('Could not load your account. Please try again.');
       return;
@@ -37,21 +48,33 @@ export function ConsentCard() {
     router.replace('/(app)/(tabs)' as Href);
   };
 
-  const handleDecline = () => {
-    Alert.alert(
-      'Decline data sharing?',
-      'Kilo Code needs to share data with AI providers to work. If you decline, you will be signed out.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Decline and sign out',
-          style: 'destructive',
-          onPress: () => {
-            void signOut();
-          },
+  const handleSecondaryAction = () => {
+    const message =
+      mode === 'review'
+        ? 'Kilo Code needs this consent to function. Revoking will sign you out. You can accept again on next sign-in.'
+        : 'Kilo Code needs to share data with AI providers to work. If you decline, you will be signed out.';
+
+    Alert.alert(actions.destructiveTitle, message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: actions.destructiveLabel,
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            if (mode === 'review') {
+              if (!userId) {
+                toast.error('Could not load your account. Please try again.');
+                return;
+              }
+
+              await revokeConsent(userId);
+            }
+
+            await signOut();
+          })();
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleOpenPrivacy = () => {
@@ -98,7 +121,11 @@ export function ConsentCard() {
 
         <Pressable
           onPress={() => {
-            router.push('/(app)/consent-details' as Href);
+            router.push(
+              mode === 'review'
+                ? ('/(app)/consent-details?mode=review' as Href)
+                : ('/(app)/consent-details' as Href)
+            );
           }}
           hitSlop={8}
           accessibilityLabel="See full details"
@@ -119,15 +146,20 @@ export function ConsentCard() {
         <View className="mt-8 gap-3">
           <Button
             onPress={() => {
-              void handleAccept();
+              void handlePrimaryAction();
             }}
             size="lg"
-            accessibilityLabel="Accept and continue"
+            accessibilityLabel={actions.primaryLabel}
           >
-            <Text>Accept and continue</Text>
+            <Text>{actions.primaryLabel}</Text>
           </Button>
-          <Button variant="outline" size="lg" onPress={handleDecline} accessibilityLabel="Decline">
-            <Text>Decline</Text>
+          <Button
+            variant={mode === 'review' ? 'destructive' : 'outline'}
+            size="lg"
+            onPress={handleSecondaryAction}
+            accessibilityLabel={actions.secondaryLabel}
+          >
+            <Text>{actions.secondaryLabel}</Text>
           </Button>
         </View>
       </ScrollView>

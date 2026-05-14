@@ -1,5 +1,4 @@
-import { ExternalLink, Plus, Server } from 'lucide-react-native';
-import { Linking } from 'react-native';
+import { Plus, Server } from 'lucide-react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import {
@@ -8,7 +7,6 @@ import {
 } from '@/components/kiloclaw/access-required-screen';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { WEB_BASE_URL } from '@/lib/config';
 import { type MobileOnboardingState } from '@/lib/derive-mobile-onboarding-state';
 
 type EmptyStateContentProps = {
@@ -41,27 +39,7 @@ export function EmptyStateContent({
   foregroundColor,
   onCreate,
 }: Readonly<EmptyStateContentProps>) {
-  if (state === undefined) {
-    return (
-      <EmptyState
-        icon={Server}
-        title="No KiloClaw instances"
-        description="You don't have any KiloClaw instances yet. Continue on kilo.ai to get started."
-        action={
-          <Button
-            variant="outline"
-            onPress={() => void Linking.openURL(`${WEB_BASE_URL}/claw`)}
-            accessibilityRole="link"
-          >
-            <Text>Continue on kilo.ai</Text>
-            <ExternalLink size={16} color={foregroundColor} />
-          </Button>
-        }
-      />
-    );
-  }
-
-  if (state.state === 'pending_settlement') {
+  if (state?.state === 'pending_settlement') {
     return (
       <EmptyState
         icon={Server}
@@ -71,7 +49,7 @@ export function EmptyStateContent({
     );
   }
 
-  const accessRequiredSubcase = resolveAccessRequiredSubcase(state);
+  const accessRequiredSubcase = state ? resolveAccessRequiredSubcase(state) : null;
   if (accessRequiredSubcase) {
     return <AccessRequiredScreen subcase={accessRequiredSubcase} />;
   }

@@ -10,7 +10,7 @@ import { Text } from '@/components/ui/text';
 import { type MobileOnboardingState } from '@/lib/derive-mobile-onboarding-state';
 
 type EmptyStateContentProps = {
-  state: MobileOnboardingState | undefined;
+  state: MobileOnboardingState;
   foregroundColor: string;
   onCreate: () => void;
 };
@@ -39,7 +39,7 @@ export function EmptyStateContent({
   foregroundColor,
   onCreate,
 }: Readonly<EmptyStateContentProps>) {
-  if (state?.state === 'pending_settlement') {
+  if (state.state === 'pending_settlement') {
     return (
       <EmptyState
         icon={Server}
@@ -49,7 +49,7 @@ export function EmptyStateContent({
     );
   }
 
-  const accessRequiredSubcase = state ? resolveAccessRequiredSubcase(state) : null;
+  const accessRequiredSubcase = resolveAccessRequiredSubcase(state);
   if (accessRequiredSubcase) {
     return <AccessRequiredScreen subcase={accessRequiredSubcase} />;
   }

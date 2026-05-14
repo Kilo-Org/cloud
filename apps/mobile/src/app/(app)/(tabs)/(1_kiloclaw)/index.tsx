@@ -48,7 +48,11 @@ export default function KiloClawTab() {
     })();
   }, [refetchInstances]);
 
-  if (instancesQuery.isError) {
+  const onboardingQueryEnabled = entryDecision.kind === 'empty';
+  const hasQueryError =
+    instancesQuery.isError || (onboardingQueryEnabled && onboardingQuery.isError);
+
+  if (hasQueryError) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
@@ -63,7 +67,12 @@ export default function KiloClawTab() {
             className="flex-1"
             message="Could not load KiloClaw instances"
             onRetry={() => {
-              void instancesQuery.refetch();
+              if (instancesQuery.isError) {
+                void instancesQuery.refetch();
+              }
+              if (onboardingQueryEnabled && onboardingQuery.isError) {
+                void onboardingQuery.refetch();
+              }
             }}
           />
         </Animated.View>
@@ -101,7 +110,7 @@ export default function KiloClawTab() {
         headerRight={<ProfileAvatarButton />}
       />
       <Animated.View layout={LinearTransition} className="flex-1 px-4">
-        {showInstanceSkeleton ? (
+        {showInstanceSkeleton || onboardingQuery.data === undefined ? (
           <Animated.View exiting={FadeOut.duration(150)} className="w-full gap-3 px-4 pt-5">
             <Skeleton className="h-16 w-full rounded-xl" />
             <Skeleton className="h-16 w-full rounded-xl" />

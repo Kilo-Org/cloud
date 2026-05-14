@@ -1,14 +1,11 @@
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
 
-import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import {
   JetBrainsMono_500Medium,
   JetBrainsMono_600SemiBold,
 } from '@expo-google-fonts/jetbrains-mono';
-import { PortalHost } from '@rn-primitives/portal';
 import * as Sentry from '@sentry/react-native';
-import { QueryClientProvider } from '@tanstack/react-query';
 import { isRunningInExpoGo } from 'expo';
 import { useFonts } from 'expo-font';
 import {
@@ -22,19 +19,16 @@ import {
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
 import { useEffect, useState } from 'react';
-import { Platform, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Toaster } from 'sonner-native';
+import { View } from 'react-native';
 
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
-import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
-import { shouldStartAppsFlyer } from '@/lib/appsflyer-consent';
-import { initAppsFlyer } from '@/lib/appsflyer';
+import { AppRootProviders } from '@/components/app-root-providers';
+import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
+import { useAuth } from '@/lib/auth/auth-context';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
-import { hasAcceptedConsent, subscribeToConsentChanges } from '@/lib/consent';
+import { checkConsentGate } from '@/lib/consent-gate';
+import { subscribeToConsentChanges } from '@/lib/consent';
+import { useAppsFlyerConsentGate } from '@/lib/hooks/use-appsflyer-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
@@ -43,10 +37,7 @@ import {
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
-import { OrganizationProvider } from '@/lib/organization-context';
 import { resolvePendingNotificationNavigation } from '@/lib/pending-notification-navigation';
-import { queryClient } from '@/lib/query-client';
-import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
@@ -59,24 +50,16 @@ Sentry.init({
 
   sendDefaultPii: false,
 
-  // Enable Logs
   enableLogs: true,
-
-  // Tracing is fully disabled.
   tracesSampleRate: 0,
-
-  // Configure Session Replay
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1,
-
-  // Capture a screenshot and view hierarchy on every error
   attachScreenshot: true,
   attachViewHierarchy: true,
 
   integrations: [Sentry.mobileReplayIntegration(), navigationIntegration],
   enableNativeFramesTracking: false,
 
-  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   spotlight: __DEV__,
 });
 
@@ -103,6 +86,8 @@ function RootLayoutNav() {
   } = useCurrentUserId({ enabled: token != null });
   const [consentChecked, setConsentChecked] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
+  const [consentCheckError, setConsentCheckError] = useState<unknown>(null);
+  const [consentCheckRetryKey, setConsentCheckRetryKey] = useState(0);
 
   useEffect(() => {
     if (fontsError) {
@@ -110,10 +95,6 @@ function RootLayoutNav() {
     }
   }, [fontsError]);
 
-  // Treat font load errors as terminal: fall back to system fonts rather
-  // than holding the app at opacity 0 forever. `useFonts` sets `error` and
-  // leaves `loaded` false on failure, so gating only on `!fontsLoaded` would
-  // keep the splash screen up indefinitely.
   const fontsReady = fontsLoaded || fontsError !== null;
   const isLoading = authLoading || updateChecking || !fontsReady;
   const inAuthGroup = segments[0] === '(auth)';
@@ -128,14 +109,25 @@ function RootLayoutNav() {
       if (!token || !userId) {
         setConsentChecked(false);
         setNeedsConsent(false);
+        setConsentCheckError(null);
         return;
       }
 
-      const accepted = await hasAcceptedConsent(userId);
+      const result = await checkConsentGate(userId);
       if (cancelled) {
         return;
       }
-      setNeedsConsent(!accepted);
+
+      if (result.status === 'error') {
+        Sentry.captureException(result.error);
+        setNeedsConsent(false);
+        setConsentChecked(false);
+        setConsentCheckError(result.error);
+        return;
+      }
+
+      setConsentCheckError(null);
+      setNeedsConsent(result.status === 'needs-consent');
       setConsentChecked(true);
     }
 
@@ -144,7 +136,7 @@ function RootLayoutNav() {
     return () => {
       cancelled = true;
     };
-  }, [token, userId]);
+  }, [token, userId, consentCheckRetryKey]);
 
   useEffect(() => {
     if (!token || !userId) {
@@ -163,26 +155,7 @@ function RootLayoutNav() {
     return unsubscribe;
   }, [token, userId]);
 
-  useEffect(() => {
-    if (
-      !shouldStartAppsFlyer({
-        hasToken: token != null,
-        consentChecked,
-        needsConsent,
-      })
-    ) {
-      return;
-    }
-
-    async function startAppsFlyer() {
-      if (Platform.OS === 'ios') {
-        await requestTrackingPermissionsAsync();
-      }
-      initAppsFlyer();
-    }
-
-    void startAppsFlyer();
-  }, [token, consentChecked, needsConsent]);
+  useAppsFlyerConsentGate({ hasToken: token != null, consentChecked, needsConsent });
 
   useEffect(() => {
     if (isLoading) {
@@ -199,7 +172,6 @@ function RootLayoutNav() {
     }
 
     if (inForceUpdate) {
-      // Version is now acceptable, leave the force-update screen
       router.replace('/(app)');
       return;
     }
@@ -212,6 +184,11 @@ function RootLayoutNav() {
       }
     } else {
       if (userIdError) {
+        void SplashScreen.hideAsync();
+        return;
+      }
+
+      if (consentCheckError) {
         void SplashScreen.hideAsync();
         return;
       }
@@ -250,6 +227,7 @@ function RootLayoutNav() {
     router,
     userIdLoading,
     userIdError,
+    consentCheckError,
     consentChecked,
     needsConsent,
     onConsentRoute,
@@ -261,6 +239,7 @@ function RootLayoutNav() {
   const needsAuth = !token && !inAuthGroup;
   const needsAppRedirect = token != null && inAuthGroup;
   const hasUserBootstrapError = token != null && userIdError;
+  const hasConsentBootstrapError = token != null && consentCheckError !== null;
   const consentLoading =
     token != null && !consentChecked && !inAuthGroup && !inForceUpdate && !onConsentRoute;
   const needsConsentRedirect = consentChecked && needsConsent && !onConsentRoute;
@@ -274,35 +253,45 @@ function RootLayoutNav() {
   // initialised — returning null unmounts it and breaks router.replace.
   // The native splash screen covers everything during initial load, and
   // opacity 0 hides the wrong screen during redirects.
-  const hidden = !hasUserBootstrapError && (isLoading || needsRedirect || consentLoading);
+  const hidden =
+    !hasUserBootstrapError &&
+    !hasConsentBootstrapError &&
+    (isLoading || needsRedirect || consentLoading);
 
   if (hasUserBootstrapError) {
     return (
-      <View className="flex-1 items-center justify-center gap-4 bg-background px-6">
-        <View className="gap-2">
-          <Text className="text-center text-lg font-semibold text-foreground">
-            Could not load your account
-          </Text>
-          <Text className="text-center text-sm text-muted-foreground">
-            Check your connection and try again.
-          </Text>
-        </View>
-        <View className="w-full gap-3">
-          <Button size="lg" onPress={refetchUserId} accessibilityLabel="Retry loading account">
-            <Text>Retry</Text>
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onPress={() => {
-              void signOut();
-            }}
-            accessibilityLabel="Sign out"
-          >
-            <Text>Sign out</Text>
-          </Button>
-        </View>
-      </View>
+      <BootstrapErrorScreen
+        title="Could not load your account"
+        description="Check your connection and try again."
+        primaryLabel="Retry"
+        primaryAccessibilityLabel="Retry loading account"
+        onPrimaryPress={refetchUserId}
+        secondaryLabel="Sign out"
+        secondaryAccessibilityLabel="Sign out"
+        onSecondaryPress={() => {
+          void signOut();
+        }}
+      />
+    );
+  }
+
+  if (hasConsentBootstrapError) {
+    return (
+      <BootstrapErrorScreen
+        title="Could not load privacy choices"
+        description="Check your device security settings and try again."
+        primaryLabel="Retry"
+        primaryAccessibilityLabel="Retry loading privacy choices"
+        onPrimaryPress={() => {
+          setConsentCheckError(null);
+          setConsentCheckRetryKey(key => key + 1);
+        }}
+        secondaryLabel="Sign out"
+        secondaryAccessibilityLabel="Sign out"
+        onSecondaryPress={() => {
+          void signOut();
+        }}
+      />
     );
   }
 
@@ -333,24 +322,10 @@ function RootLayout() {
   }, []);
 
   return (
-    <GestureHandlerRootView className="flex-1">
+    <AppRootProviders>
       <StatusBar style="auto" />
-      <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <OrganizationProvider>
-              <ActionSheetProvider>
-                <>
-                  <RootLayoutNav />
-                  <Toaster />
-                  <PortalHost />
-                </>
-              </ActionSheetProvider>
-            </OrganizationProvider>
-          </AuthProvider>
-        </QueryClientProvider>
-      </TRPCProvider>
-    </GestureHandlerRootView>
+      <RootLayoutNav />
+    </AppRootProviders>
   );
 }
 

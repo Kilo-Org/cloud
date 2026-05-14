@@ -1,14 +1,19 @@
-import { and, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { addMonths, format } from 'date-fns';
 
 import type { WorkerDb } from '@kilocode/db';
 import {
+  findUnresolvedTerminalRenewalFailure,
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
   KILOCLAW_PRICE_VERSIONS,
+  listUnresolvedTerminalRenewalFailures,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  markTerminalRenewalFailureResolved,
   getWorkerDb,
   insertKiloClawSubscriptionChangeLog,
+  recordTerminalRenewalFailure,
+  supersedeTerminalRenewalFailuresForBoundary,
   type KiloClawSubscription,
 } from '@kilocode/db';
 import type {
@@ -23,21 +28,35 @@ import {
 } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
   credit_transactions,
+  kilo_pass_pause_events,
+  kilo_pass_subscriptions,
   kiloclaw_email_log,
   kiloclaw_instances,
   kiloclaw_subscriptions,
   kilocode_users,
 } from '@kilocode/db/schema';
+import { KiloClawTerminalRenewalFailureCode } from '@kilocode/db/schema-types';
 import type {
   KiloClawPlan,
   KiloClawSubscriptionChangeAction,
   KiloClawScheduledPlan,
   KiloClawSubscriptionStatus,
 } from '@kilocode/db/schema-types';
+import {
+  computeProjectedKiloPassBonusMicrodollars,
+  getEffectiveKiloPassThreshold,
+  pickKiloPassSubscriptionForProjection,
+  type KiloPassBonusProjectionSubscription,
+  type KiloPassSubscriptionProjectionCandidate,
+} from '@kilocode/worker-utils/kilo-pass-bonus-projection';
 
 import type {
   BillingMessageSweep,
   BillingWorkerEnv,
+  CreditRenewalDiscoveryContinuationQueueMessage,
+  CreditRenewalDiscoveryQueueMessage,
+  CreditRenewalItemQueueMessage,
+  CreditRenewalTerminalFailureQueueMessage,
   TrialInactivityStopCandidateQueueMessage,
 } from './types.js';
 import { logger, withLogTags, type BillingLogFields } from './logger.js';
@@ -139,6 +158,11 @@ type CreditRenewalRow = {
   user_updated_at: string;
 };
 
+type KiloPassProjectionSubscriptionRow = KiloPassBonusProjectionSubscription &
+  KiloPassSubscriptionProjectionCandidate & {
+    id: string;
+  };
+
 type EmailActionInput = {
   to: string;
   templateName: TemplateName;
@@ -235,14 +259,6 @@ type SideEffectRequest =
       };
     }
   | {
-      action: 'project_pending_kilo_pass_bonus';
-      input: {
-        userId: string;
-        microdollarsUsed: number;
-        kiloPassThreshold: number | null;
-      };
-    }
-  | {
       action: 'issue_kilo_pass_bonus_from_usage_threshold';
       input: { userId: string; nowIso: string };
     };
@@ -262,9 +278,7 @@ type SideEffectResponse<T extends SideEffectRequest> = T['action'] extends 'send
               conversionId: string | null;
               disqualificationReason: string | null;
             }
-          : T['action'] extends 'project_pending_kilo_pass_bonus'
-            ? { projectedBonusMicrodollars: number }
-            : { ok: true };
+          : { ok: true };
 
 export class KiloClawApiError extends Error {
   readonly statusCode: number;
@@ -324,6 +338,23 @@ function createSummary(): BillingSummary {
     emails_skipped: 0,
     errors: 0,
   };
+}
+
+function creditRenewalItemOutcome(summary: BillingSummary): string {
+  if (summary.credit_renewals > 0) return 'renewed';
+  if (summary.credit_renewals_canceled > 0) return 'canceled';
+  if (summary.credit_renewals_past_due > 0) return 'past_due';
+  if (summary.credit_renewals_auto_top_up > 0) return 'auto_top_up';
+  if (summary.credit_renewals_skipped_duplicate > 0) return 'duplicate';
+  if (summary.errors > 0) return 'failed';
+  return 'skipped';
+}
+
+function elapsedMsSince(iso: string | undefined): number | undefined {
+  if (!iso) return undefined;
+  const timestamp = Date.parse(iso);
+  if (Number.isNaN(timestamp)) return undefined;
+  return Math.max(0, Date.now() - timestamp);
 }
 
 function log(level: 'info' | 'warn' | 'error', message: string, fields: BillingLogFields) {
@@ -423,7 +454,7 @@ function hasTrialInactivityEligibleDuration(row: { kiloclaw_price_version: strin
 }
 
 async function getSubscriptionById(
-  database: WorkerDb,
+  database: Pick<WorkerDb, 'select'>,
   subscriptionId: string
 ): Promise<KiloClawSubscription | null> {
   const [subscription] = await database
@@ -959,26 +990,59 @@ async function trySendEmail(
   return true;
 }
 
+async function getKiloPassSubscriptionForProjection(
+  database: Pick<WorkerDb, 'select'>,
+  userId: string
+): Promise<KiloPassProjectionSubscriptionRow | null> {
+  const subscriptionRows = await database
+    .select({
+      id: kilo_pass_subscriptions.id,
+      tier: kilo_pass_subscriptions.tier,
+      cadence: kilo_pass_subscriptions.cadence,
+      status: kilo_pass_subscriptions.status,
+      cancelAtPeriodEnd: kilo_pass_subscriptions.cancel_at_period_end,
+      currentStreakMonths: kilo_pass_subscriptions.current_streak_months,
+      startedAt: kilo_pass_subscriptions.started_at,
+      createdAt: kilo_pass_subscriptions.created_at,
+    })
+    .from(kilo_pass_subscriptions)
+    .where(eq(kilo_pass_subscriptions.kilo_user_id, userId));
+
+  const selected = pickKiloPassSubscriptionForProjection(subscriptionRows);
+  if (!selected || selected.status !== 'active') return selected;
+
+  const openPauseEvents = await database
+    .select({ id: kilo_pass_pause_events.id })
+    .from(kilo_pass_pause_events)
+    .where(
+      and(
+        eq(kilo_pass_pause_events.kilo_pass_subscription_id, selected.id),
+        isNull(kilo_pass_pause_events.resumed_at)
+      )
+    )
+    .limit(1);
+
+  return openPauseEvents.length > 0 ? { ...selected, status: 'paused' } : selected;
+}
+
 async function projectPendingKiloPassBonusMicrodollars(
-  env: BillingWorkerEnv,
-  context: SweepExecutionContext,
+  database: Pick<WorkerDb, 'select'>,
   params: {
     userId: string;
     microdollarsUsed: number;
     kiloPassThreshold: number | null;
   }
 ): Promise<number> {
-  const result = await callBillingSideEffect(
-    env,
-    context,
-    {
-      action: 'project_pending_kilo_pass_bonus',
-      input: params,
-    },
-    { userId: params.userId }
-  );
+  const effectiveThreshold = getEffectiveKiloPassThreshold(params.kiloPassThreshold);
+  if (effectiveThreshold === null || params.microdollarsUsed < effectiveThreshold) return 0;
 
-  return result.projectedBonusMicrodollars;
+  const subscription = await getKiloPassSubscriptionForProjection(database, params.userId);
+
+  return computeProjectedKiloPassBonusMicrodollars({
+    microdollarsUsed: params.microdollarsUsed,
+    kiloPassThreshold: params.kiloPassThreshold,
+    subscription,
+  });
 }
 
 async function maybeIssueKiloPassBonusFromUsageThreshold(
@@ -1214,127 +1278,247 @@ async function autoResumeIfSuspended(
   return true;
 }
 
+type CreditRenewalTransactionOutcome =
+  | { kind: 'skipped' }
+  | { kind: 'canceled'; row: CreditRenewalRow; renewalAt: string }
+  | {
+      kind: 'duplicate';
+      userId: string;
+      renewalAt: string;
+      deductionCategory: string;
+      effectivePlan: 'commit' | 'standard';
+      priceVersion: string;
+      costMicrodollars: number;
+      newPeriodEnd: string;
+    }
+  | {
+      kind: 'renewed';
+      userId: string;
+      renewalAt: string;
+      deductionCategory: string;
+      effectivePlan: 'commit' | 'standard';
+      priceVersion: string;
+      costMicrodollars: number;
+      wasPastDue: boolean;
+      row: CreditRenewalRow;
+      newPeriodEnd: string;
+    }
+  | { kind: 'auto_top_up'; row: CreditRenewalRow }
+  | { kind: 'past_due'; row: CreditRenewalRow };
+
+async function fetchLockedCreditRenewalItemRow(
+  database: Pick<WorkerDb, 'select'>,
+  subscriptionId: string,
+  renewalBoundary: string,
+  expectedUserId: string
+): Promise<CreditRenewalRow | null> {
+  const rows = await database
+    .select(selectCreditRenewalRowFields())
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.id, subscriptionId),
+        eq(kiloclaw_subscriptions.user_id, expectedUserId),
+        eq(kiloclaw_subscriptions.credit_renewal_at, renewalBoundary),
+        eq(kiloclaw_subscriptions.payment_source, 'credits'),
+        isNull(kiloclaw_subscriptions.stripe_subscription_id),
+        currentSubscriptionRowFilter(),
+        inArray(kiloclaw_subscriptions.status, ['active', 'past_due'])
+      )
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+function buildCreditRenewalAdvanceUpdateSet(params: {
+  applyingPlanSwitch: boolean;
+  current: CreditRenewalRow;
+  effectivePlan: 'commit' | 'standard';
+  newPeriodEnd: string;
+  newPeriodStart: string;
+  wasPastDue: boolean;
+}): Partial<typeof kiloclaw_subscriptions.$inferInsert> {
+  const updateSet: Partial<typeof kiloclaw_subscriptions.$inferInsert> = {
+    current_period_start: params.newPeriodStart,
+    current_period_end: params.newPeriodEnd,
+    credit_renewal_at: params.newPeriodEnd,
+    auto_top_up_triggered_for_period: null,
+  };
+
+  if (params.applyingPlanSwitch) {
+    updateSet.plan = params.effectivePlan;
+    updateSet.scheduled_plan = null;
+    updateSet.scheduled_by = null;
+    updateSet.commit_ends_at =
+      params.effectivePlan === 'commit'
+        ? addMonths(new Date(params.newPeriodStart), 6).toISOString()
+        : null;
+  }
+
+  if (
+    params.effectivePlan === 'commit' &&
+    !params.applyingPlanSwitch &&
+    params.current.commit_ends_at &&
+    new Date(params.current.commit_ends_at) <= new Date(params.newPeriodStart)
+  ) {
+    updateSet.commit_ends_at = addMonths(new Date(params.current.commit_ends_at), 6).toISOString();
+  }
+
+  if (params.wasPastDue) {
+    updateSet.status = 'active';
+    updateSet.past_due_since = null;
+  }
+
+  return updateSet;
+}
+
+function creditRenewalAdvanceChangeAction(params: {
+  applyingPlanSwitch: boolean;
+  wasPastDue: boolean;
+}): KiloClawSubscriptionChangeAction {
+  if (params.applyingPlanSwitch) return 'plan_switched';
+  if (params.wasPastDue) return 'reactivated';
+  return 'period_advanced';
+}
+
 async function processCreditRenewalRow(
   database: WorkerDb,
   env: BillingWorkerEnv,
   context: SweepExecutionContext,
-  row: CreditRenewalRow,
+  row: Pick<CreditRenewalRow, 'id' | 'user_id' | 'credit_renewal_at'>,
   clawUrl: string,
-  summary: BillingSummary
+  summary: BillingSummary,
+  options: { resolveTerminalFailureOnExpectedOutcome?: boolean } = {}
 ): Promise<void> {
-  if (!row.instance_id) {
-    logSkippedSubscriptionRow('Skipping credit renewal for detached subscription row', row, {
-      reason: 'missing_instance_id',
-    });
-    return;
-  }
-
-  if (!row.instance_row_id) {
-    logSkippedSubscriptionRow(
-      'Skipping credit renewal for subscription without instance row',
-      row,
-      {
-        reason: 'missing_instance_row',
-      }
-    );
-    return;
-  }
-
-  if (row.organization_id) {
-    logSkippedSubscriptionRow(
-      'Skipping personal credit renewal for organization-managed row',
-      row,
-      {
-        reason: 'organization_managed',
-        organizationId: row.organization_id,
-      }
-    );
-    return;
-  }
-
-  if (row.instance_destroyed_at) {
-    logSkippedSubscriptionRow('Skipping credit renewal for destroyed instance row', row, {
-      reason: 'instance_destroyed',
-    });
-    return;
-  }
-
-  const { user_id: userId, credit_renewal_at: renewalAt } = row;
+  const renewalAt = row.credit_renewal_at;
   if (!renewalAt) return;
+  const shouldResolveTerminalFailure = options.resolveTerminalFailureOnExpectedOutcome === true;
 
-  if (row.stripe_subscription_id) {
-    logSkippedSubscriptionRow('Skipping credit renewal for hybrid subscription row', row, {
-      reason: 'stripe_funded_hybrid',
+  const outcome = await database.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT ${kilocode_users.id} FROM ${kilocode_users} WHERE ${kilocode_users.id} = ${row.user_id} FOR UPDATE`
+    );
+
+    const current = await fetchLockedCreditRenewalItemRow(tx, row.id, renewalAt, row.user_id);
+    if (!current || current.user_id !== row.user_id || isSoftDeletedUserEmail(current.email)) {
+      return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+    }
+
+    if (current.stripe_subscription_id) {
+      logSkippedSubscriptionRow('Skipping credit renewal for hybrid subscription row', current, {
+        reason: 'stripe_funded_hybrid',
+      });
+      return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+    }
+
+    if (!current.instance_id) {
+      logSkippedSubscriptionRow('Skipping credit renewal for detached subscription row', current, {
+        reason: 'missing_instance_id',
+      });
+      return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+    }
+
+    if (!current.instance_row_id) {
+      logSkippedSubscriptionRow(
+        'Skipping credit renewal for subscription without instance row',
+        current,
+        {
+          reason: 'missing_instance_row',
+        }
+      );
+      return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+    }
+
+    if (current.organization_id) {
+      logSkippedSubscriptionRow(
+        'Skipping personal credit renewal for organization-managed row',
+        current,
+        {
+          reason: 'organization_managed',
+          organizationId: current.organization_id,
+        }
+      );
+      return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+    }
+
+    if (current.instance_destroyed_at) {
+      logSkippedSubscriptionRow('Skipping credit renewal for destroyed instance row', current, {
+        reason: 'instance_destroyed',
+      });
+      return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+    }
+
+    const userId = current.user_id;
+    if (current.cancel_at_period_end) {
+      const before = await getSubscriptionById(tx, current.id);
+      const [updated] = await tx
+        .update(kiloclaw_subscriptions)
+        .set({
+          status: 'canceled',
+          cancel_at_period_end: false,
+          auto_top_up_triggered_for_period: null,
+        })
+        .where(eq(kiloclaw_subscriptions.id, current.id))
+        .returning();
+
+      if (updated) {
+        await insertKiloClawSubscriptionChangeLog(tx, {
+          subscriptionId: current.id,
+          actor: LIFECYCLE_ACTOR,
+          action: 'canceled',
+          reason: 'credit_renewal_cancel_at_period_end',
+          before,
+          after: updated,
+        });
+      }
+
+      return {
+        kind: 'canceled',
+        row: current,
+        renewalAt,
+      } satisfies CreditRenewalTransactionOutcome;
+    }
+
+    const effectivePlan =
+      current.scheduled_plan === 'commit' || current.scheduled_plan === 'standard'
+        ? current.scheduled_plan
+        : current.plan;
+
+    if (effectivePlan !== 'commit' && effectivePlan !== 'standard') {
+      log('error', 'Credit renewal found unexpected plan', { userId, plan: effectivePlan });
+      return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+    }
+
+    const applyingPlanSwitch =
+      current.scheduled_plan !== null && current.scheduled_plan !== current.plan;
+    const costMicrodollars = getKiloClawPlanCostMicrodollars({
+      priceVersion: current.kiloclaw_price_version,
+      plan: effectivePlan,
     });
-    return;
-  }
-
-  if (row.cancel_at_period_end) {
-    const before = await getSubscriptionById(database, row.id);
-    const [updated] = await database
-      .update(kiloclaw_subscriptions)
-      .set({
-        status: 'canceled',
-        cancel_at_period_end: false,
-        auto_top_up_triggered_for_period: null,
-      })
-      .where(eq(kiloclaw_subscriptions.id, row.id))
-      .returning();
-
-    await insertLifecycleChangeLogBestEffort(database, {
-      subscriptionId: row.id,
-      action: 'canceled',
-      reason: 'credit_renewal_cancel_at_period_end',
-      before,
-      after: updated ?? null,
+    const periodMonths = effectivePlan === 'commit' ? 6 : 1;
+    const rawBalance = current.total_microdollars_acquired - current.microdollars_used;
+    const projectedBonus = await projectPendingKiloPassBonusMicrodollars(tx, {
+      userId,
+      microdollarsUsed: current.microdollars_used + costMicrodollars,
+      kiloPassThreshold: current.kilo_pass_threshold,
     });
+    const effectiveBalance = rawBalance + projectedBonus;
 
-    summary.credit_renewals_canceled++;
-    return;
-  }
-
-  const effectivePlan =
-    row.scheduled_plan === 'commit' || row.scheduled_plan === 'standard'
-      ? row.scheduled_plan
-      : row.plan;
-
-  if (effectivePlan !== 'commit' && effectivePlan !== 'standard') {
-    log('error', 'Credit renewal found unexpected plan', { userId, plan: effectivePlan });
-    return;
-  }
-
-  const applyingPlanSwitch = row.scheduled_plan !== null && row.scheduled_plan !== row.plan;
-  const costMicrodollars = getKiloClawPlanCostMicrodollars({
-    priceVersion: row.kiloclaw_price_version,
-    plan: effectivePlan,
-  });
-  const periodMonths = effectivePlan === 'commit' ? 6 : 1;
-  const rawBalance = row.total_microdollars_acquired - row.microdollars_used;
-  const projectedBonus = await projectPendingKiloPassBonusMicrodollars(env, context, {
-    userId,
-    microdollarsUsed: row.microdollars_used + costMicrodollars,
-    kiloPassThreshold: row.kilo_pass_threshold,
-  });
-  const effectiveBalance = rawBalance + projectedBonus;
-
-  if (effectiveBalance >= costMicrodollars) {
-    const periodKey = format(new Date(renewalAt), 'yyyy-MM');
-    const instanceId = row.instance_id;
-    const categoryPrefix =
-      effectivePlan === 'commit'
-        ? `kiloclaw-subscription-commit:${instanceId}`
-        : `kiloclaw-subscription:${instanceId}`;
-    const deductionCategory = `${categoryPrefix}:${periodKey}`;
-    const newPeriodStart = renewalAt;
-    const newPeriodEnd = addMonths(new Date(renewalAt), periodMonths).toISOString();
-    const wasPastDue = row.status === 'past_due';
-
-    let deductionIsNew = false;
-    let updatedSubscription: KiloClawSubscription | null = null;
-    let beforeSubscription: KiloClawSubscription | null = null;
-
-    await database.transaction(async tx => {
-      beforeSubscription = await getSubscriptionById(database, row.id);
+    if (effectiveBalance >= costMicrodollars) {
+      const periodKey = format(new Date(renewalAt), 'yyyy-MM');
+      const instanceId = current.instance_id;
+      const categoryPrefix =
+        effectivePlan === 'commit'
+          ? `kiloclaw-subscription-commit:${instanceId}`
+          : `kiloclaw-subscription:${instanceId}`;
+      const deductionCategory = `${categoryPrefix}:${periodKey}`;
+      const newPeriodStart = renewalAt;
+      const newPeriodEnd = addMonths(new Date(renewalAt), periodMonths).toISOString();
+      const wasPastDue = current.status === 'past_due';
+      const beforeSubscription = await getSubscriptionById(tx, current.id);
       const deductionResult = await tx
         .insert(credit_transactions)
         .values({
@@ -1345,12 +1529,61 @@ async function processCreditRenewalRow(
           description: `KiloClaw ${effectivePlan} renewal`,
           credit_category: deductionCategory,
           check_category_uniqueness: true,
-          original_baseline_microdollars_used: row.microdollars_used,
+          original_baseline_microdollars_used: current.microdollars_used,
         })
         .onConflictDoNothing();
 
-      deductionIsNew = (deductionResult.rowCount ?? 0) > 0;
-      if (!deductionIsNew) return;
+      const deductionIsNew = (deductionResult.rowCount ?? 0) > 0;
+      const updateSet = buildCreditRenewalAdvanceUpdateSet({
+        applyingPlanSwitch,
+        current,
+        effectivePlan,
+        newPeriodEnd,
+        newPeriodStart,
+        wasPastDue,
+      });
+      const changeAction = creditRenewalAdvanceChangeAction({ applyingPlanSwitch, wasPastDue });
+
+      if (!deductionIsNew) {
+        const [updatedSubscription] = await tx
+          .update(kiloclaw_subscriptions)
+          .set(updateSet)
+          .where(
+            and(
+              eq(kiloclaw_subscriptions.id, current.id),
+              eq(kiloclaw_subscriptions.credit_renewal_at, renewalAt)
+            )
+          )
+          .returning();
+
+        if (updatedSubscription) {
+          await insertKiloClawSubscriptionChangeLog(tx, {
+            subscriptionId: current.id,
+            actor: LIFECYCLE_ACTOR,
+            action: changeAction,
+            reason: 'credit_renewal_duplicate_idempotency_reconciled',
+            before: beforeSubscription,
+            after: updatedSubscription,
+          });
+
+          await supersedeTerminalRenewalFailuresForBoundary(tx, {
+            subscriptionId: current.id,
+            currentBoundary: newPeriodEnd,
+            supersededAt: new Date().toISOString(),
+          });
+        }
+
+        return {
+          kind: 'duplicate',
+          userId,
+          renewalAt,
+          deductionCategory,
+          effectivePlan,
+          priceVersion: current.kiloclaw_price_version,
+          costMicrodollars,
+          newPeriodEnd,
+        } satisfies CreditRenewalTransactionOutcome;
+      }
 
       await tx
         .update(kilocode_users)
@@ -1359,50 +1592,17 @@ async function processCreditRenewalRow(
         })
         .where(eq(kilocode_users.id, userId));
 
-      const updateSet: Partial<typeof kiloclaw_subscriptions.$inferInsert> = {
-        current_period_start: newPeriodStart,
-        current_period_end: newPeriodEnd,
-        credit_renewal_at: newPeriodEnd,
-        auto_top_up_triggered_for_period: null,
-      };
-
-      if (applyingPlanSwitch) {
-        updateSet.plan = effectivePlan;
-        updateSet.scheduled_plan = null;
-        updateSet.scheduled_by = null;
-        updateSet.commit_ends_at =
-          effectivePlan === 'commit' ? addMonths(new Date(newPeriodStart), 6).toISOString() : null;
-      }
-
-      if (
-        effectivePlan === 'commit' &&
-        !applyingPlanSwitch &&
-        row.commit_ends_at &&
-        new Date(row.commit_ends_at) <= new Date(newPeriodStart)
-      ) {
-        updateSet.commit_ends_at = addMonths(new Date(row.commit_ends_at), 6).toISOString();
-      }
-
-      if (wasPastDue) {
-        updateSet.status = 'active';
-        updateSet.past_due_since = null;
-      }
-
-      [updatedSubscription] = await tx
+      const [updatedSubscription] = await tx
         .update(kiloclaw_subscriptions)
         .set(updateSet)
-        .where(eq(kiloclaw_subscriptions.id, row.id))
+        .where(eq(kiloclaw_subscriptions.id, current.id))
         .returning();
 
       if (updatedSubscription) {
         await insertKiloClawSubscriptionChangeLog(tx, {
-          subscriptionId: row.id,
+          subscriptionId: current.id,
           actor: LIFECYCLE_ACTOR,
-          action: applyingPlanSwitch
-            ? 'plan_switched'
-            : wasPastDue
-              ? 'reactivated'
-              : 'period_advanced',
+          action: changeAction,
           reason: applyingPlanSwitch
             ? 'credit_renewal_plan_switch'
             : wasPastDue
@@ -1412,83 +1612,119 @@ async function processCreditRenewalRow(
           after: updatedSubscription,
         });
       }
-    });
 
-    if (!deductionIsNew) {
-      await processPaidConversionBestEffort(env, context, {
-        userId,
-        dedupeKey: `affiliate:impact:sale:${deductionCategory}`,
-        eventDateIso: renewalAt,
-        orderId: deductionCategory,
-        amount: costMicrodollars / 1_000_000,
-        currencyCode: 'usd',
-        itemCategory: getKiloClawAffiliateItemCategory({
-          plan: effectivePlan,
-          priceVersion: row.kiloclaw_price_version,
-        }),
-        itemName: getKiloClawAffiliateItemName(effectivePlan),
-        itemSku: getKiloClawAffiliateItemSku({
-          plan: effectivePlan,
-          priceVersion: row.kiloclaw_price_version,
-        }),
+      await supersedeTerminalRenewalFailuresForBoundary(tx, {
+        subscriptionId: current.id,
+        currentBoundary: newPeriodEnd,
+        supersededAt: new Date().toISOString(),
       });
 
-      await database
-        .update(kiloclaw_subscriptions)
-        .set({ credit_renewal_at: newPeriodEnd })
-        .where(eq(kiloclaw_subscriptions.id, row.id));
-
-      summary.credit_renewals_skipped_duplicate++;
-      return;
+      return {
+        kind: 'renewed',
+        userId,
+        renewalAt,
+        deductionCategory,
+        effectivePlan,
+        priceVersion: current.kiloclaw_price_version,
+        costMicrodollars,
+        wasPastDue,
+        row: current,
+        newPeriodEnd,
+      } satisfies CreditRenewalTransactionOutcome;
     }
 
+    if (current.auto_top_up_enabled && !current.auto_top_up_triggered_for_period) {
+      return { kind: 'auto_top_up', row: current } satisfies CreditRenewalTransactionOutcome;
+    }
+
+    return { kind: 'past_due', row: current } satisfies CreditRenewalTransactionOutcome;
+  });
+
+  if (outcome.kind === 'canceled') {
+    if (shouldResolveTerminalFailure) {
+      await resolveTerminalRenewalFailureForFinalizedBoundary(database, {
+        subscriptionId: outcome.row.id,
+        renewalBoundary: outcome.renewalAt,
+        reason: 'credit_renewal_cancel_at_period_end_finalized',
+        userId: outcome.row.user_id,
+        instanceId: outcome.row.instance_id,
+      });
+    }
+    summary.credit_renewals_canceled++;
+    return;
+  }
+
+  if (outcome.kind === 'duplicate') {
+    await processPaidConversionBestEffort(env, context, {
+      userId: outcome.userId,
+      dedupeKey: `affiliate:impact:sale:${outcome.deductionCategory}`,
+      eventDateIso: outcome.renewalAt,
+      orderId: outcome.deductionCategory,
+      amount: outcome.costMicrodollars / 1_000_000,
+      currencyCode: 'usd',
+      itemCategory: getKiloClawAffiliateItemCategory({
+        plan: outcome.effectivePlan,
+        priceVersion: outcome.priceVersion,
+      }),
+      itemName: getKiloClawAffiliateItemName(outcome.effectivePlan),
+      itemSku: getKiloClawAffiliateItemSku({
+        plan: outcome.effectivePlan,
+        priceVersion: outcome.priceVersion,
+      }),
+    });
+
+    summary.credit_renewals_skipped_duplicate++;
+    return;
+  }
+
+  if (outcome.kind === 'renewed') {
     try {
       await maybeIssueKiloPassBonusFromUsageThreshold(env, context, {
-        userId,
+        userId: outcome.userId,
         nowIso: new Date().toISOString(),
       });
     } catch (error) {
       log('error', 'Kilo Pass bonus evaluation failed after credit renewal', {
-        userId,
+        userId: outcome.userId,
         error: error instanceof Error ? error.message : String(error),
       });
     }
 
-    if (wasPastDue && !row.suspended_at) {
+    if (outcome.wasPastDue && !outcome.row.suspended_at) {
       await database.delete(kiloclaw_email_log).where(
         emailLogRowCondition({
-          userId,
-          instanceId: row.instance_id,
+          userId: outcome.userId,
+          instanceId: outcome.row.instance_id,
           emailType: 'claw_credit_renewal_failed',
         })
       );
     }
 
-    if (wasPastDue && row.suspended_at) {
+    if (outcome.wasPastDue && outcome.row.suspended_at) {
       await autoResumeIfSuspended(env, database, context, {
-        id: row.id,
-        user_id: userId,
-        instance_id: row.instance_id,
-        organization_id: row.organization_id,
-        auto_resume_attempt_count: row.auto_resume_attempt_count,
+        id: outcome.row.id,
+        user_id: outcome.userId,
+        instance_id: outcome.row.instance_id,
+        organization_id: outcome.row.organization_id,
+        auto_resume_attempt_count: outcome.row.auto_resume_attempt_count,
       });
     }
 
     await processPaidConversionBestEffort(env, context, {
-      userId,
-      dedupeKey: `affiliate:impact:sale:${deductionCategory}`,
-      eventDateIso: renewalAt,
-      orderId: deductionCategory,
-      amount: costMicrodollars / 1_000_000,
+      userId: outcome.userId,
+      dedupeKey: `affiliate:impact:sale:${outcome.deductionCategory}`,
+      eventDateIso: outcome.renewalAt,
+      orderId: outcome.deductionCategory,
+      amount: outcome.costMicrodollars / 1_000_000,
       currencyCode: 'usd',
       itemCategory: getKiloClawAffiliateItemCategory({
-        plan: effectivePlan,
-        priceVersion: row.kiloclaw_price_version,
+        plan: outcome.effectivePlan,
+        priceVersion: outcome.priceVersion,
       }),
-      itemName: getKiloClawAffiliateItemName(effectivePlan),
+      itemName: getKiloClawAffiliateItemName(outcome.effectivePlan),
       itemSku: getKiloClawAffiliateItemSku({
-        plan: effectivePlan,
-        priceVersion: row.kiloclaw_price_version,
+        plan: outcome.effectivePlan,
+        priceVersion: outcome.priceVersion,
       }),
     });
 
@@ -1496,13 +1732,14 @@ async function processCreditRenewalRow(
     return;
   }
 
-  if (row.auto_top_up_enabled && !row.auto_top_up_triggered_for_period) {
+  if (outcome.kind === 'auto_top_up') {
+    const before = await getSubscriptionById(database, outcome.row.id);
     const [updated] = await database
       .update(kiloclaw_subscriptions)
       .set({ auto_top_up_triggered_for_period: renewalAt })
       .where(
         and(
-          eq(kiloclaw_subscriptions.id, row.id),
+          eq(kiloclaw_subscriptions.id, outcome.row.id),
           isNull(kiloclaw_subscriptions.auto_top_up_triggered_for_period)
         )
       )
@@ -1513,29 +1750,36 @@ async function processCreditRenewalRow(
     }
 
     await insertLifecycleChangeLogBestEffort(database, {
-      subscriptionId: row.id,
+      subscriptionId: outcome.row.id,
       action: 'status_changed',
       reason: 'credit_renewal_auto_top_up_marked',
-      before: {
-        ...updated,
-        auto_top_up_triggered_for_period: null,
-      },
+      before,
       after: updated,
     });
 
     try {
       await triggerUserAutoTopUp(env, context, {
-        id: userId,
-        total_microdollars_acquired: row.total_microdollars_acquired,
-        microdollars_used: row.microdollars_used,
-        auto_top_up_enabled: row.auto_top_up_enabled,
-        next_credit_expiration_at: row.next_credit_expiration_at,
-        updated_at: row.user_updated_at,
+        id: outcome.row.user_id,
+        total_microdollars_acquired: outcome.row.total_microdollars_acquired,
+        microdollars_used: outcome.row.microdollars_used,
+        auto_top_up_enabled: outcome.row.auto_top_up_enabled,
+        next_credit_expiration_at: outcome.row.next_credit_expiration_at,
+        updated_at: outcome.row.user_updated_at,
       });
     } catch (error) {
       log('error', 'Auto top-up trigger failed during credit renewal', {
-        userId,
+        userId: outcome.row.user_id,
         error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    if (shouldResolveTerminalFailure) {
+      await resolveTerminalRenewalFailureForFinalizedBoundary(database, {
+        subscriptionId: outcome.row.id,
+        renewalBoundary: renewalAt,
+        reason: 'credit_renewal_auto_top_up_deferred',
+        userId: outcome.row.user_id,
+        instanceId: outcome.row.instance_id,
       });
     }
 
@@ -1543,42 +1787,54 @@ async function processCreditRenewalRow(
     return;
   }
 
-  const before = await getSubscriptionById(database, row.id);
-  const [updated] = await database
-    .update(kiloclaw_subscriptions)
-    .set({
-      status: 'past_due',
-      past_due_since: sql`COALESCE(${kiloclaw_subscriptions.past_due_since}, now())`,
-    })
-    .where(eq(kiloclaw_subscriptions.id, row.id))
-    .returning();
+  if (outcome.kind === 'past_due') {
+    const before = await getSubscriptionById(database, outcome.row.id);
+    const [updated] = await database
+      .update(kiloclaw_subscriptions)
+      .set({
+        status: 'past_due',
+        past_due_since: sql`COALESCE(${kiloclaw_subscriptions.past_due_since}, now())`,
+      })
+      .where(eq(kiloclaw_subscriptions.id, outcome.row.id))
+      .returning();
 
-  await insertLifecycleChangeLogBestEffort(database, {
-    subscriptionId: row.id,
-    action: 'status_changed',
-    reason: 'credit_renewal_insufficient_credits',
-    before,
-    after: updated ?? null,
-  });
+    await insertLifecycleChangeLogBestEffort(database, {
+      subscriptionId: outcome.row.id,
+      action: 'status_changed',
+      reason: 'credit_renewal_insufficient_credits',
+      before,
+      after: updated ?? null,
+    });
 
-  await trySendEmail(
-    database,
-    env,
-    context,
-    userId,
-    row.email,
-    'claw_credit_renewal_failed',
-    'clawCreditRenewalFailed',
-    { claw_url: buildClawUrl(env) },
-    summary,
-    undefined,
-    { instanceId: row.instance_id }
-  );
+    if (shouldResolveTerminalFailure) {
+      await resolveTerminalRenewalFailureForFinalizedBoundary(database, {
+        subscriptionId: outcome.row.id,
+        renewalBoundary: renewalAt,
+        reason: 'credit_renewal_insufficient_credits_finalized',
+        userId: outcome.row.user_id,
+        instanceId: outcome.row.instance_id,
+      });
+    }
 
-  summary.credit_renewals_past_due++;
+    await trySendEmail(
+      database,
+      env,
+      context,
+      outcome.row.user_id,
+      outcome.row.email,
+      'claw_credit_renewal_failed',
+      'clawCreditRenewalFailed',
+      { claw_url: clawUrl },
+      summary,
+      undefined,
+      { instanceId: outcome.row.instance_id ?? undefined }
+    );
+
+    summary.credit_renewals_past_due++;
+  }
 }
 
-async function runCreditRenewalSweep(
+export async function runCreditRenewalSweep(
   database: WorkerDb,
   env: BillingWorkerEnv,
   context: SweepExecutionContext,
@@ -1641,6 +1897,295 @@ async function runCreditRenewalSweep(
       });
     }
   }
+}
+
+const CREDIT_RENEWAL_DISCOVERY_DEFAULT_PAGE_BUDGET = 50;
+const CREDIT_RENEWAL_DISCOVERY_DEFAULT_WALL_CLOCK_BUDGET_MS = 25_000;
+
+function creditRenewalEligibilityFilter(nowIso: string) {
+  return and(
+    eq(kiloclaw_subscriptions.payment_source, 'credits'),
+    isNull(kiloclaw_subscriptions.stripe_subscription_id),
+    currentSubscriptionRowFilter(),
+    inArray(kiloclaw_subscriptions.status, ['active', 'past_due']),
+    lte(kiloclaw_subscriptions.credit_renewal_at, nowIso)
+  );
+}
+
+function creditRenewalCursorFilter(
+  cursorSubscriptionId: string | undefined,
+  cursorRenewalBoundary: string | undefined
+) {
+  if (!cursorSubscriptionId || !cursorRenewalBoundary) {
+    return undefined;
+  }
+
+  return or(
+    gt(kiloclaw_subscriptions.credit_renewal_at, cursorRenewalBoundary),
+    and(
+      eq(kiloclaw_subscriptions.credit_renewal_at, cursorRenewalBoundary),
+      gt(kiloclaw_subscriptions.id, cursorSubscriptionId)
+    )
+  );
+}
+
+function selectCreditRenewalRowFields() {
+  return {
+    id: kiloclaw_subscriptions.id,
+    user_id: kiloclaw_subscriptions.user_id,
+    email: kilocode_users.google_user_email,
+    instance_id: kiloclaw_subscriptions.instance_id,
+    instance_row_id: kiloclaw_instances.id,
+    organization_id: kiloclaw_instances.organization_id,
+    instance_destroyed_at: kiloclaw_instances.destroyed_at,
+    plan: kiloclaw_subscriptions.plan,
+    status: kiloclaw_subscriptions.status,
+    kiloclaw_price_version: kiloclaw_subscriptions.kiloclaw_price_version,
+    stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
+    credit_renewal_at: kiloclaw_subscriptions.credit_renewal_at,
+    current_period_end: kiloclaw_subscriptions.current_period_end,
+    cancel_at_period_end: kiloclaw_subscriptions.cancel_at_period_end,
+    scheduled_plan: kiloclaw_subscriptions.scheduled_plan,
+    commit_ends_at: kiloclaw_subscriptions.commit_ends_at,
+    past_due_since: kiloclaw_subscriptions.past_due_since,
+    suspended_at: kiloclaw_subscriptions.suspended_at,
+    auto_resume_attempt_count: kiloclaw_subscriptions.auto_resume_attempt_count,
+    auto_top_up_triggered_for_period: kiloclaw_subscriptions.auto_top_up_triggered_for_period,
+    total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
+    microdollars_used: kilocode_users.microdollars_used,
+    auto_top_up_enabled: kilocode_users.auto_top_up_enabled,
+    kilo_pass_threshold: kilocode_users.kilo_pass_threshold,
+    next_credit_expiration_at: kilocode_users.next_credit_expiration_at,
+    user_updated_at: kilocode_users.updated_at,
+  };
+}
+
+async function fetchCreditRenewalRowsForDiscovery(
+  database: WorkerDb,
+  nowIso: string,
+  message: CreditRenewalDiscoveryQueueMessage | CreditRenewalDiscoveryContinuationQueueMessage,
+  limit: number
+): Promise<CreditRenewalRow[]> {
+  const cursorFilter = creditRenewalCursorFilter(
+    message.cursorSubscriptionId,
+    message.cursorRenewalBoundary
+  );
+
+  return await database
+    .select(selectCreditRenewalRowFields())
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
+    .where(and(creditRenewalEligibilityFilter(nowIso), cursorFilter))
+    .orderBy(asc(kiloclaw_subscriptions.credit_renewal_at), asc(kiloclaw_subscriptions.id))
+    .limit(limit);
+}
+
+async function fetchCreditRenewalItemRow(
+  database: WorkerDb,
+  message: CreditRenewalItemQueueMessage
+): Promise<CreditRenewalRow | null> {
+  const rows = await database
+    .select(selectCreditRenewalRowFields())
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.id, message.subscriptionId),
+        eq(kiloclaw_subscriptions.credit_renewal_at, message.renewalBoundary),
+        eq(kiloclaw_subscriptions.payment_source, 'credits'),
+        isNull(kiloclaw_subscriptions.stripe_subscription_id),
+        currentSubscriptionRowFilter(),
+        inArray(kiloclaw_subscriptions.status, ['active', 'past_due'])
+      )
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+export async function processCreditRenewalDiscovery(
+  env: BillingWorkerEnv,
+  message: CreditRenewalDiscoveryQueueMessage | CreditRenewalDiscoveryContinuationQueueMessage,
+  attempt = 1
+): Promise<BillingSummary> {
+  const context = createSweepContext(message, attempt);
+
+  return await withLogTags(
+    {
+      source: 'processCreditRenewalDiscovery',
+      tags: {
+        ...context,
+        billingComponent: 'worker',
+      },
+    },
+    async () => {
+      const database = getDb(env);
+      const summary = createSummary();
+      const startedAt = Date.now();
+      const pageBudget = message.pageBudget ?? CREDIT_RENEWAL_DISCOVERY_DEFAULT_PAGE_BUDGET;
+      const wallClockBudgetMs =
+        message.wallClockBudgetMs ?? CREDIT_RENEWAL_DISCOVERY_DEFAULT_WALL_CLOCK_BUDGET_MS;
+      const cutoffTime = message.cutoffTime ?? new Date().toISOString();
+      const rows = await fetchCreditRenewalRowsForDiscovery(
+        database,
+        cutoffTime,
+        message,
+        pageBudget + 1
+      );
+      const discoveredAt = new Date().toISOString();
+      let emitted = 0;
+      let lastEmitted: CreditRenewalRow | null = null;
+
+      for (const row of rows.slice(0, pageBudget)) {
+        if (Date.now() - startedAt >= wallClockBudgetMs && emitted > 0) {
+          break;
+        }
+
+        if (!row.credit_renewal_at) {
+          continue;
+        }
+
+        await env.LIFECYCLE_QUEUE.send({
+          kind: 'credit_renewal_item',
+          runId: message.runId,
+          sweep: 'credit_renewal_item',
+          subscriptionId: row.id,
+          userId: row.user_id,
+          renewalBoundary: row.credit_renewal_at,
+          discoveredAt,
+          diagnostics: {
+            instanceId: row.instance_id,
+            plan: row.plan,
+            status: row.status,
+          },
+        });
+        emitted++;
+        lastEmitted = row;
+      }
+
+      const shouldContinue = rows.length > emitted;
+      if (shouldContinue && lastEmitted?.credit_renewal_at) {
+        await env.LIFECYCLE_QUEUE.send({
+          kind: 'credit_renewal_discovery_continuation',
+          runId: message.runId,
+          sweep: 'credit_renewal_discovery',
+          cutoffTime,
+          cursorSubscriptionId: lastEmitted.id,
+          cursorRenewalBoundary: lastEmitted.credit_renewal_at,
+          pageBudget: message.pageBudget,
+          wallClockBudgetMs: message.wallClockBudgetMs,
+        });
+      }
+
+      log('info', 'Processed credit-renewal discovery', {
+        event: 'credit_renewal_discovery',
+        outcome: 'completed',
+        cutoffTime,
+        cursorSubscriptionId: message.cursorSubscriptionId,
+        cursorRenewalBoundary: message.cursorRenewalBoundary,
+        pageBudget,
+        fetchedCount: rows.length,
+        enqueuedCount: emitted,
+        discoveryBacklogLikely: shouldContinue,
+        continuationEnqueued: shouldContinue && lastEmitted?.credit_renewal_at !== undefined,
+        nextCursorSubscriptionId: lastEmitted?.id,
+        nextCursorRenewalBoundary: lastEmitted?.credit_renewal_at ?? undefined,
+      });
+
+      return summary;
+    }
+  );
+}
+
+export async function processCreditRenewalItem(
+  env: BillingWorkerEnv,
+  message: CreditRenewalItemQueueMessage,
+  attempt = 1
+): Promise<BillingSummary> {
+  const context = createSweepContext(message, attempt);
+
+  return await withLogTags(
+    {
+      source: 'processCreditRenewalItem',
+      tags: {
+        ...context,
+        billingComponent: 'worker',
+        kiloclawSubscriptionId: message.subscriptionId,
+      },
+    },
+    async () => {
+      const database = getDb(env);
+      const summary = createSummary();
+      const row = message.userId
+        ? {
+            id: message.subscriptionId,
+            user_id: message.userId,
+            credit_renewal_at: message.renewalBoundary,
+          }
+        : await fetchCreditRenewalItemRow(database, message);
+
+      if (!row) {
+        log('info', 'Skipping stale or ineligible credit-renewal item', {
+          event: 'credit_renewal_item_skipped',
+          outcome: 'discarded',
+          subscriptionId: message.subscriptionId,
+          renewalBoundary: message.renewalBoundary,
+          reason: 'stale_or_ineligible',
+        });
+        return summary;
+      }
+
+      await processCreditRenewalRow(database, env, context, row, buildClawUrl(env), summary, {
+        resolveTerminalFailureOnExpectedOutcome: message.resolveTerminalFailureOnExpectedOutcome,
+      });
+      log('info', 'Processed credit-renewal item', {
+        event: 'credit_renewal_item',
+        outcome: 'completed',
+        itemOutcome: creditRenewalItemOutcome(summary),
+        terminalFailureStatus: 'none',
+        itemQueueAgeMs: elapsedMsSince(message.discoveredAt),
+        subscriptionId: message.subscriptionId,
+        userId: row.user_id,
+        instanceId: message.diagnostics?.instanceId ?? undefined,
+        renewalBoundary: message.renewalBoundary,
+        plan: message.diagnostics?.plan,
+        status: message.diagnostics?.status,
+      });
+      return summary;
+    }
+  );
+}
+
+export async function recordCreditRenewalTerminalFailure(
+  env: BillingWorkerEnv,
+  message: CreditRenewalTerminalFailureQueueMessage
+): Promise<void> {
+  const database = getDb(env);
+  const failure = await recordTerminalRenewalFailure(database, {
+    subscriptionId: message.subscriptionId,
+    renewalBoundary: message.renewalBoundary,
+    attempts: message.attempts,
+    failureCode: KiloClawTerminalRenewalFailureCode.QueueDeliveryExhausted,
+    failureMessage: message.failureMessage ?? null,
+    observedAt: new Date().toISOString(),
+  });
+  const unresolvedFailures = await listUnresolvedTerminalRenewalFailures(database);
+  const oldestFailure = unresolvedFailures[0];
+
+  log('error', 'Recorded credit-renewal terminal failure', {
+    event: 'credit_renewal_terminal_failure',
+    outcome: 'completed',
+    subscriptionId: message.subscriptionId,
+    renewalBoundary: message.renewalBoundary,
+    attempts: message.attempts,
+    terminalFailureStatus: failure.status,
+    terminalFailureCount: unresolvedFailures.length,
+    oldestUnresolvedTerminalFailureAt: oldestFailure?.first_failure_at,
+    oldestUnresolvedTerminalFailureSubscriptionId: oldestFailure?.subscription_id,
+    oldestUnresolvedTerminalFailureRenewalBoundary: oldestFailure?.renewal_boundary,
+  });
 }
 
 async function runInterruptedAutoResumeSweep(
@@ -1923,6 +2468,71 @@ async function runTrialExpirySweep(
   }
 }
 
+async function hasUnresolvedTerminalRenewalFailureForBoundary(
+  database: WorkerDb,
+  row: { id: string; credit_renewal_at?: string | null }
+): Promise<boolean> {
+  if (!row.credit_renewal_at) return false;
+
+  const failure = await findUnresolvedTerminalRenewalFailure(database, {
+    subscriptionId: row.id,
+    renewalBoundary: row.credit_renewal_at,
+  });
+
+  return failure !== null;
+}
+
+async function resolveTerminalRenewalFailureForFinalizedBoundary(
+  database: WorkerDb,
+  params: {
+    subscriptionId: string;
+    renewalBoundary: string;
+    reason: string;
+    userId: string;
+    instanceId?: string | null;
+  }
+): Promise<void> {
+  try {
+    const resolved = await markTerminalRenewalFailureResolved(database, {
+      subscriptionId: params.subscriptionId,
+      renewalBoundary: params.renewalBoundary,
+      actor: {
+        type: 'system',
+        id: LIFECYCLE_ACTOR.actorId,
+      },
+      reason: params.reason,
+      resolvedAt: new Date().toISOString(),
+    });
+
+    if (resolved) {
+      log('info', 'Resolved terminal renewal failure after finalized credit-renewal retry', {
+        event: 'credit_renewal_terminal_failure_resolved',
+        outcome: 'completed',
+        subscriptionId: params.subscriptionId,
+        renewalBoundary: params.renewalBoundary,
+        userId: params.userId,
+        instanceId: params.instanceId ?? undefined,
+        reason: params.reason,
+      });
+    }
+  } catch (error) {
+    log(
+      'error',
+      'Failed to resolve terminal renewal failure after finalized credit-renewal retry',
+      {
+        event: 'credit_renewal_terminal_failure_resolve_failed',
+        outcome: 'failed',
+        subscriptionId: params.subscriptionId,
+        renewalBoundary: params.renewalBoundary,
+        userId: params.userId,
+        instanceId: params.instanceId ?? undefined,
+        reason: params.reason,
+        error: errorMessage(error),
+      }
+    );
+  }
+}
+
 async function runSubscriptionExpirySweep(
   database: WorkerDb,
   env: BillingWorkerEnv,
@@ -1941,6 +2551,7 @@ async function runSubscriptionExpirySweep(
       instance_destroyed_at: kiloclaw_instances.destroyed_at,
       organization_id: kiloclaw_instances.organization_id,
       email: kilocode_users.google_user_email,
+      credit_renewal_at: kiloclaw_subscriptions.credit_renewal_at,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -1995,6 +2606,10 @@ async function runSubscriptionExpirySweep(
             organizationId: row.organization_id,
           }
         );
+        continue;
+      }
+
+      if (await hasUnresolvedTerminalRenewalFailureForBoundary(database, row)) {
         continue;
       }
 
@@ -2065,6 +2680,7 @@ async function runInstanceDestructionSweep(
       organization_id: kiloclaw_instances.organization_id,
       status: kiloclaw_subscriptions.status,
       email: kilocode_users.google_user_email,
+      credit_renewal_at: kiloclaw_subscriptions.credit_renewal_at,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -2122,6 +2738,10 @@ async function runInstanceDestructionSweep(
             organizationId: row.organization_id,
           }
         );
+        continue;
+      }
+
+      if (await hasUnresolvedTerminalRenewalFailureForBoundary(database, row)) {
         continue;
       }
 
@@ -2231,6 +2851,7 @@ async function runPastDueCleanupSweep(
       instance_destroyed_at: kiloclaw_instances.destroyed_at,
       organization_id: kiloclaw_instances.organization_id,
       email: kilocode_users.google_user_email,
+      credit_renewal_at: kiloclaw_subscriptions.credit_renewal_at,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -2277,6 +2898,10 @@ async function runPastDueCleanupSweep(
           reason: 'organization_managed',
           organizationId: row.organization_id,
         });
+        continue;
+      }
+
+      if (await hasUnresolvedTerminalRenewalFailureForBoundary(database, row)) {
         continue;
       }
 
@@ -2391,6 +3016,7 @@ async function runDestructionWarningSweep(
       instance_destroyed_at: kiloclaw_instances.destroyed_at,
       organization_id: kiloclaw_instances.organization_id,
       plan: kiloclaw_subscriptions.plan,
+      credit_renewal_at: kiloclaw_subscriptions.credit_renewal_at,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -2418,6 +3044,9 @@ async function runDestructionWarningSweep(
             organizationId: row.organization_id,
           }
         );
+        continue;
+      }
+      if (await hasUnresolvedTerminalRenewalFailureForBoundary(database, row)) {
         continue;
       }
       const instanceIdShort = shortInstanceId(row.instance_id);
@@ -3220,7 +3849,11 @@ export async function runSweep(
       try {
         switch (message.sweep) {
           case 'credit_renewal':
-            await runCreditRenewalSweep(database, env, context, summary);
+            await env.LIFECYCLE_QUEUE.send({
+              kind: 'credit_renewal_discovery',
+              runId: message.runId,
+              sweep: 'credit_renewal_discovery',
+            });
             break;
           case 'interrupted_auto_resume':
             await runInterruptedAutoResumeSweep(database, env, context, summary);

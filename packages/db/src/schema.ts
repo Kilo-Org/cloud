@@ -47,6 +47,9 @@ import {
   KiloClawSubscriptionAccessOrigin,
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionChangeAction,
+  KiloClawTerminalRenewalFailureStatus,
+  KiloClawTerminalRenewalFailureCode,
+  KiloClawTerminalRenewalFailureResolutionActorType,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
@@ -142,6 +145,9 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawSubscriptionAccessOrigin,
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionChangeAction,
+  KiloClawTerminalRenewalFailureStatus,
+  KiloClawTerminalRenewalFailureCode,
+  KiloClawTerminalRenewalFailureResolutionActorType,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
@@ -5460,6 +5466,86 @@ export const kiloclaw_subscription_change_log = pgTable(
 
 export type KiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferSelect;
 export type NewKiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferInsert;
+
+// KiloClaw credit-renewal terminal failures — durable record of
+// (subscription_id, renewal_boundary) pairs whose automatic retry has been
+// exhausted and that require operator resolution, waiver, retry, or
+// supersession before downstream enforcement may proceed.
+//
+// Only unresolved rows protect a subscription-renewal boundary from
+// downstream enforcement. Resolved, waived, and superseded rows are kept for
+// operator history but do not block enforcement.
+//
+// Uniqueness on (subscription_id, renewal_boundary) makes duplicate
+// terminal-failure recording for the same boundary idempotent: ON CONFLICT
+// updates the existing row's attempt history and last-error fields rather
+// than inserting a duplicate.
+export const kiloclaw_terminal_renewal_failures = pgTable(
+  'kiloclaw_terminal_renewal_failures',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    subscription_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_subscriptions.id),
+    renewal_boundary: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    status: text()
+      .notNull()
+      .$type<KiloClawTerminalRenewalFailureStatus>()
+      .default(KiloClawTerminalRenewalFailureStatus.Unresolved),
+    attempt_count: integer().notNull().default(0),
+    first_failure_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_failure_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_failure_code: text().notNull().$type<KiloClawTerminalRenewalFailureCode>(),
+    last_failure_message: text(),
+    resolution_actor_type: text().$type<KiloClawTerminalRenewalFailureResolutionActorType>(),
+    resolution_actor_id: text(),
+    resolution_at: timestamp({ withTimezone: true, mode: 'string' }),
+    resolution_reason: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_kiloclaw_terminal_renewal_failures_subscription_boundary').on(
+      table.subscription_id,
+      table.renewal_boundary
+    ),
+    // Partial index optimizing the hot enforcement-protection lookup and
+    // operator diagnostics for unresolved failures only. Resolved, waived,
+    // and superseded rows are kept for history but are not in the index.
+    index('IDX_kiloclaw_terminal_renewal_failures_unresolved')
+      .on(table.subscription_id, table.renewal_boundary)
+      .where(sql`${table.status} = 'unresolved'`),
+    index('IDX_kiloclaw_terminal_renewal_failures_status_last_failure_at').on(
+      table.status,
+      table.last_failure_at
+    ),
+    enumCheck(
+      'kiloclaw_terminal_renewal_failures_status_check',
+      table.status,
+      KiloClawTerminalRenewalFailureStatus
+    ),
+    enumCheck(
+      'kiloclaw_terminal_renewal_failures_last_failure_code_check',
+      table.last_failure_code,
+      KiloClawTerminalRenewalFailureCode
+    ),
+    enumCheck(
+      'kiloclaw_terminal_renewal_failures_resolution_actor_type_check',
+      table.resolution_actor_type,
+      KiloClawTerminalRenewalFailureResolutionActorType
+    ),
+  ]
+);
+
+export type KiloClawTerminalRenewalFailure = typeof kiloclaw_terminal_renewal_failures.$inferSelect;
+export type NewKiloClawTerminalRenewalFailure =
+  typeof kiloclaw_terminal_renewal_failures.$inferInsert;
 
 // KiloClaw subscription-started emails are per paid activation, not per
 // instance lifetime. Cancel+resubscribe reuses the same subscription row (we

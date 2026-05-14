@@ -904,6 +904,13 @@
       "when": 1778768873847,
       "tag": "0128_regular_vulcan",
       "breakpoints": true
+    },
+    {
+      "idx": 129,
+      "version": "7",
+      "when": 1778780291834,
+      "tag": "0129_cold_colossus",
+      "breakpoints": true
     }
   ]
 }

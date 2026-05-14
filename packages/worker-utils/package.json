@@ -12,6 +12,7 @@
     "./redact-headers": "./src/redact-headers.ts",
     "./normalize-git-url": "./src/normalize-git-url.ts",
     "./kiloclaw-billing-observability": "./src/kiloclaw-billing-observability.ts",
+    "./kilo-pass-bonus-projection": "./src/kilo-pass-bonus-projection.ts",
     "./git-url": "./src/git-url.ts"
   },
   "scripts": {

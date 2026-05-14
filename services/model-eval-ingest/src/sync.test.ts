@@ -142,6 +142,16 @@ describe('syncFromBench', () => {
     });
   });
 
+  it('accepts bench legacy promoter placeholders for audit rows', async () => {
+    const env = createEnv([promotion({ promoted_by_email: 'unknown' })]);
+    const { db, insertedRows } = createDb();
+    vi.mocked(getWorkerDb).mockReturnValue(db as unknown as ReturnType<typeof getWorkerDb>);
+
+    await syncFromBench(env);
+
+    expect(insertedRows[0]).toMatchObject({ promoted_by_email: 'unknown' });
+  });
+
   it('requests bench promotions from the persisted promoted_at watermark', async () => {
     const env = createEnv([]);
     const { db } = createDb({ maxPromotedAtMs: 1_778_620_123_456 });

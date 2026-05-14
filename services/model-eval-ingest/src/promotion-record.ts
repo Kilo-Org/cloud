@@ -17,7 +17,7 @@ export const PromotionRecordSchema = z.object({
   avg_cache_read_tokens: z.number().nullable(),
   avg_execution_ms: z.number().nullable(),
   promoted_at: z.number().int().nonnegative(),
-  promoted_by_email: z.string().email(),
+  promoted_by_email: z.string().min(1),
   promotion_note: z.string().nullable(),
 });
 

@@ -88,10 +88,9 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
     case 'clawTrialEndingSoon':
       return { days_remaining: '5', claw_url: `${NEXTAUTH_URL}/claw` };
     case 'clawTrialExpiresTomorrow':
+    case 'clawInstanceReady':
     case 'clawInstanceDestroyed':
       return { claw_url: `${NEXTAUTH_URL}/claw` };
-    case 'clawInstanceReady':
-      return { claw_url: `${NEXTAUTH_URL}/claw`, trial_period: '1 day' };
     case 'clawScheduledRestartNotice':
     case 'clawScheduledRestartCancelled':
       return {

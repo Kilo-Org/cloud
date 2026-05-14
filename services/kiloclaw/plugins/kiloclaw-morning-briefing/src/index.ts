@@ -829,7 +829,7 @@ async function collectLinear(api: {
       sectionLines: [
         'No issues assigned to you in Linear.',
         '',
-        'If you expected results, check `mcporter call linear list_issues assignee:me limit:8` from your container shell. The brief is scoped to issues you own; issues assigned to others will not appear.',
+        'If you expected results, check `mcporter call linear list_issues assignee:me limit:8 orderBy:updatedAt` from your container shell. The brief is scoped to issues you own; issues assigned to others will not appear.',
       ],
     };
   }

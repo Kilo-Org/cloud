@@ -11,10 +11,10 @@ function row(overrides: Partial<LatestPromotionRow> = {}): LatestPromotionRow {
     overall_score: '0.375',
     n_total_trials: 4,
     avg_cost_usd: '0.420000',
-    avg_input_tokens: 1_000,
-    avg_output_tokens: 500,
-    avg_cache_read_tokens: 250,
-    avg_execution_ms: 12_000,
+    avg_input_tokens: '1000.250000',
+    avg_output_tokens: '500.500000',
+    avg_cache_read_tokens: '250.750000',
+    avg_execution_ms: '12000.125000',
     promoted_at: '2026-05-13T12:00:00.000Z',
     ...overrides,
   };
@@ -86,6 +86,10 @@ describe('buildKiloBenchCache', () => {
       overallScore: 0.375,
       totalScore: 1.5,
       nTotalTrials: 4,
+      avgInputTokens: 1000.25,
+      avgOutputTokens: 500.5,
+      avgCacheReadTokens: 250.75,
+      avgExecutionMs: 12000.125,
     });
     expect(cache.evals['terminal-bench']).not.toHaveProperty('nErrored');
     expect(cache.evals['terminal-bench']).not.toHaveProperty('benchEvalUrl');
@@ -134,6 +138,23 @@ describe('recomputeModelStatsKiloBench', () => {
     expect(updated).toBe(true);
     expect(db.select).toHaveBeenCalledTimes(1);
     expect(db.execute).toHaveBeenCalledTimes(1);
+    expect(db.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('normalizes bench kilo model identifiers to OpenRouter ids', async () => {
+    const db = createDb({
+      exactTarget: { id: 'stats-normalized', openrouterId: 'anthropic/claude-sonnet-4.6' },
+      rows: [row()],
+    });
+
+    const updated = await recomputeModelStatsKiloBench(db.db as never, {
+      provider: 'anthropic',
+      model: 'kilo/anthropic/claude-sonnet-4.6',
+      variant: null,
+    });
+
+    expect(updated).toBe(true);
+    expect(db.select).toHaveBeenCalledTimes(1);
     expect(db.update).toHaveBeenCalledTimes(1);
   });
 

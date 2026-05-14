@@ -139,6 +139,8 @@ describe('syncFromBench', () => {
       total_score: '1.5',
       overall_score: '0.375',
       n_total_trials: 4,
+      avg_input_tokens: '1000',
+      avg_execution_ms: '12000',
     });
   });
 

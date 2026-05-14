@@ -25,15 +25,29 @@ type LatestPromotionRow = {
   overall_score: string;
   n_total_trials: number;
   avg_cost_usd: string | null;
-  avg_input_tokens: number | null;
-  avg_output_tokens: number | null;
-  avg_cache_read_tokens: number | null;
-  avg_execution_ms: number | null;
+  avg_input_tokens: string | null;
+  avg_output_tokens: string | null;
+  avg_cache_read_tokens: string | null;
+  avg_execution_ms: string | null;
   promoted_at: string;
 };
 
+function baseOpenrouterIdForIdentity(identity: PromotionIdentity): string {
+  const kiloPrefix = `kilo/${identity.provider}/`;
+  if (identity.model.startsWith(kiloPrefix)) {
+    return `${identity.provider}/${identity.model.slice(kiloPrefix.length)}`;
+  }
+
+  const providerPrefix = `${identity.provider}/`;
+  if (identity.model.startsWith(providerPrefix)) {
+    return identity.model;
+  }
+
+  return `${identity.provider}/${identity.model}`;
+}
+
 function openrouterIdForIdentity(identity: PromotionIdentity): string {
-  const base = `${identity.provider}/${identity.model}`;
+  const base = baseOpenrouterIdForIdentity(identity);
   return identity.variant ? `${base}:${identity.variant}` : base;
 }
 
@@ -57,7 +71,7 @@ async function findTargetModelStats(
     return null;
   }
 
-  const baseOpenrouterId = `${identity.provider}/${identity.model}`;
+  const baseOpenrouterId = baseOpenrouterIdForIdentity(identity);
   const fallbackRows = await db
     .select({ id: modelStats.id, openrouterId: modelStats.openrouterId })
     .from(modelStats)
@@ -131,10 +145,10 @@ export function buildKiloBenchCache(rows: LatestPromotionRow[]) {
       totalScore: Number(row.total_score),
       nTotalTrials: row.n_total_trials,
       avgCostUsd: asNullableNumber(row.avg_cost_usd),
-      avgInputTokens: row.avg_input_tokens,
-      avgOutputTokens: row.avg_output_tokens,
-      avgCacheReadTokens: row.avg_cache_read_tokens,
-      avgExecutionMs: row.avg_execution_ms,
+      avgInputTokens: asNullableNumber(row.avg_input_tokens),
+      avgOutputTokens: asNullableNumber(row.avg_output_tokens),
+      avgCacheReadTokens: asNullableNumber(row.avg_cache_read_tokens),
+      avgExecutionMs: asNullableNumber(row.avg_execution_ms),
       lastPromotedAt: row.promoted_at,
     } satisfies ModelStatsKiloBenchEval;
 

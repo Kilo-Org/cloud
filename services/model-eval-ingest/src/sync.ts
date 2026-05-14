@@ -68,10 +68,14 @@ function mapPromotionInsertValues(promotion: PromotionRecordInput) {
     overall_score: String(promotion.overall_score),
     n_errored: promotion.n_errored,
     avg_cost_usd: promotion.avg_cost_usd === null ? null : String(promotion.avg_cost_usd),
-    avg_input_tokens: promotion.avg_input_tokens,
-    avg_output_tokens: promotion.avg_output_tokens,
-    avg_cache_read_tokens: promotion.avg_cache_read_tokens,
-    avg_execution_ms: promotion.avg_execution_ms,
+    avg_input_tokens:
+      promotion.avg_input_tokens === null ? null : String(promotion.avg_input_tokens),
+    avg_output_tokens:
+      promotion.avg_output_tokens === null ? null : String(promotion.avg_output_tokens),
+    avg_cache_read_tokens:
+      promotion.avg_cache_read_tokens === null ? null : String(promotion.avg_cache_read_tokens),
+    avg_execution_ms:
+      promotion.avg_execution_ms === null ? null : String(promotion.avg_execution_ms),
     promoted_at: new Date(promotion.promoted_at).toISOString(),
     promoted_by_email: promotion.promoted_by_email,
     promotion_note: promotion.promotion_note,

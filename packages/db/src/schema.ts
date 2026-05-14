@@ -2893,10 +2893,10 @@ export const model_eval_ingest = pgTable(
     n_errored: integer('n_errored').notNull(),
 
     avg_cost_usd: decimal('avg_cost_usd', { precision: 12, scale: 6 }),
-    avg_input_tokens: integer('avg_input_tokens'),
-    avg_output_tokens: integer('avg_output_tokens'),
-    avg_cache_read_tokens: integer('avg_cache_read_tokens'),
-    avg_execution_ms: integer('avg_execution_ms'),
+    avg_input_tokens: decimal('avg_input_tokens', { precision: 14, scale: 6 }),
+    avg_output_tokens: decimal('avg_output_tokens', { precision: 14, scale: 6 }),
+    avg_cache_read_tokens: decimal('avg_cache_read_tokens', { precision: 14, scale: 6 }),
+    avg_execution_ms: decimal('avg_execution_ms', { precision: 14, scale: 6 }),
 
     // Bench-side audit metadata.
     // promoted_by_email is the kilocode operator (CF Access SSO), not customer PII.

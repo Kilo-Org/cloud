@@ -45,7 +45,7 @@
       "services": [
         {
           "binding": "BENCH_DASHBOARD",
-          "service": "kilo-bench-dashboard",
+          "service": "kilo-bench-dashboard-dev",
           "entrypoint": "Dashboard",
         },
       ],

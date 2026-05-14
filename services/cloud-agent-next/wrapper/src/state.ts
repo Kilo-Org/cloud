@@ -24,6 +24,7 @@ export type JobContext = {
   ingestUrl: string;
   ingestToken: string;
   workerAuthToken: string;
+  platform?: string;
 };
 
 export type LastError = {

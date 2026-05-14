@@ -69,6 +69,30 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
 ];
 
 const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
+  'bash',
+  'sh',
+  'zsh',
+  'fish',
+  'python',
+  'python3',
+  'node',
+  'irb',
+  'php -a',
+  'rails console',
+  'vi',
+  'vim',
+  'nvim',
+  'nano',
+  'emacs',
+  'less',
+  'more',
+  'top',
+  'htop',
+  'watch',
+  'tail -f',
+  'ssh',
+  'tmux',
+  'screen',
   'git add',
   'git commit',
   'git push',
@@ -88,6 +112,9 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'gh pr create',
   'gh pr close',
   'gh pr edit',
+  'gh pr checkout',
+  'gh auth login',
+  'gh auth refresh',
   'gh issue',
   'gh repo create',
   'gh repo fork',
@@ -803,6 +830,17 @@ export class SessionService {
     const isInteractive = createdOnPlatform == 'cloud-agent-web';
     const commandGuardPolicy = getCommandGuardPolicy(createdOnPlatform);
 
+    if (commandGuardPolicy) {
+      Object.assign(envVars, {
+        CI: 'true',
+        GIT_TERMINAL_PROMPT: '0',
+        GH_PROMPT_DISABLED: '1',
+        PAGER: 'cat',
+        GIT_PAGER: 'cat',
+        TERM: 'dumb',
+      });
+    }
+
     const permission: Record<string, unknown> = {
       external_directory: {
         '*': 'deny',
@@ -834,6 +872,7 @@ export class SessionService {
       // so denied sub-commands correctly override broader allows.
       const bashPermissions: Record<string, string> = {};
       for (const cmd of commandGuardPolicy.denied) {
+        bashPermissions[cmd] = 'deny';
         bashPermissions[`${cmd} *`] = 'deny';
       }
       for (const cmd of commandGuardPolicy.allowed) {

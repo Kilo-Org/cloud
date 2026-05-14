@@ -40,7 +40,7 @@ import type {
   PromptInfo,
 } from '@/lib/ai-gateway/processUsage.types';
 import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
-import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
+import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.shared';
 export { proxyErrorTypeSchema, ProxyErrorType } from '@/lib/proxy-error-types';

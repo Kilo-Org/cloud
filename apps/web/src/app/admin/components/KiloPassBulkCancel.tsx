@@ -39,6 +39,7 @@ type BulkResultStatus =
   | 'skipped_no_user'
   | 'skipped_no_subscription'
   | 'skipped_already_canceled'
+  | 'skipped_store_managed'
   | 'error';
 
 type ResultRow = {
@@ -76,6 +77,7 @@ const statusLabel: Record<BulkResultStatus, string> = {
   skipped_no_user: 'User not found',
   skipped_no_subscription: 'No Kilo Pass',
   skipped_already_canceled: 'Already cancelled',
+  skipped_store_managed: 'App Store managed',
   error: 'Error',
 };
 
@@ -84,12 +86,14 @@ const statusBadgeClass: Record<BulkResultStatus, string> = {
   skipped_no_user: 'bg-gray-800 text-gray-300',
   skipped_no_subscription: 'bg-gray-800 text-gray-300',
   skipped_already_canceled: 'bg-yellow-900/20 text-yellow-400',
+  skipped_store_managed: 'bg-blue-900/20 text-blue-400',
   error: 'bg-red-900/20 text-red-400',
 };
 
 const statusGroupOrder: BulkResultStatus[] = [
   'cancelled_and_refunded',
   'error',
+  'skipped_store_managed',
   'skipped_already_canceled',
   'skipped_no_subscription',
   'skipped_no_user',
@@ -280,6 +284,11 @@ export function KiloPassBulkCancel() {
                             <TableCell className="text-xs">
                               {row.status === 'error' ? (
                                 <span className="text-red-400">{row.error}</span>
+                              ) : row.status === 'skipped_store_managed' ? (
+                                <span className="text-muted-foreground">
+                                  Refund must be initiated via the App Store. The customer needs to
+                                  contact Apple Support.
+                                </span>
                               ) : row.status === 'cancelled_and_refunded' && row.alreadyBlocked ? (
                                 <span className="text-muted-foreground">
                                   Account was already blocked

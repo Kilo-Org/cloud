@@ -157,6 +157,7 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
         providerState = result.providerState;
       }
     } catch (err) {
+      if (fly.isFlyMissingVolume(err)) throw err;
       if (!fly.isFlyInsufficientResources(err)) throw err;
 
       await onCapacityRecovery?.(err);

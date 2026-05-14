@@ -82,8 +82,8 @@ import {
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
-import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
-import { applyResolvedAutoModel } from '@/lib/ai-gateway/kilo-auto/resolution';
+import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import {

@@ -1,4 +1,4 @@
-import type { GatewayProcessStatusResponse, KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import type { GatewayProcessStatusOkResponse, KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 
 export type PopulatedClawStatus = KiloClawDashboardStatus & {
   status: NonNullable<KiloClawDashboardStatus['status']>;
@@ -9,17 +9,17 @@ export type ClawOnboardingMode = 'create-first' | 'post-provisioning';
 export type OnboardingStep =
   | 'identity'
   | 'calendar'
-  | 'channels'
+  | 'email'
+  | 'interests'
   | 'provisioning'
-  | 'pairing'
   | 'done';
 
 export const CLAW_ONBOARDING_WIZARD_STEPS = [
   'identity',
   'calendar',
-  'channels',
+  'email',
+  'interests',
   'provisioning',
-  'pairing',
 ] as const satisfies OnboardingStep[];
 
 export type ClawOnboardingWizardStep = (typeof CLAW_ONBOARDING_WIZARD_STEPS)[number];
@@ -27,12 +27,15 @@ export type ClawOnboardingWizardStep = (typeof CLAW_ONBOARDING_WIZARD_STEPS)[num
 export type ClawOnboardingRenderStep =
   | 'identity'
   | 'calendar'
-  | 'channels'
+  | 'email'
+  | 'interests'
   | 'provisioning'
-  | 'pairing'
   | 'complete'
   | 'error';
 
+// Kept for parity with `ChannelPairingStep.tsx`, which currently isn't wired
+// into the wizard but stays in the codebase in case channel pairing comes
+// back. Not used in the active onboarding flow.
 export type PairingChannelId = 'telegram' | 'discord';
 
 export const FAKE_ONBOARDING_STEP_PARAM = 'fakeOnboardingStep';
@@ -40,9 +43,9 @@ export const FAKE_ONBOARDING_STEP_PARAM = 'fakeOnboardingStep';
 export const CLAW_ONBOARDING_FAKE_STEPS = [
   'identity',
   'calendar',
-  'channels',
+  'email',
+  'interests',
   'provisioning',
-  'pairing',
   'complete',
   'error',
 ] satisfies ClawOnboardingRenderStep[];
@@ -72,16 +75,22 @@ export type ClawOnboardingFlowStateInput = {
   setupFailed?: boolean;
   onboardingStep: OnboardingStep;
   hasBotIdentity: boolean;
-  selectedChannelId: string | null;
-  gatewayState?: GatewayProcessStatusResponse['state'] | null;
+  gatewayState?: GatewayProcessStatusOkResponse['state'] | null;
   /**
    * Whether the calendar step is available in the wizard. Calendar OAuth is
    * gated to Kilo Code admins (the `/api/integrations/google/connect` and
    * `/disconnect` routes both require `adminOnly: true`), so non-admins skip
-   * the step entirely. When false, the wizard advances identity → channels
-   * and `'calendar'` is mapped to `'channels'` in the render decision.
+   * the step entirely. When false, the wizard advances identity → email
+   * and `'calendar'` is mapped to `'email'` in the render decision.
    */
   hasCalendarStep?: boolean;
+  /**
+   * Whether the morning-briefing Interests step is available in the wizard.
+   * Briefing is admin-only today (see `canSeeMorningBriefing` in
+   * `SettingsTab.tsx`), so non-admins skip the step entirely. When false,
+   * `'interests'` is mapped to `'provisioning'` in the render decision.
+   */
+  hasInterestsStep?: boolean;
   debugLogSource?: string;
 };
 
@@ -94,7 +103,7 @@ export type ClawOnboardingFlowState = {
   createSetupActive: boolean;
   postProvisioningReady: boolean;
   hasCalendarStep: boolean;
-  hasPairingStep: boolean;
+  hasInterestsStep: boolean;
   currentStep: number;
   totalSteps: number;
 };
@@ -116,20 +125,24 @@ export function isClawOnboardingErrorStatus(status: PopulatedClawStatus['status'
   return false;
 }
 
-function getActiveWizardSteps(hasPairingStep: boolean, hasCalendarStep: boolean): OnboardingStep[] {
+function getActiveWizardSteps(
+  hasCalendarStep: boolean,
+  hasInterestsStep: boolean
+): OnboardingStep[] {
   const steps: OnboardingStep[] = ['identity'];
   if (hasCalendarStep) steps.push('calendar');
-  steps.push('channels', 'provisioning');
-  if (hasPairingStep) steps.push('pairing');
+  steps.push('email');
+  if (hasInterestsStep) steps.push('interests');
+  steps.push('provisioning');
   return steps;
 }
 
 export function getClawOnboardingStepProgress(
   step: OnboardingStep,
-  hasPairingStep: boolean,
-  hasCalendarStep: boolean = true
+  hasCalendarStep: boolean = true,
+  hasInterestsStep: boolean = true
 ): { currentStep: number; totalSteps: number } {
-  const wizardSteps = getActiveWizardSteps(hasPairingStep, hasCalendarStep);
+  const wizardSteps = getActiveWizardSteps(hasCalendarStep, hasInterestsStep);
   const totalSteps = wizardSteps.length;
 
   if (step === 'done') {
@@ -137,9 +150,12 @@ export function getClawOnboardingStepProgress(
   }
 
   // A non-admin sitting briefly on `onboardingStep === 'calendar'` (e.g. via
-  // a stale `?step=calendar` URL) gets normalized to channels for progress
+  // a stale `?step=calendar` URL) gets normalized to email for progress
   // display, matching the renderStep redirect in getRenderStepDecision.
-  const lookupStep: OnboardingStep = step === 'calendar' && !hasCalendarStep ? 'channels' : step;
+  // Same treatment for `'interests'` → `'provisioning'`.
+  let lookupStep: OnboardingStep = step;
+  if (lookupStep === 'calendar' && !hasCalendarStep) lookupStep = 'email';
+  if (lookupStep === 'interests' && !hasInterestsStep) lookupStep = 'provisioning';
   const index = wizardSteps.indexOf(lookupStep);
   const currentStep = index === -1 ? 0 : index + 1;
 
@@ -153,9 +169,9 @@ export function getClawOnboardingFlowState({
   setupFailed = false,
   onboardingStep,
   hasBotIdentity,
-  selectedChannelId,
   gatewayState,
   hasCalendarStep = true,
+  hasInterestsStep = true,
   debugLogSource = 'default',
 }: ClawOnboardingFlowStateInput): ClawOnboardingFlowState {
   const instanceStatus = hasPopulatedStatus(status) ? status : null;
@@ -165,11 +181,10 @@ export function getClawOnboardingFlowState({
   const postProvisioningReady = isRunning;
   const createSetupActive =
     mode === 'create-first' && (createSetupStarted || instanceStatus !== null);
-  const hasPairingStep = isPairingChannel(selectedChannelId);
   const { currentStep, totalSteps } = getClawOnboardingStepProgress(
     onboardingStep,
-    hasPairingStep,
-    hasCalendarStep
+    hasCalendarStep,
+    hasInterestsStep
   );
   const renderStepDecision = getRenderStepDecision({
     mode,
@@ -180,7 +195,7 @@ export function getClawOnboardingFlowState({
     onboardingStep,
     hasBotIdentity,
     hasCalendarStep,
-    hasPairingStep,
+    hasInterestsStep,
   });
   const flowState = {
     renderStep: renderStepDecision.renderStep,
@@ -191,7 +206,7 @@ export function getClawOnboardingFlowState({
     createSetupActive,
     postProvisioningReady,
     hasCalendarStep,
-    hasPairingStep,
+    hasInterestsStep,
     currentStep,
     totalSteps,
   } satisfies ClawOnboardingFlowState;
@@ -203,9 +218,9 @@ export function getClawOnboardingFlowState({
     setupFailed,
     onboardingStep,
     hasBotIdentity,
-    selectedChannelId,
     gatewayState,
     hasCalendarStep,
+    hasInterestsStep,
     debugLogSource,
     instanceStatus,
     isRunning,
@@ -213,7 +228,6 @@ export function getClawOnboardingFlowState({
     instanceRunning,
     createSetupActive,
     postProvisioningReady,
-    hasPairingStep,
     currentStep,
     totalSteps,
     renderStepDecision,
@@ -229,7 +243,7 @@ type RenderStepInput = Pick<
   instanceStatus: PopulatedClawStatus | null;
   postProvisioningReady: boolean;
   hasCalendarStep: boolean;
-  hasPairingStep: boolean;
+  hasInterestsStep: boolean;
 };
 
 type RenderStepDecision = {
@@ -240,13 +254,13 @@ type RenderStepDecision = {
 type ClawOnboardingFlowDebugLogInput = ClawOnboardingFlowStateInput & {
   debugLogSource: string;
   hasCalendarStep: boolean;
+  hasInterestsStep: boolean;
   instanceStatus: PopulatedClawStatus | null;
   isRunning: boolean;
   gatewayReady: boolean;
   instanceRunning: boolean;
   createSetupActive: boolean;
   postProvisioningReady: boolean;
-  hasPairingStep: boolean;
   currentStep: number;
   totalSteps: number;
   renderStepDecision: RenderStepDecision;
@@ -270,7 +284,7 @@ function getRenderStepDecision({
   onboardingStep,
   hasBotIdentity,
   hasCalendarStep,
-  hasPairingStep,
+  hasInterestsStep,
 }: RenderStepInput): RenderStepDecision {
   if (instanceStatus && isClawOnboardingErrorStatus(instanceStatus.status)) {
     return {
@@ -290,16 +304,13 @@ function getRenderStepDecision({
     // After a full-page reload (e.g. the Google OAuth round-trip), the
     // wizard often remounts in post-provisioning mode because the instance
     // row is now visible — but the user is still mid-wizard. Honor any
-    // explicit wizard step rather than auto-routing them past it. Without
-    // this, advancing from calendar → channels → provisioning would fall
-    // through to the default post-prov branch and skip channels, pairing,
-    // and the provisioning UX entirely.
+    // explicit wizard step rather than auto-routing them past it.
     if (onboardingStep === 'calendar') {
       if (!hasCalendarStep) {
         return {
-          renderStep: 'channels',
+          renderStep: 'email',
           reason:
-            'calendar step is admin-only and the current user is not an admin; advance to channels',
+            'calendar step is admin-only and the current user is not an admin; advance to email',
         };
       }
       return {
@@ -307,22 +318,29 @@ function getRenderStepDecision({
         reason: 'calendar resume requested; honor it even in post-provisioning mode',
       };
     }
-    if (onboardingStep === 'channels') {
+    if (onboardingStep === 'email') {
       return {
-        renderStep: 'channels',
-        reason: 'wizard resume on channels; honor it even in post-provisioning mode',
+        renderStep: 'email',
+        reason: 'wizard resume on email; honor it even in post-provisioning mode',
+      };
+    }
+    if (onboardingStep === 'interests') {
+      if (!hasInterestsStep) {
+        return {
+          renderStep: 'provisioning',
+          reason:
+            'interests step is admin-only and the current user is not an admin; advance to provisioning',
+        };
+      }
+      return {
+        renderStep: 'interests',
+        reason: 'wizard resume on interests; honor it even in post-provisioning mode',
       };
     }
     if (onboardingStep === 'provisioning') {
       return {
         renderStep: 'provisioning',
         reason: 'wizard resume on provisioning; honor it even in post-provisioning mode',
-      };
-    }
-    if (onboardingStep === 'pairing' && hasPairingStep) {
-      return {
-        renderStep: 'pairing',
-        reason: 'wizard resume on pairing; honor it even in post-provisioning mode',
       };
     }
     if (postProvisioningReady) {
@@ -363,9 +381,9 @@ function getRenderStepDecision({
   if (onboardingStep === 'calendar') {
     if (!hasCalendarStep) {
       return {
-        renderStep: 'channels',
+        renderStep: 'email',
         reason:
-          'calendar step is admin-only and the current user is not an admin; advance to channels',
+          'calendar step is admin-only and the current user is not an admin; advance to email',
       };
     }
     return {
@@ -374,10 +392,24 @@ function getRenderStepDecision({
     };
   }
 
-  if (onboardingStep === 'channels') {
+  if (onboardingStep === 'email') {
     return {
-      renderStep: 'channels',
-      reason: 'stored onboarding step is channels',
+      renderStep: 'email',
+      reason: 'stored onboarding step is email',
+    };
+  }
+
+  if (onboardingStep === 'interests') {
+    if (!hasInterestsStep) {
+      return {
+        renderStep: 'provisioning',
+        reason:
+          'interests step is admin-only and the current user is not an admin; advance to provisioning',
+      };
+    }
+    return {
+      renderStep: 'interests',
+      reason: 'stored onboarding step is interests',
     };
   }
 
@@ -385,13 +417,6 @@ function getRenderStepDecision({
     return {
       renderStep: 'provisioning',
       reason: 'stored onboarding step is provisioning',
-    };
-  }
-
-  if (onboardingStep === 'pairing' && hasPairingStep) {
-    return {
-      renderStep: 'pairing',
-      reason: 'stored onboarding step is pairing and the selected channel requires pairing',
     };
   }
 
@@ -408,9 +433,9 @@ function logClawOnboardingFlowStateDecision({
   setupFailed,
   onboardingStep,
   hasBotIdentity,
-  selectedChannelId,
   gatewayState,
   hasCalendarStep,
+  hasInterestsStep,
   debugLogSource,
   instanceStatus,
   isRunning,
@@ -418,7 +443,6 @@ function logClawOnboardingFlowStateDecision({
   instanceRunning,
   createSetupActive,
   postProvisioningReady,
-  hasPairingStep,
   currentStep,
   totalSteps,
   renderStepDecision,
@@ -432,9 +456,9 @@ function logClawOnboardingFlowStateDecision({
       setupFailed,
       onboardingStep,
       hasBotIdentity,
-      selectedChannelId,
       gatewayState: gatewayState ?? null,
       hasCalendarStep,
+      hasInterestsStep,
       status: status?.status ?? null,
       hasStatusResponse: status !== undefined,
     },
@@ -449,7 +473,6 @@ function logClawOnboardingFlowStateDecision({
       instanceRunning,
       createSetupActive,
       postProvisioningReady,
-      hasPairingStep,
       currentStep,
       totalSteps,
     },

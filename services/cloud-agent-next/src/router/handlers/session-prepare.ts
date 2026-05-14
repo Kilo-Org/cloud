@@ -1,3 +1,4 @@
+import { dirname } from 'node:path';
 import { TRPCError } from '@trpc/server';
 import type * as z from 'zod';
 import { getSandbox } from '@cloudflare/sandbox';
@@ -562,17 +563,56 @@ const prepareSessionHandler = internalApiProtectedProcedure
         await writeAuthFile(sandbox, sessionHome, ctx.authToken);
         await writeGlobalRules(sandbox, sessionHome, cloudAgentSessionId);
 
-        // 11. Start wrapper (which starts kilo server in-process and creates session)
-        logger.info('Starting wrapper');
-        const { client: _wrapperClient, sessionId: kiloSessionId } =
-          await WrapperClient.ensureWrapper(sandbox, session, {
-            agentSessionId: cloudAgentSessionId,
-            userId: ctx.userId,
-            workspacePath,
-          });
-
+        // 11. Pre-import a minimal session so the wrapper starts with --session-id.
+        // This avoids the race condition where Session.Event.Created fires before
+        // KiloSessions.init() has registered its Bus.subscribe handler.
+        const kiloSessionId = generateKiloSessionId();
         logger.setTags({ kiloSessionId });
-        logger.info('Wrapper started, kilo session created');
+        logger.info('Pre-importing kilo session');
+        const now = Date.now();
+        const minimalSessionJson = JSON.stringify({
+          info: {
+            id: kiloSessionId,
+            slug: '',
+            projectID: '',
+            directory: '',
+            title: 'New session - ' + new Date(now).toISOString(),
+            version: '2',
+            time: { created: now, updated: now },
+          },
+          messages: [],
+        });
+        const importFilePath = `/tmp/kilo-empty-session-${kiloSessionId}.json`;
+        await sandbox.writeFile(importFilePath, minimalSessionJson);
+        const escapedFile = importFilePath.replaceAll("'", "'\\''");
+        const escapedId = kiloSessionId.replaceAll("'", "'\\''");
+        const escapedWorkspace = workspacePath.replaceAll("'", "'\\''");
+        const restoreResult = await session.exec(
+          `bun /usr/local/bin/kilo-restore-session.js --file '${escapedFile}' '${escapedId}' '${escapedWorkspace}'`,
+          { cwd: dirname(workspacePath) }
+        );
+        if (restoreResult.exitCode !== 0) {
+          const stdout = restoreResult.stdout?.trim() ?? '';
+          logger
+            .withFields({ exitCode: restoreResult.exitCode, stdout })
+            .error('Pre-import of kilo session failed');
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Failed to pre-import kilo session (exit ${restoreResult.exitCode})`,
+          });
+        }
+        logger.info('Kilo session pre-imported');
+
+        // 12. Start wrapper with --session-id so no new session is created (no race)
+        logger.info('Starting wrapper');
+        const { client: _wrapperClient } = await WrapperClient.ensureWrapper(sandbox, session, {
+          agentSessionId: cloudAgentSessionId,
+          userId: ctx.userId,
+          workspacePath,
+          sessionId: kiloSessionId,
+        });
+
+        logger.info('Wrapper started');
 
         return { workspacePath, sessionHome, branchName, kiloSessionId };
       };

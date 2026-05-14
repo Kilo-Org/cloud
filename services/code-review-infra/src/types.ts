@@ -44,12 +44,14 @@ export interface CodeReviewEvent {
 
 export interface CodeReview {
   reviewId: string;
+  attemptId?: string;
   authToken: string;
   sessionInput: SessionInput;
   owner: Owner;
   status: CodeReviewStatus;
   sessionId?: string; // Cloud agent session ID (agent_xxx)
   cliSessionId?: string; // CLI session UUID (from session_created event or prepareSession)
+  sandboxId?: string;
   errorMessage?: string;
   terminalReason?: CloudAgentTerminalReason;
   startedAt?: string;
@@ -74,6 +76,7 @@ export interface CodeReview {
 
 export interface CodeReviewStatusResponse {
   reviewId: string;
+  attemptId?: string;
   status: CodeReviewStatus;
   sessionId?: string; // Cloud agent session ID (agent_xxx)
   cliSessionId?: string; // CLI session UUID
@@ -97,6 +100,19 @@ export const InternalStatusResponseSchema = z.object({
   success: z.boolean().optional(),
   message: z.string().optional(),
   currentStatus: z.enum(['completed', 'failed', 'cancelled']).optional(),
+  terminalReason: z
+    .enum([
+      'billing',
+      'user_cancelled',
+      'superseded',
+      'interrupted',
+      'timeout',
+      'upstream_error',
+      'sandbox_error',
+      'unknown',
+    ])
+    .nullable()
+    .optional(),
   error: z.string().optional(),
 });
 
@@ -104,6 +120,7 @@ export type InternalStatusResponse = z.infer<typeof InternalStatusResponseSchema
 
 export interface CodeReviewRequest {
   reviewId: string;
+  attemptId?: string;
   authToken: string;
   sessionInput: SessionInput;
   owner: Owner;
@@ -116,6 +133,7 @@ export interface CodeReviewRequest {
 
 export interface CodeReviewResponse {
   reviewId: string;
+  attemptId?: string;
   status: CodeReviewStatus;
 }
 

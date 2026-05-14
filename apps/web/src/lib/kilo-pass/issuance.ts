@@ -314,12 +314,24 @@ export async function issueBaseCreditsForIssuance(
      * The Stripe Invoice ID here is used as the Stripe Payment ID for `processTopUp`.
      * Even though it isn't a payment ID, it's good enough because it's guaranteed to be unique.
      */
-    stripeInvoiceId: string;
+    stripeInvoiceId?: string | null;
+    providerPaymentId?: string | null;
     description: string;
   }
 ): Promise<IssueCreditResult> {
-  const { issuanceId, subscriptionId, kiloUserId, amountUsd, stripeInvoiceId, description } =
-    params;
+  const {
+    issuanceId,
+    subscriptionId,
+    kiloUserId,
+    amountUsd,
+    stripeInvoiceId,
+    providerPaymentId,
+    description,
+  } = params;
+  const creditPaymentId = stripeInvoiceId ?? providerPaymentId;
+  if (!creditPaymentId) {
+    throw new Error('issueBaseCreditsForIssuance requires a payment id');
+  }
 
   await lockIssuanceRow(tx, issuanceId);
 
@@ -334,7 +346,7 @@ export async function issueBaseCreditsForIssuance(
       result: KiloPassAuditLogResult.SkippedIdempotent,
       kiloUserId,
       kiloPassSubscriptionId: subscriptionId,
-      stripeInvoiceId,
+      stripeInvoiceId: stripeInvoiceId ?? null,
       relatedCreditTransactionId: existing.creditTransactionId,
       relatedMonthlyIssuanceId: issuanceId,
       payload: { reason: 'issuance_item_already_exists', kind: KiloPassIssuanceItemKind.Base },
@@ -362,7 +374,7 @@ export async function issueBaseCreditsForIssuance(
     amountCents,
     {
       type: 'stripe',
-      stripe_payment_id: stripeInvoiceId,
+      stripe_payment_id: creditPaymentId,
     },
     {
       dbOrTx: tx,
@@ -378,13 +390,13 @@ export async function issueBaseCreditsForIssuance(
         await tx
           .select({ id: credit_transactions.id })
           .from(credit_transactions)
-          .where(eq(credit_transactions.stripe_payment_id, stripeInvoiceId))
+          .where(eq(credit_transactions.stripe_payment_id, creditPaymentId))
           .limit(1)
       )[0]?.id;
 
   if (!creditTransactionId) {
     throw new Error(
-      `processTopUp returned ok=${topUpOk} but no credit_transactions row exists (stripe_payment_id=${stripeInvoiceId})`
+      `processTopUp returned ok=${topUpOk} but no credit_transactions row exists (stripe_payment_id=${creditPaymentId})`
     );
   }
 
@@ -409,13 +421,14 @@ export async function issueBaseCreditsForIssuance(
     result: topUpOk ? KiloPassAuditLogResult.Success : KiloPassAuditLogResult.SkippedIdempotent,
     kiloUserId,
     kiloPassSubscriptionId: subscriptionId,
-    stripeInvoiceId,
+    stripeInvoiceId: stripeInvoiceId ?? null,
     relatedCreditTransactionId: creditTransactionId,
     relatedMonthlyIssuanceId: issuanceId,
     payload: {
       kind: KiloPassIssuanceItemKind.Base,
       amountUsd: centsToUsd(amountCents),
-      stripeInvoiceId,
+      stripeInvoiceId: stripeInvoiceId ?? null,
+      providerPaymentId: providerPaymentId ?? null,
       originalBaselineMicrodollarsUsed,
     },
   });

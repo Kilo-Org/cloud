@@ -15,6 +15,7 @@ import { githubAppsRouter } from '@/routers/github-apps-router';
 import { gitlabRouter } from '@/routers/gitlab-router';
 import { slackRouter } from '@/routers/slack-router';
 import { linearRouter } from '@/routers/linear-router';
+import { dolthubRouter } from '@/routers/dolthub-router';
 import { discordRouter } from '@/routers/discord-router';
 import { codeReviewRouter } from '@/routers/code-reviews/code-reviews-router';
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
@@ -38,6 +39,7 @@ import { kiloclawRouter } from '@/routers/kiloclaw-router';
 import { modelsRouter } from '@/routers/models-router';
 import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
+import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -52,6 +54,7 @@ export const rootRouter = createTRPCRouter({
   gitlab: gitlabRouter,
   slack: slackRouter,
   linear: linearRouter,
+  dolthub: dolthubRouter,
   discord: discordRouter,
   cloudAgent: cloudAgentRouter,
   cloudAgentNext: cloudAgentNextRouter,
@@ -77,6 +80,7 @@ export const rootRouter = createTRPCRouter({
   models: modelsRouter,
   unifiedSessions: unifiedSessionsRouter,
   activeSessions: activeSessionsRouter,
+  usageAnalytics: usageAnalyticsRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

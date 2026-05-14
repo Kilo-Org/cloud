@@ -13,6 +13,7 @@ export function defineTestUser(userData: Partial<User> = {}): User {
     google_user_name: 'Test User',
     google_user_image_url: 'https://example.com/avatar.png',
     stripe_customer_id: `stripe-customer-${randomUserId}`,
+    app_store_account_token: crypto.randomUUID(),
     hosted_domain: hosted_domain_specials.non_workspace_google_account,
     created_at: now,
     updated_at: now,

@@ -11,6 +11,13 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-05-13',
+    description:
+      'Optimized the KiloClaw image and startup path by cleaning npm and Bun package caches. Build-time cleanup reduces deployed image size, and runtime npm cache cleanup now runs after bootstrap finishes so it reduces persistent storage growth without delaying readiness.',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
     date: '2026-05-07',
     description:
       "Stopped agents from hallucinating fixes that rely on systemd. The base container image ships systemd packages as transitive apt dependencies (so `which systemctl` finds the binary), but systemd is never PID 1 and the daemon is never running. `openclaw`, the gateway, and other background processes are managed by KiloClaw's own controller supervisor. TOOLS.md now documents this explicitly so the agent stops recommending `systemctl`, `journalctl`, or unit files. Existing instances pick up the new TOOLS.md section automatically on redeploy.",

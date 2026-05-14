@@ -42,6 +42,7 @@ import type {
   OpenclawConfigResponse,
   MorningBriefingStatusResponse,
   MorningBriefingActionResponse,
+  MorningBriefingInterestsResponse,
   MorningBriefingReadResponse,
   GoogleCredentialsInput,
   GoogleCredentialsResponse,
@@ -424,6 +425,22 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async updateBriefingInterests(
+    userId: string,
+    topics: string[],
+    instanceId?: string
+  ): Promise<MorningBriefingInterestsResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/interests${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, topics }),
       },
       { userId }
     );
@@ -1023,6 +1040,7 @@ export class KiloClawInternalClient {
   async resizeMachine(
     userId: string,
     instanceType: InstanceTierKey,
+    actor: { actorId: string; actorEmail: string },
     instanceId?: string
   ): Promise<ResizeMachineResponse> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
@@ -1030,7 +1048,7 @@ export class KiloClawInternalClient {
       `/api/platform/resize-machine${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, instanceType }),
+        body: JSON.stringify({ userId, instanceType, ...actor }),
       },
       { userId }
     );

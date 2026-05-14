@@ -869,6 +869,27 @@
       "when": 1778231429988,
       "tag": "0123_condemned_hobgoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 124,
+      "version": "7",
+      "when": 1778541394737,
+      "tag": "0124_naive_paper_doll",
+      "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1778674482981,
+      "tag": "0125_hesitant_millenium_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1778695155783,
+      "tag": "0126_solid_dakota_north",
+      "breakpoints": true
     }
   ]
 }

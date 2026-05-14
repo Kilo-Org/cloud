@@ -53,15 +53,13 @@ RUN echo "apt cache bust: ${APT_CACHE_BUST}" \
 # build-only config does not ship in the runtime image.
 RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.com/"
 
-# Install pnpm globally
-RUN npm install -g pnpm
-
-# Install OpenClaw
-# Pin to specific version for reproducible builds
+# Install global CLI tools in a single invocation, then patch openclaw and clean cache once.
+# Packages: pnpm (package manager), openclaw (pinned for reproducible builds; patched below),
+#   clawhub, mcporter, @steipete/summarize, @kilocode/cli (runtime tooling).
 # Patch: bump model discovery timeout from 5s to 60s — shared-cpu machines
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Remove this sed patch once openclaw exposes a configurable timeout.
-RUN npm install -g openclaw@2026.4.23 \
+RUN npm install -g pnpm openclaw@2026.4.23 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && FOUND_FILES=$(find "$OC_DIST" -name 'provider-models-*.js' | wc -l | tr -d ' ') \
     && if [ "$FOUND_FILES" -eq 0 ]; then echo "ERROR: provider-models-*.js not found in openclaw dist" >&2; exit 1; fi \
@@ -78,7 +76,8 @@ RUN npm install -g openclaw@2026.4.23 \
     && sed -i 's/MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"/\(MESSAGE_ACTION_TARGET_MODE[action] ?? "none"\) !== "none"/' "$CT_FILE" \
     && if grep -q 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$CT_FILE"; then echo "ERROR: actionRequiresTarget patch failed" >&2; exit 1; fi \
     && echo "OK: patched actionRequiresTarget in $(basename "$CT_FILE")" \
-    && openclaw --version
+    && openclaw --version \
+    && npm cache clean --force
 
 # Bake bundled plugin runtime deps into the image so first boot is pure
 # startup — no npm install from `openclaw doctor` on shared-cpu Fly machines.
@@ -96,18 +95,6 @@ RUN cd /usr/local/lib/node_modules/openclaw \
            --no-fund --no-audit \
     && rm -f /tmp/bundled-plugin-specs.raw /tmp/bundled-plugin-specs.txt \
     && rm -rf /root/.npm
-
-# Install ClawHub CLI
-RUN npm install -g clawhub
-
-# Install mcporter (MCP server tooling)
-RUN npm install -g mcporter@0.7.3
-
-# Install summarize (web page summarization CLI)
-RUN npm install -g @steipete/summarize@0.12.0
-
-# Install Kilo CLI (agentic coding assistant for the terminal)
-RUN npm install -g @kilocode/cli@7.2.31
 
 # Install Go (available at runtime for users to `go install` additional tools)
 ENV GO_VERSION=1.26.2
@@ -198,6 +185,7 @@ RUN cd /tmp/controller-build \
     && bun build src/index.ts --outfile=/usr/local/bin/kiloclaw-controller.js --target=node --minify \
        --define "KILOCLAW_CONTROLLER_VERSION=\"${CONTROLLER_VERSION}\"" \
        --define "KILOCLAW_CONTROLLER_COMMIT=\"${CONTROLLER_COMMIT}\"" \
+    && bun pm cache rm \
     && rm -rf /tmp/controller-build
 
 # ── Final stage: runtime image ────────────────────────────────────────

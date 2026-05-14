@@ -98,6 +98,7 @@ async function loadStartControllerWithMocks(options: {
   vi.doMock('./bootstrap', () => ({
     bootstrapCritical: options.bootstrapCritical,
     bootstrapNonCritical: options.bootstrapNonCritical,
+    cleanNpmCache: () => undefined,
   }));
 
   vi.doMock('./supervisor', () => ({

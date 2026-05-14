@@ -29,6 +29,7 @@ const mockCancelKiloCliRun: jest.Mock<any, any> = jest.fn();
 const mockStartKiloCliRun: jest.Mock<any, any> = jest.fn();
 const mockStart: jest.Mock<any, any> = jest.fn();
 const mockUserClientRestartMachine: jest.Mock<any, any> = jest.fn();
+const mockWakeScheduledAction: jest.Mock<any, any> = jest.fn();
 const startedResponse = {
   ok: true,
   started: true,
@@ -46,6 +47,7 @@ function mockKiloClawInternalClient() {
     cancelKiloCliRun: mockCancelKiloCliRun,
     startKiloCliRun: mockStartKiloCliRun,
     start: mockStart,
+    wakeScheduledAction: mockWakeScheduledAction,
   }));
 }
 
@@ -57,6 +59,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
     cancelKiloCliRun: mockCancelKiloCliRun,
     startKiloCliRun: mockStartKiloCliRun,
     start: mockStart,
+    wakeScheduledAction: mockWakeScheduledAction,
   })),
   KiloClawApiError: class KiloClawApiError extends Error {
     statusCode: number;
@@ -160,6 +163,8 @@ beforeEach(async () => {
   mockStart.mockResolvedValue(startedResponse);
   mockUserClientRestartMachine.mockReset();
   mockUserClientRestartMachine.mockResolvedValue({ success: true, message: 'restarting' });
+  mockWakeScheduledAction.mockReset();
+  mockWakeScheduledAction.mockResolvedValue({ ok: true });
   mockKiloClawInternalClient();
 });
 
@@ -1869,6 +1874,58 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
 
 describe('admin.kiloclawInstances scheduled actions', () => {
   let testInstanceId: string;
+  const fleetCatalogTags: string[] = [];
+
+  async function insertFleetCatalogEntry(params: {
+    openclawVersion: string;
+    imageTag?: string;
+    status?: 'available' | 'disabled';
+  }) {
+    const imageTag = params.imageTag ?? `fleet-test-${crypto.randomUUID()}`;
+    fleetCatalogTags.push(imageTag);
+    await db.insert(kiloclaw_image_catalog).values({
+      openclaw_version: params.openclawVersion,
+      variant: 'default',
+      image_tag: imageTag,
+      image_digest: `sha256:${crypto.randomUUID()}`,
+      status: params.status ?? 'available',
+      published_at: new Date().toISOString(),
+    });
+    return imageTag;
+  }
+
+  async function insertFleetInstance(params: {
+    trackedImageTag: string | null;
+    userId?: string;
+    pinned?: boolean;
+    inactiveTrialStopped?: boolean;
+    suspended?: boolean;
+  }) {
+    const instanceId = crypto.randomUUID();
+    const userId = params.userId ?? regularUser.id;
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: userId,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+      tracked_image_tag: params.trackedImageTag,
+      inactive_trial_stopped_at: params.inactiveTrialStopped ? '2026-04-20T12:00:00.000Z' : null,
+    });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: userId,
+      instance_id: instanceId,
+      plan: 'trial',
+      status: 'trialing',
+      suspended_at: params.suspended ? '2026-04-20T12:00:00.000Z' : null,
+    });
+    if (params.pinned && params.trackedImageTag) {
+      await db.insert(kiloclaw_version_pins).values({
+        instance_id: instanceId,
+        image_tag: params.trackedImageTag,
+        pinned_by: userId,
+      });
+    }
+    return instanceId;
+  }
 
   beforeEach(async () => {
     const [instance] = await db
@@ -1904,6 +1961,15 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       await db
         .delete(kiloclaw_scheduled_actions)
         .where(inArray(kiloclaw_scheduled_actions.id, ids));
+    }
+    if (fleetCatalogTags.length > 0) {
+      await db
+        .delete(kiloclaw_version_pins)
+        .where(inArray(kiloclaw_version_pins.image_tag, [...fleetCatalogTags]));
+      await db
+        .delete(kiloclaw_image_catalog)
+        .where(inArray(kiloclaw_image_catalog.image_tag, [...fleetCatalogTags]));
+      fleetCatalogTags.length = 0;
     }
     await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, testInstanceId));
     /* eslint-enable drizzle/enforce-delete-with-where */
@@ -2354,6 +2420,213 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       expect(detail.stages).toHaveLength(1);
       expect(detail.targets).toHaveLength(1);
       expect(detail.targets[0].instance_id).toBe(testInstanceId);
+    });
+  });
+
+  describe('fleet upgrade', () => {
+    it('throws FORBIDDEN for non-admin preview callers', async () => {
+      const targetTag = await insertFleetCatalogEntry({ openclawVersion: '2026.2.10' });
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.admin.kiloclawInstances.previewFleetUpgrade({
+          versionBelow: '2026.2.10',
+          targetImageTag: targetTag,
+          overridePins: false,
+          startsAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+          tranchePercent: 50,
+          intervalDays: 2,
+          notify: false,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('previews eligibility buckets with numeric CalVer comparison', async () => {
+      const oldTag = await insertFleetCatalogEntry({ openclawVersion: '2026.2.9' });
+      const newerTag = await insertFleetCatalogEntry({ openclawVersion: '2026.2.10' });
+      const targetTag = await insertFleetCatalogEntry({ openclawVersion: '2026.3.1' });
+      const unknownTag = `fleet-missing-${crypto.randomUUID()}`;
+
+      const actionableId = await insertFleetInstance({ trackedImageTag: oldTag });
+      const pinnedId = await insertFleetInstance({ trackedImageTag: oldTag, pinned: true });
+      const conflictId = await insertFleetInstance({ trackedImageTag: oldTag });
+      await insertFleetInstance({ trackedImageTag: newerTag });
+      await insertFleetInstance({ trackedImageTag: targetTag });
+      await insertFleetInstance({ trackedImageTag: unknownTag });
+      await insertFleetInstance({ trackedImageTag: null });
+
+      const caller = await createCallerForUser(adminUser.id);
+      await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [conflictId],
+        scheduledAt: new Date(Date.now() + 90 * 60_000).toISOString(),
+        notify: false,
+      });
+
+      const preview = await caller.admin.kiloclawInstances.previewFleetUpgrade({
+        versionBelow: '2026.2.10',
+        targetImageTag: targetTag,
+        overridePins: false,
+        startsAt: new Date(Date.now() + 120 * 60_000).toISOString(),
+        tranchePercent: 50,
+        intervalDays: 2,
+        notify: false,
+      });
+
+      expect(preview.counts).toMatchObject({
+        eligible: 3,
+        actionable: 1,
+        pinned: 1,
+        conflicts: 1,
+        alreadyOnTarget: 1,
+        unknownVersion: 2,
+      });
+      expect(preview.actionableInstanceIds).toEqual([actionableId]);
+      expect(preview.excluded.pinnedInstanceIds).toEqual([pinnedId]);
+      expect(preview.excluded.conflictInstanceIds).toEqual([conflictId]);
+      expect(preview.stages).toHaveLength(1);
+      expect(preview.stages[0]).toMatchObject({ stageIndex: 0, targetCount: 1 });
+    });
+
+    it('creates one version-change parent split across deterministic stages', async () => {
+      const oldTag = await insertFleetCatalogEntry({ openclawVersion: '2026.2.1' });
+      const targetTag = await insertFleetCatalogEntry({ openclawVersion: '2026.3.1' });
+      const instanceIds = await Promise.all(
+        Array.from({ length: 5 }, () => insertFleetInstance({ trackedImageTag: oldTag }))
+      );
+      const startsAt = new Date(Date.now() + 120 * 60_000).toISOString();
+
+      const caller = await createCallerForUser(adminUser.id);
+      const created = await caller.admin.kiloclawInstances.createFleetUpgrade({
+        versionBelow: '2026.2.10',
+        targetImageTag: targetTag,
+        overridePins: true,
+        startsAt,
+        tranchePercent: 40,
+        intervalDays: 3,
+        reason: 'fleet rollout test',
+        notify: true,
+        noticeLeadHours: 12,
+        noticeSubject: 'Maintenance window',
+        noticeBody: 'A version update is scheduled.',
+        noticeChannels: ['email', 'webapp'],
+      });
+
+      expect(created.targetCount).toBe(5);
+      expect(created.stageIds).toHaveLength(3);
+
+      const [parent] = await db
+        .select()
+        .from(kiloclaw_scheduled_actions)
+        .where(eq(kiloclaw_scheduled_actions.id, created.id));
+      expect(parent).toMatchObject({
+        action_type: 'version_change',
+        target_image_tag: targetTag,
+        override_pins: true,
+        reason: 'fleet rollout test',
+        total_count: 5,
+        notice_lead_hours: 12,
+        notice_subject: 'Maintenance window',
+        notice_body: 'A version update is scheduled.',
+      });
+
+      const stages = await db
+        .select()
+        .from(kiloclaw_scheduled_action_stages)
+        .where(eq(kiloclaw_scheduled_action_stages.scheduled_action_id, created.id));
+      expect(stages.map(s => s.stage_index).sort()).toEqual([0, 1, 2]);
+      expect(stages.map(s => new Date(s.scheduled_at).toISOString()).sort()).toEqual([
+        new Date(startsAt).toISOString(),
+        new Date(new Date(startsAt).getTime() + 3 * 86_400_000).toISOString(),
+        new Date(new Date(startsAt).getTime() + 6 * 86_400_000).toISOString(),
+      ]);
+
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+      expect(targets).toHaveLength(5);
+      expect(new Set(targets.map(t => t.instance_id))).toEqual(new Set(instanceIds));
+      expect(new Set(targets.map(t => t.target_image_tag))).toEqual(new Set([targetTag]));
+
+      const stageSizes = new Map(stages.map(stage => [stage.id, 0]));
+      for (const target of targets) {
+        stageSizes.set(target.stage_id ?? '', (stageSizes.get(target.stage_id ?? '') ?? 0) + 1);
+      }
+      expect(Array.from(stageSizes.values()).sort()).toEqual([1, 2, 2]);
+
+      const notices = await db
+        .select()
+        .from(kiloclaw_scheduled_action_notifications)
+        .innerJoin(
+          kiloclaw_scheduled_action_targets,
+          eq(
+            kiloclaw_scheduled_action_targets.id,
+            kiloclaw_scheduled_action_notifications.target_id
+          )
+        )
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+      expect(notices).toHaveLength(10);
+
+      const logs = await db
+        .select()
+        .from(kiloclaw_admin_audit_logs)
+        .where(
+          and(
+            eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+            eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.fleet_upgrade.created')
+          )
+        );
+      expect(logs).toHaveLength(1);
+      expect(logs[0].metadata).toMatchObject({
+        scheduledActionId: created.id,
+        versionBelow: '2026.2.10',
+        targetImageTag: targetTag,
+        tranchePercent: 40,
+        intervalDays: 3,
+        targetCount: 5,
+        stageSizes: [2, 2, 1],
+      });
+
+      const list = await caller.admin.kiloclawInstances.listScheduledActions({});
+      const row = list.items.find(item => item.id === created.id);
+      expect(row).toMatchObject({
+        target_count: 5,
+        stage_count: 3,
+        latest_scheduled_at: expect.any(String),
+      });
+
+      const detail = await caller.admin.kiloclawInstances.getScheduledAction({ id: created.id });
+      expect(detail.stages).toHaveLength(3);
+      expect(detail.targets.map(target => target.stage_index).sort()).toEqual([0, 0, 1, 1, 2]);
+    });
+
+    it('rejects create when an actionable target has a pending scheduled action', async () => {
+      const oldTag = await insertFleetCatalogEntry({ openclawVersion: '2026.2.1' });
+      const targetTag = await insertFleetCatalogEntry({ openclawVersion: '2026.3.1' });
+      const instanceId = await insertFleetInstance({ trackedImageTag: oldTag });
+      const caller = await createCallerForUser(adminUser.id);
+      await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [instanceId],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        notify: false,
+      });
+
+      await expect(
+        caller.admin.kiloclawInstances.createFleetUpgrade({
+          versionBelow: '2026.2.10',
+          targetImageTag: targetTag,
+          overridePins: false,
+          startsAt: new Date(Date.now() + 120 * 60_000).toISOString(),
+          tranchePercent: 50,
+          intervalDays: 2,
+          notify: false,
+        })
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: expect.stringContaining('pending or in-flight scheduled actions'),
+      });
     });
   });
 

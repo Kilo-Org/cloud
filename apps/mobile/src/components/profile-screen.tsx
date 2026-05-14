@@ -22,17 +22,24 @@ function providerIcon(_provider: string) {
 }
 
 export function ProfileScreen() {
-  const { signOut } = useAuth();
+  const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
   const colors = useThemeColors();
+  const isAuthenticated = token != null;
   const {
     data,
     isLoading,
     isError: providersError,
     refetch: refetchProviders,
-  } = useQuery(trpc.user.getAuthProviders.queryOptions());
-  const { data: orgs } = useQuery(trpc.organizations.list.queryOptions());
+  } = useQuery({
+    ...trpc.user.getAuthProviders.queryOptions(),
+    enabled: isAuthenticated,
+  });
+  const { data: orgs } = useQuery({
+    ...trpc.organizations.list.queryOptions(),
+    enabled: isAuthenticated,
+  });
 
   const { bottom } = useSafeAreaInsets();
 
@@ -93,7 +100,7 @@ export function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Credits */}
-        <CreditsCard orgs={orgs} />
+        <CreditsCard orgs={orgs} enabled={isAuthenticated} />
 
         {/* Linked accounts */}
         <Animated.View className="mt-6 gap-3" layout={LinearTransition}>

@@ -24,8 +24,8 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom, top } = useSafeAreaInsets();
-  const { signOut } = useAuth();
-  const { userId } = useCurrentUserId();
+  const { signOut, token } = useAuth();
+  const { userId } = useCurrentUserId({ enabled: token != null });
   const actions = getConsentActions(mode);
   const rootStyle = { paddingTop: top };
   const contentContainerStyle = {

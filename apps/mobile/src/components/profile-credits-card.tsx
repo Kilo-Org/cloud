@@ -14,10 +14,11 @@ import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
 type CreditsCardProps = {
+  readonly enabled: boolean;
   orgs: { organizationId: string; organizationName: string }[] | undefined;
 };
 
-export function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
+export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -33,17 +34,18 @@ export function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
     refetch: refetchBalance,
   } = useQuery({
     ...trpc.user.getContextBalance.queryOptions({ organizationId: selectedOrgId }),
+    enabled,
     placeholderData: keepPreviousData,
   });
 
   const { data: personalCreditData, isLoading: personalCreditsLoading } = useQuery({
     ...trpc.user.getCreditBlocks.queryOptions({}),
-    enabled: !selectedOrgId,
+    enabled: enabled && !selectedOrgId,
   });
 
   const { data: orgCreditData, isLoading: orgCreditsLoading } = useQuery({
     ...trpc.organizations.getCreditBlocks.queryOptions({ organizationId: selectedOrgId ?? '' }),
-    enabled: Boolean(selectedOrgId),
+    enabled: enabled && Boolean(selectedOrgId),
     placeholderData: keepPreviousData,
   });
 
@@ -147,7 +149,7 @@ export function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
           {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </View>
       )}
-      {!selectedOrgId && <KiloPassSubscriptionCard />}
+      {enabled && !selectedOrgId && <KiloPassSubscriptionCard />}
     </View>
   );
 }

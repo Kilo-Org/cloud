@@ -100,6 +100,7 @@ const config: ExpoConfig = {
         isAndroidForegroundServiceEnabled: false,
       },
     ],
+    'expo-apple-authentication',
     'expo-iap',
     [
       'expo-tracking-transparency',

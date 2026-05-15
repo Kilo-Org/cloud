@@ -127,7 +127,8 @@ export function ReviewMdGuideContent({
               </p>
               <p>
                 When REVIEW.md is used, Kilo adds a footer to the review summary. The footer notes
-                that guidance came from the base branch and indicates whether the file was truncated.
+                that guidance came from the base branch and indicates whether the file was
+                truncated.
               </p>
             </CardContent>
           </Card>

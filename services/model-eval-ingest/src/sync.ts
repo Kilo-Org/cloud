@@ -1,5 +1,5 @@
 import type { WorkerDb } from '@kilocode/db/client';
-import { model_eval_ingest, modelStats } from '@kilocode/db/schema';
+import { model_eval_ingestions, modelStats } from '@kilocode/db/schema';
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   PromotionRecordSchema,
@@ -12,6 +12,19 @@ import {
 } from './types.js';
 
 const PROMOTION_PULL_LIMIT = 1000;
+const MICRODOLLARS_PER_DOLLAR = 1_000_000;
+
+export function usdToMicrodollars(value: number | null): number | null {
+  return value === null ? null : Math.round(value * MICRODOLLARS_PER_DOLLAR);
+}
+
+export function roundAverage(value: number | null): number | null {
+  return value === null ? null : Math.round(value);
+}
+
+function microdollarsToUsd(value: number | null): number | null {
+  return value === null ? null : value / MICRODOLLARS_PER_DOLLAR;
+}
 
 type BenchDashboard = {
   listPromotions(opts?: { sinceMs?: number; limit?: number }): Promise<PromotionRecord[]>;
@@ -35,9 +48,9 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
   return {
     async getLatestPromotedAtMs(): Promise<number> {
       const [latest] = await db
-        .select({ promotedAt: model_eval_ingest.promoted_at })
-        .from(model_eval_ingest)
-        .orderBy(desc(model_eval_ingest.promoted_at))
+        .select({ promotedAt: model_eval_ingestions.promoted_at })
+        .from(model_eval_ingestions)
+        .orderBy(desc(model_eval_ingestions.promoted_at))
         .limit(1);
 
       return latest ? Date.parse(latest.promotedAt) : 0;
@@ -58,7 +71,7 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
       if (promotions.length === 0) return new Set();
 
       const inserted = await db
-        .insert(model_eval_ingest)
+        .insert(model_eval_ingestions)
         .values(
           promotions.map(({ promotion, modelStatsId }) => ({
             bench_eval_name: promotion.bench_eval_name,
@@ -72,18 +85,18 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
             total_score: promotion.total_score,
             overall_score: promotion.overall_score,
             n_errored: promotion.n_errored,
-            avg_cost_usd: promotion.avg_cost_usd,
-            avg_input_tokens: promotion.avg_input_tokens,
-            avg_output_tokens: promotion.avg_output_tokens,
-            avg_cache_read_tokens: promotion.avg_cache_read_tokens,
-            avg_execution_ms: promotion.avg_execution_ms,
+            avg_cost_microdollars: usdToMicrodollars(promotion.avg_cost_usd),
+            avg_input_tokens: roundAverage(promotion.avg_input_tokens),
+            avg_output_tokens: roundAverage(promotion.avg_output_tokens),
+            avg_cache_read_tokens: roundAverage(promotion.avg_cache_read_tokens),
+            avg_execution_ms: roundAverage(promotion.avg_execution_ms),
             promoted_at: new Date(promotion.promoted_at).toISOString(),
             promoted_by_email: promotion.promoted_by_email,
             promotion_note: promotion.promotion_note,
           }))
         )
-        .onConflictDoNothing({ target: model_eval_ingest.bench_eval_name })
-        .returning({ benchEvalName: model_eval_ingest.bench_eval_name });
+        .onConflictDoNothing({ target: model_eval_ingestions.bench_eval_name })
+        .returning({ benchEvalName: model_eval_ingestions.bench_eval_name });
 
       return new Set(inserted.map(row => row.benchEvalName));
     },
@@ -93,31 +106,34 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
     ): Promise<LatestPromotion[]> {
       const variantCondition =
         tuple.variant === null
-          ? isNull(model_eval_ingest.variant)
-          : eq(model_eval_ingest.variant, tuple.variant);
+          ? isNull(model_eval_ingestions.variant)
+          : eq(model_eval_ingestions.variant, tuple.variant);
       const rows = await db
         .select({
-          taskSource: model_eval_ingest.task_source,
-          totalScore: model_eval_ingest.total_score,
-          overallScore: model_eval_ingest.overall_score,
-          avgCostUsd: model_eval_ingest.avg_cost_usd,
-          avgInputTokens: model_eval_ingest.avg_input_tokens,
-          avgOutputTokens: model_eval_ingest.avg_output_tokens,
-          avgCacheReadTokens: model_eval_ingest.avg_cache_read_tokens,
-          avgExecutionMs: model_eval_ingest.avg_execution_ms,
-          nTotalTrials: model_eval_ingest.n_total_trials,
-          nErrored: model_eval_ingest.n_errored,
-          promotedAt: model_eval_ingest.promoted_at,
+          taskSource: model_eval_ingestions.task_source,
+          totalScore: model_eval_ingestions.total_score,
+          overallScore: model_eval_ingestions.overall_score,
+          avgCostMicrodollars: model_eval_ingestions.avg_cost_microdollars,
+          avgInputTokens: model_eval_ingestions.avg_input_tokens,
+          avgOutputTokens: model_eval_ingestions.avg_output_tokens,
+          avgCacheReadTokens: model_eval_ingestions.avg_cache_read_tokens,
+          avgExecutionMs: model_eval_ingestions.avg_execution_ms,
+          nTotalTrials: model_eval_ingestions.n_total_trials,
+          nErrored: model_eval_ingestions.n_errored,
+          promotedAt: model_eval_ingestions.promoted_at,
         })
-        .from(model_eval_ingest)
+        .from(model_eval_ingestions)
         .where(
           and(
-            eq(model_eval_ingest.provider, tuple.provider),
-            eq(model_eval_ingest.model, tuple.model),
+            eq(model_eval_ingestions.provider, tuple.provider),
+            eq(model_eval_ingestions.model, tuple.model),
             variantCondition
           )
         )
-        .orderBy(desc(model_eval_ingest.promoted_at), desc(model_eval_ingest.bench_eval_name));
+        .orderBy(
+          desc(model_eval_ingestions.promoted_at),
+          desc(model_eval_ingestions.bench_eval_name)
+        );
 
       const latestByTaskSource = new Map<string, LatestPromotion>();
       for (const row of rows) {
@@ -158,7 +174,7 @@ export function buildKiloBenchBenchmarks(rows: LatestPromotion[]): KiloBenchBenc
       taskSource: row.taskSource,
       overallScore: row.overallScore,
       totalScore: row.totalScore,
-      avgCostUsd: row.avgCostUsd,
+      avgCostUsd: microdollarsToUsd(row.avgCostMicrodollars),
       avgInputTokens: row.avgInputTokens,
       avgOutputTokens: row.avgOutputTokens,
       avgCacheReadTokens: row.avgCacheReadTokens,

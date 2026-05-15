@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { syncPromotionsFromBench, type PromotionStore } from './sync.js';
+import {
+  roundAverage,
+  syncPromotionsFromBench,
+  usdToMicrodollars,
+  type PromotionStore,
+} from './sync.js';
 import type {
   KiloBenchBenchmarks,
   LatestPromotion,
@@ -64,11 +69,11 @@ class MemoryPromotionStore implements PromotionStore {
         taskSource: promotion.task_source,
         totalScore: promotion.total_score,
         overallScore: promotion.overall_score,
-        avgCostUsd: promotion.avg_cost_usd,
-        avgInputTokens: promotion.avg_input_tokens,
-        avgOutputTokens: promotion.avg_output_tokens,
-        avgCacheReadTokens: promotion.avg_cache_read_tokens,
-        avgExecutionMs: promotion.avg_execution_ms,
+        avgCostMicrodollars: usdToMicrodollars(promotion.avg_cost_usd),
+        avgInputTokens: roundAverage(promotion.avg_input_tokens),
+        avgOutputTokens: roundAverage(promotion.avg_output_tokens),
+        avgCacheReadTokens: roundAverage(promotion.avg_cache_read_tokens),
+        avgExecutionMs: roundAverage(promotion.avg_execution_ms),
         nTotalTrials: promotion.n_total_trials,
         nErrored: promotion.n_errored,
         promotedAt: new Date(promotion.promoted_at).toISOString(),
@@ -132,6 +137,11 @@ describe('syncPromotionsFromBench', () => {
     expect(cache?.evals['terminal-bench']).toMatchObject({
       totalScore: 1.5,
       overallScore: 0.375,
+      avgCostUsd: 0.25,
+      avgInputTokens: 101,
+      avgOutputTokens: 50,
+      avgCacheReadTokens: 10,
+      avgExecutionMs: 251,
       nTotalTrials: 4,
     });
     expect(cache?.overallScore).toBe(0.5625);

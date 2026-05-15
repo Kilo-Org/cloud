@@ -66,7 +66,7 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
-  model_eval_ingest,
+  model_eval_ingestions,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import {
@@ -127,7 +127,7 @@ describe('User', () => {
     await db.delete(organization_audit_logs);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
-    await db.delete(model_eval_ingest);
+    await db.delete(model_eval_ingestions);
     await db.delete(kiloclaw_scheduled_action_targets);
     await db.delete(kiloclaw_scheduled_action_stages);
     await db.delete(kiloclaw_scheduled_actions);
@@ -1132,7 +1132,7 @@ describe('User', () => {
       const promoter = await insertTestUser();
       const otherPromoter = await insertTestUser();
 
-      await db.insert(model_eval_ingest).values([
+      await db.insert(model_eval_ingestions).values([
         {
           bench_eval_name: 'soft-delete-promoter-eval',
           bench_eval_url: 'https://bench.example.com/jobs/soft-delete-promoter-eval',
@@ -1169,10 +1169,10 @@ describe('User', () => {
 
       const rows = await db
         .select({
-          benchEvalName: model_eval_ingest.bench_eval_name,
-          promoterEmail: model_eval_ingest.promoted_by_email,
+          benchEvalName: model_eval_ingestions.bench_eval_name,
+          promoterEmail: model_eval_ingestions.promoted_by_email,
         })
-        .from(model_eval_ingest);
+        .from(model_eval_ingestions);
       const anonymized = rows.find(row => row.benchEvalName === 'soft-delete-promoter-eval');
       const retained = rows.find(row => row.benchEvalName === 'retained-promoter-eval');
 

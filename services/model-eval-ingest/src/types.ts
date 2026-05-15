@@ -46,7 +46,7 @@ export type LatestPromotion = {
   taskSource: string;
   totalScore: number;
   overallScore: number;
-  avgCostUsd: number | null;
+  avgCostMicrodollars: number | null;
   avgInputTokens: number | null;
   avgOutputTokens: number | null;
   avgCacheReadTokens: number | null;

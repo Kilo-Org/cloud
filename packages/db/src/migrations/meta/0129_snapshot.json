@@ -1,5 +1,5 @@
 {
-  "id": "7bcd585c-df56-4643-85e3-19035f610796",
+  "id": "742eda59-0cc9-4066-8c98-1b4eecd510fe",
   "prevId": "fc135682-02f6-42d4-91c4-f671b33dc41c",
   "version": "7",
   "dialect": "postgresql",
@@ -15598,8 +15598,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.model_eval_ingest": {
-      "name": "model_eval_ingest",
+    "public.model_eval_ingestions": {
+      "name": "model_eval_ingestions",
       "schema": "",
       "columns": {
         "id": {
@@ -15675,33 +15675,33 @@
           "primaryKey": false,
           "notNull": true
         },
-        "avg_cost_usd": {
-          "name": "avg_cost_usd",
-          "type": "numeric(14, 8)",
+        "avg_cost_microdollars": {
+          "name": "avg_cost_microdollars",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
         "avg_input_tokens": {
           "name": "avg_input_tokens",
-          "type": "numeric(16, 6)",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
         "avg_output_tokens": {
           "name": "avg_output_tokens",
-          "type": "numeric(16, 6)",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
         "avg_cache_read_tokens": {
           "name": "avg_cache_read_tokens",
-          "type": "numeric(16, 6)",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
         "avg_execution_ms": {
           "name": "avg_execution_ms",
-          "type": "numeric(16, 6)",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -15723,8 +15723,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "ingested_at": {
-          "name": "ingested_at",
+        "created_at": {
+          "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
@@ -15732,8 +15732,8 @@
         }
       },
       "indexes": {
-        "IDX_model_eval_ingest_lookup": {
-          "name": "IDX_model_eval_ingest_lookup",
+        "IDX_model_eval_ingestions_lookup": {
+          "name": "IDX_model_eval_ingestions_lookup",
           "columns": [
             {
               "expression": "provider",
@@ -15771,8 +15771,8 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_model_eval_ingest_model_stats": {
-          "name": "IDX_model_eval_ingest_model_stats",
+        "IDX_model_eval_ingestions_model_stats": {
+          "name": "IDX_model_eval_ingestions_model_stats",
           "columns": [
             {
               "expression": "model_stats_id",
@@ -15786,8 +15786,8 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_model_eval_ingest_promoted_by_email_lower": {
-          "name": "IDX_model_eval_ingest_promoted_by_email_lower",
+        "IDX_model_eval_ingestions_promoted_by_email_lower": {
+          "name": "IDX_model_eval_ingestions_promoted_by_email_lower",
           "columns": [
             {
               "expression": "LOWER(\"promoted_by_email\")",
@@ -15803,9 +15803,9 @@
         }
       },
       "foreignKeys": {
-        "model_eval_ingest_model_stats_id_model_stats_id_fk": {
-          "name": "model_eval_ingest_model_stats_id_model_stats_id_fk",
-          "tableFrom": "model_eval_ingest",
+        "model_eval_ingestions_model_stats_id_model_stats_id_fk": {
+          "name": "model_eval_ingestions_model_stats_id_model_stats_id_fk",
+          "tableFrom": "model_eval_ingestions",
           "tableTo": "model_stats",
           "columnsFrom": [
             "model_stats_id"
@@ -15819,8 +15819,8 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "model_eval_ingest_bench_eval_name_unique": {
-          "name": "model_eval_ingest_bench_eval_name_unique",
+        "model_eval_ingestions_bench_eval_name_unique": {
+          "name": "model_eval_ingestions_bench_eval_name_unique",
           "nullsNotDistinct": false,
           "columns": [
             "bench_eval_name"

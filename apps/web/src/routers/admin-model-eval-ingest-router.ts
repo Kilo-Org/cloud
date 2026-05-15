@@ -1,6 +1,6 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { model_eval_ingest } from '@kilocode/db/schema';
+import { model_eval_ingestions } from '@kilocode/db/schema';
 import { desc, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import * as z from 'zod';
@@ -16,26 +16,26 @@ export const adminModelEvalIngestRouter = createTRPCRouter({
     const offset = (input.page - 1) * input.limit;
     const rows = await db
       .select({
-        id: model_eval_ingest.id,
-        benchEvalName: model_eval_ingest.bench_eval_name,
-        benchEvalUrl: model_eval_ingest.bench_eval_url,
-        provider: model_eval_ingest.provider,
-        model: model_eval_ingest.model,
-        variant: model_eval_ingest.variant,
-        taskSource: model_eval_ingest.task_source,
-        nTotalTrials: model_eval_ingest.n_total_trials,
-        totalScore: model_eval_ingest.total_score,
-        overallScore: model_eval_ingest.overall_score,
-        nErrored: model_eval_ingest.n_errored,
-        promotedAt: model_eval_ingest.promoted_at,
-        promotedByEmail: model_eval_ingest.promoted_by_email,
-        promotionNote: model_eval_ingest.promotion_note,
-        ingestedAt: model_eval_ingest.ingested_at,
-        modelStatsId: model_eval_ingest.model_stats_id,
+        id: model_eval_ingestions.id,
+        benchEvalName: model_eval_ingestions.bench_eval_name,
+        benchEvalUrl: model_eval_ingestions.bench_eval_url,
+        provider: model_eval_ingestions.provider,
+        model: model_eval_ingestions.model,
+        variant: model_eval_ingestions.variant,
+        taskSource: model_eval_ingestions.task_source,
+        nTotalTrials: model_eval_ingestions.n_total_trials,
+        totalScore: model_eval_ingestions.total_score,
+        overallScore: model_eval_ingestions.overall_score,
+        nErrored: model_eval_ingestions.n_errored,
+        promotedAt: model_eval_ingestions.promoted_at,
+        promotedByEmail: model_eval_ingestions.promoted_by_email,
+        promotionNote: model_eval_ingestions.promotion_note,
+        createdAt: model_eval_ingestions.created_at,
+        modelStatsId: model_eval_ingestions.model_stats_id,
         total: sql<number>`count(*) OVER()::int`.as('total'),
       })
-      .from(model_eval_ingest)
-      .orderBy(desc(model_eval_ingest.promoted_at), desc(model_eval_ingest.bench_eval_name))
+      .from(model_eval_ingestions)
+      .orderBy(desc(model_eval_ingestions.promoted_at), desc(model_eval_ingestions.bench_eval_name))
       .limit(input.limit)
       .offset(offset);
 

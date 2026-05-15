@@ -137,7 +137,7 @@ export function ModelEvalIngestContent() {
                         {row.promotedByEmail}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
-                        {formatTimestamp(row.ingestedAt)}
+                        {formatTimestamp(row.createdAt)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button

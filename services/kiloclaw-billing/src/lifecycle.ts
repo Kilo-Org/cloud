@@ -1460,13 +1460,6 @@ async function processCreditRenewalRow(
       return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
     }
 
-    if (current.instance_destroyed_at) {
-      logSkippedSubscriptionRow('Skipping credit renewal for destroyed instance row', current, {
-        reason: 'instance_destroyed',
-      });
-      return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
-    }
-
     const userId = current.user_id;
     if (current.cancel_at_period_end) {
       const before = await getSubscriptionById(tx, current.id);

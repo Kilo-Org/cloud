@@ -139,7 +139,9 @@ downstream enforcement can proceed.
    the item MUST be skipped without billing mutation.
 5. If the associated instance or ownership context makes the row
    ineligible for personal credit renewal, the item MUST be skipped
-   without billing mutation.
+   without billing mutation. Instance destruction alone MUST NOT make a
+   current personal pure-credit subscription ineligible; renewal remains
+   governed by subscription state and cancellation intent.
 6. If the user has been soft-deleted, the item MUST NOT create
    user-facing side effects.
 7. Expected stale, superseded, or ineligible-row outcomes MUST NOT be
@@ -187,9 +189,11 @@ downstream enforcement can proceed.
    expected outcome.
 6. Reconciling a duplicate idempotency key as an already-finalized
    boundary is an expected outcome.
-7. Skipping a stale, superseded, transferred, destroyed, detached,
+7. Skipping a stale, superseded, transferred, detached,
    organization-managed, Stripe-funded, hybrid, or otherwise ineligible
-   row is an expected outcome.
+   row is an expected outcome. A destroyed instance row is not skipped
+   when its current personal pure-credit subscription otherwise remains
+   renewable.
 8. Expected outcomes MUST NOT create terminal renewal failures.
 9. Expected outcomes MUST NOT block unrelated downstream enforcement.
 

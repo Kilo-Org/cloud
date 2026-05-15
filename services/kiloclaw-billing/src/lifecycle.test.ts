@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as DbModule from '@kilocode/db';
 
 const { mockGetWorkerDb, mockGetMissingSnowflakeConfig, mockQueryKiloclawActiveUserIds } =
   vi.hoisted(() => ({
@@ -1633,7 +1634,7 @@ describe('trial expiry sweep', () => {
       throw new Error('expected trial expiry candidate query predicate');
     }
 
-    const actualDbModule = await vi.importActual<typeof import('@kilocode/db')>('@kilocode/db');
+    const actualDbModule = await vi.importActual<typeof DbModule>('@kilocode/db');
     const trialExpirySql = actualDbModule
       .getWorkerDb('postgres://unused:unused@localhost:0/unused')
       .select()

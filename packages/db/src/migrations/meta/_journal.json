@@ -911,13 +911,6 @@
       "when": 1778780291834,
       "tag": "0129_cold_colossus",
       "breakpoints": true
-    },
-    {
-      "idx": 130,
-      "version": "7",
-      "when": 1778849962694,
-      "tag": "0130_add_microdollar_usage_daily",
-      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,8 @@ packages:
   - services/cloud-agent/wrapper
   - services/cloud-agent-next/wrapper
   - services/gastown/container
+  - services/kiloclaw/controller
+  - services/kiloclaw/plugins/*
   - services/deploy-infra/builder
   - services/deploy-infra/dispatcher
   - packages/*
@@ -40,6 +42,9 @@ catalog:
   zod: 4.4.3
 
 minimumReleaseAge: 6842
+minimumReleaseAgeExclude:
+  - tsx
+  - expo-dev-client
 overrides:
   '@sentry/cli': 3.4.2
   mdast-util-to-hast: 13.2.1
@@ -71,7 +76,10 @@ overrides:
   hono: 4.12.18
   '@hono/node-server': 1.19.14
   undici@^6: 6.24.1
-  lightningcss: 1.30.2
+  # 1.30.2+ regresses var() round-trip through JS visitors, breaking
+  # react-native-css's metro transformer. Upstream issue:
+  # https://github.com/parcel-bundler/lightningcss/issues/1081
+  lightningcss: 1.30.1
   axios: 1.16.1
   protobufjs: 8.0.3
 patchedDependencies:
@@ -100,3 +108,6 @@ allowBuilds:
   sharp: false
   unrs-resolver: false
   utf-8-validate: false
+  '@google/genai': false
+  koffi: false
+  openclaw: false

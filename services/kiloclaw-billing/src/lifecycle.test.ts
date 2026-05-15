@@ -654,6 +654,47 @@ describe('credit renewal fanout queue processing', () => {
     });
   });
 
+  it('normalizes Postgres credit-renewal timestamps before queue fanout', async () => {
+    const first = creditRenewalRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      credit_renewal_at: '2026-04-29 01:16:12.945+00',
+    });
+    const second = creditRenewalRow({
+      id: '33333333-3333-4333-8333-333333333333',
+      credit_renewal_at: '2026-04-30 01:16:12.945+00',
+    });
+    const { db } = createMockDb([[first, second]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    await processCreditRenewalDiscovery(
+      env,
+      {
+        kind: 'credit_renewal_discovery',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'credit_renewal_discovery',
+        cutoffTime: '2026-05-01T00:00:00.000Z',
+        pageBudget: 1,
+      },
+      1
+    );
+
+    expect(lifecycleSend).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        kind: 'credit_renewal_item',
+        renewalBoundary: '2026-04-29T01:16:12.945Z',
+      })
+    );
+    expect(lifecycleSend).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        kind: 'credit_renewal_discovery_continuation',
+        cursorRenewalBoundary: '2026-04-29T01:16:12.945Z',
+      })
+    );
+  });
+
   it('logs discovery cursor, page, and backlog diagnostics without user PII', async () => {
     const first = creditRenewalRow({
       id: '11111111-1111-4111-8111-111111111111',

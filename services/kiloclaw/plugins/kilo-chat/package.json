@@ -32,6 +32,7 @@
   },
   "devDependencies": {
     "esbuild": "0.25.12",
+    "openclaw": "2026.4.23",
     "vitest": "catalog:"
   },
   "dependencies": {

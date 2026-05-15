@@ -1,6 +1,4 @@
-import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
 
 import { shouldStartAppsFlyer } from '@/lib/appsflyer-consent';
 import { initAppsFlyer } from '@/lib/appsflyer';
@@ -21,13 +19,6 @@ export function useAppsFlyerConsentGate({
       return;
     }
 
-    async function startAppsFlyer() {
-      if (Platform.OS === 'ios') {
-        await requestTrackingPermissionsAsync();
-      }
-      initAppsFlyer();
-    }
-
-    void startAppsFlyer();
+    initAppsFlyer();
   }, [hasToken, consentChecked, needsConsent]);
 }

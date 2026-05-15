@@ -15,6 +15,9 @@ permissions:
   contents: read
   pull-requests: read
 
+env:
+  VERCEL_VERSION: '53.3.1'
+
 # Optional repo/org variables for runner migration:
 # - RUNNER_DEFAULT_LABEL=blacksmith-2vcpu-ubuntu-2404
 # - RUNNER_LARGE_LABEL=blacksmith-8vcpu-ubuntu-2404
@@ -266,8 +269,8 @@ jobs:
       - name: Setup Vercel ENV
         working-directory: apps/web
         run: |
-          pnpm --config.minimum-release-age=0 dlx vercel@53.3.1 link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-          pnpm --config.minimum-release-age=0 dlx vercel@53.3.1 env pull .env.production.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+          pnpm dlx vercel@${{ env.VERCEL_VERSION }} env pull .env.production.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build application
         env:

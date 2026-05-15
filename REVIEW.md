@@ -102,6 +102,10 @@ Use this EXACT format for the summary comment. ALWAYS start with `<!-- kilo-revi
 
 **Status:** X Issues Found | **Recommendation:** Address before merge
 
+### Executive Summary
+
+One concise sentence naming the highest-risk issue and affected area.
+
 ### Overview
 
 | Severity   | Count |
@@ -137,6 +141,10 @@ Use this EXACT format for the summary comment. ALWAYS start with `<!-- kilo-revi
 ## Code Review Summary
 
 **Status:** No Issues Found | **Recommendation:** Merge
+
+### Executive Summary
+
+One concise sentence describing the reviewed scope and confidence level.
 
 <details>
 <summary><b>Files Reviewed (X files)</b></summary>

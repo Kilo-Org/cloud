@@ -226,23 +226,33 @@ export function createConnectionManager(
 
       const pendingQuestion = questions.find(q => q.sessionID === kiloSessionId);
       const pendingPermission = permissions.find(p => p.sessionID === kiloSessionId);
+      const codeReviewJob = isCodeReviewJob(state);
+      const skipStatusForCodeReview =
+        codeReviewJob && (sessionStatus.type === 'question' || sessionStatus.type === 'permission');
+
+      if (codeReviewJob) {
+        rejectCodeReviewQuestion(pendingQuestion?.id, config.kiloClient);
+        rejectCodeReviewPermission(pendingPermission?.id, config.kiloClient);
+      }
 
       // Send session status as a regular kilocode event
-      const statusProperties = { sessionID: kiloSessionId, status: sessionStatus };
-      sendToIngest({
-        streamEventType: 'kilocode',
-        data: {
-          ...statusProperties,
-          event: 'session.status',
-          type: 'session.status',
-          properties: statusProperties,
-        },
-        timestamp: new Date().toISOString(),
-      });
+      if (!skipStatusForCodeReview) {
+        const statusProperties = { sessionID: kiloSessionId, status: sessionStatus };
+        sendToIngest({
+          streamEventType: 'kilocode',
+          data: {
+            ...statusProperties,
+            event: 'session.status',
+            type: 'session.status',
+            properties: statusProperties,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
 
       // Replay pending questions/permissions as regular events
       // (same format as real-time delivery — matches CLI behavior)
-      if (pendingQuestion) {
+      if (pendingQuestion && !codeReviewJob) {
         sendToIngest({
           streamEventType: 'kilocode',
           data: {
@@ -253,7 +263,7 @@ export function createConnectionManager(
           timestamp: new Date().toISOString(),
         });
       }
-      if (pendingPermission) {
+      if (pendingPermission && !codeReviewJob) {
         sendToIngest({
           streamEventType: 'kilocode',
           data: {
@@ -266,7 +276,7 @@ export function createConnectionManager(
       }
 
       logToFile(
-        `kilo state sent: status=${sessionStatus.type}, question=${pendingQuestion?.id ?? 'none'}, permission=${pendingPermission?.id ?? 'none'}`
+        `kilo state sent: status=${sessionStatus.type}${skipStatusForCodeReview ? ' (suppressed)' : ''}, question=${pendingQuestion?.id ?? 'none'}${codeReviewJob && pendingQuestion ? ' (rejected)' : ''}, permission=${pendingPermission?.id ?? 'none'}${codeReviewJob && pendingPermission ? ' (rejected)' : ''}`
       );
     } catch (err) {
       logToFile(
@@ -490,7 +500,6 @@ export function createConnectionManager(
             const permId = typeof properties.id === 'string' ? properties.id : undefined;
             if (isCodeReviewJob(state)) {
               rejectCodeReviewPermission(permId, config.kiloClient);
-              callbacks.onSseEvent?.();
               continue;
             }
 
@@ -510,7 +519,6 @@ export function createConnectionManager(
             if (eventType === 'question.asked') {
               const questionId = typeof properties.id === 'string' ? properties.id : undefined;
               rejectCodeReviewQuestion(questionId, config.kiloClient);
-              callbacks.onSseEvent?.();
               continue;
             }
 
@@ -518,7 +526,6 @@ export function createConnectionManager(
               eventType === 'session.status' &&
               statusTypeFromProperties(properties) === 'question'
             ) {
-              callbacks.onSseEvent?.();
               continue;
             }
 
@@ -526,7 +533,6 @@ export function createConnectionManager(
               eventType === 'session.status' &&
               statusTypeFromProperties(properties) === 'permission'
             ) {
-              callbacks.onSseEvent?.();
               continue;
             }
           }

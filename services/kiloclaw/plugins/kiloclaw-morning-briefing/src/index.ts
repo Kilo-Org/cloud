@@ -19,7 +19,12 @@ import {
 } from './cron-utils';
 import { extractBriefingArgsFromText } from './command-fallback-utils';
 import { type EnableInput, isValidTimezone, parseEnableArgs } from './enable-input-utils';
-import { normalizeLinearIssues, summarizeLinearCallFailure } from './linear-utils';
+import {
+  formatLinearIssueLine,
+  hasHighSignalPriority,
+  normalizeLinearIssues,
+  summarizeLinearCallFailure,
+} from './linear-utils';
 import { resolveNextReconcileAction } from './reconcile-queue-utils';
 import { normalizeWebResults } from './web-utils';
 
@@ -779,6 +784,7 @@ async function collectLinear(api: {
       'call',
       'linear',
       'list_issues',
+      'assignee:me',
       'limit:8',
       'orderBy:updatedAt',
       '--output',
@@ -819,20 +825,22 @@ async function collectLinear(api: {
       source: 'linear',
       configured: true,
       ok: true,
-      summary: 'No Linear issues matched the default query',
-      sectionLines: ['- No Linear issues returned.'],
+      summary: '0 issues assigned to you in Linear',
+      sectionLines: [
+        'No issues assigned to you in Linear.',
+        '',
+        'If you expected results, check `mcporter call linear list_issues assignee:me limit:8 orderBy:updatedAt` from your container shell. The brief is scoped to issues you own; issues assigned to others will not appear.',
+      ],
     };
   }
 
+  const briefHasHighSignal = hasHighSignalPriority(issues);
   return {
     source: 'linear',
     configured: true,
     ok: true,
-    summary: `Fetched ${issues.length} Linear issues`,
-    sectionLines: issues.map(issue => {
-      const updatedSuffix = issue.updatedAt ? ` (updated ${issue.updatedAt})` : '';
-      return `- [${issue.id}](${issue.url}) ${issue.title} - ${issue.status}${updatedSuffix}`;
-    }),
+    summary: `Fetched ${issues.length} Linear issues assigned to you`,
+    sectionLines: issues.map(issue => formatLinearIssueLine(issue, briefHasHighSignal)),
   };
 }
 

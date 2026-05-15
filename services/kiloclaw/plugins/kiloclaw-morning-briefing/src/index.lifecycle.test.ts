@@ -75,6 +75,20 @@ async function createHarness(options?: {
   preloadedStatus?: Record<string, unknown>;
   githubAuthReady?: boolean;
   githubIssues?: Array<{ title: string; url: string; updatedAt?: string }>;
+  /**
+   * When set, populates `LINEAR_API_KEY` in the process env via
+   * `vi.stubEnv` so `resolveLinearReady` returns configured. Cleared
+   * automatically in `afterEach`.
+   */
+  linearApiKey?: string;
+  /**
+   * Payload returned by the mocked `mcporter call linear list_issues`
+   * invocation. The harness wraps these in the `{issues, hasNextPage}`
+   * envelope that the real Linear MCP server returns.
+   */
+  linearIssues?: Array<Record<string, unknown>>;
+  /** When set, the mocked mcporter call fails with this stderr / non-zero exit. */
+  linearMcpFailure?: { stdout?: string; stderr?: string };
   channelsConfig?: Record<string, unknown>;
   messageSendFailures?: Partial<Record<'telegram' | 'discord' | 'slack', string>>;
   messageSendFailureCounts?: Partial<Record<'telegram' | 'discord' | 'slack', number>>;
@@ -88,6 +102,12 @@ async function createHarness(options?: {
    */
   cronAddBarrier?: Promise<void>;
 }): Promise<TestHarness> {
+  // Linear readiness reads `process.env.LINEAR_API_KEY` directly. Stub it
+  // per-test so `vi.unstubAllEnvs()` in `afterEach` restores the original
+  // and tests that don't opt in run with the env explicitly cleared (no
+  // host-environment leakage into the `resolveLinearReady` path).
+  vi.stubEnv('LINEAR_API_KEY', options?.linearApiKey ?? '');
+
   const { default: morningBriefingPlugin } = await import('./index');
   const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'morning-briefing-'));
   const pluginDir = path.join(stateDir, 'morning-briefing');
@@ -127,6 +147,29 @@ async function createHarness(options?: {
     if (argv[0] === 'gh' && argv[1] === 'search' && argv[2] === 'issues') {
       return {
         stdout: JSON.stringify(options?.githubIssues ?? []),
+        stderr: '',
+        code: 0,
+      };
+    }
+
+    if (
+      argv[0] === 'mcporter' &&
+      argv[1] === 'call' &&
+      argv[2] === 'linear' &&
+      argv[3] === 'list_issues'
+    ) {
+      if (options?.linearMcpFailure) {
+        return {
+          stdout: options.linearMcpFailure.stdout ?? '',
+          stderr: options.linearMcpFailure.stderr ?? 'mcporter failure',
+          code: 1,
+        };
+      }
+      return {
+        stdout: JSON.stringify({
+          issues: options?.linearIssues ?? [],
+          hasNextPage: false,
+        }),
         stderr: '',
         code: 0,
       };
@@ -351,6 +394,7 @@ async function waitForReconcileState(
 afterEach(async () => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe('morning briefing lifecycle', () => {
@@ -966,6 +1010,179 @@ describe('morning briefing lifecycle', () => {
         )
       )
     ).toBe(true);
+  });
+
+  describe('linear source', () => {
+    async function readGithubAndLinearStatus(
+      stateDir: string
+    ): Promise<Array<{ source: string; summary: string }>> {
+      const status = (await readJson(path.join(stateDir, 'morning-briefing', 'status.json'))) as {
+        sourceSummary?: Array<{ source: string; summary: string }>;
+      };
+      return status.sourceSummary ?? [];
+    }
+
+    const telegramOnly = { telegram: { enabled: true, defaultTo: '-100123456' } };
+
+    it('queries with assignee:me + limit:8 + orderBy:updatedAt and uses the correct workspace cwd', async () => {
+      const harness = await createHarness({
+        linearApiKey: 'lin_api_abc',
+        linearIssues: [],
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const linearCall = harness.runCommandWithTimeout.mock.calls.find(
+        ([argv]) => Array.isArray(argv) && argv[0] === 'mcporter' && argv[3] === 'list_issues'
+      );
+      expect(linearCall).toBeDefined();
+      const [argv, opts] = linearCall as [string[], { cwd?: string }];
+      expect(argv).toContain('assignee:me');
+      expect(argv).toContain('limit:8');
+      expect(argv).toContain('orderBy:updatedAt');
+      expect(argv).toEqual(expect.arrayContaining(['mcporter', 'call', 'linear', 'list_issues']));
+      expect(opts.cwd).toMatch(/workspace$/);
+    });
+
+    it('renders empty-result diagnostic when assignee:me returns no issues', async () => {
+      const harness = await createHarness({
+        linearApiKey: 'lin_api_abc',
+        linearIssues: [],
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      expect(sent).toContain('No issues assigned to you in Linear');
+      expect(sent).toContain('mcporter call linear list_issues assignee:me');
+
+      const summaries = await readGithubAndLinearStatus(harness.stateDir);
+      const linearSummary = summaries.find(s => s.source === 'linear');
+      expect(linearSummary?.summary).toBe('0 issues assigned to you in Linear');
+    });
+
+    it('renders priority + labels + due date in the issue line, hiding Low when high-signal exists', async () => {
+      const harness = await createHarness({
+        linearApiKey: 'lin_api_abc',
+        linearIssues: [
+          {
+            id: 'KIL-8',
+            title: 'My test issue',
+            status: 'Todo',
+            url: 'https://linear.app/x/issue/KIL-8',
+            updatedAt: '2026-05-14T23:13:00.450Z',
+            priority: { value: 1, name: 'Urgent' },
+            labels: ['Bug'],
+            dueDate: '2026-05-15',
+          },
+          {
+            id: 'KIL-7',
+            title: 'Add Discord button',
+            status: 'Todo',
+            url: 'https://linear.app/x/issue/KIL-7',
+            updatedAt: '2026-05-12',
+            priority: { value: 4, name: 'Low' },
+            labels: [],
+          },
+        ],
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      // KIL-8 has Urgent + Bug + due date — all surfaced.
+      expect(sent).toContain('KIL-8');
+      expect(sent).toContain('Urgent, Bug');
+      expect(sent).toContain('due 2026-05-15');
+      // KIL-7 has Low priority — hidden because KIL-8 carries high signal.
+      expect(sent).toContain('KIL-7');
+      expect(sent).toContain('Add Discord button');
+      expect(sent).not.toContain('Low');
+
+      const summaries = await readGithubAndLinearStatus(harness.stateDir);
+      const linearSummary = summaries.find(s => s.source === 'linear');
+      expect(linearSummary?.summary).toBe('Fetched 2 Linear issues assigned to you');
+    });
+
+    it('shows Low / None priority badges when nothing in the brief is high-signal', async () => {
+      const harness = await createHarness({
+        linearApiKey: 'lin_api_abc',
+        linearIssues: [
+          {
+            id: 'KIL-1',
+            title: 'Lower priority task',
+            status: 'Todo',
+            url: 'https://linear.app/x/issue/KIL-1',
+            updatedAt: '2026-05-12',
+            priority: { value: 4, name: 'Low' },
+            labels: [],
+          },
+          {
+            id: 'KIL-2',
+            title: 'No priority set',
+            status: 'Todo',
+            url: 'https://linear.app/x/issue/KIL-2',
+            updatedAt: '2026-05-11',
+            priority: { value: 0, name: 'None' },
+            labels: ['Backend'],
+          },
+        ],
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      // When the whole brief is Low / None, surface those badges so the
+      // reader knows priority is set, not just absent.
+      expect(sent).toContain('Low');
+      expect(sent).toContain('None');
+      expect(sent).toContain('Backend');
+    });
+
+    it('treats mcporter failure as an error source without breaking the brief', async () => {
+      const harness = await createHarness({
+        linearApiKey: 'lin_api_abc',
+        linearMcpFailure: {
+          stdout: JSON.stringify({
+            server: 'linear',
+            tool: 'list_issues',
+            error: 'SSE error: Non-200 status code (401)',
+            issue: { kind: 'auth', statusCode: 401 },
+          }),
+        },
+        githubAuthReady: true,
+        githubIssues: [
+          {
+            title: 'GH issue',
+            url: 'https://github.com/x/y/issues/1',
+            updatedAt: '2026-05-12',
+          },
+        ],
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const summaries = await readGithubAndLinearStatus(harness.stateDir);
+      const linearSummary = summaries.find(s => s.source === 'linear');
+      expect(linearSummary?.summary).toBe(
+        'Linear authentication failed (check LINEAR_API_KEY and redeploy)'
+      );
+    });
   });
 
   describe('interests HTTP route', () => {

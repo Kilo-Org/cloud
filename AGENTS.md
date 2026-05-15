@@ -52,6 +52,12 @@ Before making or reviewing UI changes under `apps/web` — components, routes/pa
 - When the linter flags an unused variable, investigate the root cause — do not blindly prefix with `_`.
 - Use existing dependencies before implementing custom solutions. Check `package.json` for what's available.
 
+## Timestamp Serialization
+
+- Drizzle/Postgres `timestamp({ withTimezone: true, mode: 'string' })` rows may surface timestamp text like `2026-04-29 01:16:12.945+00`, which strict ISO validators such as `z.string().datetime()` reject.
+- Before putting DB-backed timestamp strings into HTTP bodies, queue messages, or other strict JSON contracts, normalize them to UTC ISO with an existing domain serializer or `new Date(value).toISOString()`. Do not forward raw DB timestamp text across contract boundaries.
+- Keep strict validators unless the receiving contract intentionally accepts a broader format. Add regression fixtures using production-shape Postgres timestamp text when fixing or extending these paths.
+
 ## Workers & Durable Objects
 
 - Do not cache database clients, pools, or other transport-owning/request-context-bound SDK objects in module scope for Cloudflare Workers or Durable Objects. Workers reuse isolates across requests, Durable Object classes in the same Worker can share module memory across object instances, and stale module-scope I/O state can cause cross-context runtime failures.

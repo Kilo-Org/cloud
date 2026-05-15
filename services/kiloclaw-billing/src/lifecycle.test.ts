@@ -3806,6 +3806,138 @@ describe('credit renewal sweep affiliate tracking', () => {
     expect(typeof autoResumeUpdate?.auto_resume_retry_after).toBe('string');
   });
 
+  it('normalizes Postgres renewal timestamps before paid-conversion side effects', async () => {
+    const postgresRenewalAt = '2026-04-29 01:16:12.945+00';
+    const renewalAtIso = '2026-04-29T01:16:12.945Z';
+    const { db } = createMockDb([
+      [
+        creditRenewalRow({
+          id: 'sub-1',
+          instance_id: 'instance-1',
+          instance_row_id: 'instance-1',
+          credit_renewal_at: postgresRenewalAt,
+          current_period_end: postgresRenewalAt,
+          total_microdollars_acquired: 50_000_000,
+          kilo_pass_threshold: null,
+        }),
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+        input: Record<string, unknown>;
+      };
+
+      switch (body.action) {
+        case 'project_pending_kilo_pass_bonus':
+          return Response.json({ projectedBonusMicrodollars: 0 });
+        case 'issue_kilo_pass_bonus_from_usage_threshold':
+          return Response.json({ ok: true });
+        case 'process_paid_conversion':
+          return Response.json({
+            affiliateSaleEnqueued: false,
+            winningTouchType: 'none',
+            conversionId: null,
+            disqualificationReason: null,
+          });
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({
+        runId: 'acacacac-acac-4cac-8cac-acacacacacac',
+        renewalBoundary: renewalAtIso,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(1);
+    const saleCall = fetch.mock.calls
+      .map(
+        ([, init]) =>
+          JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+            action: string;
+            input: Record<string, unknown>;
+          }
+      )
+      .find(call => call.action === 'process_paid_conversion');
+
+    expect(saleCall?.input.eventDateIso).toBe(renewalAtIso);
+  });
+
+  it('normalizes Postgres user timestamps before auto top-up side effects', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const beforeRow = creditRenewalRow({
+      id: 'sub-1',
+      credit_renewal_at: renewalAt,
+      current_period_end: renewalAt,
+      total_microdollars_acquired: 1_000_000,
+      microdollars_used: 900_000,
+      auto_top_up_enabled: true,
+      kilo_pass_threshold: null,
+      next_credit_expiration_at: '2026-04-29 01:16:12.945+00',
+      user_updated_at: '2026-04-09 09:00:00+00',
+    });
+    const afterRow = {
+      ...beforeRow,
+      auto_top_up_triggered_for_period: renewalAt,
+    };
+    const { db } = createMockDb([[beforeRow]], {
+      updateReturningRows: [[afterRow]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+        input: Record<string, unknown>;
+      };
+
+      switch (body.action) {
+        case 'project_pending_kilo_pass_bonus':
+          return Response.json({ projectedBonusMicrodollars: 0 });
+        case 'trigger_user_auto_top_up':
+          return Response.json({ ok: true });
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({
+        runId: 'bcbcbcbc-bcbc-4cbc-8cbc-bcbcbcbcbcbc',
+        renewalBoundary: renewalAt,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals_auto_top_up).toBe(1);
+    const autoTopUpCall = fetch.mock.calls
+      .map(
+        ([, init]) =>
+          JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+            action: string;
+            input: { user?: Record<string, unknown> };
+          }
+      )
+      .find(call => call.action === 'trigger_user_auto_top_up');
+
+    expect(autoTopUpCall?.input.user).toEqual(
+      expect.objectContaining({
+        next_credit_expiration_at: '2026-04-29T01:16:12.945Z',
+        updated_at: '2026-04-09T09:00:00.000Z',
+      })
+    );
+  });
+
   it('enqueues a sale affiliate event for pure-credit renewals', async () => {
     const renewalAt = '2026-04-09T10:00:00.000Z';
     const { db, txInserts, txUpdates } = createMockDb([

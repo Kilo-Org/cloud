@@ -137,36 +137,39 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/b
 # dependencies do not inflate the runtime image layers.
 FROM runtime AS customizer-builder
 
-COPY plugins/kiloclaw-customizer/ /tmp/kiloclaw-customizer/
-RUN cd /tmp/kiloclaw-customizer \
-    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
-    && PKG_TGZ="$(npm pack --silent)" \
-    && mv "${PKG_TGZ}" /tmp/kiloclaw-customizer.tgz \
-    && cd / \
-    && rm -rf /tmp/kiloclaw-customizer /root/.npm
+COPY --from=workspace pnpm-workspace.yaml pnpm-lock.yaml /tmp/plugin-workspace/
+COPY --from=workspace patches/ /tmp/plugin-workspace/patches/
+COPY plugins/kiloclaw-customizer/ /tmp/plugin-workspace/services/kiloclaw/plugins/kiloclaw-customizer/
+RUN cd /tmp/plugin-workspace \
+    && pnpm install --filter @kiloclaw/kiloclaw-customizer --frozen-lockfile --ignore-scripts \
+    && pnpm --dir services/kiloclaw/plugins/kiloclaw-customizer pack --out /tmp/kiloclaw-customizer.tgz \
+    && pnpm store prune \
+    && rm -rf /tmp/plugin-workspace /root/.npm
 
 # ── Builder stage: package kilo-chat plugin ────────────────────────────
 # Build the vendored plugin tarball in an isolated stage so dev-time
 # dependencies do not inflate the runtime image layers.
 FROM runtime AS kilo-chat-builder
 
-COPY plugins/kilo-chat/ /tmp/kilo-chat/
-RUN cd /tmp/kilo-chat \
-    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
-    && PKG_TGZ="$(npm pack --silent)" \
-    && mv "${PKG_TGZ}" /tmp/kilo-chat.tgz \
-    && cd / \
-    && rm -rf /tmp/kilo-chat /root/.npm
+COPY --from=workspace pnpm-workspace.yaml pnpm-lock.yaml /tmp/plugin-workspace/
+COPY --from=workspace patches/ /tmp/plugin-workspace/patches/
+COPY plugins/kilo-chat/ /tmp/plugin-workspace/services/kiloclaw/plugins/kilo-chat/
+RUN cd /tmp/plugin-workspace \
+    && pnpm install --filter @kiloclaw/kilo-chat --frozen-lockfile --ignore-scripts \
+    && pnpm --dir services/kiloclaw/plugins/kilo-chat pack --out /tmp/kilo-chat.tgz \
+    && pnpm store prune \
+    && rm -rf /tmp/plugin-workspace /root/.npm
 
 FROM runtime AS morning-briefing-builder
 
-COPY plugins/kiloclaw-morning-briefing/ /tmp/kiloclaw-morning-briefing/
-RUN cd /tmp/kiloclaw-morning-briefing \
-    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
-    && PKG_TGZ="$(npm pack --silent)" \
-    && mv "${PKG_TGZ}" /tmp/kiloclaw-morning-briefing.tgz \
-    && cd / \
-    && rm -rf /tmp/kiloclaw-morning-briefing /root/.npm
+COPY --from=workspace pnpm-workspace.yaml pnpm-lock.yaml /tmp/plugin-workspace/
+COPY --from=workspace patches/ /tmp/plugin-workspace/patches/
+COPY plugins/kiloclaw-morning-briefing/ /tmp/plugin-workspace/services/kiloclaw/plugins/kiloclaw-morning-briefing/
+RUN cd /tmp/plugin-workspace \
+    && pnpm install --filter @kiloclaw/kiloclaw-morning-briefing --frozen-lockfile --ignore-scripts \
+    && pnpm --dir services/kiloclaw/plugins/kiloclaw-morning-briefing pack --out /tmp/kiloclaw-morning-briefing.tgz \
+    && pnpm store prune \
+    && rm -rf /tmp/plugin-workspace /root/.npm
 
 # ── Builder stage: compile the controller with Bun ────────────────────
 # Bun is only needed to bundle the controller TypeScript into a single JS

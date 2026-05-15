@@ -46,7 +46,7 @@ jobs:
       #
       # Files included (must match what the Dockerfile COPYs):
       #   - Dockerfile itself (base image, apt packages, npm versions)
-      #   - ../../pnpm-workspace.yaml + ../../pnpm-lock.yaml + ../../patches/ (controller pnpm install)
+      #   - ../../pnpm-workspace.yaml + ../../pnpm-lock.yaml + ../../patches/ (image package pnpm installs)
       #   - controller/        (COPY controller/ → compiled to controller.js)
       #   - container/         (COPY container/TOOLS.md → /usr/local/share/kiloclaw/)
       #   - plugins/kiloclaw-customizer/ (COPY plugin package for image install)

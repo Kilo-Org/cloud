@@ -911,6 +911,13 @@
       "when": 1778780291834,
       "tag": "0129_cold_colossus",
       "breakpoints": true
+    },
+    {
+      "idx": 130,
+      "version": "7",
+      "when": 1778834349464,
+      "tag": "0130_kiloclaw_instances_user_id_created_at_idx",
+      "breakpoints": true
     }
   ]
 }

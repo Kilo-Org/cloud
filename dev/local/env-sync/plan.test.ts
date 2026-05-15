@@ -384,3 +384,38 @@ test('preserves host.docker.internal in @url defaults for useLanIp services', ()
     repo.cleanup();
   }
 });
+
+test('preserves localhost in worker-side @url defaults for useLanIp services', () => {
+  const repo = createRepo({
+    '.env.local': '',
+    [`${workerDir}/package.json`]: JSON.stringify(
+      { scripts: { dev: "wrangler dev --env 'dev'" } },
+      null,
+      2
+    ),
+    [`${workerDir}/wrangler.jsonc`]: '{ "dev": { "port": 8794 } }',
+    [`${workerDir}/.dev.vars.example`]: [
+      '# @url nextjs',
+      'KILOCODE_BACKEND_BASE_URL=http://localhost:3000',
+      '# @url nextjs/api',
+      'KILO_OPENROUTER_BASE=http://localhost:3000/api',
+      '# @url cloud-agent-next',
+      'WORKER_URL=http://host.docker.internal:8794',
+      '',
+    ].join('\n'),
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['cloud-agent-next']));
+    assert.equal(plan.missingEnvLocal, false);
+    assert.equal(plan.devVarsChanges.length, 1);
+    const [change] = plan.devVarsChanges;
+    assert.ok(change);
+    assert.equal(change.isNew, true);
+    const content = change.newFileContent ?? '';
+    assert.ok(content.includes('KILOCODE_BACKEND_BASE_URL=http://localhost:3000'));
+    assert.ok(content.includes('KILO_OPENROUTER_BASE=http://localhost:3000/api'));
+    assert.ok(content.includes('WORKER_URL=http://host.docker.internal:8794'));
+  } finally {
+    repo.cleanup();
+  }
+});

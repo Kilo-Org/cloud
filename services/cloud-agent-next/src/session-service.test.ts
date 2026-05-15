@@ -67,6 +67,7 @@ import {
   cleanupWorkspace as mockCleanupWorkspace,
 } from './workspace.js';
 import {
+  backendUrlForSandbox,
   buildAgentEntryFromRuntimeAgent,
   InvalidSessionMetadataError,
   SessionService,
@@ -1351,6 +1352,55 @@ describe('SessionService', () => {
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
+    });
+
+    it('translates worker-local backend URLs before injecting sandbox environment', async () => {
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
+      const sandbox = {
+        createSession: sandboxCreateSession,
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      const sessionId: SessionId = 'agent_local_backend_url';
+      mockedSetupWorkspace.mockResolvedValue({
+        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
+        sessionHome: `/home/${sessionId}`,
+      });
+
+      const service = new SessionService();
+      await service.initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        githubRepo: 'acme/repo',
+        env: {
+          ...mockEnv,
+          KILOCODE_BACKEND_BASE_URL: 'http://localhost:3000',
+          KILO_OPENROUTER_BASE: 'http://localhost:3000/api',
+        },
+      });
+
+      const callArgs = sandboxCreateSession.mock.calls[0]?.[0] as { env: Record<string, string> };
+      expect(callArgs.env.KILOCODE_BACKEND_BASE_URL).toBe('http://host.docker.internal:3000');
+      expect(callArgs.env.KILO_API_URL).toBe('http://host.docker.internal:3000');
+
+      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
+        provider: { kilo: { options: { baseURL?: string } } };
+      };
+      expect(configContent.provider.kilo.options.baseURL).toBe(
+        'http://host.docker.internal:3000/api'
+      );
     });
 
     it('should handle special characters in env var values', async () => {
@@ -3979,5 +4029,17 @@ describe('buildAgentEntryFromRuntimeAgent', () => {
     expect(result.temperature).toBe(0.7);
     expect(result.prompt).toBe('You are a test agent');
     expect(result.mode).toBe('subagent');
+  });
+});
+
+describe('backendUrlForSandbox', () => {
+  it.each([
+    ['http://localhost:3000', 'http://host.docker.internal:3000'],
+    ['http://127.0.0.1:3000', 'http://host.docker.internal:3000'],
+    ['http://localhost:3000/api', 'http://host.docker.internal:3000/api'],
+    ['https://api.kilo.ai', 'https://api.kilo.ai'],
+    ['not-a-url', 'not-a-url'],
+  ])('maps %s to %s', (input, expected) => {
+    expect(backendUrlForSandbox(input)).toBe(expected);
   });
 });

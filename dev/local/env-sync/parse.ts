@@ -202,6 +202,8 @@ function toPkcs8IfNeeded(pem: string): string {
 
 type ResolvedValueSource = 'env-local' | 'generated' | 'exec' | 'default' | 'missing';
 
+const WORKER_LOCALHOST_URL_KEYS = new Set(['KILOCODE_BACKEND_BASE_URL', 'KILO_OPENROUTER_BASE']);
+
 function resolveAnnotatedValue(
   key: string,
   entry: ExampleEntry,
@@ -224,14 +226,21 @@ function resolveAnnotatedValue(
       const isHostname = key.includes('HOSTNAME') && !key.includes('URL');
       const isWs = key.includes('_WS_');
       const defaultUsesDockerHost = entry.defaultValue.includes('host.docker.internal');
+      const defaultUsesWorkerLocalhost =
+        WORKER_LOCALHOST_URL_KEYS.has(key) &&
+        (entry.defaultValue.includes('localhost') || entry.defaultValue.includes('127.0.0.1'));
       // LAN IP for container services, but never for ORIGINS keys.
       // Preserve host.docker.internal when the example default uses it
       // (sandbox containers need it to reach the host from inside Docker).
+      // Preserve localhost for worker-side URLs that are translated separately
+      // before being sent into sandbox containers.
       const host = defaultUsesDockerHost
         ? 'host.docker.internal'
-        : serviceUsesLanIp && !isOrigins && lanIp
-          ? lanIp
-          : 'localhost';
+        : defaultUsesWorkerLocalhost
+          ? 'localhost'
+          : serviceUsesLanIp && !isOrigins && lanIp
+            ? lanIp
+            : 'localhost';
       const protocol = isWs ? 'ws' : 'http';
 
       const resolvedParts: string[] = [];

@@ -131,6 +131,19 @@ export function determineBranchName(sessionId: string, upstreamBranch?: string):
   return upstreamBranch ?? `session/${sessionId}`;
 }
 
+export function backendUrlForSandbox(workerBackendUrl: string): string {
+  try {
+    const url = new URL(workerBackendUrl);
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      url.hostname = 'host.docker.internal';
+      return url.toString().replace(/\/$/, '');
+    }
+  } catch {
+    // Non-URL value: leave untouched.
+  }
+  return workerBackendUrl;
+}
+
 type SandboxRetryConfig = {
   maxAttempts: number;
   baseBackoffMs: number;
@@ -798,7 +811,7 @@ export class SessionService {
       providerOptions.kilocodeOrganizationId = kilocodeOrganizationId;
     }
     if (env.KILO_OPENROUTER_BASE) {
-      providerOptions.baseURL = env.KILO_OPENROUTER_BASE;
+      providerOptions.baseURL = backendUrlForSandbox(env.KILO_OPENROUTER_BASE);
     }
     const isInteractive = createdOnPlatform == 'cloud-agent-web';
     const commandGuardPolicy = getCommandGuardPolicy(createdOnPlatform);
@@ -963,9 +976,10 @@ export class SessionService {
     }
 
     if (env.KILOCODE_BACKEND_BASE_URL) {
-      envVars.KILOCODE_BACKEND_BASE_URL = env.KILOCODE_BACKEND_BASE_URL;
+      const sandboxUrl = backendUrlForSandbox(env.KILOCODE_BACKEND_BASE_URL);
+      envVars.KILOCODE_BACKEND_BASE_URL = sandboxUrl;
       // Used by kilo server to check user auth to send to ingest
-      envVars.KILO_API_URL = env.KILOCODE_BACKEND_BASE_URL;
+      envVars.KILO_API_URL = sandboxUrl;
     }
 
     if (env.KILO_SESSION_INGEST_URL) {

@@ -17,14 +17,14 @@ INTERNAL_API_SECRET=your-internal-api-secret-here
 #KILOCODE_TOKEN_OVERRIDE=your-override-token-here
 #KILOCODE_ORG_ID_OVERRIDE=your-override-org-id-here
 
-# Kilocode backend base URL and KILO_OPENROUTER_BASE for API calls and session environment variables
-# For local development, point to your local kilocode-backend.
-# Sandbox containers run under Docker Desktop, so `host.docker.internal`
-# resolves to the host where Next.js is listening.
+# Kilocode backend URLs used by the worker for local server-side fetches and
+# CLI provider config. Use a hostname reachable from the worker process. Before
+# these values are sent into sandbox containers, the worker translates
+# localhost/127.0.0.1 to host.docker.internal automatically.
 # @url nextjs
-KILOCODE_BACKEND_BASE_URL=http://host.docker.internal:3000
+KILOCODE_BACKEND_BASE_URL=http://localhost:3000
 # @url nextjs/api
-KILO_OPENROUTER_BASE=http://host.docker.internal:3000/api
+KILO_OPENROUTER_BASE=http://localhost:3000/api
 
 # Worker base URL used by the wrapper to connect to /ingest.
 # Sandbox containers reach the host via `host.docker.internal`.

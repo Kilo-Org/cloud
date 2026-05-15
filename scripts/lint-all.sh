@@ -21,6 +21,10 @@ workspace_dirs=$(pnpm ls --json -r --depth -1 2>/dev/null | node -e "
 
 while IFS= read -r pkg; do
   [ -z "$pkg" ] && continue
+  # Controller joins workspace for image dependency resolution, not lint scope.
+  if [[ "$pkg" == services/kiloclaw/controller ]]; then
+    continue
+  fi
   if [ -d "$pkg/src" ]; then
     if [[ "$pkg" == apps/mobile ]]; then
       mobile_lint_dirs+=("$pkg/src")

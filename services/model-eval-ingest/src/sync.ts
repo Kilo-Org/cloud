@@ -1,6 +1,6 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import { model_eval_ingest, modelStats } from '@kilocode/db/schema';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   PromotionRecordSchema,
   type KiloBenchBenchmarks,
@@ -18,10 +18,15 @@ type BenchDashboard = {
   getPromotion(name: string): Promise<PromotionRecord | null>;
 };
 
+type PromotionInsert = {
+  promotion: PromotionRecord;
+  modelStatsId: string | null;
+};
+
 export type PromotionStore = {
   getLatestPromotedAtMs(): Promise<number>;
-  findModelStatsTarget(model: string): Promise<ModelStatsTarget | null>;
-  insertPromotion(promotion: PromotionRecord, modelStatsId: string | null): Promise<boolean>;
+  findModelStatsTargets(models: string[]): Promise<Map<string, ModelStatsTarget>>;
+  insertPromotions(promotions: PromotionInsert[]): Promise<Set<string>>;
   listLatestPromotions(tuple: Omit<PromotionTuple, 'modelStatsId'>): Promise<LatestPromotion[]>;
   writeKiloBenchBenchmarks(modelStatsId: string, benchmarks: KiloBenchBenchmarks): Promise<void>;
 };
@@ -38,47 +43,49 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
       return latest ? Date.parse(latest.promotedAt) : 0;
     },
 
-    async findModelStatsTarget(model: string): Promise<ModelStatsTarget | null> {
-      const [target] = await db
+    async findModelStatsTargets(models: string[]): Promise<Map<string, ModelStatsTarget>> {
+      if (models.length === 0) return new Map();
+
+      const targets = await db
         .select({ id: modelStats.id, model: modelStats.openrouterId })
         .from(modelStats)
-        .where(eq(modelStats.openrouterId, model))
-        .limit(1);
+        .where(inArray(modelStats.openrouterId, models));
 
-      return target ?? null;
+      return new Map(targets.map(target => [target.model, target]));
     },
 
-    async insertPromotion(
-      promotion: PromotionRecord,
-      modelStatsId: string | null
-    ): Promise<boolean> {
+    async insertPromotions(promotions: PromotionInsert[]): Promise<Set<string>> {
+      if (promotions.length === 0) return new Set();
+
       const inserted = await db
         .insert(model_eval_ingest)
-        .values({
-          bench_eval_name: promotion.bench_eval_name,
-          bench_eval_url: promotion.bench_eval_url,
-          provider: promotion.provider,
-          model: promotion.model,
-          model_stats_id: modelStatsId,
-          variant: promotion.variant,
-          task_source: promotion.task_source,
-          n_total_trials: promotion.n_total_trials,
-          total_score: promotion.total_score,
-          overall_score: promotion.overall_score,
-          n_errored: promotion.n_errored,
-          avg_cost_usd: promotion.avg_cost_usd,
-          avg_input_tokens: promotion.avg_input_tokens,
-          avg_output_tokens: promotion.avg_output_tokens,
-          avg_cache_read_tokens: promotion.avg_cache_read_tokens,
-          avg_execution_ms: promotion.avg_execution_ms,
-          promoted_at: new Date(promotion.promoted_at).toISOString(),
-          promoted_by_email: promotion.promoted_by_email,
-          promotion_note: promotion.promotion_note,
-        })
+        .values(
+          promotions.map(({ promotion, modelStatsId }) => ({
+            bench_eval_name: promotion.bench_eval_name,
+            bench_eval_url: promotion.bench_eval_url,
+            provider: promotion.provider,
+            model: promotion.model,
+            model_stats_id: modelStatsId,
+            variant: promotion.variant,
+            task_source: promotion.task_source,
+            n_total_trials: promotion.n_total_trials,
+            total_score: promotion.total_score,
+            overall_score: promotion.overall_score,
+            n_errored: promotion.n_errored,
+            avg_cost_usd: promotion.avg_cost_usd,
+            avg_input_tokens: promotion.avg_input_tokens,
+            avg_output_tokens: promotion.avg_output_tokens,
+            avg_cache_read_tokens: promotion.avg_cache_read_tokens,
+            avg_execution_ms: promotion.avg_execution_ms,
+            promoted_at: new Date(promotion.promoted_at).toISOString(),
+            promoted_by_email: promotion.promoted_by_email,
+            promotion_note: promotion.promotion_note,
+          }))
+        )
         .onConflictDoNothing({ target: model_eval_ingest.bench_eval_name })
-        .returning({ id: model_eval_ingest.id });
+        .returning({ benchEvalName: model_eval_ingest.bench_eval_name });
 
-      return inserted.length > 0;
+      return new Set(inserted.map(row => row.benchEvalName));
     },
 
     async listLatestPromotions(
@@ -193,17 +200,28 @@ export async function syncPromotionsFromBench(
   let inserted = 0;
   let alreadyHad = 0;
   const tuplesToRecompute = new Map<string, PromotionTuple>();
+  const modelStatsTargets = await store.findModelStatsTargets([
+    ...new Set(promotions.map(promotion => promotion.model)),
+  ]);
+  const promotionsToInsert = promotions.map(promotion => {
+    const modelStatsTarget = modelStatsTargets.get(promotion.model);
+    return {
+      promotion,
+      modelStatsId: modelStatsTarget?.id ?? null,
+    } satisfies PromotionInsert;
+  });
+  const insertedPromotionNames = await store.insertPromotions(promotionsToInsert);
 
   for (const promotion of promotions) {
-    const modelStatsTarget = await store.findModelStatsTarget(promotion.model);
-    const wasInserted = await store.insertPromotion(promotion, modelStatsTarget?.id ?? null);
+    const modelStatsTarget = modelStatsTargets.get(promotion.model);
+    const wasInserted = insertedPromotionNames.has(promotion.bench_eval_name);
     if (wasInserted) {
       inserted++;
     } else {
       alreadyHad++;
     }
 
-    if (modelStatsTarget) {
+    if (modelStatsTarget && (wasInserted || opts.promotionName != null)) {
       const tuple = {
         provider: promotion.provider,
         model: promotion.model,

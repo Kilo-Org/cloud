@@ -1085,7 +1085,7 @@ export async function softDeleteUser(userId: string) {
 
     await tx
       .update(model_eval_ingest)
-      .set({ promoted_by_email: 'deleted-user@deleted.invalid' })
+      .set({ promoted_by_email: `deleted+${userId}@deleted.invalid` })
       .where(sql`lower(${model_eval_ingest.promoted_by_email}) = lower(${originalEmail})`);
 
     // Credit campaigns: strip the creator-admin reference. The campaigns

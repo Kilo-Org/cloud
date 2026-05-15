@@ -1,13 +1,17 @@
 import 'server-only';
+import * as z from 'zod';
 import { INTERNAL_API_SECRET, MODEL_EVAL_INGEST_URL } from '@/lib/config.server';
 
-export type ModelEvalSyncResult = {
-  success: true;
-  inserted: number;
-  alreadyHad: number;
-  cacheRecomputes: number;
-  fetched: number;
-};
+const ModelEvalSyncResultSchema = z.object({
+  success: z.literal(true),
+  inserted: z.number().int().nonnegative(),
+  alreadyHad: z.number().int().nonnegative(),
+  cacheRecomputes: z.number().int().nonnegative(),
+  fetched: z.number().int().nonnegative(),
+});
+const ModelEvalSyncErrorSchema = z.object({ error: z.string().optional() });
+
+export type ModelEvalSyncResult = z.infer<typeof ModelEvalSyncResultSchema>;
 
 type ModelEvalSyncRequest = {
   promotionName?: string;
@@ -29,10 +33,13 @@ export async function syncModelEvalPromotions(
     body: JSON.stringify(request),
   });
 
-  const body = (await response.json()) as ModelEvalSyncResult | { error?: string };
-  if (!response.ok || !('success' in body) || body.success !== true) {
-    throw new Error('error' in body && body.error ? body.error : `HTTP ${response.status}`);
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const errorBody = ModelEvalSyncErrorSchema.safeParse(body);
+    throw new Error(
+      errorBody.success && errorBody.data.error ? errorBody.data.error : `HTTP ${response.status}`
+    );
   }
 
-  return body;
+  return ModelEvalSyncResultSchema.parse(body);
 }

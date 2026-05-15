@@ -23,14 +23,25 @@ class MemoryPromotionStore implements PromotionStore {
     return latest;
   }
 
-  async findModelStatsTarget(model: string): Promise<ModelStatsTarget | null> {
-    return this.modelStats.get(model) ?? null;
+  async findModelStatsTargets(models: string[]): Promise<Map<string, ModelStatsTarget>> {
+    return new Map(
+      models.flatMap(model => {
+        const target = this.modelStats.get(model);
+        return target ? [[model, target]] : [];
+      })
+    );
   }
 
-  async insertPromotion(promotion: PromotionRecord, modelStatsId: string | null): Promise<boolean> {
-    if (this.rows.has(promotion.bench_eval_name)) return false;
-    this.rows.set(promotion.bench_eval_name, { promotion, modelStatsId });
-    return true;
+  async insertPromotions(
+    promotions: Array<{ promotion: PromotionRecord; modelStatsId: string | null }>
+  ): Promise<Set<string>> {
+    const inserted = new Set<string>();
+    for (const { promotion, modelStatsId } of promotions) {
+      if (this.rows.has(promotion.bench_eval_name)) continue;
+      this.rows.set(promotion.bench_eval_name, { promotion, modelStatsId });
+      inserted.add(promotion.bench_eval_name);
+    }
+    return inserted;
   }
 
   async listLatestPromotions(
@@ -136,6 +147,21 @@ describe('syncPromotionsFromBench', () => {
     expect(store.rows.size).toBe(1);
     expect(rerun.inserted).toBe(0);
     expect(rerun.alreadyHad).toBe(1);
+    expect(rerun.cacheRecomputes).toBe(0);
+  });
+
+  it('recomputes cache on an explicit admin re-pull of an existing promotion', async () => {
+    const store = createStore();
+    const bench = new MemoryBenchDashboard([promotion({ bench_eval_name: 'repull-row' })]);
+
+    await syncPromotionsFromBench(bench, store);
+    const repull = await syncPromotionsFromBench(bench, store, {
+      promotionName: 'repull-row',
+    });
+
+    expect(repull.inserted).toBe(0);
+    expect(repull.alreadyHad).toBe(1);
+    expect(repull.cacheRecomputes).toBe(1);
   });
 
   it('uses the latest promoted task row and excludes audit-only promotion details from cache', async () => {

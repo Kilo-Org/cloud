@@ -3037,6 +3037,9 @@ export const model_eval_ingest = pgTable(
       table.promoted_at
     ),
     index('IDX_model_eval_ingest_model_stats').on(table.model_stats_id),
+    index('IDX_model_eval_ingest_promoted_by_email_lower').on(
+      sql`LOWER(${table.promoted_by_email})`
+    ),
   ]
 );
 

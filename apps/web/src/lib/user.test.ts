@@ -1176,7 +1176,7 @@ describe('User', () => {
       const anonymized = rows.find(row => row.benchEvalName === 'soft-delete-promoter-eval');
       const retained = rows.find(row => row.benchEvalName === 'retained-promoter-eval');
 
-      expect(anonymized?.promoterEmail).toBe('deleted-user@deleted.invalid');
+      expect(anonymized?.promoterEmail).toBe(`deleted+${promoter.id}@deleted.invalid`);
       expect(retained?.promoterEmail).toBe(otherPromoter.google_user_email);
     });
 

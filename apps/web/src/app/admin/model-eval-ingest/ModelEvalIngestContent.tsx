@@ -35,6 +35,17 @@ export function ModelEvalIngestContent() {
       onError: error => toast.error(error.message || 'Model eval sync failed'),
     })
   );
+  const repullMutation = useMutation(
+    trpc.admin.modelEvalIngest.repullPromotion.mutationOptions({
+      onSuccess: result => {
+        toast.success(
+          `Promotion re-pull fetched ${result.fetched} record and refreshed ${result.cacheRecomputes} cache`
+        );
+        void historyQuery.refetch();
+      },
+      onError: error => toast.error(error.message || 'Promotion re-pull failed'),
+    })
+  );
 
   const rows = historyQuery.data?.rows ?? [];
   const pagination = historyQuery.data?.pagination;
@@ -77,12 +88,13 @@ export function ModelEvalIngestContent() {
                   <TableHead>Promoted</TableHead>
                   <TableHead>Promoter</TableHead>
                   <TableHead>Ingested</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-muted-foreground h-24 text-center">
+                    <TableCell colSpan={9} className="text-muted-foreground h-24 text-center">
                       {historyQuery.isLoading
                         ? 'Loading ingest history...'
                         : 'No ingested promotions yet.'}
@@ -128,6 +140,18 @@ export function ModelEvalIngestContent() {
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {formatTimestamp(row.ingestedAt)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() =>
+                            repullMutation.mutate({ promotionName: row.benchEvalName })
+                          }
+                          disabled={repullMutation.isPending}
+                        >
+                          Repull
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))

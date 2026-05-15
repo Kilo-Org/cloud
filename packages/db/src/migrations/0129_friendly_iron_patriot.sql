@@ -25,4 +25,5 @@ CREATE TABLE "model_eval_ingest" (
 --> statement-breakpoint
 ALTER TABLE "model_eval_ingest" ADD CONSTRAINT "model_eval_ingest_model_stats_id_model_stats_id_fk" FOREIGN KEY ("model_stats_id") REFERENCES "public"."model_stats"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "IDX_model_eval_ingest_lookup" ON "model_eval_ingest" USING btree ("provider","model","variant","task_source","promoted_at");--> statement-breakpoint
-CREATE INDEX "IDX_model_eval_ingest_model_stats" ON "model_eval_ingest" USING btree ("model_stats_id");
+CREATE INDEX "IDX_model_eval_ingest_model_stats" ON "model_eval_ingest" USING btree ("model_stats_id");--> statement-breakpoint
+CREATE INDEX "IDX_model_eval_ingest_promoted_by_email_lower" ON "model_eval_ingest" USING btree (LOWER("promoted_by_email"));

@@ -1,5 +1,5 @@
 {
-  "id": "81fd284a-d3b6-4b78-920d-543c4ed9137f",
+  "id": "7bcd585c-df56-4643-85e3-19035f610796",
   "prevId": "fc135682-02f6-42d4-91c4-f671b33dc41c",
   "version": "7",
   "dialect": "postgresql",
@@ -15778,6 +15778,21 @@
               "expression": "model_stats_id",
               "isExpression": false,
               "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_model_eval_ingest_promoted_by_email_lower": {
+          "name": "IDX_model_eval_ingest_promoted_by_email_lower",
+          "columns": [
+            {
+              "expression": "LOWER(\"promoted_by_email\")",
+              "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],

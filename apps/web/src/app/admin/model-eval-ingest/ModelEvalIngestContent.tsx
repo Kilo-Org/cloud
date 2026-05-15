@@ -39,7 +39,7 @@ export function ModelEvalIngestContent() {
     trpc.admin.modelEvalIngest.repullPromotion.mutationOptions({
       onSuccess: result => {
         toast.success(
-          `Promotion re-pull fetched ${result.fetched} record and refreshed ${result.cacheRecomputes} cache`
+          `Promotion re-pull fetched ${result.fetched} records and refreshed ${result.cacheRecomputes} caches`
         );
         void historyQuery.refetch();
       },

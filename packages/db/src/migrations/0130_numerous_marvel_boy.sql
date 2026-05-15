@@ -1,1 +1,0 @@
-CREATE INDEX "IDX_model_eval_ingest_promoted_by_email_lower" ON "model_eval_ingest" USING btree (LOWER("promoted_by_email"));

@@ -221,6 +221,7 @@ export async function syncPromotionsFromBench(
       alreadyHad++;
     }
 
+    // Named admin re-pulls refresh the model cache even when the audit row is already present.
     if (modelStatsTarget && (wasInserted || opts.promotionName != null)) {
       const tuple = {
         provider: promotion.provider,

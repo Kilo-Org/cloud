@@ -18,6 +18,14 @@
       "extends": "base",
       "autoIncrement": true,
       "credentialsSource": "remote"
+    },
+    "preview": {
+      "extends": "base",
+      "distribution": "internal",
+      "credentialsSource": "remote",
+      "ios": {
+        "simulator": false
+      }
     }
   },
   "submit": {

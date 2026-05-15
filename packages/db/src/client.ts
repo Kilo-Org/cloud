@@ -25,7 +25,6 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
   }
 
   const pool = new pg.Pool({
-    options: '-c timezone=UTC',
     ...baseConfig,
     ...poolConfig,
   });
@@ -47,7 +46,6 @@ export function getWorkerDb(connectionString: string, options: GetWorkerDbOption
   const pool = new pg.Pool({
     connectionString,
     max: 1,
-    options: '-c timezone=UTC',
     ...options,
   });
   return drizzle(pool, { schema });

@@ -105,6 +105,34 @@ async function createHarness(options?: {
   linearIssues?: Array<Record<string, unknown>>;
   /** When set, the mocked mcporter call fails with this stderr / non-zero exit. */
   linearMcpFailure?: { stdout?: string; stderr?: string };
+  /**
+   * Stubs `process.env.KILOCLAW_USER_LOCATION` and
+   * `process.env.KILOCLAW_USER_TIMEZONE` via `vi.stubEnv` so
+   * `resolveLocationContext` (in local-news-utils) returns the
+   * matching shape. Cleared automatically in `afterEach`.
+   */
+  userLocationEnv?: { KILOCLAW_USER_LOCATION?: string; KILOCLAW_USER_TIMEZONE?: string };
+  /**
+   * Web-search runtime stub. `providers` populates `listProviders()`;
+   * `resultsPerQuery` is a map from the issued query string to the
+   * `{ provider, result }` envelope that `search()` returns. Queries
+   * that don't match any key fall back to `defaultResult`.
+   *
+   * Local-news tier escalation issues distinct queries per tier, so
+   * tests for the tier loop seed `resultsPerQuery` with all tiers
+   * the test expects to fire. Unmatched queries surface as
+   * `{ provider: 'none', result: { results: [] } }`.
+   */
+  webSearch?: {
+    providers?: Array<{ id?: string }>;
+    resultsPerQuery?: Record<
+      string,
+      { provider?: string; results?: Array<{ title: string; url: string; summary?: string }> }
+    >;
+    defaultResult?: { provider?: string; results?: Array<{ title: string; url: string }> };
+    /** When set, every call to `search()` rejects with this error. */
+    searchThrows?: Error;
+  };
   channelsConfig?: Record<string, unknown>;
   messageSendFailures?: Partial<Record<'telegram' | 'discord' | 'slack', string>>;
   messageSendFailureCounts?: Partial<Record<'telegram' | 'discord' | 'slack', number>>;
@@ -128,6 +156,11 @@ async function createHarness(options?: {
   // pattern; default cleared so the resolveLinearReady path doesn't
   // accidentally pick up the host env.
   vi.stubEnv('LINEAR_API_KEY', options?.linearApiKey ?? '');
+  // Local-news location resolution reads two env vars (set in
+  // `gateway/env.ts` at provision time). Stub them per-test for the
+  // same reason — the host env must not leak in.
+  vi.stubEnv('KILOCLAW_USER_LOCATION', options?.userLocationEnv?.KILOCLAW_USER_LOCATION ?? '');
+  vi.stubEnv('KILOCLAW_USER_TIMEZONE', options?.userLocationEnv?.KILOCLAW_USER_TIMEZONE ?? '');
 
   const { default: morningBriefingPlugin } = await import('./index');
   const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'morning-briefing-'));
@@ -357,8 +390,25 @@ async function createHarness(options?: {
       state: { resolveStateDir: () => stateDir },
       system: { runCommandWithTimeout },
       webSearch: {
-        listProviders: () => [],
-        search: async () => ({ provider: 'none', result: {} }),
+        listProviders: () => options?.webSearch?.providers ?? [],
+        search: async (params: { args: Record<string, unknown> }) => {
+          if (options?.webSearch?.searchThrows) {
+            throw options.webSearch.searchThrows;
+          }
+          const query = typeof params.args?.query === 'string' ? params.args.query : '';
+          const perQuery = options?.webSearch?.resultsPerQuery?.[query];
+          if (perQuery) {
+            return {
+              provider: perQuery.provider ?? 'brave',
+              result: { results: perQuery.results ?? [] },
+            };
+          }
+          const fallback = options?.webSearch?.defaultResult;
+          return {
+            provider: fallback?.provider ?? 'none',
+            result: { results: fallback?.results ?? [] },
+          };
+        },
       },
     },
     config: {
@@ -1377,6 +1427,264 @@ describe('morning briefing lifecycle', () => {
       expect(linearSummary?.summary).toBe(
         'Linear authentication failed (check LINEAR_API_KEY and redeploy)'
       );
+    });
+  });
+
+  describe('local news source', () => {
+    const telegramOnly = { telegram: { enabled: true, defaultTo: '-100123456' } };
+
+    async function readAllSourceStatus(
+      stateDir: string
+    ): Promise<Array<{ source: string; summary: string; configured: boolean; ok: boolean }>> {
+      const status = (await readJson(path.join(stateDir, 'morning-briefing', 'status.json'))) as {
+        sourceSummary?: Array<{
+          source: string;
+          summary: string;
+          configured: boolean;
+          ok: boolean;
+        }>;
+      };
+      return status.sourceSummary ?? [];
+    }
+
+    function preloadInterestsConfig(topics: string[]): Record<string, unknown> {
+      return {
+        enabled: true,
+        cronJobId: null,
+        cron: '0 7 * * *',
+        timezone: 'UTC',
+        interestTopics: topics,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    it('omits the local-news source entirely when "Local News" is not in interests', async () => {
+      const harness = await createHarness({
+        preloadedConfig: preloadInterestsConfig(['Tech', 'AI']),
+        userLocationEnv: { KILOCLAW_USER_LOCATION: 'San Francisco, CA' },
+        // Need at least one configured source so the brief doesn't
+        // throw "no usable sources". Web search with an empty default
+        // counts as configured+ok.
+        webSearch: { providers: [{ id: 'brave' }] },
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const summaries = await readAllSourceStatus(harness.stateDir);
+      expect(summaries.find(s => s.source === 'local-news')).toBeUndefined();
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      expect(sent).not.toContain('Local News');
+    });
+
+    it('renders a "set a location" message when interest is selected but no env vars are set', async () => {
+      const harness = await createHarness({
+        preloadedConfig: preloadInterestsConfig(['Local News']),
+        // No userLocationEnv → both KILOCLAW_USER_LOCATION and
+        // KILOCLAW_USER_TIMEZONE are empty.
+        webSearch: {
+          providers: [{ id: 'brave' }],
+        },
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      expect(sent).toContain('Local News');
+      expect(sent).toContain('Set a location in Settings');
+
+      const summaries = await readAllSourceStatus(harness.stateDir);
+      const localNewsSummary = summaries.find(s => s.source === 'local-news');
+      expect(localNewsSummary).toBeDefined();
+      expect(localNewsSummary?.configured).toBe(false);
+      expect(localNewsSummary?.summary).toContain('No location');
+    });
+
+    it('renders explicit-location section with results when tier 1 returns ≥ 3 unique items', async () => {
+      const harness = await createHarness({
+        preloadedConfig: preloadInterestsConfig(['Local News']),
+        userLocationEnv: { KILOCLAW_USER_LOCATION: 'San Francisco, CA' },
+        webSearch: {
+          providers: [{ id: 'brave' }],
+          resultsPerQuery: {
+            'local news in San Francisco, CA within 100 miles from the last 24 hours': {
+              provider: 'brave',
+              results: [
+                { title: 'SF article 1', url: 'https://sfchronicle.com/1' },
+                { title: 'SF article 2', url: 'https://sfchronicle.com/2' },
+                { title: 'SF article 3', url: 'https://sfchronicle.com/3' },
+              ],
+            },
+          },
+        },
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      expect(sent).toContain('Local News (San Francisco, CA)');
+      expect(sent).toContain('SF article 1');
+      expect(sent).toContain('SF article 2');
+      expect(sent).toContain('SF article 3');
+
+      const summaries = await readAllSourceStatus(harness.stateDir);
+      const localNewsSummary = summaries.find(s => s.source === 'local-news');
+      expect(localNewsSummary?.ok).toBe(true);
+      expect(localNewsSummary?.summary).toContain('3 local news');
+      expect(localNewsSummary?.summary).toContain('1 tier');
+    });
+
+    it('escalates through tiers until it accumulates 3 unique items', async () => {
+      const harness = await createHarness({
+        preloadedConfig: preloadInterestsConfig(['Local News']),
+        userLocationEnv: { KILOCLAW_USER_LOCATION: 'San Francisco, CA' },
+        webSearch: {
+          providers: [{ id: 'brave' }],
+          resultsPerQuery: {
+            'local news in San Francisco, CA within 100 miles from the last 24 hours': {
+              provider: 'brave',
+              results: [{ title: 'Hyperlocal 1', url: 'https://a.com/1' }],
+            },
+            'local news in San Francisco, CA within 250 miles from the last 3 days': {
+              provider: 'brave',
+              results: [
+                { title: 'Hyperlocal 1', url: 'https://a.com/1' }, // dup, should be deduped
+                { title: 'Regional 1', url: 'https://b.com/1' },
+              ],
+            },
+            'local news in San Francisco, CA from the last 7 days': {
+              provider: 'brave',
+              results: [
+                { title: 'Last week 1', url: 'https://c.com/1' },
+                { title: 'Last week 2', url: 'https://c.com/2' },
+              ],
+            },
+          },
+        },
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      expect(sent).toContain('Hyperlocal 1');
+      expect(sent).toContain('Regional 1');
+      expect(sent).toContain('Last week 1');
+
+      const summaries = await readAllSourceStatus(harness.stateDir);
+      const localNewsSummary = summaries.find(s => s.source === 'local-news');
+      expect(localNewsSummary?.ok).toBe(true);
+      // After 3 tiers, accumulated count is 4 (1 from tier 1, 1 from
+      // tier 2 after dedupe, 2 from tier 3). Min items is 3, so loop
+      // bails after tier 3.
+      expect(localNewsSummary?.summary).toContain('3 tier');
+    });
+
+    it('falls back to timezone-derived header when only KILOCLAW_USER_TIMEZONE is set', async () => {
+      const harness = await createHarness({
+        preloadedConfig: preloadInterestsConfig(['Local News']),
+        userLocationEnv: { KILOCLAW_USER_TIMEZONE: 'America/Los_Angeles' },
+        webSearch: {
+          providers: [{ id: 'brave' }],
+          resultsPerQuery: {
+            'local news in Los Angeles from the last 24 hours': {
+              provider: 'brave',
+              results: [
+                { title: 'LA story 1', url: 'https://latimes.com/1' },
+                { title: 'LA story 2', url: 'https://latimes.com/2' },
+                { title: 'LA story 3', url: 'https://latimes.com/3' },
+              ],
+            },
+          },
+        },
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      expect(sent).toContain('Local News (Los Angeles area, from timezone)');
+      expect(sent).toContain('LA story 1');
+
+      // Confirm the tier query had no "miles" language since this is
+      // a timezone-derived context (we don't know real coordinates).
+      const searchArgs = await readJson(
+        path.join(harness.stateDir, 'morning-briefing', 'status.json')
+      );
+      // Status doesn't capture the raw query, but the sent message
+      // shouldn't contain "miles" framing in any tier reference.
+      expect(sent).not.toContain('within 100 miles');
+      void searchArgs;
+    });
+
+    it('returns "no local news found" message when all tiers come back empty', async () => {
+      const harness = await createHarness({
+        preloadedConfig: preloadInterestsConfig(['Local News']),
+        userLocationEnv: { KILOCLAW_USER_LOCATION: 'Smallville, KS' },
+        webSearch: {
+          providers: [{ id: 'brave' }],
+          // No resultsPerQuery keys — all tiers fall through to the
+          // default empty result.
+          defaultResult: { provider: 'brave', results: [] },
+        },
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      expect(sent).toContain('Local News (Smallville, KS)');
+      expect(sent).toContain('No local news found near Smallville, KS');
+
+      const summaries = await readAllSourceStatus(harness.stateDir);
+      const localNewsSummary = summaries.find(s => s.source === 'local-news');
+      expect(localNewsSummary?.ok).toBe(true);
+      expect(localNewsSummary?.summary).toContain('0 local news');
+    });
+
+    it('reports search failure as an [error] without breaking the brief', async () => {
+      const harness = await createHarness({
+        preloadedConfig: preloadInterestsConfig(['Local News']),
+        userLocationEnv: { KILOCLAW_USER_LOCATION: 'San Francisco, CA' },
+        webSearch: {
+          // No providers → readiness check fails before tier loop runs.
+          providers: [],
+        },
+        githubAuthReady: true,
+        githubIssues: [
+          {
+            title: 'GH placeholder',
+            url: 'https://github.com/x/y/issues/1',
+            updatedAt: '2026-05-15',
+          },
+        ],
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const summaries = await readAllSourceStatus(harness.stateDir);
+      const localNewsSummary = summaries.find(s => s.source === 'local-news');
+      expect(localNewsSummary?.configured).toBe(false);
+      expect(localNewsSummary?.ok).toBe(false);
+      expect(localNewsSummary?.summary).toContain('No web search provider');
     });
   });
 

@@ -34,6 +34,20 @@ import {
   normalizeLinearIssues,
   summarizeLinearCallFailure,
 } from './linear-utils';
+import {
+  buildLocalNewsSectionTitle,
+  buildLocalNewsTiers,
+  dedupeByUrl,
+  formatLocalNewsLine,
+  LOCAL_NEWS_INTEREST_LABEL,
+  LOCAL_NEWS_MAX_ITEMS,
+  LOCAL_NEWS_MIN_ITEMS,
+  LOCAL_NEWS_NO_LOCATION_LINES,
+  LOCAL_NEWS_NO_LOCATION_SUMMARY,
+  type LocalNewsItem,
+  type LocationContext,
+  resolveLocationContext,
+} from './local-news-utils';
 import { resolveNextReconcileAction } from './reconcile-queue-utils';
 import { normalizeWebResults } from './web-utils';
 
@@ -98,11 +112,19 @@ type StoredStatus = {
 };
 
 type SourceCollectionResult = {
-  source: 'github' | 'linear' | 'web';
+  source: 'github' | 'linear' | 'local-news' | 'web';
   configured: boolean;
   ok: boolean;
   summary: string;
   sectionLines: string[];
+  /**
+   * Optional per-source section title override. Most sources use a
+   * fixed title (`GitHub`, `Linear`, `Web Search`), but `local-news`
+   * varies the parenthetical based on the resolved location context
+   * (explicit vs timezone-derived vs none). Set by `collectLocalNews`;
+   * unset for sources with a static title.
+   */
+  sectionTitle?: string;
 };
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -873,6 +895,162 @@ async function collectWebSearch(
   }
 }
 
+type WebSearchRuntime = {
+  runtime: {
+    webSearch: {
+      listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
+      search: (params: { args: Record<string, unknown>; config?: unknown }) => Promise<{
+        provider: string;
+        result: Record<string, unknown>;
+      }>;
+    };
+  };
+  config: unknown;
+  logger: { info?: (message: string) => void; warn?: (message: string) => void };
+};
+
+/**
+ * Detect whether the user opted into Local News by checking for the
+ * exact `LOCAL_NEWS_INTEREST_LABEL` string in their interest topics.
+ * Case-insensitive, whitespace-trimmed — matches how the Settings
+ * editor stores topics.
+ */
+function wantsLocalNews(interestTopics: readonly string[]): boolean {
+  const target = LOCAL_NEWS_INTEREST_LABEL.toLowerCase();
+  return interestTopics.some(topic => topic.trim().toLowerCase() === target);
+}
+
+/**
+ * Run the Local News tier escalation. Loops `buildLocalNewsTiers` in
+ * order, calling `webSearch.search()` per tier, deduping by URL across
+ * tiers, and stopping early once we have at least
+ * `LOCAL_NEWS_MIN_ITEMS` unique results. Caps at `LOCAL_NEWS_MAX_ITEMS`.
+ *
+ * Any individual tier failure is swallowed so a transient search
+ * provider error doesn't tank the whole section — we just move on to
+ * the next tier and aggregate what we have.
+ *
+ * Caller is responsible for short-circuiting the no-location case
+ * (the tier list comes back empty for `kind: 'none'`); this loop just
+ * returns an empty array in that case, which is fine but wasteful if
+ * the caller didn't short-circuit.
+ */
+async function runLocalNewsTiers(
+  api: WebSearchRuntime,
+  locationContext: LocationContext
+): Promise<{ items: LocalNewsItem[]; providersTried: string[]; tiersConsumed: number }> {
+  const tiers = buildLocalNewsTiers(locationContext);
+  const accumulated: LocalNewsItem[] = [];
+  const providersTried = new Set<string>();
+  let tiersConsumed = 0;
+
+  for (const query of tiers) {
+    tiersConsumed += 1;
+    try {
+      const response = await api.runtime.webSearch.search({
+        config: api.config,
+        args: { query, count: LOCAL_NEWS_MAX_ITEMS },
+      });
+      providersTried.add(response.provider);
+      const fresh = normalizeWebResults(response.result).map<LocalNewsItem>(item => ({
+        title: item.title,
+        url: item.url,
+        summary: item.summary,
+      }));
+      const novel = dedupeByUrl(fresh, accumulated);
+      accumulated.push(...novel);
+      if (accumulated.length >= LOCAL_NEWS_MIN_ITEMS) {
+        break;
+      }
+    } catch (error) {
+      // Swallow per-tier errors; the next tier may still succeed and
+      // the accumulated set might already be enough. Logger surfaces
+      // the failure for observability without breaking the brief.
+      const errorText = error instanceof Error ? error.message : String(error);
+      api.logger.warn?.(`Morning briefing local-news tier ${tiersConsumed} failed: ${errorText}`);
+    }
+  }
+
+  return {
+    items: accumulated.slice(0, LOCAL_NEWS_MAX_ITEMS),
+    providersTried: Array.from(providersTried),
+    tiersConsumed,
+  };
+}
+
+/**
+ * Build the `local-news` SourceCollectionResult. Only invoked when
+ * the user has `Local News` in their interest topics; otherwise the
+ * brief skips this source entirely.
+ *
+ * Three result shapes:
+ * - No location resolvable: emits a "set a location" nudge in the
+ *   section body and a status footer flagged `[skipped]`.
+ * - Web-search provider unavailable: error shape, no section content.
+ * - Got results: section renders the items, status footer reports
+ *   tier count + provider(s) used.
+ */
+async function collectLocalNews(api: WebSearchRuntime): Promise<SourceCollectionResult> {
+  const locationContext = resolveLocationContext();
+
+  if (locationContext.kind === 'none') {
+    return {
+      source: 'local-news',
+      configured: false,
+      ok: true,
+      summary: LOCAL_NEWS_NO_LOCATION_SUMMARY,
+      sectionLines: [...LOCAL_NEWS_NO_LOCATION_LINES],
+      sectionTitle: buildLocalNewsSectionTitle(locationContext),
+    };
+  }
+
+  const readiness = await resolveWebSearchReady(api);
+  if (!readiness.configured) {
+    return {
+      source: 'local-news',
+      configured: false,
+      ok: false,
+      summary: readiness.summary,
+      sectionLines: [],
+      sectionTitle: buildLocalNewsSectionTitle(locationContext),
+    };
+  }
+
+  try {
+    const { items, providersTried, tiersConsumed } = await runLocalNewsTiers(api, locationContext);
+    if (items.length === 0) {
+      return {
+        source: 'local-news',
+        configured: true,
+        ok: true,
+        summary: `0 local news results after ${tiersConsumed} tier(s)`,
+        sectionLines: [
+          `No local news found near ${locationContext.kind === 'explicit' ? locationContext.raw : locationContext.cityHint}.`,
+        ],
+        sectionTitle: buildLocalNewsSectionTitle(locationContext),
+      };
+    }
+    const providerSuffix = providersTried.length > 0 ? ` via ${providersTried.join(', ')}` : '';
+    return {
+      source: 'local-news',
+      configured: true,
+      ok: true,
+      summary: `Fetched ${items.length} local news result(s) in ${tiersConsumed} tier(s)${providerSuffix}`,
+      sectionLines: items.map(formatLocalNewsLine),
+      sectionTitle: buildLocalNewsSectionTitle(locationContext),
+    };
+  } catch (error) {
+    return {
+      source: 'local-news',
+      configured: true,
+      ok: false,
+      summary: `Local news search failed: ${error instanceof Error ? error.message : String(error)}`,
+      sectionLines: [],
+      sectionTitle: buildLocalNewsSectionTitle(locationContext),
+    };
+  }
+}
+
 async function collectLinear(api: {
   runtime: {
     state: { resolveStateDir: () => string };
@@ -1005,12 +1183,25 @@ async function generateBriefing(
     ? storedConfig.interestTopics.filter((value): value is string => typeof value === 'string')
     : [];
 
-  const [github, linear, web] = await Promise.all([
+  // Always-on sources first, then opt-in sources based on interests.
+  // Order in the array determines order in the rendered brief.
+  const corePromises = [
     collectGithub(api),
     collectLinear(api),
     collectWebSearch(api, interestTopics),
-  ]);
-  const sources = [github, linear, web];
+  ];
+  const [github, linear, web] = await Promise.all(corePromises);
+  // Local News slots between Linear and Web Search — interest-gated so
+  // users who haven't opted in pay no search cost and see no
+  // local-news entry in the source-status footer.
+  const localNews = wantsLocalNews(interestTopics) ? await collectLocalNews(api) : null;
+
+  const sources: SourceCollectionResult[] = [
+    github,
+    linear,
+    ...(localNews ? [localNews] : []),
+    web,
+  ];
   const successes = sources.filter(source => source.ok);
 
   if (successes.length === 0) {
@@ -1022,6 +1213,15 @@ async function generateBriefing(
   const failures = sources
     .filter(source => !source.ok)
     .map(source => `${source.source}: ${source.summary}`);
+  // Default titles per source type. Individual sources can override via
+  // `SourceCollectionResult.sectionTitle` (used by Local News to surface
+  // the resolved location in the parens).
+  const DEFAULT_SECTION_TITLE: Record<SourceCollectionResult['source'], string> = {
+    github: 'GitHub',
+    linear: 'Linear',
+    'local-news': 'Local News',
+    web: 'Web Search',
+  };
   const markdown = buildBriefingMarkdown({
     dateKey,
     generatedAt: new Date(),
@@ -1031,11 +1231,10 @@ async function generateBriefing(
       ok: source.ok,
       summary: source.summary,
     })),
-    sections: [
-      { title: 'GitHub', lines: github.sectionLines },
-      { title: 'Linear', lines: linear.sectionLines },
-      { title: 'Web Search', lines: web.sectionLines },
-    ],
+    sections: sources.map(source => ({
+      title: source.sectionTitle ?? DEFAULT_SECTION_TITLE[source.source],
+      lines: source.sectionLines,
+    })),
     failures,
   });
 

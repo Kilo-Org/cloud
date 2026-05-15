@@ -448,6 +448,8 @@ describe('kiloclawRouter getStatus', () => {
       botNature: null,
       botVibe: null,
       botEmoji: null,
+      userLocation: null,
+      userTimezone: null,
       workerUrl: 'https://claw.test',
       name: null,
       instanceId: null,

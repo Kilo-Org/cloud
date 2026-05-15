@@ -126,8 +126,10 @@ const createCallbacks = (): ConnectionCallbacks & {
   onReconnecting: ReturnType<typeof vi.fn>;
   onReconnected: ReturnType<typeof vi.fn>;
   onDisconnect: ReturnType<typeof vi.fn>;
+  onTerminalError: ReturnType<typeof vi.fn>;
 } => ({
   onMessageComplete: vi.fn(),
+  onTerminalError: vi.fn(),
   onCommand: vi.fn(),
   onDisconnect: vi.fn(),
   onCompletionSignal: vi.fn(),
@@ -865,7 +867,7 @@ describe('ingest WS reconnection', () => {
     }
   );
 
-  it('forwards payment-style events instead of treating them as terminal errors', async () => {
+  it('forwards payment-style events and reports terminal errors', async () => {
     const kiloClient = createMockKiloClient({
       sdkClient: {
         event: {
@@ -893,6 +895,7 @@ describe('ingest WS reconnection', () => {
       event: 'payment_required',
       error: 'Insufficient credits',
     });
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith('Insufficient credits');
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
     expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
   });

@@ -227,6 +227,21 @@ async function main() {
       onMessageComplete: (messageId: string) => {
         lifecycleManager?.onMessageComplete(messageId);
       },
+      onTerminalError: (reason: string) => {
+        logToFile(`terminal error: ${reason}`);
+        state.sendToIngest({
+          streamEventType: 'error',
+          data: { error: reason, fatal: true },
+          timestamp: new Date().toISOString(),
+        });
+        const job = state.currentJob;
+        if (job) {
+          kiloClient.abortSession({ sessionId: job.kiloSessionId }).catch(() => {});
+        }
+        lifecycleManager?.setAborted();
+        state.setActive(false);
+        lifecycleManager?.triggerDrainAndClose();
+      },
       onCommand: (cmd: WrapperCommand) => {
         logToFile(`command received: ${cmd.type}`);
         if (cmd.type === 'kill') {

@@ -118,6 +118,7 @@ const createCodeReviewJobContext = (): JobContext => ({
 
 const createCallbacks = (): ConnectionCallbacks => ({
   onMessageComplete: vi.fn(),
+  onTerminalError: vi.fn(),
   onCommand: vi.fn(),
   onDisconnect: vi.fn(),
   onCompletionSignal: vi.fn(),
@@ -364,6 +365,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       properties: pendingQuestion,
     });
     expect(rejectQuestion).not.toHaveBeenCalled();
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
   it('replays pending permissions for code-review snapshots without rejecting them', async () => {
@@ -398,6 +400,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       properties: pendingPermission,
     });
     expect(answerPermission).not.toHaveBeenCalled();
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
   it('replays code-review question status snapshots as session.status events', async () => {
@@ -422,6 +425,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       sessionID: 'kilo_sess_456',
       status: { type: 'question' },
     });
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
   it('replays code-review permission status snapshots as session.status events', async () => {
@@ -446,6 +450,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       sessionID: 'kilo_sess_456',
       status: { type: 'permission' },
     });
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------

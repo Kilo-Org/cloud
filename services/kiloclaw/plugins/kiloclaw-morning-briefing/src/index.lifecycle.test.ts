@@ -34,6 +34,7 @@ type TestHarness = {
   statusHttpHandler: (_req: unknown, res: FakeResponse) => Promise<void>;
   enableHttpHandler: (req: unknown, res: FakeResponse) => Promise<void>;
   interestsHttpHandler: (req: unknown, res: FakeResponse) => Promise<void>;
+  userLocationHttpHandler: (req: unknown, res: FakeResponse) => Promise<void>;
   runHttpHandler: (_req: unknown, res: FakeResponse) => Promise<void>;
   cronJobs: CronJob[];
   sentMessages: Array<{
@@ -381,6 +382,7 @@ async function createHarness(options?: {
   let statusHttpHandler: ((_req: unknown, res: FakeResponse) => Promise<void>) | null = null;
   let enableHttpHandler: ((req: unknown, res: FakeResponse) => Promise<void>) | null = null;
   let interestsHttpHandler: ((req: unknown, res: FakeResponse) => Promise<void>) | null = null;
+  let userLocationHttpHandler: ((req: unknown, res: FakeResponse) => Promise<void>) | null = null;
   let runHttpHandler: ((_req: unknown, res: FakeResponse) => Promise<void>) | null = null;
   const loggerInfo = vi.fn();
   const loggerWarn = vi.fn();
@@ -429,6 +431,8 @@ async function createHarness(options?: {
         enableHttpHandler = route.handler;
       } else if (route.path.endsWith('/interests')) {
         interestsHttpHandler = route.handler;
+      } else if (route.path.endsWith('/user-location')) {
+        userLocationHttpHandler = route.handler;
       } else if (route.path.endsWith('/run')) {
         runHttpHandler = route.handler;
       }
@@ -442,6 +446,7 @@ async function createHarness(options?: {
     !statusHttpHandler ||
     !enableHttpHandler ||
     !interestsHttpHandler ||
+    !userLocationHttpHandler ||
     !runHttpHandler
   ) {
     throw new Error('Failed to register command or HTTP handlers');
@@ -453,6 +458,7 @@ async function createHarness(options?: {
     statusHttpHandler,
     enableHttpHandler,
     interestsHttpHandler,
+    userLocationHttpHandler,
     runHttpHandler,
     cronJobs,
     sentMessages,
@@ -1688,6 +1694,148 @@ describe('morning briefing lifecycle', () => {
       expect(localNewsSummary?.configured).toBe(false);
       expect(localNewsSummary?.ok).toBe(false);
       expect(localNewsSummary?.summary).toContain('No web search provider');
+    });
+  });
+
+  describe('user-location HTTP route', () => {
+    it('writes a string location to config.json and echoes it back', async () => {
+      const harness = await createHarness();
+      const response = new FakeResponse();
+
+      await harness.userLocationHttpHandler(
+        createJsonRequest({ userLocation: 'Novato, CA' }),
+        response
+      );
+
+      expect(response.statusCode).toBe(200);
+      const payload = JSON.parse(response.body) as Record<string, unknown>;
+      expect(payload.ok).toBe(true);
+      expect(payload.userLocation).toBe('Novato, CA');
+
+      const stored = (await readJson(
+        path.join(harness.stateDir, 'morning-briefing', 'config.json')
+      )) as { userLocation?: string | null };
+      expect(stored.userLocation).toBe('Novato, CA');
+    });
+
+    it('clears the override when userLocation is null', async () => {
+      const harness = await createHarness({
+        preloadedConfig: {
+          enabled: false,
+          cronJobId: null,
+          cron: '0 7 * * *',
+          timezone: 'UTC',
+          interestTopics: [],
+          userLocation: 'Old Place, XX',
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      const response = new FakeResponse();
+
+      await harness.userLocationHttpHandler(createJsonRequest({ userLocation: null }), response);
+
+      expect(response.statusCode).toBe(200);
+      const payload = JSON.parse(response.body) as Record<string, unknown>;
+      expect(payload.ok).toBe(true);
+      expect(payload.userLocation).toBeNull();
+
+      const stored = (await readJson(
+        path.join(harness.stateDir, 'morning-briefing', 'config.json')
+      )) as { userLocation?: string | null };
+      expect(stored.userLocation).toBeNull();
+    });
+
+    it('treats an empty / whitespace-only string as a clear', async () => {
+      const harness = await createHarness({
+        preloadedConfig: {
+          enabled: false,
+          cronJobId: null,
+          cron: '0 7 * * *',
+          timezone: 'UTC',
+          interestTopics: [],
+          userLocation: 'Old Place, XX',
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      const response = new FakeResponse();
+
+      await harness.userLocationHttpHandler(createJsonRequest({ userLocation: '   ' }), response);
+
+      expect(response.statusCode).toBe(200);
+      const payload = JSON.parse(response.body) as Record<string, unknown>;
+      expect(payload.userLocation).toBeNull();
+    });
+
+    it('trims surrounding whitespace before persisting', async () => {
+      const harness = await createHarness();
+      const response = new FakeResponse();
+
+      await harness.userLocationHttpHandler(
+        createJsonRequest({ userLocation: '  San Francisco, CA  ' }),
+        response
+      );
+
+      expect(response.statusCode).toBe(200);
+      const payload = JSON.parse(response.body) as Record<string, unknown>;
+      expect(payload.userLocation).toBe('San Francisco, CA');
+    });
+
+    it('returns 400 when userLocation is the wrong type', async () => {
+      const harness = await createHarness();
+      const response = new FakeResponse();
+
+      await harness.userLocationHttpHandler(createJsonRequest({ userLocation: 42 }), response);
+
+      expect(response.statusCode).toBe(400);
+      const payload = JSON.parse(response.body) as Record<string, unknown>;
+      expect(payload.ok).toBe(false);
+      expect(payload.error).toContain('string or null');
+    });
+
+    it('returns 400 when userLocation exceeds the length cap', async () => {
+      const harness = await createHarness();
+      const response = new FakeResponse();
+
+      await harness.userLocationHttpHandler(
+        createJsonRequest({ userLocation: 'a'.repeat(201) }),
+        response
+      );
+
+      expect(response.statusCode).toBe(400);
+      const payload = JSON.parse(response.body) as Record<string, unknown>;
+      expect(payload.ok).toBe(false);
+      expect(payload.error).toContain('200 characters');
+    });
+
+    it('preserves enabled / cron / timezone / interestTopics when only location updates', async () => {
+      const harness = await createHarness({
+        preloadedConfig: {
+          enabled: true,
+          cronJobId: 'job-1',
+          cron: '0 8 * * *',
+          timezone: 'America/New_York',
+          interestTopics: ['Tech', 'AI'],
+          userLocation: null,
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      const response = new FakeResponse();
+
+      await harness.userLocationHttpHandler(
+        createJsonRequest({ userLocation: 'Boston, MA' }),
+        response
+      );
+
+      expect(response.statusCode).toBe(200);
+      const stored = (await readJson(
+        path.join(harness.stateDir, 'morning-briefing', 'config.json')
+      )) as Record<string, unknown>;
+      expect(stored.enabled).toBe(true);
+      expect(stored.cronJobId).toBe('job-1');
+      expect(stored.cron).toBe('0 8 * * *');
+      expect(stored.timezone).toBe('America/New_York');
+      expect(stored.interestTopics).toEqual(['Tech', 'AI']);
+      expect(stored.userLocation).toBe('Boston, MA');
     });
   });
 

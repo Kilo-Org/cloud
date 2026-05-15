@@ -200,4 +200,4 @@ export function buildNoLocationSectionLines(timezone: string | null): string[] {
 
 /** Source-status footer summary when no explicit location is set. */
 export const LOCAL_NEWS_NO_LOCATION_SUMMARY =
-  'No location configured — set one in Settings to enable local news';
+  'No location configured — set one in Settings → Morning Briefing to enable local news';

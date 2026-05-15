@@ -869,19 +869,7 @@ type WebSearchPerTopicResult = {
 };
 
 async function collectWebSearch(
-  api: {
-    runtime: {
-      webSearch: {
-        listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-        search: (params: { args: Record<string, unknown>; config?: unknown }) => Promise<{
-          provider: string;
-          result: Record<string, unknown>;
-        }>;
-      };
-    };
-    config: unknown;
-    logger?: { info?: (message: string) => void; warn?: (message: string) => void };
-  },
+  api: WebSearchRuntime,
   interestTopics: readonly string[]
 ): Promise<SourceCollectionResult> {
   // Caller already filtered out "Local News" — that has its own source.
@@ -938,7 +926,7 @@ async function collectWebSearch(
       }
     } catch (error) {
       const errorText = error instanceof Error ? error.message : String(error);
-      api.logger?.warn?.(`Morning briefing web search topic '${topic}' failed: ${errorText}`);
+      api.logger.warn?.(`Morning briefing web search topic '${topic}' failed: ${errorText}`);
     }
   }
 
@@ -1297,7 +1285,7 @@ async function generateBriefing(
 
   if (successes.length === 0) {
     throw new Error(
-      'No usable briefing sources are available. Configure at least one of GitHub, Linear, or web search.'
+      'No usable briefing sources are available. Configure at least one of GitHub, Linear, Local News, or web search.'
     );
   }
 

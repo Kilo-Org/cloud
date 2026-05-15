@@ -1,5 +1,5 @@
 export const BILLING_HOURLY_CRON = '0 * * * *';
-export const INSTANCE_DESTRUCTION_QUARTER_HOURLY_CRON = '*/15 * * * *';
+export const INSTANCE_DESTRUCTION_QUARTER_HOURLY_CRON = '5,20,35,50 * * * *';
 export const TRIAL_INACTIVITY_DAILY_CRON = '0 8 * * *';
 export const TRIAL_INACTIVITY_SWEEP = 'trial_inactivity_stop' as const;
 export const TRIAL_INACTIVITY_STOP_CANDIDATE_SWEEP = 'trial_inactivity_stop_candidate' as const;

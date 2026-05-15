@@ -155,7 +155,7 @@ describe('kiloclaw billing worker handler', () => {
     const { env, lifecycleSend, trialInactivitySend } = createEnv();
 
     await handler.scheduled?.(
-      { cron: '*/15 * * * *' } as ScheduledController,
+      { cron: '5,20,35,50 * * * *' } as ScheduledController,
       env,
       {} as ExecutionContext
     );
@@ -173,7 +173,7 @@ describe('kiloclaw billing worker handler', () => {
     expect(record).toMatchObject({
       event: 'run_started',
       outcome: 'started',
-      cron: '*/15 * * * *',
+      cron: '5,20,35,50 * * * *',
     });
     expect(record?.tags).toEqual(
       expect.objectContaining({

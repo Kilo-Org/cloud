@@ -2096,7 +2096,7 @@ describe('instance destruction sweep', () => {
 
   it('keeps DB/email cleanup unchanged when platform destroy succeeds', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
-    const { db, updates, txUpdates, inserts, deletes } = createMockDb([
+    const { db, updates, txUpdates, inserts, deletes, selectBuilders } = createMockDb([
       [
         {
           id: 'sub-1',
@@ -2146,6 +2146,7 @@ describe('instance destruction sweep', () => {
 
     expect(summary.errors).toBe(0);
     expect(summary.sweep3_instance_destruction).toBe(1);
+    expect(selectBuilders[0]?.limit).toHaveBeenCalledWith(50);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     expect(inserts).toEqual(

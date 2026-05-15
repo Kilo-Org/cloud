@@ -71,6 +71,7 @@ const DESTRUCTION_WARNING_DAYS = 2;
 const EARLYBIRD_WARNING_DAYS = 14;
 const AUTO_RESUME_INITIAL_BACKOFF_MS = 2 * 60 * 60 * 1000;
 const AUTO_RESUME_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
+const INSTANCE_DESTRUCTION_BATCH_SIZE = 50;
 const TRIAL_INACTIVITY_BATCH_SIZE = 50;
 const SOFT_DELETED_EMAIL_SUFFIX = '@deleted.invalid';
 const TRIAL_ENDING_SOON_MIN_DURATION_DAYS = 2;
@@ -2725,7 +2726,9 @@ async function runInstanceDestructionSweep(
         isNotNull(kiloclaw_subscriptions.suspended_at),
         inArray(kiloclaw_subscriptions.status, ['canceled', 'past_due', 'unpaid'])
       )
-    );
+    )
+    .orderBy(asc(kiloclaw_subscriptions.destruction_deadline), asc(kiloclaw_subscriptions.id))
+    .limit(INSTANCE_DESTRUCTION_BATCH_SIZE);
 
   for (const row of destructionCandidates) {
     try {

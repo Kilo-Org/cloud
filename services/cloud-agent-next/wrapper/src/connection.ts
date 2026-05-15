@@ -28,6 +28,10 @@ function statusTypeFromProperties(properties: Record<string, unknown>): string |
   return isRecord(status) && typeof status.type === 'string' ? status.type : undefined;
 }
 
+function isInteractiveStatusType(statusType: string | undefined): boolean {
+  return statusType === 'question' || statusType === 'permission';
+}
+
 function rejectCodeReviewQuestion(
   questionId: string | undefined,
   kiloClient: WrapperKiloClient
@@ -227,8 +231,7 @@ export function createConnectionManager(
       const pendingQuestion = questions.find(q => q.sessionID === kiloSessionId);
       const pendingPermission = permissions.find(p => p.sessionID === kiloSessionId);
       const codeReviewJob = isCodeReviewJob(state);
-      const skipStatusForCodeReview =
-        codeReviewJob && (sessionStatus.type === 'question' || sessionStatus.type === 'permission');
+      const skipStatusForCodeReview = codeReviewJob && isInteractiveStatusType(sessionStatus.type);
 
       if (codeReviewJob) {
         rejectCodeReviewQuestion(pendingQuestion?.id, config.kiloClient);
@@ -524,14 +527,7 @@ export function createConnectionManager(
 
             if (
               eventType === 'session.status' &&
-              statusTypeFromProperties(properties) === 'question'
-            ) {
-              continue;
-            }
-
-            if (
-              eventType === 'session.status' &&
-              statusTypeFromProperties(properties) === 'permission'
+              isInteractiveStatusType(statusTypeFromProperties(properties))
             ) {
               continue;
             }

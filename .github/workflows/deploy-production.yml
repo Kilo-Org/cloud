@@ -13,6 +13,8 @@ concurrency:
 
 env:
   VERCEL_VERSION: '53.3.1'
+  # pnpm dlx vercel can hit ERR_PNPM_MISSING_TIME with default resolution mode.
+  PNPM_CONFIG_RESOLUTION_MODE: 'highest'
 
 jobs:
   check-production-db-startup:
@@ -48,7 +50,6 @@ jobs:
   run-migrations:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
-    needs: check-production-db-startup
     environment: production
 
     steps:
@@ -79,7 +80,7 @@ jobs:
   deploy-app:
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 30
-    needs: run-migrations
+    needs: [check-production-db-startup, run-migrations]
     environment: production
 
     env:
@@ -130,7 +131,7 @@ jobs:
   deploy-global-app:
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 30
-    needs: run-migrations
+    needs: [check-production-db-startup, run-migrations]
     environment: production
 
     env:
@@ -179,7 +180,7 @@ jobs:
         run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-kiloclaw:
-    needs: check-production-db-startup
+    needs: [check-production-db-startup, run-migrations]
     permissions:
       contents: read
       packages: write

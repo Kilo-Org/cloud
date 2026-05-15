@@ -162,7 +162,7 @@ function formatSubscriptionEndDate(iso: string | null): string {
     return 'period end';
   }
 
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
     year: 'numeric',

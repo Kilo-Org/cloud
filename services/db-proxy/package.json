@@ -18,12 +18,12 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.21",
-    "@types/jest": "^30.0.0",
-    "@types/node": ">=24 <25",
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@types/jest": "30.0.0",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "jest": "^30.3.0",
-    "ts-jest": "^29.4.6",
+    "jest": "30.3.0",
+    "ts-jest": "29.4.9",
     "typescript": "catalog:",
     "wrangler": "catalog:"
   }

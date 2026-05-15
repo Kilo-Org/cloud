@@ -20,9 +20,9 @@
   },
   "devDependencies": {
     "@trpc/server": "catalog:",
-    "@types/node": ">=24 <25",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "~3.2.4"
+    "vitest": "catalog:"
   }
 }

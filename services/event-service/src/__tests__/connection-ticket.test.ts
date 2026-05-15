@@ -1,6 +1,6 @@
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from 'cloudflare:test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { signKiloToken } from '@kilocode/worker-utils';
+import { clearSecretCacheForTest, signKiloToken } from '@kilocode/worker-utils';
 import type { ConnectionTicketDO } from '../do/connection-ticket-do';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
@@ -53,6 +53,7 @@ async function connect(ticket: string): Promise<Response> {
 
 describe('event-service WebSocket connection tickets', () => {
   beforeEach(() => {
+    clearSecretCacheForTest();
     vi.spyOn(env.NEXTAUTH_SECRET, 'get').mockResolvedValue(TEST_JWT_SECRET);
   });
 

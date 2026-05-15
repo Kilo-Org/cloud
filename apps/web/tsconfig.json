@@ -3,7 +3,6 @@
     "target": "es2017",
     "module": "commonjs",
     "lib": ["dom", "dom.iterable", "esnext", "esnext.asynciterable"],
-    "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

@@ -11,12 +11,13 @@
     "types": "wrangler types --include-runtime=false"
   },
   "dependencies": {
-    "@cloudflare/containers": "^0.3.2",
+    "@cloudflare/containers": "0.3.4",
     "hono": "catalog:",
     "jose": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "wrangler": "catalog:"
   }

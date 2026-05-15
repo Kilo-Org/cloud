@@ -23,13 +23,76 @@ export type BillingSweepKind = (typeof BILLING_SWEEP_ORDER)[number];
 export type TrialInactivitySweepKind =
   | typeof TRIAL_INACTIVITY_SWEEP
   | typeof TRIAL_INACTIVITY_STOP_CANDIDATE_SWEEP;
-export type BillingMessageSweep = BillingSweepKind | TrialInactivitySweepKind;
+export type CreditRenewalMessageSweep =
+  | 'credit_renewal_discovery'
+  | 'credit_renewal_item'
+  | 'credit_renewal_terminal_failure';
+export type BillingMessageSweep =
+  | BillingSweepKind
+  | TrialInactivitySweepKind
+  | CreditRenewalMessageSweep;
 
 export type LifecycleQueueMessage = {
   kind: 'lifecycle';
   runId: string;
   sweep: BillingSweepKind;
 };
+
+export type CreditRenewalDiscoveryQueueMessage = {
+  kind: 'credit_renewal_discovery';
+  runId: string;
+  sweep: 'credit_renewal_discovery';
+  cutoffTime?: string;
+  cursorSubscriptionId?: string;
+  cursorRenewalBoundary?: string;
+  pageBudget?: number;
+  wallClockBudgetMs?: number;
+};
+
+export type CreditRenewalDiscoveryContinuationQueueMessage = {
+  kind: 'credit_renewal_discovery_continuation';
+  runId: string;
+  sweep: 'credit_renewal_discovery';
+  cutoffTime: string;
+  cursorSubscriptionId: string;
+  cursorRenewalBoundary: string;
+  pageBudget?: number;
+  wallClockBudgetMs?: number;
+};
+
+export type CreditRenewalItemQueueMessage = {
+  kind: 'credit_renewal_item';
+  runId: string;
+  sweep: 'credit_renewal_item';
+  subscriptionId: string;
+  userId?: string;
+  renewalBoundary: string;
+  discoveredAt?: string;
+  resolveTerminalFailureOnExpectedOutcome?: boolean;
+  diagnostics?: {
+    instanceId: string | null;
+    plan: string;
+    status: string;
+  };
+};
+
+export type CreditRenewalTerminalFailureQueueMessage = {
+  kind: 'credit_renewal_terminal_failure';
+  runId: string;
+  sweep: 'credit_renewal_terminal_failure';
+  subscriptionId: string;
+  renewalBoundary: string;
+  attempts: number;
+  failureMessage?: string;
+};
+
+export type CreditRenewalQueueMessage =
+  | CreditRenewalDiscoveryQueueMessage
+  | CreditRenewalDiscoveryContinuationQueueMessage
+  | CreditRenewalItemQueueMessage
+  | CreditRenewalTerminalFailureQueueMessage;
+
+export type LifecycleProducerQueueMessage = LifecycleQueueMessage | CreditRenewalQueueMessage;
 
 export type TrialInactivityKickoffQueueMessage = {
   kind: 'trial_inactivity_stop';
@@ -50,7 +113,10 @@ export type TrialInactivityQueueMessage =
   | TrialInactivityKickoffQueueMessage
   | TrialInactivityStopCandidateQueueMessage;
 
-export type BillingQueueMessage = LifecycleQueueMessage | TrialInactivityQueueMessage;
+export type BillingQueueMessage =
+  | LifecycleQueueMessage
+  | CreditRenewalQueueMessage
+  | TrialInactivityQueueMessage;
 
 export type ServiceFetcher = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
@@ -58,7 +124,7 @@ export type ServiceFetcher = {
 
 export type BillingWorkerEnv = {
   HYPERDRIVE: { connectionString: string };
-  LIFECYCLE_QUEUE: Queue<LifecycleQueueMessage>;
+  LIFECYCLE_QUEUE: Queue<LifecycleProducerQueueMessage>;
   TRIAL_INACTIVITY_QUEUE: Queue<TrialInactivityQueueMessage>;
   KILOCLAW: ServiceFetcher;
   KILOCODE_BACKEND_BASE_URL: string;

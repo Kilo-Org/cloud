@@ -12,6 +12,7 @@
     "./redact-headers": "./src/redact-headers.ts",
     "./normalize-git-url": "./src/normalize-git-url.ts",
     "./kiloclaw-billing-observability": "./src/kiloclaw-billing-observability.ts",
+    "./kilo-pass-bonus-projection": "./src/kilo-pass-bonus-projection.ts",
     "./git-url": "./src/git-url.ts"
   },
   "scripts": {
@@ -31,6 +32,6 @@
   "devDependencies": {
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "~3.2.4"
+    "vitest": "catalog:"
   }
 }

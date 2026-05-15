@@ -14,6 +14,9 @@ vi.mock('cloudflare:workers', () => ({
 vi.mock('./lifecycle.js', () => ({
   runSweep: vi.fn(),
   processTrialInactivityStopCandidate: vi.fn(),
+  processCreditRenewalDiscovery: vi.fn(),
+  processCreditRenewalItem: vi.fn(),
+  recordCreditRenewalTerminalFailure: vi.fn(),
 }));
 
 vi.mock('./bootstrap.js', () => ({
@@ -22,7 +25,13 @@ vi.mock('./bootstrap.js', () => ({
 
 import { handler, KiloClawBillingService } from './index.js';
 import { bootstrapProvisionSubscription } from './bootstrap.js';
-import { processTrialInactivityStopCandidate, runSweep } from './lifecycle.js';
+import {
+  processCreditRenewalDiscovery,
+  processCreditRenewalItem,
+  processTrialInactivityStopCandidate,
+  recordCreditRenewalTerminalFailure,
+  runSweep,
+} from './lifecycle.js';
 import type { BillingQueueMessage, BillingWorkerEnv } from './types.js';
 
 let loggedValues: unknown[] = [];
@@ -121,6 +130,9 @@ describe('kiloclaw billing worker handler', () => {
     };
     vi.mocked(runSweep).mockResolvedValue(emptySummary);
     vi.mocked(processTrialInactivityStopCandidate).mockResolvedValue(emptySummary);
+    vi.mocked(processCreditRenewalDiscovery).mockResolvedValue(emptySummary);
+    vi.mocked(processCreditRenewalItem).mockResolvedValue(emptySummary);
+    vi.mocked(recordCreditRenewalTerminalFailure).mockResolvedValue(undefined);
   });
 
   it('enqueues the first lifecycle sweep on the hourly cron', async () => {
@@ -197,7 +209,7 @@ describe('kiloclaw billing worker handler', () => {
     expect(runSweep).not.toHaveBeenCalled();
   });
 
-  it('chains the next sweep after a successful queue run', async () => {
+  it('fans out credit renewal discovery before continuing the lifecycle run', async () => {
     const { env, lifecycleSend } = createEnv();
     const runId = '11111111-1111-4111-8111-111111111111';
     const message = {
@@ -209,12 +221,13 @@ describe('kiloclaw billing worker handler', () => {
 
     await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
 
-    expect(runSweep).toHaveBeenCalledWith(
-      env,
-      { kind: 'lifecycle', runId, sweep: 'credit_renewal' },
-      1
-    );
-    expect(lifecycleSend).toHaveBeenLastCalledWith({
+    expect(runSweep).not.toHaveBeenCalled();
+    expect(lifecycleSend).toHaveBeenNthCalledWith(1, {
+      kind: 'credit_renewal_discovery',
+      runId,
+      sweep: 'credit_renewal_discovery',
+    });
+    expect(lifecycleSend).toHaveBeenNthCalledWith(2, {
       kind: 'lifecycle',
       runId,
       sweep: 'interrupted_auto_resume',
@@ -230,7 +243,7 @@ describe('kiloclaw billing worker handler', () => {
       body: {
         kind: 'lifecycle',
         runId: '11111111-1111-4111-8111-111111111111',
-        sweep: 'credit_renewal',
+        sweep: 'interrupted_auto_resume',
       },
       attempts: 2,
       ack: vi.fn(),
@@ -356,6 +369,186 @@ describe('kiloclaw billing worker handler', () => {
     });
   });
 
+  it('processes credit-renewal discovery queue messages', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const message = {
+      body: {
+        kind: 'credit_renewal_discovery',
+        runId: '66666666-6666-4666-8666-666666666666',
+        sweep: 'credit_renewal_discovery',
+        pageBudget: 25,
+        wallClockBudgetMs: 1000,
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processCreditRenewalDiscovery).toHaveBeenCalledWith(
+      env,
+      {
+        kind: 'credit_renewal_discovery',
+        runId: '66666666-6666-4666-8666-666666666666',
+        sweep: 'credit_renewal_discovery',
+        pageBudget: 25,
+        wallClockBudgetMs: 1000,
+      },
+      1
+    );
+    expect(runSweep).not.toHaveBeenCalled();
+    expect(lifecycleSend).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('processes one credit-renewal item queue message', async () => {
+    const { env } = createEnv();
+    const message = {
+      body: {
+        kind: 'credit_renewal_item',
+        runId: '77777777-7777-4777-8777-777777777777',
+        sweep: 'credit_renewal_item',
+        subscriptionId: '88888888-8888-4888-8888-888888888888',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processCreditRenewalItem).toHaveBeenCalledWith(
+      env,
+      {
+        kind: 'credit_renewal_item',
+        runId: '77777777-7777-4777-8777-777777777777',
+        sweep: 'credit_renewal_item',
+        subscriptionId: '88888888-8888-4888-8888-888888888888',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      1
+    );
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('discards invalid credit-renewal queue messages with structured logs', async () => {
+    const { env } = createEnv();
+    const message = {
+      body: {
+        kind: 'credit_renewal_item',
+        runId: '77777777-7777-4777-8777-777777777777',
+        sweep: 'credit_renewal_item',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processCreditRenewalItem).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(findLogRecord('Discarding invalid billing queue message')).toMatchObject({
+      event: 'invalid_message_discarded',
+      outcome: 'discarded',
+      attempts: 1,
+    });
+  });
+
+  it('retries unexpected credit-renewal item failures and records terminal failure on the last retry', async () => {
+    const { env } = createEnv();
+    vi.mocked(processCreditRenewalItem).mockRejectedValueOnce(new Error('db unavailable'));
+    const message = {
+      body: {
+        kind: 'credit_renewal_item',
+        runId: '77777777-7777-4777-8777-777777777777',
+        sweep: 'credit_renewal_item',
+        subscriptionId: '88888888-8888-4888-8888-888888888888',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      attempts: 3,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(recordCreditRenewalTerminalFailure).toHaveBeenCalledWith(env, {
+      kind: 'credit_renewal_terminal_failure',
+      runId: '77777777-7777-4777-8777-777777777777',
+      sweep: 'credit_renewal_terminal_failure',
+      subscriptionId: '88888888-8888-4888-8888-888888888888',
+      renewalBoundary: '2026-06-01T00:00:00.000Z',
+      attempts: 3,
+      failureMessage: 'db unavailable',
+    });
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('retries the last credit-renewal item attempt when terminal failure recording fails', async () => {
+    const { env } = createEnv();
+    vi.mocked(processCreditRenewalItem).mockRejectedValueOnce(new Error('db unavailable'));
+    vi.mocked(recordCreditRenewalTerminalFailure).mockRejectedValueOnce(
+      new Error('terminal repository unavailable')
+    );
+    const message = {
+      body: {
+        kind: 'credit_renewal_item',
+        runId: '77777777-7777-4777-8777-777777777777',
+        sweep: 'credit_renewal_item',
+        subscriptionId: '88888888-8888-4888-8888-888888888888',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      attempts: 3,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(recordCreditRenewalTerminalFailure).toHaveBeenCalledTimes(1);
+    expect(message.retry).toHaveBeenCalledTimes(1);
+    expect(message.ack).not.toHaveBeenCalled();
+    expect(
+      findLogRecord('Failed to record credit-renewal terminal failure before DLQ')
+    ).toMatchObject({
+      event: 'terminal_failure_record_failed',
+      outcome: 'failed',
+      attempts: 3,
+    });
+  });
+
+  it('processes explicit terminal-failure queue messages', async () => {
+    const { env } = createEnv();
+    const message = {
+      body: {
+        kind: 'credit_renewal_terminal_failure',
+        runId: '99999999-9999-4999-8999-999999999999',
+        sweep: 'credit_renewal_terminal_failure',
+        subscriptionId: '88888888-8888-4888-8888-888888888888',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+        attempts: 3,
+        failureMessage: 'dead-lettered',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(recordCreditRenewalTerminalFailure).toHaveBeenCalledWith(env, message.body);
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
   it('bootstrapProvisionSubscription RPC delegates to bootstrap module and returns subscriptionId', async () => {
     vi.mocked(bootstrapProvisionSubscription).mockResolvedValueOnce({
       id: 'sub-bootstrap',
@@ -401,7 +594,7 @@ describe('kiloclaw billing worker handler', () => {
       body: {
         kind: 'lifecycle',
         runId: '11111111-1111-4111-8111-111111111111',
-        sweep: 'credit_renewal',
+        sweep: 'interrupted_auto_resume',
       },
       attempts: 3,
       ack: vi.fn(),
@@ -423,7 +616,7 @@ describe('kiloclaw billing worker handler', () => {
         billingFlow: 'kiloclaw_lifecycle',
         billingComponent: 'worker',
         billingRunId: '11111111-1111-4111-8111-111111111111',
-        billingSweep: 'credit_renewal',
+        billingSweep: 'interrupted_auto_resume',
         billingAttempt: 3,
       })
     );

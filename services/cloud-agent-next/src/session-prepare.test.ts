@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import * as schemas from './router/schemas.js';
 import * as schemaLimits from './schema.js';
 import type * as WorkspaceModule from './workspace.js';
@@ -131,15 +132,17 @@ import {
   runSetupCommands as mockedRunSetupCommands,
 } from './session-service.js';
 
+type MockDOProcedure = Mock<(...args: unknown[]) => Promise<unknown>>;
+
 // Helper to create a mock DO stub
 function createMockDOStub(
   overrides: {
-    prepare?: ReturnType<typeof vi.fn>;
-    tryUpdate?: ReturnType<typeof vi.fn>;
-    tryInitiate?: ReturnType<typeof vi.fn>;
-    getMetadata?: ReturnType<typeof vi.fn>;
-    updateMetadata?: ReturnType<typeof vi.fn>;
-    deleteSession?: ReturnType<typeof vi.fn>;
+    prepare?: MockDOProcedure;
+    tryUpdate?: MockDOProcedure;
+    tryInitiate?: MockDOProcedure;
+    getMetadata?: MockDOProcedure;
+    updateMetadata?: MockDOProcedure;
+    deleteSession?: MockDOProcedure;
   } = {}
 ) {
   return {

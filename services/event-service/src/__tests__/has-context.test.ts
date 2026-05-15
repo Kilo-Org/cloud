@@ -24,7 +24,7 @@ async function attachContexts(
 
 describe('UserSessionDO.hasContext', () => {
   it('returns false when no sockets are open', async () => {
-    const stub = getStub('user-no-sockets');
+    const stub = getStub('has-context-user-no-sockets');
     await runInDurableObject(stub, async (instance: UserSessionDO) => {
       expect(await instance.hasContext('/presence/web')).toBe(false);
     });
@@ -39,7 +39,7 @@ describe('UserSessionDO.hasContext', () => {
   });
 
   it('returns false for contexts no socket has subscribed to', async () => {
-    const stub = getStub('user-other-sub');
+    const stub = getStub('has-context-user-other-sub');
     await attachContexts(stub, ['/presence/web']);
     await runInDurableObject(stub, async (instance: UserSessionDO) => {
       expect(await instance.hasContext('/presence/app')).toBe(false);

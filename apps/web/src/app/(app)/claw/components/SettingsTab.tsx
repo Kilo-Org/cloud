@@ -1114,9 +1114,15 @@ function MorningBriefingCard({
                   {isReading ? (
                     <p className="text-muted-foreground text-xs">Loading saved briefing...</p>
                   ) : readData?.markdown ? (
-                    <pre className="bg-muted max-h-56 overflow-auto rounded p-3 text-xs whitespace-pre-wrap">
-                      {readData.markdown}
-                    </pre>
+                    <>
+                      <pre className="bg-muted max-h-56 overflow-auto rounded p-3 text-xs whitespace-pre-wrap">
+                        {readData.markdown}
+                      </pre>
+                      <p className="text-muted-foreground mt-2 text-xs italic">
+                        Raw markdown output. Briefings delivered to chat are reformatted for
+                        readability.
+                      </p>
+                    </>
                   ) : (
                     <p className="text-muted-foreground text-xs">
                       No saved briefing for {requestedDay === 'today' ? 'today' : 'yesterday'}.

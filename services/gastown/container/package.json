@@ -12,14 +12,14 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/gastown/container/src"
   },
   "dependencies": {
-    "@kilocode/plugin": "7.2.14",
+    "@kilocode/plugin": "7.2.52",
     "@kilocode/sdk": "7.2.14",
     "hono": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/bun": "^1.2.17",
+    "@types/bun": "1.3.14",
     "typescript": "catalog:",
-    "vitest": "^3.2.4"
+    "vitest": "catalog:"
   }
 }

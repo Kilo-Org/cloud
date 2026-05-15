@@ -575,7 +575,7 @@ These scripts validate the machine-side Node controller introduced for KiloClaw.
 Build the image first from `kiloclaw/`:
 
 ```bash
-docker build --progress=plain -t kiloclaw:controller .
+docker buildx build --build-context workspace=../.. --load --progress=plain -t kiloclaw:controller .
 ```
 
 Then run one of:

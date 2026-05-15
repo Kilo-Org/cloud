@@ -23,30 +23,30 @@
     "build:types": "tsgo -p tsconfig.types.json || true"
   },
   "dependencies": {
-    "@cloudflare/containers": "^0.1.0",
-    "@hono/trpc-server": "^0.4.2",
+    "@cloudflare/containers": "0.1.1",
+    "@hono/trpc-server": "0.4.2",
     "@kilocode/db": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
-    "@sentry/cloudflare": "^9",
+    "@sentry/cloudflare": "9.47.1",
     "@trpc/server": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
-    "itty-time": "^1.0.6",
+    "itty-time": "1.0.6",
     "jose": "catalog:",
     "jsonwebtoken": "catalog:",
-    "pg": "^8.16.3",
+    "pg": "8.20.0",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.8",
+    "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "catalog:",
     "@sentry/cli": "catalog:",
     "@types/jsonwebtoken": "catalog:",
-    "@types/node": ">=24 <25",
-    "@typescript/native-preview": "7.0.0-dev.20251019.1",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^3.2.4",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

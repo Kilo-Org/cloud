@@ -9,8 +9,8 @@
  *    produce no `lastAssistantMessageText` rather than an empty string.
  */
 
-import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { env, runInDurableObject } from 'cloudflare:test';
+import { describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
@@ -101,11 +101,6 @@ async function prepareSessionWithCallback(
 }
 
 describe('Callback notification with latest assistant message', () => {
-  beforeEach(async () => {
-    const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    expect(ids).toHaveLength(0);
-  });
-
   it('includes lastAssistantMessageText on completed callbacks', async () => {
     const userId = 'user_cb_1';
     const sessionId = 'agent_cb_1';

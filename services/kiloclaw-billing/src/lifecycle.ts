@@ -1924,6 +1924,14 @@ export async function runCreditRenewalSweep(
 const CREDIT_RENEWAL_DISCOVERY_DEFAULT_PAGE_BUDGET = 50;
 const CREDIT_RENEWAL_DISCOVERY_DEFAULT_WALL_CLOCK_BUDGET_MS = 25_000;
 
+function serializeBillingQueueTimestamp(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('Cannot serialize invalid billing queue timestamp');
+  }
+  return date.toISOString();
+}
+
 function creditRenewalEligibilityFilter(nowIso: string) {
   return and(
     eq(kiloclaw_subscriptions.payment_source, 'credits'),
@@ -2075,7 +2083,7 @@ export async function processCreditRenewalDiscovery(
           sweep: 'credit_renewal_item',
           subscriptionId: row.id,
           userId: row.user_id,
-          renewalBoundary: row.credit_renewal_at,
+          renewalBoundary: serializeBillingQueueTimestamp(row.credit_renewal_at),
           discoveredAt,
           diagnostics: {
             instanceId: row.instance_id,
@@ -2088,14 +2096,18 @@ export async function processCreditRenewalDiscovery(
       }
 
       const shouldContinue = rows.length > pageBudget;
-      if (shouldContinue && lastEmitted?.credit_renewal_at) {
+      const nextCursorRenewalBoundary =
+        shouldContinue && lastEmitted?.credit_renewal_at
+          ? serializeBillingQueueTimestamp(lastEmitted.credit_renewal_at)
+          : undefined;
+      if (nextCursorRenewalBoundary && lastEmitted) {
         await env.LIFECYCLE_QUEUE.send({
           kind: 'credit_renewal_discovery_continuation',
           runId: message.runId,
           sweep: 'credit_renewal_discovery',
           cutoffTime,
           cursorSubscriptionId: lastEmitted.id,
-          cursorRenewalBoundary: lastEmitted.credit_renewal_at,
+          cursorRenewalBoundary: nextCursorRenewalBoundary,
           pageBudget: message.pageBudget,
           wallClockBudgetMs: message.wallClockBudgetMs,
         });
@@ -2111,9 +2123,9 @@ export async function processCreditRenewalDiscovery(
         fetchedCount: rows.length,
         enqueuedCount: emitted,
         discoveryBacklogLikely: shouldContinue,
-        continuationEnqueued: shouldContinue && lastEmitted?.credit_renewal_at !== undefined,
+        continuationEnqueued: nextCursorRenewalBoundary !== undefined,
         nextCursorSubscriptionId: lastEmitted?.id,
-        nextCursorRenewalBoundary: lastEmitted?.credit_renewal_at ?? undefined,
+        nextCursorRenewalBoundary,
       });
 
       return summary;

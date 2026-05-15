@@ -508,15 +508,21 @@ function GoogleAccountCard({
  *
  * When no location is set, surfaces an amber-bordered nudge with an
  * inline input. When a location is set, renders a read-only value with
- * an Edit affordance.
+ * an Edit affordance and a Clear button.
  *
- * Saves via the existing `updateConfig` mutation (the same path
- * onboarding uses on the weather-location step). Note: the running
- * kiloclaw container reads `KILOCLAW_USER_LOCATION` from env at boot,
- * so the new value only takes effect after the next container restart
- * / redeploy. A small warning surfaces that fact next to the Save
- * button so users aren't surprised when the next brief still uses
- * the old value.
+ * Saves via the existing `updateConfig` mutation. Two delivery paths
+ * downstream:
+ *   - Instance running: the worker DO calls
+ *     `gateway.updateMorningBriefingUserLocation`, which writes the
+ *     new value into the plugin's `config.json`. The plugin reads
+ *     that file at the start of every brief via
+ *     `resolveLocationContextWithOverride`, so the next brief uses
+ *     the new location with no restart.
+ *   - Instance stopped: the DO updates state + Postgres, and the
+ *     `KILOCLAW_USER_LOCATION` env var is rewritten on next boot so
+ *     the plugin picks it up via the env-var fallback.
+ * Either way, the next briefing run picks up the new value — no
+ * manual restart needed.
  */
 function MorningBriefingLocationEditor({
   mutations,
@@ -542,12 +548,28 @@ function MorningBriefingLocationEditor({
       { userLocation: value },
       {
         onSuccess: () => {
-          toast.success('Location saved. Restart your bot for the change to take effect.', {
-            duration: 8000,
+          toast.success('Location saved. Changes take effect on your next morning brief.', {
+            duration: 6000,
           });
           setEditing(false);
         },
         onError: err => toast.error(`Failed to save location: ${err.message}`),
+      }
+    );
+  }
+
+  function handleClear() {
+    mutations.updateConfig.mutate(
+      { userLocation: null },
+      {
+        onSuccess: () => {
+          toast.success('Location cleared. Local News will be disabled until you set one.', {
+            duration: 6000,
+          });
+          setDraft('');
+          setEditing(false);
+        },
+        onError: err => toast.error(`Failed to clear location: ${err.message}`),
       }
     );
   }
@@ -617,8 +639,19 @@ function MorningBriefingLocationEditor({
             <Button size="sm" variant="ghost" onClick={handleCancel} disabled={isSaving}>
               Cancel
             </Button>
+            {hasLocation && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleClear}
+                disabled={isSaving}
+                className="text-destructive hover:text-destructive"
+              >
+                Clear
+              </Button>
+            )}
             <p className="text-muted-foreground text-xs">
-              Restart your bot after saving for the change to take effect.
+              Changes take effect on your next morning brief.
             </p>
           </div>
         </div>

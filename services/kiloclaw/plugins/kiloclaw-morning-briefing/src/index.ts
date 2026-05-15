@@ -831,22 +831,42 @@ async function collectGithub(api: GithubApiRunner): Promise<SourceCollectionResu
 }
 
 /**
- * Build the web-search query for the morning briefing.
+ * Build a per-topic web-search query for the morning briefing.
  *
- * If the user picked interest topics in the onboarding step (or Settings
- * editor), interpolate them into the query so the briefing is scoped to
- * their interests. Falls back to the original hardcoded "engineering
- * updates" query when no topics are selected — keeps the briefing useful
- * out of the box and preserves behavior for instances that pre-date the
- * interests feature.
+ * Each interest topic gets its OWN query so the search engine returns
+ * balanced per-topic coverage. The old behavior (comma-joining all
+ * topics into a single query) caused the engine to dilute results as
+ * topics multiplied — 9 topics with a single 6-result count gave 6
+ * mushy results trying to cover everything. The per-topic loop runs
+ * one search per topic with a small count and dedupes by URL.
+ *
+ * Caller is responsible for trimming and filtering out "Local News"
+ * (it has its own dedicated source). This function is called once per
+ * topic with the topic string already cleaned.
  */
-export function buildBriefingWebSearchQuery(interestTopics: readonly string[]): string {
-  const cleaned = interestTopics.map(topic => topic.trim()).filter(topic => topic.length > 0);
-  if (cleaned.length === 0) {
-    return 'top engineering updates and breaking software infrastructure news from the last 24 hours';
-  }
-  return `latest news and updates on ${cleaned.join(', ')} from the last 24 hours`;
+export function buildBriefingWebSearchQuery(topic: string): string {
+  return `latest news and updates on ${topic} from the last 24 hours`;
 }
+
+/**
+ * Per-topic web search call count cap. Each topic gets up to this many
+ * results before the dedupe/cap step. Higher = better per-topic
+ * coverage but more search-engine calls. 3 is a balance: enough to
+ * dedupe duplicates and still surface 2-3 unique items per topic.
+ */
+const WEB_SEARCH_COUNT_PER_TOPIC = 3;
+
+/**
+ * Total result cap on the rendered `## Web Search` section. Even with
+ * many topics, we slice down to this count after deduping by URL.
+ */
+const WEB_SEARCH_MAX_ITEMS = 10;
+
+type WebSearchPerTopicResult = {
+  topic: string;
+  title: string;
+  url: string;
+};
 
 async function collectWebSearch(
   api: {
@@ -860,9 +880,26 @@ async function collectWebSearch(
       };
     };
     config: unknown;
+    logger?: { info?: (message: string) => void; warn?: (message: string) => void };
   },
   interestTopics: readonly string[]
 ): Promise<SourceCollectionResult> {
+  // Caller already filtered out "Local News" — that has its own source.
+  // If nothing remains, the user hasn't opted into general web news.
+  // Surface a nudge instead of forcing a hardcoded fallback query.
+  const cleanedTopics = interestTopics.map(topic => topic.trim()).filter(topic => topic.length > 0);
+  if (cleanedTopics.length === 0) {
+    return {
+      source: 'web',
+      configured: false,
+      ok: true,
+      summary: 'No general-interest topics selected',
+      sectionLines: [
+        'Select interests like Tech, AI, Finance, or Markets in Settings → Morning Briefing to add general web news to your briefing.',
+      ],
+    };
+  }
+
   const readiness = await resolveWebSearchReady(api);
   if (!readiness.configured) {
     return {
@@ -874,40 +911,56 @@ async function collectWebSearch(
     };
   }
 
-  try {
-    const response = await api.runtime.webSearch.search({
-      config: api.config,
-      args: {
-        query: buildBriefingWebSearchQuery(interestTopics),
-        count: 6,
-      },
-    });
-    const results = normalizeWebResults(response.result);
-    if (results.length === 0) {
-      return {
-        source: 'web',
-        configured: true,
-        ok: true,
-        summary: 'Web search returned no results',
-        sectionLines: ['- No web-search results returned.'],
-      };
+  // Per-topic loop. Run searches sequentially (provider rate limits +
+  // ordering predictability outweigh the parallelism win for a daily
+  // brief). Per-topic failures are swallowed and logged so a transient
+  // search error doesn't tank the whole section. Results across topics
+  // are deduped by URL — first-seen-wins so the topic that pulled it
+  // in keeps the badge.
+  const accumulated: WebSearchPerTopicResult[] = [];
+  const seenUrls = new Set<string>();
+  const providersTried = new Set<string>();
+  for (const topic of cleanedTopics) {
+    try {
+      const response = await api.runtime.webSearch.search({
+        config: api.config,
+        args: {
+          query: buildBriefingWebSearchQuery(topic),
+          count: WEB_SEARCH_COUNT_PER_TOPIC,
+        },
+      });
+      providersTried.add(response.provider);
+      const results = normalizeWebResults(response.result);
+      for (const item of results) {
+        if (!item.url || seenUrls.has(item.url)) continue;
+        seenUrls.add(item.url);
+        accumulated.push({ topic, title: item.title, url: item.url });
+      }
+    } catch (error) {
+      const errorText = error instanceof Error ? error.message : String(error);
+      api.logger?.warn?.(`Morning briefing web search topic '${topic}' failed: ${errorText}`);
     }
+  }
+
+  if (accumulated.length === 0) {
     return {
       source: 'web',
       configured: true,
       ok: true,
-      summary: `Fetched ${results.length} web results (${response.provider})`,
-      sectionLines: results.slice(0, 6).map(item => `- [${item.title}](${item.url})`),
-    };
-  } catch (error) {
-    return {
-      source: 'web',
-      configured: true,
-      ok: false,
-      summary: `Web search failed: ${error instanceof Error ? error.message : String(error)}`,
-      sectionLines: [],
+      summary: 'Web search returned no results',
+      sectionLines: ['- No web-search results returned.'],
     };
   }
+
+  const rendered = accumulated.slice(0, WEB_SEARCH_MAX_ITEMS);
+  const providerSuffix = providersTried.size > 0 ? ` (${[...providersTried].join(', ')})` : '';
+  return {
+    source: 'web',
+    configured: true,
+    ok: true,
+    summary: `Fetched ${rendered.length} web results across ${cleanedTopics.length} topic(s)${providerSuffix}`,
+    sectionLines: rendered.map(item => `- [${item.topic}] [${item.title}](${item.url})`),
+  };
 }
 
 type WebSearchRuntime = {
@@ -1210,10 +1263,21 @@ async function generateBriefing(
 
   // Always-on sources first, then opt-in sources based on interests.
   // Order in the array determines order in the rendered brief.
+  //
+  // "Local News" is excluded from the Web Search topic list — it has
+  // its own dedicated source and shouldn't leak into the general
+  // web-search query (otherwise the search engine treats "Local News"
+  // as text and returns local stories from arbitrary cities, ignoring
+  // the user's actual location). Case-insensitive trim matches the
+  // plugin's `wantsLocalNews` exactly.
+  const localNewsLabelLower = LOCAL_NEWS_INTEREST_LABEL.toLowerCase();
+  const webSearchTopics = interestTopics.filter(
+    topic => topic.trim().toLowerCase() !== localNewsLabelLower
+  );
   const corePromises = [
     collectGithub(api),
     collectLinear(api),
-    collectWebSearch(api, interestTopics),
+    collectWebSearch(api, webSearchTopics),
   ];
   const [github, linear, web] = await Promise.all(corePromises);
   // Local News slots between Linear and Web Search — interest-gated so

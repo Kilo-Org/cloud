@@ -4860,10 +4860,14 @@ describe('credit renewal sweep affiliate tracking', () => {
         }),
       ])
     );
-    expect(JSON.stringify(loggedValues)).not.toContain(
-      'Skipping credit renewal for destroyed instance row'
+    expect(loggedValues).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: 'subscription_row_skipped',
+          reason: 'instance_destroyed',
+        }),
+      ])
     );
-    expect(JSON.stringify(loggedValues)).not.toContain('instance_destroyed');
   });
 
   it('renews destroyed suspended past-due rows without requesting platform auto-resume', async () => {

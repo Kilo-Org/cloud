@@ -496,6 +496,14 @@ beforeEach(() => {
           })
         );
       }
+      if (typeof url === 'string' && url.includes('/_kilo/morning-briefing/user-location')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, userLocation: null }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
       // Root path probe — return non-502
       return Promise.resolve({ ok: true, status: 200 });
     })

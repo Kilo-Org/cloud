@@ -32,6 +32,10 @@ async function runSync(env: CloudflareEnv, promotionName?: string) {
   return syncPromotionsFromBench(env.BENCH_DASHBOARD, createPromotionStore(db), { promotionName });
 }
 
+async function getInternalApiSecret(secret: SecretBinding | string): Promise<string> {
+  return typeof secret === 'string' ? secret : secret.get();
+}
+
 async function handleFetch(request: Request, env: CloudflareEnv): Promise<Response> {
   const url = new URL(request.url);
 
@@ -47,7 +51,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     return Response.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const internalSecret = await env.INTERNAL_API_SECRET.get();
+  const internalSecret = await getInternalApiSecret(env.INTERNAL_API_SECRET);
   const authHeader = request.headers.get('x-internal-api-key');
   if (!authHeader || !internalSecret || !(await timingSafeEqual(authHeader, internalSecret))) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });

@@ -1,0 +1,3 @@
+# Shared secret required for local manual sync; secrets store is unavailable in wrangler dev.
+# @from INTERNAL_API_SECRET
+INTERNAL_API_SECRET=

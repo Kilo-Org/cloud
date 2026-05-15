@@ -918,6 +918,13 @@
       "when": 1778834349464,
       "tag": "0130_kiloclaw_instances_user_id_created_at_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 131,
+      "version": "7",
+      "when": 1778850746897,
+      "tag": "0131_known_banshee",
+      "breakpoints": true
     }
   ]
 }

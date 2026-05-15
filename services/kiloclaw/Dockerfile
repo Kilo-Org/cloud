@@ -175,8 +175,19 @@ RUN cd /tmp/kiloclaw-morning-briefing \
 # Fly Volume mount at /root, so it was unreachable at runtime anyway.
 FROM debian:trixie-slim AS controller-builder
 
+ENV NODE_VERSION=24.15.0
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl unzip \
+    && apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils \
+    && ARCH="$(dpkg --print-architecture)" \
+    && case "${ARCH}" in \
+         amd64) NODE_ARCH="x64" ;; \
+         arm64) NODE_ARCH="arm64" ;; \
+         *) echo "Unsupported architecture: ${ARCH}" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz -o /tmp/node.tar.xz \
+    && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
+    && rm /tmp/node.tar.xz \
+    && npm install --global pnpm@11.1.1 \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.13" \
     && rm -rf /var/lib/apt/lists/*
 ENV PATH="/root/.bun/bin:$PATH"
@@ -184,15 +195,19 @@ ENV PATH="/root/.bun/bin:$PATH"
 # Re-declare global ARGs to make them available in this stage
 ARG CONTROLLER_COMMIT
 ARG CONTROLLER_CACHE_BUST
-COPY controller/ /tmp/controller-build/
-RUN cd /tmp/controller-build \
-    && bun install --frozen-lockfile \
+COPY --from=workspace pnpm-workspace.yaml pnpm-lock.yaml /tmp/controller-workspace/
+COPY --from=workspace patches/ /tmp/controller-workspace/patches/
+COPY controller/ /tmp/controller-workspace/services/kiloclaw/controller/
+RUN cd /tmp/controller-workspace \
+    && pnpm install --filter kiloclaw-controller --frozen-lockfile --ignore-scripts \
+    && cd services/kiloclaw/controller \
     && CONTROLLER_VERSION="$(date -u +'%Y.%-m.%-d.%H%M')" \
     && bun build src/index.ts --outfile=/usr/local/bin/kiloclaw-controller.js --target=node --minify \
        --define "KILOCLAW_CONTROLLER_VERSION=\"${CONTROLLER_VERSION}\"" \
        --define "KILOCLAW_CONTROLLER_COMMIT=\"${CONTROLLER_COMMIT}\"" \
     && bun pm cache rm \
-    && rm -rf /tmp/controller-build
+    && pnpm store prune \
+    && rm -rf /tmp/controller-workspace
 
 # ── Final stage: runtime image ────────────────────────────────────────
 FROM runtime AS final

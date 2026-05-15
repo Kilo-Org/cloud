@@ -4,7 +4,7 @@ import { ModelEvalIngestContent } from './ModelEvalIngestContent';
 
 const breadcrumbs = (
   <BreadcrumbItem>
-    <BreadcrumbPage>Model Eval Ingest</BreadcrumbPage>
+    <BreadcrumbPage>Model Benchmarks</BreadcrumbPage>
   </BreadcrumbItem>
 );
 

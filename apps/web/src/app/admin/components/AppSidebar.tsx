@@ -181,7 +181,7 @@ const analyticsObservabilityItems: MenuItem[] = [
     icon: () => <BarChart />,
   },
   {
-    title: () => 'Model Eval Ingest',
+    title: () => 'Model Benchmarks',
     url: '/admin/model-eval-ingest',
     icon: () => <FileSearch />,
   },

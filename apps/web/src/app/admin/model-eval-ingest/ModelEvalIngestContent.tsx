@@ -52,7 +52,7 @@ export function ModelEvalIngestContent() {
     <div className="flex w-full flex-col gap-6">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold">Model Eval Ingest</h2>
+          <h2 className="text-2xl font-bold">Model Benchmarks</h2>
           <p className="text-muted-foreground max-w-4xl">
             Audit promoted kilo-bench evals that cloud has pulled, then refresh the public Kilo
             Bench cache on demand. Bench remains the aggregate source; this table is the cloud-side

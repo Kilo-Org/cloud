@@ -42,6 +42,8 @@ catalog:
   zod: 4.4.3
 
 minimumReleaseAge: 6842
+minimumReleaseAgeExclude:
+  - tsx@4.21.0
 overrides:
   '@sentry/cli': 3.4.2
   mdast-util-to-hast: 13.2.1

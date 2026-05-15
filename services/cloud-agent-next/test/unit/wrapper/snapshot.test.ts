@@ -2,8 +2,7 @@
  * Unit tests for sendKiloSnapshot behavior in createConnectionManager.
  *
  * Verifies that sendKiloSnapshot sends regular kilocode events (session.status,
- * permission.asked) instead of a kilo_snapshot event, and fails code-review
- * sessions that try to enter interactive states.
+ * question.asked, permission.asked) instead of a kilo_snapshot event.
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
@@ -119,7 +118,6 @@ const createCodeReviewJobContext = (): JobContext => ({
 
 const createCallbacks = (): ConnectionCallbacks => ({
   onMessageComplete: vi.fn(),
-  onTerminalError: vi.fn(),
   onCommand: vi.fn(),
   onDisconnect: vi.fn(),
   onCompletionSignal: vi.fn(),
@@ -335,7 +333,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     });
   });
 
-  it('rejects pending questions and fails code-review sessions', async () => {
+  it('replays pending questions for code-review snapshots without rejecting them', async () => {
     const pendingQuestion = {
       id: 'q_123',
       sessionID: 'kilo_sess_456',
@@ -360,14 +358,15 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       m => m.streamEventType === 'kilocode' && m.data.event === 'question.asked'
     );
 
-    expect(questionEvents).toHaveLength(0);
-    expect(rejectQuestion).toHaveBeenCalledWith('q_123');
-    expect(callbacks.onTerminalError).toHaveBeenCalledWith(
-      'Code review attempted to ask an interactive question'
-    );
+    expect(questionEvents).toHaveLength(1);
+    expect(questionEvents[0].data).toMatchObject({
+      event: 'question.asked',
+      properties: pendingQuestion,
+    });
+    expect(rejectQuestion).not.toHaveBeenCalled();
   });
 
-  it('rejects pending permissions and fails code-review sessions', async () => {
+  it('replays pending permissions for code-review snapshots without rejecting them', async () => {
     const pendingPermission = {
       id: 'p_456',
       sessionID: 'kilo_sess_456',
@@ -393,14 +392,15 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       m => m.streamEventType === 'kilocode' && m.data.event === 'permission.asked'
     );
 
-    expect(permissionEvents).toHaveLength(0);
-    expect(answerPermission).toHaveBeenCalledWith('p_456', 'reject');
-    expect(callbacks.onTerminalError).toHaveBeenCalledWith(
-      'Code review attempted to request interactive permission'
-    );
+    expect(permissionEvents).toHaveLength(1);
+    expect(permissionEvents[0].data).toMatchObject({
+      event: 'permission.asked',
+      properties: pendingPermission,
+    });
+    expect(answerPermission).not.toHaveBeenCalled();
   });
 
-  it('fails code-review sessions that snapshot a question status without a question id', async () => {
+  it('replays code-review question status snapshots as session.status events', async () => {
     const kiloClient = createMockKiloClient({
       getSessionStatuses: vi.fn().mockResolvedValue({
         kilo_sess_456: { type: 'question' },
@@ -416,10 +416,36 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       m => m.streamEventType === 'kilocode' && m.data.event === 'session.status'
     );
 
-    expect(statusEvents).toHaveLength(0);
-    expect(callbacks.onTerminalError).toHaveBeenCalledWith(
-      'Code review attempted to ask an interactive question'
+    expect(statusEvents).toHaveLength(1);
+    expect(statusEvents[0].data).toMatchObject({
+      event: 'session.status',
+      sessionID: 'kilo_sess_456',
+      status: { type: 'question' },
+    });
+  });
+
+  it('replays code-review permission status snapshots as session.status events', async () => {
+    const kiloClient = createMockKiloClient({
+      getSessionStatuses: vi.fn().mockResolvedValue({
+        kilo_sess_456: { type: 'permission' },
+      }),
+    });
+
+    state.startJob(createCodeReviewJobContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+    const statusEvents = messages.filter(
+      m => m.streamEventType === 'kilocode' && m.data.event === 'session.status'
     );
+
+    expect(statusEvents).toHaveLength(1);
+    expect(statusEvents[0].data).toMatchObject({
+      event: 'session.status',
+      sessionID: 'kilo_sess_456',
+      status: { type: 'permission' },
+    });
   });
 
   // -----------------------------------------------------------------------

@@ -84,8 +84,6 @@ export type ConnectionConfig = {
 export type ConnectionCallbacks = {
   /** Called when a completion event is detected for a message */
   onMessageComplete: (messageId: string) => void;
-  /** Called when a terminal error is detected */
-  onTerminalError: (reason: string) => void;
   /** Called when a command is received from DO */
   onCommand: (cmd: WrapperCommand) => void;
   /** Called when the connection unexpectedly closes */
@@ -226,20 +224,6 @@ export function createConnectionManager(
 
       const pendingQuestion = questions.find(q => q.sessionID === kiloSessionId);
       const pendingPermission = permissions.find(p => p.sessionID === kiloSessionId);
-
-      if (isCodeReviewJob(state)) {
-        if (sessionStatus.type === 'question' || pendingQuestion) {
-          rejectCodeReviewQuestion(pendingQuestion?.id, config.kiloClient);
-          callbacks.onTerminalError('Code review attempted to ask an interactive question');
-          return;
-        }
-
-        if (sessionStatus.type === 'permission' || pendingPermission) {
-          rejectCodeReviewPermission(pendingPermission?.id, config.kiloClient);
-          callbacks.onTerminalError('Code review attempted to request interactive permission');
-          return;
-        }
-      }
 
       // Send session status as a regular kilocode event
       const statusProperties = { sessionID: kiloSessionId, status: sessionStatus };
@@ -384,50 +368,6 @@ export function createConnectionManager(
   }
 
   /**
-   * Check if an event represents a terminal error (payment/billing/quota).
-   */
-  function isTerminalError(eventType: string, properties: Record<string, unknown>): boolean {
-    if (eventType === 'payment_required' || eventType === 'insufficient_funds') {
-      return true;
-    }
-    const error = properties.error;
-    if (error) {
-      const errorStr = typeof error === 'string' ? error : JSON.stringify(error);
-      if (
-        errorStr.includes('payment') ||
-        errorStr.includes('credit') ||
-        errorStr.includes('balance') ||
-        errorStr.includes('quota')
-      ) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  function getTerminalErrorText(eventType: string, properties: Record<string, unknown>): string {
-    const error = properties.error;
-    if (typeof error === 'string') {
-      return error;
-    }
-
-    if (isRecord(error)) {
-      if (typeof error.message === 'string') {
-        return error.message;
-      }
-
-      const data = error.data;
-      if (isRecord(data) && typeof data.message === 'string') {
-        return data.message;
-      }
-
-      return JSON.stringify(error);
-    }
-
-    return `Insufficient credits: ${eventType}`;
-  }
-
-  /**
    * Start the SDK event subscription. Runs in the background.
    * Replaces the old SSE consumer with a typed event stream from the SDK.
    */
@@ -504,8 +444,8 @@ export function createConnectionManager(
             const permId = typeof properties.id === 'string' ? properties.id : undefined;
             if (isCodeReviewJob(state)) {
               rejectCodeReviewPermission(permId, config.kiloClient);
-              callbacks.onTerminalError('Code review attempted to request interactive permission');
-              return;
+              callbacks.onSseEvent?.();
+              continue;
             }
 
             if (permId) {
@@ -524,24 +464,24 @@ export function createConnectionManager(
             if (eventType === 'question.asked') {
               const questionId = typeof properties.id === 'string' ? properties.id : undefined;
               rejectCodeReviewQuestion(questionId, config.kiloClient);
-              callbacks.onTerminalError('Code review attempted to ask an interactive question');
-              return;
+              callbacks.onSseEvent?.();
+              continue;
             }
 
             if (
               eventType === 'session.status' &&
               statusTypeFromProperties(properties) === 'question'
             ) {
-              callbacks.onTerminalError('Code review entered interactive question state');
-              return;
+              callbacks.onSseEvent?.();
+              continue;
             }
 
             if (
               eventType === 'session.status' &&
               statusTypeFromProperties(properties) === 'permission'
             ) {
-              callbacks.onTerminalError('Code review entered interactive permission state');
-              return;
+              callbacks.onSseEvent?.();
+              continue;
             }
           }
 
@@ -566,12 +506,6 @@ export function createConnectionManager(
                 state.setLastAssistantMessageId(info.id);
               }
             }
-          }
-
-          // Terminal error detection
-          if (isTerminalError(eventType, properties)) {
-            callbacks.onTerminalError(getTerminalErrorText(eventType, properties));
-            return;
           }
 
           // session.idle is the primary completion signal - it means the assistant finished

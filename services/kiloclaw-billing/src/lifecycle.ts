@@ -1669,7 +1669,7 @@ async function processCreditRenewalRow(
     await processPaidConversionBestEffort(env, context, {
       userId: outcome.userId,
       dedupeKey: `affiliate:impact:sale:${outcome.deductionCategory}`,
-      eventDateIso: outcome.renewalAt,
+      eventDateIso: serializeBillingTimestamp(outcome.renewalAt),
       orderId: outcome.deductionCategory,
       amount: outcome.costMicrodollars / 1_000_000,
       currencyCode: 'usd',
@@ -1734,7 +1734,7 @@ async function processCreditRenewalRow(
     await processPaidConversionBestEffort(env, context, {
       userId: outcome.userId,
       dedupeKey: `affiliate:impact:sale:${outcome.deductionCategory}`,
-      eventDateIso: outcome.renewalAt,
+      eventDateIso: serializeBillingTimestamp(outcome.renewalAt),
       orderId: outcome.deductionCategory,
       amount: outcome.costMicrodollars / 1_000_000,
       currencyCode: 'usd',
@@ -1784,8 +1784,10 @@ async function processCreditRenewalRow(
         total_microdollars_acquired: outcome.row.total_microdollars_acquired,
         microdollars_used: outcome.row.microdollars_used,
         auto_top_up_enabled: outcome.row.auto_top_up_enabled,
-        next_credit_expiration_at: outcome.row.next_credit_expiration_at,
-        updated_at: outcome.row.user_updated_at,
+        next_credit_expiration_at: outcome.row.next_credit_expiration_at
+          ? serializeBillingTimestamp(outcome.row.next_credit_expiration_at)
+          : null,
+        updated_at: serializeBillingTimestamp(outcome.row.user_updated_at),
       });
     } catch (error) {
       log('error', 'Auto top-up trigger failed during credit renewal', {
@@ -1924,10 +1926,10 @@ export async function runCreditRenewalSweep(
 const CREDIT_RENEWAL_DISCOVERY_DEFAULT_PAGE_BUDGET = 50;
 const CREDIT_RENEWAL_DISCOVERY_DEFAULT_WALL_CLOCK_BUDGET_MS = 25_000;
 
-function serializeBillingQueueTimestamp(timestamp: string): string {
+function serializeBillingTimestamp(timestamp: string): string {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) {
-    throw new Error('Cannot serialize invalid billing queue timestamp');
+    throw new Error('Cannot serialize invalid billing timestamp');
   }
   return date.toISOString();
 }
@@ -2083,7 +2085,7 @@ export async function processCreditRenewalDiscovery(
           sweep: 'credit_renewal_item',
           subscriptionId: row.id,
           userId: row.user_id,
-          renewalBoundary: serializeBillingQueueTimestamp(row.credit_renewal_at),
+          renewalBoundary: serializeBillingTimestamp(row.credit_renewal_at),
           discoveredAt,
           diagnostics: {
             instanceId: row.instance_id,
@@ -2098,7 +2100,7 @@ export async function processCreditRenewalDiscovery(
       const shouldContinue = rows.length > pageBudget;
       const nextCursorRenewalBoundary =
         shouldContinue && lastEmitted?.credit_renewal_at
-          ? serializeBillingQueueTimestamp(lastEmitted.credit_renewal_at)
+          ? serializeBillingTimestamp(lastEmitted.credit_renewal_at)
           : undefined;
       if (nextCursorRenewalBoundary && lastEmitted) {
         await env.LIFECYCLE_QUEUE.send({

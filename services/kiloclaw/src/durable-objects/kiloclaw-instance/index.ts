@@ -997,7 +997,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           // Mirror the rest of this method's pattern of letting writes
           // through gateway helpers raise. Worth a warn log so the
           // failure is visible without blocking the DO save.
-          doWarn('updateMorningBriefingUserLocation failed', toLoggable(err));
+          doWarn(this.s, 'updateMorningBriefingUserLocation failed', {
+            error: toLoggable(err),
+          });
         }
       }
     }

@@ -1625,13 +1625,6 @@ describe('morning briefing lifecycle', () => {
       expect(sent).toContain('America/Los_Angeles');
       expect(sent).toContain('city or address');
 
-      // No `gh search`-style queries fired against the brief's web
-      // search — the timezone is never used as a query source.
-      const searchCalls = harness.runCommandWithTimeout.mock.calls.filter(
-        ([argv]) => Array.isArray(argv) && argv[0] === 'gh' && argv[1] === 'search'
-      );
-      void searchCalls;
-
       const summaries = await readAllSourceStatus(harness.stateDir);
       const localNewsSummary = summaries.find(s => s.source === 'local-news');
       expect(localNewsSummary?.configured).toBe(false);
@@ -1694,6 +1687,34 @@ describe('morning briefing lifecycle', () => {
       expect(localNewsSummary?.configured).toBe(false);
       expect(localNewsSummary?.ok).toBe(false);
       expect(localNewsSummary?.summary).toContain('No web search provider');
+    });
+
+    it('swallows webSearch.search() throws across all tiers and reports 0 results', async () => {
+      // collectLocalNews → runLocalNewsTiers catches per-tier errors
+      // and continues, so a throw on every search call just produces
+      // an empty accumulated list rather than tanking the brief.
+      const harness = await createHarness({
+        preloadedConfig: preloadInterestsConfig(['Local News']),
+        userLocationEnv: { KILOCLAW_USER_LOCATION: 'Novato, CA' },
+        webSearch: {
+          providers: [{ id: 'brave' }],
+          searchThrows: new Error('rate limit exceeded'),
+        },
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      expect(sent).toContain('No local news found near Novato, CA');
+
+      const summaries = await readAllSourceStatus(harness.stateDir);
+      const localNewsSummary = summaries.find(s => s.source === 'local-news');
+      expect(localNewsSummary?.configured).toBe(true);
+      expect(localNewsSummary?.ok).toBe(true);
+      expect(localNewsSummary?.summary).toContain('0 local news results');
     });
   });
 

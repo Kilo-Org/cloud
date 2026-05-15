@@ -2386,7 +2386,11 @@ async function runTrialExpirySweep(
         eq(kiloclaw_subscriptions.status, 'trialing'),
         currentSubscriptionRowFilter(),
         lt(kiloclaw_subscriptions.trial_ends_at, now),
-        isNull(kiloclaw_subscriptions.suspended_at)
+        isNull(kiloclaw_subscriptions.suspended_at),
+        isNotNull(kiloclaw_subscriptions.instance_id),
+        isNotNull(kiloclaw_instances.sandbox_id),
+        isNull(kiloclaw_instances.destroyed_at),
+        isNull(kiloclaw_instances.organization_id)
       )
     );
 

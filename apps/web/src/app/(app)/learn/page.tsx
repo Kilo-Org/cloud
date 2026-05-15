@@ -38,10 +38,31 @@ function VideoIcon({ className }: { className?: string }) {
   );
 }
 
+function FileTextIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" />
+      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+      <path d="M10 9H8" />
+      <path d="M16 13H8" />
+      <path d="M16 17H8" />
+    </svg>
+  );
+}
+
 export default function LearnPage() {
   return (
     <PageLayout title="Learn">
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="group border-brand-primary/20 hover:border-brand-primary/40 hover:shadow-brand-primary/5 relative flex flex-col justify-between overflow-hidden transition-all hover:shadow-lg">
           <div className="bg-brand-primary/10 group-hover:bg-brand-primary/20 absolute top-0 right-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full blur-2xl transition-all" />
           <CardHeader className="relative flex-1">
@@ -61,6 +82,27 @@ export default function LearnPage() {
               <Link href="https://kilo.ai/docs" target="_blank" rel="noopener noreferrer">
                 View Documentation
               </Link>
+            </Button>
+          </CardFooter>
+        </Card>
+
+        <Card className="group border-brand-primary/20 hover:border-brand-primary/40 hover:shadow-brand-primary/5 relative flex flex-col justify-between overflow-hidden transition-all hover:shadow-lg">
+          <div className="bg-brand-primary/10 group-hover:bg-brand-primary/20 absolute top-0 right-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full blur-2xl transition-all" />
+          <CardHeader className="relative flex-1">
+            <div className="bg-brand-primary/10 text-brand-primary mb-4 flex h-12 w-12 items-center justify-center rounded-lg">
+              <FileTextIcon className="h-6 w-6" />
+            </div>
+            <CardTitle className="text-xl">Code Reviewer guidance</CardTitle>
+            <CardDescription className="text-muted-foreground mt-2">
+              Use REVIEW.md to keep repository-specific review policy with your codebase.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter>
+            <Button
+              className="bg-brand-primary hover:text-brand-primary hover:ring-brand-primary w-full text-black hover:bg-black hover:ring-2"
+              asChild
+            >
+              <Link href="/code-reviews/review-md">Read guide</Link>
             </Button>
           </CardFooter>
         </Card>

@@ -1,5 +1,5 @@
 {
-  "id": "742eda59-0cc9-4066-8c98-1b4eecd510fe",
+  "id": "be3523cb-2334-44fa-90a9-17219419091d",
   "prevId": "fc135682-02f6-42d4-91c4-f671b33dc41c",
   "version": "7",
   "dialect": "postgresql",
@@ -15677,7 +15677,7 @@
         },
         "avg_cost_microdollars": {
           "name": "avg_cost_microdollars",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
           "notNull": false
         },

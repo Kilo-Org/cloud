@@ -3012,7 +3012,7 @@ export const model_eval_ingestions = pgTable(
     total_score: decimal('total_score', { precision: 14, scale: 6, mode: 'number' }).notNull(),
     overall_score: decimal('overall_score', { precision: 12, scale: 8, mode: 'number' }).notNull(),
     n_errored: integer('n_errored').notNull(),
-    avg_cost_microdollars: integer('avg_cost_microdollars'),
+    avg_cost_microdollars: bigint('avg_cost_microdollars', { mode: 'number' }),
     avg_input_tokens: integer('avg_input_tokens'),
     avg_output_tokens: integer('avg_output_tokens'),
     avg_cache_read_tokens: integer('avg_cache_read_tokens'),

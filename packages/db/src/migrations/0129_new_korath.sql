@@ -11,7 +11,7 @@ CREATE TABLE "model_eval_ingestions" (
 	"total_score" numeric(14, 6) NOT NULL,
 	"overall_score" numeric(12, 8) NOT NULL,
 	"n_errored" integer NOT NULL,
-	"avg_cost_microdollars" integer,
+	"avg_cost_microdollars" bigint,
 	"avg_input_tokens" integer,
 	"avg_output_tokens" integer,
 	"avg_cache_read_tokens" integer,

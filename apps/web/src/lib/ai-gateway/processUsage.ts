@@ -423,6 +423,14 @@ async function insertUsageAndMetadataWithBalanceUpdate(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData
 ): Promise<BalanceUpdateResult> {
+  // Pick the matching partial unique index for the daily-rollup upsert. The
+  // microdollar_usage_daily table has two partial unique indexes; the upsert
+  // must target the one corresponding to this row's scope.
+  const dailyConflictTarget =
+    coreUsageFields.organization_id === null
+      ? sql`(kilo_user_id, usage_date) WHERE organization_id IS NULL`
+      : sql`(kilo_user_id, organization_id, usage_date) WHERE organization_id IS NOT NULL`;
+
   // Use a single SQL statement with CTEs to insert usage, upsert all lookup values, metadata, and update user balance in one roundtrip
   // This ensures atomicity: microdollar_usage insert and kilocode_users.microdollars_used update happen together
   const result = await db.execute<{
@@ -543,6 +551,22 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT feature_id FROM feature_cte),
               (SELECT mode_id FROM mode_cte),
               (SELECT auto_model_id FROM auto_model_cte)
+          )
+          , microdollar_usage_daily_upsert AS (
+            INSERT INTO microdollar_usage_daily (
+              kilo_user_id, organization_id, usage_date, total_cost_microdollars
+            )
+            SELECT
+              ${coreUsageFields.kilo_user_id},
+              ${coreUsageFields.organization_id}::uuid,
+              date_trunc('day', ${coreUsageFields.created_at}::timestamptz)::date,
+              ${coreUsageFields.cost}::bigint
+            WHERE ${coreUsageFields.cost} <> 0
+            ON CONFLICT ${dailyConflictTarget}
+            DO UPDATE SET
+              total_cost_microdollars =
+                microdollar_usage_daily.total_cost_microdollars + EXCLUDED.total_cost_microdollars,
+              updated_at = NOW()
           )
           UPDATE kilocode_users
           SET microdollars_used = microdollars_used + ${coreUsageFields.cost}

@@ -19,8 +19,12 @@ import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { db } from '@/lib/drizzle';
-import { microdollar_usage, microdollar_usage_metadata } from '@kilocode/db/schema';
-import { eq, getTableColumns } from 'drizzle-orm';
+import {
+  microdollar_usage,
+  microdollar_usage_daily,
+  microdollar_usage_metadata,
+} from '@kilocode/db/schema';
+import { and, eq, getTableColumns, isNull, sql } from 'drizzle-orm';
 import { findUserById } from '../user';
 import { Readable } from 'node:stream';
 import { getFraudDetectionHeaders, toMicrodollars } from '../utils';
@@ -739,6 +743,115 @@ describe('logMicrodollarUsage', () => {
     // Verify user balance was NOT updated (org usage doesn't deplete user balance)
     const updatedUser = await findUserById('test-insert-org-user');
     expect(updatedUser?.microdollars_used).toBe(4000); // unchanged
+  });
+
+  test('insertUsageRecord populates microdollar_usage_daily for personal usage', async () => {
+    const user = await insertTestUser({
+      id: 'test-daily-personal-user',
+      microdollars_used: 0,
+      google_user_email: 'daily-personal@example.com',
+    });
+
+    await insertUsageWithOverrides({
+      kilo_user_id: user.id,
+      cost: 1500,
+    });
+
+    const dailyRows = await db
+      .select()
+      .from(microdollar_usage_daily)
+      .where(
+        and(
+          eq(microdollar_usage_daily.kilo_user_id, user.id),
+          isNull(microdollar_usage_daily.organization_id)
+        )
+      );
+
+    expect(dailyRows).toHaveLength(1);
+    expect(dailyRows[0].total_cost_microdollars).toBe(1500);
+    expect(dailyRows[0].organization_id).toBeNull();
+  });
+
+  test('insertUsageRecord increments microdollar_usage_daily on subsequent inserts on the same day', async () => {
+    const user = await insertTestUser({
+      id: 'test-daily-increment-user',
+      microdollars_used: 0,
+      google_user_email: 'daily-increment@example.com',
+    });
+
+    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 1000 });
+    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 2500 });
+    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 700 });
+
+    const [row] = await db
+      .select({
+        total: sql<number>`coalesce(sum(${microdollar_usage_daily.total_cost_microdollars}), 0)::int`,
+      })
+      .from(microdollar_usage_daily)
+      .where(
+        and(
+          eq(microdollar_usage_daily.kilo_user_id, user.id),
+          isNull(microdollar_usage_daily.organization_id)
+        )
+      );
+
+    expect(row.total).toBe(4200);
+  });
+
+  test('insertUsageRecord writes org-scoped rollup separately from personal rollup', async () => {
+    const user = await insertTestUser({
+      id: 'test-daily-org-scope-user',
+      microdollars_used: 0,
+      google_user_email: 'daily-org-scope@example.com',
+    });
+    const orgId = '11111111-1111-1111-1111-111111111111';
+
+    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 500 });
+    await insertUsageWithOverrides({
+      kilo_user_id: user.id,
+      organization_id: orgId,
+      cost: 9000,
+    });
+
+    const personalRows = await db
+      .select()
+      .from(microdollar_usage_daily)
+      .where(
+        and(
+          eq(microdollar_usage_daily.kilo_user_id, user.id),
+          isNull(microdollar_usage_daily.organization_id)
+        )
+      );
+    expect(personalRows).toHaveLength(1);
+    expect(personalRows[0].total_cost_microdollars).toBe(500);
+
+    const orgRows = await db
+      .select()
+      .from(microdollar_usage_daily)
+      .where(
+        and(
+          eq(microdollar_usage_daily.kilo_user_id, user.id),
+          eq(microdollar_usage_daily.organization_id, orgId)
+        )
+      );
+    expect(orgRows).toHaveLength(1);
+    expect(orgRows[0].total_cost_microdollars).toBe(9000);
+  });
+
+  test('insertUsageRecord skips microdollar_usage_daily for zero-cost rows', async () => {
+    const user = await insertTestUser({
+      id: 'test-daily-zero-cost-user',
+      microdollars_used: 0,
+      google_user_email: 'daily-zero@example.com',
+    });
+
+    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 0 });
+
+    const dailyRows = await db
+      .select()
+      .from(microdollar_usage_daily)
+      .where(eq(microdollar_usage_daily.kilo_user_id, user.id));
+    expect(dailyRows).toHaveLength(0);
   });
 });
 

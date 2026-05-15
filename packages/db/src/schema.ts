@@ -1522,6 +1522,41 @@ export const microdollar_usage = pgTable(
   ]
 );
 
+// Per-day rollup of microdollar_usage.cost, keyed by (kilo_user_id, organization_id,
+// usage_date). Maintained by the same CTE that inserts into microdollar_usage so it
+// is updated atomically with the source row. Powers the hot 3-month-rolling-sum
+// query in kiloPass.getAverageMonthlyUsageLast3Months without scanning the raw
+// 800M-row microdollar_usage table.
+export const microdollar_usage_daily = pgTable(
+  'microdollar_usage_daily',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    usage_date: date({ mode: 'string' }).notNull(),
+    total_cost_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    // Personal-scope rollup: one row per user per day (no org).
+    uniqueIndex('idx_microdollar_usage_daily_personal')
+      .on(table.kilo_user_id, table.usage_date)
+      .where(isNull(table.organization_id)),
+    // Org-scope rollup: one row per user per org per day.
+    uniqueIndex('idx_microdollar_usage_daily_org')
+      .on(table.kilo_user_id, table.organization_id, table.usage_date)
+      .where(isNotNull(table.organization_id)),
+  ]
+);
+
+export type MicrodollarUsageDaily = typeof microdollar_usage_daily.$inferSelect;
+
 export const microdollar_usage_metadata = pgTable(
   'microdollar_usage_metadata',
   {

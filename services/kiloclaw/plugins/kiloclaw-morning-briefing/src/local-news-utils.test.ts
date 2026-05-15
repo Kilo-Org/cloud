@@ -2,42 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   buildLocalNewsSectionTitle,
   buildLocalNewsTiers,
+  buildNoLocationSectionLines,
   dedupeByUrl,
-  extractCityFromTimezone,
   formatLocalNewsLine,
-  LOCAL_NEWS_NO_LOCATION_LINES,
   LOCAL_NEWS_NO_LOCATION_SUMMARY,
   resolveLocationContext,
 } from './local-news-utils';
 
-describe('extractCityFromTimezone', () => {
-  it('returns the city portion of a two-segment IANA tz', () => {
-    expect(extractCityFromTimezone('America/Los_Angeles')).toBe('Los Angeles');
-    expect(extractCityFromTimezone('Europe/London')).toBe('London');
-  });
-
-  it('returns the last segment for three-segment IANA tz', () => {
-    expect(extractCityFromTimezone('America/Argentina/Buenos_Aires')).toBe('Buenos Aires');
-  });
-
-  it('returns null for single-segment values like UTC', () => {
-    expect(extractCityFromTimezone('UTC')).toBeNull();
-  });
-
-  it('returns null for empty / null / undefined / whitespace', () => {
-    expect(extractCityFromTimezone(undefined)).toBeNull();
-    expect(extractCityFromTimezone(null)).toBeNull();
-    expect(extractCityFromTimezone('')).toBeNull();
-    expect(extractCityFromTimezone('   ')).toBeNull();
-  });
-
-  it('trims surrounding whitespace before parsing', () => {
-    expect(extractCityFromTimezone('  America/Chicago  ')).toBe('Chicago');
-  });
-});
-
 describe('resolveLocationContext', () => {
-  it('prefers KILOCLAW_USER_LOCATION when set', () => {
+  it('returns explicit when KILOCLAW_USER_LOCATION is set', () => {
     expect(
       resolveLocationContext({
         KILOCLAW_USER_LOCATION: 'San Francisco, CA',
@@ -50,26 +23,31 @@ describe('resolveLocationContext', () => {
     });
   });
 
-  it('falls back to timezone city when location is empty', () => {
-    expect(
-      resolveLocationContext({
-        KILOCLAW_USER_LOCATION: '   ',
-        KILOCLAW_USER_TIMEZONE: 'America/Los_Angeles',
-      })
-    ).toEqual({
-      kind: 'timezone-derived',
+  it('returns kind=none with timezone context when only timezone is set', () => {
+    expect(resolveLocationContext({ KILOCLAW_USER_TIMEZONE: 'America/Los_Angeles' })).toEqual({
+      kind: 'none',
       timezone: 'America/Los_Angeles',
-      cityHint: 'Los Angeles',
-      displayLabel: 'Los Angeles area, from timezone',
     });
   });
 
-  it('returns kind=none when neither env var is set', () => {
-    expect(resolveLocationContext({})).toEqual({ kind: 'none' });
+  it('returns kind=none with null timezone when nothing is set', () => {
+    expect(resolveLocationContext({})).toEqual({ kind: 'none', timezone: null });
   });
 
-  it('returns kind=none when timezone is unusable (UTC) and no location', () => {
-    expect(resolveLocationContext({ KILOCLAW_USER_TIMEZONE: 'UTC' })).toEqual({ kind: 'none' });
+  it('treats whitespace-only location as unset', () => {
+    expect(
+      resolveLocationContext({
+        KILOCLAW_USER_LOCATION: '   ',
+        KILOCLAW_USER_TIMEZONE: 'UTC',
+      })
+    ).toEqual({ kind: 'none', timezone: 'UTC' });
+  });
+
+  it('treats whitespace-only timezone as null', () => {
+    expect(resolveLocationContext({ KILOCLAW_USER_TIMEZONE: '  ' })).toEqual({
+      kind: 'none',
+      timezone: null,
+    });
   });
 });
 
@@ -84,19 +62,11 @@ describe('buildLocalNewsSectionTitle', () => {
     ).toBe('Local News (San Francisco, CA)');
   });
 
-  it('marks timezone-derived sources in the parens', () => {
-    expect(
-      buildLocalNewsSectionTitle({
-        kind: 'timezone-derived',
-        timezone: 'America/Los_Angeles',
-        cityHint: 'Los Angeles',
-        displayLabel: 'Los Angeles area, from timezone',
-      })
-    ).toBe('Local News (Los Angeles area, from timezone)');
-  });
-
   it('renders bare title when no location is resolvable', () => {
-    expect(buildLocalNewsSectionTitle({ kind: 'none' })).toBe('Local News');
+    expect(buildLocalNewsSectionTitle({ kind: 'none', timezone: null })).toBe('Local News');
+    expect(buildLocalNewsSectionTitle({ kind: 'none', timezone: 'America/Los_Angeles' })).toBe(
+      'Local News'
+    );
   });
 });
 
@@ -119,22 +89,28 @@ describe('buildLocalNewsTiers', () => {
     }
   });
 
-  it('drops miles language for timezone-derived locations', () => {
-    const tiers = buildLocalNewsTiers({
-      kind: 'timezone-derived',
-      timezone: 'America/Los_Angeles',
-      cityHint: 'Los Angeles',
-      displayLabel: 'Los Angeles area, from timezone',
-    });
-    expect(tiers).toHaveLength(4);
-    for (const tier of tiers) {
-      expect(tier).not.toContain('miles');
-      expect(tier).toContain('Los Angeles');
-    }
+  it('returns an empty list for the no-location context', () => {
+    expect(buildLocalNewsTiers({ kind: 'none', timezone: null })).toEqual([]);
+    expect(buildLocalNewsTiers({ kind: 'none', timezone: 'America/Los_Angeles' })).toEqual([]);
+  });
+});
+
+describe('buildNoLocationSectionLines', () => {
+  it('returns just the base nudge when no timezone is known', () => {
+    const lines = buildNoLocationSectionLines(null);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('Settings');
+    expect(lines[0]).toContain('Morning Briefing');
   });
 
-  it('returns an empty list when there is no resolvable location', () => {
-    expect(buildLocalNewsTiers({ kind: 'none' })).toEqual([]);
+  it('mentions the timezone as context when known but never as a query source', () => {
+    const lines = buildNoLocationSectionLines('America/Los_Angeles');
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain('Set a location in Settings');
+    expect(lines[1]).toContain('America/Los_Angeles');
+    expect(lines[1]).toContain('city or address');
+    // Sanity: we never claim the timezone IS the location.
+    expect(lines[1]).not.toContain('local news in');
   });
 });
 
@@ -181,11 +157,9 @@ describe('formatLocalNewsLine', () => {
   });
 });
 
-describe('no-location copy', () => {
-  it('exposes a single-line section body and a status summary', () => {
-    expect(LOCAL_NEWS_NO_LOCATION_LINES).toHaveLength(1);
-    expect(LOCAL_NEWS_NO_LOCATION_LINES[0]).toContain('Settings');
-    expect(LOCAL_NEWS_NO_LOCATION_LINES[0]).toContain('Morning Briefing');
+describe('LOCAL_NEWS_NO_LOCATION_SUMMARY', () => {
+  it('mentions Settings and "no location"', () => {
     expect(LOCAL_NEWS_NO_LOCATION_SUMMARY).toContain('No location');
+    expect(LOCAL_NEWS_NO_LOCATION_SUMMARY).toContain('Settings');
   });
 });

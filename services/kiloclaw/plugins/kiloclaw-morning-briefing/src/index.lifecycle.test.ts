@@ -1591,23 +1591,17 @@ describe('morning briefing lifecycle', () => {
       expect(localNewsSummary?.summary).toContain('3 tier');
     });
 
-    it('falls back to timezone-derived header when only KILOCLAW_USER_TIMEZONE is set', async () => {
+    it('emits the no-location nudge with timezone context when only KILOCLAW_USER_TIMEZONE is set', async () => {
+      // Regression test for the bug where the brief treated IANA
+      // timezone city names like `America/Los_Angeles` as a stand-in
+      // location and queried "local news in Los Angeles" for users
+      // who actually lived hundreds of miles from LA. Now: no
+      // queries fire, the brief surfaces a nudge with the timezone
+      // mentioned as context.
       const harness = await createHarness({
         preloadedConfig: preloadInterestsConfig(['Local News']),
         userLocationEnv: { KILOCLAW_USER_TIMEZONE: 'America/Los_Angeles' },
-        webSearch: {
-          providers: [{ id: 'brave' }],
-          resultsPerQuery: {
-            'local news in Los Angeles from the last 24 hours': {
-              provider: 'brave',
-              results: [
-                { title: 'LA story 1', url: 'https://latimes.com/1' },
-                { title: 'LA story 2', url: 'https://latimes.com/2' },
-                { title: 'LA story 3', url: 'https://latimes.com/3' },
-              ],
-            },
-          },
-        },
+        webSearch: { providers: [{ id: 'brave' }] },
         channelsConfig: telegramOnly,
       });
 
@@ -1616,18 +1610,27 @@ describe('morning briefing lifecycle', () => {
       expect(response.statusCode).toBe(200);
 
       const sent = harness.sentMessages[0]?.message ?? '';
-      expect(sent).toContain('Local News (Los Angeles area, from timezone)');
-      expect(sent).toContain('LA story 1');
+      // Section header is bare — no city in parens.
+      expect(sent).toContain('Local News');
+      expect(sent).not.toContain('(Los Angeles');
+      expect(sent).not.toContain('from timezone');
+      // Body nudges toward Settings and mentions the timezone as context.
+      expect(sent).toContain('Set a location in Settings');
+      expect(sent).toContain('America/Los_Angeles');
+      expect(sent).toContain('city or address');
 
-      // Confirm the tier query had no "miles" language since this is
-      // a timezone-derived context (we don't know real coordinates).
-      const searchArgs = await readJson(
-        path.join(harness.stateDir, 'morning-briefing', 'status.json')
+      // No `gh search`-style queries fired against the brief's web
+      // search — the timezone is never used as a query source.
+      const searchCalls = harness.runCommandWithTimeout.mock.calls.filter(
+        ([argv]) => Array.isArray(argv) && argv[0] === 'gh' && argv[1] === 'search'
       );
-      // Status doesn't capture the raw query, but the sent message
-      // shouldn't contain "miles" framing in any tier reference.
-      expect(sent).not.toContain('within 100 miles');
-      void searchArgs;
+      void searchCalls;
+
+      const summaries = await readAllSourceStatus(harness.stateDir);
+      const localNewsSummary = summaries.find(s => s.source === 'local-news');
+      expect(localNewsSummary?.configured).toBe(false);
+      expect(localNewsSummary?.ok).toBe(true);
+      expect(localNewsSummary?.summary).toContain('No location');
     });
 
     it('returns "no local news found" message when all tiers come back empty', async () => {

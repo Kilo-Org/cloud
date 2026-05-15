@@ -230,6 +230,19 @@ export type PlatformStatusResponse = {
   botVibe: string | null;
   botEmoji: string | null;
   /**
+   * User-provided free-text location (e.g. "San Francisco, CA" or a
+   * "lat,lng" pair). Captured during onboarding via the weather-location
+   * step, editable from Settings → Morning Briefing. Used by the
+   * morning briefing's Local News source.
+   */
+  userLocation: string | null;
+  /**
+   * IANA timezone (e.g. "America/Los_Angeles"). Auto-detected during
+   * onboarding via `getBrowserTimeZone()`. Surfaced read-only in
+   * Settings as context next to userLocation.
+   */
+  userTimezone: string | null;
+  /**
    * Version of the controller-configuration contract the running machine
    * was started with. Bumped by the worker whenever the set of env vars /
    * config it writes into a machine changes in a way callers care about.

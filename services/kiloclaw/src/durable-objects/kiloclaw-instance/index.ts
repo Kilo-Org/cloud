@@ -979,6 +979,27 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         userTimezone,
         userLocation,
       });
+      // Also propagate userLocation to the morning-briefing plugin's
+      // config.json so the next brief picks up the new value without
+      // requiring a container restart. The plugin reads from
+      // config.json first and falls back to KILOCLAW_USER_LOCATION env
+      // var. We always call this when shouldWriteUserProfile is true
+      // — null clears the override (back to env-var fallback), a
+      // string sets it. The gateway helper returns null on older
+      // controllers that lack the route; we ignore that and let the
+      // env-var-only fallback path keep working.
+      if (userLocation !== previousUserLocation) {
+        try {
+          await gateway.updateMorningBriefingUserLocation(this.s, this.env, {
+            userLocation,
+          });
+        } catch (err) {
+          // Mirror the rest of this method's pattern of letting writes
+          // through gateway helpers raise. Worth a warn log so the
+          // failure is visible without blocking the DO save.
+          doWarn('updateMorningBriefingUserLocation failed', toLoggable(err));
+        }
+      }
     }
 
     if (isNew) {
@@ -2677,6 +2698,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     botNature: string | null;
     botVibe: string | null;
     botEmoji: string | null;
+    userLocation: string | null;
+    userTimezone: string | null;
     controllerCapabilitiesVersion: number | null;
   }> {
     await this.loadState();
@@ -2727,6 +2750,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       botNature: this.s.botNature,
       botVibe: this.s.botVibe,
       botEmoji: this.s.botEmoji,
+      userLocation: this.s.userLocation ?? null,
+      userTimezone: this.s.userTimezone ?? null,
       controllerCapabilitiesVersion: this.s.controllerCapabilitiesVersion,
     };
   }

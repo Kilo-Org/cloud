@@ -502,6 +502,131 @@ function GoogleAccountCard({
   );
 }
 
+/**
+ * Inline editor for the user's free-text location, surfaced inside the
+ * Morning Briefing card. Drives the Local News source of the brief.
+ *
+ * When no location is set, surfaces an amber-bordered nudge with an
+ * inline input. When a location is set, renders a read-only value with
+ * an Edit affordance.
+ *
+ * Saves via the existing `updateConfig` mutation (the same path
+ * onboarding uses on the weather-location step). Note: the running
+ * kiloclaw container reads `KILOCLAW_USER_LOCATION` from env at boot,
+ * so the new value only takes effect after the next container restart
+ * / redeploy. A small warning surfaces that fact next to the Save
+ * button so users aren't surprised when the next brief still uses
+ * the old value.
+ */
+function MorningBriefingLocationEditor({
+  mutations,
+  userLocation,
+  userTimezone,
+}: {
+  mutations: ClawMutations;
+  userLocation: string | null;
+  userTimezone: string | null;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(userLocation ?? '');
+  const isSaving = mutations.updateConfig.isPending;
+  const hasLocation = userLocation !== null && userLocation.trim().length > 0;
+
+  function handleSave() {
+    const value = draft.trim();
+    if (value.length === 0) {
+      toast.error('Location cannot be empty');
+      return;
+    }
+    mutations.updateConfig.mutate(
+      { userLocation: value },
+      {
+        onSuccess: () => {
+          toast.success('Location saved. Restart your bot for the change to take effect.', {
+            duration: 8000,
+          });
+          setEditing(false);
+        },
+        onError: err => toast.error(`Failed to save location: ${err.message}`),
+      }
+    );
+  }
+
+  function handleCancel() {
+    setDraft(userLocation ?? '');
+    setEditing(false);
+  }
+
+  const containerClass = hasLocation
+    ? 'rounded-lg border p-4'
+    : 'rounded-lg border border-amber-500/50 bg-amber-500/5 p-4';
+
+  return (
+    <div className={containerClass}>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-foreground text-sm font-semibold">Location for Local News</h3>
+        {hasLocation && !editing && (
+          <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+        )}
+      </div>
+
+      {hasLocation && !editing && (
+        <>
+          <p className="text-foreground text-sm">{userLocation}</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            Used by the Local News source in your morning briefing.
+            {userTimezone ? ` Timezone: ${userTimezone}.` : ''}
+          </p>
+        </>
+      )}
+
+      {!hasLocation && !editing && (
+        <>
+          <p className="text-foreground text-sm">
+            No location set. Local News is disabled until you provide one.
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {userTimezone
+              ? `We know your timezone is ${userTimezone}, but that's too coarse for local news — a city or address works much better.`
+              : 'Add a city or address (e.g. "San Francisco, CA") and we\'ll surface local headlines.'}
+          </p>
+          <div className="mt-3">
+            <Button size="sm" onClick={() => setEditing(true)}>
+              Set location
+            </Button>
+          </div>
+        </>
+      )}
+
+      {editing && (
+        <div className="flex flex-col gap-2">
+          <Input
+            placeholder="e.g. San Francisco, CA"
+            value={draft}
+            onChange={event => setDraft(event.target.value)}
+            disabled={isSaving}
+            maxLength={200}
+            autoFocus
+          />
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={handleCancel} disabled={isSaving}>
+              Cancel
+            </Button>
+            <p className="text-muted-foreground text-xs">
+              Restart your bot after saving for the change to take effect.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MorningBriefingInterestsEditor({
   mutations,
   briefingStatus,
@@ -754,6 +879,8 @@ function MorningBriefingCard({
   actionsReady,
   onRequestUpgrade,
   supportsInterests,
+  userLocation,
+  userTimezone,
 }: {
   mutations: ClawMutations;
   briefingStatus: MorningBriefingStatusLite | undefined;
@@ -773,6 +900,14 @@ function MorningBriefingCard({
    * of the controls so users on stale images don't hit a 404 on save.
    */
   supportsInterests: boolean;
+  /**
+   * Current user-provided location (e.g. "San Francisco, CA"). Drives
+   * the Local News source — when null the brief surfaces a "set a
+   * location" nudge. Editable via the Location section below.
+   */
+  userLocation: string | null;
+  /** IANA timezone, shown as context next to the location editor. */
+  userTimezone: string | null;
 }) {
   const [requestedDay, setRequestedDay] = useState<'today' | 'yesterday' | null>(null);
   // Card starts collapsed — matches the OpenClaw Manage Version section. The
@@ -1108,6 +1243,21 @@ function MorningBriefingCard({
                 supportsInterests={supportsInterests}
                 onRequestUpgrade={onRequestUpgrade}
               />
+
+              {/* Location card only matters when the user has opted
+                  into Local News. For everyone else it's noise. Case-
+                  insensitive trim matches what the plugin's
+                  `wantsLocalNews` does so custom-cased entries like
+                  "local news" still count. */}
+              {(briefingStatus?.interestTopics ?? []).some(
+                topic => topic.trim().toLowerCase() === 'local news'
+              ) && (
+                <MorningBriefingLocationEditor
+                  mutations={mutations}
+                  userLocation={userLocation}
+                  userTimezone={userTimezone}
+                />
+              )}
 
               {requestedDay && (
                 <div>
@@ -2311,6 +2461,8 @@ export function SettingsTab({
               actionsReady={morningBriefingActionsReady}
               onRequestUpgrade={onRequestUpgrade}
               supportsInterests={supportsBriefingInterests}
+              userLocation={status.userLocation ?? null}
+              userTimezone={status.userTimezone ?? null}
               fallbackReadiness={{
                 githubConfigured: configuredSecrets.github ?? false,
                 linearConfigured: configuredSecrets.linear ?? false,

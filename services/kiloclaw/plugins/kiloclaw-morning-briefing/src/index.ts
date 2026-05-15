@@ -37,16 +37,16 @@ import {
 import {
   buildLocalNewsSectionTitle,
   buildLocalNewsTiers,
+  buildNoLocationSectionLines,
   dedupeByUrl,
   formatLocalNewsLine,
   LOCAL_NEWS_INTEREST_LABEL,
   LOCAL_NEWS_MAX_ITEMS,
   LOCAL_NEWS_MIN_ITEMS,
-  LOCAL_NEWS_NO_LOCATION_LINES,
   LOCAL_NEWS_NO_LOCATION_SUMMARY,
   type LocalNewsItem,
   type LocationContext,
-  resolveLocationContext,
+  resolveLocationContextWithOverride,
 } from './local-news-utils';
 import { resolveNextReconcileAction } from './reconcile-queue-utils';
 import { normalizeWebResults } from './web-utils';
@@ -93,6 +93,13 @@ type StoredConfig = {
   // by the gateway `interests` route; read on every reconcile and on
   // every briefing run.
   interestTopics: string[];
+  // User-provided location override for the Local News source. When
+  // non-null, takes priority over the `KILOCLAW_USER_LOCATION` env var
+  // so saves from Settings → Morning Briefing → Location take effect
+  // without a container restart. Null means "use env var or fall
+  // through to no-location nudge." Written by the gateway
+  // `user-location` route.
+  userLocation: string | null;
   updatedAt: string;
 };
 
@@ -120,9 +127,9 @@ type SourceCollectionResult = {
   /**
    * Optional per-source section title override. Most sources use a
    * fixed title (`GitHub`, `Linear`, `Web Search`), but `local-news`
-   * varies the parenthetical based on the resolved location context
-   * (explicit vs timezone-derived vs none). Set by `collectLocalNews`;
-   * unset for sources with a static title.
+   * adds the resolved user location in parens when one is set. Bare
+   * `Local News` heading when no location is configured. Set by
+   * `collectLocalNews`; unset for sources with a static title.
    */
   sectionTitle?: string;
 };
@@ -363,9 +370,16 @@ async function readStoredConfig(
       cron: defaults.cron,
       timezone: defaults.timezone,
       interestTopics: [],
+      userLocation: null,
       updatedAt: new Date().toISOString(),
     };
   }
+  // Trim defensively — the worker validates length but a direct
+  // authenticated gateway call could otherwise persist " Novato, CA "
+  // and break case-sensitive UI compares downstream. Empty-after-trim
+  // becomes null (treated the same as "never set").
+  const trimmedUserLocation =
+    typeof existing.userLocation === 'string' ? existing.userLocation.trim() : '';
   return {
     enabled: existing.enabled === true,
     cronJobId:
@@ -378,6 +392,7 @@ async function readStoredConfig(
     interestTopics: Array.isArray(existing.interestTopics)
       ? existing.interestTopics.filter((topic): topic is string => typeof topic === 'string')
       : [],
+    userLocation: trimmedUserLocation.length > 0 ? trimmedUserLocation : null,
     updatedAt:
       typeof existing.updatedAt === 'string' ? existing.updatedAt : new Date().toISOString(),
   };
@@ -990,8 +1005,15 @@ async function runLocalNewsTiers(
  * - Got results: section renders the items, status footer reports
  *   tier count + provider(s) used.
  */
-async function collectLocalNews(api: WebSearchRuntime): Promise<SourceCollectionResult> {
-  const locationContext = resolveLocationContext();
+async function collectLocalNews(
+  api: WebSearchRuntime,
+  storedUserLocation: string | null
+): Promise<SourceCollectionResult> {
+  // Stored config overrides env. Settings edits write to config.json
+  // via the gateway `/user-location` route; the override takes effect
+  // on the next brief without restart. Env var is the boot-time
+  // fallback (set at provision time).
+  const locationContext = resolveLocationContextWithOverride(storedUserLocation);
 
   if (locationContext.kind === 'none') {
     return {
@@ -999,7 +1021,7 @@ async function collectLocalNews(api: WebSearchRuntime): Promise<SourceCollection
       configured: false,
       ok: true,
       summary: LOCAL_NEWS_NO_LOCATION_SUMMARY,
-      sectionLines: [...LOCAL_NEWS_NO_LOCATION_LINES],
+      sectionLines: buildNoLocationSectionLines(locationContext.timezone),
       sectionTitle: buildLocalNewsSectionTitle(locationContext),
     };
   }
@@ -1024,9 +1046,7 @@ async function collectLocalNews(api: WebSearchRuntime): Promise<SourceCollection
         configured: true,
         ok: true,
         summary: `0 local news results after ${tiersConsumed} tier(s)`,
-        sectionLines: [
-          `No local news found near ${locationContext.kind === 'explicit' ? locationContext.raw : locationContext.cityHint}.`,
-        ],
+        sectionLines: [`No local news found near ${locationContext.raw}.`],
         sectionTitle: buildLocalNewsSectionTitle(locationContext),
       };
     }
@@ -1173,15 +1193,20 @@ async function generateBriefing(
   const paths = getStatePaths(api);
   await ensureStorage(paths);
 
-  // Read interest topics directly from config.json — we only need this
-  // narrow field here, and the surrounding `api` shape doesn't have the
-  // `pluginConfig` / `agents.defaults.userTimezone` context that
-  // `readStoredConfig` uses to default cron/timezone. Missing or
-  // malformed file => empty topics (fallback query).
+  // Read interest topics + userLocation directly from config.json — we
+  // only need these two narrow fields here, and the surrounding `api`
+  // shape doesn't have the `pluginConfig` / `agents.defaults.userTimezone`
+  // context that `readStoredConfig` uses to default cron/timezone.
+  // Missing or malformed file => empty topics + null location (env-var
+  // fallback path in resolveLocationContextWithOverride).
   const storedConfig = await readJsonFile<StoredConfig>(paths.configPath);
   const interestTopics = Array.isArray(storedConfig?.interestTopics)
     ? storedConfig.interestTopics.filter((value): value is string => typeof value === 'string')
     : [];
+  const storedUserLocation =
+    typeof storedConfig?.userLocation === 'string' && storedConfig.userLocation.trim().length > 0
+      ? storedConfig.userLocation.trim()
+      : null;
 
   // Always-on sources first, then opt-in sources based on interests.
   // Order in the array determines order in the rendered brief.
@@ -1194,7 +1219,9 @@ async function generateBriefing(
   // Local News slots between Linear and Web Search — interest-gated so
   // users who haven't opted in pay no search cost and see no
   // local-news entry in the source-status footer.
-  const localNews = wantsLocalNews(interestTopics) ? await collectLocalNews(api) : null;
+  const localNews = wantsLocalNews(interestTopics)
+    ? await collectLocalNews(api, storedUserLocation)
+    : null;
 
   const sources: SourceCollectionResult[] = [
     github,
@@ -1623,6 +1650,28 @@ export default definePluginEntry({
       });
     };
 
+    // Update user location only — same write-only semantics as
+    // updateInterestsFromInput: doesn't touch cron, doesn't trigger
+    // reconcile. Affects the next briefing's Local News tier queries
+    // via `resolveLocationContextWithOverride`. Caller passes the
+    // trimmed string (or `null` to clear).
+    const updateUserLocationFromInput = async (
+      userLocation: string | null
+    ): Promise<StoredConfig> => {
+      const paths = getStatePaths(api);
+      await ensureStorage(paths);
+      return queueConfigWrite(paths.configPath, async () => {
+        const current = await readStoredConfig(api, paths);
+        const next: StoredConfig = {
+          ...current,
+          userLocation,
+          updatedAt: new Date().toISOString(),
+        };
+        await writeJsonFile(paths.configPath, next);
+        return next;
+      });
+    };
+
     void (async () => {
       const paths = getStatePaths(api);
       await ensureStorage(paths);
@@ -1960,6 +2009,61 @@ export default definePluginEntry({
           sendJson(res, 200, {
             ok: true,
             interestTopics: result.interestTopics,
+          });
+        } catch (error) {
+          sendJson(res, 500, {
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      },
+    });
+
+    api.registerHttpRoute({
+      path: '/api/plugins/kiloclaw-morning-briefing/user-location',
+      auth: 'gateway',
+      match: 'exact',
+      handler: async (req, res) => {
+        try {
+          const body = asObject(await readRequestBody(req));
+          // Three accepted shapes:
+          //   - { userLocation: "Novato, CA" }  → set
+          //   - { userLocation: null }          → clear
+          //   - { userLocation: "" }            → clear (trim-empty)
+          // Any other type (number, array, object) is rejected.
+          if (
+            body.userLocation !== null &&
+            body.userLocation !== undefined &&
+            typeof body.userLocation !== 'string'
+          ) {
+            sendJson(res, 400, {
+              ok: false,
+              error: 'userLocation must be a string or null',
+            });
+            return;
+          }
+          // Cap length defensively. Worker enforces 200 via Zod
+          // (`userLocationSchema`); we cap here so a direct authenticated
+          // gateway call can't write a runaway string into config.json
+          // and slow down brief-time query construction. Keep in sync
+          // with `apps/web/src/routers/kiloclaw-router.ts`.
+          const MAX_USER_LOCATION_LENGTH = 200;
+          let next: string | null = null;
+          if (typeof body.userLocation === 'string') {
+            const trimmed = body.userLocation.trim();
+            if (trimmed.length > MAX_USER_LOCATION_LENGTH) {
+              sendJson(res, 400, {
+                ok: false,
+                error: `userLocation must be ${MAX_USER_LOCATION_LENGTH} characters or fewer`,
+              });
+              return;
+            }
+            next = trimmed.length > 0 ? trimmed : null;
+          }
+          const result = await updateUserLocationFromInput(next);
+          sendJson(res, 200, {
+            ok: true,
+            userLocation: result.userLocation,
           });
         } catch (error) {
           sendJson(res, 500, {

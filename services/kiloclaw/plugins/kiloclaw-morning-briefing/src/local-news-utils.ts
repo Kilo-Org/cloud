@@ -7,6 +7,13 @@
  * The Local News feature is opt-in via the user's interest topics. When
  * "Local News" is one of the selected topics, `collectLocalNews` runs;
  * otherwise the briefing skips this source entirely.
+ *
+ * Only an *explicit* user-provided location drives queries. The user's
+ * IANA timezone is captured as soft context (so we can mention it in
+ * the "no location set" message) but is never used as a query source.
+ * Timezone city names like `Los_Angeles` are misleading as a stand-in
+ * for "where the user lives" — `America/Los_Angeles` covers the entire
+ * US Pacific coast.
  */
 
 /**
@@ -32,91 +39,78 @@ export const LOCAL_NEWS_MIN_ITEMS = 3;
 export const LOCAL_NEWS_MAX_ITEMS = 10;
 
 /**
- * Effective location the brief is going to query against. The
- * `explicit` source comes straight from `KILOCLAW_USER_LOCATION`
- * (set during onboarding via the weather-location step). The
- * `timezone-derived` source falls back to the city portion of
- * `KILOCLAW_USER_TIMEZONE` (e.g. `America/Los_Angeles` →
- * `Los Angeles`); this is a much coarser hint and the queries are
- * adapted to drop radius language since we don't actually know
- * coordinates. The `none` case happens when neither env var is set;
- * the brief surfaces a "set a location" message in the section
- * instead of running any queries.
+ * Resolved location for the brief. `explicit` is the only kind that
+ * drives queries. `none` short-circuits with a nudge message; the
+ * optional `timezone` field decorates that message ("your timezone is
+ * America/Los_Angeles") to help the user understand what we know vs
+ * what we need.
  */
 export type LocationContext =
   | { kind: 'explicit'; raw: string; displayLabel: string }
-  | {
-      kind: 'timezone-derived';
-      timezone: string;
-      cityHint: string;
-      displayLabel: string;
-    }
-  | { kind: 'none' };
+  | { kind: 'none'; timezone: string | null };
 
 /**
- * Extract a human-readable city hint from an IANA timezone string.
- * Returns `null` for malformed inputs or single-segment timezones.
+ * Resolve the effective location the brief should use. Reads the
+ * explicit `KILOCLAW_USER_LOCATION` env var (set during onboarding via
+ * the weather-location step). When unset, returns `kind: 'none'` along
+ * with the user's IANA timezone (captured separately during onboarding)
+ * so the no-location message can reference it for context.
  *
- * - `America/Los_Angeles` → `Los Angeles`
- * - `Europe/London` → `London`
- * - `America/Argentina/Buenos_Aires` → `Buenos Aires` (last segment)
- * - `UTC` → null (single segment, no city)
- * - empty / null → null
- */
-export function extractCityFromTimezone(timezone: string | undefined | null): string | null {
-  if (!timezone) return null;
-  const parts = timezone.trim().split('/');
-  if (parts.length < 2) return null;
-  const last = parts[parts.length - 1];
-  if (!last) return null;
-  const city = last.replace(/_/g, ' ').trim();
-  return city.length > 0 ? city : null;
-}
-
-/**
- * Resolve the effective location the brief should use. Reads two env
- * vars in priority order:
- *
- * 1. `KILOCLAW_USER_LOCATION` (free text from onboarding weather step)
- * 2. `KILOCLAW_USER_TIMEZONE` (IANA; fall back to the city portion)
- *
- * Both are plumbed by `services/kiloclaw/src/gateway/env.ts` at
- * provision time. Live edits to user location (post-onboarding) need
- * a gateway env patch to be observed here.
+ * Note: timezone is *not* used as a query source. IANA timezone city
+ * names (`America/Los_Angeles`, `America/New_York`, `America/Chicago`)
+ * span thousands of miles in any direction and would produce news from
+ * a location hundreds of miles away from where the user actually lives.
+ * Better to ask the user to set a precise location than to pretend.
  */
 export function resolveLocationContext(env: NodeJS.ProcessEnv = process.env): LocationContext {
   const raw = env.KILOCLAW_USER_LOCATION?.trim();
   if (raw && raw.length > 0) {
     return { kind: 'explicit', raw, displayLabel: raw };
   }
-
   const timezone = env.KILOCLAW_USER_TIMEZONE?.trim();
-  if (timezone) {
-    const cityHint = extractCityFromTimezone(timezone);
-    if (cityHint) {
-      return {
-        kind: 'timezone-derived',
-        timezone,
-        cityHint,
-        displayLabel: `${cityHint} area, from timezone`,
-      };
-    }
-  }
+  return {
+    kind: 'none',
+    timezone: timezone && timezone.length > 0 ? timezone : null,
+  };
+}
 
-  return { kind: 'none' };
+/**
+ * Resolve the effective location with an in-process override.
+ *
+ * Priority (highest to lowest):
+ *   1. `storedUserLocation` from the plugin's `config.json`. Written
+ *      by the Settings → Morning Briefing → Location editor via the
+ *      `/api/plugins/kiloclaw-morning-briefing/user-location` route.
+ *      Takes effect on the next brief without needing a container
+ *      restart, mirroring how `interestTopics` propagates.
+ *   2. The env var `KILOCLAW_USER_LOCATION` (set at provision time
+ *      from the onboarding weather step).
+ *   3. `kind: 'none'`, with the IANA timezone surfaced as soft
+ *      context for the no-location nudge.
+ *
+ * `storedUserLocation` is trimmed; whitespace-only counts as unset
+ * and falls through to the env-var path.
+ */
+export function resolveLocationContextWithOverride(
+  storedUserLocation: string | null,
+  env: NodeJS.ProcessEnv = process.env
+): LocationContext {
+  const trimmed = storedUserLocation?.trim();
+  if (trimmed && trimmed.length > 0) {
+    return { kind: 'explicit', raw: trimmed, displayLabel: trimmed };
+  }
+  return resolveLocationContext(env);
 }
 
 /**
  * Render the `## Local News (...)` section title based on the source
  * quality. The parenthetical tells the user which location signal was
  * used so they can see at a glance whether the brief is running off
- * their explicit location or just their timezone.
+ * their explicit location or has nothing to work with.
  */
 export function buildLocalNewsSectionTitle(ctx: LocationContext): string {
   switch (ctx.kind) {
     case 'explicit':
-      return `Local News (${ctx.displayLabel})`;
-    case 'timezone-derived':
       return `Local News (${ctx.displayLabel})`;
     case 'none':
       return 'Local News';
@@ -124,22 +118,14 @@ export function buildLocalNewsSectionTitle(ctx: LocationContext): string {
 }
 
 /**
- * The query strings issued per retry tier. The brief calls
- * `webSearch.search()` with each query in order and accumulates unique
- * results (deduped by URL) until it has `LOCAL_NEWS_MIN_ITEMS` or has
- * exhausted the list.
+ * The query strings issued per retry tier. Only the `explicit` context
+ * produces queries; `none` returns an empty list so the caller can
+ * short-circuit to the nudge message.
  *
  * Explicit-location tiers carry "within N miles" framing; the search
  * engine may or may not respect it, but it's the strongest hint we
  * can pass through the query string (the `webSearch.search` interface
  * does not expose provider-native location/radius params today).
- *
- * Timezone-derived tiers drop the radius language because the city
- * hint is only approximate; "within 100 miles" of an IANA timezone
- * city is misleading at best.
- *
- * `none` returns an empty list — the caller short-circuits and emits
- * a "set a location" message instead.
  */
 export function buildLocalNewsTiers(ctx: LocationContext): readonly string[] {
   switch (ctx.kind) {
@@ -150,15 +136,6 @@ export function buildLocalNewsTiers(ctx: LocationContext): readonly string[] {
         `local news in ${loc} within 250 miles from the last 3 days`,
         `local news in ${loc} from the last 7 days`,
         `top news in ${loc} region from the last 7 days`,
-      ];
-    }
-    case 'timezone-derived': {
-      const loc = ctx.cityHint;
-      return [
-        `local news in ${loc} from the last 24 hours`,
-        `regional news around ${loc} from the last 3 days`,
-        `regional news around ${loc} from the last 7 days`,
-        `top news in ${loc} area from the last 7 days`,
       ];
     }
     case 'none':
@@ -204,15 +181,23 @@ export function formatLocalNewsLine(item: LocalNewsItem): string {
 }
 
 /**
- * The "no location" section body. Surfaced when the user has "Local
- * News" in their interests but neither `KILOCLAW_USER_LOCATION` nor a
- * usable `KILOCLAW_USER_TIMEZONE` is set. Nudges them toward the
- * Settings → Morning Briefing card.
+ * Build the section body shown when there's no explicit location set.
+ * Used by `collectLocalNews` to nudge the user toward the Settings →
+ * Morning Briefing card. When a timezone is available, the message
+ * mentions it as context so the user knows we're not flying blind
+ * — but we still don't query off it.
  */
-export const LOCAL_NEWS_NO_LOCATION_LINES: readonly string[] = [
-  'Set a location in Settings → Morning Briefing to enable local news.',
-];
+export function buildNoLocationSectionLines(timezone: string | null): string[] {
+  const base = 'Set a location in Settings → Morning Briefing to enable local news.';
+  if (timezone) {
+    return [
+      base,
+      `Your timezone is \`${timezone}\`, but a city or address gives much better results.`,
+    ];
+  }
+  return [base];
+}
 
-/** Source-status footer summary when no location is resolvable. */
+/** Source-status footer summary when no explicit location is set. */
 export const LOCAL_NEWS_NO_LOCATION_SUMMARY =
   'No location configured — set one in Settings to enable local news';

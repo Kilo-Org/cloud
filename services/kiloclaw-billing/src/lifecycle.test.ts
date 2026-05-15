@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as DbModule from '@kilocode/db';
 
 const { mockGetWorkerDb, mockGetMissingSnowflakeConfig, mockQueryKiloclawActiveUserIds } =
   vi.hoisted(() => ({
@@ -1611,6 +1612,45 @@ describe('trial expiry sweep', () => {
     );
     expect(cancellationUpdate).toBeDefined();
     expect(updates).toContainEqual({ inactive_trial_stopped_at: null });
+  });
+
+  it('filters detached, missing, destroyed, and organization-managed trial rows in SQL', async () => {
+    const { db, updates, inserts, selectBuilders } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '23232323-2323-4232-8232-232323232320',
+        sweep: 'trial_expiry',
+      },
+      1
+    );
+
+    const trialExpiryWhere = selectBuilders[0]?.where.mock.calls[0]?.[0];
+    expect(trialExpiryWhere).toBeDefined();
+    if (!trialExpiryWhere) {
+      throw new Error('expected trial expiry candidate query predicate');
+    }
+
+    const actualDbModule = await vi.importActual<typeof DbModule>('@kilocode/db');
+    const trialExpirySql = actualDbModule
+      .getWorkerDb('postgres://unused:unused@localhost:0/unused')
+      .select()
+      .from(actualDbModule.kiloclaw_subscriptions)
+      .where(trialExpiryWhere)
+      .toSQL().sql;
+
+    expect(trialExpirySql).toMatch(/"kiloclaw_subscriptions"\."instance_id"\s+is not null/i);
+    expect(trialExpirySql).toMatch(/"kiloclaw_instances"\."sandbox_id"\s+is not null/i);
+    expect(trialExpirySql).toMatch(/"kiloclaw_instances"\."destroyed_at"\s+is null/i);
+    expect(trialExpirySql).toMatch(/"kiloclaw_instances"\."organization_id"\s+is null/i);
+    expect(summary.sweep1_trial_expiry).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
   });
 
   it('does not expire a legacy trial before its recorded trial end timestamp', async () => {

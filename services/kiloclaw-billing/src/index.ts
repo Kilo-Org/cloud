@@ -6,6 +6,7 @@ import {
   BILLING_HOURLY_CRON,
   BILLING_QUEUE_MAX_RETRIES,
   BILLING_SWEEP_ORDER,
+  INSTANCE_DESTRUCTION_QUARTER_HOURLY_CRON,
   TRIAL_INACTIVITY_DAILY_CRON,
   TRIAL_INACTIVITY_STOP_CANDIDATE_SWEEP,
   TRIAL_INACTIVITY_SWEEP,
@@ -40,6 +41,12 @@ const LifecycleQueueMessageSchema = z.object({
   kind: z.literal('lifecycle'),
   runId: z.string().uuid(),
   sweep: z.enum(BILLING_SWEEP_ORDER),
+});
+
+const StandaloneInstanceDestructionQueueMessageSchema = z.object({
+  kind: z.literal('standalone_instance_destruction'),
+  runId: z.string().uuid(),
+  sweep: z.literal('instance_destruction'),
 });
 
 const TrialInactivityQueueMessageSchema = z.object({
@@ -109,6 +116,7 @@ const CreditRenewalTerminalFailureQueueMessageSchema = z.object({
 
 const BillingQueueMessageSchema = z.discriminatedUnion('kind', [
   LifecycleQueueMessageSchema,
+  StandaloneInstanceDestructionQueueMessageSchema,
   TrialInactivityQueueMessageSchema,
   TrialInactivityStopCandidateQueueMessageSchema,
   CreditRenewalDiscoveryQueueMessageSchema,
@@ -319,6 +327,36 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
       return;
     }
 
+    if (controller.cron === INSTANCE_DESTRUCTION_QUARTER_HOURLY_CRON) {
+      const message = {
+        kind: 'standalone_instance_destruction',
+        runId,
+        sweep: 'instance_destruction',
+      } satisfies BillingQueueMessage;
+
+      await withLogTags(
+        {
+          source: 'scheduled',
+          tags: {
+            billingFlow: BILLING_FLOW,
+            billingComponent: 'worker',
+            billingRunId: runId,
+            billingSweep: message.sweep,
+          },
+        },
+        async () => {
+          await env.LIFECYCLE_QUEUE.send(message);
+
+          log('info', 'Enqueued standalone instance destruction sweep', {
+            event: 'run_started',
+            outcome: 'started',
+            cron: controller.cron,
+          });
+        }
+      );
+      return;
+    }
+
     if (controller.cron !== BILLING_HOURLY_CRON) {
       await withLogTags(
         {
@@ -440,6 +478,12 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
                 outcome: 'completed',
                 subscriptionId: parsed.data.subscriptionId,
                 renewalBoundary: parsed.data.renewalBoundary,
+              });
+            } else if (parsed.data.kind === 'standalone_instance_destruction') {
+              await runSweep(env, parsed.data, message.attempts);
+              log('info', 'Completed standalone instance destruction run', {
+                event: 'run_completed',
+                outcome: 'completed',
               });
             } else if (parsed.data.kind === 'lifecycle' && parsed.data.sweep === 'credit_renewal') {
               await env.LIFECYCLE_QUEUE.send({

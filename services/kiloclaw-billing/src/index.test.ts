@@ -151,6 +151,39 @@ describe('kiloclaw billing worker handler', () => {
     expect(trialInactivitySend).not.toHaveBeenCalled();
   });
 
+  it('enqueues standalone instance destruction on the quarter-hourly cron', async () => {
+    const { env, lifecycleSend, trialInactivitySend } = createEnv();
+
+    await handler.scheduled?.(
+      { cron: '*/15 * * * *' } as ScheduledController,
+      env,
+      {} as ExecutionContext
+    );
+
+    expect(lifecycleSend).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'standalone_instance_destruction',
+        sweep: 'instance_destruction',
+      })
+    );
+    expect(trialInactivitySend).not.toHaveBeenCalled();
+
+    const record = findLogRecord('Enqueued standalone instance destruction sweep');
+    expect(record).toMatchObject({
+      event: 'run_started',
+      outcome: 'started',
+      cron: '*/15 * * * *',
+    });
+    expect(record?.tags).toEqual(
+      expect.objectContaining({
+        billingFlow: 'kiloclaw_lifecycle',
+        billingComponent: 'worker',
+        billingSweep: 'instance_destruction',
+      })
+    );
+  });
+
   it('enqueues the daily trial inactivity run on the daily cron when enabled', async () => {
     const { env, lifecycleSend, trialInactivitySend } = createEnv();
     env.TRIAL_INACTIVITY_STOP_ENABLED = 'true';
@@ -193,6 +226,24 @@ describe('kiloclaw billing worker handler', () => {
     });
   });
 
+  it('logs and ignores unknown cron triggers', async () => {
+    const { env, lifecycleSend, trialInactivitySend } = createEnv();
+
+    await handler.scheduled?.(
+      { cron: '5 * * * *' } as ScheduledController,
+      env,
+      {} as ExecutionContext
+    );
+
+    expect(lifecycleSend).not.toHaveBeenCalled();
+    expect(trialInactivitySend).not.toHaveBeenCalled();
+    expect(findLogRecord('Ignoring unknown billing cron trigger')).toMatchObject({
+      event: 'run_skipped',
+      outcome: 'discarded',
+      cron: '5 * * * *',
+    });
+  });
+
   it('acks invalid queue messages', async () => {
     const { env } = createEnv();
     const message = {
@@ -231,6 +282,69 @@ describe('kiloclaw billing worker handler', () => {
       kind: 'lifecycle',
       runId,
       sweep: 'interrupted_auto_resume',
+    });
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('runs standalone instance destruction without chaining later lifecycle sweeps', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '22222222-2222-4222-8222-222222222222';
+    const message = {
+      body: {
+        kind: 'standalone_instance_destruction',
+        runId,
+        sweep: 'instance_destruction',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(runSweep).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+
+    const record = findLogRecord('Completed standalone instance destruction run');
+    expect(record).toMatchObject({
+      event: 'run_completed',
+      outcome: 'completed',
+    });
+    expect(record?.tags).toEqual(
+      expect.objectContaining({
+        billingFlow: 'kiloclaw_lifecycle',
+        billingComponent: 'worker',
+        billingRunId: runId,
+        billingSweep: 'instance_destruction',
+        billingAttempt: 1,
+      })
+    );
+  });
+
+  it('continues hourly lifecycle instance destruction into past-due cleanup', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '33333333-3333-4333-8333-333333333333';
+    const message = {
+      body: {
+        kind: 'lifecycle',
+        runId,
+        sweep: 'instance_destruction',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(runSweep).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'lifecycle',
+      runId,
+      sweep: 'past_due_cleanup',
     });
     expect(message.ack).toHaveBeenCalledTimes(1);
     expect(message.retry).not.toHaveBeenCalled();

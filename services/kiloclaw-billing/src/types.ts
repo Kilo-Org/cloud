@@ -1,4 +1,5 @@
 export const BILLING_HOURLY_CRON = '0 * * * *';
+export const INSTANCE_DESTRUCTION_QUARTER_HOURLY_CRON = '*/15 * * * *';
 export const TRIAL_INACTIVITY_DAILY_CRON = '0 8 * * *';
 export const TRIAL_INACTIVITY_SWEEP = 'trial_inactivity_stop' as const;
 export const TRIAL_INACTIVITY_STOP_CANDIDATE_SWEEP = 'trial_inactivity_stop_candidate' as const;
@@ -36,6 +37,12 @@ export type LifecycleQueueMessage = {
   kind: 'lifecycle';
   runId: string;
   sweep: BillingSweepKind;
+};
+
+export type StandaloneInstanceDestructionQueueMessage = {
+  kind: 'standalone_instance_destruction';
+  runId: string;
+  sweep: 'instance_destruction';
 };
 
 export type CreditRenewalDiscoveryQueueMessage = {
@@ -92,7 +99,10 @@ export type CreditRenewalQueueMessage =
   | CreditRenewalItemQueueMessage
   | CreditRenewalTerminalFailureQueueMessage;
 
-export type LifecycleProducerQueueMessage = LifecycleQueueMessage | CreditRenewalQueueMessage;
+export type LifecycleProducerQueueMessage =
+  | LifecycleQueueMessage
+  | StandaloneInstanceDestructionQueueMessage
+  | CreditRenewalQueueMessage;
 
 export type TrialInactivityKickoffQueueMessage = {
   kind: 'trial_inactivity_stop';
@@ -115,6 +125,7 @@ export type TrialInactivityQueueMessage =
 
 export type BillingQueueMessage =
   | LifecycleQueueMessage
+  | StandaloneInstanceDestructionQueueMessage
   | CreditRenewalQueueMessage
   | TrialInactivityQueueMessage;
 

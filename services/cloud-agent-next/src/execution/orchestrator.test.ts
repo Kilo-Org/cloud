@@ -160,5 +160,10 @@ describe('ExecutionOrchestrator tool overrides', () => {
         },
       })
     );
+    expect(getOrCreateSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        createdOnPlatform: 'code-review',
+      })
+    );
   });
 });

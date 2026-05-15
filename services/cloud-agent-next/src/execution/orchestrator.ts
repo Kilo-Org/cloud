@@ -348,7 +348,7 @@ export class ExecutionOrchestrator {
             originalToken: initContext.kilocodeToken,
             kilocodeModel: initContext.kilocodeModel ?? 'default',
             originalOrgId: orgId,
-            createdOnPlatform: initContext.createdOnPlatform,
+            createdOnPlatform: this.getCreatedOnPlatform(plan),
             appendSystemPrompt: existingMetadata.appendSystemPrompt,
             profile: mergeFastPathProfile(initContext.profile, existingMetadata.profile),
           }),

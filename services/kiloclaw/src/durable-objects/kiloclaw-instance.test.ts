@@ -1237,6 +1237,412 @@ describe('destroy error tracking', () => {
   });
 });
 
+describe('destroy volume: max-retry abandon', () => {
+  // vi.clearAllMocks() in the global beforeEach clears call history but not
+  // implementations. Without this reset, a previous test in the file that
+  // used `.mockResolvedValue([volumes...])` on listVolumes would leak its
+  // mocked volumes into other tests, where the new orphan sweep would then
+  // pick them up and (e.g.) promote one into the pending pointers, preventing
+  // finalize from running.
+  beforeEach(() => {
+    (flyClient.listVolumes as Mock).mockResolvedValue([]);
+  });
+
+  it('increments destroyVolumeAttempts on each failure and keeps pending state', async () => {
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-1',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    (flyClient.deleteVolume as Mock).mockRejectedValue(
+      new FlyApiError(
+        'failed_precondition: volume is currently bound to machine: abc123',
+        412,
+        '{}'
+      )
+    );
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    expect(storage._store.get('destroyVolumeAttempts')).toBe(1);
+    expect(storage._store.get('pendingDestroyVolumeId')).toBe('vol-1');
+
+    // Second alarm bumps the counter again.
+    const { instance: inst2 } = createInstance(storage, env);
+    await inst2.alarm();
+    expect(storage._store.get('destroyVolumeAttempts')).toBe(2);
+    expect(storage._store.get('pendingDestroyVolumeId')).toBe('vol-1');
+  });
+
+  it('emits destroy_volume_abandoned_after_max_retries and clears state at the cap', async () => {
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    // Seed at the cap-minus-one so the next failed alarm triggers abandon.
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+      destroyVolumeAttempts: 49,
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-1',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    (flyClient.deleteVolume as Mock).mockRejectedValue(
+      new FlyApiError('persistent failure', 502, '{}')
+    );
+    (flyClient.listVolumes as Mock).mockResolvedValue([]);
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // Pending state cleared so the destroy loop can finalize.
+    expect(storage._store.has('pendingDestroyVolumeId')).toBe(false);
+    // Destroy finalizes and the storage is wiped.
+    expect(storage._store.size).toBe(0);
+
+    // The escalation event was emitted to Analytics Engine, scoped to the
+    // right sandbox so alerts can attribute the abandoned volume.
+    const abandoned = analyticsEventsByName(
+      env,
+      'reconcile.destroy_volume_abandoned_after_max_retries'
+    );
+    expect(abandoned).toHaveLength(1);
+    expect(abandoned[0]?.blobs).toEqual(expect.arrayContaining(['user-1', 'sandbox-1']));
+  });
+
+  it('orphan sweep runs on the same alarm as abandon and may complete the cleanup', async () => {
+    // When the abandon branch fires, it clears pendingDestroyVolumeId and the
+    // reconcile loop continues into tryDeleteOrphanVolumes on the same alarm.
+    // If the stuck volume still exists on Fly and matches the sandbox name,
+    // the sweep gets one final best-effort attempt — and in that attempt the
+    // underlying transient condition may have resolved (e.g. a phantom bound
+    // machine has finally been reaped on Fly's side). This test pins that
+    // interaction so consumers of the abandoned event understand the volume
+    // can occasionally be cleaned up immediately after.
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+      destroyVolumeAttempts: 49,
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-1',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    // First delete (pending-destroy path) fails → triggers abandon. Second
+    // delete (orphan sweep) succeeds — same alarm.
+    (flyClient.deleteVolume as Mock)
+      .mockRejectedValueOnce(new FlyApiError('persistent failure', 502, '{}'))
+      .mockResolvedValueOnce(undefined);
+    (flyClient.listVolumes as Mock).mockResolvedValue([
+      {
+        id: 'vol-1',
+        name: 'kiloclaw_sandbox_1',
+        state: 'created',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+    ]);
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // Both events fired on the same alarm: the abandon (for alerting) and the
+    // sweep's success (the actual cleanup).
+    expect(
+      analyticsEventsByName(env, 'reconcile.destroy_volume_abandoned_after_max_retries')
+    ).toHaveLength(1);
+    expect(analyticsEventsByName(env, 'reconcile.destroy_orphan_volume_ok')).toHaveLength(1);
+
+    // deleteVolume was called twice: once from the pending-destroy path, once
+    // from the orphan sweep.
+    expect(flyClient.deleteVolume).toHaveBeenCalledTimes(2);
+
+    // Destroy finalizes cleanly — storage wiped.
+    expect(storage._store.size).toBe(0);
+  });
+
+  it('resets destroyVolumeAttempts on successful delete', async () => {
+    const { storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+      destroyVolumeAttempts: 17,
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-1',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    const { instance } = createInstance(storage);
+    await instance.alarm();
+
+    // Destroy finalized; storage cleared.
+    expect(storage._store.size).toBe(0);
+  });
+
+  it('destroy() resets destroyVolumeAttempts so a previous cycles count does not bleed into a new destroy', async () => {
+    // Counter semantics are "consecutive failures on the current
+    // pendingDestroyVolumeId". A fresh destroy() invocation must start at 0
+    // even if the previous cycle's failures left the counter non-zero.
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage, {
+      // Simulate a stale counter from a previous (resolved) destroy cycle.
+      destroyVolumeAttempts: 42,
+    });
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    // First delete attempt fails so we can observe the post-destroy counter.
+    (flyClient.deleteVolume as Mock).mockRejectedValueOnce(
+      new FlyApiError('transient', 503, 'try again')
+    );
+
+    const { instance } = createInstance(storage, env);
+    await instance.destroy();
+
+    // Counter restarted at 0 for the new cycle and bumped to 1 by the single
+    // failed delete attempt — *not* 43.
+    expect(storage._store.get('destroyVolumeAttempts')).toBe(1);
+  });
+
+  it('resets destroyVolumeAttempts when volume returns 404 (already gone)', async () => {
+    const { storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+      destroyVolumeAttempts: 10,
+    });
+
+    (flyClient.getVolume as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+    (flyClient.deleteVolume as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+
+    const { instance } = createInstance(storage);
+    await instance.alarm();
+
+    // 404 path treats the volume as gone — destroy finalizes cleanly.
+    expect(storage._store.size).toBe(0);
+  });
+});
+
+describe('orphan volume sweep', () => {
+  // Reset listVolumes so we never bleed into later tests outside this block;
+  // see the matching note in the abandon describe.
+  beforeEach(() => {
+    (flyClient.listVolumes as Mock).mockResolvedValue([]);
+  });
+
+  it('destroys volumes that match the sandbox name when pendingDestroyVolumeId is clear', async () => {
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: null,
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: null,
+    });
+
+    // sandboxId 'sandbox-1' -> volumeName 'kiloclaw_sandbox_1'.
+    // The first volume matches, the second has a different name (different sandbox on a shared app).
+    (flyClient.listVolumes as Mock).mockResolvedValue([
+      {
+        id: 'vol-orphan',
+        name: 'kiloclaw_sandbox_1',
+        state: 'created',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+      {
+        id: 'vol-other-sandbox',
+        name: 'kiloclaw_other_sandbox',
+        state: 'created',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+    ]);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // Only the matching volume was destroyed.
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-orphan');
+    expect(flyClient.deleteVolume).not.toHaveBeenCalledWith(expect.anything(), 'vol-other-sandbox');
+
+    // Destroy finalizes once the sweep is clean.
+    expect(storage._store.size).toBe(0);
+  });
+
+  it('skips volumes already in pending_destroy / destroying / destroyed states', async () => {
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: null,
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: null,
+    });
+
+    (flyClient.listVolumes as Mock).mockResolvedValue([
+      {
+        id: 'vol-fly-reaping',
+        name: 'kiloclaw_sandbox_1',
+        state: 'pending_destroy',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+      {
+        id: 'vol-fly-destroying',
+        name: 'kiloclaw_sandbox_1',
+        state: 'destroying',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+    ]);
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // Fly is already tearing both down — no client-side delete needed.
+    expect(flyClient.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('promotes the first attached orphan into pendingDestroy* so finalize does not skip it', async () => {
+    // This pins the fix for the gap where attached orphans (volumes that
+    // share our name but are bound to a machine the DO never tracked) were
+    // silently skipped, then finalize wiped DO state and the orphans leaked
+    // permanently. The sweep now promotes attached orphans into the primary
+    // pending pointers so the existing tryDeleteMachine + tryDeleteVolume
+    // flow handles them on the next alarm.
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: null,
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: null,
+    });
+
+    (flyClient.listVolumes as Mock).mockResolvedValue([
+      // Unattached orphan: destroyed inline on this alarm.
+      {
+        id: 'vol-orphan-unattached',
+        name: 'kiloclaw_sandbox_1',
+        state: 'created',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+      // Attached orphan: promoted to pending* for next alarm.
+      {
+        id: 'vol-orphan-attached',
+        name: 'kiloclaw_sandbox_1',
+        state: 'attached',
+        attached_machine_id: 'machine-orphan',
+        region: 'iad',
+      },
+      // Second attached orphan: not yet promoted (only one fits in the
+      // pending pointers); picked up after the first is resolved.
+      {
+        id: 'vol-orphan-attached-2',
+        name: 'kiloclaw_sandbox_1',
+        state: 'attached',
+        attached_machine_id: 'machine-orphan-2',
+        region: 'iad',
+      },
+    ]);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // Unattached orphan was destroyed inline.
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-orphan-unattached');
+    // Attached orphans were NOT destroyed directly (the existing pending
+    // destroy flow will handle them on subsequent alarms).
+    expect(flyClient.deleteVolume).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'vol-orphan-attached'
+    );
+
+    // The first attached orphan was promoted into the pending pointers.
+    // This is what prevents finalize from running and wiping state.
+    expect(storage._store.get('pendingDestroyMachineId')).toBe('machine-orphan');
+    expect(storage._store.get('pendingDestroyVolumeId')).toBe('vol-orphan-attached');
+    expect(storage._store.get('destroyVolumeAttempts')).toBe(0);
+
+    // Storage was NOT wiped (destroy did not finalize this alarm).
+    expect(storage._store.size).toBeGreaterThan(0);
+
+    // The promotion event was emitted with both ids attached.
+    const promoted = analyticsEventsByName(
+      env,
+      'reconcile.destroy_orphan_volume_promoted_to_pending'
+    );
+    expect(promoted).toHaveLength(1);
+  });
+
+  it('does not run when pendingDestroyVolumeId is still set', async () => {
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-pending',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-pending',
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-pending',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    (flyClient.deleteVolume as Mock).mockRejectedValue(
+      new FlyApiError('transient', 503, 'try again')
+    );
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // listVolumes never called — main pending destroy path took precedence.
+    expect(flyClient.listVolumes).not.toHaveBeenCalled();
+  });
+});
+
 describe('reconciliation: machine status sync', () => {
   it('transitions running to recovering after threshold failures and launches recovery once', async () => {
     const { storage } = createInstance();
@@ -7067,11 +7473,12 @@ describe('provision: instance feature flags', () => {
 });
 
 describe('auto-destroy stale provisioned instances', () => {
-  // Reset listMachines to return [] for each test in this block, since
-  // earlier metadata-recovery tests may have set it to return machines
-  // and vi.clearAllMocks() does not reset implementations.
+  // Reset listMachines + listVolumes to return [] for each test in this
+  // block, since earlier tests may have set them to return values and
+  // vi.clearAllMocks() does not reset implementations.
   beforeEach(() => {
     (flyClient.listMachines as Mock).mockResolvedValue([]);
+    (flyClient.listVolumes as Mock).mockResolvedValue([]);
   });
 
   function createInstanceWithPostgres(markImpl: () => Promise<void> = () => Promise.resolve()): {

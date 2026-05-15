@@ -367,6 +367,11 @@ export const PersistedStateSchema = z.object({
   lastDestroyErrorStatus: z.number().nullable().default(null),
   lastDestroyErrorMessage: z.string().nullable().default(null),
   lastDestroyErrorAt: z.number().nullable().default(null),
+  // Counts consecutive `tryDeleteVolume` failures. Reset on success/404.
+  // When it reaches MAX_DESTROY_VOLUME_ATTEMPTS, the DO emits
+  // `reconcile.destroy_volume_abandoned_after_max_retries` and clears
+  // `pendingDestroyVolumeId` so the destroy loop can exit.
+  destroyVolumeAttempts: z.number().int().nonnegative().default(0),
   // Structured last-error from background start() failures, for admin observability.
   // Populated by the startAsync() catch handler when start() throws before creating a machine.
   lastStartErrorMessage: z.string().nullable().default(null),

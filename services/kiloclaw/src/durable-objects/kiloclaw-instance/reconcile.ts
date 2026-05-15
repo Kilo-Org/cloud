@@ -1,6 +1,6 @@
 import type { KiloClawEnv } from '../../types';
 import type { FlyClientConfig } from '../../fly/client';
-import type { FlyMachineConfig } from '../../fly/types';
+import type { FlyMachineConfig, FlyVolume } from '../../fly/types';
 import type { PersistedState } from '../../schemas/instance-config';
 import * as fly from '../../fly/client';
 import {
@@ -28,6 +28,7 @@ import {
   METADATA_KEY_USER_ID,
   METADATA_KEY_SANDBOX_ID,
   parseMachineSizeFromFlyGuest,
+  volumeNameFromSandboxId,
 } from '../machine-config';
 import type { InstanceMutableState, DestroyResult } from './types';
 import { getAppKey } from './types';
@@ -1397,6 +1398,12 @@ async function retryPendingDestroy(
   await recoverBoundMachineForDestroy(flyConfig, ctx, state, rctx);
   await tryDeleteMachine(flyConfig, ctx, state, rctx);
   await tryDeleteVolume(flyConfig, ctx, state, rctx);
+  // Best-effort sweep for any volumes the DO has lost track of (e.g. abandoned
+  // recovery clones, originals that were never associated with the current
+  // pendingDestroyVolumeId). Runs after the pending-pointer cleanup so the
+  // primary destroy path is unaffected. May also promote an attached orphan
+  // into the pending pointers, which then defers finalize to the next alarm.
+  await tryDeleteOrphanVolumes(flyConfig, ctx, state, rctx);
   const result = await finalizeDestroyIfComplete(ctx, state, rctx, markDestroyedInPostgres);
   if (!result.finalized) {
     await maybeEmitDestroyStuckTelemetry(ctx, state, rctx);
@@ -1514,6 +1521,30 @@ export async function tryDeleteMachine(
   }
 }
 
+/**
+ * Cap on retries against a single `pendingDestroyVolumeId` before the DO gives
+ * up. At the current ~1 retry/minute alarm cadence, 50 attempts is roughly an
+ * hour of wall-clock retries. Past this point the volume is treated as
+ * permanently stuck — the DO emits `destroy_volume_abandoned_after_max_retries`
+ * (for alerting), clears the pending pointer so the destroy loop can finalize,
+ * and the volume will be picked up by the org-wide volume janitor (if any).
+ *
+ * Before this cap existed, a single stuck volume could retry on every alarm
+ * indefinitely — confirmed in production where 8 sandboxes accumulated 12k+
+ * retries each over ~14 days.
+ *
+ * Interaction with the orphan sweep: when this cap is reached, the abandon
+ * branch clears `pendingDestroyVolumeId` and falls through into
+ * `tryDeleteOrphanVolumes` on the same alarm. If the stuck volume still exists
+ * on Fly and matches `volumeNameFromSandboxId(sandboxId)`, the sweep will make
+ * exactly one additional best-effort delete attempt against it. That can mean
+ * `destroy_volume_abandoned_after_max_retries` fires moments before the volume
+ * is actually cleaned up — alerting consumers should treat the event as "this
+ * needs human attention" rather than "this volume is leaked," and re-check
+ * actual Fly state before acting.
+ */
+const MAX_DESTROY_VOLUME_ATTEMPTS = 50;
+
 export async function tryDeleteVolume(
   flyConfig: FlyClientConfig,
   ctx: DurableObjectState,
@@ -1522,16 +1553,20 @@ export async function tryDeleteVolume(
 ): Promise<void> {
   if (!state.pendingDestroyVolumeId) return;
 
+  let shouldClearState = false;
+
   try {
     await fly.deleteVolume(flyConfig, state.pendingDestroyVolumeId);
     rctx.log('destroy_volume_ok', {
       volume_id: state.pendingDestroyVolumeId,
     });
+    shouldClearState = true;
   } catch (err) {
     if (fly.isFlyNotFound(err)) {
       rctx.log('destroy_volume_already_gone', {
         volume_id: state.pendingDestroyVolumeId,
       });
+      shouldClearState = true;
     } else {
       const message = err instanceof Error ? err.message : String(err);
       const status = err instanceof fly.FlyApiError ? err.status : null;
@@ -1540,19 +1575,168 @@ export async function tryDeleteVolume(
         error: message,
       });
       await persistDestroyError(ctx, state, 'volume', status, message);
-      return;
+
+      const attempts = state.destroyVolumeAttempts + 1;
+      if (attempts >= MAX_DESTROY_VOLUME_ATTEMPTS) {
+        rctx.log('destroy_volume_abandoned_after_max_retries', {
+          volume_id: state.pendingDestroyVolumeId,
+          attempts,
+          last_error: message,
+          last_status: status,
+        });
+        shouldClearState = true;
+      } else {
+        state.destroyVolumeAttempts = attempts;
+        await ctx.storage.put(storageUpdate({ destroyVolumeAttempts: attempts }));
+        return;
+      }
     }
   }
 
+  if (!shouldClearState) return;
+
   state.pendingDestroyVolumeId = null;
   state.flyVolumeId = null;
+  state.destroyVolumeAttempts = 0;
   await ctx.storage.put(
     storageUpdate(
-      syncProviderStateForStorage(state, { pendingDestroyVolumeId: null, flyVolumeId: null })
+      syncProviderStateForStorage(state, {
+        pendingDestroyVolumeId: null,
+        flyVolumeId: null,
+        destroyVolumeAttempts: 0,
+      })
     )
   );
   if (!state.pendingDestroyMachineId) {
     await clearDestroyError(ctx, state);
+  }
+}
+
+/**
+ * Best-effort sweep for volumes the DO has lost track of.
+ *
+ * `tryDeleteVolume()` only ever targets `state.pendingDestroyVolumeId`. If a
+ * volume isn't there because it was an earlier original whose pointer got
+ * overwritten by a recovery clone, or a previous recovery clone that never
+ * made it into the state, it survives the destroy flow forever.
+ *
+ * This sweep:
+ *  - Runs only when the primary destroy pointers are clear (so it doesn't
+ *    fight the main destroy path).
+ *  - Calls `listVolumes` for the app.
+ *  - Filters by exact name match against `volumeNameFromSandboxId(sandboxId)`.
+ *    Critical: see the safety assumption below.
+ *  - Destroys unattached matching volumes inline (best-effort).
+ *  - For matching volumes that are still attached to a machine: promotes the
+ *    first one into `pendingDestroyMachineId` / `pendingDestroyVolumeId` so
+ *    the next alarm's machine+volume destroy flow handles it. That promotion
+ *    is what keeps `finalizeDestroyIfComplete` from wiping DO state while
+ *    attached orphans still exist. Without it, attached orphans would be
+ *    skipped, finalize would run, and the DO would forget about them
+ *    permanently. Additional attached orphans get picked up on subsequent
+ *    alarms (one per alarm, since the pending pointers only hold one at a
+ *    time).
+ *  - Errors on individual deletes are logged but do not fail the alarm.
+ *
+ * Safety assumption: one sandbox per Fly app today.
+ *  - `ki_*` (instance-keyed) sandboxes route to `inst-{hash(instanceId)}` apps
+ *    via `getAppKey()`, which is per-instance by construction.
+ *  - Legacy (base64-encoded user UUID) sandboxes route to `acct-{hash(userId)}`
+ *    apps with at most one legacy sandbox per user.
+ *  In both cases the app contains exactly one DO's sandbox, so any volume
+ *  whose name matches `volumeNameFromSandboxId(state.sandboxId)` is ours.
+ *
+ *  TODO(multi-instance): `volumeNameFromSandboxId()` truncates to 30 chars,
+ *  which for `ki_<32 hex>` IDs leaves only the first 18 UUID hex chars in the
+ *  name. If a future change ever places multiple instances inside the same
+ *  Fly app (e.g. a per-user app hosting many instance-keyed sandboxes), two
+ *  instances whose UUIDs share their first 18 hex chars would produce the
+ *  same volume name and this filter could match a sibling instance's volume.
+ *  Revisit this function (or remove the truncation) before such a migration
+ *  ships. Today the routing in `getAppKey()` makes that case unreachable.
+ */
+async function tryDeleteOrphanVolumes(
+  flyConfig: FlyClientConfig,
+  ctx: DurableObjectState,
+  state: InstanceMutableState,
+  rctx: ReconcileContext
+): Promise<void> {
+  if (state.pendingDestroyVolumeId || state.pendingDestroyMachineId) return;
+  if (!state.sandboxId) return;
+
+  const expectedName = volumeNameFromSandboxId(state.sandboxId);
+
+  let volumes: FlyVolume[];
+  try {
+    volumes = await fly.listVolumes(flyConfig);
+  } catch (err) {
+    rctx.log('destroy_orphan_volumes_list_failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
+
+  // First pass: destroy unattached matching orphans inline, record any
+  // attached orphan for promotion at the end. We want the inline deletes to
+  // happen regardless so we still make forward progress in this alarm.
+  let promoteVolumeId: string | null = null;
+  let promoteMachineId: string | null = null;
+
+  for (const vol of volumes) {
+    if (vol.name !== expectedName) continue;
+    // Fly is already tearing the volume down; let it finish.
+    if (
+      vol.state === 'pending_destroy' ||
+      vol.state === 'destroying' ||
+      vol.state === 'destroyed'
+    ) {
+      continue;
+    }
+    if (vol.attached_machine_id) {
+      // Attached orphan: the pending-destroy path knows how to handle this
+      // (destroy machine then volume, with retry+error tracking), so promote
+      // it into the primary pointers. Only the first attached orphan gets
+      // promoted in this alarm; subsequent ones are picked up after this
+      // pair is resolved.
+      if (!promoteVolumeId) {
+        promoteVolumeId = vol.id;
+        promoteMachineId = vol.attached_machine_id;
+      }
+      continue;
+    }
+    try {
+      await fly.deleteVolume(flyConfig, vol.id);
+      rctx.log('destroy_orphan_volume_ok', { volume_id: vol.id });
+    } catch (err) {
+      if (fly.isFlyNotFound(err)) continue;
+      rctx.log('destroy_orphan_volume_failed', {
+        volume_id: vol.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  if (promoteVolumeId && promoteMachineId) {
+    state.pendingDestroyMachineId = promoteMachineId;
+    state.pendingDestroyVolumeId = promoteVolumeId;
+    state.flyMachineId = promoteMachineId;
+    state.flyVolumeId = promoteVolumeId;
+    state.destroyVolumeAttempts = 0;
+    await ctx.storage.put(
+      storageUpdate(
+        syncProviderStateForStorage(state, {
+          pendingDestroyMachineId: promoteMachineId,
+          pendingDestroyVolumeId: promoteVolumeId,
+          flyMachineId: promoteMachineId,
+          flyVolumeId: promoteVolumeId,
+          destroyVolumeAttempts: 0,
+        })
+      )
+    );
+    rctx.log('destroy_orphan_volume_promoted_to_pending', {
+      volume_id: promoteVolumeId,
+      attached_machine_id: promoteMachineId,
+    });
   }
 }
 

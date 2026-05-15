@@ -309,6 +309,7 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.lastDestroyErrorStatus = d.lastDestroyErrorStatus;
     s.lastDestroyErrorMessage = d.lastDestroyErrorMessage;
     s.lastDestroyErrorAt = d.lastDestroyErrorAt;
+    s.destroyVolumeAttempts = d.destroyVolumeAttempts;
     s.lastStartErrorMessage = d.lastStartErrorMessage;
     s.lastStartErrorAt = d.lastStartErrorAt;
     s.lastRestartErrorMessage = d.lastRestartErrorMessage;
@@ -419,6 +420,7 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.lastDestroyErrorStatus = null;
   s.lastDestroyErrorMessage = null;
   s.lastDestroyErrorAt = null;
+  s.destroyVolumeAttempts = 0;
   s.lastStartErrorMessage = null;
   s.lastStartErrorAt = null;
   s.lastRestartErrorMessage = null;
@@ -515,6 +517,7 @@ export function createMutableState(): InstanceMutableState {
     lastDestroyErrorStatus: null,
     lastDestroyErrorMessage: null,
     lastDestroyErrorAt: null,
+    destroyVolumeAttempts: 0,
     lastStartErrorMessage: null,
     lastStartErrorAt: null,
     lastRestartErrorMessage: null,

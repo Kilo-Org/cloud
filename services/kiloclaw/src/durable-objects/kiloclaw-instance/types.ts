@@ -118,6 +118,7 @@ export type InstanceMutableState = {
   lastDestroyErrorStatus: number | null;
   lastDestroyErrorMessage: string | null;
   lastDestroyErrorAt: number | null;
+  destroyVolumeAttempts: number;
   lastStartErrorMessage: string | null;
   lastStartErrorAt: number | null;
   lastRestartErrorMessage: string | null;

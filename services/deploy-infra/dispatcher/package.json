@@ -11,17 +11,17 @@
     "test": "jest"
   },
   "devDependencies": {
-    "@swc/jest": "^0.2.39",
-    "@types/jest": "^30.0.0",
+    "@swc/jest": "0.2.39",
+    "@types/jest": "30.0.0",
     "@types/jsonwebtoken": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "jest": "^30.3.0",
+    "jest": "30.3.0",
     "typescript": "catalog:",
     "wrangler": "catalog:"
   },
   "dependencies": {
     "hono": "catalog:",
-    "hono-rate-limiter": "^0.5.3",
+    "hono-rate-limiter": "0.5.3",
     "jsonwebtoken": "catalog:",
     "zod": "catalog:"
   }

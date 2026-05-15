@@ -2508,6 +2508,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     this.s.pendingDestroyMachineId = runtimeId;
     this.s.pendingDestroyVolumeId = storageId;
+    // Counter tracks "consecutive failures on the current pendingDestroyVolumeId".
+    // Reset on every fresh destroy() invocation so a previous failing cycle's
+    // count never bleeds into a new destroy attempt's cap window.
+    this.s.destroyVolumeAttempts = 0;
     this.s.destroyStartedAt = destroyStartedAt;
     this.s.lastDestroyPendingEventAt = null;
     this.s.status = 'destroying';
@@ -2516,6 +2520,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       status: 'destroying',
       pendingDestroyMachineId: this.s.pendingDestroyMachineId,
       pendingDestroyVolumeId: this.s.pendingDestroyVolumeId,
+      destroyVolumeAttempts: 0,
       destroyStartedAt,
       lastDestroyPendingEventAt: null,
     });

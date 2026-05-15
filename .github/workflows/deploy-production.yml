@@ -11,6 +11,9 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+env:
+  VERCEL_VERSION: '53.3.1'
+
 jobs:
   run-migrations:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
@@ -36,8 +39,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Setup Vercel ENV — link from repo root; Vercel rootDirectory (apps/web) is set on the dashboard
-      - run: pnpm --config.minimum-release-age=0 dlx vercel@53.3.1 link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-      - run: pnpm --config.minimum-release-age=0 dlx vercel@53.3.1 env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Run Drizzle migrations
         run: NODE_ENV=production pnpm run drizzle migrate
@@ -80,18 +83,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
 
-      - run: pnpm --config.minimum-release-age=0 dlx vercel@53.3.1 link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
 
       - name: Pull Vercel Environment Information
-        run: pnpm --config.minimum-release-age=0 dlx vercel@53.3.1 pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Project Artifacts
         env:
           NODE_OPTIONS: '--max-old-space-size=8192'
-        run: pnpm --config.minimum-release-age=0 dlx vercel@53.3.1 build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy Project Artifacts to Vercel
-        run: pnpm --config.minimum-release-age=0 dlx vercel@53.3.1 deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-global-app:
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
@@ -131,18 +134,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
 
-      - run: pnpm --config.minimum-release-age=0 dlx vercel@53.3.1 link --project=kilocode-global-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-global-app --token=${{ secrets.VERCEL_TOKEN }} --yes
 
       - name: Pull Vercel Environment Information
-        run: pnpm --config.minimum-release-age=0 dlx vercel@53.3.1 pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Project Artifacts
         env:
           NODE_OPTIONS: '--max-old-space-size=8192'
-        run: pnpm --config.minimum-release-age=0 dlx vercel@53.3.1 build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy Project Artifacts to Vercel
-        run: pnpm --config.minimum-release-age=0 dlx vercel@53.3.1 deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-kiloclaw:
     permissions:

@@ -24,6 +24,7 @@ vi.mock('./snowflake.js', () => ({
 import {
   processCreditRenewalDiscovery,
   processCreditRenewalItem,
+  processTrialExpiryPage,
   processTrialInactivityStopCandidate,
   recordCreditRenewalTerminalFailure,
   runCreditRenewalSweep,
@@ -313,6 +314,20 @@ function creditRenewalRow(overrides: Partial<Record<string, unknown>> = {}) {
     kilo_pass_threshold: 1_000_000_000,
     next_credit_expiration_at: null,
     user_updated_at: '2026-05-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function trialExpiryRow(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: '11111111-1111-4111-8111-111111111111',
+    user_id: 'user-1',
+    instance_id: '22222222-2222-4222-8222-222222222222',
+    sandbox_id: 'ki_22222222222242228222222222222222',
+    instance_destroyed_at: null,
+    organization_id: null,
+    email: 'user-1@example.com',
+    trial_ends_at: '2026-04-17T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -1525,7 +1540,10 @@ describe('trial expiry sweep', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetWorkerDb.mockReset();
-    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    loggedValues = [];
+    vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
+      loggedValues.push(value);
+    });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       async () =>
@@ -1583,17 +1601,20 @@ describe('trial expiry sweep', () => {
       );
     });
 
-    const summary = await runSweep(
-      createEnv(fetch),
+    const { env } = createEnvWithQueueMocks(fetch);
+    const result = await processTrialExpiryPage(
+      env,
       {
+        kind: 'trial_expiry_page',
         runId: '21212121-2121-4212-8212-212121212120',
         sweep: 'trial_expiry',
       },
       1
     );
 
-    expect(summary.sweep1_trial_expiry).toBe(1);
-    expect(summary.errors).toBe(0);
+    expect(result.summary.sweep1_trial_expiry).toBe(1);
+    expect(result.summary.errors).toBe(0);
+    expect(result.continuationEnqueued).toBe(false);
     expect(fetch).toHaveBeenCalledTimes(1);
     const stopRequest = fetch.mock.calls[0]?.[0];
     expect(stopRequest).toBeInstanceOf(Request);
@@ -1619,9 +1640,11 @@ describe('trial expiry sweep', () => {
     mockGetWorkerDb.mockReturnValue(db);
     const fetch = vi.fn();
 
-    const summary = await runSweep(
-      createEnv(fetch),
+    const { env } = createEnvWithQueueMocks(fetch);
+    const result = await processTrialExpiryPage(
+      env,
       {
+        kind: 'trial_expiry_page',
         runId: '23232323-2323-4232-8232-232323232320',
         sweep: 'trial_expiry',
       },
@@ -1646,8 +1669,9 @@ describe('trial expiry sweep', () => {
     expect(trialExpirySql).toMatch(/"kiloclaw_instances"\."sandbox_id"\s+is not null/i);
     expect(trialExpirySql).toMatch(/"kiloclaw_instances"\."destroyed_at"\s+is null/i);
     expect(trialExpirySql).toMatch(/"kiloclaw_instances"\."organization_id"\s+is null/i);
-    expect(summary.sweep1_trial_expiry).toBe(0);
-    expect(summary.errors).toBe(0);
+    expect(result.summary.sweep1_trial_expiry).toBe(0);
+    expect(result.summary.errors).toBe(0);
+    expect(result.continuationEnqueued).toBe(false);
     expect(fetch).not.toHaveBeenCalled();
     expect(updates).toEqual([]);
     expect(inserts).toEqual([]);
@@ -1672,20 +1696,183 @@ describe('trial expiry sweep', () => {
     mockGetWorkerDb.mockReturnValue(db);
     const fetch = vi.fn();
 
-    const summary = await runSweep(
-      createEnv(fetch),
+    const { env } = createEnvWithQueueMocks(fetch);
+    const result = await processTrialExpiryPage(
+      env,
       {
+        kind: 'trial_expiry_page',
         runId: '22222222-2222-4222-8222-222222222220',
         sweep: 'trial_expiry',
       },
       1
     );
 
-    expect(summary.sweep1_trial_expiry).toBe(0);
-    expect(summary.errors).toBe(0);
+    expect(result.summary.sweep1_trial_expiry).toBe(0);
+    expect(result.summary.errors).toBe(0);
+    expect(result.continuationEnqueued).toBe(false);
     expect(fetch).not.toHaveBeenCalled();
     expect(updates).toEqual([]);
     expect(inserts).toEqual([]);
+  });
+
+  it('processes only the trial-expiry page budget and enqueues a continuation', async () => {
+    const first = trialExpiryRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      trial_ends_at: '2026-04-17T00:00:00.000Z',
+    });
+    const second = trialExpiryRow({
+      id: '33333333-3333-4333-8333-333333333333',
+      instance_id: '44444444-4444-4444-8444-444444444444',
+      trial_ends_at: '2026-04-18T00:00:00.000Z',
+    });
+    const { db } = createMockDb([[first, second], [first]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            stopped: true,
+            previousStatus: 'running',
+            currentStatus: 'stopped',
+            stoppedAt: Date.parse('2026-04-22T00:00:00.000Z'),
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
+    );
+    const { env, lifecycleSend } = createEnvWithQueueMocks(fetch);
+
+    const result = await processTrialExpiryPage(env, {
+      kind: 'trial_expiry_page',
+      runId: '44444444-4444-4444-8444-444444444440',
+      sweep: 'trial_expiry',
+      cutoffTime: '2026-04-20T00:00:00.000Z',
+      pageBudget: 1,
+    });
+
+    expect(result.summary.sweep1_trial_expiry).toBe(1);
+    expect(result.continuationEnqueued).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'trial_expiry_continuation',
+      runId: '44444444-4444-4444-8444-444444444440',
+      sweep: 'trial_expiry',
+      cutoffTime: '2026-04-20T00:00:00.000Z',
+      cursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
+      cursorTrialEndsAt: '2026-04-17T00:00:00.000Z',
+      pageBudget: 1,
+      wallClockBudgetMs: undefined,
+    });
+  });
+
+  it('does not enqueue another trial-expiry continuation after the final page', async () => {
+    const { db } = createMockDb([
+      [
+        trialExpiryRow({
+          email: 'deleted-user@deleted.invalid',
+        }),
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    const result = await processTrialExpiryPage(env, {
+      kind: 'trial_expiry_continuation',
+      runId: '55555555-5555-4555-8555-555555555550',
+      sweep: 'trial_expiry',
+      cutoffTime: '2026-04-20T00:00:00.000Z',
+      cursorSubscriptionId: '00000000-0000-4000-8000-000000000000',
+      cursorTrialEndsAt: '2026-04-16T00:00:00.000Z',
+      pageBudget: 1,
+    });
+
+    expect(result.summary.sweep1_trial_expiry).toBe(0);
+    expect(result.continuationEnqueued).toBe(false);
+    expect(lifecycleSend).not.toHaveBeenCalled();
+  });
+
+  it('keeps trial-expiry cursors ordered by subscription id at the same trial end', async () => {
+    const sharedTrialEnd = '2026-04-17T00:00:00.000Z';
+    const { db } = createMockDb([
+      [
+        trialExpiryRow({
+          id: '11111111-1111-4111-8111-111111111111',
+          email: 'deleted-first@deleted.invalid',
+          trial_ends_at: sharedTrialEnd,
+        }),
+        trialExpiryRow({
+          id: '33333333-3333-4333-8333-333333333333',
+          email: 'deleted-second@deleted.invalid',
+          trial_ends_at: sharedTrialEnd,
+        }),
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    await processTrialExpiryPage(env, {
+      kind: 'trial_expiry_page',
+      runId: '66666666-6666-4666-8666-666666666660',
+      sweep: 'trial_expiry',
+      cutoffTime: '2026-04-20T00:00:00.000Z',
+      pageBudget: 1,
+    });
+
+    expect(lifecycleSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'trial_expiry_continuation',
+        cursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
+        cursorTrialEndsAt: sharedTrialEnd,
+      })
+    );
+  });
+
+  it('logs trial-expiry page backlog and cursor diagnostics without user PII', async () => {
+    const { db } = createMockDb([
+      [
+        trialExpiryRow({
+          id: '11111111-1111-4111-8111-111111111111',
+          email: 'private-first@deleted.invalid',
+        }),
+        trialExpiryRow({
+          id: '33333333-3333-4333-8333-333333333333',
+          email: 'private-second@deleted.invalid',
+          trial_ends_at: '2026-04-18T00:00:00.000Z',
+        }),
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env } = createEnvWithQueueMocks(vi.fn());
+
+    await processTrialExpiryPage(env, {
+      kind: 'trial_expiry_continuation',
+      runId: '77777777-7777-4777-8777-777777777770',
+      sweep: 'trial_expiry',
+      cutoffTime: '2026-04-20T00:00:00.000Z',
+      cursorSubscriptionId: '00000000-0000-4000-8000-000000000000',
+      cursorTrialEndsAt: '2026-04-16T00:00:00.000Z',
+      pageBudget: 1,
+    });
+
+    expect(findLogRecord('Processed trial-expiry page')).toMatchObject({
+      event: 'trial_expiry_page',
+      outcome: 'completed',
+      cutoffTime: '2026-04-20T00:00:00.000Z',
+      cursorSubscriptionId: '00000000-0000-4000-8000-000000000000',
+      cursorTrialEndsAt: '2026-04-16T00:00:00.000Z',
+      pageBudget: 1,
+      fetchedCount: 2,
+      processedCount: 1,
+      trialExpiryBacklogLikely: true,
+      continuationEnqueued: true,
+      nextCursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
+      nextCursorTrialEndsAt: '2026-04-17T00:00:00.000Z',
+    });
+    expect(JSON.stringify(loggedValues)).not.toContain('private-first@deleted.invalid');
+    expect(JSON.stringify(loggedValues)).not.toContain('private-second@deleted.invalid');
   });
 });
 

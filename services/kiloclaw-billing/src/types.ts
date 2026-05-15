@@ -99,10 +99,37 @@ export type CreditRenewalQueueMessage =
   | CreditRenewalItemQueueMessage
   | CreditRenewalTerminalFailureQueueMessage;
 
+export type TrialExpiryPageQueueMessage = {
+  kind: 'trial_expiry_page';
+  runId: string;
+  sweep: 'trial_expiry';
+  cutoffTime?: string;
+  cursorSubscriptionId?: string;
+  cursorTrialEndsAt?: string;
+  pageBudget?: number;
+  wallClockBudgetMs?: number;
+};
+
+export type TrialExpiryContinuationQueueMessage = {
+  kind: 'trial_expiry_continuation';
+  runId: string;
+  sweep: 'trial_expiry';
+  cutoffTime: string;
+  cursorSubscriptionId: string;
+  cursorTrialEndsAt: string;
+  pageBudget?: number;
+  wallClockBudgetMs?: number;
+};
+
+export type TrialExpiryQueueMessage =
+  | TrialExpiryPageQueueMessage
+  | TrialExpiryContinuationQueueMessage;
+
 export type LifecycleProducerQueueMessage =
   | LifecycleQueueMessage
   | StandaloneInstanceDestructionQueueMessage
-  | CreditRenewalQueueMessage;
+  | CreditRenewalQueueMessage
+  | TrialExpiryQueueMessage;
 
 export type TrialInactivityKickoffQueueMessage = {
   kind: 'trial_inactivity_stop';
@@ -127,6 +154,7 @@ export type BillingQueueMessage =
   | LifecycleQueueMessage
   | StandaloneInstanceDestructionQueueMessage
   | CreditRenewalQueueMessage
+  | TrialExpiryQueueMessage
   | TrialInactivityQueueMessage;
 
 export type ServiceFetcher = {

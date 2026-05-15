@@ -58,6 +58,8 @@ import type {
   CreditRenewalDiscoveryQueueMessage,
   CreditRenewalItemQueueMessage,
   CreditRenewalTerminalFailureQueueMessage,
+  TrialExpiryContinuationQueueMessage,
+  TrialExpiryPageQueueMessage,
   TrialInactivityStopCandidateQueueMessage,
 } from './types.js';
 import { logger, withLogTags, type BillingLogFields } from './logger.js';
@@ -158,6 +160,17 @@ type CreditRenewalRow = {
   kilo_pass_threshold: number | null;
   next_credit_expiration_at: string | null;
   user_updated_at: string;
+};
+
+type TrialExpiryRow = {
+  id: string;
+  user_id: string;
+  instance_id: string | null;
+  sandbox_id: string | null;
+  instance_destroyed_at: string | null;
+  organization_id: string | null;
+  email: string;
+  trial_ends_at: string | null;
 };
 
 type KiloPassProjectionSubscriptionRow = KiloPassBonusProjectionSubscription &
@@ -1926,6 +1939,8 @@ export async function runCreditRenewalSweep(
 
 const CREDIT_RENEWAL_DISCOVERY_DEFAULT_PAGE_BUDGET = 50;
 const CREDIT_RENEWAL_DISCOVERY_DEFAULT_WALL_CLOCK_BUDGET_MS = 25_000;
+const TRIAL_EXPIRY_DEFAULT_PAGE_BUDGET = 50;
+const TRIAL_EXPIRY_DEFAULT_WALL_CLOCK_BUDGET_MS = 25_000;
 
 function serializeBillingTimestamp(timestamp: string): string {
   const date = new Date(timestamp);
@@ -2359,151 +2374,264 @@ async function destroyInstanceForEnforcement(
   }
 }
 
-async function runTrialExpirySweep(
-  database: WorkerDb,
-  env: BillingWorkerEnv,
-  context: SweepExecutionContext,
-  summary: BillingSummary
-): Promise<void> {
-  const now = new Date().toISOString();
-  const clawUrl = buildClawUrl(env);
+function trialExpiryEligibilityFilter(cutoffTime: string) {
+  return and(
+    eq(kiloclaw_subscriptions.status, 'trialing'),
+    currentSubscriptionRowFilter(),
+    lt(kiloclaw_subscriptions.trial_ends_at, cutoffTime),
+    isNull(kiloclaw_subscriptions.suspended_at),
+    isNotNull(kiloclaw_subscriptions.instance_id),
+    isNotNull(kiloclaw_instances.sandbox_id),
+    isNull(kiloclaw_instances.destroyed_at),
+    isNull(kiloclaw_instances.organization_id)
+  );
+}
 
-  const expiredTrials = await database
-    .select({
-      id: kiloclaw_subscriptions.id,
-      user_id: kiloclaw_subscriptions.user_id,
-      instance_id: kiloclaw_subscriptions.instance_id,
-      sandbox_id: kiloclaw_instances.sandbox_id,
-      instance_destroyed_at: kiloclaw_instances.destroyed_at,
-      organization_id: kiloclaw_instances.organization_id,
-      email: kilocode_users.google_user_email,
-      trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
-    })
+function trialExpiryCursorFilter(
+  cursorSubscriptionId: string | undefined,
+  cursorTrialEndsAt: string | undefined
+) {
+  if (!cursorSubscriptionId || !cursorTrialEndsAt) {
+    return undefined;
+  }
+
+  return or(
+    gt(kiloclaw_subscriptions.trial_ends_at, cursorTrialEndsAt),
+    and(
+      eq(kiloclaw_subscriptions.trial_ends_at, cursorTrialEndsAt),
+      gt(kiloclaw_subscriptions.id, cursorSubscriptionId)
+    )
+  );
+}
+
+function selectTrialExpiryRowFields() {
+  return {
+    id: kiloclaw_subscriptions.id,
+    user_id: kiloclaw_subscriptions.user_id,
+    instance_id: kiloclaw_subscriptions.instance_id,
+    sandbox_id: kiloclaw_instances.sandbox_id,
+    instance_destroyed_at: kiloclaw_instances.destroyed_at,
+    organization_id: kiloclaw_instances.organization_id,
+    email: kilocode_users.google_user_email,
+    trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
+  };
+}
+
+async function fetchTrialExpiryRows(
+  database: WorkerDb,
+  cutoffTime: string,
+  message: TrialExpiryPageQueueMessage | TrialExpiryContinuationQueueMessage,
+  limit: number
+): Promise<TrialExpiryRow[]> {
+  const cursorFilter = trialExpiryCursorFilter(
+    message.cursorSubscriptionId,
+    message.cursorTrialEndsAt
+  );
+
+  return await database
+    .select(selectTrialExpiryRowFields())
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
     .leftJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
-    .where(
-      and(
-        eq(kiloclaw_subscriptions.status, 'trialing'),
-        currentSubscriptionRowFilter(),
-        lt(kiloclaw_subscriptions.trial_ends_at, now),
-        isNull(kiloclaw_subscriptions.suspended_at),
-        isNotNull(kiloclaw_subscriptions.instance_id),
-        isNotNull(kiloclaw_instances.sandbox_id),
-        isNull(kiloclaw_instances.destroyed_at),
-        isNull(kiloclaw_instances.organization_id)
-      )
-    );
+    .where(and(trialExpiryEligibilityFilter(cutoffTime), cursorFilter))
+    .orderBy(asc(kiloclaw_subscriptions.trial_ends_at), asc(kiloclaw_subscriptions.id))
+    .limit(limit);
+}
 
-  for (const row of expiredTrials) {
-    try {
-      if (isSoftDeletedUserEmail(row.email)) continue;
-      if (!row.trial_ends_at || new Date(row.trial_ends_at).getTime() >= Date.now()) {
-        logSkippedSubscriptionRow('Skipping trial expiry for active recorded trial end', row, {
-          reason: 'trial_end_not_elapsed',
-        });
-        continue;
-      }
-
-      if (!row.instance_id) {
-        logSkippedSubscriptionRow('Skipping trial expiry for detached subscription row', row, {
-          reason: 'missing_instance_id',
-        });
-        continue;
-      }
-
-      if (!row.sandbox_id) {
-        logSkippedSubscriptionRow(
-          'Skipping trial expiry for subscription without instance row',
-          row,
-          {
-            reason: 'missing_instance_row',
-          }
-        );
-        continue;
-      }
-
-      if (row.instance_destroyed_at) {
-        logSkippedSubscriptionRow('Skipping trial expiry for destroyed instance', row, {
-          reason: 'instance_destroyed',
-        });
-        continue;
-      }
-
-      if (row.organization_id) {
-        logSkippedSubscriptionRow('Skipping trial expiry for organization-managed row', row, {
-          reason: 'organization_managed',
-          organizationId: row.organization_id,
-        });
-        continue;
-      }
-
-      await stopInstanceForEnforcement(env, context, row, 'trial_expiry');
-
-      const destructionDeadline = new Date(Date.now() + DESTRUCTION_GRACE_DAYS * MS_PER_DAY);
-      const before = await getSubscriptionById(database, row.id);
-      const [updated] = await database
-        .update(kiloclaw_subscriptions)
-        .set({
-          status: 'canceled',
-          suspended_at: now,
-          destruction_deadline: destructionDeadline.toISOString(),
-        })
-        .where(eq(kiloclaw_subscriptions.id, row.id))
-        .returning();
-
-      if (row.instance_id) {
-        await setInactiveTrialStoppedAt(database, row.instance_id, null);
-      }
-
-      await insertLifecycleChangeLogBestEffort(database, {
-        subscriptionId: row.id,
-        action: 'suspended',
-        reason: 'trial_expired',
-        before,
-        after: updated ?? null,
-      });
-
-      await enqueueAffiliateEvent(env, context, {
-        userId: row.user_id,
-        provider: 'impact',
-        eventType: 'trial_end',
-        dedupeKey: `affiliate:impact:trial_end:${row.id}`,
-        eventDateIso: now,
-        orderId: 'IR_AN_64_TS',
-      }).catch(error => {
-        log('warn', 'Affiliate trial end enqueue failed during sweep', {
-          userId: row.user_id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      });
-
-      await trySendEmail(
-        database,
-        env,
-        context,
-        row.user_id,
-        row.email,
-        'claw_suspended_trial',
-        'clawSuspendedTrial',
-        {
-          destruction_date: formatDateForEmail(destructionDeadline),
-          claw_url: clawUrl,
-        },
-        summary,
-        undefined,
-        { instanceId: row.instance_id }
-      );
-
-      summary.sweep1_trial_expiry++;
-    } catch (error) {
-      summary.errors++;
-      log('error', 'Trial expiry sweep failed for user', {
-        userId: row.user_id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+async function processTrialExpiryRow(
+  database: WorkerDb,
+  env: BillingWorkerEnv,
+  context: SweepExecutionContext,
+  summary: BillingSummary,
+  row: TrialExpiryRow,
+  clawUrl: string,
+  now: string
+): Promise<void> {
+  if (isSoftDeletedUserEmail(row.email)) return;
+  if (!row.trial_ends_at || new Date(row.trial_ends_at).getTime() >= Date.now()) {
+    logSkippedSubscriptionRow('Skipping trial expiry for active recorded trial end', row, {
+      reason: 'trial_end_not_elapsed',
+    });
+    return;
   }
+
+  if (!row.instance_id) {
+    logSkippedSubscriptionRow('Skipping trial expiry for detached subscription row', row, {
+      reason: 'missing_instance_id',
+    });
+    return;
+  }
+
+  if (!row.sandbox_id) {
+    logSkippedSubscriptionRow('Skipping trial expiry for subscription without instance row', row, {
+      reason: 'missing_instance_row',
+    });
+    return;
+  }
+
+  if (row.instance_destroyed_at) {
+    logSkippedSubscriptionRow('Skipping trial expiry for destroyed instance', row, {
+      reason: 'instance_destroyed',
+    });
+    return;
+  }
+
+  if (row.organization_id) {
+    logSkippedSubscriptionRow('Skipping trial expiry for organization-managed row', row, {
+      reason: 'organization_managed',
+      organizationId: row.organization_id,
+    });
+    return;
+  }
+
+  await stopInstanceForEnforcement(env, context, row, 'trial_expiry');
+
+  const destructionDeadline = new Date(Date.now() + DESTRUCTION_GRACE_DAYS * MS_PER_DAY);
+  const before = await getSubscriptionById(database, row.id);
+  const [updated] = await database
+    .update(kiloclaw_subscriptions)
+    .set({
+      status: 'canceled',
+      suspended_at: now,
+      destruction_deadline: destructionDeadline.toISOString(),
+    })
+    .where(eq(kiloclaw_subscriptions.id, row.id))
+    .returning();
+
+  await setInactiveTrialStoppedAt(database, row.instance_id, null);
+
+  await insertLifecycleChangeLogBestEffort(database, {
+    subscriptionId: row.id,
+    action: 'suspended',
+    reason: 'trial_expired',
+    before,
+    after: updated ?? null,
+  });
+
+  await enqueueAffiliateEvent(env, context, {
+    userId: row.user_id,
+    provider: 'impact',
+    eventType: 'trial_end',
+    dedupeKey: `affiliate:impact:trial_end:${row.id}`,
+    eventDateIso: now,
+    orderId: 'IR_AN_64_TS',
+  }).catch(error => {
+    log('warn', 'Affiliate trial end enqueue failed during sweep', {
+      userId: row.user_id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
+
+  await trySendEmail(
+    database,
+    env,
+    context,
+    row.user_id,
+    row.email,
+    'claw_suspended_trial',
+    'clawSuspendedTrial',
+    {
+      destruction_date: formatDateForEmail(destructionDeadline),
+      claw_url: clawUrl,
+    },
+    summary,
+    undefined,
+    { instanceId: row.instance_id }
+  );
+
+  summary.sweep1_trial_expiry++;
+}
+
+export async function processTrialExpiryPage(
+  env: BillingWorkerEnv,
+  message: TrialExpiryPageQueueMessage | TrialExpiryContinuationQueueMessage,
+  attempt = 1
+): Promise<{ summary: BillingSummary; continuationEnqueued: boolean }> {
+  const context = createSweepContext(message, attempt);
+
+  return await withLogTags(
+    {
+      source: 'processTrialExpiryPage',
+      tags: {
+        ...context,
+        billingComponent: 'worker',
+      },
+    },
+    async () => {
+      const database = getDb(env);
+      const summary = createSummary();
+      const startedAt = Date.now();
+      const pageBudget = message.pageBudget ?? TRIAL_EXPIRY_DEFAULT_PAGE_BUDGET;
+      const wallClockBudgetMs =
+        message.wallClockBudgetMs ?? TRIAL_EXPIRY_DEFAULT_WALL_CLOCK_BUDGET_MS;
+      const cutoffTime = message.cutoffTime ?? new Date().toISOString();
+      const rows = await fetchTrialExpiryRows(database, cutoffTime, message, pageBudget + 1);
+      const clawUrl = buildClawUrl(env);
+      const processedAt = new Date().toISOString();
+      let processedCount = 0;
+      let lastProcessed: TrialExpiryRow | null = null;
+
+      for (const row of rows.slice(0, pageBudget)) {
+        if (Date.now() - startedAt >= wallClockBudgetMs && processedCount > 0) {
+          break;
+        }
+
+        try {
+          await processTrialExpiryRow(database, env, context, summary, row, clawUrl, processedAt);
+        } catch (error) {
+          summary.errors++;
+          log('error', 'Trial expiry sweep failed for user', {
+            userId: row.user_id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+
+        processedCount++;
+        lastProcessed = row;
+      }
+
+      const shouldContinue = rows.length > processedCount;
+      const nextCursorTrialEndsAt =
+        shouldContinue && lastProcessed?.trial_ends_at
+          ? serializeBillingTimestamp(lastProcessed.trial_ends_at)
+          : undefined;
+
+      if (shouldContinue && (!lastProcessed || !nextCursorTrialEndsAt)) {
+        throw new Error('Cannot continue trial expiry page without a complete cursor');
+      }
+
+      if (nextCursorTrialEndsAt && lastProcessed) {
+        await env.LIFECYCLE_QUEUE.send({
+          kind: 'trial_expiry_continuation',
+          runId: message.runId,
+          sweep: 'trial_expiry',
+          cutoffTime,
+          cursorSubscriptionId: lastProcessed.id,
+          cursorTrialEndsAt: nextCursorTrialEndsAt,
+          pageBudget: message.pageBudget,
+          wallClockBudgetMs: message.wallClockBudgetMs,
+        });
+      }
+
+      const continuationEnqueued = nextCursorTrialEndsAt !== undefined;
+      log('info', 'Processed trial-expiry page', {
+        event: 'trial_expiry_page',
+        outcome: 'completed',
+        cutoffTime,
+        cursorSubscriptionId: message.cursorSubscriptionId,
+        cursorTrialEndsAt: message.cursorTrialEndsAt,
+        pageBudget,
+        fetchedCount: rows.length,
+        processedCount,
+        trialExpiryBacklogLikely: shouldContinue,
+        continuationEnqueued,
+        nextCursorSubscriptionId: lastProcessed?.id,
+        nextCursorTrialEndsAt,
+      });
+
+      return { summary, continuationEnqueued };
+    }
+  );
 }
 
 async function hasUnresolvedTerminalRenewalFailureForBoundary(
@@ -3899,7 +4027,11 @@ export async function runSweep(
             await runInterruptedAutoResumeSweep(database, env, context, summary);
             break;
           case 'trial_expiry':
-            await runTrialExpirySweep(database, env, context, summary);
+            await env.LIFECYCLE_QUEUE.send({
+              kind: 'trial_expiry_page',
+              runId: message.runId,
+              sweep: 'trial_expiry',
+            });
             break;
           case 'subscription_expiry':
             await runSubscriptionExpirySweep(database, env, context, summary);

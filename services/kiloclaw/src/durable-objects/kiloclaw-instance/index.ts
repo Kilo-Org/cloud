@@ -983,24 +983,22 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       // config.json so the next brief picks up the new value without
       // requiring a container restart. The plugin reads from
       // config.json first and falls back to KILOCLAW_USER_LOCATION env
-      // var. We always call this when shouldWriteUserProfile is true
-      // — null clears the override (back to env-var fallback), a
-      // string sets it. The gateway helper returns null on older
-      // controllers that lack the route; we ignore that and let the
-      // env-var-only fallback path keep working.
+      // var. Null clears the override (plugin then falls back to env);
+      // a string sets it. The gateway helper returns null on older
+      // controllers that lack the route, and that null is treated as
+      // success here — older instances boot with the env-var path
+      // anyway, so the user still gets the new value on next restart.
+      //
+      // Network / auth errors are intentionally NOT caught — they
+      // propagate up so the caller sees an error toast and can retry.
+      // Matches the `writeUserProfile` call above which also lets its
+      // errors raise. Without this, saves can silently succeed in DO
+      // state but never reach the running plugin's config.json, and
+      // the next brief uses stale data with no signal to the user.
       if (userLocation !== previousUserLocation) {
-        try {
-          await gateway.updateMorningBriefingUserLocation(this.s, this.env, {
-            userLocation,
-          });
-        } catch (err) {
-          // Mirror the rest of this method's pattern of letting writes
-          // through gateway helpers raise. Worth a warn log so the
-          // failure is visible without blocking the DO save.
-          doWarn(this.s, 'updateMorningBriefingUserLocation failed', {
-            error: toLoggable(err),
-          });
-        }
+        await gateway.updateMorningBriefingUserLocation(this.s, this.env, {
+          userLocation,
+        });
       }
     }
 

@@ -563,9 +563,16 @@ function MorningBriefingLocationEditor({
       { userLocation: null },
       {
         onSuccess: () => {
-          toast.success('Location cleared. Local News will be disabled until you set one.', {
-            duration: 6000,
-          });
+          // Note: clearing the override only removes the Settings-side
+          // value. The plugin still falls back to the onboarding
+          // `KILOCLAW_USER_LOCATION` env var if one was set there, so
+          // Local News may keep running off the old onboarding
+          // location. To fully disable Local News, deselect it from
+          // the Interests list above.
+          toast.success(
+            'Override cleared. Local News will fall back to your onboarding location until you set a new one. To fully disable, deselect "Local News" from Interests.',
+            { duration: 8000 }
+          );
           setDraft('');
           setEditing(false);
         },

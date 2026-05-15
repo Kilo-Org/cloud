@@ -908,6 +908,13 @@ async function collectWebSearch(
   const accumulated: WebSearchPerTopicResult[] = [];
   const seenUrls = new Set<string>();
   const providersTried = new Set<string>();
+  // Track which topics returned a response (even if empty) vs threw.
+  // If EVERY topic threw, we treat the whole source as failed instead
+  // of misreporting it as a successful empty search — that would hide
+  // real outages (rate limits, auth breaks, provider down) from the
+  // brief's failure list and source-status footer.
+  let topicSuccessCount = 0;
+  const topicFailures: Array<{ topic: string; error: string }> = [];
   for (const topic of cleanedTopics) {
     try {
       const response = await api.runtime.webSearch.search({
@@ -918,6 +925,7 @@ async function collectWebSearch(
         },
       });
       providersTried.add(response.provider);
+      topicSuccessCount += 1;
       const results = normalizeWebResults(response.result);
       for (const item of results) {
         if (!item.url || seenUrls.has(item.url)) continue;
@@ -926,8 +934,24 @@ async function collectWebSearch(
       }
     } catch (error) {
       const errorText = error instanceof Error ? error.message : String(error);
+      topicFailures.push({ topic, error: errorText });
       api.logger.warn?.(`Morning briefing web search topic '${topic}' failed: ${errorText}`);
     }
+  }
+
+  // Hard failure: zero topics returned a response. Surface as an error
+  // source so the brief's failure section and source-status footer
+  // record it. Without this, a complete provider outage looks
+  // identical to a benign empty result.
+  if (topicSuccessCount === 0) {
+    const firstFailure = topicFailures[0]?.error ?? 'unknown error';
+    return {
+      source: 'web',
+      configured: true,
+      ok: false,
+      summary: `Web search failed for all ${cleanedTopics.length} topic(s): ${firstFailure}`,
+      sectionLines: [],
+    };
   }
 
   if (accumulated.length === 0) {
@@ -2082,12 +2106,21 @@ export default definePluginEntry({
           //   - { userLocation: "Novato, CA" }  → set
           //   - { userLocation: null }          → clear
           //   - { userLocation: "" }            → clear (trim-empty)
-          // Any other type (number, array, object) is rejected.
-          if (
-            body.userLocation !== null &&
-            body.userLocation !== undefined &&
-            typeof body.userLocation !== 'string'
-          ) {
+          // Any other type (number, array, object) is rejected. Missing
+          // field (`body.userLocation === undefined`, e.g. `{}` body or
+          // malformed JSON that the controller fell back to an empty
+          // object on) is ALSO rejected — otherwise a buggy caller
+          // could silently erase the saved location by omitting the
+          // field, since `undefined` was previously falling through to
+          // the null-write path.
+          if (!('userLocation' in body)) {
+            sendJson(res, 400, {
+              ok: false,
+              error: 'userLocation field is required (use null to clear)',
+            });
+            return;
+          }
+          if (body.userLocation !== null && typeof body.userLocation !== 'string') {
             sendJson(res, 400, {
               ok: false,
               error: 'userLocation must be a string or null',

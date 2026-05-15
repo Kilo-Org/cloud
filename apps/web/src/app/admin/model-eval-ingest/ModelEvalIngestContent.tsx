@@ -27,9 +27,7 @@ export function ModelEvalIngestContent() {
   const syncMutation = useMutation(
     trpc.admin.modelEvalIngest.syncNow.mutationOptions({
       onSuccess: result => {
-        toast.success(
-          `Bench sync fetched ${result.fetched} promotions and inserted ${result.inserted}`
-        );
+        toast.success(formatSyncToast(result));
         void historyQuery.refetch();
       },
       onError: error => toast.error(error.message || 'Model eval sync failed'),
@@ -193,4 +191,27 @@ function formatTimestamp(value: string): string {
 
 function formatScore(value: number): string {
   return value.toFixed(4);
+}
+
+function formatSyncToast(result: {
+  inserted: number;
+  alreadyHad: number;
+  fetched: number;
+}): string {
+  if (result.inserted > 0) {
+    const inserted = `Bench sync inserted ${formatCount(result.inserted, 'new promotion')}.`;
+    return result.alreadyHad > 0
+      ? `${inserted} ${formatCount(result.alreadyHad, 'existing promotion')} rechecked.`
+      : inserted;
+  }
+
+  if (result.alreadyHad > 0) {
+    return `Bench sync is up to date; ${formatCount(result.alreadyHad, 'existing promotion')} rechecked.`;
+  }
+
+  return `Bench sync is up to date; ${formatCount(result.fetched, 'promotion')} returned.`;
+}
+
+function formatCount(count: number, label: string): string {
+  return `${count} ${label}${count === 1 ? '' : 's'}`;
 }

@@ -358,6 +358,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
         botNature: null,
         botVibe: null,
         botEmoji: null,
+        userLocation: null,
+        userTimezone: null,
         workerUrl: legacyWorkerUrl,
         controllerCapabilitiesVersion: null,
         name: null,

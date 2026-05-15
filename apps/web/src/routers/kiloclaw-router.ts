@@ -1018,6 +1018,8 @@ function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDash
     botNature: null,
     botVibe: null,
     botEmoji: null,
+    userLocation: null,
+    userTimezone: null,
     workerUrl,
     controllerCapabilitiesVersion: null,
     name: null,

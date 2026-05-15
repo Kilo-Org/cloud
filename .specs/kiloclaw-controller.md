@@ -438,7 +438,8 @@ patches to `openclaw.json`. The patches MUST include:
     Web search MUST auto-enable the `kilo-exa` provider when
     `KILO_EXA_SEARCH_MODE=kilo-proxy`, or when the mode is unset and the
     user has not explicitly configured search; it MUST disable or defer to
-    user/Brave configuration when `KILO_EXA_SEARCH_MODE=disabled`.
+    user/Brave configuration when `KILO_EXA_SEARCH_MODE=disabled` or any
+    unrecognised value (unknown values MUST be logged and treated as `disabled`).
 16. KiloClaw morning briefing plugin: load path and entry MUST be
     present; when `plugins.allow` exists, it MUST include
     `kiloclaw-morning-briefing`.

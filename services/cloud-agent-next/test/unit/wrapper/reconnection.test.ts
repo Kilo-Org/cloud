@@ -117,10 +117,16 @@ const createJobContext = (): JobContext => ({
   workerAuthToken: 'kilo_token_789',
 });
 
+const createCodeReviewJobContext = (): JobContext => ({
+  ...createJobContext(),
+  platform: 'code-review',
+});
+
 const createCallbacks = (): ConnectionCallbacks & {
   onReconnecting: ReturnType<typeof vi.fn>;
   onReconnected: ReturnType<typeof vi.fn>;
   onDisconnect: ReturnType<typeof vi.fn>;
+  onTerminalError: ReturnType<typeof vi.fn>;
 } => ({
   onMessageComplete: vi.fn(),
   onTerminalError: vi.fn(),
@@ -131,7 +137,18 @@ const createCallbacks = (): ConnectionCallbacks & {
   onReconnected: vi.fn(),
 });
 
-const createMockKiloClient = (): WrapperKiloClient => ({
+type KiloEvent = { type: string; properties?: Record<string, unknown> };
+
+function createEventStream(events: KiloEvent[]): AsyncIterable<KiloEvent> {
+  return (async function* () {
+    for (const event of events) {
+      yield event;
+    }
+    await new Promise(() => {});
+  })();
+}
+
+const createMockKiloClient = (overrides?: Partial<WrapperKiloClient>): WrapperKiloClient => ({
   createSession: vi.fn().mockResolvedValue({ id: 'kilo_sess' }),
   getSession: vi.fn().mockResolvedValue({ id: 'kilo_sess' }),
   sendPromptAsync: vi.fn().mockResolvedValue(undefined),
@@ -141,18 +158,19 @@ const createMockKiloClient = (): WrapperKiloClient => ({
   answerQuestion: vi.fn().mockResolvedValue(true),
   rejectQuestion: vi.fn().mockResolvedValue(true),
   generateCommitMessage: vi.fn().mockResolvedValue({ message: 'test commit' }),
+  getSessionStatuses: vi.fn().mockResolvedValue({}),
+  getQuestions: vi.fn().mockResolvedValue([]),
+  getPermissions: vi.fn().mockResolvedValue([]),
   sdkClient: {
     event: {
       // Return a stream that never yields — keeps event subscription alive
       subscribe: vi.fn().mockResolvedValue({
-        stream: (async function* () {
-          // Never yield — keeps alive without events
-          await new Promise(() => {});
-        })(),
+        stream: createEventStream([]),
       }),
     },
   } as unknown as WrapperKiloClient['sdkClient'],
   serverUrl: 'http://127.0.0.1:0',
+  ...overrides,
 });
 
 /**
@@ -220,6 +238,17 @@ describe('ingest WS reconnection', () => {
 
   function createManager() {
     return createConnectionManager(state, { kiloClient: createMockKiloClient() }, callbacks);
+  }
+
+  function createManagerWithClient(kiloClient: WrapperKiloClient) {
+    return createConnectionManager(state, { kiloClient }, callbacks);
+  }
+
+  function parseSentMessages(ws: MockWebSocket): Array<{
+    streamEventType: string;
+    data: Record<string, unknown>;
+  }> {
+    return ws.sent.map(msg => JSON.parse(msg));
   }
 
   // -------------------------------------------------------------------------
@@ -339,7 +368,7 @@ describe('ingest WS reconnection', () => {
     // (old WS is closed, so nothing is sent — events are buffered internally)
     const oldWsSentAfterClose = ws.sent.filter(msg => {
       const parsed = JSON.parse(msg);
-      return parsed.streamEventType === 'kilocode' || parsed.streamEventType === 'output';
+      return parsed.data.event === 'test_event_1' || parsed.data.text === 'some output';
     });
     // The old WS may have sent a heartbeat before close; filter to our test events
     expect(oldWsSentAfterClose).toHaveLength(0);
@@ -365,8 +394,8 @@ describe('ingest WS reconnection', () => {
     const flushedEvents = newWs.sent
       .map(msg => JSON.parse(msg))
       .filter(
-        (e: { streamEventType: string }) =>
-          e.streamEventType === 'kilocode' || e.streamEventType === 'output'
+        (e: { streamEventType: string; data: Record<string, unknown> }) =>
+          e.streamEventType === 'output' || e.data.event === 'test_event_1'
       );
     expect(flushedEvents).toHaveLength(2);
     expect(flushedEvents[0].data.event).toBe('test_event_1');
@@ -732,5 +761,142 @@ describe('ingest WS reconnection', () => {
     expect(manager2.isReconnecting()).toBe(true);
     expect(callbacks2.onDisconnect).not.toHaveBeenCalled();
     expect(callbacks2.onReconnecting).toHaveBeenCalledWith(1);
+  });
+
+  it('rejects real-time code-review questions without disconnecting', async () => {
+    state = new WrapperState();
+    state.startJob(createCodeReviewJobContext());
+    const rejectQuestion = vi.fn().mockResolvedValue(true);
+    const kiloClient = createMockKiloClient({
+      rejectQuestion,
+      sdkClient: {
+        event: {
+          subscribe: vi.fn().mockResolvedValue({
+            stream: createEventStream([
+              { type: 'question.asked', properties: { id: 'q_123', sessionID: 'kilo_sess_456' } },
+            ]),
+          }),
+        },
+      } as unknown as WrapperKiloClient['sdkClient'],
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    const ws = await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    const questionEvents = parseSentMessages(ws).filter(
+      event => event.streamEventType === 'kilocode' && event.data.event === 'question.asked'
+    );
+    expect(questionEvents).toHaveLength(0);
+    expect(rejectQuestion).toHaveBeenCalledWith('q_123');
+    expect(callbacks.onDisconnect).not.toHaveBeenCalled();
+    expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
+  });
+
+  it('rejects real-time code-review permissions without disconnecting', async () => {
+    state = new WrapperState();
+    state.startJob(createCodeReviewJobContext());
+    const answerPermission = vi.fn().mockResolvedValue(true);
+    const kiloClient = createMockKiloClient({
+      answerPermission,
+      sdkClient: {
+        event: {
+          subscribe: vi.fn().mockResolvedValue({
+            stream: createEventStream([
+              {
+                type: 'permission.asked',
+                properties: { id: 'p_456', sessionID: 'kilo_sess_456', permission: 'file_write' },
+              },
+            ]),
+          }),
+        },
+      } as unknown as WrapperKiloClient['sdkClient'],
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    const ws = await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    const permissionEvents = parseSentMessages(ws).filter(
+      event => event.streamEventType === 'kilocode' && event.data.event === 'permission.asked'
+    );
+    expect(permissionEvents).toHaveLength(0);
+    expect(answerPermission).toHaveBeenCalledWith('p_456', 'reject');
+    expect(callbacks.onDisconnect).not.toHaveBeenCalled();
+    expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
+  });
+
+  it.each(['question', 'permission'])(
+    'ignores real-time code-review %s session status without disconnecting',
+    async statusType => {
+      state = new WrapperState();
+      state.startJob(createCodeReviewJobContext());
+      const kiloClient = createMockKiloClient({
+        sdkClient: {
+          event: {
+            subscribe: vi.fn().mockResolvedValue({
+              stream: createEventStream([
+                {
+                  type: 'session.status',
+                  properties: { sessionID: 'kilo_sess_456', status: { type: statusType } },
+                },
+              ]),
+            }),
+          },
+        } as unknown as WrapperKiloClient['sdkClient'],
+      });
+
+      const manager = createManagerWithClient(kiloClient);
+      const ws = await openConnection(manager);
+      await vi.advanceTimersByTimeAsync(0);
+
+      const statusEvents = parseSentMessages(ws).filter(event => {
+        const status = event.data.status;
+        return (
+          event.streamEventType === 'kilocode' &&
+          event.data.event === 'session.status' &&
+          typeof status === 'object' &&
+          status !== null &&
+          'type' in status &&
+          status.type === statusType
+        );
+      });
+      expect(statusEvents).toHaveLength(0);
+      expect(callbacks.onDisconnect).not.toHaveBeenCalled();
+      expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
+    }
+  );
+
+  it('forwards payment-style events and reports terminal errors', async () => {
+    const kiloClient = createMockKiloClient({
+      sdkClient: {
+        event: {
+          subscribe: vi.fn().mockResolvedValue({
+            stream: createEventStream([
+              {
+                type: 'payment_required',
+                properties: { error: 'Insufficient credits', sessionID: 'kilo_sess_456' },
+              },
+            ]),
+          }),
+        },
+      } as unknown as WrapperKiloClient['sdkClient'],
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    const ws = await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    const paymentEvents = parseSentMessages(ws).filter(
+      event => event.streamEventType === 'kilocode' && event.data.event === 'payment_required'
+    );
+    expect(paymentEvents).toHaveLength(1);
+    expect(paymentEvents[0].data).toMatchObject({
+      event: 'payment_required',
+      error: 'Insufficient credits',
+    });
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith('Insufficient credits');
+    expect(callbacks.onDisconnect).not.toHaveBeenCalled();
+    expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
   });
 });

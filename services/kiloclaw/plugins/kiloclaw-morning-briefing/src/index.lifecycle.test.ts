@@ -76,6 +76,22 @@ async function createHarness(options?: {
   githubAuthReady?: boolean;
   githubIssues?: Array<{ title: string; url: string; updatedAt?: string }>;
   /**
+   * Stubs the diagnostic path that fires on empty issue results.
+   * `login` populates the `gh api user` body; `oauthScopes` populates the
+   * `X-OAuth-Scopes` header in that response; `accessibleRepoCount`
+   * populates the `gh api user/repos --paginate --jq '. | length'` total.
+   * Setting `GH_TOKEN` / `GITHUB_TOKEN` in `tokenEnv` controls
+   * `classifyGithubToken` since the plugin reads from `process.env`.
+   */
+  githubDiagnostics?: {
+    login?: string;
+    oauthScopes?: string[];
+    accessibleRepoCount?: number;
+    userApiFails?: boolean;
+    reposApiFails?: boolean;
+  };
+  tokenEnv?: { GH_TOKEN?: string; GITHUB_TOKEN?: string };
+  /**
    * When set, populates `LINEAR_API_KEY` in the process env via
    * `vi.stubEnv` so `resolveLinearReady` returns configured. Cleared
    * automatically in `afterEach`.
@@ -102,10 +118,15 @@ async function createHarness(options?: {
    */
   cronAddBarrier?: Promise<void>;
 }): Promise<TestHarness> {
-  // Linear readiness reads `process.env.LINEAR_API_KEY` directly. Stub it
-  // per-test so `vi.unstubAllEnvs()` in `afterEach` restores the original
-  // and tests that don't opt in run with the env explicitly cleared (no
-  // host-environment leakage into the `resolveLinearReady` path).
+  // `gatherGithubEmptyResultContext` reads from `process.env`. Use
+  // vi.stubEnv so the value is scoped to the test and `vi.unstubAllEnvs`
+  // in afterEach restores the original. Tests that don't set tokenEnv
+  // get an explicit-unset to avoid leaking host env into the test.
+  vi.stubEnv('GH_TOKEN', options?.tokenEnv?.GH_TOKEN ?? '');
+  vi.stubEnv('GITHUB_TOKEN', options?.tokenEnv?.GITHUB_TOKEN ?? '');
+  // Linear readiness reads `process.env.LINEAR_API_KEY` directly. Same
+  // pattern; default cleared so the resolveLinearReady path doesn't
+  // accidentally pick up the host env.
   vi.stubEnv('LINEAR_API_KEY', options?.linearApiKey ?? '');
 
   const { default: morningBriefingPlugin } = await import('./index');
@@ -150,6 +171,33 @@ async function createHarness(options?: {
         stderr: '',
         code: 0,
       };
+    }
+
+    if (argv[0] === 'gh' && argv[1] === 'api' && argv[2] === '-i' && argv[3] === 'user') {
+      if (options?.githubDiagnostics?.userApiFails) {
+        return { stdout: '', stderr: 'api error', code: 1 };
+      }
+      const login = options?.githubDiagnostics?.login ?? 'testuser';
+      const scopesHeader =
+        options?.githubDiagnostics?.oauthScopes !== undefined
+          ? `X-OAuth-Scopes: ${options.githubDiagnostics.oauthScopes.join(', ')}\n`
+          : '';
+      const body = JSON.stringify({ login, id: 1 });
+      const stdout = `HTTP/2.0 200 OK\nContent-Type: application/json\n${scopesHeader}\n${body}`;
+      return { stdout, stderr: '', code: 0 };
+    }
+
+    if (
+      argv[0] === 'gh' &&
+      argv[1] === 'api' &&
+      argv[2] === 'user/repos' &&
+      argv.includes('--paginate')
+    ) {
+      if (options?.githubDiagnostics?.reposApiFails) {
+        return { stdout: '', stderr: 'api error', code: 1 };
+      }
+      const count = options?.githubDiagnostics?.accessibleRepoCount ?? 0;
+      return { stdout: `${count}\n`, stderr: '', code: 0 };
     }
 
     if (
@@ -1010,6 +1058,153 @@ describe('morning briefing lifecycle', () => {
         )
       )
     ).toBe(true);
+  });
+
+  describe('github source diagnostics on empty results', () => {
+    async function readGithubStatusSummary(stateDir: string): Promise<string | undefined> {
+      const status = (await readJson(path.join(stateDir, 'morning-briefing', 'status.json'))) as {
+        sourceSummary?: Array<{ source: string; summary: string }>;
+      };
+      return status.sourceSummary?.find(s => s.source === 'github')?.summary;
+    }
+
+    const telegramOnly = { telegram: { enabled: true, defaultTo: '-100123456' } };
+
+    it('renders fine-grained PAT empty-result copy with accessible repo count', async () => {
+      const harness = await createHarness({
+        githubAuthReady: true,
+        githubIssues: [],
+        tokenEnv: { GITHUB_TOKEN: 'github_pat_11ABC_xxxxx' },
+        githubDiagnostics: {
+          login: 'astormsocbot',
+          accessibleRepoCount: 3,
+        },
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      expect(sent).toContain('No open issues involving you were found');
+      expect(sent).toContain('astormsocbot');
+      expect(sent).toContain('fine-grained PAT');
+      expect(sent).toContain('3 repositories');
+      expect(sent).toContain('switch to a classic PAT');
+
+      expect(await readGithubStatusSummary(harness.stateDir)).toBe(
+        '0 issues — fine-grained PAT for astormsocbot sees 3 repos'
+      );
+    });
+
+    it('renders classic PAT empty-result with missing scope when repo not granted', async () => {
+      const harness = await createHarness({
+        githubAuthReady: true,
+        githubIssues: [],
+        tokenEnv: { GITHUB_TOKEN: 'ghp_xxxxxxxx' },
+        githubDiagnostics: {
+          login: 'astormsocbot',
+          oauthScopes: ['public_repo', 'read:user'],
+        },
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      expect(sent).toContain('classic PAT');
+      expect(sent).toContain('Granted scopes: public_repo, read:user');
+      expect(sent).toContain('Missing scopes useful for KiloClaw: repo');
+      expect(sent).toContain('gh auth refresh -h github.com');
+
+      expect(await readGithubStatusSummary(harness.stateDir)).toBe(
+        '0 issues — classic PAT missing scopes: repo'
+      );
+    });
+
+    it('renders classic PAT happy-path empty copy when all scopes are present', async () => {
+      const harness = await createHarness({
+        githubAuthReady: true,
+        githubIssues: [],
+        tokenEnv: { GITHUB_TOKEN: 'ghp_xxxxxxxx' },
+        githubDiagnostics: {
+          login: 'astormsocbot',
+          oauthScopes: ['repo', 'read:org'],
+        },
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      expect(sent).toContain('classic PAT');
+      expect(sent).toContain('Token has the scopes the brief needs');
+      expect(sent).not.toContain('Missing scopes');
+      expect(sent).not.toContain('gh auth refresh');
+
+      expect(await readGithubStatusSummary(harness.stateDir)).toBe(
+        '0 issues involving astormsocbot'
+      );
+    });
+
+    it('falls back to unknown-token copy when diagnostics fail to resolve a token type', async () => {
+      const harness = await createHarness({
+        githubAuthReady: true,
+        githubIssues: [],
+        // No tokenEnv -> readGithubTokenFromEnv returns undefined ->
+        // classify returns 'unknown'.
+        githubDiagnostics: {
+          login: 'astormsocbot',
+        },
+        channelsConfig: telegramOnly,
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const sent = harness.sentMessages[0]?.message ?? '';
+      expect(sent).toContain('unknown token');
+      expect(sent).toContain('Could not determine accessible repositories or scopes');
+    });
+
+    it('issues the scoped flag-form gh search query (involves @me, sort updated desc)', async () => {
+      const harness = await createHarness({
+        githubAuthReady: true,
+        githubIssues: [
+          {
+            title: 'Issue 1',
+            url: 'https://github.com/foo/bar/issues/1',
+            updatedAt: '2026-05-14T00:00:00Z',
+          },
+        ],
+        tokenEnv: { GITHUB_TOKEN: 'ghp_xxxxxxxx' },
+      });
+
+      const response = new FakeResponse();
+      await harness.runHttpHandler({}, response);
+      expect(response.statusCode).toBe(200);
+
+      const searchCall = harness.runCommandWithTimeout.mock.calls.find(
+        ([argv]) => Array.isArray(argv) && argv[0] === 'gh' && argv[1] === 'search'
+      );
+      expect(searchCall).toBeDefined();
+      const argv = searchCall?.[0] as string[];
+      expect(argv).toContain('--involves');
+      expect(argv).toContain('@me');
+      expect(argv).toContain('--state');
+      expect(argv).toContain('open');
+      expect(argv).toContain('--sort');
+      expect(argv).toContain('updated');
+      expect(argv).toContain('--order');
+      expect(argv).toContain('desc');
+      expect(argv).not.toContain('is:open sort:updated-desc');
+    });
   });
 
   describe('linear source', () => {

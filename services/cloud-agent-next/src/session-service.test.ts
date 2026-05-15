@@ -1628,8 +1628,18 @@ describe('SessionService', () => {
       // Denied commands use "cmd *" glob pattern format
       expect(configContent.permission?.bash?.['git commit *']).toBe('deny');
       expect(configContent.permission?.bash?.['gh pr merge *']).toBe('deny');
+      expect(configContent.permission?.bash?.bash).toBe('deny');
+      expect(configContent.permission?.bash?.['bash *']).toBe('deny');
+      expect(configContent.permission?.bash?.['vim *']).toBe('deny');
+      expect(configContent.permission?.bash?.['gh auth login *']).toBe('deny');
       expect(configContent.permission?.edit).toBe('deny');
       expect(configContent.permission?.read).toBe('allow');
+
+      expect(callArgs.env.CI).toBe('true');
+      expect(callArgs.env.GIT_TERMINAL_PROMPT).toBe('0');
+      expect(callArgs.env.GH_PROMPT_DISABLED).toBe('1');
+      expect(callArgs.env.PAGER).toBe('cat');
+      expect(callArgs.env.GIT_PAGER).toBe('cat');
     });
   });
 

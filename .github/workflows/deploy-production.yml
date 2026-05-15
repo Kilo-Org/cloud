@@ -13,8 +13,6 @@ concurrency:
 
 env:
   VERCEL_VERSION: '53.3.1'
-  # pnpm dlx vercel can hit ERR_PNPM_MISSING_TIME with default resolution mode.
-  PNPM_CONFIG_RESOLUTION_MODE: 'highest'
 
 jobs:
   check-production-db-startup:

@@ -111,6 +111,11 @@ const createJobContext = (): JobContext => ({
   workerAuthToken: 'kilo_token_789',
 });
 
+const createCodeReviewJobContext = (): JobContext => ({
+  ...createJobContext(),
+  platform: 'code-review',
+});
+
 const createCallbacks = (): ConnectionCallbacks => ({
   onMessageComplete: vi.fn(),
   onTerminalError: vi.fn(),
@@ -296,10 +301,10 @@ describe('sendKiloSnapshot → sendKiloState', () => {
   });
 
   // -----------------------------------------------------------------------
-  // 4. replays pending question as kilocode event
+  // 4. replays pending question as kilocode event for interactive sessions
   // -----------------------------------------------------------------------
 
-  it('replays pending question as kilocode event', async () => {
+  it('replays pending question as kilocode event for interactive sessions', async () => {
     const pendingQuestion = {
       id: 'q_123',
       sessionID: 'kilo_sess_456',
@@ -327,6 +332,125 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       event: 'question.asked',
       properties: pendingQuestion,
     });
+  });
+
+  it('replays pending questions for code-review snapshots without rejecting them', async () => {
+    const pendingQuestion = {
+      id: 'q_123',
+      sessionID: 'kilo_sess_456',
+      tool: { messageID: 'msg_1', callID: 'call_1' },
+      questions: [
+        { question: 'Pick a color', header: 'Color', options: [{ label: 'Red', description: '' }] },
+      ],
+    };
+    const rejectQuestion = vi.fn().mockResolvedValue(true);
+
+    const kiloClient = createMockKiloClient({
+      getQuestions: vi.fn().mockResolvedValue([pendingQuestion]),
+      rejectQuestion,
+    });
+
+    state.startJob(createCodeReviewJobContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+    const questionEvents = messages.filter(
+      m => m.streamEventType === 'kilocode' && m.data.event === 'question.asked'
+    );
+
+    expect(questionEvents).toHaveLength(1);
+    expect(questionEvents[0].data).toMatchObject({
+      event: 'question.asked',
+      properties: pendingQuestion,
+    });
+    expect(rejectQuestion).not.toHaveBeenCalled();
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+  });
+
+  it('replays pending permissions for code-review snapshots without rejecting them', async () => {
+    const pendingPermission = {
+      id: 'p_456',
+      sessionID: 'kilo_sess_456',
+      permission: 'file_write',
+      patterns: ['**/*.ts'],
+      metadata: {},
+      always: [],
+      tool: { messageID: 'msg_2', callID: 'call_2' },
+    };
+    const answerPermission = vi.fn().mockResolvedValue(true);
+
+    const kiloClient = createMockKiloClient({
+      getPermissions: vi.fn().mockResolvedValue([pendingPermission]),
+      answerPermission,
+    });
+
+    state.startJob(createCodeReviewJobContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+    const permissionEvents = messages.filter(
+      m => m.streamEventType === 'kilocode' && m.data.event === 'permission.asked'
+    );
+
+    expect(permissionEvents).toHaveLength(1);
+    expect(permissionEvents[0].data).toMatchObject({
+      event: 'permission.asked',
+      properties: pendingPermission,
+    });
+    expect(answerPermission).not.toHaveBeenCalled();
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+  });
+
+  it('replays code-review question status snapshots as session.status events', async () => {
+    const kiloClient = createMockKiloClient({
+      getSessionStatuses: vi.fn().mockResolvedValue({
+        kilo_sess_456: { type: 'question' },
+      }),
+    });
+
+    state.startJob(createCodeReviewJobContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+    const statusEvents = messages.filter(
+      m => m.streamEventType === 'kilocode' && m.data.event === 'session.status'
+    );
+
+    expect(statusEvents).toHaveLength(1);
+    expect(statusEvents[0].data).toMatchObject({
+      event: 'session.status',
+      sessionID: 'kilo_sess_456',
+      status: { type: 'question' },
+    });
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+  });
+
+  it('replays code-review permission status snapshots as session.status events', async () => {
+    const kiloClient = createMockKiloClient({
+      getSessionStatuses: vi.fn().mockResolvedValue({
+        kilo_sess_456: { type: 'permission' },
+      }),
+    });
+
+    state.startJob(createCodeReviewJobContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+    const statusEvents = messages.filter(
+      m => m.streamEventType === 'kilocode' && m.data.event === 'session.status'
+    );
+
+    expect(statusEvents).toHaveLength(1);
+    expect(statusEvents[0].data).toMatchObject({
+      event: 'session.status',
+      sessionID: 'kilo_sess_456',
+      status: { type: 'permission' },
+    });
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------

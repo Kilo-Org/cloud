@@ -19,6 +19,39 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function isCodeReviewJob(state: WrapperState): boolean {
+  return state.currentJob?.platform === 'code-review';
+}
+
+function statusTypeFromProperties(properties: Record<string, unknown>): string | undefined {
+  const status = properties.status;
+  return isRecord(status) && typeof status.type === 'string' ? status.type : undefined;
+}
+
+function rejectCodeReviewQuestion(
+  questionId: string | undefined,
+  kiloClient: WrapperKiloClient
+): void {
+  if (!questionId) return;
+  kiloClient.rejectQuestion(questionId).catch(err => {
+    logToFile(
+      `failed to reject code-review question ${questionId}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  });
+}
+
+function rejectCodeReviewPermission(
+  permissionId: string | undefined,
+  kiloClient: WrapperKiloClient
+): void {
+  if (!permissionId) return;
+  kiloClient.answerPermission(permissionId, 'reject').catch(err => {
+    logToFile(
+      `failed to reject code-review permission ${permissionId}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  });
+}
+
 export function trimIngestEvent(event: IngestEvent): IngestEvent {
   return {
     ...event,
@@ -455,6 +488,12 @@ export function createConnectionManager(
           // waiting for a human response that will never come.
           if (eventType === 'permission.asked') {
             const permId = typeof properties.id === 'string' ? properties.id : undefined;
+            if (isCodeReviewJob(state)) {
+              rejectCodeReviewPermission(permId, config.kiloClient);
+              callbacks.onSseEvent?.();
+              continue;
+            }
+
             if (permId) {
               logToFile(`auto-approving permission ${permId} (${String(properties.permission)})`);
               config.kiloClient.answerPermission(permId, 'always').catch(err => {
@@ -465,6 +504,31 @@ export function createConnectionManager(
             }
             callbacks.onSseEvent?.();
             continue;
+          }
+
+          if (isCodeReviewJob(state)) {
+            if (eventType === 'question.asked') {
+              const questionId = typeof properties.id === 'string' ? properties.id : undefined;
+              rejectCodeReviewQuestion(questionId, config.kiloClient);
+              callbacks.onSseEvent?.();
+              continue;
+            }
+
+            if (
+              eventType === 'session.status' &&
+              statusTypeFromProperties(properties) === 'question'
+            ) {
+              callbacks.onSseEvent?.();
+              continue;
+            }
+
+            if (
+              eventType === 'session.status' &&
+              statusTypeFromProperties(properties) === 'permission'
+            ) {
+              callbacks.onSseEvent?.();
+              continue;
+            }
           }
 
           // Build and forward ingest event

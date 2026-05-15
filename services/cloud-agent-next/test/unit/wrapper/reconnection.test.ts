@@ -794,7 +794,7 @@ describe('ingest WS reconnection', () => {
     expect(rejectQuestion).toHaveBeenCalledWith('q_123');
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
     expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
-    expect(callbacks.onSseEvent).not.toHaveBeenCalled();
+    expect(callbacks.onSseEvent).toHaveBeenCalledTimes(1);
   });
 
   it('rejects real-time code-review permissions without disconnecting', async () => {
@@ -829,7 +829,7 @@ describe('ingest WS reconnection', () => {
     expect(answerPermission).toHaveBeenCalledWith('p_456', 'reject');
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
     expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
-    expect(callbacks.onSseEvent).not.toHaveBeenCalled();
+    expect(callbacks.onSseEvent).toHaveBeenCalledTimes(1);
   });
 
   it.each(['question', 'permission'])(
@@ -871,7 +871,7 @@ describe('ingest WS reconnection', () => {
       expect(statusEvents).toHaveLength(0);
       expect(callbacks.onDisconnect).not.toHaveBeenCalled();
       expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
-      expect(callbacks.onSseEvent).not.toHaveBeenCalled();
+      expect(callbacks.onSseEvent).toHaveBeenCalledTimes(1);
     }
   );
 

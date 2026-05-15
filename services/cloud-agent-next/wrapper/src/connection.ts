@@ -503,6 +503,7 @@ export function createConnectionManager(
             const permId = typeof properties.id === 'string' ? properties.id : undefined;
             if (isCodeReviewJob(state)) {
               rejectCodeReviewPermission(permId, config.kiloClient);
+              callbacks.onSseEvent?.();
               continue;
             }
 
@@ -522,6 +523,7 @@ export function createConnectionManager(
             if (eventType === 'question.asked') {
               const questionId = typeof properties.id === 'string' ? properties.id : undefined;
               rejectCodeReviewQuestion(questionId, config.kiloClient);
+              callbacks.onSseEvent?.();
               continue;
             }
 
@@ -529,6 +531,7 @@ export function createConnectionManager(
               eventType === 'session.status' &&
               isInteractiveStatusType(statusTypeFromProperties(properties))
             ) {
+              callbacks.onSseEvent?.();
               continue;
             }
           }

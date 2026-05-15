@@ -173,6 +173,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['nextjs'],
     dir: 'services/o11y',
   },
+  'cloudflare-model-eval-ingest': {
+    group: 'observability',
+    dependsOn: ['postgres'],
+    dir: 'services/model-eval-ingest',
+  },
   'cloudflare-ai-attribution': {
     group: 'observability',
     dependsOn: [],

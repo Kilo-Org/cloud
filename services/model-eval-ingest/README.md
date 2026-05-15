@@ -11,29 +11,39 @@ Cloudflare Worker that pulls promoted eval aggregates from the kilo-bench dashbo
 
 ## Local Development
 
-### 1. Configure the shared manual-sync secret
+### 1. Sync local env files
 
-The local Worker uses Wrangler `.dev.vars`, matching the pattern used by other Workers in this repo.
+From the cloud repo root, run:
+
+```bash
+pnpm dev:env
+```
+
+This repo-standard env sync reads `.env.local` plus the `.example` templates and writes:
+
+- `services/model-eval-ingest/.dev.vars`, including `INTERNAL_API_SECRET` copied from `.env.local`
+- `apps/web/.env.development.local`, including `MODEL_EVAL_INGEST_URL` generated from the local Worker port
+
+The manual sync secret must match on both sides because `apps/web` calls the Worker's HTTP `/internal/sync` route. The Worker-to-bench hop remains a Service Binding and does not use this secret.
+
+If `pnpm dev:env` is unavailable for some reason, the equivalent manual setup is:
 
 ```bash
 cd services/model-eval-ingest
 cp .dev.vars.example .dev.vars
 ```
 
-Set `INTERNAL_API_SECRET` in `.dev.vars` to the same value as repo-root `.env.local`:
-
 ```env
 # services/model-eval-ingest/.dev.vars
-INTERNAL_API_SECRET=<same value as .env.local INTERNAL_API_SECRET>
+INTERNAL_API_SECRET=<same value as repo-root .env.local INTERNAL_API_SECRET>
 ```
 
-The web app also needs the local Worker URL in repo-root `.env.local`:
-
 ```env
+# apps/web/.env.development.local
 MODEL_EVAL_INGEST_URL=http://localhost:8798
 ```
 
-Example templates are kept in:
+Relevant templates are kept in:
 
 - `.env.local.example`
 - `apps/web/.env.development.local.example`
@@ -63,7 +73,7 @@ Wrangler serves the Worker at `http://localhost:8798` by default.
 
 ### 4. Restart Next.js after env changes
 
-If `.env.local` was updated after Next.js was already running, restart it so the admin sync client sees `MODEL_EVAL_INGEST_URL`:
+If `pnpm dev:env` updated `apps/web/.env.development.local` after Next.js was already running, restart it so the admin sync client sees `MODEL_EVAL_INGEST_URL`:
 
 ```bash
 pnpm dev:restart nextjs

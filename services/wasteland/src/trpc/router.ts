@@ -9,8 +9,8 @@ import { z } from 'zod';
 import { router, procedure, adminProcedure } from './init';
 import { resolveWastelandOwnership } from './ownership';
 import { getWastelandDOStub, type WastelandMemberResult } from '../dos/Wasteland.do';
-import { getWastelandContainerStub } from '../dos/WastelandContainer.do';
 import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
+import { createUpstream as bootstrapCreateUpstream } from '../upstream-bootstrap/create-upstream';
 import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.util';
 import { resolveSecret } from '../util/secret.util';
 import { meterEvent } from '../util/billing.util';
@@ -135,7 +135,14 @@ async function loadAdminContext(
   env: Env,
   wastelandId: string,
   userId: string
-): Promise<{ token: string; upstream: string; isUpstreamAdmin: boolean; rigHandle: string }> {
+): Promise<{
+  token: string;
+  upstream: string;
+  isUpstreamAdmin: boolean;
+  rigHandle: string;
+  /** DoltHub username/org — needed for the rig row's `dolthub_org` column. */
+  dolthubOrg: string | null;
+}> {
   const doStub = getWastelandDOStub(env, wastelandId);
   const config = await doStub.getConfig();
   if (!config?.dolthub_upstream) {
@@ -161,6 +168,7 @@ async function loadAdminContext(
       upstream: config.dolthub_upstream,
       isUpstreamAdmin,
       rigHandle,
+      dolthubOrg,
     };
   }
 
@@ -192,6 +200,7 @@ async function loadAdminContext(
     upstream: config.dolthub_upstream,
     isUpstreamAdmin: credential.is_upstream_admin,
     rigHandle,
+    dolthubOrg,
   };
 }
 
@@ -288,12 +297,17 @@ export const wastelandRouter = router({
       return config;
     }),
 
-  // ── Create Upstream (invokes `wl create` on the container) ──────────
-  // Bootstraps a brand-new DoltHub commons repo with the wasteland schema
-  // and registers the caller as the first rig. Requires the caller's
-  // credential to already be stored AND marked as upstream-admin. Should
-  // only be called as part of the "create your own wasteland" flow after
-  // storeCredential has run.
+  // ── Create Upstream (worker-side bootstrap of a new commons) ────────
+  // Bootstraps a brand-new DoltHub commons repo: creates the database
+  // via DoltHub's REST API, applies the wasteland commons schema, and
+  // registers the caller as the first rig with `trust_level=1`.
+  // Requires the caller's credential to already be stored AND marked
+  // as upstream-admin. Should only be called as part of the "create
+  // your own wasteland" flow after storeCredential has run.
+  //
+  // Implementation lives in `upstream-bootstrap/`; see
+  // `services/wasteland/docs/wasteland-container-retirement.md`
+  // (Phase 1) for the migration story away from the container.
   createUpstream: procedure
     .input(
       z.object({
@@ -302,12 +316,18 @@ export const wastelandRouter = router({
         rigHandle: z.string().optional(),
         rigDisplayName: z.string().optional(),
         rigEmail: z.string().email().optional(),
+        visibility: z.enum(['public', 'private']).optional(),
       })
     )
-    .output(z.object({ success: z.boolean() }))
+    .output(z.object({ success: z.boolean(), databaseCreated: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
 
+      // Resolve credentials inline rather than via loadAdminContext —
+      // the latter requires `config.dolthub_upstream` to already be
+      // set, but createUpstream is the call that *establishes* it.
+      // The upstream-bootstrap path always uses the explicit input
+      // upstream regardless of what's on the config.
       const doStub = getWastelandDOStub(ctx.env, input.wastelandId);
       const credential = await doStub.getCredential(ctx.userId);
       if (!credential) {
@@ -324,39 +344,62 @@ export const wastelandRouter = router({
         });
       }
 
-      const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
-      if (!rawKey) {
+      // Token resolution: prefer fresh OAuth, fall back to the locally
+      // encrypted credential. Same shape as `loadAdminContext` but
+      // without the upstream-on-config precondition.
+      const fresh = await fetchFreshDoltHubToken(ctx.env, { userId: ctx.userId });
+      const dolthubOrg =
+        (fresh.status === 'ok' ? fresh.data.dolthubUsername : null) ?? credential.dolthub_org;
+      if (!dolthubOrg) {
         throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Encryption key unavailable',
+          code: 'PRECONDITION_FAILED',
+          message:
+            'DoltHub username unknown — reconnect DoltHub in settings to refresh your credential',
         });
       }
-      const cryptoKey = await deriveEncryptionKey(rawKey);
-      const token = await decryptToken(credential.encrypted_token, cryptoKey);
+      let token: string;
+      if (fresh.status === 'ok') {
+        token = fresh.data.token;
+      } else {
+        if (fresh.status === 'unavailable') {
+          console.warn('[createUpstream] fresh DoltHub token unavailable, falling back', {
+            wastelandId: input.wastelandId,
+            userId: ctx.userId,
+            reason: fresh.reason,
+          });
+        }
+        const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
+        if (!rawKey) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Encryption key unavailable',
+          });
+        }
+        const cryptoKey = await deriveEncryptionKey(rawKey);
+        token = await decryptToken(credential.encrypted_token, cryptoKey);
+      }
 
       const config = await doStub.getConfig();
-      const displayName = input.rigDisplayName ?? config?.name;
+      const handle = input.rigHandle ?? credential.rig_handle ?? dolthubOrg;
+      const displayName = input.rigDisplayName ?? config?.name ?? handle;
+      const ownerEmail = input.rigEmail ?? `${handle}@kilo.local`;
 
-      const container = getWastelandContainerStub(ctx.env, input.wastelandId);
-      const res = await container.fetch(
-        new Request('http://container/wl/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', DOLTHUB_TOKEN: token },
-          body: JSON.stringify({
-            upstream: input.upstream,
-            name: config?.name,
-            displayName,
-            handle: input.rigHandle ?? credential.rig_handle ?? undefined,
-            email: input.rigEmail,
-          }),
-        })
-      );
-
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
+      let result: Awaited<ReturnType<typeof bootstrapCreateUpstream>>;
+      try {
+        result = await bootstrapCreateUpstream({
+          upstream: input.upstream,
+          token,
+          rigHandle: handle,
+          rigDisplayName: displayName,
+          ownerEmail,
+          dolthubOrg,
+          wastelandName: config?.name,
+          visibility: input.visibility,
+        });
+      } catch (err) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: `wl create failed: ${body || res.statusText}`,
+          message: `wl create failed: ${err instanceof Error ? err.message : String(err)}`,
         });
       }
 
@@ -370,7 +413,7 @@ export const wastelandRouter = router({
         label: 'create_upstream',
       });
 
-      return { success: true };
+      return { success: true, databaseCreated: result.databaseCreated };
     }),
 
   // ── List ────────────────────────────────────────────────────────────
@@ -622,15 +665,9 @@ export const wastelandRouter = router({
         ...(input.dolthubUpstream !== undefined ? { dolthub_upstream: input.dolthubUpstream } : {}),
       });
 
-      // Sync upstream to the container so it's available on next boot
-      if (input.dolthubUpstream !== undefined) {
-        const container = getWastelandContainerStub(ctx.env, input.wastelandId);
-        if (input.dolthubUpstream) {
-          await container.setEnvVar('WL_UPSTREAM', input.dolthubUpstream);
-        } else {
-          await container.deleteEnvVar('WL_UPSTREAM');
-        }
-      }
+      // Phase 2: container env-var sync removed alongside the
+      // container itself. The wasm path reads the upstream off the DO
+      // config on every op, so there's nothing to sync to.
 
       meterEvent(ctx.env, {
         event: 'billing.api_operation',
@@ -679,66 +716,11 @@ export const wastelandRouter = router({
         isUpstreamAdmin: input.isUpstreamAdmin,
       });
 
-      // Inject token and config into the container env vars (persisted
-      // for next boot) and tell the running container to init immediately.
-      // Per-user dolt commit identity (DOLT_USER_NAME / DOLT_USER_EMAIL) and
-      // the JWK push credential (DOLT_CREDS_JWK) are intentionally not
-      // collected here — the container's `configureDolt` falls back to
-      // sensible defaults derived from DOLTHUB_ORG, and pushes use the
-      // OAuth-issued token rather than a per-user JWK.
-      //
-      // Only the wasteland's *creator* drives container init from this
-      // call site; secondary members (rigs joining a wasteland someone
-      // else owns) get their credentials stored but don't repurpose the
-      // shared container's env vars.
-      const config = await stub.getConfig();
-      if (config && config.owner_user_id === ctx.userId) {
-        const container = getWastelandContainerStub(ctx.env, input.wastelandId);
-        await container.setEnvVar('DOLTHUB_TOKEN', input.dolthubToken);
-        await container.setEnvVar('DOLTHUB_ORG', input.dolthubOrg);
-        if (config.dolthub_upstream) {
-          // Don't push WL_UPSTREAM (or trigger /wl/init) until the repo
-          // actually exists on DoltHub. The wasteland config can hold an
-          // upstream string ahead of the repo being created — the
-          // standalone "create new wasteland" wizard records the user's
-          // intended upstream before `createUpstream` runs `wl create`,
-          // and the Gastown wizard calls storeCredential before
-          // createUpstream too. If we eagerly push WL_UPSTREAM, the
-          // container's selfInit kicks off a `wl join` against a
-          // non-existent repo and crash-loops. We let `createUpstream`
-          // (whose own `/wl/create` invocation populates the repo and
-          // then sets the env vars correctly) handle it instead.
-          const upstreamReady = await doltApi.upstreamExistsOnDolthub(
-            config.dolthub_upstream,
-            input.dolthubToken
-          );
-          if (upstreamReady) {
-            await container.setEnvVar('WL_UPSTREAM', config.dolthub_upstream);
-
-            // Tell the (possibly already running) container to init now.
-            // Surface failures so the user knows init didn't work.
-            const initRes = await container.fetch(
-              new Request('http://container/wl/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  upstream: config.dolthub_upstream,
-                  token: input.dolthubToken,
-                  dolthubOrg: input.dolthubOrg,
-                }),
-              })
-            );
-            if (!initRes.ok) {
-              const body = await initRes.text().catch(() => '');
-              console.warn(`[storeCredential] container init returned ${initRes.status}: ${body}`);
-            }
-          } else {
-            console.info(
-              `[storeCredential] upstream ${config.dolthub_upstream} not yet on DoltHub — deferring WL_UPSTREAM push until createUpstream runs`
-            );
-          }
-        }
-      }
+      // Container env-var sync removed (Phase 1 of the container
+      // retirement, see services/wasteland/docs/wasteland-container-retirement.md).
+      // The wasm-on-Worker wanted-board path resolves credentials from
+      // `loadContext` directly on every op; there's nothing to push into
+      // a container any more.
 
       meterEvent(ctx.env, {
         event: 'billing.credential_stored',
@@ -829,7 +811,15 @@ export const wastelandRouter = router({
     }),
 
   // ── Container Status ────────────────────────────────────────────────
-
+  // Phase 2 of the container retirement
+  // (services/wasteland/docs/wasteland-container-retirement.md): the
+  // wasm path has no container to be "joined" to, so the response is
+  // synthesized from worker-side state (DO config + stored credential
+  // + a token-freshness probe). Legacy fields (`hasJwk`,
+  // `doltCredPubKey`, `wlVersion`, `uptime`, `lastOperation`,
+  // `joined`) keep their old shape but return constants so existing
+  // UI keeps rendering. Drop them once the SettingsClient stops
+  // reading them.
   containerStatus: procedure
     .input(z.object({ wastelandId: z.string().uuid() }))
     .output(
@@ -848,88 +838,43 @@ export const wastelandRouter = router({
     .query(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
 
-      const container = getWastelandContainerStub(ctx.env, input.wastelandId);
-      const res = await container.fetch(
-        new Request('http://container/wl/config', { method: 'GET' })
-      );
+      const doStub = getWastelandDOStub(ctx.env, input.wastelandId);
+      const config = await doStub.getConfig();
+      const credential = await doStub.getCredential(ctx.userId);
 
-      if (!res.ok) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: `Container status check failed: ${res.statusText}`,
-        });
+      // hasToken: prefer a fresh-OAuth probe, fall back to "do we have
+      // a locally encrypted credential". Both prove the caller can
+      // talk to DoltHub on behalf of this wasteland.
+      let hasToken = !!credential;
+      if (!hasToken) {
+        const fresh = await fetchFreshDoltHubToken(ctx.env, { userId: ctx.userId });
+        hasToken = fresh.status === 'ok';
       }
 
-      const data: unknown = await res.json();
-      return z
-        .object({
-          joined: z.boolean(),
-          upstream: z.string().nullable(),
-          dolthubOrg: z.string().nullable(),
-          hasToken: z.boolean(),
-          hasJwk: z.boolean(),
-          doltCredPubKey: z.string().nullable(),
-          wlVersion: z.string(),
-          uptime: z.number(),
-          lastOperation: z.string().nullable(),
-        })
-        .parse(data);
+      return {
+        joined: !!config?.dolthub_upstream,
+        upstream: config?.dolthub_upstream ?? null,
+        dolthubOrg: credential?.dolthub_org ?? null,
+        hasToken,
+        // Deprecated — kept for shape compatibility with the old container
+        // payload until the UI stops reading these.
+        hasJwk: false,
+        doltCredPubKey: null,
+        wlVersion: 'wasm',
+        uptime: 0,
+        lastOperation: null,
+      };
     }),
 
+  // `containerJoin` is now a no-op (Phase 1 of the container
+  // retirement, see services/wasteland/docs/wasteland-container-retirement.md).
+  // Once the SettingsClient stops calling it, drop the procedure entirely.
   containerJoin: procedure
     .input(z.object({ wastelandId: z.string().uuid() }))
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      // Still verify access so callers can't probe DO existence.
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
-
-      const doStub = getWastelandDOStub(ctx.env, input.wastelandId);
-      const config = await doStub.getConfig();
-      if (!config?.dolthub_upstream) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'No DoltHub upstream configured',
-        });
-      }
-
-      const credential = await doStub.getCredential(ctx.userId);
-      if (!credential) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'No DoltHub credential stored',
-        });
-      }
-
-      const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
-      if (!rawKey) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Encryption key unavailable',
-        });
-      }
-      const cryptoKey = await deriveEncryptionKey(rawKey);
-      const token = await decryptToken(credential.encrypted_token, cryptoKey);
-
-      const container = getWastelandContainerStub(ctx.env, input.wastelandId);
-      const res = await container.fetch(
-        new Request('http://container/wl/init', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            upstream: config.dolthub_upstream,
-            token,
-            dolthubOrg: credential.dolthub_org,
-          }),
-        })
-      );
-
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: `Container join failed: ${body || res.statusText}`,
-        });
-      }
-
       return { success: true };
     }),
 

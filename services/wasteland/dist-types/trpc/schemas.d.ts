@@ -114,6 +114,19 @@ export declare const MergePullOutput: z.ZodObject<{
     pull_id: z.ZodString;
     state: z.ZodString;
 }, z.core.$strip>;
+export declare const PendingClaimOutput: z.ZodObject<{
+    item_id: z.ZodString;
+    pull_id: z.ZodString;
+    pr_url: z.ZodString;
+    from_branch: z.ZodString;
+    state: z.ZodEnum<{
+        Closed: "Closed";
+        Merged: "Merged";
+        Open: "Open";
+    }>;
+    created_at: z.ZodNullable<z.ZodString>;
+    updated_at: z.ZodNullable<z.ZodString>;
+}, z.core.$strip>;
 export declare const UpstreamAdminVerifyOutput: z.ZodObject<{
     hasWriteAccess: z.ZodBoolean;
     error: z.ZodNullable<z.ZodString>;
@@ -124,6 +137,121 @@ export declare const UpstreamRigOutput: z.ZodObject<{
     trust_level: z.ZodNumber;
     registered_at: z.ZodNullable<z.ZodString>;
     last_seen_at: z.ZodNullable<z.ZodString>;
+}, z.core.$strip>;
+export declare const RigDetailOutput: z.ZodObject<{
+    rig_handle: z.ZodString;
+    display_name: z.ZodNullable<z.ZodString>;
+    trust_level: z.ZodNumber;
+    dolthub_org: z.ZodNullable<z.ZodString>;
+    owner_email: z.ZodNullable<z.ZodString>;
+    hop_uri: z.ZodNullable<z.ZodString>;
+    gt_version: z.ZodNullable<z.ZodString>;
+    registered_at: z.ZodNullable<z.ZodString>;
+    last_seen_at: z.ZodNullable<z.ZodString>;
+}, z.core.$strip>;
+export declare const CompletionOutput: z.ZodObject<{
+    completion_id: z.ZodString;
+    wanted_id: z.ZodString;
+    wanted_title: z.ZodNullable<z.ZodString>;
+    completed_by: z.ZodNullable<z.ZodString>;
+    evidence: z.ZodNullable<z.ZodString>;
+    hop_uri: z.ZodNullable<z.ZodString>;
+    validated_by: z.ZodNullable<z.ZodString>;
+    stamp_id: z.ZodNullable<z.ZodString>;
+    completed_at: z.ZodNullable<z.ZodString>;
+}, z.core.$strip>;
+export declare const StampOutput: z.ZodObject<{
+    stamp_id: z.ZodString;
+    author: z.ZodString;
+    subject: z.ZodString;
+    valence: z.ZodNullable<z.ZodString>;
+    confidence: z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>;
+    severity: z.ZodNullable<z.ZodString>;
+    skill_tags: z.ZodNullable<z.ZodString>;
+    message: z.ZodNullable<z.ZodString>;
+    context_id: z.ZodNullable<z.ZodString>;
+    context_type: z.ZodNullable<z.ZodString>;
+    wanted_id: z.ZodNullable<z.ZodString>;
+    wanted_title: z.ZodNullable<z.ZodString>;
+}, z.core.$strip>;
+export declare const RigActivityOutput: z.ZodObject<{
+    posted: z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        title: z.ZodString;
+        description: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        project: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        type: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        priority: z.ZodDefault<z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>>;
+        tags: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        posted_by: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        claimed_by: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        status: z.ZodString;
+        effort_level: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        evidence_url: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        sandbox_required: z.ZodDefault<z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>>;
+        sandbox_scope: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        sandbox_min_tier: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        created_at: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        updated_at: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    }, z.core.$strip>>;
+    claimed: z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        title: z.ZodString;
+        description: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        project: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        type: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        priority: z.ZodDefault<z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>>;
+        tags: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        posted_by: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        claimed_by: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        status: z.ZodString;
+        effort_level: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        evidence_url: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        sandbox_required: z.ZodDefault<z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>>;
+        sandbox_scope: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        sandbox_min_tier: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        created_at: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        updated_at: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    }, z.core.$strip>>;
+    completions: z.ZodArray<z.ZodObject<{
+        completion_id: z.ZodString;
+        wanted_id: z.ZodString;
+        wanted_title: z.ZodNullable<z.ZodString>;
+        completed_by: z.ZodNullable<z.ZodString>;
+        evidence: z.ZodNullable<z.ZodString>;
+        hop_uri: z.ZodNullable<z.ZodString>;
+        validated_by: z.ZodNullable<z.ZodString>;
+        stamp_id: z.ZodNullable<z.ZodString>;
+        completed_at: z.ZodNullable<z.ZodString>;
+    }, z.core.$strip>>;
+    stamps_authored: z.ZodArray<z.ZodObject<{
+        stamp_id: z.ZodString;
+        author: z.ZodString;
+        subject: z.ZodString;
+        valence: z.ZodNullable<z.ZodString>;
+        confidence: z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>;
+        severity: z.ZodNullable<z.ZodString>;
+        skill_tags: z.ZodNullable<z.ZodString>;
+        message: z.ZodNullable<z.ZodString>;
+        context_id: z.ZodNullable<z.ZodString>;
+        context_type: z.ZodNullable<z.ZodString>;
+        wanted_id: z.ZodNullable<z.ZodString>;
+        wanted_title: z.ZodNullable<z.ZodString>;
+    }, z.core.$strip>>;
+    stamps_received: z.ZodArray<z.ZodObject<{
+        stamp_id: z.ZodString;
+        author: z.ZodString;
+        subject: z.ZodString;
+        valence: z.ZodNullable<z.ZodString>;
+        confidence: z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>;
+        severity: z.ZodNullable<z.ZodString>;
+        skill_tags: z.ZodNullable<z.ZodString>;
+        message: z.ZodNullable<z.ZodString>;
+        context_id: z.ZodNullable<z.ZodString>;
+        context_type: z.ZodNullable<z.ZodString>;
+        wanted_id: z.ZodNullable<z.ZodString>;
+        wanted_title: z.ZodNullable<z.ZodString>;
+    }, z.core.$strip>>;
 }, z.core.$strip>;
 export declare const InboxItemOutput: z.ZodDiscriminatedUnion<[z.ZodObject<{
     pull_id: z.ZodString;
@@ -350,6 +478,19 @@ export declare const RpcMergePullOutput: z.ZodPipe<z.ZodAny, z.ZodObject<{
     pull_id: z.ZodString;
     state: z.ZodString;
 }, z.core.$strip>>;
+export declare const RpcPendingClaimOutput: z.ZodPipe<z.ZodAny, z.ZodObject<{
+    item_id: z.ZodString;
+    pull_id: z.ZodString;
+    pr_url: z.ZodString;
+    from_branch: z.ZodString;
+    state: z.ZodEnum<{
+        Closed: "Closed";
+        Merged: "Merged";
+        Open: "Open";
+    }>;
+    created_at: z.ZodNullable<z.ZodString>;
+    updated_at: z.ZodNullable<z.ZodString>;
+}, z.core.$strip>>;
 export declare const RpcUpstreamAdminVerifyOutput: z.ZodPipe<z.ZodAny, z.ZodObject<{
     hasWriteAccess: z.ZodBoolean;
     error: z.ZodNullable<z.ZodString>;
@@ -471,3 +612,118 @@ export declare const RpcInboxItemOutput: z.ZodPipe<z.ZodAny, z.ZodDiscriminatedU
     kind: z.ZodLiteral<"unknown">;
     commit_subjects: z.ZodArray<z.ZodString>;
 }, z.core.$strip>], "kind">>;
+export declare const RpcRigDetailOutput: z.ZodPipe<z.ZodAny, z.ZodObject<{
+    rig_handle: z.ZodString;
+    display_name: z.ZodNullable<z.ZodString>;
+    trust_level: z.ZodNumber;
+    dolthub_org: z.ZodNullable<z.ZodString>;
+    owner_email: z.ZodNullable<z.ZodString>;
+    hop_uri: z.ZodNullable<z.ZodString>;
+    gt_version: z.ZodNullable<z.ZodString>;
+    registered_at: z.ZodNullable<z.ZodString>;
+    last_seen_at: z.ZodNullable<z.ZodString>;
+}, z.core.$strip>>;
+export declare const RpcCompletionOutput: z.ZodPipe<z.ZodAny, z.ZodObject<{
+    completion_id: z.ZodString;
+    wanted_id: z.ZodString;
+    wanted_title: z.ZodNullable<z.ZodString>;
+    completed_by: z.ZodNullable<z.ZodString>;
+    evidence: z.ZodNullable<z.ZodString>;
+    hop_uri: z.ZodNullable<z.ZodString>;
+    validated_by: z.ZodNullable<z.ZodString>;
+    stamp_id: z.ZodNullable<z.ZodString>;
+    completed_at: z.ZodNullable<z.ZodString>;
+}, z.core.$strip>>;
+export declare const RpcStampOutput: z.ZodPipe<z.ZodAny, z.ZodObject<{
+    stamp_id: z.ZodString;
+    author: z.ZodString;
+    subject: z.ZodString;
+    valence: z.ZodNullable<z.ZodString>;
+    confidence: z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>;
+    severity: z.ZodNullable<z.ZodString>;
+    skill_tags: z.ZodNullable<z.ZodString>;
+    message: z.ZodNullable<z.ZodString>;
+    context_id: z.ZodNullable<z.ZodString>;
+    context_type: z.ZodNullable<z.ZodString>;
+    wanted_id: z.ZodNullable<z.ZodString>;
+    wanted_title: z.ZodNullable<z.ZodString>;
+}, z.core.$strip>>;
+export declare const RpcRigActivityOutput: z.ZodPipe<z.ZodAny, z.ZodObject<{
+    posted: z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        title: z.ZodString;
+        description: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        project: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        type: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        priority: z.ZodDefault<z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>>;
+        tags: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        posted_by: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        claimed_by: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        status: z.ZodString;
+        effort_level: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        evidence_url: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        sandbox_required: z.ZodDefault<z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>>;
+        sandbox_scope: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        sandbox_min_tier: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        created_at: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        updated_at: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    }, z.core.$strip>>;
+    claimed: z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        title: z.ZodString;
+        description: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        project: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        type: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        priority: z.ZodDefault<z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>>;
+        tags: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        posted_by: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        claimed_by: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        status: z.ZodString;
+        effort_level: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        evidence_url: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        sandbox_required: z.ZodDefault<z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>>;
+        sandbox_scope: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        sandbox_min_tier: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        created_at: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        updated_at: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    }, z.core.$strip>>;
+    completions: z.ZodArray<z.ZodObject<{
+        completion_id: z.ZodString;
+        wanted_id: z.ZodString;
+        wanted_title: z.ZodNullable<z.ZodString>;
+        completed_by: z.ZodNullable<z.ZodString>;
+        evidence: z.ZodNullable<z.ZodString>;
+        hop_uri: z.ZodNullable<z.ZodString>;
+        validated_by: z.ZodNullable<z.ZodString>;
+        stamp_id: z.ZodNullable<z.ZodString>;
+        completed_at: z.ZodNullable<z.ZodString>;
+    }, z.core.$strip>>;
+    stamps_authored: z.ZodArray<z.ZodObject<{
+        stamp_id: z.ZodString;
+        author: z.ZodString;
+        subject: z.ZodString;
+        valence: z.ZodNullable<z.ZodString>;
+        confidence: z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>;
+        severity: z.ZodNullable<z.ZodString>;
+        skill_tags: z.ZodNullable<z.ZodString>;
+        message: z.ZodNullable<z.ZodString>;
+        context_id: z.ZodNullable<z.ZodString>;
+        context_type: z.ZodNullable<z.ZodString>;
+        wanted_id: z.ZodNullable<z.ZodString>;
+        wanted_title: z.ZodNullable<z.ZodString>;
+    }, z.core.$strip>>;
+    stamps_received: z.ZodArray<z.ZodObject<{
+        stamp_id: z.ZodString;
+        author: z.ZodString;
+        subject: z.ZodString;
+        valence: z.ZodNullable<z.ZodString>;
+        confidence: z.ZodNullable<z.ZodUnion<readonly [z.ZodString, z.ZodNumber]>>;
+        severity: z.ZodNullable<z.ZodString>;
+        skill_tags: z.ZodNullable<z.ZodString>;
+        message: z.ZodNullable<z.ZodString>;
+        context_id: z.ZodNullable<z.ZodString>;
+        context_type: z.ZodNullable<z.ZodString>;
+        wanted_id: z.ZodNullable<z.ZodString>;
+        wanted_title: z.ZodNullable<z.ZodString>;
+    }, z.core.$strip>>;
+}, z.core.$strip>>;

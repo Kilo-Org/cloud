@@ -1,0 +1,139 @@
+/**
+ * The wasteland commons schema, embedded as a list of individual SQL
+ * statements ready to feed into DoltHub's write API one at a time.
+ *
+ * Source of truth: `wasteland/schema/commons.sql` in the standalone
+ * wasteland repo. Pinned schema version: **1.2** (see `_meta` row).
+ *
+ * Sync policy: this file is hand-synced from the wasteland repo. When
+ * `wasteland/schema/commons.sql` changes, copy each statement over
+ * verbatim into the array below — preserve statement order, quoting,
+ * and the `INSERT IGNORE INTO _meta` schema-version row. Statements
+ * here exclude their trailing `;` so the bootstrap can append it (or
+ * not) as the DoltHub API expects.
+ *
+ * Why an array instead of a single string + splitter: the bootstrap
+ * dispatches each statement as a separate DoltHub write API call, so
+ * pre-splitting at edit time keeps the runtime simple and removes the
+ * need for a quote-aware SQL parser. Statement boundaries are fixed
+ * by the schema author, not derived at runtime.
+ */
+export const COMMONS_SCHEMA_VERSION = '1.2';
+
+export const COMMONS_SCHEMA_STATEMENTS: readonly string[] = [
+  `CREATE TABLE IF NOT EXISTS _meta (
+    \`key\` VARCHAR(64) PRIMARY KEY,
+    value TEXT
+)`,
+
+  `INSERT IGNORE INTO _meta (\`key\`, value) VALUES ('schema_version', '1.2')`,
+
+  `CREATE TABLE IF NOT EXISTS rigs (
+    handle VARCHAR(255) PRIMARY KEY,
+    display_name VARCHAR(255),
+    dolthub_org VARCHAR(255),
+    hop_uri VARCHAR(512),
+    owner_email VARCHAR(255),
+    gt_version VARCHAR(32),
+    trust_level INT DEFAULT 0,
+    registered_at TIMESTAMP,
+    last_seen TIMESTAMP,
+    rig_type VARCHAR(16) DEFAULT 'human',
+    parent_rig VARCHAR(255)
+)`,
+
+  `CREATE TABLE IF NOT EXISTS wanted (
+    id VARCHAR(64) PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    project VARCHAR(64),
+    type VARCHAR(32),
+    priority INT DEFAULT 2,
+    tags JSON,
+    posted_by VARCHAR(255),
+    claimed_by VARCHAR(255),
+    status VARCHAR(32) DEFAULT 'open',
+    effort_level VARCHAR(16) DEFAULT 'medium',
+    evidence_url TEXT,
+    sandbox_required TINYINT(1) DEFAULT 0,
+    sandbox_scope JSON,
+    sandbox_min_tier VARCHAR(32),
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+)`,
+
+  `CREATE TABLE IF NOT EXISTS completions (
+    id VARCHAR(64) PRIMARY KEY,
+    wanted_id VARCHAR(64),
+    completed_by VARCHAR(255),
+    evidence TEXT,
+    validated_by VARCHAR(255),
+    stamp_id VARCHAR(64),
+    parent_completion_id VARCHAR(64),
+    block_hash VARCHAR(64),
+    hop_uri VARCHAR(512),
+    completed_at TIMESTAMP,
+    validated_at TIMESTAMP
+)`,
+
+  `CREATE TABLE IF NOT EXISTS stamps (
+    id VARCHAR(64) PRIMARY KEY,
+    author VARCHAR(255) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    valence JSON NOT NULL,
+    confidence FLOAT DEFAULT 1,
+    severity VARCHAR(16) DEFAULT 'leaf',
+    context_id VARCHAR(64),
+    context_type VARCHAR(32),
+    skill_tags JSON,
+    message TEXT,
+    prev_stamp_hash VARCHAR(64),
+    block_hash VARCHAR(64),
+    hop_uri VARCHAR(512),
+    created_at TIMESTAMP,
+    CHECK (NOT(author = subject))
+)`,
+
+  `CREATE TABLE IF NOT EXISTS badges (
+    id VARCHAR(64) PRIMARY KEY,
+    rig_handle VARCHAR(255),
+    badge_type VARCHAR(64),
+    awarded_at TIMESTAMP,
+    evidence TEXT
+)`,
+
+  `CREATE TABLE IF NOT EXISTS boot_blocks (
+    handle VARCHAR(255) NOT NULL PRIMARY KEY,
+    source VARCHAR(64) NOT NULL,
+    sheet_json JSON NOT NULL,
+    confidence FLOAT NOT NULL,
+    version VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    CHECK (confidence BETWEEN 0.0 AND 1.0)
+)`,
+
+  `CREATE TABLE IF NOT EXISTS chain_meta (
+    chain_id VARCHAR(64) PRIMARY KEY,
+    chain_type VARCHAR(32),
+    parent_chain_id VARCHAR(64),
+    hop_uri VARCHAR(512),
+    dolt_database VARCHAR(255),
+    created_at TIMESTAMP
+)`,
+
+  `CREATE TABLE IF NOT EXISTS rig_links (
+    id VARCHAR(64) PRIMARY KEY,
+    rig_a VARCHAR(255) NOT NULL,
+    rig_b VARCHAR(255) NOT NULL,
+    link_type VARCHAR(32) DEFAULT 'same_owner',
+    assertion_a TEXT,
+    assertion_b TEXT,
+    status VARCHAR(32) DEFAULT 'pending',
+    created_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    revoked_at TIMESTAMP,
+    revoked_by VARCHAR(255),
+    UNIQUE KEY uq_rig_pair (rig_a, rig_b),
+    CHECK (rig_a != rig_b)
+)`,
+];

@@ -10,6 +10,7 @@ import { useUser } from '@/hooks/useUser';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SecretTokenInput } from '@/components/ui/secret-token-input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -173,7 +174,7 @@ export function SettingsClient({ wastelandId }: Props) {
   const navSections: SettingsNavItem[] = [
     { id: 'general', label: 'General', icon: Settings },
     { id: 'dolthub', label: 'DoltHub Connection', icon: Database },
-    ...(showContainer ? [{ id: 'container', label: 'Container', icon: Database }] : []),
+    ...(showContainer ? [{ id: 'container', label: 'Connection', icon: Database }] : []),
     { id: 'connected-towns', label: 'Connected Towns', icon: Building2 },
     ...(showAdminSections
       ? [{ id: 'admin-verify', label: 'Admin Access', icon: ShieldCheck }]
@@ -423,14 +424,13 @@ export function SettingsClient({ wastelandId }: Props) {
               </div>
             </SettingsSection>
 
-            {/* ── Container Status ──────────────────────────────── */}
+            {/* ── Wasteland Connection ──────────────────────────── */}
             {showContainer && (
               <ContainerStatusSection
                 id="container"
                 index={navSections.findIndex(s => s.id === 'container')}
                 wastelandId={wastelandId}
                 trpc={trpc}
-                queryClient={queryClient}
               />
             )}
 
@@ -679,18 +679,34 @@ function ConnectDoltHubDialog({
                 hint="Used to identify your contributions. Cached after first connect."
               >
                 <Input
+                  name="dolthub-handle"
                   value={oauthDolthubOrg}
                   onChange={e => setOauthDolthubOrg(e.target.value)}
                   placeholder="my-username"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  data-form-type="other"
                   className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
                 />
               </FieldGroup>
 
               <FieldGroup label="Rig handle" hint="Optional identifier for this connection.">
                 <Input
+                  name="rig-handle"
                   value={rigHandle}
                   onChange={e => setRigHandle(e.target.value)}
                   placeholder="my-rig"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  data-form-type="other"
                   className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
                 />
               </FieldGroup>
@@ -713,7 +729,13 @@ function ConnectDoltHubDialog({
             </div>
           )}
 
-          {/* Manual entry — under Advanced disclosure */}
+          {/* Manual entry — under Advanced disclosure. Wrapped in a
+              non-submitting `form` with autoComplete="off" plus
+              non-credential `name` attributes so Chrome / 1Password /
+              LastPass don't fingerprint it as a sign-in form. The
+              token field uses SecretTokenInput which renders
+              type="text" with visual masking instead of
+              type="password". */}
           <Collapsible open={manualOpen} onOpenChange={setManualOpen}>
             <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-1 py-1 text-[11px] text-white/40 hover:text-white/60">
               <span className="uppercase tracking-wider">Advanced — paste an API token</span>
@@ -722,23 +744,37 @@ function ConnectDoltHubDialog({
               />
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2 space-y-3">
-              <FieldGroup label="DoltHub API token" hint="Generate at dolthub.com/settings/tokens">
-                <Input
-                  type="password"
-                  value={manualToken}
-                  onChange={e => setManualToken(e.target.value)}
-                  placeholder="Paste a personal API token"
-                  className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
-                />
-              </FieldGroup>
-              <FieldGroup label="DoltHub username" hint="Your DoltHub username or org">
-                <Input
-                  value={manualOrg}
-                  onChange={e => setManualOrg(e.target.value)}
-                  placeholder="my-username"
-                  className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
-                />
-              </FieldGroup>
+              <form autoComplete="off" className="space-y-3" onSubmit={e => e.preventDefault()}>
+                <FieldGroup
+                  label="DoltHub API token"
+                  hint="Generate at dolthub.com/settings/tokens"
+                >
+                  <SecretTokenInput
+                    name="dolthub-api-token"
+                    value={manualToken}
+                    onChange={e => setManualToken(e.target.value)}
+                    placeholder="Paste a personal API token"
+                    toggleLabel="Show DoltHub token"
+                    className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
+                  />
+                </FieldGroup>
+                <FieldGroup label="DoltHub username" hint="Your DoltHub username or org">
+                  <Input
+                    name="dolthub-handle"
+                    value={manualOrg}
+                    onChange={e => setManualOrg(e.target.value)}
+                    placeholder="my-username"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    data-1p-ignore="true"
+                    data-lpignore="true"
+                    data-form-type="other"
+                    className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
+                  />
+                </FieldGroup>
+              </form>
             </CollapsibleContent>
           </Collapsible>
         </div>
@@ -1104,63 +1140,55 @@ function ConnectTownDialog({
   );
 }
 
-// ── Container Status ─────────────────────────────────────────────────────
+// ── Wasteland Connection ─────────────────────────────────────────────────
+// Phase 2 of the container retirement: the UI no longer surfaces
+// container-runtime fields (uptime, wl version, container "joined"
+// status) because there is no container any more. The tRPC procedure
+// is still called `containerStatus` for one release cycle so older
+// clients don't 404; this section reads only the fields that have
+// real meaning in the wasm world (upstream + DoltHub org + token
+// presence).
 
 function ContainerStatusSection({
   id,
   index,
   wastelandId,
   trpc,
-  queryClient,
 }: {
   id?: string;
   index?: number;
   wastelandId: string;
   trpc: ReturnType<typeof useWastelandTRPC>;
-  queryClient: ReturnType<typeof useQueryClient>;
 }) {
   const statusQuery = useQuery({
     ...trpc.wasteland.containerStatus.queryOptions({ wastelandId }),
-    refetchInterval: 10_000,
-  });
-
-  const joinMutation = useMutation({
-    ...trpc.wasteland.containerJoin.mutationOptions(),
-    onSuccess: () => {
-      toast.success('Container join initiated');
-      void queryClient.invalidateQueries({
-        queryKey: trpc.wasteland.containerStatus.queryKey({ wastelandId }),
-      });
-    },
-    onError: err => toast.error(`Join failed: ${err.message}`),
+    refetchInterval: 30_000,
   });
 
   const status = statusQuery.data;
   const isLoading = statusQuery.isLoading;
-  const isJoining = joinMutation.isPending;
+  const isReady = !!status?.upstream && !!status.hasToken;
 
   return (
     <SettingsSection
       id={id}
       index={index}
-      title="Wasteland Container"
-      description="Status of the wl CLI container that syncs with DoltHub."
+      title="Wasteland Connection"
+      description="DoltHub upstream and credential status for this wasteland."
       icon={Database}
     >
       <div className="space-y-3">
         {isLoading ? (
           <div className="flex items-center gap-2 py-2">
             <Loader2 className="size-3.5 animate-spin text-white/30" />
-            <span className="text-xs text-white/40">Checking container status...</span>
+            <span className="text-xs text-white/40">Checking connection…</span>
           </div>
         ) : statusQuery.isError ? (
           <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
             <XCircle className="size-4 text-white/30" />
             <div className="flex-1">
-              <p className="text-sm text-white/50">Container not reachable</p>
-              <p className="mt-0.5 text-[11px] text-white/30">
-                The container may still be starting up.
-              </p>
+              <p className="text-sm text-white/50">Couldn't load connection status</p>
+              <p className="mt-0.5 text-[11px] text-white/30">{statusQuery.error.message}</p>
             </div>
             <Button
               variant="outline"
@@ -1172,75 +1200,48 @@ function ContainerStatusSection({
             </Button>
           </div>
         ) : status ? (
-          <>
-            <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-              {status.joined ? (
-                <CheckCircle2 className="size-4 text-emerald-400" />
-              ) : (
-                <XCircle className="size-4 text-amber-400" />
-              )}
-              <div className="flex-1">
-                <p className="text-sm text-white/70">{status.joined ? 'Joined' : 'Not joined'}</p>
-                <div className="mt-1 space-y-0.5 text-[11px] text-white/40">
-                  {status.upstream && (
-                    <p>
-                      Upstream: <span className="font-mono text-white/60">{status.upstream}</span>
-                    </p>
-                  )}
-                  {status.dolthubOrg && (
-                    <p>
-                      Org: <span className="font-mono text-white/60">{status.dolthubOrg}</span>
-                    </p>
-                  )}
-                  <p>
-                    Token:{' '}
-                    <span className={status.hasToken ? 'text-emerald-400/60' : 'text-red-400/60'}>
-                      {status.hasToken ? 'present' : 'missing'}
-                    </span>
-                  </p>
-                  {status.wlVersion !== 'unknown' && (
-                    <p>
-                      wl version:{' '}
-                      <span className="font-mono text-white/60">{status.wlVersion}</span>
-                    </p>
-                  )}
-                  <p>Uptime: {status.uptime}s</p>
-                </div>
-              </div>
-              <Badge
-                variant="outline"
-                className={
-                  status.joined
-                    ? 'border-emerald-500/20 text-emerald-400'
-                    : 'border-amber-500/20 text-amber-400'
-                }
-              >
-                {status.joined ? 'ready' : 'pending'}
-              </Badge>
-            </div>
-
-            {!status.joined && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                disabled={isJoining}
-                onClick={() => joinMutation.mutate({ wastelandId })}
-              >
-                {isJoining ? (
-                  <>
-                    <Loader2 className="size-3 animate-spin" />
-                    Joining...
-                  </>
-                ) : (
-                  <>
-                    <Link2 className="size-3" />
-                    Join Upstream
-                  </>
-                )}
-              </Button>
+          <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+            {isReady ? (
+              <CheckCircle2 className="size-4 text-emerald-400" />
+            ) : (
+              <XCircle className="size-4 text-amber-400" />
             )}
-          </>
+            <div className="flex-1">
+              <p className="text-sm text-white/70">{isReady ? 'Connected' : 'Setup incomplete'}</p>
+              <div className="mt-1 space-y-0.5 text-[11px] text-white/40">
+                <p>
+                  Upstream:{' '}
+                  {status.upstream ? (
+                    <span className="font-mono text-white/60">{status.upstream}</span>
+                  ) : (
+                    <span className="text-amber-400/70">not set</span>
+                  )}
+                </p>
+                {status.dolthubOrg && (
+                  <p>
+                    DoltHub user:{' '}
+                    <span className="font-mono text-white/60">{status.dolthubOrg}</span>
+                  </p>
+                )}
+                <p>
+                  Credential:{' '}
+                  <span className={status.hasToken ? 'text-emerald-400/60' : 'text-red-400/60'}>
+                    {status.hasToken ? 'present' : 'missing'}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <Badge
+              variant="outline"
+              className={
+                isReady
+                  ? 'border-emerald-500/20 text-emerald-400'
+                  : 'border-amber-500/20 text-amber-400'
+              }
+            >
+              {isReady ? 'ready' : 'pending'}
+            </Badge>
+          </div>
         ) : null}
       </div>
     </SettingsSection>

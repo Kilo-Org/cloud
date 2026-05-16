@@ -202,6 +202,7 @@ indicators.
 
 In the wasm world there is no container to be "joined" or to have
 "uptime". The semantically meaningful fields collapse to:
+
 - `upstream`: from `WastelandDO.getConfig().dolthub_upstream`
 - `dolthubOrg`: from the local credential row's `dolthub_org`
 - `hasToken`: from the local credential row + a probe of the
@@ -209,6 +210,7 @@ In the wasm world there is no container to be "joined" or to have
 - everything else: dead
 
 **Tasks:**
+
 1. Replace `containerStatus` with a procedure that returns the
    above derived shape. Mark the legacy fields as deprecated in the
    output schema (return constant values: `joined: true`,
@@ -243,6 +245,7 @@ to the container. Mirror what we did in `wasm-browse.handler.ts`'s
 POC routes.
 
 **Tasks:**
+
 1. Rewrite each `/debug/wastelands/:id/{op}` route in
    `wasteland.worker.ts` to call the corresponding
    `wantedBoard.*` function. The shape changes are minor — body
@@ -294,7 +297,7 @@ the actual deletion plus cleanup.
    ```jsonc
    {
      "tag": "v3",
-     "deleted_classes": ["WastelandContainerDO"]
+     "deleted_classes": ["WastelandContainerDO"],
    }
    ```
    Append to the `migrations` array. **Do not delete the v1 entry**
@@ -330,7 +333,7 @@ the actual deletion plus cleanup.
    The Worker uses `KILO_INTERNAL_API_URL` directly. Either:
    - delete `KILO_API_URL` from `wrangler.jsonc`, OR
    - keep it as an alias if any UI or analytics expects it.
-   Audit and decide.
+     Audit and decide.
 9. **Run `pnpm validate`** in the cloud monorepo.
 
 ### Phase 3 acceptance
@@ -349,14 +352,14 @@ the actual deletion plus cleanup.
 
 ## Risks and mitigations
 
-| Risk | Mitigation |
-|---|---|
-| DoltHub doesn't expose programmatic database creation. | Phase 1 task (1) verifies this up-front. If absent, switch to "user creates empty repo first" UX with a clearly-worded prompt in the Settings UI. The rig-registration DML still runs from the Worker. |
-| `commons.sql` schema drifts between cloud copy and the wasteland repo. | Pin the schema version in a header comment. Add a CI check (or doc note) that flags when `wasteland/schema/commons.sql` changes hash. Manual sync is fine for the cadence we've seen. |
-| The DoltHub write API's polling loop behaves differently from `RemoteDB.Exec`'s expectations. | Mirror the polling logic verbatim from `wasteland/internal/backend/remote.go:pollOperation`. If anything diverges, pin to that file's commit hash and copy as-is. |
-| Some UI or external consumer still calls `containerStatus` or `containerJoin` with hard-coded shape expectations. | Phase 2 keeps the procedure shapes intact (synthetic field values) for one release cycle before pruning. |
-| Migration `v3` (delete-DO-class) needs all live wasteland container DOs to have no in-flight requests. | Cloudflare handles this gracefully — the DO is deleted next time it would have been reactivated. No data loss because the Container DO didn't store any persistent state we care about (env vars are ephemeral and re-derivable). |
-| Rolling back is hard once the migration is shipped. | Deploy Phase 3 to dev first. Bake for at least 24h. Only then deploy to prod. If we have to roll back, redeploying the old code with a `restored_classes` migration brings the class back. |
+| Risk                                                                                                              | Mitigation                                                                                                                                                                                                                        |
+| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DoltHub doesn't expose programmatic database creation.                                                            | Phase 1 task (1) verifies this up-front. If absent, switch to "user creates empty repo first" UX with a clearly-worded prompt in the Settings UI. The rig-registration DML still runs from the Worker.                            |
+| `commons.sql` schema drifts between cloud copy and the wasteland repo.                                            | Pin the schema version in a header comment. Add a CI check (or doc note) that flags when `wasteland/schema/commons.sql` changes hash. Manual sync is fine for the cadence we've seen.                                             |
+| The DoltHub write API's polling loop behaves differently from `RemoteDB.Exec`'s expectations.                     | Mirror the polling logic verbatim from `wasteland/internal/backend/remote.go:pollOperation`. If anything diverges, pin to that file's commit hash and copy as-is.                                                                 |
+| Some UI or external consumer still calls `containerStatus` or `containerJoin` with hard-coded shape expectations. | Phase 2 keeps the procedure shapes intact (synthetic field values) for one release cycle before pruning.                                                                                                                          |
+| Migration `v3` (delete-DO-class) needs all live wasteland container DOs to have no in-flight requests.            | Cloudflare handles this gracefully — the DO is deleted next time it would have been reactivated. No data loss because the Container DO didn't store any persistent state we care about (env vars are ephemeral and re-derivable). |
+| Rolling back is hard once the migration is shipped.                                                               | Deploy Phase 3 to dev first. Bake for at least 24h. Only then deploy to prod. If we have to roll back, redeploying the old code with a `restored_classes` migration brings the class back.                                        |
 
 ## Inventory: all remaining container references at the time of this writing
 

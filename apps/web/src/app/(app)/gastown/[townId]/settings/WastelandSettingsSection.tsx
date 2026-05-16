@@ -10,6 +10,7 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { SecretTokenInput } from '@/components/ui/secret-token-input';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -24,9 +25,6 @@ import {
   Loader2,
   CheckCircle2,
   Unlink,
-  Skull,
-  Users,
-  Rocket,
   ChevronLeft,
   ChevronDown,
   ArrowRight,
@@ -42,6 +40,19 @@ import {
   useUpstreamVerification,
   type UpstreamIntent,
 } from '@/components/wasteland/UpstreamIntent';
+
+/**
+ * Derive the default wasteland name when the user hasn't typed one.
+ * Mirrors the upstream's `{owner}/{repo}` so the connection list stays
+ * recognizable. For the `reuse` intent we have no upstream string yet;
+ * the parent already knows the existing wasteland's name and won't call
+ * this — but we return `''` defensively.
+ */
+function defaultWastelandName(intent: UpstreamIntent): string {
+  if (intent.kind === 'reuse') return '';
+  const upstream = resolveUpstreamFromIntent(intent);
+  return upstream;
+}
 
 type WastelandConnection = {
   connection_id: string;
@@ -205,15 +216,18 @@ function DisconnectedState({
 
 // ── Connect Dialog ───────────────────────────────────────────────────────
 
-type Mode = 'join' | 'create';
-type Step =
-  | 'intent'
-  | 'select'
-  | 'new-details'
-  | 'credentials'
-  | 'identity'
-  | 'connecting'
-  | 'success';
+/**
+ * The dialog used to be a four-step wizard (`intent` → `select`/`new-details`
+ * → `credentials` → `identity`) where the first step asked the user to pick
+ * between joining and creating. The "create" path covers nearly every case
+ * (joining the commons, connecting to an existing repo, bootstrapping a new
+ * one) so the intent step has been collapsed away — the dialog now opens
+ * directly on `new-details` with the picker showing every option side by
+ * side. The `reuse` intent additionally short-circuits past
+ * `credentials` / `identity` since the existing wasteland's stored
+ * credential is already enough to wire up the town.
+ */
+type Step = 'new-details' | 'credentials' | 'identity' | 'connecting' | 'success';
 
 function ConnectWastelandDialog({
   townId,
@@ -233,17 +247,18 @@ function ConnectWastelandDialog({
   const wastelandClient = useWastelandTRPCClient();
   const { data: currentUser } = useUser();
 
-  const [step, setStep] = useState<Step>('intent');
-  const [mode, setMode] = useState<Mode>('join');
+  const [step, setStep] = useState<Step>('new-details');
 
-  // Existing wastelands
+  // Existing wastelands. Used both to power the picker's "Reuse"
+  // card (filtered to ones the user actually has a credential on) and
+  // to look up the upstream string when the reuse path is taken.
   const wastelandsQuery = useQuery(wastelandTrpc.wasteland.listWastelands.queryOptions({}));
   const wastelands = wastelandsQuery.data ?? [];
-  const [selectedWastelandId, setSelectedWastelandId] = useState<string | null>(null);
 
-  // Create-mode details. Defaults to "Join the Kilo Commons" so the
-  // common case is a single click: pick Create, leave the default,
-  // confirm credentials, done.
+  // Default to "Join the Kilo Commons" so the common case is a single
+  // click: open the dialog, hit Connect, done. The picker also shows
+  // the reuse and connect/create cards inline so the user can deviate
+  // without going back a step.
   const [newWastelandName, setNewWastelandName] = useState('');
   const [intent, setIntent] = useState<UpstreamIntent>({
     kind: 'commons',
@@ -258,11 +273,6 @@ function ConnectWastelandDialog({
   const [manualOpen, setManualOpen] = useState(false);
   const [dolthubToken, setDolthubToken] = useState('');
   const [dolthubOrg, setDolthubOrg] = useState('');
-  // Join-mode "I own this upstream" attestation — only relevant when
-  // joining an existing wasteland the caller didn't create. For create
-  // mode this is sourced from `intent.isUpstreamAdmin` (the picker owns
-  // the toggle there).
-  const [joinIsUpstreamAdmin, setJoinIsUpstreamAdmin] = useState(false);
 
   // Step: Identity
   const [rigHandle, setRigHandle] = useState('');
@@ -326,9 +336,7 @@ function ConnectWastelandDialog({
   // Reset state when dialog closes
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
-      setStep('intent');
-      setMode('join');
-      setSelectedWastelandId(null);
+      setStep('new-details');
       setConnectedUpstream(KILO_COMMONS_UPSTREAM);
       setConnectedWastelandId(null);
       setIntent({ kind: 'commons', isUpstreamAdmin: false });
@@ -336,53 +344,32 @@ function ConnectWastelandDialog({
       setManualOpen(false);
       setDolthubToken('');
       setDolthubOrg('');
-      setJoinIsUpstreamAdmin(false);
       setRigHandle('');
       setError(null);
     }
     onOpenChange(nextOpen);
   };
 
-  const handlePickMode = (next: Mode) => {
-    setMode(next);
-    setStep(next === 'join' ? 'select' : 'new-details');
-  };
-
-  const handleSelectWasteland = async (wastelandId: string) => {
-    setSelectedWastelandId(wastelandId);
-
-    // If credentials are already stored for this wasteland, skip straight
-    // to the connection — the user has already connected their DoltHub
-    // account to this wasteland and doesn't need to re-enter them.
-    try {
-      const existing = await wastelandClient.wasteland.getCredentialStatus.query({
-        wastelandId,
-      });
-      if (existing) {
-        await connectTownToExistingWasteland(
-          wastelandId,
-          existing.rig_handle ?? '',
-          existing.dolthub_org
-        );
-        return;
-      }
-    } catch (err) {
-      // If the check fails, fall through to the credentials step
-      console.error('Failed to check wasteland credentials', err);
-    }
-
-    setStep('credentials');
-  };
-
-  const connectTownToExistingWasteland = async (
-    wastelandId: string,
-    existingRigHandle: string,
-    existingDolthubOrg: string
-  ) => {
+  /**
+   * Reuse path: the user picked an existing wasteland in the picker.
+   * No DoltHub credential entry — we read the stored credential off
+   * the wasteland record and run the same connect mutations the
+   * `select`-step flow used to run.
+   */
+  const handleConnectReuse = async (wastelandId: string) => {
     setStep('connecting');
     setError(null);
 
     try {
+      const existing = await wastelandClient.wasteland.getCredentialStatus.query({
+        wastelandId,
+      });
+      if (!existing) {
+        throw new Error(
+          'This wasteland has no DoltHub credential stored. Open it in settings and connect DoltHub before reusing it here.'
+        );
+      }
+
       const selectedWasteland = wastelands.find(w => w.wasteland_id === wastelandId);
       const upstream = selectedWasteland?.dolthub_upstream ?? KILO_COMMONS_UPSTREAM;
       setConnectedUpstream(upstream);
@@ -397,19 +384,19 @@ function ConnectWastelandDialog({
         townId,
         wastelandId,
         upstream,
-        rigHandle: existingRigHandle,
-        dolthubOrg: existingDolthubOrg,
+        rigHandle: existing.rig_handle ?? '',
+        dolthubOrg: existing.dolthub_org,
       });
 
       void queryClient.invalidateQueries({
         queryKey: gastownTrpc.gastown.getTownWastelandConnection.queryKey({ townId }),
       });
 
-      setRigHandle(existingRigHandle);
+      setRigHandle(existing.rig_handle ?? '');
       setStep('success');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Connection failed');
-      setStep('select');
+      setStep('new-details');
     }
   };
 
@@ -428,70 +415,22 @@ function ConnectWastelandDialog({
     return null;
   };
 
-  const handleConnectJoin = async () => {
-    setStep('connecting');
-    setError(null);
-
-    try {
-      const wastelandId = selectedWastelandId;
-      const selectedWasteland = wastelands.find(w => w.wasteland_id === wastelandId);
-      const upstream = selectedWasteland?.dolthub_upstream ?? KILO_COMMONS_UPSTREAM;
-      setConnectedUpstream(upstream);
-
-      // Brand-new wasteland record is only created when the user picked
-      // a non-listed upstream — this only applies if they used the
-      // intent flow to "join" a new, unknown upstream. For now we still
-      // require a selection on the join branch.
-      if (!wastelandId) {
-        throw new Error('Select a wasteland to join, or switch to Create.');
-      }
-      setConnectedWastelandId(wastelandId);
-
-      const tokenToStore = resolveDolthubToken();
-      if (!tokenToStore) {
-        throw new Error('Connect your DoltHub account or paste an API token to continue.');
-      }
-
-      await wastelandClient.wasteland.storeCredential.mutate({
-        wastelandId,
-        dolthubToken: tokenToStore,
-        dolthubOrg,
-        rigHandle,
-        isUpstreamAdmin: joinIsUpstreamAdmin,
-      });
-
-      await wastelandClient.wasteland.connectKiloTown.mutate({
-        wastelandId,
-        townId,
-      });
-
-      await gastownClient.gastown.connectTownToWasteland.mutate({
-        townId,
-        wastelandId,
-        upstream,
-        rigHandle,
-        dolthubOrg,
-      });
-
-      // Cache the confirmed username on the OAuth integration metadata so
-      // the next wasteland connect skips this prompt. Best-effort; failures
-      // here don't fail the connect we just completed.
-      if (!manualOpen && oauthDolthubToken && dolthubOrg.trim()) {
-        rememberUsername.mutate({ username: dolthubOrg.trim() });
-      }
-
-      void queryClient.invalidateQueries({
-        queryKey: gastownTrpc.gastown.getTownWastelandConnection.queryKey({ townId }),
-      });
-
-      setStep('success');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Connection failed');
-      setStep('identity');
+  /**
+   * Provision path: the user picked commons / connect / create. We
+   * always create a wasteland record; for `create` we additionally
+   * bootstrap the DoltHub repo. For commons/connect we just register
+   * a credential against the existing upstream and forward to the
+   * town-connect mutations.
+   */
+  const handleConnectProvision = async () => {
+    if (intent.kind === 'reuse') {
+      // The Connect button shouldn't be reachable for reuse (we drive
+      // straight to handleConnectReuse from the picker), but guard
+      // defensively in case someone hit Enter from the credentials
+      // form.
+      return handleConnectReuse(intent.wastelandId);
     }
-  };
 
-  const handleConnectCreate = async () => {
     setStep('connecting');
     setError(null);
 
@@ -499,8 +438,7 @@ function ConnectWastelandDialog({
       const upstream = resolveUpstreamFromIntent(intent);
       setConnectedUpstream(upstream);
 
-      const name =
-        newWastelandName.trim() || `${dolthubOrg}-${upstream.split('/')[1] ?? 'wasteland'}`;
+      const name = newWastelandName.trim() || defaultWastelandName(intent);
 
       const tokenToStore = resolveDolthubToken();
       if (!tokenToStore) {
@@ -516,9 +454,9 @@ function ConnectWastelandDialog({
       const wastelandId = created.wasteland_id;
       setConnectedWastelandId(wastelandId);
 
-      // 2. Store credentials. For "create new upstream" the user is the
-      // admin by definition; for the other intents we honour the
-      // checkbox the user set in the picker.
+      // 2. Store credentials. For `create` the user is the admin by
+      // definition; for `commons` / `connect` we honour the toggle on
+      // the corresponding picker card.
       const isUpstreamAdmin = intent.kind === 'create' ? true : intent.isUpstreamAdmin;
       await wastelandClient.wasteland.storeCredential.mutate({
         wastelandId,
@@ -565,14 +503,9 @@ function ConnectWastelandDialog({
 
       setStep('success');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Create failed');
+      setError(err instanceof Error ? err.message : 'Connect failed');
       setStep('identity');
     }
-  };
-
-  const handleConnect = () => {
-    if (mode === 'create') return handleConnectCreate();
-    return handleConnectJoin();
   };
 
   // Verify Card 2's typed upstream against DoltHub. Reused so the "Next"
@@ -592,8 +525,12 @@ function ConnectWastelandDialog({
       (connectVerification.status === 'pending' || connectVerification.status === 'missing')) ||
     (intent.kind === 'create' &&
       (createVerification.status === 'pending' || createVerification.status === 'exists'));
-  const newDetailsValid =
-    isUpstreamIntentValid(intent) && newWastelandName.trim().length > 0 && !upstreamProbeBlocked;
+  // The wasteland name auto-defaults to the upstream when the user
+  // hasn't typed anything, so we don't gate on it being non-empty.
+  // The reuse intent skips this step's "Next" button entirely (the
+  // picker drives `handleConnectReuse` directly), but keep the validity
+  // check honest by not requiring upstream verification for reuse.
+  const newDetailsValid = isUpstreamIntentValid(intent) && !upstreamProbeBlocked;
   // The credentials step accepts either:
   //   - the OAuth-issued token (when the dolthub integration is installed
   //     and the user hasn't toggled the manual fallback open), plus a
@@ -608,148 +545,42 @@ function ConnectWastelandDialog({
   const credentialsValid = oauthCredentialsValid || manualCredentialsValid;
   const identityValid = rigHandle.trim().length > 0;
 
+  // Wastelands the caller has a stored credential on — fed to the
+  // picker's "Reuse existing connection" card. We hide deleted /
+  // disconnecting entries and exclude wastelands without an upstream
+  // (those aren't useful as a reuse target — there's nowhere to send
+  // contributions yet).
+  const reusableWastelands = wastelands
+    .filter(w => w.status === 'active' && w.dolthub_upstream)
+    .map(w => ({
+      wasteland_id: w.wasteland_id,
+      name: w.name,
+      dolthub_upstream: w.dolthub_upstream,
+    }));
+
+  // Whether the primary action proceeds via the reuse short-circuit
+  // (no credentials / identity steps) or the full provision flow.
+  const isReuseIntent = intent.kind === 'reuse';
+
+  // Connecting label varies by intent. For `create` we're bootstrapping
+  // a DoltHub repo; for `commons` / `connect` / `reuse` we're just
+  // wiring up the town to an existing upstream.
+  const connectingHeadline = intent.kind === 'create' ? 'Creating…' : 'Connecting…';
+  const successHeadline = intent.kind === 'create' ? 'Wasteland created' : 'Connected';
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="border-white/[0.08] bg-[oklch(0.13_0_0)] sm:max-w-md">
-        {step === 'intent' && (
-          <>
-            <DialogHeader>
-              <DialogTitle className="text-white/90">Connect to Wasteland</DialogTitle>
-              <DialogDescription className="text-white/50">
-                Join an existing wasteland to contribute, or create your own.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2 py-2">
-              <button
-                type="button"
-                onClick={() => handlePickMode('join')}
-                className="flex w-full items-start gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-left transition-colors hover:border-white/[0.12] hover:bg-white/[0.04]"
-              >
-                <Users className="mt-0.5 size-4 shrink-0 text-emerald-400" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-white/85">Join a wasteland</p>
-                  <p className="mt-0.5 text-[11px] text-white/40">
-                    Contribute to an existing wasteland (like the Kilo Commons). Your agents will be
-                    able to browse and claim bounties, submit PRs back upstream.
-                  </p>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handlePickMode('create')}
-                className="flex w-full items-start gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-left transition-colors hover:border-white/[0.12] hover:bg-white/[0.04]"
-              >
-                <Rocket className="mt-0.5 size-4 shrink-0 text-amber-400" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-white/85">Create your own wasteland</p>
-                  <p className="mt-0.5 text-[11px] text-white/40">
-                    Bootstrap a new DoltHub commons repo and make yourself the owner. Requires a
-                    DoltHub token with push access.
-                  </p>
-                </div>
-              </button>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="secondary"
-                onClick={() => handleOpenChange(false)}
-                className="border-white/10 text-white/70 hover:bg-white/5"
-              >
-                Cancel
-              </Button>
-            </DialogFooter>
-          </>
-        )}
-
-        {step === 'select' && (
-          <>
-            <DialogHeader>
-              <DialogTitle className="text-white/90">Pick a Wasteland to Join</DialogTitle>
-              <DialogDescription className="text-white/50">
-                Select one of your existing wastelands below.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2 py-2">
-              {wastelandsQuery.isLoading ? (
-                <div className="flex items-center gap-2 py-4">
-                  <Loader2 className="size-3.5 animate-spin text-white/30" />
-                  <span className="text-xs text-white/40">Loading wastelands...</span>
-                </div>
-              ) : wastelands.filter(w => w.status === 'active').length > 0 ? (
-                wastelands
-                  .filter(w => w.status === 'active')
-                  .map(w => (
-                    <button
-                      key={w.wasteland_id}
-                      type="button"
-                      onClick={() => void handleSelectWasteland(w.wasteland_id)}
-                      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                        selectedWastelandId === w.wasteland_id
-                          ? 'border-emerald-500/30 bg-emerald-500/5'
-                          : 'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]'
-                      }`}
-                    >
-                      <Skull className="size-4 shrink-0 text-white/30" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm text-white/70">{w.name}</p>
-                        {w.dolthub_upstream && (
-                          <p className="truncate font-mono text-[11px] text-white/30">
-                            {w.dolthub_upstream}
-                          </p>
-                        )}
-                      </div>
-                    </button>
-                  ))
-              ) : (
-                <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-6 text-center">
-                  <Skull className="mx-auto mb-2 size-5 text-white/15" />
-                  <p className="text-xs text-white/40">No wastelands to join yet.</p>
-                  <p className="mt-1 text-[11px] text-white/25">
-                    Go back and pick "Create your own" to bootstrap one.
-                  </p>
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button
-                variant="secondary"
-                onClick={() => setStep('intent')}
-                className="gap-1.5 border-white/10 text-white/70 hover:bg-white/5"
-              >
-                <ChevronLeft className="size-3" />
-                Back
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => handleOpenChange(false)}
-                className="border-white/10 text-white/70 hover:bg-white/5"
-              >
-                Cancel
-              </Button>
-            </DialogFooter>
-          </>
-        )}
-
         {step === 'new-details' && (
           <>
             <DialogHeader>
-              <DialogTitle className="text-white/90">Create a wasteland</DialogTitle>
+              <DialogTitle className="text-white/90">Connect to a wasteland</DialogTitle>
               <DialogDescription className="text-white/50">
-                Name your wasteland and pick the upstream it should target.
+                Pick what this town's upstream should be. We default to the Kilo Commons —
+                contributions go upstream as pull requests.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
-              <FieldGroup
-                label="Wasteland name"
-                hint="Display name shown in the UI; doesn't have to match the DoltHub repo."
-              >
-                <Input
-                  value={newWastelandName}
-                  onChange={e => setNewWastelandName(e.target.value)}
-                  placeholder="My wasteland"
-                  className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85 placeholder:text-white/20"
-                />
-              </FieldGroup>
               <UpstreamIntentPicker
                 value={intent}
                 onChange={setIntent}
@@ -758,24 +589,47 @@ function ConnectWastelandDialog({
                   dolthubCredentialsQuery.data?.dolthubUsername ??
                   null
                 }
+                reusableWastelands={reusableWastelands}
               />
+              {!isReuseIntent && (
+                <FieldGroup
+                  label="Wasteland name"
+                  hint={
+                    newWastelandName.trim().length === 0
+                      ? `Defaults to ${defaultWastelandName(intent) || 'the upstream name'}.`
+                      : "Display name shown in the UI; doesn't have to match the DoltHub repo."
+                  }
+                >
+                  <Input
+                    value={newWastelandName}
+                    onChange={e => setNewWastelandName(e.target.value)}
+                    placeholder={defaultWastelandName(intent) || 'owner/repo'}
+                    className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85 placeholder:text-white/20"
+                  />
+                </FieldGroup>
+              )}
             </div>
             <DialogFooter>
               <Button
                 variant="secondary"
-                onClick={() => setStep('intent')}
-                className="gap-1.5 border-white/10 text-white/70 hover:bg-white/5"
+                onClick={() => handleOpenChange(false)}
+                className="border-white/10 text-white/70 hover:bg-white/5"
               >
-                <ChevronLeft className="size-3" />
-                Back
+                Cancel
               </Button>
               <Button
                 variant="secondary"
                 disabled={!newDetailsValid}
-                onClick={() => setStep('credentials')}
+                onClick={() => {
+                  if (isReuseIntent) {
+                    void handleConnectReuse(intent.wastelandId);
+                  } else {
+                    setStep('credentials');
+                  }
+                }}
                 className="bg-white/[0.1] text-white/90 hover:bg-white/[0.15]"
               >
-                Next
+                {isReuseIntent ? 'Connect' : 'Next'}
               </Button>
             </DialogFooter>
           </>
@@ -786,9 +640,9 @@ function ConnectWastelandDialog({
             <DialogHeader>
               <DialogTitle className="text-white/90">DoltHub credentials</DialogTitle>
               <DialogDescription className="text-white/50">
-                {mode === 'create'
+                {intent.kind === 'create'
                   ? 'Connect your DoltHub account to create the repo and register the first rig.'
-                  : 'Connect your DoltHub account to fork the commons and push contributions.'}
+                  : 'Connect your DoltHub account to fork the upstream and push contributions.'}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
@@ -818,9 +672,17 @@ function ConnectWastelandDialog({
                     }
                   >
                     <Input
+                      name="dolthub-handle"
                       value={dolthubOrg}
                       onChange={e => setDolthubOrg(e.target.value)}
                       placeholder="my-username"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      data-1p-ignore="true"
+                      data-lpignore="true"
+                      data-form-type="other"
                       className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
                     />
                   </FieldGroup>
@@ -845,6 +707,12 @@ function ConnectWastelandDialog({
                 </div>
               )}
 
+              {/* The manual-token form is wrapped in a sentinel `form` with
+                  autoComplete="off" plus a non-credential name on the
+                  username-shaped field so Chrome / 1Password / LastPass
+                  don't fingerprint it as a sign-in form. The token field
+                  uses SecretTokenInput which renders type="text" with
+                  visual masking instead of type="password". */}
               <Collapsible open={manualOpen} onOpenChange={setManualOpen}>
                 <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-1 py-1 text-[11px] text-white/40 hover:text-white/60">
                   <span className="uppercase tracking-wider">Advanced — paste an API token</span>
@@ -853,57 +721,48 @@ function ConnectWastelandDialog({
                   />
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2 space-y-3">
-                  <FieldGroup
-                    label="DoltHub API token"
-                    hint="Create one at dolthub.com/settings/tokens"
-                  >
-                    <Input
-                      type="password"
-                      value={dolthubToken}
-                      onChange={e => setDolthubToken(e.target.value)}
-                      placeholder="Paste a personal API token"
-                      className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
-                    />
-                  </FieldGroup>
-                  <FieldGroup label="DoltHub username" hint="Your DoltHub username or org">
-                    <Input
-                      value={dolthubOrg}
-                      onChange={e => setDolthubOrg(e.target.value)}
-                      placeholder="my-username"
-                      className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
-                    />
-                  </FieldGroup>
+                  <form autoComplete="off" className="space-y-3" onSubmit={e => e.preventDefault()}>
+                    <FieldGroup
+                      label="DoltHub API token"
+                      hint="Create one at dolthub.com/settings/tokens"
+                    >
+                      <SecretTokenInput
+                        name="dolthub-api-token"
+                        value={dolthubToken}
+                        onChange={e => setDolthubToken(e.target.value)}
+                        placeholder="Paste a personal API token"
+                        toggleLabel="Show DoltHub token"
+                        className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
+                      />
+                    </FieldGroup>
+                    <FieldGroup label="DoltHub username" hint="Your DoltHub username or org">
+                      <Input
+                        name="dolthub-handle"
+                        value={dolthubOrg}
+                        onChange={e => setDolthubOrg(e.target.value)}
+                        placeholder="my-username"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
+                        data-1p-ignore="true"
+                        data-lpignore="true"
+                        data-form-type="other"
+                        className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
+                      />
+                    </FieldGroup>
+                  </form>
                 </CollapsibleContent>
               </Collapsible>
 
-              {/* Create-mode owns the upstream-admin toggle on the picker
-                  itself (it's per-card in the new-details step). The
-                  credentials step keeps the toggle for join-mode where
-                  the user is opting in to direct writes on a wasteland
-                  someone else originally bootstrapped. */}
-              {mode === 'join' && (
-                <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
-                  <input
-                    type="checkbox"
-                    checked={joinIsUpstreamAdmin}
-                    onChange={e => setJoinIsUpstreamAdmin(e.target.checked)}
-                    className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-500"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-white/70">I own this upstream</p>
-                    <p className="mt-0.5 text-[11px] text-white/30">
-                      Unlocks admin mode — direct writes, PR merge controls, and the ability to
-                      accept contributions from others. Only check this if your DoltHub account has
-                      push access to the upstream repo. You can toggle this later in settings.
-                    </p>
-                  </div>
-                </label>
-              )}
+              {/* The "I own this upstream" toggle now lives on the
+                  picker, per intent card, so the credentials step no
+                  longer renders a duplicate. */}
             </div>
             <DialogFooter>
               <Button
                 variant="secondary"
-                onClick={() => setStep(mode === 'create' ? 'new-details' : 'select')}
+                onClick={() => setStep('new-details')}
                 className="gap-1.5 border-white/10 text-white/70 hover:bg-white/5"
               >
                 <ChevronLeft className="size-3" />
@@ -959,7 +818,7 @@ function ConnectWastelandDialog({
               <Button
                 variant="secondary"
                 disabled={!identityValid}
-                onClick={handleConnect}
+                onClick={handleConnectProvision}
                 className="bg-white/[0.1] text-white/90 hover:bg-white/[0.15]"
               >
                 Connect
@@ -971,40 +830,42 @@ function ConnectWastelandDialog({
         {step === 'connecting' && (
           <>
             <DialogHeader>
-              <DialogTitle className="text-white/90">
-                {mode === 'create' ? 'Creating...' : 'Connecting...'}
-              </DialogTitle>
+              <DialogTitle className="text-white/90">{connectingHeadline}</DialogTitle>
               <DialogDescription className="text-white/50">
-                {mode === 'create' ? (
-                  intent.kind === 'create' ? (
-                    <>
-                      Bootstrapping{' '}
-                      <span className="font-mono text-white/70">
-                        {resolveUpstreamFromIntent(intent)}
-                      </span>{' '}
-                      on DoltHub and registering{' '}
-                      <span className="font-mono text-white/70">{rigHandle}</span> as the first rig.
-                    </>
-                  ) : (
-                    <>
-                      Connecting your wasteland to{' '}
-                      <span className="font-mono text-white/70">
-                        {resolveUpstreamFromIntent(intent)}
-                      </span>
-                      .
-                    </>
-                  )
+                {intent.kind === 'create' ? (
+                  <>
+                    Bootstrapping{' '}
+                    <span className="font-mono text-white/70">
+                      {resolveUpstreamFromIntent(intent)}
+                    </span>{' '}
+                    on DoltHub and registering{' '}
+                    <span className="font-mono text-white/70">{rigHandle}</span> as the first rig.
+                  </>
+                ) : intent.kind === 'reuse' ? (
+                  <>
+                    Wiring this town to{' '}
+                    <span className="font-mono text-white/70">{connectedUpstream}</span>.
+                  </>
                 ) : (
                   <>
-                    Setting up credentials, forking the commons, and joining as{' '}
-                    <span className="font-mono text-white/70">{rigHandle}</span>.
+                    Connecting this town to{' '}
+                    <span className="font-mono text-white/70">
+                      {resolveUpstreamFromIntent(intent)}
+                    </span>
+                    {rigHandle && (
+                      <>
+                        {' '}
+                        as <span className="font-mono text-white/70">{rigHandle}</span>
+                      </>
+                    )}
+                    .
                   </>
                 )}
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col items-center gap-3 py-8">
               <Loader2 className="size-8 animate-spin text-white/30" />
-              <p className="text-xs text-white/40">This may take a minute...</p>
+              <p className="text-xs text-white/40">This may take a minute…</p>
             </div>
           </>
         )}
@@ -1012,11 +873,9 @@ function ConnectWastelandDialog({
         {step === 'success' && (
           <>
             <DialogHeader>
-              <DialogTitle className="text-white/90">
-                {mode === 'create' ? 'Wasteland created' : 'Connected'}
-              </DialogTitle>
+              <DialogTitle className="text-white/90">{successHeadline}</DialogTitle>
               <DialogDescription className="text-white/50">
-                {mode === 'create'
+                {intent.kind === 'create'
                   ? 'Your wasteland is live. Invite contributors from settings.'
                   : 'This town is now connected to the wasteland.'}
               </DialogDescription>
@@ -1025,7 +884,7 @@ function ConnectWastelandDialog({
               <CheckCircle2 className="size-10 text-emerald-400" />
               <div className="text-center">
                 <p className="text-sm text-white/70">
-                  {mode === 'create' ? 'Your wasteland is live at ' : 'Connected to '}
+                  {intent.kind === 'create' ? 'Your wasteland is live at ' : 'Connected to '}
                   <span className="font-mono text-emerald-400">{connectedUpstream}</span>{' '}
                   {rigHandle && (
                     <>
@@ -1034,7 +893,7 @@ function ConnectWastelandDialog({
                   )}
                 </p>
                 <p className="mt-2 text-xs text-white/40">
-                  {mode === 'create'
+                  {intent.kind === 'create'
                     ? "You're the owner and admin. You can invite contributors from wasteland settings."
                     : 'Agents now have access to wasteland tools. Try asking the mayor to browse the wasteland.'}
                 </p>

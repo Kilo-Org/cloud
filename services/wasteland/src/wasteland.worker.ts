@@ -17,19 +17,8 @@ import { timingMiddleware } from './middleware/analytics.middleware';
 import { wrappedWastelandRouter } from './trpc/router';
 import { getWastelandRegistryStub } from './dos/WastelandRegistry.do';
 import { getWastelandDOStub } from './dos/Wasteland.do';
-import { getWastelandContainerStub } from './dos/WastelandContainer.do';
 import * as wantedBoard from './wanted-board/wanted-board-ops';
 import { WantedBoardOpError } from './wanted-board/wanted-board-ops';
-import {
-  handleWasmBrowse,
-  handleWasmClaim,
-  handleWasmUnclaim,
-  handleWasmDone,
-  handleWasmPost,
-  handleWasmAccept,
-  handleWasmReject,
-  handleWasmClose,
-} from './handlers/wasm-browse.handler';
 
 // ── DO Exports ──────────────────────────────────────────────────────────
 // Wrangler requires these exports to match the class_name bindings in wrangler.jsonc.
@@ -47,11 +36,17 @@ export type WastelandEnv = {
 };
 
 const app = new Hono<WastelandEnv>();
-const LOCAL_DEV_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
-
 async function cfAccessDebugMiddleware(c: Context<WastelandEnv>, next: () => Promise<void>) {
-  const hostname = new URL(c.req.url).hostname;
-  if (c.env.ENVIRONMENT === 'development' && LOCAL_DEV_HOSTNAMES.has(hostname)) {
+  // Bypass CF Access in dev. We can't trust the request hostname for
+  // a localhost check — `wrangler dev` rewrites `request.url` to the
+  // production hostname inferred from `wrangler.jsonc`'s `routes`
+  // block (see https://github.com/cloudflare/workers-sdk/issues/3635),
+  // so `URL(c.req.url).hostname` is `wasteland.kiloapps.io` even when
+  // the request actually hit `localhost`. The `ENVIRONMENT` binding
+  // is the load-bearing check: prod deploys don't pass `--env dev`,
+  // so `ENVIRONMENT` is `'production'` there and the bypass doesn't
+  // fire.
+  if (c.env.ENVIRONMENT === 'development') {
     return next();
   }
 
@@ -160,21 +155,25 @@ app.get('/debug/wastelands/:wastelandId/wanted', async c => {
   return c.json({ items: board });
 });
 
+// Container introspection routes were removed in Phase 2 of the
+// container retirement. They return a small stable payload for one
+// release cycle so external monitors don't 502; remove these once we
+// confirm nothing is polling them.
 app.get('/debug/wastelands/:wastelandId/container/config', async c => {
   const wastelandId = c.req.param('wastelandId');
-  const container = getWastelandContainerStub(c.env, wastelandId);
-  const res = await container.fetch(new Request('http://container/wl/config'));
-  const data: unknown = await res.json();
-  return c.json(data);
+  const doStub = getWastelandDOStub(c.env, wastelandId);
+  const config = await doStub.getConfig();
+  return c.json({
+    status: 'no container',
+    runtime: 'wasm',
+    upstream: config?.dolthub_upstream ?? null,
+    note: 'Container retired; see services/wasteland/docs/wasteland-container-retirement.md',
+  });
 });
 
-app.get('/debug/wastelands/:wastelandId/container/health', async c => {
-  const wastelandId = c.req.param('wastelandId');
-  const container = getWastelandContainerStub(c.env, wastelandId);
-  const res = await container.fetch(new Request('http://container/health'));
-  const data: unknown = await res.json();
-  return c.json(data);
-});
+app.get('/debug/wastelands/:wastelandId/container/health', c =>
+  c.json({ status: 'no container', runtime: 'wasm' })
+);
 
 app.get('/debug/registry', async c => {
   const registry = getWastelandRegistryStub(c.env);
@@ -257,59 +256,15 @@ app.get('/debug/wastelands/:wastelandId/browse', async c => {
   }
 });
 
-// POC: browse via libwl WASM (bypasses container, runs the Go SDK
-// in-process via syscall/js). userId via query param.
-//
-// NOTE: deliberately mounted under `/poc/wasm/...` (NOT `/debug/...`)
-// so the local CF Access dev bypass isn't on the critical path for
-// POC validation. Move under `/debug/wasm/...` once the POC is
-// validated and we wire up proper auth.
-app.get('/poc/wasm/wastelands/:wastelandId/browse', c => handleWasmBrowse(c, c.req.param()));
+// `/poc/wasm/*` routes were removed in Phase 2 of the container
+// retirement — the `/debug/wastelands/:id/{op}` routes now hit the
+// same wanted-board-ops functions, so the POC duplicates have served
+// their purpose. The helper handlers in `wasm-browse.handler.ts` will
+// be deleted alongside this once nothing else imports them.
 
-// POC mutation endpoints — JSON body { userId, itemId, ...op-specific }.
-// These all proxy to the shared `wantedBoard.*` functions which now run
-// the wasm path. Removed once the production tRPC routes have soaked.
-app.post('/poc/wasm/wastelands/:wastelandId/claim', c => handleWasmClaim(c, c.req.param()));
-app.post('/poc/wasm/wastelands/:wastelandId/unclaim', c => handleWasmUnclaim(c, c.req.param()));
-app.post('/poc/wasm/wastelands/:wastelandId/done', c => handleWasmDone(c, c.req.param()));
-app.post('/poc/wasm/wastelands/:wastelandId/post', c => handleWasmPost(c, c.req.param()));
-app.post('/poc/wasm/wastelands/:wastelandId/accept', c => handleWasmAccept(c, c.req.param()));
-app.post('/poc/wasm/wastelands/:wastelandId/reject', c => handleWasmReject(c, c.req.param()));
-app.post('/poc/wasm/wastelands/:wastelandId/close', c => handleWasmClose(c, c.req.param()));
-
-// POC helper: list members of a wasteland so a tester can pick a
-// userId that has stored credentials. Same auth caveat as above —
-// this is unauthenticated for POC convenience and goes away with the
-// rest of /poc/* once we're done.
-app.get('/poc/wasm/wastelands/:wastelandId/members', async c => {
-  const wastelandId = c.req.param('wastelandId');
-  const doStub = getWastelandDOStub(c.env, wastelandId);
-  const members = await doStub.listMembers();
-  const config = await doStub.getConfig();
-  return c.json({ wastelandId, config, members });
-});
-
-// POC helper: run the existing container-backed browse (same code path
-// the production tRPC router uses). Lets us A/B against
-// /poc/wasm/wastelands/:id/browse to confirm the token + upstream are
-// otherwise valid. Goes away with the rest of /poc/*.
-app.get('/poc/wasm/wastelands/:wastelandId/browse-via-container', async c => {
-  const wastelandId = c.req.param('wastelandId');
-  const userId = c.req.query('userId');
-  if (!userId) return c.json({ error: 'Missing userId query param' }, 400);
-  try {
-    const items = await wantedBoard.browseWantedBoard(c.env, wastelandId, userId);
-    return c.json({ source: 'container', itemCount: items.length, items });
-  } catch (err) {
-    if (err instanceof WantedBoardOpError) {
-      return c.json({ error: err.message, code: err.code }, 502);
-    }
-    throw err;
-  }
-});
-
-// Browse via DoltHub API direct (bypasses container — useful when the
-// container's Bun TLS is broken in local wrangler dev).
+// Browse via DoltHub API direct — useful when libwl is broken in
+// local wrangler dev or for sanity-checking that a token + upstream
+// combination is well-formed.
 app.get('/debug/wastelands/:wastelandId/browse-direct', async c => {
   const wastelandId = c.req.param('wastelandId');
   const doStub = getWastelandDOStub(c.env, wastelandId);
@@ -340,6 +295,138 @@ app.get('/debug/wastelands/:wastelandId/browse-direct', async c => {
     return c.json({ error: 'Unexpected DoltHub API response' }, 502);
   }
   return c.json({ itemCount: parsed.data.rows.length, items: parsed.data.rows });
+});
+
+// Auth probe: hit the same `wanted` SELECT that libwl runs, three ways
+// (anonymous, with the user's stored token, and with a fresh OAuth token
+// if installed). Use to diagnose "no such repository" errors that happen
+// only on the authenticated path — DoltHub returns that error on
+// authenticated reads against repos the user doesn't have explicit
+// permissions on, even when the repo is public.
+//
+// Usage: GET /debug/wastelands/:id/auth-probe?userId=<userId>
+//
+// Returns a JSON envelope with one entry per probe:
+//   {
+//     credential: { hasLocal, hasOauth, dolthubOrg, rigHandle, tokenPrefix },
+//     probes: {
+//       anonymous: { ok, status, message },
+//       localToken: { ok, status, message } | null,
+//       freshToken: { ok, status, message } | null,
+//     }
+//   }
+//
+// Tokens are never returned in full — only a 6-char prefix for sanity
+// checks (e.g. `dh+sat`, `dhat.v`).
+app.get('/debug/wastelands/:wastelandId/auth-probe', async c => {
+  const wastelandId = c.req.param('wastelandId');
+  const userId = c.req.query('userId');
+  if (!userId) return c.json({ error: 'Missing userId query param' }, 400);
+
+  const doStub = getWastelandDOStub(c.env, wastelandId);
+  const config = await doStub.getConfig();
+  if (!config?.dolthub_upstream) {
+    return c.json({ error: 'No upstream configured on this wasteland' }, 412);
+  }
+
+  // The same SELECT shape libwl issues — keep the column list tight so
+  // the response stays small even on a populated repo.
+  const sql = 'SELECT id, title, status FROM wanted ORDER BY created_at DESC LIMIT 3';
+  const url = `${DOLTHUB_API_BASE}/${config.dolthub_upstream}/main?q=${encodeURIComponent(sql)}`;
+
+  // Resolve the local credential (encrypted token + DoltHub username).
+  const credential = await doStub.getCredential(userId);
+  let localToken: string | null = null;
+  if (credential) {
+    const { resolveSecret } = await import('./util/secret.util');
+    const { deriveEncryptionKey, decryptToken } = await import('./util/crypto.util');
+    const rawKey = await resolveSecret(c.env.WASTELAND_ENCRYPTION_KEY);
+    if (rawKey) {
+      const cryptoKey = await deriveEncryptionKey(rawKey);
+      try {
+        localToken = await decryptToken(credential.encrypted_token, cryptoKey);
+      } catch (err) {
+        return c.json(
+          {
+            error: 'Failed to decrypt local credential',
+            detail: err instanceof Error ? err.message : String(err),
+          },
+          500
+        );
+      }
+    }
+  }
+
+  // Resolve a fresh OAuth token via apps/web's internal endpoint
+  // (returns 'unavailable' / 'not-installed' in production where OAuth
+  // is dev-only).
+  const { fetchFreshDoltHubToken } = await import('./util/dolthub-token.util');
+  const fresh = await fetchFreshDoltHubToken(c.env, { userId });
+  const freshToken = fresh.status === 'ok' ? fresh.data.token : null;
+
+  type ProbeResult = { ok: boolean; status: number; message: string; rows?: number };
+  async function probe(token: string | null): Promise<ProbeResult> {
+    const headers: Record<string, string> = { 'cache-control': 'no-cache' };
+    if (token) headers.authorization = `token ${token}`;
+    let res: Response;
+    try {
+      res = await fetch(url, { headers });
+    } catch (err) {
+      return {
+        ok: false,
+        status: 0,
+        message: `transport error: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    const bodyText = await res.text().catch(() => '');
+    let bodyJson: {
+      query_execution_status?: string;
+      query_execution_message?: string;
+      rows?: unknown[];
+    } = {};
+    try {
+      bodyJson = JSON.parse(bodyText) as typeof bodyJson;
+    } catch {
+      /* keep empty */
+    }
+    const ok = res.ok && bodyJson.query_execution_status?.toLowerCase() === 'success';
+    const message =
+      bodyJson.query_execution_message ?? (bodyText.slice(0, 400) || res.statusText || '(empty)');
+    return {
+      ok,
+      status: res.status,
+      message,
+      rows: Array.isArray(bodyJson.rows) ? bodyJson.rows.length : undefined,
+    };
+  }
+
+  const [anonymous, localResult, freshResult] = await Promise.all([
+    probe(null),
+    localToken ? probe(localToken) : Promise.resolve(null),
+    freshToken ? probe(freshToken) : Promise.resolve(null),
+  ]);
+
+  return c.json({
+    upstream: config.dolthub_upstream,
+    credential: {
+      hasLocal: !!credential,
+      hasOauth: fresh.status === 'ok',
+      oauthStatus: fresh.status,
+      oauthReason: fresh.status === 'unavailable' ? fresh.reason : undefined,
+      dolthubOrg: credential?.dolthub_org ?? null,
+      rigHandle: credential?.rig_handle ?? null,
+      isUpstreamAdmin: credential?.is_upstream_admin ?? null,
+      // First 6 chars of the token only — enough to tell `dh+sat` vs
+      // `dhat.v` apart but not enough to do anything with it.
+      localTokenPrefix: localToken ? localToken.slice(0, 6) : null,
+      freshTokenPrefix: freshToken ? freshToken.slice(0, 6) : null,
+    },
+    probes: {
+      anonymous,
+      localToken: localResult,
+      freshToken: freshResult,
+    },
+  });
 });
 
 const PostItemBody = z.object({
@@ -416,46 +503,11 @@ app.post('/debug/wastelands/:wastelandId/done', async c => {
   }
 });
 
-// Generic container dispatch for wl ops not yet exposed via the
-// wanted-board-ops module (unclaim, accept, reject, close, accept-upstream,
-// reject-upstream, close-upstream). Uses the credential stored for the
-// given userId to decrypt the DoltHub token.
-async function debugCallContainer(
-  c: Context<WastelandEnv>,
-  wastelandId: string,
-  userId: string,
-  path: string,
-  extraBody: Record<string, unknown>
-) {
-  const { getWastelandContainerStub } = await import('./dos/WastelandContainer.do');
-  const { deriveEncryptionKey, decryptToken } = await import('./util/crypto.util');
-  const { resolveSecret } = await import('./util/secret.util');
-
-  const doStub = getWastelandDOStub(c.env, wastelandId);
-  const config = await doStub.getConfig();
-  if (!config?.dolthub_upstream) {
-    return c.json({ error: 'Wasteland has no DoltHub upstream configured' }, 412);
-  }
-  const credential = await doStub.getCredential(userId);
-  if (!credential) {
-    return c.json({ error: 'No DoltHub credential stored for user' }, 412);
-  }
-  const rawKey = await resolveSecret(c.env.WASTELAND_ENCRYPTION_KEY);
-  if (!rawKey) return c.json({ error: 'Encryption key unavailable' }, 500);
-  const cryptoKey = await deriveEncryptionKey(rawKey);
-  const token = await decryptToken(credential.encrypted_token, cryptoKey);
-
-  const container = getWastelandContainerStub(c.env, wastelandId);
-  const res = await container.fetch(
-    new Request(`http://container${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', DOLTHUB_TOKEN: token },
-      body: JSON.stringify({ upstream: config.dolthub_upstream, ...extraBody }),
-    })
-  );
-  const data: unknown = await res.json();
-  return c.json(data, res.status as 200);
-}
+// Phase 2 of the container retirement: each lifecycle op now calls
+// the corresponding wanted-board-ops function directly (the same code
+// path the production tRPC + RPC entrypoints take). The previous
+// `debugCallContainer` proxy and its `/wl/*` container endpoints are
+// gone.
 
 app.post('/debug/wastelands/:wastelandId/unclaim', async c => {
   const wastelandId = c.req.param('wastelandId');
@@ -463,16 +515,24 @@ app.post('/debug/wastelands/:wastelandId/unclaim', async c => {
   if ('response' in parsed) return parsed.response;
   const userId = parsed.data.userId ?? c.req.query('userId');
   if (!userId) return c.json({ error: 'Missing userId' }, 400);
-  return debugCallContainer(c, wastelandId, userId, '/wl/unclaim', {
-    itemId: parsed.data.itemId,
-  });
+  try {
+    const result = await wantedBoard.unclaimWantedItem(
+      c.env,
+      wastelandId,
+      userId,
+      parsed.data.itemId
+    );
+    return c.json(result);
+  } catch (err) {
+    return debugErrorResponse(c, err);
+  }
 });
 
 const AcceptBody = z.object({
   userId: z.string().optional(),
   itemId: z.string().min(1),
-  quality: z.union([z.string(), z.number()]),
-  comment: z.string().optional(),
+  quality: z.enum(['excellent', 'good', 'fair', 'poor']),
+  message: z.string().optional(),
 });
 
 app.post('/debug/wastelands/:wastelandId/accept', async c => {
@@ -481,17 +541,22 @@ app.post('/debug/wastelands/:wastelandId/accept', async c => {
   if ('response' in parsed) return parsed.response;
   const userId = parsed.data.userId ?? c.req.query('userId');
   if (!userId) return c.json({ error: 'Missing userId' }, 400);
-  return debugCallContainer(c, wastelandId, userId, '/wl/accept', {
-    itemId: parsed.data.itemId,
-    quality: parsed.data.quality,
-    comment: parsed.data.comment,
-  });
+  try {
+    const result = await wantedBoard.acceptWantedItem(c.env, wastelandId, userId, {
+      itemId: parsed.data.itemId,
+      quality: parsed.data.quality,
+      message: parsed.data.message,
+    });
+    return c.json(result);
+  } catch (err) {
+    return debugErrorResponse(c, err);
+  }
 });
 
 const RejectBody = z.object({
   userId: z.string().optional(),
   itemId: z.string().min(1),
-  comment: z.string().min(1),
+  reason: z.string().min(1),
 });
 
 app.post('/debug/wastelands/:wastelandId/reject', async c => {
@@ -500,10 +565,15 @@ app.post('/debug/wastelands/:wastelandId/reject', async c => {
   if ('response' in parsed) return parsed.response;
   const userId = parsed.data.userId ?? c.req.query('userId');
   if (!userId) return c.json({ error: 'Missing userId' }, 400);
-  return debugCallContainer(c, wastelandId, userId, '/wl/reject', {
-    itemId: parsed.data.itemId,
-    comment: parsed.data.comment,
-  });
+  try {
+    const result = await wantedBoard.rejectWantedItem(c.env, wastelandId, userId, {
+      itemId: parsed.data.itemId,
+      reason: parsed.data.reason,
+    });
+    return c.json(result);
+  } catch (err) {
+    return debugErrorResponse(c, err);
+  }
 });
 
 app.post('/debug/wastelands/:wastelandId/close', async c => {
@@ -512,9 +582,17 @@ app.post('/debug/wastelands/:wastelandId/close', async c => {
   if ('response' in parsed) return parsed.response;
   const userId = parsed.data.userId ?? c.req.query('userId');
   if (!userId) return c.json({ error: 'Missing userId' }, 400);
-  return debugCallContainer(c, wastelandId, userId, '/wl/close', {
-    itemId: parsed.data.itemId,
-  });
+  try {
+    const result = await wantedBoard.closeWantedItem(
+      c.env,
+      wastelandId,
+      userId,
+      parsed.data.itemId
+    );
+    return c.json(result);
+  } catch (err) {
+    return debugErrorResponse(c, err);
+  }
 });
 
 // ── DEBUG: DoltHub API passthrough — for maintainer-side ops ──────────

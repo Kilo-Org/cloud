@@ -165,11 +165,11 @@ WastelandDO already.
 
 ## Bundle size
 
-| Metric | Bytes | Workers limit |
-|---|---:|---|
-| libwl.wasm raw | 12,505,176 | n/a |
-| libwl.wasm gzipped (-9) | 3,217,896 | 10 MB paid plan compressed |
-| wasm_exec.js | 16,992 | n/a |
+| Metric                  |      Bytes | Workers limit              |
+| ----------------------- | ---------: | -------------------------- |
+| libwl.wasm raw          | 12,505,176 | n/a                        |
+| libwl.wasm gzipped (-9) |  3,217,896 | 10 MB paid plan compressed |
+| wasm_exec.js            |     16,992 | n/a                        |
 
 Compressed, we're at ~32% of the paid-plan limit. Comfortable headroom
 for adding the seven mutations and the existing TypeScript/Sentry/Hono

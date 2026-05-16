@@ -36,9 +36,11 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
         rigHandle?: string | undefined;
         rigDisplayName?: string | undefined;
         rigEmail?: string | undefined;
+        visibility?: 'private' | 'public' | undefined;
       };
       output: {
         success: boolean;
+        databaseCreated: boolean;
       };
       meta: object;
     }>;
@@ -788,9 +790,11 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
             rigHandle?: string | undefined;
             rigDisplayName?: string | undefined;
             rigEmail?: string | undefined;
+            visibility?: 'private' | 'public' | undefined;
           };
           output: {
             success: boolean;
+            databaseCreated: boolean;
           };
           meta: object;
         }>;

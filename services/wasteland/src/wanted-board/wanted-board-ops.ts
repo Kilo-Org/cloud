@@ -515,11 +515,7 @@ export async function closeWantedItem(
   const ctx = await loadContext(env, wastelandId, userId);
   const direct = resolveDirect(options?.direct, ctx.isUpstreamAdmin);
 
-  await runLibwlMutation(
-    'wlClose',
-    { ...libwlEnv(ctx, userId, direct), item_id: itemId },
-    'Close'
-  );
+  await runLibwlMutation('wlClose', { ...libwlEnv(ctx, userId, direct), item_id: itemId }, 'Close');
 
   await ctx.doStub.refreshWantedBoard();
 
@@ -559,7 +555,9 @@ export async function postWantedItem(
       // explicit "unset" sentinel for `PostInput.Priority`, so missing
       // would unmarshal to 0 (= 'low'), shifting every untyped post.
       priority:
-        input.priority !== undefined ? PRIORITY_TO_NUMBER[input.priority] : PRIORITY_TO_NUMBER.medium,
+        input.priority !== undefined
+          ? PRIORITY_TO_NUMBER[input.priority]
+          : PRIORITY_TO_NUMBER.medium,
       ...(input.type !== undefined ? { type: input.type } : {}),
     },
     'Post'

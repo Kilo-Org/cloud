@@ -2,9 +2,26 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Globe, Hammer, Link2, Loader2, ShieldCheck, Sparkles, XCircle } from 'lucide-react';
+import {
+  Globe,
+  Hammer,
+  Link2,
+  Loader2,
+  RotateCw,
+  ShieldCheck,
+  Skull,
+  Sparkles,
+  XCircle,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useTRPC } from '@/lib/trpc/utils';
 
 /**
@@ -19,11 +36,28 @@ export const KILO_COMMONS_UPSTREAM = 'hop/wl-commons';
  */
 const UPSTREAM_PATTERN = /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/;
 
+/** A wasteland the caller already has credentials stored on, surfaced
+ *  by the picker's "Reuse existing connection" card. The dialog passes
+ *  these in via `reusableWastelands`; the picker only renders the card
+ *  when the list is non-empty. */
+export type ReusableWasteland = {
+  wasteland_id: string;
+  name: string;
+  dolthub_upstream: string | null;
+};
+
 /** The user's intent for this wasteland's upstream. */
 export type UpstreamIntent =
   | { kind: 'commons'; isUpstreamAdmin: boolean }
   | { kind: 'connect'; upstream: string; isUpstreamAdmin: boolean }
-  | { kind: 'create'; upstream: string; isUpstreamAdmin: boolean };
+  | { kind: 'create'; upstream: string; isUpstreamAdmin: boolean }
+  | {
+      /** Reuse a wasteland the caller already has credentials on.
+       *  No new wasteland record is created; the parent wires the
+       *  selection straight into `connectKiloTown`. */
+      kind: 'reuse';
+      wastelandId: string;
+    };
 
 /**
  * Live verification state for the typed upstream. The picker only fires
@@ -53,22 +87,35 @@ type Props = {
   dolthubUsername?: string | null;
   /** Per-field disabled state — used when a parent submission is in flight. */
   disabled?: boolean;
+  /**
+   * Wastelands the caller already has credentials stored on. When the
+   * list is non-empty, the picker shows a "Reuse existing connection"
+   * card at the top so users coming from Gastown can wire a town to a
+   * wasteland they already set up without re-entering credentials.
+   * Leave undefined (the default) to hide the reuse path entirely —
+   * that's what the standalone "create wasteland" wizard wants.
+   */
+  reusableWastelands?: ReusableWasteland[];
 };
 
 /**
- * Three-card upstream intent picker shared between the standalone
- * "create wasteland" wizard and the Gastown wasteland-connect dialog.
+ * Upstream intent picker shared between the standalone "create wasteland"
+ * wizard and the Gastown wasteland-connect dialog.
  *
- * Cards:
+ * Cards (the reuse card only renders when `reusableWastelands` is
+ * non-empty — typically only the Gastown connect flow passes it):
+ *
+ *   0. Reuse existing connection    — wire to a wasteland already set up
  *   1. Join the Kilo Commons        — fixed upstream `hop/wl-commons`
  *   2. Connect to an existing repo  — typed `{owner}/{repo}` + verify probe
  *   3. Create a brand-new upstream  — typed `{owner}/{repo}` (must NOT exist)
  *
- * The "I own this upstream" toggle on every card flips
+ * The "I own this upstream" toggle on cards 1–3 flips
  * `is_upstream_admin` server-side, gating direct writes vs fork+PR. We
  * default it OFF on cards 1/2 (most users won't own those repos) and ON
  * on card 3 (you always own a repo you just created), with copy that
- * explains the consequence.
+ * explains the consequence. The reuse card has no toggle because the
+ * stored credential already encodes the admin flag.
  */
 export function UpstreamIntentPicker({
   value,
@@ -76,7 +123,11 @@ export function UpstreamIntentPicker({
   organizationId,
   dolthubUsername,
   disabled,
+  reusableWastelands,
 }: Props) {
+  const reuseList = reusableWastelands ?? [];
+  const showReuse = reuseList.length > 0;
+
   const handleKindChange = (kind: Kind) => {
     if (kind === value.kind) return;
     if (kind === 'commons') {
@@ -87,6 +138,14 @@ export function UpstreamIntentPicker({
       const carriedOver =
         value.kind === 'create' ? value.upstream : value.kind === 'connect' ? value.upstream : '';
       onChange({ kind: 'connect', upstream: carriedOver, isUpstreamAdmin: false });
+      return;
+    }
+    if (kind === 'reuse') {
+      // Default to the first reusable entry so the card has a sensible
+      // pre-selection when the user clicks it.
+      const first = reuseList[0];
+      if (!first) return;
+      onChange({ kind: 'reuse', wastelandId: first.wasteland_id });
       return;
     }
     // create
@@ -103,6 +162,16 @@ export function UpstreamIntentPicker({
 
   return (
     <div className="space-y-3">
+      {showReuse && (
+        <ReuseCard
+          selected={value.kind === 'reuse'}
+          intent={value.kind === 'reuse' ? value : null}
+          onSelect={() => handleKindChange('reuse')}
+          onChange={onChange}
+          wastelands={reuseList}
+          disabled={disabled}
+        />
+      )}
       <CommonsCard
         selected={value.kind === 'commons'}
         intent={value.kind === 'commons' ? value : null}
@@ -142,15 +211,21 @@ export function UpstreamIntentPicker({
  */
 export function isUpstreamIntentValid(intent: UpstreamIntent): boolean {
   if (intent.kind === 'commons') return true;
+  if (intent.kind === 'reuse') return intent.wastelandId.length > 0;
   return UPSTREAM_PATTERN.test(intent.upstream.trim());
 }
 
 /**
  * Resolve the final upstream string for an intent. `commons` always
- * yields `hop/wl-commons`; the others return the trimmed user input.
+ * yields `hop/wl-commons`; `connect` and `create` return the trimmed
+ * user input. `reuse` has no inline upstream (the parent must look it
+ * up from the wasteland record by id) and returns an empty string —
+ * callers handling `reuse` should branch on `intent.kind` first
+ * instead of relying on this helper.
  */
 export function resolveUpstreamFromIntent(intent: UpstreamIntent): string {
   if (intent.kind === 'commons') return KILO_COMMONS_UPSTREAM;
+  if (intent.kind === 'reuse') return '';
   return intent.upstream.trim();
 }
 
@@ -283,6 +358,81 @@ function CardShell({
         <div className="border-t border-white/[0.06] px-4 pb-4 pt-3">{children}</div>
       )}
     </div>
+  );
+}
+
+function ReuseCard({
+  selected,
+  intent,
+  onSelect,
+  onChange,
+  wastelands,
+  disabled,
+}: CardProps<'reuse'> & { wastelands: ReusableWasteland[] }) {
+  // Default selection seeds with the first wasteland in the list so
+  // the dropdown trigger always shows a meaningful label.
+  const selectedId = intent?.wastelandId ?? wastelands[0]?.wasteland_id ?? '';
+  const selectedWasteland = wastelands.find(w => w.wasteland_id === selectedId) ?? null;
+
+  return (
+    <CardShell
+      selected={selected}
+      onSelect={onSelect}
+      icon={<RotateCw className="size-3.5" />}
+      title="Reuse an existing connection"
+      description="Wire this town to a wasteland you've already set up. No DoltHub credentials needed — we'll reuse the ones stored on that wasteland."
+      disabled={disabled}
+    >
+      <div className="space-y-1.5">
+        <Label className="text-xs text-white/55" htmlFor="reuse-wasteland-select">
+          Wasteland
+        </Label>
+        <Select
+          value={selectedId}
+          onValueChange={value => onChange({ kind: 'reuse', wastelandId: value })}
+          disabled={disabled}
+        >
+          <SelectTrigger
+            id="reuse-wasteland-select"
+            aria-label="Existing wasteland"
+            className="border-white/[0.1] bg-white/[0.03] text-sm text-white/85"
+          >
+            <SelectValue placeholder="Pick a wasteland">
+              {selectedWasteland && (
+                <span className="flex min-w-0 items-center gap-2">
+                  <Skull className="size-3.5 shrink-0 text-white/30" />
+                  <span className="min-w-0 flex-1 truncate text-left">
+                    {selectedWasteland.name}
+                    {selectedWasteland.dolthub_upstream && (
+                      <span className="ml-2 font-mono text-[11px] text-white/35">
+                        {selectedWasteland.dolthub_upstream}
+                      </span>
+                    )}
+                  </span>
+                </span>
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            {wastelands.map(w => (
+              <SelectItem key={w.wasteland_id} value={w.wasteland_id}>
+                <span className="flex min-w-0 items-center gap-2">
+                  <Skull className="size-3.5 shrink-0 text-white/30" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm">{w.name}</span>
+                    {w.dolthub_upstream && (
+                      <span className="block truncate font-mono text-[11px] text-white/45">
+                        {w.dolthub_upstream}
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </CardShell>
   );
 }
 

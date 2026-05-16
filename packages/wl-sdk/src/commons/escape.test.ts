@@ -52,9 +52,7 @@ describe('escapeSqlString', () => {
   it('matches representative Go DML outputs from commons.go', () => {
     // From ClaimWantedDML: UPDATE wanted SET claimed_by='%s' ...
     // with rigHandle="rig-1" -> claimed_by='rig-1'
-    expect(`claimed_by='${escapeSqlString('rig-1')}'`).toBe(
-      "claimed_by='rig-1'",
-    );
+    expect(`claimed_by='${escapeSqlString('rig-1')}'`).toBe("claimed_by='rig-1'");
 
     // From InsertWantedDML title field with an apostrophe.
     expect(`'${escapeSqlString("Bob's Wanted")}'`).toBe("'Bob''s Wanted'");

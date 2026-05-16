@@ -90,9 +90,7 @@ export function sqlStringOrNull(s: string | null | undefined): string {
  * arrays, etc.) should format them explicitly the same way the Go helpers do
  * (e.g. `formatTagsJSON`).
  */
-export function sqlValue(
-  v: string | number | bigint | boolean | null | undefined,
-): string {
+export function sqlValue(v: string | number | bigint | boolean | null | undefined): string {
   if (v === null || v === undefined) {
     return 'NULL';
   }

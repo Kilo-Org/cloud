@@ -233,11 +233,6 @@ export function createConnectionManager(
       const codeReviewJob = isCodeReviewJob(state);
       const skipStatusForCodeReview = codeReviewJob && isInteractiveStatusType(sessionStatus.type);
 
-      if (codeReviewJob) {
-        rejectCodeReviewQuestion(pendingQuestion?.id, config.kiloClient);
-        rejectCodeReviewPermission(pendingPermission?.id, config.kiloClient);
-      }
-
       // Send session status as a regular kilocode event
       if (!skipStatusForCodeReview) {
         const statusProperties = { sessionID: kiloSessionId, status: sessionStatus };
@@ -279,7 +274,7 @@ export function createConnectionManager(
       }
 
       logToFile(
-        `kilo state sent: status=${sessionStatus.type}${skipStatusForCodeReview ? ' (suppressed)' : ''}, question=${pendingQuestion?.id ?? 'none'}${codeReviewJob && pendingQuestion ? ' (rejected)' : ''}, permission=${pendingPermission?.id ?? 'none'}${codeReviewJob && pendingPermission ? ' (rejected)' : ''}`
+        `kilo state sent: status=${sessionStatus.type}${skipStatusForCodeReview ? ' (suppressed)' : ''}, question=${pendingQuestion?.id ?? 'none'}${codeReviewJob && pendingQuestion ? ' (suppressed)' : ''}, permission=${pendingPermission?.id ?? 'none'}${codeReviewJob && pendingPermission ? ' (suppressed)' : ''}`
       );
     } catch (err) {
       logToFile(

@@ -1,5 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { RigsClient } from '@/app/(app)/wasteland/[wastelandId]/rigs/RigsClient';
+import { RigsClient } from '@/app/(app)/wasteland/by-id/[wastelandId]/rigs/RigsClient';
 
 export default async function OrgRigsPage({
   params,

@@ -1,5 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { ClaimsClient } from '@/app/(app)/wasteland/[wastelandId]/claims/ClaimsClient';
+import { ClaimsClient } from '@/app/(app)/wasteland/by-id/[wastelandId]/claims/ClaimsClient';
 
 export default async function OrgClaimsPage({
   params,

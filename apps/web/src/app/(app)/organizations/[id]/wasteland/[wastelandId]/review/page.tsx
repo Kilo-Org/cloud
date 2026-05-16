@@ -1,5 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { ReviewClient } from '@/app/(app)/wasteland/[wastelandId]/review/ReviewClient';
+import { ReviewClient } from '@/app/(app)/wasteland/by-id/[wastelandId]/review/ReviewClient';
 
 export default async function OrgReviewPage({
   params,

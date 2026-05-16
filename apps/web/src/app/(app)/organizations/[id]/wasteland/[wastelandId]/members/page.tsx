@@ -1,5 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { MembersClient } from '@/app/(app)/wasteland/[wastelandId]/members/MembersClient';
+import { MembersClient } from '@/app/(app)/wasteland/by-id/[wastelandId]/members/MembersClient';
 
 export default async function OrgMembersPage({
   params,

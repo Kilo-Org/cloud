@@ -1,5 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { SettingsClient } from '@/app/(app)/wasteland/[wastelandId]/settings/SettingsClient';
+import { SettingsClient } from '@/app/(app)/wasteland/by-id/[wastelandId]/settings/SettingsClient';
 
 export default async function OrgSettingsPage({
   params,

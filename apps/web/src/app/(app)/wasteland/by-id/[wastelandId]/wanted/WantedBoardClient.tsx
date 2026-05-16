@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
@@ -16,7 +17,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ArrowUpDown, Hourglass, Loader2, Plus, RefreshCw, ScrollText, Search } from 'lucide-react';
+import {
+  ArrowUpDown,
+  ArrowUpRight,
+  Hourglass,
+  Loader2,
+  Plus,
+  RefreshCw,
+  ScrollText,
+  Search,
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
@@ -90,11 +100,37 @@ function useSlowOperationToast(isPending: boolean) {
 
 // ── Main component ───────────────────────────────────────────────────────
 
+/**
+ * Render mode for the board.
+ *
+ * - `fork` (default): the existing behavior — claim/post/done/accept/reject
+ *   actions, full drawer with action callbacks. Used by the legacy
+ *   /wasteland/[wastelandId]/wanted route and the new
+ *   /wasteland/[owner]/[repo]/fork route once it lands (M2.3).
+ * - `upstream`: the M2.2 read-only "Upstream" view used by
+ *   /wasteland/[owner]/[repo]. Mutations are hidden, the drawer opens
+ *   with no action callbacks (read-only), and each row gets a
+ *   "Take to my workshop" link that hands the item off to the fork.
+ */
+export type WantedBoardMode = 'fork' | 'upstream';
+
 type WantedBoardClientProps = {
   wastelandId: string;
+  /** Defaults to `fork` for backwards compat with the legacy route. */
+  mode?: WantedBoardMode;
+  /** Required when `mode === 'upstream'`. Used to build per-row hand-off links. */
+  workshopBasePath?: string;
+  /** Header title shown in the dashboard chrome. Defaults vary by mode. */
+  headerTitle?: string;
 };
 
-export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
+export function WantedBoardClient({
+  wastelandId,
+  mode = 'fork',
+  workshopBasePath,
+  headerTitle,
+}: WantedBoardClientProps) {
+  const isUpstream = mode === 'upstream';
   const trpc = useWastelandTRPC();
   const queryClient = useQueryClient();
   const { open: openDrawer } = useDrawerStack();
@@ -251,34 +287,41 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
         type: 'wanted-item',
         wastelandId,
         item,
-        actions: {
-          isAdmin,
-          onDone: setDoneItem,
-          onAccept: setAcceptItem,
-          onReject: setRejectItem,
-          onCloseItem: setCloseItem,
-          onUnclaim: setUnclaimItem,
-        },
+        // Upstream mode is read-only — passing `actions: null` makes the
+        // drawer panel hide every mutation affordance (see WantedItemPanel).
+        actions: isUpstream
+          ? null
+          : {
+              isAdmin,
+              onDone: setDoneItem,
+              onAccept: setAcceptItem,
+              onReject: setRejectItem,
+              onCloseItem: setCloseItem,
+              onUnclaim: setUnclaimItem,
+            },
       });
     },
-    [openDrawer, wastelandId, isAdmin]
+    [openDrawer, wastelandId, isAdmin, isUpstream]
   );
 
   // Contribute page title, item count, and CTAs into the wasteland navbar.
+  // In upstream mode we hide "Post Wanted Item" — posting is fork-only.
   useSetWastelandPageHeader({
-    title: 'Wanted Board',
+    title: headerTitle ?? (isUpstream ? 'Upstream' : 'Wanted Board'),
     icon: <ScrollText className="size-4 text-[color:oklch(70%_0.15_30_/_0.6)]" />,
     count: items.length,
     actions: (
       <>
-        <button
-          type="button"
-          onClick={() => setShowPostDialog(true)}
-          className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/80"
-        >
-          <Plus className="size-3" />
-          Post Wanted Item
-        </button>
+        {!isUpstream && (
+          <button
+            type="button"
+            onClick={() => setShowPostDialog(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/80"
+          >
+            <Plus className="size-3" />
+            Post Wanted Item
+          </button>
+        )}
         <button
           type="button"
           onClick={handleRefresh}
@@ -428,6 +471,16 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
                   >
                     {item.priority ?? 'medium'}
                   </span>
+                  {isUpstream && workshopBasePath && (
+                    <Link
+                      href={`${workshopBasePath}/fork?wantedId=${encodeURIComponent(item.id)}`}
+                      onClick={e => e.stopPropagation()}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[10px] font-medium text-white/55 opacity-0 transition-all group-hover:opacity-100 hover:bg-white/[0.06] hover:text-white/85 focus-visible:opacity-100"
+                    >
+                      Take to my workshop
+                      <ArrowUpRight className="size-3" />
+                    </Link>
+                  )}
                 </motion.div>
               );
             })}
@@ -435,43 +488,49 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
         </div>
       </div>
 
-      {/* Dialogs */}
-      <MarkDoneDialog
-        wastelandId={wastelandId}
-        item={doneItem}
-        onClose={() => setDoneItem(null)}
-        onSuccess={invalidateBoard}
-      />
-      <AcceptDialog
-        wastelandId={wastelandId}
-        item={acceptItem}
-        onClose={() => setAcceptItem(null)}
-        onSuccess={invalidateBoard}
-      />
-      <RejectDialog
-        wastelandId={wastelandId}
-        item={rejectItem}
-        onClose={() => setRejectItem(null)}
-        onSuccess={invalidateBoard}
-      />
-      <CloseItemDialog
-        wastelandId={wastelandId}
-        item={closeItem}
-        onClose={() => setCloseItem(null)}
-        onSuccess={invalidateBoard}
-      />
-      <UnclaimDialog
-        wastelandId={wastelandId}
-        item={unclaimItem}
-        onClose={() => setUnclaimItem(null)}
-        onSuccess={invalidateBoard}
-      />
-      <PostWantedItemDialog
-        wastelandId={wastelandId}
-        open={showPostDialog}
-        onClose={() => setShowPostDialog(false)}
-        onSuccess={invalidateBoard}
-      />
+      {/* Mutation dialogs are fork-only. In upstream mode the drawer
+          passes `actions: null`, so these dialogs can never open — we
+          skip mounting them entirely to keep the read-only view honest. */}
+      {!isUpstream && (
+        <>
+          <MarkDoneDialog
+            wastelandId={wastelandId}
+            item={doneItem}
+            onClose={() => setDoneItem(null)}
+            onSuccess={invalidateBoard}
+          />
+          <AcceptDialog
+            wastelandId={wastelandId}
+            item={acceptItem}
+            onClose={() => setAcceptItem(null)}
+            onSuccess={invalidateBoard}
+          />
+          <RejectDialog
+            wastelandId={wastelandId}
+            item={rejectItem}
+            onClose={() => setRejectItem(null)}
+            onSuccess={invalidateBoard}
+          />
+          <CloseItemDialog
+            wastelandId={wastelandId}
+            item={closeItem}
+            onClose={() => setCloseItem(null)}
+            onSuccess={invalidateBoard}
+          />
+          <UnclaimDialog
+            wastelandId={wastelandId}
+            item={unclaimItem}
+            onClose={() => setUnclaimItem(null)}
+            onSuccess={invalidateBoard}
+          />
+          <PostWantedItemDialog
+            wastelandId={wastelandId}
+            open={showPostDialog}
+            onClose={() => setShowPostDialog(false)}
+            onSuccess={invalidateBoard}
+          />
+        </>
+      )}
     </div>
   );
 }

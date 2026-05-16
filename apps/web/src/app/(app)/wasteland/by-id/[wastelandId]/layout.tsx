@@ -9,6 +9,16 @@ import { renderWastelandDrawerContent } from '@/components/wasteland/drawer/rend
 import { WastelandDashboardHeader } from './WastelandDashboardHeader';
 import { WastelandPageHeaderProvider } from './WastelandPageHeaderContext';
 
+/**
+ * Layout for /wasteland/by-id/[wastelandId]/... — the legacy
+ * UUID-keyed wasteland tree.
+ *
+ * The owner/repo-keyed M2.2 tree lives at /wasteland/[owner]/[repo]/...
+ * (a separate sibling under /wasteland/). Legacy URLs in the form
+ * `/wasteland/<uuid>/<rest>` are rewritten to `/wasteland/by-id/<uuid>/<rest>`
+ * by the root `middleware.ts`, so existing links keep working without
+ * needing any UUID-detection branching here.
+ */
 export default function WastelandLayout({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [trpcClient] = useState(() => createWastelandTRPCClient());

@@ -1,5 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { WantedBoardClient } from '@/app/(app)/wasteland/[wastelandId]/wanted/WantedBoardClient';
+import { WantedBoardClient } from '@/app/(app)/wasteland/by-id/[wastelandId]/wanted/WantedBoardClient';
 
 export default async function OrgWantedBoardPage({
   params,

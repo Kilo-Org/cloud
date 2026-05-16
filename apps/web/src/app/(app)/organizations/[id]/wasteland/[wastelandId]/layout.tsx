@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { WastelandTRPCProvider, createWastelandTRPCClient } from '@/lib/wasteland/trpc';
 import { HideAppTopbar } from '@/components/gastown/HideAppTopbar';
-import { WastelandDashboardHeader } from '@/app/(app)/wasteland/[wastelandId]/WastelandDashboardHeader';
-import { WastelandPageHeaderProvider } from '@/app/(app)/wasteland/[wastelandId]/WastelandPageHeaderContext';
+import { WastelandDashboardHeader } from '@/app/(app)/wasteland/by-id/[wastelandId]/WastelandDashboardHeader';
+import { WastelandPageHeaderProvider } from '@/app/(app)/wasteland/by-id/[wastelandId]/WastelandPageHeaderContext';
 
 export default function OrgWastelandLayout({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();

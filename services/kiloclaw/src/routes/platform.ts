@@ -4526,4 +4526,240 @@ platform.post('/scheduled-action/run-notice-sweep', async c => {
   }
 });
 
+// ─── Firefly–Kilo Seam: Target Picker API ──────────────────────────────
+//
+// Firefly owns the target picker UX. Kilo owns the target registry and health.
+// These endpoints let Firefly list available targets, check health, and derive
+// gateway tokens for authenticated access to Kilo instances.
+
+/**
+ * Query params for listing targets. At least one of userId or orgId is required.
+ */
+const TargetListQuerySchema = z
+  .object({
+    userId: z.string().uuid().optional(),
+    orgId: z.string().uuid().optional(),
+  })
+  .refine(data => data.userId || data.orgId, {
+    message: 'At least one of userId or orgId is required',
+  });
+
+type TargetSummary = {
+  instanceId: string;
+  name: string | null;
+  status: InstanceStatus;
+  provider: ProviderId;
+  instanceType: string | null;
+  organizationId: string | null;
+  createdAt: string | null;
+  destroyedAt: string | null;
+};
+
+/**
+ * GET /api/platform/targets?userId=...&orgId=...
+ *
+ * List all KiloClaw instances for the given owner (personal or org).
+ * Returns Postgres instance rows combined with live DO status where available.
+ */
+platform.get('/targets', async c => {
+  const parsed = TargetListQuerySchema.safeParse({
+    userId: c.req.query('userId'),
+    orgId: c.req.query('orgId'),
+  });
+  if (!parsed.success) {
+    return jsonError(parsed.error.message || 'Invalid query params', 400);
+  }
+
+  const { userId, orgId } = parsed.data;
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+
+  const instances: {
+    id: string;
+    sandbox_id: string;
+    user_id: string;
+    organization_id: string | null;
+    provider: ProviderId;
+    instance_type: string | null;
+    name: string | null;
+    created_at: string | null;
+    destroyed_at: string | null;
+  }[] = await (async () => {
+    if (!connectionString) {
+      return [];
+    }
+    const db = getWorkerDb(connectionString);
+
+    let rows: typeof instances;
+    if (userId) {
+      rows = await db
+        .select({
+          id: kiloclaw_instances.id,
+          sandbox_id: kiloclaw_instances.sandbox_id,
+          user_id: kiloclaw_instances.user_id,
+          organization_id: kiloclaw_instances.organization_id,
+          provider: kiloclaw_instances.provider,
+          instance_type: kiloclaw_instances.instance_type,
+          name: kiloclaw_instances.name,
+          created_at: kiloclaw_instances.created_at,
+          destroyed_at: kiloclaw_instances.destroyed_at,
+        })
+        .from(kiloclaw_instances)
+        .where(
+          and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.organization_id))
+        )
+        .orderBy(kiloclaw_instances.created_at);
+    } else if (orgId) {
+      rows = await db
+        .select({
+          id: kiloclaw_instances.id,
+          sandbox_id: kiloclaw_instances.sandbox_id,
+          user_id: kiloclaw_instances.user_id,
+          organization_id: kiloclaw_instances.organization_id,
+          provider: kiloclaw_instances.provider,
+          instance_type: kiloclaw_instances.instance_type,
+          name: kiloclaw_instances.name,
+          created_at: kiloclaw_instances.created_at,
+          destroyed_at: kiloclaw_instances.destroyed_at,
+        })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.organization_id, orgId))
+        .orderBy(kiloclaw_instances.created_at);
+    } else {
+      rows = [];
+    }
+    return rows;
+  })().catch(err => {
+    console.warn('[platform/targets] Failed to query Postgres:', err);
+    return [];
+  });
+
+  // Build summaries: try to enrich each instance with live DO status
+  const targets: TargetSummary[] = await Promise.all(
+    instances.map(async row => {
+      const instanceId = row.id;
+      const doKey = instanceId; // multi-instance: DO keyed by instanceId
+
+      let status: InstanceStatus = 'stopped';
+      try {
+        const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
+        const statusResult = await stub.getStatus();
+        status = statusResult.status ?? 'stopped';
+      } catch {
+        // DO unreachable — fall back to Postgres destroyed status
+        if (row.destroyed_at) {
+          status = 'destroying';
+        }
+      }
+
+      return {
+        instanceId: row.id,
+        name: row.name,
+        status,
+        provider: row.provider,
+        instanceType: row.instance_type,
+        organizationId: row.organization_id,
+        createdAt: row.created_at,
+        destroyedAt: row.destroyed_at,
+      } satisfies TargetSummary;
+    })
+  );
+
+  return c.json({ targets, ownerKey: userId ?? `org:${orgId}` });
+});
+
+/**
+ * GET /api/platform/targets/:instanceId/health?userId=...
+ *
+ * Detailed health check for a specific instance.
+ * Combines DO status with provider routing info.
+ */
+const InstanceHealthQuerySchema = z.object({
+  userId: z.string().min(1),
+});
+
+platform.get('/targets/:instanceId/health', async c => {
+  const instanceIdParsed = z.object({ instanceId: InstanceIdParam }).safeParse({
+    instanceId: c.req.param('instanceId'),
+  });
+  if (!instanceIdParsed.success) {
+    return jsonError('Invalid instanceId', 400);
+  }
+  const { instanceId } = instanceIdParsed.data;
+
+  const queryParsed = InstanceHealthQuerySchema.safeParse({
+    userId: c.req.query('userId'),
+  });
+  if (!queryParsed.success) {
+    return jsonError('Missing or invalid userId', 400);
+  }
+  const { userId } = queryParsed.data;
+
+  const doKey = await resolveInstanceDoKey(c.env, userId, instanceId);
+
+  const doStatus = await withResolvedDORetry(
+    c.env,
+    userId,
+    instanceId,
+    stub => stub.getStatus(),
+    'getStatus'
+  );
+
+  return c.json({
+    instanceId,
+    doKey,
+    status: doStatus.status,
+    provider: doStatus.provider,
+    sandboxId: doStatus.sandboxId,
+    userId: doStatus.userId,
+  });
+});
+
+/**
+ * POST /api/platform/targets/:instanceId/gateway-token?userId=...
+ *
+ * Derive a gateway token for Firefly to authenticate to a Kilo instance.
+ * The token is HMAC-SHA256(sandboxId, GATEWAY_TOKEN_SECRET).
+ */
+platform.post('/targets/:instanceId/gateway-token', async c => {
+  const instanceIdParsed = z.object({ instanceId: InstanceIdParam }).safeParse({
+    instanceId: c.req.param('instanceId'),
+  });
+  if (!instanceIdParsed.success) {
+    return jsonError('Invalid instanceId', 400);
+  }
+  const { instanceId } = instanceIdParsed.data;
+
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return jsonError('Missing or invalid userId', 400);
+  }
+
+  const gatewayTokenSecret = c.env.GATEWAY_TOKEN_SECRET;
+  if (!gatewayTokenSecret) {
+    return jsonError('GATEWAY_TOKEN_SECRET is not configured', 503);
+  }
+
+  // Resolve DO to get sandboxId
+  const doStatus = await withResolvedDORetry(
+    c.env,
+    userId,
+    instanceId,
+    stub => stub.getStatus(),
+    'getStatus'
+  );
+
+  const sandboxId = doStatus.sandboxId;
+  if (!sandboxId) {
+    return jsonError('Instance has no sandboxId', 500);
+  }
+
+  const token = await deriveGatewayToken(sandboxId, gatewayTokenSecret);
+
+  return c.json({
+    instanceId,
+    sandboxId,
+    token,
+  });
+});
+
 export { platform };

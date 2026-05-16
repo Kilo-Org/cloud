@@ -14,13 +14,16 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/wl-sdk/src"
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/wl-sdk/src",
+    "generate": "tsx scripts/generate-from-schema.ts",
+    "generate:check": "tsx scripts/generate-from-schema.ts && git diff --exit-code -- src/commons/schema.generated.ts src/commons/dml.generated.ts"
   },
   "dependencies": {
     "zod": "catalog:"
   },
   "devDependencies": {
     "@typescript/native-preview": "catalog:",
+    "tsx": "^4.21.0",
     "typescript": "catalog:",
     "vitest": "~3.2.4"
   }

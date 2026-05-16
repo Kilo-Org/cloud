@@ -1,12 +1,10 @@
-import { ComingSoonPlaceholder } from '../_components/ComingSoonPlaceholder';
+import { SettingsClient } from './SettingsClient';
 
-// TODO M2.5: replace with the wasteland settings view (connection, members, visibility).
+/**
+ * Wasteland settings page (owner/repo tree). Auth and feature-flag gating
+ * are enforced by the parent layout; the resolved `wastelandId` is
+ * provided through `WastelandRepoProvider` and read inside the client.
+ */
 export default function WastelandRepoSettingsPage() {
-  return (
-    <ComingSoonPlaceholder
-      title="Settings"
-      description="Connection settings, members, visibility, and credentials for this wasteland."
-      milestone="M2.5"
-    />
-  );
+  return <SettingsClient />;
 }

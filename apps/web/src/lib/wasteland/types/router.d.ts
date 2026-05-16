@@ -44,6 +44,25 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
+    joinWasteland: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        rigHandle: string;
+        rigDisplayName?: string | undefined;
+        rigEmail?: string | undefined;
+      };
+      output: {
+        forkOwner: string;
+        forkRepo: string;
+        forkUrl: string;
+        rigHandle: string;
+        registrationBranch: string;
+        registrationPullId: string | null;
+        registrationPullUrl: string | null;
+        alreadyJoined: boolean;
+      };
+      meta: object;
+    }>;
     listWastelands: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         organizationId?: string | undefined;
@@ -864,6 +883,25 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
           output: {
             success: boolean;
             databaseCreated: boolean;
+          };
+          meta: object;
+        }>;
+        joinWasteland: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+            rigHandle: string;
+            rigDisplayName?: string | undefined;
+            rigEmail?: string | undefined;
+          };
+          output: {
+            forkOwner: string;
+            forkRepo: string;
+            forkUrl: string;
+            rigHandle: string;
+            registrationBranch: string;
+            registrationPullId: string | null;
+            registrationPullUrl: string | null;
+            alreadyJoined: boolean;
           };
           meta: object;
         }>;

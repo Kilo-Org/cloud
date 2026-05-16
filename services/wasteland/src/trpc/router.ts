@@ -19,6 +19,7 @@ import { fetchFreshDoltHubToken } from '../util/dolthub-token.util';
 import * as wantedBoard from '../wanted-board/dispatcher';
 import { WantedBoardOpError } from '../wanted-board/wanted-board-ops';
 import * as branchOps from '../branch-ops/branch-ops';
+import * as lifecycleOps from '../lifecycle-ops/lifecycle-ops';
 import * as doltApi from '../util/dolthub-api.util';
 import * as inbox from '../inbox/inbox-classifier';
 import {
@@ -425,6 +426,57 @@ export const wastelandRouter = router({
       });
 
       return { success: true, databaseCreated: result.databaseCreated };
+    }),
+
+  // ── Join Wasteland (M2.7 explicit fork+register ceremony) ───────────
+  // Runs `WlClient.join()` on behalf of the caller: forks the upstream
+  // to the user's DoltHub account, writes the rig registration row to
+  // `wl/register/<handle>`, and opens the registration PR. After the
+  // ceremony succeeds we persist the verified rig handle onto the
+  // wasteland's stored credential so subsequent ops resolve the same
+  // handle the join PR was opened under.
+  //
+  // Idempotent: re-running with the same handle returns the existing
+  // PR (the SDK handles fork-already-exists, registration write uses
+  // ON DUPLICATE KEY UPDATE, and an open PR matching the title is
+  // returned rather than re-opened).
+
+  joinWasteland: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        rigHandle: z
+          .string()
+          .min(1)
+          .max(64)
+          .regex(/^[a-z0-9_-]+$/, 'rigHandle must be lowercase letters/digits/_-'),
+        rigDisplayName: z.string().min(1).max(128).optional(),
+        rigEmail: z.string().email().optional(),
+      })
+    )
+    .output(
+      z.object({
+        forkOwner: z.string(),
+        forkRepo: z.string(),
+        forkUrl: z.string(),
+        rigHandle: z.string(),
+        registrationBranch: z.string(),
+        registrationPullId: z.string().nullable(),
+        registrationPullUrl: z.string().nullable(),
+        alreadyJoined: z.boolean(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      try {
+        return await lifecycleOps.joinWasteland(ctx.env, input.wastelandId, ctx.userId, {
+          rigHandle: input.rigHandle,
+          rigDisplayName: input.rigDisplayName,
+          rigEmail: input.rigEmail,
+        });
+      } catch (err) {
+        return wantedBoardErrorToTRPC(err);
+      }
     }),
 
   // ── List ────────────────────────────────────────────────────────────

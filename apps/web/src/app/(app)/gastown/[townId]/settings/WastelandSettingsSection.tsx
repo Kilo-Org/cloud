@@ -475,6 +475,23 @@ function ConnectWastelandDialog({
           upstream,
           rigHandle,
         });
+      } else if (intent.kind === 'commons' || intent.kind === 'connect') {
+        // 3b. Run the explicit fork-and-register ceremony (M2.7).
+        // The previous flow stored credentials and called `connectKiloTown`
+        // without ever forking the upstream or opening the registration
+        // PR — those happened lazily on the first wanted-board op. The
+        // dedicated `joinWasteland` procedure makes the ceremony explicit
+        // and surfaces the registration PR up front.
+        // TODO(M2.7-ui): refactor this dialog to a 5-step wizard (intent
+        // → credentials → rig handle → preview → success) matching the
+        // standalone `/wasteland/new` flow. For now we keep the existing
+        // 3-step wizard and bolt on the join call here so the gastown
+        // path produces the same server-side result as the standalone
+        // wizard.
+        await wastelandClient.wasteland.joinWasteland.mutate({
+          wastelandId,
+          rigHandle,
+        });
       }
 
       // 4. Persist the town↔wasteland association on the Town DO.

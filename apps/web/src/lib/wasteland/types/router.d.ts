@@ -351,6 +351,61 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
+    listMyForkBranches: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        wastelandId: string;
+      };
+      output: Array<{
+        branchName: string;
+        wantedId: string;
+        wantedTitle: string | null;
+        wantedStatusOnBranch: 'open' | 'claimed' | 'in_review' | 'completed' | 'unknown';
+        wantedStatusOnMain: 'open' | 'claimed' | 'in_review' | 'completed' | 'unknown';
+        divergence: 'in-sync' | 'ahead' | 'diverged';
+        hasOpenPR: boolean;
+        prUrl: string | null;
+        lastCommitAt: string | null;
+      }>;
+      meta: object;
+    }>;
+    discardBranch: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        wantedId: string;
+      };
+      output: {
+        success: boolean;
+      };
+      meta: object;
+    }>;
+    publishBranch: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        wantedId: string;
+      };
+      output: {
+        prUrl: string;
+        prId: string;
+      };
+      meta: object;
+    }>;
+    listMyPulls: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        wastelandId: string;
+      };
+      output: Array<{
+        pullId: string;
+        title: string;
+        state: 'open' | 'closed' | 'merged';
+        branchName: string | null;
+        fromBranchOwner: string | null;
+        createdAt: string | null;
+        updatedAt: string | null;
+        mergeable: boolean;
+        dolthubUrl: string;
+      }>;
+      meta: object;
+    }>;
     claimWantedItem: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         wastelandId: string;
@@ -1117,6 +1172,61 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
               updated_at: string | null;
             }>;
           };
+          meta: object;
+        }>;
+        listMyForkBranches: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            wastelandId: string;
+          };
+          output: Array<{
+            branchName: string;
+            wantedId: string;
+            wantedTitle: string | null;
+            wantedStatusOnBranch: 'open' | 'claimed' | 'in_review' | 'completed' | 'unknown';
+            wantedStatusOnMain: 'open' | 'claimed' | 'in_review' | 'completed' | 'unknown';
+            divergence: 'in-sync' | 'ahead' | 'diverged';
+            hasOpenPR: boolean;
+            prUrl: string | null;
+            lastCommitAt: string | null;
+          }>;
+          meta: object;
+        }>;
+        discardBranch: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+            wantedId: string;
+          };
+          output: {
+            success: boolean;
+          };
+          meta: object;
+        }>;
+        publishBranch: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+            wantedId: string;
+          };
+          output: {
+            prUrl: string;
+            prId: string;
+          };
+          meta: object;
+        }>;
+        listMyPulls: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            wastelandId: string;
+          };
+          output: Array<{
+            pullId: string;
+            title: string;
+            state: 'open' | 'closed' | 'merged';
+            branchName: string | null;
+            fromBranchOwner: string | null;
+            createdAt: string | null;
+            updatedAt: string | null;
+            mergeable: boolean;
+            dolthubUrl: string;
+          }>;
           meta: object;
         }>;
         claimWantedItem: import('@trpc/server').TRPCMutationProcedure<{

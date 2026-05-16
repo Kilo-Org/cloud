@@ -18,6 +18,7 @@ import { meterEvent } from '../util/billing.util';
 import { fetchFreshDoltHubToken } from '../util/dolthub-token.util';
 import * as wantedBoard from '../wanted-board/dispatcher';
 import { WantedBoardOpError } from '../wanted-board/wanted-board-ops';
+import * as branchOps from '../branch-ops/branch-ops';
 import * as doltApi from '../util/dolthub-api.util';
 import * as inbox from '../inbox/inbox-classifier';
 import {
@@ -34,6 +35,9 @@ import {
   RpcUpstreamRigOutput,
   RpcRigDetailOutput,
   RpcRigActivityOutput,
+  RpcForkBranchOutput,
+  RpcMyPullOutput,
+  RpcPublishBranchOutput,
   WantedBoardRowOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
@@ -1080,6 +1084,105 @@ export const wastelandRouter = router({
         return { items };
       } catch {
         return { items: [] };
+      }
+    }),
+
+  // ── Workshop: list the user's fork branches ────────────────────────
+  // Powers the fork (workshop) view. Returns one row per
+  // `wl/<rigHandle>/*` branch on the caller's fork, cross-referenced
+  // with upstream `main` and the branch tip so the UI can render
+  // status pairs and divergence chips.
+  listMyForkBranches: procedure
+    .input(z.object({ wastelandId: z.string().uuid() }))
+    .output(z.array(RpcForkBranchOutput))
+    .query(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      try {
+        return await branchOps.listMyForkBranches(ctx.env, input.wastelandId, ctx.userId);
+      } catch (err) {
+        if (err instanceof WantedBoardOpError) {
+          // No upstream / no credential → empty workshop, not an error.
+          if (err.code === 'PRECONDITION_FAILED') return [];
+        }
+        return wantedBoardErrorToTRPC(err);
+      }
+    }),
+
+  // ── Workshop: discard a branch ──────────────────────────────────────
+  // Deletes the user's `wl/<rigHandle>/<wantedId>` branch on the fork.
+  // Idempotent: a missing branch resolves successfully.
+  discardBranch: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        wantedId: z
+          .string()
+          .min(1)
+          .max(64)
+          .regex(/^[A-Za-z0-9_.:-]+$/, 'wantedId must be 1-64 chars, letters/digits/_-.:'),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      try {
+        return await branchOps.discardBranch(
+          ctx.env,
+          input.wastelandId,
+          ctx.userId,
+          input.wantedId
+        );
+      } catch (err) {
+        return wantedBoardErrorToTRPC(err);
+      }
+    }),
+
+  // ── Workshop: publish a branch ──────────────────────────────────────
+  // Opens or updates a PR for the user's `wl/<rigHandle>/<wantedId>`
+  // branch. Idempotent: returns the existing PR's URL when one is
+  // already open against the upstream.
+  publishBranch: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        wantedId: z
+          .string()
+          .min(1)
+          .max(64)
+          .regex(/^[A-Za-z0-9_.:-]+$/, 'wantedId must be 1-64 chars, letters/digits/_-.:'),
+      })
+    )
+    .output(RpcPublishBranchOutput)
+    .mutation(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      try {
+        return await branchOps.publishBranch(
+          ctx.env,
+          input.wastelandId,
+          ctx.userId,
+          input.wantedId
+        );
+      } catch (err) {
+        return wantedBoardErrorToTRPC(err);
+      }
+    }),
+
+  // ── Pulls: list the user's PRs against upstream ────────────────────
+  // Powers the Mine tab on the pulls page. Filters all upstream pulls
+  // down to those whose source branch is owned by the caller's fork.
+  listMyPulls: procedure
+    .input(z.object({ wastelandId: z.string().uuid() }))
+    .output(z.array(RpcMyPullOutput))
+    .query(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      try {
+        return await branchOps.listMyPulls(ctx.env, input.wastelandId, ctx.userId);
+      } catch (err) {
+        if (err instanceof WantedBoardOpError) {
+          // No upstream / no credential → empty list, not an error.
+          if (err.code === 'PRECONDITION_FAILED') return [];
+        }
+        return wantedBoardErrorToTRPC(err);
       }
     }),
 

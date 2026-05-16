@@ -201,6 +201,45 @@ export const RigActivityOutput = z.object({
   stamps_received: z.array(StampOutput),
 });
 
+// ── Workshop: fork branch entry ────────────────────────────────────────
+// Powers the fork (workshop) view at /wasteland/:owner/:repo/fork.
+// One row per `wl/<rigHandle>/<wantedId>` branch on the user's fork,
+// cross-referenced with upstream `main` and the branch tip.
+
+export const ForkBranchOutput = z.object({
+  branchName: z.string(),
+  wantedId: z.string(),
+  wantedTitle: z.string().nullable(),
+  wantedStatusOnBranch: z.enum(['open', 'claimed', 'in_review', 'completed', 'unknown']),
+  wantedStatusOnMain: z.enum(['open', 'claimed', 'in_review', 'completed', 'unknown']),
+  divergence: z.enum(['in-sync', 'ahead', 'diverged']),
+  hasOpenPR: z.boolean(),
+  prUrl: z.string().nullable(),
+  lastCommitAt: z.string().nullable(),
+});
+
+// ── Pulls: a PR the caller authored against upstream ───────────────────
+// Powers the "Mine" tab on /wasteland/:owner/:repo/pulls.
+
+export const MyPullOutput = z.object({
+  pullId: z.string(),
+  title: z.string(),
+  state: z.enum(['open', 'closed', 'merged']),
+  branchName: z.string().nullable(),
+  fromBranchOwner: z.string().nullable(),
+  createdAt: z.string().nullable(),
+  updatedAt: z.string().nullable(),
+  mergeable: z.boolean(),
+  dolthubUrl: z.string(),
+});
+
+// ── Publish (open or update PR) result ─────────────────────────────────
+
+export const PublishBranchOutput = z.object({
+  prUrl: z.string(),
+  prId: z.string(),
+});
+
 // ── Admin: Review inbox items ──────────────────────────────────────────
 // Discriminated union matching the `InboxItem` type from
 // `../inbox/inbox-classifier`. Each kind renders as a distinct card in
@@ -308,3 +347,6 @@ export const RpcRigDetailOutput = rpcSafe(RigDetailOutput);
 export const RpcCompletionOutput = rpcSafe(CompletionOutput);
 export const RpcStampOutput = rpcSafe(StampOutput);
 export const RpcRigActivityOutput = rpcSafe(RigActivityOutput);
+export const RpcForkBranchOutput = rpcSafe(ForkBranchOutput);
+export const RpcMyPullOutput = rpcSafe(MyPullOutput);
+export const RpcPublishBranchOutput = rpcSafe(PublishBranchOutput);

@@ -1,12 +1,10 @@
-import { ComingSoonPlaceholder } from '../_components/ComingSoonPlaceholder';
+import { ForkClient } from './ForkClient';
 
-// TODO M2.3: replace with the fork / workshop view.
+/**
+ * Fork (workshop) page — the user's `wl/<rigHandle>/*` branches on
+ * their DoltHub fork. Auth is enforced by the parent layout; this is a
+ * thin server boundary that hands off to the client.
+ */
 export default function WastelandRepoForkPage() {
-  return (
-    <ComingSoonPlaceholder
-      title="Your fork"
-      description="Your personal workspace for claiming items, drafting work, and shipping contributions back upstream."
-      milestone="M2.3"
-    />
-  );
+  return <ForkClient />;
 }

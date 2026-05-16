@@ -156,6 +156,9 @@ export function ForkClient() {
                       type: 'wanted-item-by-id',
                       wastelandId: repo.wastelandId,
                       itemId: branch.wantedId,
+                      // Fork view → land on the My branch tab, where
+                      // the publish/discard affordances live.
+                      initialTab: 'branch',
                     })
                   }
                   onPublish={() =>

@@ -17,6 +17,7 @@ export function renderWastelandDrawerContent(
           item={entry.item}
           actions={entry.actions}
           push={helpers.push}
+          initialTab={entry.initialTab}
         />
       );
     case 'wanted-item-by-id':
@@ -25,6 +26,7 @@ export function renderWastelandDrawerContent(
           wastelandId={entry.wastelandId}
           itemId={entry.itemId}
           push={helpers.push}
+          initialTab={entry.initialTab}
         />
       );
     case 'review-item':

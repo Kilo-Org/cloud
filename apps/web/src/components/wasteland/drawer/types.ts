@@ -22,6 +22,17 @@ export type WantedPanelActions = {
   onUnclaim: (item: WantedItem) => void;
 };
 
+/**
+ * Which of the three "places" the drawer should open on. Mirrors the
+ * three-place model (upstream / fork / pulls) — each surface that opens
+ * the drawer should pick the tab that matches the place the user is in.
+ *
+ * Falls back to `upstream` when the requested tab isn't actually
+ * available for the current item (e.g. `branch` requested but the user
+ * has no branch).
+ */
+export type WantedItemTab = 'upstream' | 'branch' | 'pull';
+
 export type ReviewPanelActions = {
   upstream: string | null;
   busy: boolean;
@@ -36,11 +47,15 @@ export type WastelandDrawerRef =
       wastelandId: string;
       item: WantedItem;
       actions: WantedPanelActions | null;
+      /** Default tab. Falls back to `upstream` when unavailable. */
+      initialTab?: WantedItemTab;
     }
   | {
       type: 'wanted-item-by-id';
       wastelandId: string;
       itemId: string;
+      /** Default tab. Falls back to `upstream` when unavailable. */
+      initialTab?: WantedItemTab;
     }
   | {
       type: 'review-item';

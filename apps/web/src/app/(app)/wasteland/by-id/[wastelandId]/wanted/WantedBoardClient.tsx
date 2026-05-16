@@ -299,6 +299,11 @@ export function WantedBoardClient({
               onCloseItem: setCloseItem,
               onUnclaim: setUnclaimItem,
             },
+        // Default-tab selection: the upstream view opens on Upstream
+        // (read-only), the legacy fork view opens on My branch so the
+        // user lands on actionable affordances. The drawer falls back
+        // to Upstream when a requested tab isn't available.
+        initialTab: isUpstream ? 'upstream' : 'branch',
       });
     },
     [openDrawer, wastelandId, isAdmin, isUpstream]

@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react';
 import type { DrawerStackHelpers } from '@/components/drawer';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import { WantedItemPanel } from './WantedItemPanel';
-import type { WastelandDrawerRef } from './types';
+import type { WantedItemTab, WastelandDrawerRef } from './types';
 
 /**
  * Fetches a wanted item by id and defers to WantedItemPanel once loaded.
@@ -17,10 +17,12 @@ export function WantedItemByIdPanel({
   wastelandId,
   itemId,
   push,
+  initialTab,
 }: {
   wastelandId: string;
   itemId: string;
   push: DrawerStackHelpers<WastelandDrawerRef>['push'];
+  initialTab?: WantedItemTab;
 }) {
   const trpc = useWastelandTRPC();
   const query = useQuery(trpc.wasteland.getWantedItem.queryOptions({ wastelandId, itemId }));
@@ -56,5 +58,13 @@ export function WantedItemByIdPanel({
     );
   }
 
-  return <WantedItemPanel wastelandId={wastelandId} item={query.data} actions={null} push={push} />;
+  return (
+    <WantedItemPanel
+      wastelandId={wastelandId}
+      item={query.data}
+      actions={null}
+      push={push}
+      initialTab={initialTab}
+    />
+  );
 }

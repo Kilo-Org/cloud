@@ -1,0 +1,170 @@
+/**
+ * `browse` — branch-aware wanted-board read.
+ *
+ * Reads upstream `main`, then overlays the caller's `wl/<rig>/*` fork
+ * branches. The result identifies, per wanted id, both the upstream
+ * row (if any) and the forked branch row (if any), so callers can
+ * render "in-flight" state alongside the canonical board.
+ *
+ * Mirrors `BrowseWantedBranchAware` (`commons/queries.go:598`) and
+ * `Client.BrowseContext` (`sdk/reads.go:87`).
+ */
+
+import { z } from 'zod';
+import { doltRead } from '../dolthub/read';
+import { listBranches } from '../dolthub/branches';
+import { escapeSqlString } from '../commons/escape';
+import { WantedRowSchema, type WantedRow } from '../commons/schema.generated';
+import { parseWlBranch, rigBranchPrefix } from './branch';
+import type { DoltHubAuth, DoltFetchHooks } from '../dolthub/api';
+import type { RigHandle, WastelandRef, WlResult } from './types';
+import { WlError } from './types';
+
+export type BrowseFilter = {
+  status?: string;
+  project?: string;
+  type?: string;
+  /** Numeric priority filter (0..3). Omit to disable. */
+  priority?: number;
+  postedBy?: string;
+  claimedBy?: string;
+  /** Free-text search across title/description/tags. */
+  search?: string;
+  /** ISO8601 / SQL timestamp string; rows with `updated_at >= since`. */
+  since?: string;
+  /** Defaults to 50, matching the Go reference. */
+  limit?: number;
+};
+
+/**
+ * One row in the browse result. `upstream` is the row on upstream
+ * `main`; `fork` is the row on the caller's mutation branch. At
+ * least one of them is non-null. `source` reflects which one to
+ * render as the effective state — "fork" when a branch row exists
+ * and differs from upstream.
+ */
+export type BrowseEntry = {
+  wantedId: string;
+  upstream: WantedRow | null;
+  fork: { row: WantedRow; branchName: string } | null;
+  source: 'main' | 'fork';
+};
+
+export type BrowseOptions = {
+  auth: DoltHubAuth;
+  upstream: WastelandRef;
+  fork: { forkOwner: string; forkDb: string };
+  rigHandle: RigHandle;
+  filter?: BrowseFilter;
+  fetch?: typeof fetch;
+  hooks?: DoltFetchHooks;
+};
+
+const RowSchema = WantedRowSchema;
+
+function buildBrowseSql(filter: BrowseFilter | undefined): string {
+  const conditions: string[] = [];
+  if (filter?.status) conditions.push(`status = '${escapeSqlString(filter.status)}'`);
+  if (filter?.project) conditions.push(`project = '${escapeSqlString(filter.project)}'`);
+  if (filter?.type) conditions.push(`type = '${escapeSqlString(filter.type)}'`);
+  if (filter?.priority !== undefined && filter.priority >= 0) {
+    conditions.push(`priority = ${filter.priority}`);
+  }
+  if (filter?.postedBy) conditions.push(`posted_by = '${escapeSqlString(filter.postedBy)}'`);
+  if (filter?.claimedBy) conditions.push(`claimed_by = '${escapeSqlString(filter.claimedBy)}'`);
+  if (filter?.since) conditions.push(`updated_at >= '${escapeSqlString(filter.since)}'`);
+  if (filter?.search) {
+    const s = escapeSqlString(filter.search).replace(/%/g, '\\%').replace(/_/g, '\\_');
+    conditions.push(
+      `(title LIKE '%${s}%' OR COALESCE(description,'') LIKE '%${s}%' OR COALESCE(tags,'') LIKE '%${s}%')`
+    );
+  }
+
+  const limit = filter?.limit && filter.limit > 0 ? filter.limit : 50;
+  let sql = 'SELECT * FROM wanted';
+  if (conditions.length > 0) sql += ` WHERE ${conditions.join(' AND ')}`;
+  sql += ` ORDER BY priority ASC, created_at DESC LIMIT ${limit}`;
+  return sql;
+}
+
+export async function browse(opts: BrowseOptions): Promise<WlResult<BrowseEntry[]>> {
+  try {
+    const sql = buildBrowseSql(opts.filter);
+
+    // 1. Upstream main rows.
+    const mainRes = await doltRead({
+      auth: opts.auth,
+      owner: opts.upstream.owner,
+      db: opts.upstream.db,
+      // No ref: take advantage of the anonymous-fallback in
+      // doltRead so this works even with a user token whose
+      // identity differs from the upstream owner.
+      query: sql,
+      fetch: opts.fetch,
+      hooks: opts.hooks,
+    });
+    const mainRows = z.array(RowSchema).parse(mainRes.rows);
+    const byId = new Map<string, BrowseEntry>();
+    for (const row of mainRows) {
+      byId.set(row.id, { wantedId: row.id, upstream: row, fork: null, source: 'main' });
+    }
+
+    // 2. Caller's fork branches: list, filter to `wl/<rig>/*`, then
+    //    read each branch's wanted row.
+    const branches = await listBranches({
+      auth: opts.auth,
+      owner: opts.fork.forkOwner,
+      db: opts.fork.forkDb,
+      fetch: opts.fetch,
+      hooks: opts.hooks,
+    }).catch(() => []);
+
+    const prefix = rigBranchPrefix(opts.rigHandle);
+    const myBranches = branches.filter(b => b.branch_name.startsWith(prefix));
+
+    await Promise.all(
+      myBranches.map(async branch => {
+        const parsed = parseWlBranch(branch.branch_name);
+        if (parsed === null || parsed.kind !== 'wanted') return;
+        const branchSql = `SELECT * FROM wanted WHERE id = '${escapeSqlString(parsed.wantedId)}' LIMIT 1`;
+        try {
+          const branchRes = await doltRead({
+            auth: opts.auth,
+            owner: opts.fork.forkOwner,
+            db: opts.fork.forkDb,
+            ref: branch.branch_name,
+            query: branchSql,
+            fetch: opts.fetch,
+            hooks: opts.hooks,
+          });
+          if (branchRes.rows.length === 0) return;
+          const row = RowSchema.parse(branchRes.rows[0]);
+          const existing = byId.get(parsed.wantedId);
+          const forkInfo = { row, branchName: branch.branch_name };
+          if (existing) {
+            existing.fork = forkInfo;
+            existing.source = 'fork';
+          } else {
+            // Branch-only item — appears in result but has no
+            // upstream counterpart yet (e.g. a freshly `post`ed
+            // wanted that hasn't merged into main).
+            byId.set(parsed.wantedId, {
+              wantedId: parsed.wantedId,
+              upstream: null,
+              fork: forkInfo,
+              source: 'fork',
+            });
+          }
+        } catch {
+          // Branch read failed — skip; the upstream entry (if any)
+          // remains visible.
+        }
+      })
+    );
+
+    return { ok: true, data: Array.from(byId.values()) };
+  } catch (err) {
+    if (err instanceof WlError) return { ok: false, error: err };
+    return { ok: false, error: new WlError('browse failed', 'upstream', err) };
+  }
+}

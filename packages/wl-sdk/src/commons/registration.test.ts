@@ -11,7 +11,7 @@ describe('buildRegistrationDML', () => {
       version: '0.1.0',
     });
     expect(sql).toBe(
-      "INSERT INTO rigs (handle, display_name, dolthub_org, hop_uri, owner_email, gt_version, trust_level, registered_at, last_seen) " +
+      'INSERT INTO rigs (handle, display_name, dolthub_org, hop_uri, owner_email, gt_version, trust_level, registered_at, last_seen) ' +
         "VALUES ('alice', 'Alice', 'alice-org', 'hop://a@b.com/alice/', 'a@b.com', '0.1.0', 1, NOW(), NOW()) " +
         "ON DUPLICATE KEY UPDATE display_name = 'Alice', dolthub_org = 'alice-org', hop_uri = 'hop://a@b.com/alice/', owner_email = 'a@b.com', gt_version = '0.1.0', last_seen = NOW()"
     );
@@ -53,8 +53,7 @@ describe('buildRegistrationDML', () => {
     });
     // Exactly two occurrences of each non-handle field — once each in
     // VALUES and ON DUPLICATE KEY UPDATE.
-    const count = (haystack: string, needle: string): number =>
-      haystack.split(needle).length - 1;
+    const count = (haystack: string, needle: string): number => haystack.split(needle).length - 1;
     expect(count(sql, "'D'")).toBe(2); // displayName
     expect(count(sql, "'O'")).toBe(2); // dolthubOrg
     expect(count(sql, "'e@x'")).toBe(2); // ownerEmail

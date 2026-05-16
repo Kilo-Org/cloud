@@ -131,5 +131,3 @@ export type DoneOutcome = MutationOutcome & {
 export type AcceptOutcome = MutationOutcome & {
   stampId: string;
 };
-
-

@@ -1204,6 +1204,9 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260319.1
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2378,6 +2381,9 @@ importers:
       '@hono/trpc-server':
         specifier: ^0.4.2
         version: 0.4.2(@trpc/server@11.13.0(typescript@5.9.3))(hono@4.12.18)
+      '@kilocode/wl-sdk':
+        specifier: workspace:*
+        version: link:../../packages/wl-sdk
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

@@ -15,7 +15,7 @@ import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.
 import { resolveSecret } from '../util/secret.util';
 import { meterEvent } from '../util/billing.util';
 import { fetchFreshDoltHubToken } from '../util/dolthub-token.util';
-import * as wantedBoard from '../wanted-board/wanted-board-ops';
+import * as wantedBoard from '../wanted-board/dispatcher';
 import { WantedBoardOpError } from '../wanted-board/wanted-board-ops';
 import * as doltApi from '../util/dolthub-api.util';
 import * as inbox from '../inbox/inbox-classifier';
@@ -964,7 +964,7 @@ export const wastelandRouter = router({
     .query(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.browseWantedBoard(ctx.env, input.wastelandId, ctx.userId);
+        return await wantedBoard.dispatchBrowse(ctx.env, input.wastelandId, ctx.userId);
       } catch (err) {
         // Browse degrades to empty list if not yet configured
         if (err instanceof WantedBoardOpError && err.code === 'PRECONDITION_FAILED') {
@@ -1042,7 +1042,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.claimWantedItem(
+        return await wantedBoard.dispatchClaim(
           ctx.env,
           input.wastelandId,
           ctx.userId,
@@ -1066,7 +1066,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.unclaimWantedItem(
+        return await wantedBoard.dispatchUnclaim(
           ctx.env,
           input.wastelandId,
           ctx.userId,
@@ -1093,7 +1093,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.postWantedItem(ctx.env, input.wastelandId, ctx.userId, {
+        return await wantedBoard.dispatchPost(ctx.env, input.wastelandId, ctx.userId, {
           title: input.title,
           description: input.description,
           priority: input.priority,
@@ -1118,7 +1118,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.markWantedItemDone(ctx.env, input.wastelandId, ctx.userId, {
+        return await wantedBoard.dispatchMarkDone(ctx.env, input.wastelandId, ctx.userId, {
           itemId: input.itemId,
           evidence: input.evidence,
           direct: input.direct,
@@ -1146,7 +1146,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.acceptWantedItem(ctx.env, input.wastelandId, ctx.userId, {
+        return await wantedBoard.dispatchAccept(ctx.env, input.wastelandId, ctx.userId, {
           itemId: input.itemId,
           quality: input.quality,
           message: input.message,
@@ -1174,7 +1174,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.rejectWantedItem(ctx.env, input.wastelandId, ctx.userId, {
+        return await wantedBoard.dispatchReject(ctx.env, input.wastelandId, ctx.userId, {
           itemId: input.itemId,
           reason: input.reason,
           direct: input.direct,
@@ -1196,7 +1196,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.closeWantedItem(
+        return await wantedBoard.dispatchClose(
           ctx.env,
           input.wastelandId,
           ctx.userId,

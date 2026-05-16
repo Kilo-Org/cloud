@@ -23,16 +23,11 @@ import { callLibwl, type LibwlOp } from '../wasm/libwl-runner';
 
 // ── Error ───────────────────────────────────────────────────────────────
 
-export class WantedBoardOpError extends Error {
-  constructor(
-    message: string,
-    /** Maps roughly to HTTP/tRPC codes. Callers translate as needed. */
-    readonly code: 'NOT_FOUND' | 'PRECONDITION_FAILED' | 'INTERNAL_SERVER_ERROR' | 'UPSTREAM_ERROR'
-  ) {
-    super(message);
-    this.name = 'WantedBoardOpError';
-  }
-}
+// `WantedBoardOpError` lives in `./errors.ts` so the SDK adapter
+// (`./wanted-board-ops-sdk-inner.ts`) can import it without dragging
+// in this module's libwl runtime imports.
+import { WantedBoardOpError } from './errors';
+export { WantedBoardOpError };
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 

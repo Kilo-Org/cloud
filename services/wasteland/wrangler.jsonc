@@ -71,6 +71,11 @@
     // the host and needs `localhost`.
     "KILO_INTERNAL_API_URL": "https://api.kilo.ai",
     "WASTELAND_API_URL": "https://wasteland.kiloapps.io",
+    // Feature flag for the @kilocode/wl-sdk routing seam (M1.8).
+    // "1" (or any non-empty truthy value) routes wanted-board ops
+    // through the TS SDK; anything else keeps the libwl path.
+    // See `services/wasteland/src/wanted-board/feature-flag.ts`.
+    "WL_SDK_ENABLED": "0",
   },
 
   "analytics_engine_datasets": [{ "binding": "WASTELAND_AE", "dataset": "wasteland_events" }],
@@ -115,6 +120,7 @@
         // localhost:3000 directly — no Docker bridge needed.
         "KILO_INTERNAL_API_URL": "http://localhost:3000",
         "WASTELAND_API_URL": "http://192.168.65.254:8787",
+        "WL_SDK_ENABLED": "0",
       },
       "containers": [
         {

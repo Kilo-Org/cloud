@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@cloudflare/containers": "^0.1.0",
+    "@kilocode/wl-sdk": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@sentry/cloudflare": "^9",
     "@hono/trpc-server": "^0.4.2",

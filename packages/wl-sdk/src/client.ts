@@ -132,8 +132,10 @@ function parseUpstreamRef(spec: string): { owner: string; db: string } {
  * collisions for the same `(wantedId, rigHandle)` pair.
  */
 function makeCompletionId(wantedId: string, rigHandle: string): string {
-  const bytes = new Uint8Array(3);
-  globalThis.crypto.getRandomValues(bytes);
+  // Use bare `crypto` (rather than `globalThis.crypto`) so this
+  // module typechecks downstream against `lib: ["es2024"]` configs
+  // that don't carry the webworker `globalThis` augmentation.
+  const bytes = crypto.getRandomValues(new Uint8Array(3));
   let hex = '';
   for (const b of bytes) hex += b.toString(16).padStart(2, '0');
   return `c-${wantedId}-${rigHandle}-${hex}`;

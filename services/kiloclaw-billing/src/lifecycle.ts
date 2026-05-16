@@ -2720,7 +2720,8 @@ async function runSubscriptionExpirySweep(
         eq(kiloclaw_subscriptions.status, 'canceled'),
         currentSubscriptionRowFilter(),
         lt(kiloclaw_subscriptions.current_period_end, now),
-        isNull(kiloclaw_subscriptions.suspended_at)
+        isNull(kiloclaw_subscriptions.suspended_at),
+        isNull(kiloclaw_instances.destroyed_at)
       )
     );
 

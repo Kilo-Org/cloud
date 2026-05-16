@@ -5224,6 +5224,51 @@ describe('complementary inference ended sweep', () => {
   });
 });
 
+describe('subscription expiry sweep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  it('filters destroyed instances in SQL', async () => {
+    const { db, updates, inserts, selectBuilders } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '95959595-9595-4595-8595-959595959595',
+        sweep: 'subscription_expiry',
+      },
+      1
+    );
+
+    const subscriptionExpiryWhere = selectBuilders[0]?.where.mock.calls[0]?.[0];
+    expect(subscriptionExpiryWhere).toBeDefined();
+    if (!subscriptionExpiryWhere) {
+      throw new Error('expected subscription expiry candidate query predicate');
+    }
+
+    const actualDbModule = await vi.importActual<typeof DbModule>('@kilocode/db');
+    const subscriptionExpirySql = actualDbModule
+      .getWorkerDb('postgres://unused:unused@localhost:0/unused')
+      .select()
+      .from(actualDbModule.kiloclaw_subscriptions)
+      .where(subscriptionExpiryWhere)
+      .toSQL().sql;
+
+    expect(subscriptionExpirySql).toMatch(/"kiloclaw_instances"\."destroyed_at"\s+is null/i);
+    expect(summary.sweep2_subscription_expiry).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
+});
+
 describe('soft-deleted user lifecycle exclusion', () => {
   beforeEach(() => {
     vi.clearAllMocks();

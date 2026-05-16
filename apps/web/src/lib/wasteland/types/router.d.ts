@@ -80,6 +80,20 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
+    resolveOwnerRepo: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        owner: string;
+        repo: string;
+      };
+      output: {
+        wastelandId: string;
+        ownerType: 'org' | 'user';
+        ownerUserId: string | null;
+        organizationId: string | null;
+        name: string;
+      } | null;
+      meta: object;
+    }>;
     deleteWasteland: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         wastelandId: string;
@@ -832,6 +846,20 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
             created_at: string;
             updated_at: string;
           };
+          meta: object;
+        }>;
+        resolveOwnerRepo: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            owner: string;
+            repo: string;
+          };
+          output: {
+            wastelandId: string;
+            ownerType: 'org' | 'user';
+            ownerUserId: string | null;
+            organizationId: string | null;
+            name: string;
+          } | null;
           meta: object;
         }>;
         deleteWasteland: import('@trpc/server').TRPCMutationProcedure<{

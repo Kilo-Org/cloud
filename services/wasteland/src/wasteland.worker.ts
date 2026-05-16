@@ -181,6 +181,21 @@ app.get('/debug/registry', async c => {
   return c.json({ wastelands: all });
 });
 
+// One-off backfill of `wasteland_registry.dolthub_upstream` from each
+// per-wasteland DO's config. Idempotent — re-running converges the
+// registry rows to whatever each WastelandDO currently reports as
+// `dolthub_upstream`.
+//
+// Auth: behind cfAccessDebugMiddleware (CF Access in prod, bypassed in
+// dev). No additional gating because the operation is self-correcting.
+//
+// Usage: POST /debug/registry/backfill-upstreams
+app.post('/debug/registry/backfill-upstreams', async c => {
+  const registry = getWastelandRegistryStub(c.env);
+  const result = await registry.backfillDolthubUpstream();
+  return c.json(result);
+});
+
 // ── DEBUG: lifecycle ops (browse/post/claim/done) ─────────────────────
 // These proxy to the real wanted-board-ops functions, bypassing tRPC auth.
 // The userId is passed as a query param (?userId=...) or body field.

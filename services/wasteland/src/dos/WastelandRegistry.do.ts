@@ -1,14 +1,9 @@
 import { DurableObject } from 'cloudflare:workers';
-import { z } from 'zod';
-import { query } from '../util/query.util';
-import {
-  createTableWastelandRegistry,
-  wasteland_registry,
-  WastelandRegistryRecord,
-} from '../db/tables/wasteland-registry.table';
+import * as registryOps from './wasteland-registry/registry-ops';
+import { getWastelandDOStub } from './Wasteland.do';
+import type { WastelandRegistryRecord } from '../db/tables/wasteland-registry.table';
 
 const LOG = '[WastelandRegistry.do]';
-const CountResult = z.object({ cnt: z.coerce.number() });
 
 /**
  * WastelandRegistryDO — singleton registry that indexes wasteland ownership.
@@ -18,8 +13,15 @@ const CountResult = z.object({ cnt: z.coerce.number() });
  * to org Y?". This singleton (keyed by fixed name 'registry') maintains
  * that mapping.
  *
- * All creates/deletes in the tRPC router update this registry so
- * listWastelands can resolve ownership without scanning every WastelandDO.
+ * The class is intentionally thin: every RPC method delegates to a plain
+ * function in `./wasteland-registry/registry-ops.ts`. The Node vitest
+ * pool can't load `cloudflare:workers`, so all SQL behaviour is tested
+ * against the sub-module with a fake `SqlStorage`.
+ *
+ * `dolthub_upstream` is the `<owner>/<repo>` slug for the upstream
+ * DoltHub repo. It powers `findByOwnerRepo` so the apps/web routes
+ * `/wasteland/:owner/:repo` can resolve to a `wastelandId` without an
+ * extra round-trip per UUID-keyed procedure call.
  */
 export class WastelandRegistryDO extends DurableObject<Env> {
   private sql: SqlStorage;
@@ -36,13 +38,11 @@ export class WastelandRegistryDO extends DurableObject<Env> {
 
   private async ensureInitialized(): Promise<void> {
     if (!this.initPromise) {
-      this.initPromise = this.initializeDatabase();
+      this.initPromise = Promise.resolve().then(() => {
+        registryOps.initialize(this.sql);
+      });
     }
     await this.initPromise;
-  }
-
-  private async initializeDatabase(): Promise<void> {
-    query(this.sql, createTableWastelandRegistry(), []);
   }
 
   async register(input: {
@@ -51,103 +51,115 @@ export class WastelandRegistryDO extends DurableObject<Env> {
     owner_user_id: string | null;
     organization_id: string | null;
     name: string;
+    dolthub_upstream?: string | null;
   }): Promise<void> {
     await this.ensureInitialized();
-    const timestamp = new Date().toISOString();
     console.log(
-      `${LOG} register: wasteland_id=${input.wasteland_id} owner_type=${input.owner_type}`
+      `${LOG} register: wasteland_id=${input.wasteland_id} owner_type=${input.owner_type} dolthub_upstream=${input.dolthub_upstream ?? 'null'}`
     );
-
-    query(
+    registryOps.register(
       this.sql,
-      /* sql */ `
-        INSERT OR REPLACE INTO ${wasteland_registry} (
-          ${wasteland_registry.columns.wasteland_id},
-          ${wasteland_registry.columns.owner_type},
-          ${wasteland_registry.columns.owner_user_id},
-          ${wasteland_registry.columns.organization_id},
-          ${wasteland_registry.columns.name},
-          ${wasteland_registry.columns.created_at}
-        ) VALUES (?, ?, ?, ?, ?, ?)
-      `,
-      [
-        input.wasteland_id,
-        input.owner_type,
-        input.owner_user_id,
-        input.organization_id,
-        input.name,
-        timestamp,
-      ]
+      {
+        wasteland_id: input.wasteland_id,
+        owner_type: input.owner_type,
+        owner_user_id: input.owner_user_id,
+        organization_id: input.organization_id,
+        name: input.name,
+        dolthub_upstream: input.dolthub_upstream ?? null,
+      },
+      new Date().toISOString()
     );
   }
 
   async unregister(wastelandId: string): Promise<void> {
     await this.ensureInitialized();
     console.log(`${LOG} unregister: wasteland_id=${wastelandId}`);
+    registryOps.unregister(this.sql, wastelandId);
+  }
 
-    query(
-      this.sql,
-      /* sql */ `DELETE FROM ${wasteland_registry} WHERE ${wasteland_registry.wasteland_id} = ?`,
-      [wastelandId]
+  async setDolthubUpstream(wastelandId: string, dolthubUpstream: string | null): Promise<void> {
+    await this.ensureInitialized();
+    console.log(
+      `${LOG} setDolthubUpstream: wasteland_id=${wastelandId} dolthub_upstream=${dolthubUpstream ?? 'null'}`
     );
+    registryOps.setDolthubUpstream(this.sql, wastelandId, dolthubUpstream);
   }
 
   async listByUser(userId: string): Promise<WastelandRegistryRecord[]> {
     await this.ensureInitialized();
-    const rows = [
-      ...query(
-        this.sql,
-        /* sql */ `
-          SELECT * FROM ${wasteland_registry}
-          WHERE ${wasteland_registry.owner_type} = 'user'
-            AND ${wasteland_registry.owner_user_id} = ?
-          ORDER BY ${wasteland_registry.created_at} DESC
-        `,
-        [userId]
-      ),
-    ];
-    return WastelandRegistryRecord.array().parse(rows);
+    return registryOps.listByUser(this.sql, userId);
   }
 
   async listByOrg(orgId: string): Promise<WastelandRegistryRecord[]> {
     await this.ensureInitialized();
-    const rows = [
-      ...query(
-        this.sql,
-        /* sql */ `
-          SELECT * FROM ${wasteland_registry}
-          WHERE ${wasteland_registry.owner_type} = 'org'
-            AND ${wasteland_registry.organization_id} = ?
-          ORDER BY ${wasteland_registry.created_at} DESC
-        `,
-        [orgId]
-      ),
-    ];
-    return WastelandRegistryRecord.array().parse(rows);
+    return registryOps.listByOrg(this.sql, orgId);
   }
 
   async listAll(): Promise<WastelandRegistryRecord[]> {
     await this.ensureInitialized();
-    const rows = [
-      ...query(
-        this.sql,
-        /* sql */ `
-          SELECT * FROM ${wasteland_registry}
-          ORDER BY ${wasteland_registry.created_at} DESC
-        `,
-        []
-      ),
-    ];
-    return WastelandRegistryRecord.array().parse(rows);
+    return registryOps.listAll(this.sql);
   }
 
   /** Return the total number of registered (active) wastelands. */
   async countAll(): Promise<number> {
     await this.ensureInitialized();
-    const rows = [
-      ...query(this.sql, /* sql */ `SELECT COUNT(*) AS cnt FROM ${wasteland_registry}`, []),
-    ];
-    return CountResult.parse(rows[0]).cnt;
+    return registryOps.countAll(this.sql);
+  }
+
+  /**
+   * Look up a wasteland by its `<owner>/<repo>` upstream slug. Returns
+   * the registry record (including ownership fields) so callers can
+   * decide how to authorise the lookup. Comparison is case-insensitive.
+   */
+  async findByOwnerRepo(owner: string, repo: string): Promise<WastelandRegistryRecord | null> {
+    await this.ensureInitialized();
+    return registryOps.findByOwnerRepo(this.sql, owner, repo);
+  }
+
+  /**
+   * One-off backfill: walk every registered wasteland, read its
+   * per-wasteland `wasteland_config.dolthub_upstream`, and copy it onto
+   * the registry row. Idempotent — runs `setDolthubUpstream` for every
+   * row regardless of current state, so re-running the backfill always
+   * converges to the per-wasteland config truth.
+   *
+   * Returns counts so the caller can report progress. Does NOT throw on
+   * a single wasteland's failure — logs and continues — to keep a
+   * partial dev/staging dataset from blocking the whole run.
+   */
+  async backfillDolthubUpstream(): Promise<{
+    total: number;
+    updated: number;
+    cleared: number;
+    failed: number;
+  }> {
+    await this.ensureInitialized();
+    const all = registryOps.listAll(this.sql);
+    let updated = 0;
+    let cleared = 0;
+    let failed = 0;
+    for (const entry of all) {
+      try {
+        const stub = getWastelandDOStub(this.env, entry.wasteland_id);
+        const config = await stub.getConfig();
+        const upstream = config?.dolthub_upstream ?? null;
+        registryOps.setDolthubUpstream(this.sql, entry.wasteland_id, upstream);
+        if (upstream === null) {
+          cleared += 1;
+        } else {
+          updated += 1;
+        }
+      } catch (err) {
+        failed += 1;
+        console.warn(
+          `${LOG} backfill failed for wasteland_id=${entry.wasteland_id}: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+    console.log(
+      `${LOG} backfillDolthubUpstream complete: total=${all.length} updated=${updated} cleared=${cleared} failed=${failed}`
+    );
+    return { total: all.length, updated, cleared, failed };
   }
 }
 

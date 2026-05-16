@@ -8,6 +8,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { router, procedure, adminProcedure } from './init';
 import { resolveWastelandOwnership } from './ownership';
+import { resolveWasteland } from './resolve-wasteland';
 import { getWastelandDOStub, type WastelandMemberResult } from '../dos/Wasteland.do';
 import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
 import { createUpstream as bootstrapCreateUpstream } from '../upstream-bootstrap/create-upstream';
@@ -286,6 +287,7 @@ export const wastelandRouter = router({
         owner_user_id: ctx.userId,
         organization_id: input.organizationId ?? null,
         name: input.name,
+        dolthub_upstream: input.dolthubUpstream ?? null,
       });
 
       meterEvent(ctx.env, {
@@ -406,6 +408,11 @@ export const wastelandRouter = router({
       // Persist the upstream on the wasteland config now that the repo exists.
       await doStub.updateConfig({ dolthub_upstream: input.upstream });
 
+      // Sync the new upstream onto the central registry so the
+      // `<owner>/<repo>` lookup contract returns this wasteland.
+      const registryStub = getWastelandRegistryStub(ctx.env);
+      await registryStub.setDolthubUpstream(input.wastelandId, input.upstream);
+
       meterEvent(ctx.env, {
         event: 'billing.api_operation',
         userId: ctx.userId,
@@ -464,6 +471,45 @@ export const wastelandRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Wasteland not found' });
       }
       return config;
+    }),
+
+  // ── Resolve <owner>/<repo> → wastelandId ───────────────────────────
+  // Powers the `/wasteland/:owner/:repo` route family in apps/web.
+  // Tells you what wasteland (if any) is registered under that
+  // upstream slug. Auth is intentionally NOT enforced here — the caller
+  // either 404s on null or layers ownership checks when it forwards
+  // the resolved `wastelandId` to a UUID-keyed procedure.
+  //
+  // Slug comparison is case-insensitive (DoltHub slug convention).
+
+  resolveOwnerRepo: procedure
+    .input(
+      z.object({
+        owner: z.string().min(1).max(64),
+        repo: z.string().min(1).max(64),
+      })
+    )
+    .output(
+      z
+        .object({
+          wastelandId: z.string(),
+          ownerType: z.enum(['user', 'org']),
+          ownerUserId: z.string().nullable(),
+          organizationId: z.string().nullable(),
+          name: z.string(),
+        })
+        .nullable()
+    )
+    .query(async ({ ctx, input }) => {
+      const resolved = await resolveWasteland(ctx.env, input);
+      if (!resolved) return null;
+      return {
+        wastelandId: resolved.wastelandId,
+        ownerType: resolved.ownerType,
+        ownerUserId: resolved.ownerUserId,
+        organizationId: resolved.organizationId,
+        name: resolved.name,
+      };
     }),
 
   // ── Delete ──────────────────────────────────────────────────────────
@@ -664,6 +710,15 @@ export const wastelandRouter = router({
         ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
         ...(input.dolthubUpstream !== undefined ? { dolthub_upstream: input.dolthubUpstream } : {}),
       });
+
+      // Mirror dolthub_upstream onto the central registry so the
+      // `<owner>/<repo>` lookup stays in sync. Treat empty string as
+      // "clear" so the registry can fall back to a null sentinel.
+      if (input.dolthubUpstream !== undefined) {
+        const registryStub = getWastelandRegistryStub(ctx.env);
+        const next = input.dolthubUpstream.length > 0 ? input.dolthubUpstream : null;
+        await registryStub.setDolthubUpstream(input.wastelandId, next);
+      }
 
       // Phase 2: container env-var sync removed alongside the
       // container itself. The wasm path reads the upstream off the DO

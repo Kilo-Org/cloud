@@ -8,38 +8,27 @@ Companion reference: [`wl-cli-reference.md`](./wl-cli-reference.md).
 
 ## Two execution paths
 
-Each flow can be verified through one of two paths, depending on the
-dev environment's container-egress health:
+Each flow can be verified through one of two paths:
 
-### Path A: Container-driven (production-equivalent)
+### Path A: Production code path (via wanted-board ops)
 
 Uses the `POST /debug/wastelands/:id/{post,claim,done,...}` endpoints,
-which delegate to `wanted-board-ops.ts` → the wasteland container → the
-`wl` Go binary → DoltHub. This mirrors exactly what production does.
+which delegate to the wanted-board ops layer
+(`src/wanted-board/wanted-board-ops-sdk.ts`) → `@kilocode/wl-sdk` →
+DoltHub. This mirrors exactly what production does.
 
-**Known issue (local wrangler dev only)**: the workerd-managed container
-in local dev has broken HTTPS egress. TLS handshakes to `www.dolthub.com`
-fail with `SSL_ERROR_SYSCALL`. Both `wl` mutations and the container's
-Bun `fetch` for browse fail in this environment. In production CF
-Containers this works normally. See troubleshooting section at the end.
-
-### Path B: Worker-direct (dev-only simulation)
+### Path B: Worker-direct (low-level DoltHub probes)
 
 Uses the `POST /debug/dolthub/{owner}/{db}/{write,pulls}` endpoints,
-which fetch directly from the wasteland worker (where TLS works) to
-DoltHub. This simulates what `wl` would do — create a branch with DML,
-open a PR, wait for merge — but from the worker's TLS-working
-environment.
+which fetch directly from the wasteland worker to DoltHub. This validates
+**DoltHub state transitions** (branch creation, PR merge, upstream table
+updates) without going through the wanted-board ops layer — useful for
+diagnosing whether a failure is in the ops layer or upstream of it.
 
-Worker-direct only validates the **DoltHub state transitions** (branch
-creation, PR merge, upstream table updates). It does not exercise the
-container code path or `wl` CLI. Use it when path A is blocked by the
-container-egress issue.
-
-Each flow below is written against **Path B** (worker-direct) for
-reliability in dev. To run the same flow through Path A in a healthy
-environment, substitute the `POST /debug/wastelands/:id/{op}` endpoint
-for the explicit write+PR+merge steps.
+Each flow below is written against **Path B** for reliability and
+explicit step-by-step visibility. To run the same flow through Path A,
+substitute the `POST /debug/wastelands/:id/{op}` endpoint for the
+explicit write+PR+merge steps.
 
 ## Prerequisites
 
@@ -64,10 +53,10 @@ for the explicit write+PR+merge steps.
 - `UPSTREAM` — the DoltHub upstream, e.g. `jrf0110/wl-commons`
   (discoverable via `GET /debug/wastelands/:WASTELAND_ID/status` →
   `config.dolthub_upstream`)
-- `RIG_HANDLE` — the rig handle for this town's connection (via
-  `GET /debug/wastelands/:WASTELAND_ID/container/config` → `dolthubOrg`;
-  the rig handle typically matches the DoltHub org). For the **contributor**
-  (posts and claims items).
+- `RIG_HANDLE` — the rig handle for this town's connection. Stored on
+  the wasteland's credential row (`rig_handle` on
+  `wasteland_credentials`); the rig handle typically matches the DoltHub
+  org. For the **contributor** (posts and claims items).
 - `MAINTAINER_RIG` — a separate registered rig that accepts PRs. For
   self-owned upstreams, the upstream owner's rig (e.g. `jrf0110`) is
   registered and used for accept/reject operations. Required because
@@ -95,16 +84,14 @@ still show the pre-merge values for 5–30 seconds. Every flow below uses a
 
 ### Inspection (read-only)
 
-| Endpoint                                                                | Purpose                                                      |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `GET $WL/debug/wastelands/:id/status`                                   | Wasteland config, members, connected towns, board size       |
-| `GET $WL/debug/wastelands/:id/wanted`                                   | Cached wanted board rows from the Wasteland DO               |
-| `GET $WL/debug/wastelands/:id/container/config`                         | Container join status, upstream, dolthubOrg, wl version      |
-| `GET $WL/debug/wastelands/:id/container/health`                         | Container heartbeat                                          |
-| `GET $WL/debug/wastelands/:id/browse-direct?-H Authorization:token ...` | Query upstream wanted via DoltHub SQL API (bypass container) |
-| `GET $WL/debug/wastelands/:id/browse?userId=...`                        | Browse through the production wanted-board-ops path          |
-| `GET $WL/debug/registry`                                                | All wastelands in the global registry                        |
-| `GET $GT/debug/towns/:id/wasteland`                                     | Town DO's connected wasteland row                            |
+| Endpoint                                                                | Purpose                                                       |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `GET $WL/debug/wastelands/:id/status`                                   | Wasteland config, members, connected towns                    |
+| `GET $WL/debug/wastelands/:id/browse-direct?-H Authorization:token ...` | Query upstream wanted via DoltHub SQL API directly            |
+| `GET $WL/debug/wastelands/:id/browse?userId=...`                        | Browse through the production wanted-board-ops path           |
+| `GET $WL/debug/wastelands/:id/auth-probe?userId=...`                    | Diagnose token auth issues against DoltHub (anon/local/fresh) |
+| `GET $WL/debug/registry`                                                | All wastelands in the global registry                         |
+| `GET $GT/debug/towns/:id/wasteland`                                     | Town DO's connected wasteland row                             |
 
 ### Lifecycle mutations (uses stored credential)
 
@@ -145,9 +132,15 @@ WASTELAND_ID=63bac39a-11d9-4e4e-8fdb-124d5abeb247
 UPSTREAM_OWNER=jrf0110
 UPSTREAM_DB=wl-commons
 
-# User ID / rig handle lookup
+# User ID lookup
 USER_ID=$(curl -s $WL/debug/wastelands/$WASTELAND_ID/status | jq -r .config.owner_user_id)
-RIG_HANDLE=$(curl -s $WL/debug/wastelands/$WASTELAND_ID/container/config | jq -r .dolthubOrg)
+# RIG_HANDLE — read from the credential row. With the wasteland Vitest
+# DO at hand the easiest lookup is via tRPC (`getCredentialStatus`).
+# In a one-off shell, hit auth-probe and copy the rig handle from there:
+#   curl -s "$WL/debug/wastelands/$WASTELAND_ID/auth-probe?userId=$USER_ID" \
+#     | jq -r .credential.rigHandle
+RIG_HANDLE=$(curl -s "$WL/debug/wastelands/$WASTELAND_ID/auth-probe?userId=$USER_ID" \
+  | jq -r '.credential.rigHandle // empty')
 
 # Wait for a PR to be merged (polls up to 60s)
 wait_for_pr_merged() {
@@ -195,27 +188,21 @@ find_pr_for_branch() {
 
 ## Flow 1: Join & register (already executed on connect)
 
-This flow runs automatically when a town connects to a wasteland through
-the settings UI. It's documented here so you understand the expected
-shape when verifying other flows.
+This flow runs automatically when a user joins a wasteland (via the
+`joinWasteland` tRPC procedure or the connect dialog). It's documented
+here so you understand the expected shape when verifying other flows.
 
 ### Preconditions
 
 - Wasteland exists with `dolthub_upstream` configured.
 - Credentials have been stored via `storeCredential` tRPC (or the
   onboarding dialog).
-- Container has been initialized (`wl join` succeeded).
+- `joinWasteland` has been invoked (creates the user's fork + opens the
+  registration PR via the SDK).
 
 ### Verification steps
 
-1. **Container joined?**
-
-   ```bash
-   curl -s $WL/debug/wastelands/$WASTELAND_ID/container/config
-   # Expect: { joined: true, upstream: "...", hasToken: true, hasJwk: true, ... }
-   ```
-
-2. **Rig registration PR exists?** (may or may not be merged yet)
+1. **Rig registration PR exists?** (may or may not be merged yet)
 
    ```bash
    curl -s -H "authorization: token $TOKEN" \
@@ -223,16 +210,16 @@ shape when verifying other flows.
      | jq '.pulls[] | select(.title | contains("Register rig: '$RIG_HANDLE'"))'
    ```
 
-3. **Merge the registration PR** (maintainer side):
+2. **Merge the registration PR** (maintainer side):
 
    ```bash
-   PULL_ID=... # from step 2
+   PULL_ID=... # from step 1
    curl -s -X POST -H "authorization: token $TOKEN" \
      "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls/$PULL_ID/merge"
    wait_for_pr_merged $PULL_ID
    ```
 
-4. **Rig appears on upstream main?**
+3. **Rig appears on upstream main?**
    ```bash
    curl -s -H "authorization: token $TOKEN" \
      "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20handle%20FROM%20rigs%20WHERE%20handle%20=%20%27$RIG_HANDLE%27"
@@ -241,7 +228,6 @@ shape when verifying other flows.
 
 ### Pass criteria
 
-- Container config reports `joined: true` and `hasJwk: true`
 - Registration PR state transitions to `Merged`
 - `rigs` table on upstream main contains the rig handle
 
@@ -249,7 +235,7 @@ shape when verifying other flows.
 
 ### Verification steps
 
-1. **Browse via production path (through container)**:
+1. **Browse via production path (through wanted-board ops + SDK)**:
 
    ```bash
    curl -s "$WL/debug/wastelands/$WASTELAND_ID/browse?userId=$USER_ID" \
@@ -267,13 +253,6 @@ shape when verifying other flows.
 
 - Both counts are equal.
 - Counts match the direct SQL `SELECT COUNT(*) FROM wanted` on upstream main.
-
-### Known issues
-
-- The production path (`/browse`) calls the container; if the container's
-  Bun TLS is broken (wrangler dev local issue), this returns
-  `DoltHub API fetch failed: unknown certificate verification error`.
-  Use `/browse-direct` for verification in that case.
 
 ## Flow 3: Post a new wanted item (Path B — worker-direct)
 
@@ -771,15 +750,12 @@ Most failures fall into these buckets:
 
 | Symptom                                                     | Likely cause                                                                                          | Fix                                                                                                |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `Browse query failed: unknown certificate ...`              | Container Bun TLS broken in local dev                                                                 | Use `/browse-direct` instead                                                                       |
-| `wl claim failed: push failed`                              | Dolt JWK missing or mismatched                                                                        | Reconnect via onboarding dialog with correct JWK                                                   |
-| `wl claim failed: rig not found`                            | Registration PR not merged yet                                                                        | Merge flow 1's PR first                                                                            |
-| `wl post failed: EOF` or all container writes fail          | workerd container HTTPS egress broken in local dev                                                    | Use Path B (worker-direct) flows instead                                                           |
+| `claim` / `post` returns `rig not found`                    | Registration PR not merged yet                                                                        | Merge flow 1's PR first                                                                            |
 | DoltHub write returns `Success` but nothing lands on branch | Multi-statement SQL silently skipped, OR check constraint violation (e.g. `stamps.author != subject`) | Split into separate writes per statement; verify against `SHOW CREATE TABLE <t>` check constraints |
 | PR state stuck on `Open` after merge call                   | DoltHub async processing                                                                              | Wait 5–30s; use `wait_for_pr_merged`                                                               |
 | `cannot merge pull that is not open`                        | PR already merged or closed                                                                           | Check current state; pick a different PR                                                           |
-| Container not responding (`[not connected]`)                | Wrangler dev registry missed the binding                                                              | Restart gastown wrangler dev; check binding shows `wasteland-dev#WastelandRPCEntrypoint`           |
 | `stamps` INSERT succeeds but doesn't commit                 | Violating `CHECK (author != subject)` constraint                                                      | Ensure `author` and `subject` are different rig handles                                            |
+| Browse / claim returns `no such repository`                 | Token lacks access to upstream repo                                                                   | Use `/auth-probe` to compare anon / local / fresh-token paths and identify which credential fails  |
 
 ## Schema constraints
 
@@ -836,7 +812,7 @@ Status of each flow after the E2E verification run on 2026-04-20.
 
 ### Findings that drove doc updates
 
-1. **Container HTTPS egress is broken in local wrangler dev.** Both the container's Bun `fetch` (used by `dolthubSql` for browse) and the `wl` Go binary (used for mutations) fail to establish TLS to `www.dolthub.com`. This is a workerd-container limitation; production CF Containers work normally. Path B (worker-direct) was added as a workaround for local dev verification.
+1. **Path B (worker-direct) is retained for low-level upstream debugging.** The wanted-board ops layer now talks to DoltHub directly via `@kilocode/wl-sdk` (no container in between), so Path A and Path B differ mainly in whether the ops layer is exercised. Path B remains the simplest tool for diagnosing whether a failure originates in the ops/SDK layer or in DoltHub itself.
 
 2. **DoltHub's write API silently drops multi-statement SQL.** Calls like `UPDATE ...; INSERT ...;` return `Success` at submission but nothing lands on the branch. Each statement must be its own write call. Subsequent writes to the same branch use `write/{branch}/{branch}` (fromBranch == toBranch) rather than `write/main/{branch}`.
 

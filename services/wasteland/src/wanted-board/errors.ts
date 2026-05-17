@@ -1,10 +1,7 @@
 /**
  * Shared error type for the wanted-board ops layer.
  *
- * Lives in a dedicated module (rather than inside `wanted-board-ops.ts`)
- * so the SDK adapter can throw the same error class without dragging
- * `wanted-board-ops.ts`'s libwl runtime imports into modules that are
- * unit-tested in the Node vitest pool.
+ * Code maps roughly to HTTP/tRPC error codes; callers translate as needed.
  */
 
 export class WantedBoardOpError extends Error {

@@ -4,16 +4,13 @@
  * Worker-bound layer over the inner functions in
  * `lifecycle-ops-inner.ts`. The wrapper:
  *
- *  1. Resolves DoltHub auth + fork coordinates via {@link loadContext}
- *     (mirrors `loadContext` in `branch-ops.ts`).
+ *  1. Resolves DoltHub auth + fork coordinates via the local
+ *     `loadContext` helper.
  *  2. Calls the matching `*ViaSdk` inner function.
  *  3. Persists the resolved `rig_handle` (and DoltHub username) onto
  *     the wasteland's stored credential so subsequent ops resolve the
  *     same handle the join PR was opened under.
  *  4. Emits a billing meter event.
- *
- * This is an SDK-only op (no libwl equivalent existed) and therefore
- * has no dispatcher and is not gated by `WL_SDK_ENABLED`.
  */
 
 import { WantedBoardOpError } from '../wanted-board/errors';

@@ -146,11 +146,6 @@ app.get('/debug/wastelands/:wastelandId/status', async c => {
   return c.json({ config, members, connectedTowns });
 });
 
-// `/debug/wastelands/:wastelandId/wanted` was a thin wrapper around the
-// retired `wasteland_wanted_board` cache table. It always returned `[]`
-// after the container retirement (the cache was never populated). Use
-// `/debug/wastelands/:wastelandId/browse?userId=...` for live data.
-
 app.get('/debug/registry', async c => {
   const registry = getWastelandRegistryStub(c.env);
   const all = await registry.listAll();
@@ -247,15 +242,9 @@ app.get('/debug/wastelands/:wastelandId/browse', async c => {
   }
 });
 
-// `/poc/wasm/*` routes were removed in Phase 2 of the container
-// retirement — the `/debug/wastelands/:id/{op}` routes now hit the
-// same wanted-board-ops functions, so the POC duplicates have served
-// their purpose. The helper handlers in `wasm-browse.handler.ts` will
-// be deleted alongside this once nothing else imports them.
-
-// Browse via DoltHub API direct — useful when libwl is broken in
-// local wrangler dev or for sanity-checking that a token + upstream
-// combination is well-formed.
+// Browse via DoltHub API direct — sanity-checks that a token + upstream
+// combination is well-formed without going through the wanted-board ops
+// layer.
 app.get('/debug/wastelands/:wastelandId/browse-direct', async c => {
   const wastelandId = c.req.param('wastelandId');
   const doStub = getWastelandDOStub(c.env, wastelandId);
@@ -288,9 +277,9 @@ app.get('/debug/wastelands/:wastelandId/browse-direct', async c => {
   return c.json({ itemCount: parsed.data.rows.length, items: parsed.data.rows });
 });
 
-// Auth probe: hit the same `wanted` SELECT that libwl runs, three ways
-// (anonymous, with the user's stored token, and with a fresh OAuth token
-// if installed). Use to diagnose "no such repository" errors that happen
+// Auth probe: run a small `wanted` SELECT three ways (anonymous, with
+// the user's stored token, and with a fresh OAuth token if installed).
+// Use to diagnose "no such repository" errors that happen
 // only on the authenticated path — DoltHub returns that error on
 // authenticated reads against repos the user doesn't have explicit
 // permissions on, even when the repo is public.
@@ -320,8 +309,8 @@ app.get('/debug/wastelands/:wastelandId/auth-probe', async c => {
     return c.json({ error: 'No upstream configured on this wasteland' }, 412);
   }
 
-  // The same SELECT shape libwl issues — keep the column list tight so
-  // the response stays small even on a populated repo.
+  // Keep the column list tight so the response stays small even on a
+  // populated repo.
   const sql = 'SELECT id, title, status FROM wanted ORDER BY created_at DESC LIMIT 3';
   const url = `${DOLTHUB_API_BASE}/${config.dolthub_upstream}/main?q=${encodeURIComponent(sql)}`;
 

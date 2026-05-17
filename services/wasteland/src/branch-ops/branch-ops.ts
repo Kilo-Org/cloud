@@ -3,14 +3,11 @@
  *
  * Worker-bound layer over the inner functions in
  * `branch-ops-inner.ts`. Each wrapper:
- *  1. Resolves DoltHub auth + fork coordinates via {@link loadContext}
- *     (mirrors `loadSdkContext` in `wanted-board-ops-sdk.ts`).
+ *  1. Resolves DoltHub auth + fork coordinates via the local
+ *     `loadContext` helper.
  *  2. Calls the matching `*ViaSdk` inner function.
  *  3. Refreshes the WastelandDO's wanted-board cache (where needed)
  *     and emits a billing meter event.
- *
- * These are SDK-only operations (no libwl equivalent existed) and
- * therefore have no dispatcher and are not gated by `WL_SDK_ENABLED`.
  *
  *   - listMyForkBranches — enumerate `wl/<rig>/*` branches on the fork,
  *     cross-referenced with each item's status on `main` and on the

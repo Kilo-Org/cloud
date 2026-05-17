@@ -233,10 +233,6 @@ export function createWastelandClient(deps: WastelandClientDeps) {
       return trpcQuery(deps, 'browseWantedBoard', input, WantedItemOutput.array());
     },
 
-    refreshWantedBoard(input: { wastelandId: string }) {
-      return trpcMutation(deps, 'refreshWantedBoard', input, WantedItemOutput.array());
-    },
-
     claimWantedItem(input: { wastelandId: string; itemId: string }) {
       return trpcMutation(deps, 'claimWantedItem', input, z.object({ success: z.boolean() }));
     },

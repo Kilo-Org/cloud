@@ -3,22 +3,16 @@
  *
  * Thin wrappers over the inner functions in
  * `wanted-board-ops-sdk-inner.ts`. Each wrapper:
- *  1. Resolves DoltHub auth + fork coordinates via `loadSdkContext`
- *     (mirrors `loadContext` in `wanted-board-ops.ts`).
+ *  1. Resolves DoltHub auth + fork coordinates via `loadSdkContext`.
  *  2. Calls the matching `*ViaSdk` inner function.
  *  3. Refreshes the WastelandDO's wanted-board cache and emits a
  *     billing meter event.
  *
- * The libwl path's parameter shapes are preserved verbatim so the
- * dispatcher (`dispatcher.ts`) can swap implementations without
- * touching the tRPC router.
- *
- * Notable mappings (carried in the inner module's docs):
+ * Notable behaviour (see the inner module's docs for details):
  *  - `claim.pr_url` is produced by calling `wl.publish` after
- *    `wl.claim`; the SDK separates the two ops while libwl bundles
- *    them.
+ *    `wl.claim`; the SDK separates the two ops.
  *  - `direct` mode is silently downgraded to PR mode because the SDK
- *    has no upstream-direct write path. M1 accepts this.
+ *    has no upstream-direct write path.
  *  - `post` synthesizes a `w-<random>` id (the SDK does not own id
  *    generation).
  *  - `accept` reads the latest completion id off the user's branch
@@ -136,8 +130,8 @@ export async function claimWantedItem(
   wastelandId: string,
   userId: string,
   itemId: string,
-  // libwl honors `direct` for upstream admins; the SDK has no direct
-  // mode and silently downgrades.
+  // `direct` is accepted for API compatibility but silently ignored —
+  // the SDK has no upstream-direct write path.
   _options?: { direct?: boolean }
 ): Promise<{ success: true; pr_url: string | null }> {
   const ctx = await loadSdkContext(env, wastelandId, userId);

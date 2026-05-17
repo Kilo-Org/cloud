@@ -125,7 +125,8 @@ function normalizeStatus(raw: string | null | undefined): BranchWantedStatus {
   if (!raw) return 'unknown';
   const v = raw.toLowerCase();
   if (v === 'open' || v === 'claimed' || v === 'in_review' || v === 'completed') return v;
-  // libwl historically used 'done' as an alias for completed.
+  // 'done' is accepted as an alias for 'completed' for compatibility with
+  // older rows on upstream that pre-date the canonical status set.
   if (v === 'done') return 'completed';
   return 'unknown';
 }

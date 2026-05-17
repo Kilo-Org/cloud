@@ -15,7 +15,9 @@
  * back to whatever credential is stored locally (which is a
  * long-lived manual API token, not an OAuth access token, so it never
  * expires). The fallback path is the responsibility of the caller —
- * see `loadContext` in `wanted-board/wanted-board-ops.ts`.
+ * see `loadSdkContext` in `wanted-board/wanted-board-ops-sdk.ts` and
+ * `loadContext` in `branch-ops/branch-ops.ts` /
+ * `lifecycle-ops/lifecycle-ops.ts`.
  */
 
 import { resolveSecret } from './secret.util';

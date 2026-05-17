@@ -19,20 +19,22 @@ export type PullRequestCheckoutRefInput = {
   };
 };
 
+export function getGitHubPullRequestCheckoutRef(prNumber: number): string {
+  return `refs/pull/${prNumber}/head`;
+}
+
 /**
  * Resolve which git ref should be checked out for a PR review.
  *
- * - Same-repo PRs: use head.ref (e.g. "feature/my-change")
- * - Fork PRs: use GitHub's synthetic pull ref (e.g. "refs/pull/123/head")
+ * GitHub keeps refs/pull/<number>/head available even when the source
+ * branch is deleted after merge/close, so use it for both same-repo and fork PRs.
  */
 export function resolvePullRequestCheckoutRef(
   payload: PullRequestCheckoutRefInput
 ): PullRequestCheckoutRef {
   const headRepoFullName = payload.pull_request.head.repo?.full_name ?? null;
   const isForkPr = headRepoFullName !== null && headRepoFullName !== payload.repository.full_name;
-  const checkoutRef = isForkPr
-    ? `refs/pull/${payload.pull_request.number}/head`
-    : payload.pull_request.head.ref;
+  const checkoutRef = getGitHubPullRequestCheckoutRef(payload.pull_request.number);
 
   return {
     checkoutRef,

@@ -17,12 +17,12 @@
   },
   "dependencies": {
     "@kilocode/event-service": "workspace:*",
-    "ulid": "3.0.1",
+    "ulid": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "~3.2.4"
+    "vitest": "catalog:"
   }
 }

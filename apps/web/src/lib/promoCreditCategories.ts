@@ -8,7 +8,6 @@ import {
   FIRST_TOPUP_BONUS_AMOUNT,
   REFERRAL_BONUS_AMOUNT,
   PROMO_CREDIT_EXPIRY_HRS,
-  WELCOME_CREDIT_EXPIRY_HRS,
   OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS,
 } from '@/lib/constants';
 import { promoCategoriesOld } from '@/lib/promoCreditCategoriesOld';
@@ -171,13 +170,6 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
     is_idempotent: true,
     amount_usd: 5,
     description: 'temp fix for stytch 1usd bug',
-  },
-  {
-    credit_category: 'automatic-welcome-credits',
-    description: 'Free credits for new users who pass both Turnstile and Stytch validation',
-    amount_usd: 1.25,
-    is_idempotent: true,
-    expiry_hours: WELCOME_CREDIT_EXPIRY_HRS,
   },
   {
     credit_category: 'openclaw-security-advisor-signup-bonus',

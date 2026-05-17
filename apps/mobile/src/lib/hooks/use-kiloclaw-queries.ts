@@ -3,13 +3,14 @@ import { useMemo } from 'react';
 
 import { deriveMobileOnboardingStateFromBilling } from '@/lib/derive-mobile-onboarding-state';
 import { resolveContext } from '@/lib/hooks/use-context-query';
+import { isInstanceNotRunningSentinel } from '@/lib/kiloclaw/instance-not-running-sentinel';
 import { useTRPC } from '@/lib/trpc';
 
 export { useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-mutations';
 
 export type InstanceStatus = NonNullable<ReturnType<typeof useKiloClawStatus>['data']>['status'];
 export type GatewayState = NonNullable<
-  ReturnType<typeof useKiloClawGatewayStatus>['data']
+  NonNullable<ReturnType<typeof useKiloClawGatewayStatus>['data']>
 >['state'];
 
 export function useKiloClawStatus(
@@ -99,7 +100,11 @@ export function useKiloClawGatewayStatus(organizationId?: string | null, enabled
       refetchInterval: orgEnabled ? 30_000 : false,
     })
   );
-  return isOrg ? org : personal;
+  const query = isOrg ? org : personal;
+  // Narrow off the instance-not-running sentinel so consumers always see the
+  // OK-shape payload (or `undefined` while the instance is stopped).
+  const data = query.data && !isInstanceNotRunningSentinel(query.data) ? query.data : undefined;
+  return { ...query, data };
 }
 
 export function useKiloClawGatewayReady(organizationId?: string | null, enabled = true) {

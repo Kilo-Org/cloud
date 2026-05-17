@@ -8,6 +8,7 @@ import {
   kiloclaw_access_codes,
   kiloclaw_google_oauth_connections,
   kiloclaw_instances,
+  kiloclaw_morning_briefing_configs,
   kiloclaw_scheduled_actions,
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
@@ -15,6 +16,7 @@ import {
 } from '@kilocode/db/schema';
 import type { KiloClawScheduledActionStatus } from '@kilocode/db/schema-types';
 import { eq, and, isNull, gt, lte, inArray, sql } from 'drizzle-orm';
+import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
 
 export { getWorkerDb, type WorkerDb };
 
@@ -115,6 +117,7 @@ export async function getInstanceBySandboxId(db: WorkerDb, sandboxId: string) {
       user_id: kiloclaw_instances.user_id,
       organization_id: kiloclaw_instances.organization_id,
       provider: kiloclaw_instances.provider,
+      instance_type: kiloclaw_instances.instance_type,
     })
     .from(kiloclaw_instances)
     .where(
@@ -130,6 +133,7 @@ export async function getInstanceBySandboxId(db: WorkerDb, sandboxId: string) {
     userId: row.user_id,
     orgId: row.organization_id,
     provider: row.provider,
+    instanceType: row.instance_type,
   };
 }
 
@@ -158,6 +162,7 @@ export async function getInstanceByIdIncludingDestroyed(
       organization_id: kiloclaw_instances.organization_id,
       inbound_email_enabled: kiloclaw_instances.inbound_email_enabled,
       provider: kiloclaw_instances.provider,
+      instance_type: kiloclaw_instances.instance_type,
     })
     .from(kiloclaw_instances)
     .where(where)
@@ -172,6 +177,7 @@ export async function getInstanceByIdIncludingDestroyed(
     orgId: row.organization_id,
     inboundEmailEnabled: row.inbound_email_enabled,
     provider: row.provider,
+    instanceType: row.instance_type,
   };
 }
 
@@ -225,6 +231,62 @@ export async function syncTrackedImageTag(
         eq(kiloclaw_instances.sandbox_id, sandboxId),
         isNull(kiloclaw_instances.destroyed_at),
         sql`${kiloclaw_instances.tracked_image_tag} IS DISTINCT FROM ${trackedImageTag}`
+      )
+    );
+}
+
+export async function syncInstanceType(
+  db: WorkerDb,
+  userId: string,
+  sandboxId: string,
+  instanceType: string | null
+) {
+  await db
+    .update(kiloclaw_instances)
+    .set({ instance_type: instanceType })
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.destroyed_at),
+        sql`${kiloclaw_instances.instance_type} IS DISTINCT FROM ${instanceType}`
+      )
+    );
+}
+
+/**
+ * Sync `admin_size_override` from DO state. Pass `null` to clear, or the
+ * full payload (override size + metadata) to set. Conditional UPDATE — the
+ * SQL `IS DISTINCT FROM` guards against churning rows when nothing changed.
+ *
+ * Called from the DO RPC paths that explicitly mutate the override
+ * (`setAdminMachineSizeOverride` / `clearAdminMachineSizeOverride`) and as
+ * part of tier resize when the override is auto-cleared. NOT called from
+ * the alarm tick — there's no "observed override" to derive.
+ */
+export type AdminSizeOverridePayload = {
+  size: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' };
+  reason: string;
+  actorId: string;
+  actorEmail: string;
+  setAt: number;
+};
+
+export async function syncAdminSizeOverride(
+  db: WorkerDb,
+  userId: string,
+  sandboxId: string,
+  payload: AdminSizeOverridePayload | null
+) {
+  await db
+    .update(kiloclaw_instances)
+    .set({ admin_size_override: payload })
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.destroyed_at),
+        sql`${kiloclaw_instances.admin_size_override} IS DISTINCT FROM ${payload}::jsonb`
       )
     );
 }
@@ -631,4 +693,99 @@ export async function deleteVersionPinWithCAS(
     )
     .returning({ id: kiloclaw_version_pins.id });
   return { deleted: result.length > 0 };
+}
+
+// ─── Morning Briefing configs ────────────────────────────────────────
+//
+// Denormalized desired-state mirror for "is briefing enabled?
+// cron/timezone/interests?" The plugin's local config.json on the
+// instance is the source of truth; this is a queryable cache the worker
+// writes to alongside the plugin push. Plugin runtime state (cronJobId,
+// lastGeneratedAt, reconcileState) stays in the plugin and is NOT
+// mirrored here.
+
+export type MorningBriefingConfigRow = {
+  instance_id: string;
+  enabled: boolean;
+  cron: string;
+  timezone: string;
+  interest_topics: string[];
+};
+
+export async function getMorningBriefingConfig(
+  db: WorkerDb,
+  instanceId: string
+): Promise<MorningBriefingConfigRow | null> {
+  const row = await db
+    .select({
+      instance_id: kiloclaw_morning_briefing_configs.instance_id,
+      enabled: kiloclaw_morning_briefing_configs.enabled,
+      cron: kiloclaw_morning_briefing_configs.cron,
+      timezone: kiloclaw_morning_briefing_configs.timezone,
+      interest_topics: kiloclaw_morning_briefing_configs.interest_topics,
+    })
+    .from(kiloclaw_morning_briefing_configs)
+    .where(eq(kiloclaw_morning_briefing_configs.instance_id, instanceId))
+    .limit(1)
+    .then(rows => rows[0] ?? null);
+  return row;
+}
+
+export type MorningBriefingConfigUpsertInput = {
+  instanceId: string;
+  // All fields are optional — patch semantics. On INSERT, omitted fields
+  // take the column default (enabled = false, cron = plugin default,
+  // timezone = 'UTC', interest_topics = '{}'). On UPDATE, omitted fields
+  // are preserved. Callers pass only what's actually changing:
+  // enable/disable flows pass enabled (+ cron/timezone), the interests
+  // flow passes only interestTopics.
+  enabled?: boolean;
+  cron?: string;
+  timezone?: string;
+  interestTopics?: string[];
+};
+
+/**
+ * Upsert the desired-state row for an instance's morning briefing.
+ *
+ * Patch semantics on conflict: only fields explicitly provided in `input`
+ * are overwritten. On insert, omitted fields fall through to column
+ * defaults.
+ */
+export async function upsertMorningBriefingConfig(
+  db: WorkerDb,
+  input: MorningBriefingConfigUpsertInput
+): Promise<void> {
+  // Type the SET clause against Drizzle's UpdateSet shape so a typo
+  // (e.g. `interestTopics` instead of `interest_topics`) fails at
+  // compile time instead of silently producing a no-op UPDATE. Drizzle
+  // accepts the column type, `sql` expressions, or column refs as
+  // per-key values; `PgUpdateSetSource` captures that.
+  const setOnConflict: PgUpdateSetSource<typeof kiloclaw_morning_briefing_configs> = {
+    updated_at: sql`now()`,
+  };
+  if (input.enabled !== undefined) setOnConflict.enabled = input.enabled;
+  if (input.cron !== undefined) setOnConflict.cron = input.cron;
+  if (input.timezone !== undefined) setOnConflict.timezone = input.timezone;
+  if (input.interestTopics !== undefined) {
+    setOnConflict.interest_topics = input.interestTopics;
+  }
+
+  // INSERT values: undefined fields fall through to the column DEFAULT.
+  // Typed declaration so the conditional assignments below stay
+  // type-checked without an `as` cast.
+  const insertValues: typeof kiloclaw_morning_briefing_configs.$inferInsert = {
+    instance_id: input.instanceId,
+  };
+  if (input.enabled !== undefined) insertValues.enabled = input.enabled;
+  if (input.cron !== undefined) insertValues.cron = input.cron;
+  if (input.timezone !== undefined) insertValues.timezone = input.timezone;
+  if (input.interestTopics !== undefined) {
+    insertValues.interest_topics = input.interestTopics;
+  }
+
+  await db.insert(kiloclaw_morning_briefing_configs).values(insertValues).onConflictDoUpdate({
+    target: kiloclaw_morning_briefing_configs.instance_id,
+    set: setOnConflict,
+  });
 }

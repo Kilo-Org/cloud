@@ -3,7 +3,6 @@
     "target": "es2017",
     "module": "commonjs",
     "lib": ["dom", "dom.iterable", "esnext", "esnext.asynciterable"],
-    "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -12,6 +11,7 @@
       "@/*": ["./src/*"],
       "@kilocode/db": ["../../packages/db/src/index.ts"],
       "@kilocode/db/*": ["../../packages/db/src/*"],
+      "@kilocode/cloud-agent-profile": ["../../packages/cloud-agent-profile/src/index.ts"],
       "@kilocode/encryption": ["../../packages/encryption/src/index.ts"],
       "@kilocode/worker-utils": ["../../packages/worker-utils/src/index.ts"],
       "@kilocode/worker-utils/*": ["../../packages/worker-utils/src/*"]

@@ -2,6 +2,7 @@ import { getWorkerDb } from '@kilocode/db';
 import type { AppEnv } from '../types';
 import {
   bootstrapProvisionSubscriptionWithDb,
+  resolveProvisionEntitlementWithDb,
   type BootstrapProvisionInput,
 } from '../../../kiloclaw-billing/src/provision-bootstrap-shared.js';
 
@@ -38,6 +39,7 @@ export async function bootstrapProvisionedSubscriptionViaRpc(params: {
     userId: params.input.userId,
     instanceId: params.input.instanceId,
     orgId: params.input.orgId,
+    expectedPriceVersion: params.input.expectedPriceVersion,
   });
 }
 
@@ -66,6 +68,60 @@ export async function bootstrapProvisionedSubscriptionLocally(params: {
   });
 
   return { subscriptionId: subscription.id };
+}
+
+export async function resolveProvisionEntitlementViaRpc(params: {
+  env: AppEnv['Bindings'];
+  input: Pick<BootstrapProvisionInput, 'userId' | 'orgId'>;
+}) {
+  if (!params.env.KILOCLAW_BILLING) {
+    throw new Error('KILOCLAW_BILLING service binding is not configured');
+  }
+
+  return await params.env.KILOCLAW_BILLING.resolveProvisionEntitlement({
+    userId: params.input.userId,
+    orgId: params.input.orgId,
+  });
+}
+
+export async function resolveProvisionEntitlementLocally(params: {
+  env: AppEnv['Bindings'];
+  input: Pick<BootstrapProvisionInput, 'userId' | 'orgId'>;
+}) {
+  const connectionString = params.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    throw new Error('HYPERDRIVE is not configured');
+  }
+
+  const db = getWorkerDb(connectionString);
+  return await resolveProvisionEntitlementWithDb({ db, input: params.input });
+}
+
+// Coupling note: this catch swallows every RPC error, including legitimate blocking
+// conditions thrown by the billing service (e.g. existing live subscription guards,
+// earlybird guards). The local fallback must therefore stay behaviourally identical
+// to the RPC path, otherwise we silently produce a different result when the RPC
+// fails. Today both paths execute `resolveProvisionEntitlementWithDb` from
+// `provision-bootstrap-shared.ts`, so they share the same guards. If the billing
+// service's `resolveProvisionEntitlement` ever diverges from the shared
+// implementation, this fallback contract must be revisited.
+export async function resolveProvisionEntitlementWithFallback(params: {
+  env: AppEnv['Bindings'];
+  input: Pick<BootstrapProvisionInput, 'userId' | 'orgId'>;
+}) {
+  try {
+    const result = await resolveProvisionEntitlementViaRpc(params);
+    return { ...result, mode: 'rpc' as const };
+  } catch (rpcError) {
+    console.error('[platform] Provision entitlement RPC failed; attempting local fallback', {
+      userId: params.input.userId,
+      orgId: params.input.orgId,
+      error: rpcError instanceof Error ? rpcError.message : String(rpcError),
+    });
+
+    const result = await resolveProvisionEntitlementLocally(params);
+    return { ...result, mode: 'local_fallback' as const };
+  }
 }
 
 export async function bootstrapProvisionedSubscriptionWithFallback(params: {

@@ -5,6 +5,7 @@ import {
   decryptEnvVars,
   setupDirectories,
   applyFeatureFlags,
+  cleanNpmCache,
   generateHooksToken,
   configureGitHub,
   configureLinear,
@@ -27,6 +28,7 @@ import {
   LINEAR_SECTION_CONFIG,
   KILOCLAW_MITIGATIONS_SECTION_CONFIG,
   PLUGIN_INSTALL_SECTION_CONFIG,
+  PROCESS_MODEL_SECTION_CONFIG,
   buildGatewayArgs,
   bootstrapCritical,
   bootstrapNonCritical,
@@ -305,6 +307,18 @@ describe('setupDirectories', () => {
     expect(env.NODE_COMPILE_CACHE).toBe('/var/tmp/openclaw-compile-cache');
     expect(env.INVOCATION_ID).toBe('1');
     expect(env.GOG_KEYRING_PASSWORD).toBe('kiloclaw');
+    expect(env.OPENCLAW_PLUGIN_STAGE_DIR).toBe('/usr/local/share/openclaw-plugin-runtime-deps');
+  });
+
+  it('preserves an explicit OpenClaw plugin stage dir', () => {
+    const { deps } = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      OPENCLAW_PLUGIN_STAGE_DIR: '/custom/plugin-runtime-deps',
+    };
+
+    setupDirectories(env, deps);
+
+    expect(env.OPENCLAW_PLUGIN_STAGE_DIR).toBe('/custom/plugin-runtime-deps');
   });
 
   it('derives KILO_API_URL from KILOCODE_API_BASE_URL origin', () => {
@@ -423,6 +437,49 @@ describe('applyFeatureFlags', () => {
 
     expect(env.NPM_CONFIG_PREFIX).toBeUndefined();
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('failed to create npm-global'));
+    warnSpy.mockRestore();
+  });
+});
+
+// ---- cleanNpmCache ----
+
+describe('cleanNpmCache', () => {
+  it('runs npm cache clean with the runtime env', () => {
+    const { deps, execCalls } = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      NPM_CONFIG_PREFIX: '/root/.npm-global',
+    };
+
+    cleanNpmCache(env, deps);
+
+    expect(execCalls).toContainEqual({
+      cmd: 'npm',
+      args: ['cache', 'clean', '--force'],
+      input: undefined,
+    });
+    expect(deps.execFileSync).toHaveBeenCalledWith(
+      'npm',
+      ['cache', 'clean', '--force'],
+      expect.objectContaining({
+        env: expect.objectContaining({ NPM_CONFIG_PREFIX: '/root/.npm-global' }),
+        stdio: 'pipe',
+      })
+    );
+  });
+
+  it('logs and continues when npm cache clean fails', () => {
+    const { deps } = fakeDeps();
+    (deps.execFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('npm failed');
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() => cleanNpmCache({}, deps)).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[controller] npm cache clean failed, continuing:',
+      'npm failed'
+    );
+
     warnSpy.mockRestore();
   });
 });
@@ -1226,6 +1283,57 @@ describe('runOnboardOrDoctor', () => {
     expect(preDoctorConfig.plugins?.entries).not.toHaveProperty('openclaw-channel-streamchat');
   });
 
+  it('back-fills hooks.allowRequestSessionKey on existing configs before doctor', () => {
+    const harness = fakeDeps();
+    harness.setConfigExists(true);
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({
+        hooks: {
+          enabled: true,
+          token: 'existing-token',
+          path: '/hooks',
+          mappings: [
+            {
+              id: 'cloudflare-email-inbound',
+              match: { path: 'email' },
+              action: 'agent',
+              wakeMode: 'now',
+              sessionKey: '{{payload.sessionKey}}',
+              messageTemplate: 'From: {{payload.from}}',
+              deliver: false,
+            },
+          ],
+        },
+      })
+    );
+
+    runOnboardOrDoctor(
+      {
+        KILOCODE_API_KEY: 'test-key',
+        OPENCLAW_GATEWAY_TOKEN: 'test-token',
+        AUTO_APPROVE_DEVICES: 'true',
+      },
+      harness.deps
+    );
+
+    const doctorCallIndex = (
+      harness.deps.execFileSync as ReturnType<typeof vi.fn>
+    ).mock.calls.findIndex(([_cmd, args]) => Array.isArray(args) && args.includes('doctor'));
+    expect(doctorCallIndex).not.toBe(-1);
+    const doctorCallOrder = (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[doctorCallIndex];
+
+    const preDoctorWriteIndex = (
+      harness.deps.writeFileSync as ReturnType<typeof vi.fn>
+    ).mock.invocationCallOrder.findIndex(order => order < doctorCallOrder);
+    expect(preDoctorWriteIndex).not.toBe(-1);
+
+    const preDoctorConfig = JSON.parse(harness.writeCalls[preDoctorWriteIndex].data) as {
+      hooks?: { allowRequestSessionKey?: boolean };
+    };
+    expect(preDoctorConfig.hooks?.allowRequestSessionKey).toBe(true);
+  });
+
   it('migrates legacy plaintext kilocode key in auth-profiles.json to a keyRef', () => {
     // Integration check: runOnboardOrDoctor must drive the auth-profiles
     // migration. On a legacy doctor boot, a plaintext key in
@@ -1808,6 +1916,7 @@ describe('TOOLS.md section configs', () => {
     LINEAR_SECTION_CONFIG,
     KILOCLAW_MITIGATIONS_SECTION_CONFIG,
     PLUGIN_INSTALL_SECTION_CONFIG,
+    PROCESS_MODEL_SECTION_CONFIG,
   ];
 
   for (const config of configs) {
@@ -1841,6 +1950,22 @@ describe('TOOLS.md section configs', () => {
     // old "OpenClaw Security Advisor" copy.
     expect(section).toContain('ShellSecurity plugin bundled with KiloClaw');
     expect(section).not.toContain('OpenClaw Security Advisor');
+  });
+
+  it('Process Model: pins systemd ban directives', () => {
+    const section = PROCESS_MODEL_SECTION_CONFIG.section;
+    // The lede must be unambiguous so an agent skimming the section
+    // does not skip past it.
+    expect(section).toContain('does NOT use systemd');
+    // Explain WHY systemctl exists on disk despite not being usable, so
+    // the agent does not treat `which systemctl` as evidence systemd works.
+    expect(section).toContain('which systemctl');
+    // The ban list — agents must not propose any of these.
+    expect(section).toContain('Do not suggest `systemctl`');
+    expect(section).toContain('`journalctl`');
+    expect(section).toContain('unit files');
+    // Tell the agent where process management actually lives.
+    expect(section).toContain('supervised by the controller');
   });
 
   it('Plugin Install: references the CLI command and plugins.allow field', () => {
@@ -1934,6 +2059,23 @@ describe('bootstrapCritical', () => {
 
     expect(phases).toEqual(['decrypting', 'directories', 'feature-flags']);
     expect(JSON.parse(env.KILOCLAW_GATEWAY_ARGS ?? '[]')).toContain('gw-token');
+  });
+
+  it('does not clean npm cache before readiness-critical steps complete', async () => {
+    const harness = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      KILOCODE_API_KEY: 'api-key',
+      OPENCLAW_GATEWAY_TOKEN: 'gw-token',
+      AUTO_APPROVE_DEVICES: 'true',
+    };
+
+    await bootstrapCritical(env, () => {}, harness.deps);
+
+    expect(harness.execCalls).not.toContainEqual({
+      cmd: 'npm',
+      args: ['cache', 'clean', '--force'],
+      input: undefined,
+    });
   });
 
   it('throws before later steps when decryption fails', async () => {
@@ -2125,6 +2267,11 @@ describe('bootstrap', () => {
       'tools-md',
       'mcporter',
     ]);
+    expect(harness.execCalls.at(-1)).toEqual({
+      cmd: 'npm',
+      args: ['cache', 'clean', '--force'],
+      input: undefined,
+    });
   });
 
   it('reports doctor phase when config exists', async () => {

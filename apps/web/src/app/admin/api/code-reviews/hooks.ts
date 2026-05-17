@@ -9,7 +9,7 @@ export type FilterParams = {
   userId?: string;
   organizationId?: string;
   ownershipType?: 'all' | 'personal' | 'organization';
-  agentVersion?: 'all' | 'v1' | 'v2';
+  retryAccountingMode?: 'final_outcome' | 'all_attempts';
 };
 
 export function useCodeReviewOverviewStats(params: FilterParams) {

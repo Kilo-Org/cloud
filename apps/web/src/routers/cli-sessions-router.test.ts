@@ -12,12 +12,7 @@ import {
 import { CliSessionSharedState } from '@/types/cli-session-shared-state';
 import { eq, and } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
-import {
-  sanitizeGitUrl,
-  isValidGitUrl,
-  parseGitUrl,
-  sanitizeForPostgres,
-} from './cli-sessions-router';
+import { sanitizeGitUrl, isValidGitUrl, sanitizeForPostgres } from './cli-sessions-router';
 
 jest.mock('@/lib/r2/cli-sessions', () => ({
   generateSignedUrls: jest.fn().mockResolvedValue({
@@ -1684,28 +1679,6 @@ describe('cli-sessions-router', () => {
 
       it('should handle HTTP URLs', () => {
         expect(sanitizeGitUrl('http://github.com/org/repo')).toBe('http://github.com/org/repo');
-      });
-    });
-
-    describe('parseGitUrl', () => {
-      it('should return sanitized URL for valid HTTPS', () => {
-        expect(parseGitUrl('https://user:pass@github.com/org/repo?token=abc')).toBe(
-          'https://github.com/org/repo'
-        );
-      });
-
-      it('should return sanitized URL for valid SSH', () => {
-        expect(parseGitUrl('git@github.com:org/repo.git?ref=main')).toBe(
-          'git@github.com:org/repo.git'
-        );
-      });
-
-      it('should return undefined for invalid URLs', () => {
-        expect(parseGitUrl('not-a-valid-url')).toBeUndefined();
-      });
-
-      it('should return undefined for non-http protocols', () => {
-        expect(parseGitUrl('ftp://github.com/repo')).toBeUndefined();
       });
     });
   });

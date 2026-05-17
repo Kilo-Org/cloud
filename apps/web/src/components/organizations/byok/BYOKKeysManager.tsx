@@ -53,6 +53,7 @@ import * as z from 'zod';
 const VERCEL_BYOK_PROVIDER_NAMES = {
   anthropic: 'Anthropic',
   bedrock: 'AWS Bedrock',
+  deepseek: 'DeepSeek',
   openai: 'OpenAI',
   inception: 'Inception',
   fireworks: 'Fireworks',
@@ -61,6 +62,7 @@ const VERCEL_BYOK_PROVIDER_NAMES = {
   mistral: 'Mistral AI (other models)',
   moonshotai: 'Moonshot AI',
   novita: 'Novita',
+  perplexity: 'Perplexity',
   xai: 'xAI',
   xiaomi: 'Xiaomi',
   zai: 'Z.ai (pay as you go)',

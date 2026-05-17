@@ -11,7 +11,7 @@ import { z } from 'zod';
 import * as fs from 'node:fs/promises';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
-import { buildKiloConfigContent } from './agent-runner';
+import { buildKiloConfigContent, mayorWorkdirForTown } from './agent-runner';
 import {
   getCurrentTownConfig,
   getLastAppliedEnvVarKeys,
@@ -30,6 +30,7 @@ type SDKInstance = {
   client: KiloClient;
   server: { url: string; close(): void };
   sessionCount: number;
+  configContent?: string;
 };
 
 const agents = new Map<string, ManagedAgent>();
@@ -70,6 +71,47 @@ export function isDraining(): boolean {
 // would corrupt each other's globals. This serializes server creation only;
 // once created, the SDK instance is reused without locking.
 let sdkServerLock: Promise<void> = Promise.resolve();
+
+// Per-agentId mutex for startAgent. Without this, two concurrent POST
+// /agents/start calls for the same agentId (observed in production: two
+// `[control-server] /agents/start:` log lines at the same millisecond)
+// both pass the re-entrancy check at the top of startAgent before either
+// has committed a 'starting' record. The second invocation aborts the
+// first's startupAbortController and both paths race on session creation,
+// idle timers, and SDK instance reference counts — leaving the agent in
+// an inconsistent state (orphaned sessions, leaked sessionCount, etc).
+//
+// Serialising per agentId means the second caller waits for the first to
+// complete (or abort) before proceeding, and then observes a consistent
+// snapshot in `agents.get(agentId)`.
+const startAgentLocks = new Map<string, Promise<unknown>>();
+
+// Exported for tests that exercise the locking behaviour directly without
+// bringing up the whole SDK/process harness. Production callers should use
+// `startAgent` (which wraps `startAgentImpl` with this lock).
+export async function withStartAgentLock<T>(agentId: string, fn: () => Promise<T>): Promise<T> {
+  const previous = startAgentLocks.get(agentId) ?? Promise.resolve();
+  // Use the same explicit `new Promise` pattern as `sdkServerLock` above
+  // instead of `Promise.withResolvers`, which is not available on older
+  // Bun runtimes. This module is imported during container startup, so a
+  // missing global here would throw before the crash handlers are
+  // registered and prevent the control server from starting.
+  let releaseLock!: () => void;
+  const lockPromise = new Promise<void>(resolve => {
+    releaseLock = resolve;
+  });
+  startAgentLocks.set(agentId, lockPromise);
+  try {
+    await previous.catch(() => {});
+    return await fn();
+  } finally {
+    releaseLock();
+    // Only clear the slot if no newer caller has queued behind us.
+    if (startAgentLocks.get(agentId) === lockPromise) {
+      startAgentLocks.delete(agentId);
+    }
+  }
+}
 
 export function getUptime(): number {
   return Date.now() - startTime;
@@ -540,6 +582,12 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
  * corrupting each other's globals. Once created, the SDK instance is
  * cached and returned without locking.
  */
+const PERSIST_ENV_KEYS = new Set([
+  'KILO_CONFIG_CONTENT',
+  'OPENCODE_CONFIG_CONTENT',
+  'GASTOWN_ORGANIZATION_ID',
+]);
+
 async function ensureSDKServer(
   workdir: string,
   env: Record<string, string>
@@ -547,10 +595,23 @@ async function ensureSDKServer(
   // Fast path: reuse existing instance without locking.
   const existing = sdkInstances.get(workdir);
   if (existing) {
-    return {
-      client: existing.client,
-      port: parseInt(new URL(existing.server.url).port),
-    };
+    const newConfig = env.KILO_CONFIG_CONTENT;
+    if (newConfig && newConfig !== existing.configContent) {
+      console.log(
+        `${MANAGER_LOG} ensureSDKServer: config mismatch for ${workdir}, evicting prewarmed server`
+      );
+      existing.server.close();
+      sdkInstances.delete(workdir);
+    } else {
+      for (const key of PERSIST_ENV_KEYS) {
+        const value = env[key];
+        if (value) process.env[key] = value;
+      }
+      return {
+        client: existing.client,
+        port: parseInt(new URL(existing.server.url).port),
+      };
+    }
   }
 
   // Slow path: serialize server creation. createKilo() reads process.cwd()
@@ -570,25 +631,27 @@ async function ensureSDKServer(
     // Re-check after acquiring lock — another caller may have created it.
     const cached = sdkInstances.get(workdir);
     if (cached) {
-      return {
-        client: cached.client,
-        port: parseInt(new URL(cached.server.url).port),
-      };
+      const newConfig = env.KILO_CONFIG_CONTENT;
+      if (newConfig && newConfig !== cached.configContent) {
+        console.log(
+          `${MANAGER_LOG} ensureSDKServer: config mismatch for ${workdir} (locked), evicting prewarmed server`
+        );
+        cached.server.close();
+        sdkInstances.delete(workdir);
+      } else {
+        for (const key of PERSIST_ENV_KEYS) {
+          const value = env[key];
+          if (value) process.env[key] = value;
+        }
+        return {
+          client: cached.client,
+          port: parseInt(new URL(cached.server.url).port),
+        };
+      }
     }
 
     const port = nextPort++;
     console.log(`${MANAGER_LOG} Starting SDK server on port ${port} for ${workdir}`);
-
-    // Keys that must persist on process.env after the SDK server starts.
-    // KILO_CONFIG_CONTENT / OPENCODE_CONFIG_CONTENT carry the kilo provider
-    // auth config (including organizationId) and must survive the snapshot
-    // restore so extractOrganizationId() and subsequent model hot-swaps can
-    // read them. GASTOWN_ORGANIZATION_ID is the standalone org ID env var.
-    const PERSIST_ENV_KEYS = new Set([
-      'KILO_CONFIG_CONTENT',
-      'OPENCODE_CONFIG_CONTENT',
-      'GASTOWN_ORGANIZATION_ID',
-    ]);
 
     const envSnapshot: Record<string, string | undefined> = {};
     for (const key of Object.keys(env)) {
@@ -605,7 +668,12 @@ async function ensureSDKServer(
         timeout: 30_000,
       });
 
-      const instance: SDKInstance = { client, server, sessionCount: 0 };
+      const instance: SDKInstance = {
+        client,
+        server,
+        sessionCount: 0,
+        configContent: env.KILO_CONFIG_CONTENT,
+      };
       sdkInstances.set(workdir, instance);
 
       console.log(`${MANAGER_LOG} SDK server started: ${server.url}`);
@@ -1005,8 +1073,19 @@ async function subscribeToEvents(
 /**
  * Start an agent: ensure SDK server, create session, subscribe to events,
  * send initial prompt.
+ *
+ * Serialises concurrent callers for the same agentId so the re-entrancy
+ * handling inside `startAgentImpl` observes a consistent snapshot.
  */
 export async function startAgent(
+  request: StartAgentRequest,
+  workdir: string,
+  env: Record<string, string>
+): Promise<ManagedAgent> {
+  return withStartAgentLock(request.agentId, () => startAgentImpl(request, workdir, env));
+}
+
+async function startAgentImpl(
   request: StartAgentRequest,
   workdir: string,
   env: Record<string, string>
@@ -1082,8 +1161,15 @@ export async function startAgent(
       phase: 'db_hydrated',
       elapsedMs: tDbDone - t0,
     });
+    postEventToWorker('agent.startup_phase', {
+      agentId: request.agentId,
+      role: request.role,
+      label: 'db_hydrated',
+      elapsedMs: tDbDone - t0,
+    });
 
     // 1. Ensure SDK server is running for this workdir
+    const sdkExistedBefore = sdkInstances.has(workdir);
     const { client, port } = await ensureSDKServer(workdir, env);
     agent.serverPort = port;
     const tSdkDone = Date.now();
@@ -1091,7 +1177,15 @@ export async function startAgent(
       agentId: request.agentId,
       phase: 'sdk_ready',
       elapsedMs: tSdkDone - t0,
-      phaseMs: tSdkDone - tDbDone,
+      phaseMs: sdkExistedBefore ? 0 : tSdkDone - tDbDone,
+      prewarmed: sdkExistedBefore,
+    });
+    postEventToWorker('agent.startup_phase', {
+      agentId: request.agentId,
+      role: request.role,
+      label: 'sdk_ready',
+      elapsedMs: tSdkDone - t0,
+      phaseMs: sdkExistedBefore ? 0 : tSdkDone - tDbDone,
     });
 
     // Check if startup was cancelled while waiting for the SDK server
@@ -1147,6 +1241,13 @@ export async function startAgent(
       elapsedMs: tSessionDone - t0,
       phaseMs: tSessionDone - tSdkDone,
       resumed,
+    });
+    postEventToWorker('agent.startup_phase', {
+      agentId: request.agentId,
+      role: request.role,
+      label: 'session_created',
+      elapsedMs: tSessionDone - t0,
+      phaseMs: tSessionDone - tSdkDone,
     });
 
     // Now check if startup was cancelled while creating the session.
@@ -1816,6 +1917,80 @@ export async function refreshTokenForAllAgents(): Promise<
 }
 
 /**
+ * Minimal shape of `client.session` needed by {@link applyModelToSession}.
+ * Defined structurally so tests can pass a fake without pulling in the
+ * whole KiloClient type.
+ */
+type SessionPromptClient = {
+  session: {
+    prompt: (args: {
+      path: { id: string };
+      body: {
+        parts: Array<{ type: 'text'; text: string }>;
+        model: { providerID: string; modelID: string };
+        noReply?: boolean;
+      };
+    }) => Promise<unknown>;
+  };
+};
+
+/**
+ * Push a model selection onto a mayor session.
+ *
+ * For a freshly created session, sends the startup prompt together with
+ * the model param so the first turn runs the configured model.
+ *
+ * For a resumed session the startup prompt MUST NOT be replayed (it
+ * would recreate the duplicate turn regression fixed by 9785570b9),
+ * but the per-session model on the SDK server still needs to be updated
+ * so the next user turn uses the newly-selected model. We do this by
+ * sending a `noReply: true` prompt that carries only the model param;
+ * the SDK treats this as a state update and does not trigger the model.
+ *
+ * Errors on the resumed path are swallowed: if pushing the model fails,
+ * the mayor falls back to whichever model the SDK server loaded from
+ * KILO_CONFIG_CONTENT at startup, which we have already updated.
+ */
+export async function applyModelToSession(params: {
+  client: SessionPromptClient;
+  sessionId: string;
+  model: string;
+  prompt: string;
+  resumedSession: boolean;
+}): Promise<void> {
+  const { client, sessionId, model, prompt, resumedSession } = params;
+  const modelParam = { providerID: 'kilo', modelID: model };
+  if (!resumedSession) {
+    await client.session.prompt({
+      path: { id: sessionId },
+      body: {
+        parts: [{ type: 'text', text: prompt }],
+        model: modelParam,
+      },
+    });
+    return;
+  }
+  try {
+    await client.session.prompt({
+      path: { id: sessionId },
+      body: {
+        parts: [{ type: 'text', text: '' }],
+        model: modelParam,
+        noReply: true,
+      },
+    });
+    console.log(
+      `${MANAGER_LOG} updateAgentModel: pushed model=${model} to resumed session ${sessionId}`
+    );
+  } catch (err) {
+    console.warn(
+      `${MANAGER_LOG} updateAgentModel: failed to push model to resumed session ${sessionId}:`,
+      err
+    );
+  }
+}
+
+/**
  * Update the model for a running agent by restarting its SDK server with
  * new KILO_CONFIG_CONTENT. The kilo serve child process reads the model
  * from KILO_CONFIG_CONTENT at startup (highest config precedence after
@@ -1958,16 +2133,13 @@ export async function updateAgentModel(
     const prompt = conversationHistory
       ? `${conversationHistory}\n\n${MAYOR_STARTUP_PROMPT}`
       : MAYOR_STARTUP_PROMPT;
-    if (!resumedSession) {
-      const modelParam = { providerID: 'kilo', modelID: model };
-      await client.session.prompt({
-        path: { id: agent.sessionId },
-        body: {
-          parts: [{ type: 'text', text: prompt }],
-          model: modelParam,
-        },
-      });
-    }
+    await applyModelToSession({
+      client,
+      sessionId: agent.sessionId,
+      model,
+      prompt,
+      resumedSession,
+    });
     agent.messageCount = 1;
 
     // 6. New server is healthy — now tear down the old one.
@@ -2419,6 +2591,139 @@ export async function stopAll(): Promise<void> {
   sdkInstances.clear();
 }
 
+function postEventToWorker(event: string, data: Record<string, unknown>): void {
+  const apiUrl = process.env.GASTOWN_API_URL;
+  const townId = process.env.GASTOWN_TOWN_ID;
+  const token = process.env.GASTOWN_CONTAINER_TOKEN;
+  if (!apiUrl || !townId || !token) return;
+
+  fetch(`${apiUrl}/api/towns/${townId}/container-events`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ event, townId, ...data }),
+  }).catch(err => {
+    console.warn(`${MANAGER_LOG} postEventToWorker failed for ${event}:`, err);
+  });
+}
+
+async function fetchMayorAgentId(
+  townId: string,
+  apiUrl: string,
+  token: string
+): Promise<string | null> {
+  try {
+    const resp = await fetch(`${apiUrl}/api/towns/${townId}/mayor-id`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!resp.ok) {
+      console.log(`${MANAGER_LOG} fetchMayorAgentId: ${resp.status} for town ${townId}`);
+      return null;
+    }
+    const json: unknown = await resp.json();
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      'agentId' in json &&
+      typeof (json as { agentId: unknown }).agentId === 'string'
+    ) {
+      return (json as { agentId: string }).agentId;
+    }
+    return null;
+  } catch (err) {
+    console.warn(`${MANAGER_LOG} fetchMayorAgentId failed:`, err);
+    return null;
+  }
+}
+
+function buildPrewarmEnv(mayorAgentId: string): Record<string, string> {
+  const env: Record<string, string> = {
+    KILO_TEST_HOME: `/tmp/agent-home-${mayorAgentId}`,
+    XDG_DATA_HOME: `/tmp/agent-home-${mayorAgentId}/.local/share`,
+  };
+  const keys = [
+    'GASTOWN_API_URL',
+    'GASTOWN_CONTAINER_TOKEN',
+    'GASTOWN_TOWN_ID',
+    'KILOCODE_TOKEN',
+    'GASTOWN_ORGANIZATION_ID',
+    'KILO_API_URL',
+    'KILO_OPENROUTER_BASE',
+  ];
+  for (const key of keys) {
+    const value = process.env[key];
+    if (value) env[key] = value;
+  }
+
+  const kilocodeToken = env.KILOCODE_TOKEN;
+  if (kilocodeToken) {
+    const organizationId = env.GASTOWN_ORGANIZATION_ID || undefined;
+    const configJson = buildKiloConfigContent(
+      kilocodeToken,
+      'anthropic/claude-sonnet-4.6',
+      'anthropic/claude-haiku-4.5',
+      organizationId
+    );
+    env.KILO_CONFIG_CONTENT = configJson;
+    env.OPENCODE_CONFIG_CONTENT = configJson;
+  }
+
+  return env;
+}
+
+async function prewarmMayorSDK(townId: string, apiUrl: string, token: string): Promise<void> {
+  const t0 = Date.now();
+
+  const mayorAgentId = await fetchMayorAgentId(townId, apiUrl, token);
+  if (!mayorAgentId) {
+    console.log(`${MANAGER_LOG} prewarmMayorSDK: no mayor agent for town ${townId}`);
+    return;
+  }
+
+  const workdir = mayorWorkdirForTown(townId);
+
+  await hydrateDbFromSnapshot(mayorAgentId, apiUrl, token, `mayor-${townId}`, townId);
+
+  const env = buildPrewarmEnv(mayorAgentId);
+
+  const existing = sdkInstances.get(workdir);
+  if (existing) {
+    const durationMs = Date.now() - t0;
+    log.info('mayor.prewarm_complete', {
+      agentId: mayorAgentId,
+      townId,
+      port: parseInt(new URL(existing.server.url).port),
+      durationMs,
+      alreadyRunning: true,
+    });
+    postEventToWorker('mayor.prewarm_complete', {
+      agentId: mayorAgentId,
+      role: 'mayor',
+      durationMs,
+    });
+    return;
+  }
+
+  const { port } = await ensureSDKServer(workdir, env);
+
+  const durationMs = Date.now() - t0;
+  log.info('mayor.prewarm_complete', {
+    agentId: mayorAgentId,
+    townId,
+    port,
+    durationMs,
+    alreadyRunning: false,
+  });
+  postEventToWorker('mayor.prewarm_complete', {
+    agentId: mayorAgentId,
+    role: 'mayor',
+    durationMs,
+  });
+}
+
 /**
  * Boot-time agent hydration — fetches the container registry from the
  * Gastown worker and resumes all registered agents.
@@ -2469,34 +2774,49 @@ export async function bootHydration(): Promise<void> {
 
   if (!Array.isArray(registry) || registry.length === 0) {
     console.log(`${LOG} No agents in registry — nothing to hydrate`);
-    return;
+  } else {
+    console.log(`${LOG} Resuming ${registry.length} agent(s) from registry`);
+
+    for (const entry of registry as Record<string, unknown>[]) {
+      const agentId = entry.agentId as string | undefined;
+      const agentRequest = entry.request as StartAgentRequest | undefined;
+      const workdir = entry.workdir as string | undefined;
+      const env = entry.env as Record<string, string> | undefined;
+
+      if (!agentId || !agentRequest || !workdir || !env) {
+        console.warn(`${LOG} Skipping malformed registry entry:`, entry);
+        continue;
+      }
+
+      // Registry entries were written with the token snapshot at dispatch
+      // time. If we just refreshed, overlay the fresh value so the hydrated
+      // kilo serve child inherits the current token.
+      const hydratedEnv = { ...env, GASTOWN_CONTAINER_TOKEN: token };
+
+      console.log(`${LOG} Resuming agent ${agentId} in ${workdir}`);
+      try {
+        await startAgent(agentRequest, workdir, hydratedEnv);
+        console.log(`${LOG} Agent ${agentId} resumed`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`${LOG} Failed to resume agent ${agentId}:`, msg);
+      }
+    }
   }
 
-  console.log(`${LOG} Resuming ${registry.length} agent(s) from registry`);
-
-  for (const entry of registry as Record<string, unknown>[]) {
-    const agentId = entry.agentId as string | undefined;
-    const agentRequest = entry.request as StartAgentRequest | undefined;
-    const workdir = entry.workdir as string | undefined;
-    const env = entry.env as Record<string, string> | undefined;
-
-    if (!agentId || !agentRequest || !workdir || !env) {
-      console.warn(`${LOG} Skipping malformed registry entry:`, entry);
-      continue;
-    }
-
-    // Registry entries were written with the token snapshot at dispatch
-    // time. If we just refreshed, overlay the fresh value so the hydrated
-    // kilo serve child inherits the current token.
-    const hydratedEnv = { ...env, GASTOWN_CONTAINER_TOKEN: token };
-
-    console.log(`${LOG} Resuming agent ${agentId} in ${workdir}`);
+  const mayorAlreadyResumed = (Array.isArray(registry) ? registry : []).some(
+    (e: unknown) =>
+      typeof e === 'object' &&
+      e !== null &&
+      'request' in e &&
+      typeof (e as { request?: { role?: string } }).request?.role === 'string' &&
+      (e as { request: { role: string } }).request.role === 'mayor'
+  );
+  if (!mayorAlreadyResumed) {
     try {
-      await startAgent(agentRequest, workdir, hydratedEnv);
-      console.log(`${LOG} Agent ${agentId} resumed`);
+      await prewarmMayorSDK(townId, apiUrl, token);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`${LOG} Failed to resume agent ${agentId}:`, msg);
+      console.warn(`${LOG} Mayor SDK prewarm failed:`, err);
     }
   }
 }

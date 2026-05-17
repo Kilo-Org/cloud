@@ -26,6 +26,9 @@ vi.mock('./logger.js', () => ({
     descriptor,
 }));
 import {
+  BranchNotFoundError,
+  GitCloneFailedError,
+  GitRepositoryNotFoundError,
   manageBranch,
   cloneGitHubRepo,
   cloneGitRepo,
@@ -137,27 +140,24 @@ describe('manageBranch', () => {
     });
 
     describe('and it is an upstream branch', () => {
-      it('should fetch and checkout GitHub pull refs', async () => {
+      it('should always fetch and checkout GitHub pull refs', async () => {
         mockExec
           .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-          .mockResolvedValueOnce({ exitCode: 1 }) // local check (does not exist)
-          .mockResolvedValueOnce({ exitCode: 1 }) // remote check (does not exist)
           .mockResolvedValueOnce({ exitCode: 0 }) // fetch pull ref
           .mockResolvedValueOnce({ exitCode: 0 }); // checkout from FETCH_HEAD
 
         const result = await manageBranch(fakeSession, '/workspace', 'refs/pull/42/head', true);
 
         const execCalls = mockExec.mock.calls;
-        expect(execCalls[3]?.[0]).toContain("git fetch origin 'refs/pull/42/head'");
-        expect(execCalls[4]?.[0]).toContain("git checkout -B 'refs/pull/42/head' FETCH_HEAD");
+        expect(execCalls[1]?.[0]).toContain("git fetch origin 'refs/pull/42/head'");
+        expect(execCalls[2]?.[0]).toContain("git checkout -B 'refs/pull/42/head' FETCH_HEAD");
+        expect(mockExec).toHaveBeenCalledTimes(3);
         expect(result).toBe('refs/pull/42/head');
       });
 
-      it('should fetch and checkout GitLab merge-request refs', async () => {
+      it('should always fetch and checkout GitLab merge-request refs', async () => {
         mockExec
           .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-          .mockResolvedValueOnce({ exitCode: 1 }) // local check (does not exist)
-          .mockResolvedValueOnce({ exitCode: 1 }) // remote check (does not exist)
           .mockResolvedValueOnce({ exitCode: 0 }) // fetch merge-request ref
           .mockResolvedValueOnce({ exitCode: 0 }); // checkout from FETCH_HEAD
 
@@ -169,18 +169,17 @@ describe('manageBranch', () => {
         );
 
         const execCalls = mockExec.mock.calls;
-        expect(execCalls[3]?.[0]).toContain("git fetch origin 'refs/merge-requests/99/head'");
-        expect(execCalls[4]?.[0]).toContain(
+        expect(execCalls[1]?.[0]).toContain("git fetch origin 'refs/merge-requests/99/head'");
+        expect(execCalls[2]?.[0]).toContain(
           "git checkout -B 'refs/merge-requests/99/head' FETCH_HEAD"
         );
+        expect(mockExec).toHaveBeenCalledTimes(3);
         expect(result).toBe('refs/merge-requests/99/head');
       });
 
       it('should throw when pull ref fetch fails', async () => {
         mockExec
           .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
-          .mockResolvedValueOnce({ exitCode: 1 }) // local check (does not exist)
-          .mockResolvedValueOnce({ exitCode: 1 }) // remote check (does not exist)
           .mockResolvedValueOnce({ exitCode: 1, stderr: 'fetch pull ref error' }); // fetch pull ref fails
 
         await expect(
@@ -188,15 +187,15 @@ describe('manageBranch', () => {
         ).rejects.toThrow('Failed to fetch pull ref refs/pull/42/head');
       });
 
-      it('should throw error', async () => {
+      it('should throw BranchNotFoundError', async () => {
         mockExec
           .mockResolvedValueOnce({ exitCode: 0 }) // git fetch
           .mockResolvedValueOnce({ exitCode: 1 }) // local check (does not exist)
           .mockResolvedValueOnce({ exitCode: 1 }); // remote check (does not exist)
 
-        await expect(manageBranch(fakeSession, '/workspace', 'main', true)).rejects.toThrow(
-          'Branch "main" not found in repository'
-        );
+        const promise = manageBranch(fakeSession, '/workspace', 'main', true);
+        await expect(promise).rejects.toBeInstanceOf(BranchNotFoundError);
+        await expect(promise).rejects.toThrow('Branch "main" not found in repository');
       });
     });
   });
@@ -589,6 +588,75 @@ describe('disk space checking', () => {
         })
       );
       expect(mockTimeoutWarn).toHaveBeenCalledWith('Sandbox operation timed out');
+    });
+
+    it('preserves sandbox 500 errors for recovery handling', async () => {
+      const error = new Error('HTTP error! status: 500');
+      Object.assign(error, { name: 'SandboxError' });
+      mockGitCheckout.mockRejectedValueOnce(error);
+
+      await expect(
+        cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git')
+      ).rejects.toBe(error);
+    });
+
+    it('throws GitRepositoryNotFoundError when git stderr says repository not found', async () => {
+      mockGitCheckout.mockRejectedValueOnce(
+        new Error(
+          "remote: Repository not found.\nfatal: repository 'https://example.com/repo' not found"
+        )
+      );
+
+      const promise = cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
+      await expect(promise).rejects.toBeInstanceOf(GitRepositoryNotFoundError);
+      await expect(promise).rejects.toThrow('Repository not found: https://example.com/repo.git');
+    });
+
+    it('throws GitRepositoryNotFoundError when stderr field on the SDK error contains the pattern', async () => {
+      const sdkError = Object.assign(new Error('Git checkout failed'), {
+        name: 'GitCheckoutError',
+        stderr: "remote: Repository not found.\nfatal: repository '...' not found",
+      });
+      mockGitCheckout.mockRejectedValueOnce(sdkError);
+
+      const promise = cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
+      await expect(promise).rejects.toBeInstanceOf(GitRepositoryNotFoundError);
+    });
+
+    it('throws GitCloneFailedError for LFS smudge failures (not repo-not-found)', async () => {
+      mockGitCheckout.mockRejectedValueOnce(
+        new Error(
+          "error: external filter 'git-lfs filter-process' failed: smudge filter lfs failed"
+        )
+      );
+
+      const promise = cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
+      await expect(promise).rejects.toBeInstanceOf(GitCloneFailedError);
+      await expect(promise).rejects.toThrow(
+        'Failed to clone repository from https://example.com/repo.git'
+      );
+    });
+
+    it('throws GitCloneFailedError when gitCheckout returns success=false', async () => {
+      mockGitCheckout.mockResolvedValue({ success: false, exitCode: 128 });
+
+      const promise = cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
+      await expect(promise).rejects.toBeInstanceOf(GitCloneFailedError);
+    });
+
+    it('sanitizes tokens out of GitCloneFailedError reason', async () => {
+      mockGitCheckout.mockRejectedValueOnce(
+        new Error('clone failed at https://x-access-token:secret123@example.com/repo.git')
+      );
+
+      try {
+        await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
+        throw new Error('Expected cloneGitRepo to reject');
+      } catch (err) {
+        expect(err).toBeInstanceOf(GitCloneFailedError);
+        expect((err as Error).message).not.toContain('secret123');
+        expect((err as Error).message).toContain('x-access-token:***@');
+      }
     });
   });
 

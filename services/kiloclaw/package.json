@@ -25,23 +25,24 @@
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/kilo-chat": "workspace:*",
+    "@kilocode/kiloclaw-instance-tiers": "workspace:*",
     "@kilocode/kiloclaw-secret-catalog": "workspace:*",
     "@kilocode/notifications": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
-    "@northflank/js-client": "^0.9.3",
+    "@northflank/js-client": "0.9.5",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
-    "jose": "^6.2.1",
+    "jose": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": ">=24 <25",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "@vitest/coverage-v8": "^4.1.0",
+    "@vitest/coverage-v8": "catalog:",
     "drizzle-kit": "catalog:",
+    "playwright": "^1.58.2",
     "typescript": "catalog:",
-    "vitest": "^4.1.0",
-    "wrangler": "catalog:",
-    "playwright": "^1.58.2"
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
   }
 }

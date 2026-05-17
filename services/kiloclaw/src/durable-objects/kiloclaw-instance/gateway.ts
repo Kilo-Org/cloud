@@ -15,6 +15,8 @@ import {
   OpenclawConfigResponseSchema,
   MorningBriefingStatusResponseSchema,
   MorningBriefingActionResponseSchema,
+  MorningBriefingInterestsResponseSchema,
+  MorningBriefingUserLocationResponseSchema,
   MorningBriefingReadResponseSchema,
   OpenclawWorkspaceImportResponseSchema,
   GatewayControllerError,
@@ -38,6 +40,9 @@ async function requireGatewayControllerContext(
 }> {
   if (!state.sandboxId) {
     throw new GatewayControllerError(409, 'Instance not provisioned');
+  }
+  if (state.status !== 'running') {
+    throw new GatewayControllerError(409, 'Instance is not running');
   }
 
   let routingTarget: ProviderRoutingTarget;
@@ -281,6 +286,7 @@ function isMorningBriefingWarmupControllerError(error: unknown): boolean {
   return (
     message.includes('instance has no machine id') ||
     message.includes('instance not provisioned') ||
+    message.includes('instance is not running') ||
     message.includes('gateway not running') ||
     message.includes('failed to reach gateway') ||
     message.includes('operation was aborted due to timeout')
@@ -552,6 +558,48 @@ export async function disableMorningBriefing(
       'POST',
       MorningBriefingActionResponseSchema,
       {},
+      { timeoutMs: 8_000 }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function updateMorningBriefingInterests(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  input: { topics: string[] }
+): Promise<z.infer<typeof MorningBriefingInterestsResponseSchema> | null> {
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/morning-briefing/interests',
+      'POST',
+      MorningBriefingInterestsResponseSchema,
+      input,
+      { timeoutMs: 8_000 }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function updateMorningBriefingUserLocation(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  input: { userLocation: string | null }
+): Promise<z.infer<typeof MorningBriefingUserLocationResponseSchema> | null> {
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/morning-briefing/user-location',
+      'POST',
+      MorningBriefingUserLocationResponseSchema,
+      input,
       { timeoutMs: 8_000 }
     );
   } catch (error) {

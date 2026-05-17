@@ -65,9 +65,10 @@ type ServiceMeta = {
 
 const serviceMeta: Record<string, ServiceMeta> = {
   // core
-  nextjs: { group: 'core', dependsOn: ['postgres', 'redis'] },
+  nextjs: { group: 'core', dependsOn: ['postgres', 'redis', 'stripe'] },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
+  stripe: { group: 'core', dependsOn: [] },
   // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
@@ -135,7 +136,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
   },
   // kiloclaw
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
-  'kiloclaw-stripe': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-docker-tcp': { group: 'kiloclaw', dependsOn: [] },
   notifications: {
     group: 'kiloclaw',
@@ -223,6 +223,20 @@ function getPortOffset(): number {
 
 export const portOffset = getPortOffset();
 
+function getNextjsTargetPort(): number {
+  const explicit = process.env.PORT;
+  if (explicit === undefined || explicit === '') return 3000 + portOffset;
+
+  const port = Number(explicit);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid PORT: ${explicit}`);
+  }
+
+  return port;
+}
+
+const nextjsTargetPort = getNextjsTargetPort();
+
 // ---------------------------------------------------------------------------
 // Wrangler config discovery
 // ---------------------------------------------------------------------------
@@ -306,7 +320,7 @@ function buildServiceDefs(): ServiceDef[] {
         name,
         type: 'nextjs',
         dir: 'apps/web',
-        port: 3000 + portOffset,
+        port: nextjsTargetPort,
         dependsOn: meta.dependsOn,
         command: ['pnpm', 'run', 'dev'],
         group: meta.group,
@@ -355,7 +369,6 @@ function buildServiceDefs(): ServiceDef[] {
     }
 
     if (name === 'kiloclaw-tunnel') {
-      const nextjsPort = 3000 + portOffset;
       const kiloclawPort = readWranglerPort(path.join(repoRoot, 'services/kiloclaw')) + portOffset;
       const kiloChatPort = readWranglerPort(path.join(repoRoot, 'services/kilo-chat')) + portOffset;
       defs.push({
@@ -367,7 +380,7 @@ function buildServiceDefs(): ServiceDef[] {
         command: [
           'tsx',
           'dev/local/scripts/start-tunnel.ts',
-          String(nextjsPort),
+          String(nextjsTargetPort),
           String(kiloclawPort),
           String(kiloChatPort),
         ],
@@ -376,14 +389,14 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
-    if (name === 'kiloclaw-stripe') {
+    if (name === 'stripe') {
       defs.push({
         name,
         type: 'process',
         dir: '.',
         port: 0,
         dependsOn: meta.dependsOn,
-        command: ['tsx', 'dev/local/scripts/start-stripe.ts'],
+        command: ['tsx', 'dev/local/scripts/start-stripe.ts', String(nextjsTargetPort)],
         group: meta.group,
       });
       continue;

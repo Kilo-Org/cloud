@@ -4,6 +4,7 @@ import {
   extractEmbeddingPromptInfo,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
+  parseTranscriptionUsageFromResponse,
 } from './llm-proxy-helpers';
 
 describe('checkOrganizationModelRestrictions', () => {
@@ -113,12 +114,11 @@ describe('checkOrganizationModelRestrictions', () => {
     });
   });
 
-  describe('provider policy - allow list applies after migration marker', () => {
+  describe('provider policy - allow list applies for enterprise plans', () => {
     it('should return provider config with only providers for enterprise plan', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          provider_policy_mode: 'allow',
           provider_allow_list: ['openai'],
         },
         organizationPlan: 'enterprise',
@@ -126,55 +126,12 @@ describe('checkOrganizationModelRestrictions', () => {
 
       expect(result.error).toBeNull();
       expect(result.providerConfig).toEqual({ only: ['openai'] });
-    });
-
-    it('should prefer provider_allow_list over legacy provider_deny_list after migration', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          provider_policy_mode: 'allow',
-          provider_allow_list: ['openai'],
-          provider_deny_list: ['openai'],
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-      expect(result.providerConfig).toEqual({ only: ['openai'] });
-    });
-
-    it('should ignore stale provider_allow_list without policy marker', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          provider_allow_list: ['openai'],
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-      expect(result.providerConfig).toBeUndefined();
-    });
-
-    it('should fall back to provider_deny_list before provider allow policy is enabled', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          provider_allow_list: ['openai'],
-          provider_deny_list: ['anthropic'],
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-      expect(result.providerConfig).toEqual({ ignore: ['anthropic'] });
     });
 
     it('should not return providerConfig for teams plan with provider_allow_list', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          provider_policy_mode: 'allow',
           provider_allow_list: ['openai'],
         },
         organizationPlan: 'teams',
@@ -188,7 +145,6 @@ describe('checkOrganizationModelRestrictions', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          provider_policy_mode: 'allow',
           provider_allow_list: [],
         },
         organizationPlan: 'enterprise',
@@ -226,25 +182,10 @@ describe('checkOrganizationModelRestrictions', () => {
       expect(result.providerConfig).toEqual({ data_collection: 'deny' });
     });
 
-    it('should combine provider_deny_list and data_collection before provider migration', () => {
+    it('should combine provider_allow_list and data_collection', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          provider_deny_list: ['openai'],
-          data_collection: 'deny',
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-      expect(result.providerConfig).toEqual({ ignore: ['openai'], data_collection: 'deny' });
-    });
-
-    it('should combine provider_allow_list and data_collection after provider migration', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          provider_policy_mode: 'allow',
           provider_allow_list: ['openai'],
           data_collection: 'deny',
         },
@@ -415,6 +356,94 @@ describe('parseEmbeddingUsageFromResponse', () => {
     const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.inputTokens).toBe(42);
+  });
+});
+
+describe('parseTranscriptionUsageFromResponse', () => {
+  function makeResponse(overrides: Record<string, unknown> = {}) {
+    return JSON.stringify({
+      id: 'stt-123',
+      model: 'openai/gpt-4o-mini-transcribe',
+      text: 'hello world',
+      usage: {
+        seconds: 2.5,
+        input_tokens: 10,
+        output_tokens: 4,
+        total_tokens: 14,
+        cost: 0.00002,
+        is_byok: false,
+      },
+      ...overrides,
+    });
+  }
+
+  it('uses upstream cost and token fields', () => {
+    const result = parseTranscriptionUsageFromResponse(
+      makeResponse(),
+      200,
+      'openai/gpt-4o-mini-transcribe'
+    );
+
+    expect(result.cost_mUsd).toBe(20);
+    expect(result.inputTokens).toBe(10);
+    expect(result.outputTokens).toBe(4);
+  });
+
+  it('uses BYOK upstream inference cost when present', () => {
+    const result = parseTranscriptionUsageFromResponse(
+      makeResponse({
+        usage: {
+          seconds: 2.5,
+          input_tokens: 10,
+          output_tokens: 4,
+          total_tokens: 14,
+          cost: 0,
+          is_byok: true,
+          cost_details: { upstream_inference_cost: 0.00004 },
+        },
+      }),
+      200,
+      'openai/gpt-4o-mini-transcribe'
+    );
+
+    expect(result.cost_mUsd).toBe(40);
+    expect(result.is_byok).toBe(true);
+  });
+
+  it('stores duration as generation time', () => {
+    const result = parseTranscriptionUsageFromResponse(
+      makeResponse(),
+      200,
+      'openai/gpt-4o-mini-transcribe'
+    );
+
+    expect(result.generation_time).toBe(2.5);
+  });
+
+  it('falls back to requested model when response model is absent', () => {
+    const parsed = JSON.parse(makeResponse());
+    delete parsed.model;
+
+    const result = parseTranscriptionUsageFromResponse(
+      JSON.stringify(parsed),
+      200,
+      'openai/whisper-1'
+    );
+
+    expect(result.model).toBe('openai/whisper-1');
+  });
+
+  it('marks non-text responses as errors', () => {
+    const parsed = JSON.parse(makeResponse());
+    delete parsed.text;
+
+    const result = parseTranscriptionUsageFromResponse(
+      JSON.stringify(parsed),
+      200,
+      'openai/gpt-4o-mini-transcribe'
+    );
+
+    expect(result.hasError).toBe(true);
   });
 });
 

@@ -73,6 +73,8 @@ export async function recordExaUsage(params: {
   costMicrodollars: number;
   chargedToBalance: boolean;
   freeAllowanceMicrodollars: number;
+  featureId?: string;
+  type?: string;
 }): Promise<void> {
   const {
     userId,
@@ -81,6 +83,8 @@ export async function recordExaUsage(params: {
     costMicrodollars,
     chargedToBalance,
     freeAllowanceMicrodollars,
+    featureId,
+    type,
   } = params;
   const chargedAmount = chargedToBalance ? costMicrodollars : 0;
 
@@ -94,6 +98,8 @@ export async function recordExaUsage(params: {
     path,
     cost_microdollars: costMicrodollars,
     charged_to_balance: chargedToBalance,
+    feature_id: featureId ?? null,
+    type: type ?? null,
   });
 
   // 2. Upsert the monthly counter (atomic increment).

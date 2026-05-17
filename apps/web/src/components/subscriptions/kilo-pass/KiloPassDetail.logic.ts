@@ -1,3 +1,8 @@
+export {
+  getKiloPassProviderManagementModel,
+  type KiloPassProviderManagementModel,
+} from '@/components/profile/kilo-pass/kiloPassManagementAction';
+
 export type KiloPassSubscriptionDisplayModel = {
   status: string;
   detailDateLabel: 'Next billing' | 'Active until' | 'Resumes on' | 'Resume date';

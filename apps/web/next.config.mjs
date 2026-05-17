@@ -24,10 +24,17 @@ validateGitLfs();
 
 const monorepoRoot = resolve(import.meta.dirname, '../..');
 
+const localNetworkDevOrigins = [
+  '10.*.*.*',
+  '192.168.*.*',
+  ...Array.from({ length: 16 }, (_, index) => `172.${16 + index}.*.*`),
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  allowedDevOrigins: localNetworkDevOrigins,
 
   // Both values MUST be set to the monorepo root and kept in sync.
   // `vercel build` sets NEXT_PRIVATE_OUTPUT_TRACE_ROOT to the project dir (apps/web)

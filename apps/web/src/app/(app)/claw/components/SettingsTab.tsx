@@ -25,6 +25,7 @@ import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { useUser } from '@/hooks/useUser';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus, MorningBriefingStatusLite } from '@/lib/kiloclaw/types';
+import { morningBriefingStatusOk } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import {
@@ -67,6 +68,12 @@ import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DetailTile } from './DetailTile';
 import { EMBEDDING_MODELS, DEFAULT_EMBEDDING_MODEL } from './embeddingModels';
+import {
+  INTEREST_TOPIC_PRESETS,
+  MORNING_BRIEFING_INTERESTS_MAX_TOPICS,
+  MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH,
+  MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION,
+} from '@/lib/kiloclaw/morning-briefing-interests';
 import { deriveMorningBriefingCardState } from './morning-briefing-card-state';
 
 import { getEntriesByCategory } from '@kilocode/kiloclaw-secret-catalog';
@@ -495,12 +502,425 @@ function GoogleAccountCard({
   );
 }
 
+/**
+ * Inline editor for the user's free-text location, surfaced inside the
+ * Morning Briefing card. Drives the Local News source of the brief.
+ *
+ * When no location is set, surfaces an amber-bordered nudge with an
+ * inline input. When a location is set, renders a read-only value with
+ * an Edit affordance and a Clear button.
+ *
+ * Saves via the existing `updateConfig` mutation. Two delivery paths
+ * downstream:
+ *   - Instance running: the worker DO calls
+ *     `gateway.updateMorningBriefingUserLocation`, which writes the
+ *     new value into the plugin's `config.json`. The plugin reads
+ *     that file at the start of every brief via
+ *     `resolveLocationContextWithOverride`, so the next brief uses
+ *     the new location with no restart.
+ *   - Instance stopped: the DO updates state + Postgres, and the
+ *     `KILOCLAW_USER_LOCATION` env var is rewritten on next boot so
+ *     the plugin picks it up via the env-var fallback.
+ * Either way, the next briefing run picks up the new value — no
+ * manual restart needed.
+ */
+function MorningBriefingLocationEditor({
+  mutations,
+  userLocation,
+  userTimezone,
+}: {
+  mutations: ClawMutations;
+  userLocation: string | null;
+  userTimezone: string | null;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(userLocation ?? '');
+  const isSaving = mutations.updateConfig.isPending;
+  const hasLocation = userLocation !== null && userLocation.trim().length > 0;
+
+  function handleSave() {
+    const value = draft.trim();
+    if (value.length === 0) {
+      toast.error('Location cannot be empty');
+      return;
+    }
+    mutations.updateConfig.mutate(
+      { userLocation: value },
+      {
+        onSuccess: () => {
+          toast.success('Location saved. Changes take effect on your next morning brief.', {
+            duration: 6000,
+          });
+          setEditing(false);
+        },
+        onError: err => toast.error(`Failed to save location: ${err.message}`),
+      }
+    );
+  }
+
+  function handleClear() {
+    mutations.updateConfig.mutate(
+      { userLocation: null },
+      {
+        onSuccess: () => {
+          // Note: clearing the override only removes the Settings-side
+          // value. The plugin still falls back to the onboarding
+          // `KILOCLAW_USER_LOCATION` env var if one was set there, so
+          // Local News may keep running off the old onboarding
+          // location. To fully disable Local News, deselect it from
+          // the Interests list above.
+          toast.success(
+            'Override cleared. Local News will fall back to your onboarding location until you set a new one. To fully disable, deselect "Local News" from Interests.',
+            { duration: 8000 }
+          );
+          setDraft('');
+          setEditing(false);
+        },
+        onError: err => toast.error(`Failed to clear location: ${err.message}`),
+      }
+    );
+  }
+
+  function handleCancel() {
+    setDraft(userLocation ?? '');
+    setEditing(false);
+  }
+
+  const containerClass = hasLocation
+    ? 'rounded-lg border p-4'
+    : 'rounded-lg border border-amber-500/50 bg-amber-500/5 p-4';
+
+  return (
+    <div className={containerClass}>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-foreground text-sm font-semibold">Location for Local News</h3>
+        {hasLocation && !editing && (
+          <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+        )}
+      </div>
+
+      {hasLocation && !editing && (
+        <>
+          <p className="text-foreground text-sm">{userLocation}</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            Used by the Local News source in your morning briefing.
+            {userTimezone ? ` Timezone: ${userTimezone}.` : ''}
+          </p>
+        </>
+      )}
+
+      {!hasLocation && !editing && (
+        <>
+          <p className="text-foreground text-sm">
+            No location set. Local News is disabled until you provide one.
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {userTimezone
+              ? `We know your timezone is ${userTimezone}, but that's too coarse for local news — a city or address works much better.`
+              : 'Add a city or address (e.g. "San Francisco, CA") and we\'ll surface local headlines.'}
+          </p>
+          <div className="mt-3">
+            <Button size="sm" onClick={() => setEditing(true)}>
+              Set location
+            </Button>
+          </div>
+        </>
+      )}
+
+      {editing && (
+        <div className="flex flex-col gap-2">
+          <Input
+            placeholder="e.g. San Francisco, CA"
+            value={draft}
+            onChange={event => setDraft(event.target.value)}
+            disabled={isSaving}
+            maxLength={200}
+            autoFocus
+          />
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={handleCancel} disabled={isSaving}>
+              Cancel
+            </Button>
+            {hasLocation && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleClear}
+                disabled={isSaving}
+                className="text-destructive hover:text-destructive"
+              >
+                Clear
+              </Button>
+            )}
+            <p className="text-muted-foreground text-xs">
+              Changes take effect on your next morning brief.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MorningBriefingInterestsEditor({
+  mutations,
+  briefingStatus,
+  actionsReady,
+  supportsInterests,
+  onRequestUpgrade,
+}: {
+  mutations: ClawMutations;
+  briefingStatus: MorningBriefingStatusLite | undefined;
+  actionsReady: boolean;
+  /** Whether the running controller has the interests plugin route. */
+  supportsInterests: boolean;
+  /** Opens the focused upgrade confirmation flow. */
+  onRequestUpgrade?: () => void;
+}) {
+  // All hooks must run unconditionally before any early return so a
+  // `supportsInterests` transition (e.g. controller version query
+  // resolves to old) doesn't change the hook count between renders.
+  const storedTopics = briefingStatus?.interestTopics ?? null;
+  const [draft, setDraft] = useState<string[] | null>(null);
+  const [customInput, setCustomInput] = useState('');
+
+  // Sync draft from server when the stored value first arrives or changes
+  // out from under us (e.g. another tab saved). Drop changes the user has
+  // in flight if the saved set differs from what we last seeded.
+  const lastSeenStored = useRef<string | null>(null);
+  useEffect(() => {
+    if (storedTopics === null) return;
+    // JSON.stringify avoids the separator-collision case where a user-
+    // typed topic like "Tech||AI" would produce the same signature as
+    // two separate topics joined with "||". Matches the isDirty
+    // comparison just below.
+    const serialized = JSON.stringify(storedTopics);
+    if (lastSeenStored.current === serialized) return;
+    lastSeenStored.current = serialized;
+    setDraft(storedTopics);
+  }, [storedTopics]);
+
+  const effective = draft ?? storedTopics ?? [];
+  const isDirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(storedTopics ?? []);
+  const atCap = effective.length >= MORNING_BRIEFING_INTERESTS_MAX_TOPICS;
+
+  function togglePreset(topic: string) {
+    setDraft(current => {
+      const base = current ?? storedTopics ?? [];
+      const isSelected = base.some(value => value.toLowerCase() === topic.toLowerCase());
+      if (isSelected) {
+        return base.filter(value => value.toLowerCase() !== topic.toLowerCase());
+      }
+      if (base.length >= MORNING_BRIEFING_INTERESTS_MAX_TOPICS) return base;
+      return [...base, topic];
+    });
+  }
+
+  function addCustom() {
+    const value = customInput.trim().slice(0, MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH);
+    if (!value) return;
+    setDraft(current => {
+      const base = current ?? storedTopics ?? [];
+      if (base.some(existing => existing.toLowerCase() === value.toLowerCase())) return base;
+      if (base.length >= MORNING_BRIEFING_INTERESTS_MAX_TOPICS) return base;
+      return [...base, value];
+    });
+    setCustomInput('');
+  }
+
+  function removeTopic(topic: string) {
+    setDraft(current => {
+      const base = current ?? storedTopics ?? [];
+      return base.filter(value => value !== topic);
+    });
+  }
+
+  function reset() {
+    setDraft(storedTopics ?? []);
+    setCustomInput('');
+  }
+
+  function save() {
+    const topics = effective;
+    // For the org variant, `bind` (useOrgKiloClaw.ts) injects
+    // `organizationId` automatically; the personal variant takes just
+    // `{ topics }`. Same call site works for both.
+    mutations.updateBriefingInterests.mutate(
+      { topics },
+      {
+        onSuccess: () => {
+          toast.success('Interests saved');
+        },
+        onError: err => toast.error(`Failed to save interests: ${err.message}`),
+      }
+    );
+  }
+
+  const saving = mutations.updateBriefingInterests.isPending;
+  const disabled = !actionsReady;
+
+  // Early return AFTER all hooks have run. When the controller is too
+  // old the worker would return `controller_route_unavailable` on save,
+  // so render the same amber upgrade-required block + Upgrade button
+  // used by the parent MorningBriefingCard's controller-out-of-date
+  // branch. We deliberately don't surface a version number to end users
+  // (controller calver is an internal detail; just direct them to
+  // upgrade).
+  if (!supportsInterests) {
+    return (
+      <div className="mt-3 flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-amber-200">Upgrade required</p>
+          <p className="text-muted-foreground text-xs">
+            Interest topics require a newer KiloClaw version. Upgrade to choose the topics your
+            morning briefing covers.
+          </p>
+        </div>
+        {onRequestUpgrade && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300"
+            onClick={onRequestUpgrade}
+          >
+            Upgrade
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-border mt-3 flex flex-col gap-3 rounded-md border p-3">
+      <div className="flex flex-col gap-1">
+        <span className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+          Interests
+        </span>
+        <p className="text-muted-foreground text-xs">
+          Topics that scope tomorrow’s briefing web search.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {INTEREST_TOPIC_PRESETS.map(preset => {
+          const active = effective.some(value => value.toLowerCase() === preset.toLowerCase());
+          return (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => togglePreset(preset)}
+              disabled={disabled || saving || (!active && atCap)}
+              className={`focus-visible:ring-ring rounded-full border px-3 py-1 text-xs transition focus-visible:ring-2 focus-visible:outline-none ${
+                active
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-background text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50'
+              }`}
+              aria-pressed={active}
+            >
+              {preset}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={customInput}
+          onChange={event => setCustomInput(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              addCustom();
+            }
+          }}
+          maxLength={MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH}
+          placeholder="Add your own (e.g. Biotech)"
+          disabled={disabled || saving || atCap}
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={addCustom}
+          disabled={disabled || saving || !customInput.trim() || atCap}
+        >
+          Add
+        </Button>
+      </div>
+      {effective.some(
+        topic =>
+          !INTEREST_TOPIC_PRESETS.some(preset => preset.toLowerCase() === topic.toLowerCase())
+      ) && (
+        <div className="flex flex-wrap gap-2">
+          {effective
+            .filter(
+              topic =>
+                !INTEREST_TOPIC_PRESETS.some(preset => preset.toLowerCase() === topic.toLowerCase())
+            )
+            .map(topic => (
+              <span
+                key={topic}
+                className="border-border bg-muted text-foreground inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+              >
+                {topic}
+                <button
+                  type="button"
+                  onClick={() => removeTopic(topic)}
+                  aria-label={`Remove ${topic}`}
+                  className="hover:text-destructive"
+                  disabled={disabled || saving}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-muted-foreground text-xs">
+          {effective.length === 0
+            ? 'No topics selected. Briefing falls back to its default search.'
+            : `${effective.length} topic${effective.length === 1 ? '' : 's'} selected.`}
+        </span>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={reset}
+            disabled={!isDirty || saving}
+          >
+            Reset
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="primary"
+            onClick={save}
+            disabled={!isDirty || saving || disabled}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MorningBriefingCard({
   mutations,
   briefingStatus,
   fallbackReadiness,
   isRunning,
   actionsReady,
+  onRequestUpgrade,
+  supportsInterests,
+  userLocation,
+  userTimezone,
 }: {
   mutations: ClawMutations;
   briefingStatus: MorningBriefingStatusLite | undefined;
@@ -511,8 +931,29 @@ function MorningBriefingCard({
   };
   isRunning: boolean;
   actionsReady: boolean;
+  /** Callback that opens the focused upgrade confirmation flow. */
+  onRequestUpgrade?: () => void;
+  /**
+   * Whether the running controller image includes the
+   * `/_kilo/morning-briefing/interests` plugin route. When false the
+   * interests editor renders an "Upgrade Required" placeholder instead
+   * of the controls so users on stale images don't hit a 404 on save.
+   */
+  supportsInterests: boolean;
+  /**
+   * Current user-provided location (e.g. "San Francisco, CA"). Drives
+   * the Local News source — when null the brief surfaces a "set a
+   * location" nudge. Editable via the Location section below.
+   */
+  userLocation: string | null;
+  /** IANA timezone, shown as context next to the location editor. */
+  userTimezone: string | null;
 }) {
   const [requestedDay, setRequestedDay] = useState<'today' | 'yesterday' | null>(null);
+  // Card starts collapsed — matches the OpenClaw Manage Version section. The
+  // collapsed trigger surfaces enabled-state and the schedule at a glance;
+  // expand to reach the enable/disable/run controls and the interests editor.
+  const [open, setOpen] = useState(false);
   const { data: readData, isFetching: isReading } = useClawReadMorningBriefing(requestedDay, true);
 
   const sourceReadiness =
@@ -539,12 +980,17 @@ function MorningBriefingCard({
     } as const);
 
   const hasSchedule = Boolean(briefingStatus?.cron && briefingStatus?.timezone);
-  const { desiredEnabled, observedEnabled, hasResolvedBriefingToggleState, isWarmupState } =
-    deriveMorningBriefingCardState({
-      isRunning,
-      actionsReady,
-      briefingStatus,
-    });
+  const {
+    desiredEnabled,
+    observedEnabled,
+    hasResolvedBriefingToggleState,
+    isWarmupState,
+    isControllerOutOfDate,
+  } = deriveMorningBriefingCardState({
+    isRunning,
+    actionsReady,
+    briefingStatus,
+  });
   const reconcileState = briefingStatus?.reconcileState ?? 'idle';
   const lastReconcileAction = briefingStatus?.lastReconcileAction ?? null;
   const isTransitioning =
@@ -553,6 +999,10 @@ function MorningBriefingCard({
     mutations.disableMorningBriefing.isPending;
 
   const statusLabel = (() => {
+    if (isControllerOutOfDate) {
+      return 'Upgrade Required';
+    }
+
     if (isWarmupState) {
       return 'Instance Warming Up';
     }
@@ -585,13 +1035,14 @@ function MorningBriefingCard({
 
     return observedEnabled ? 'Enabled' : 'Disabled';
   })();
-  const statusVariant = isWarmupState
-    ? 'secondary'
-    : statusLabel === 'Instance Stopped'
+  const statusVariant =
+    isControllerOutOfDate || isWarmupState
       ? 'secondary'
-      : observedEnabled || (isTransitioning && desiredEnabled)
-        ? 'default'
-        : 'secondary';
+      : statusLabel === 'Instance Stopped'
+        ? 'secondary'
+        : observedEnabled || (isTransitioning && desiredEnabled)
+          ? 'default'
+          : 'secondary';
 
   const readySources = [
     sourceReadiness.github.configured ? 'GitHub' : null,
@@ -610,12 +1061,17 @@ function MorningBriefingCard({
       : readySources.length === 0
         ? 'No sources are connected yet. Configure GitHub, Linear, or Web Search to generate richer briefings.'
         : `Connected sources: ${joinFriendlyList(readySources)}. Disconnected sources: ${joinFriendlyList(missingSources)}.`;
-  const showScheduleDetails = !isWarmupState && hasSchedule && desiredEnabled;
-  const controlsEnabled = actionsReady && !isWarmupState;
+  const showScheduleDetails =
+    !isWarmupState && !isControllerOutOfDate && hasSchedule && desiredEnabled;
+  const controlsEnabled = actionsReady && !isWarmupState && !isControllerOutOfDate;
   const canUseBriefingControls = controlsEnabled && desiredEnabled;
   const lastDelivery = briefingStatus?.lastDelivery ?? [];
   const showLastDelivery =
-    !isWarmupState && actionsReady && hasResolvedBriefingToggleState && lastDelivery.length > 0;
+    !isWarmupState &&
+    !isControllerOutOfDate &&
+    actionsReady &&
+    hasResolvedBriefingToggleState &&
+    lastDelivery.length > 0;
   const deliveryChannelLabel = {
     telegram: 'Telegram',
     discord: 'Discord',
@@ -633,145 +1089,242 @@ function MorningBriefingCard({
     config_unavailable: 'Config unavailable',
   } as const;
 
+  // One-line summary surfaced in the collapsed trigger. Conveys
+  // "what's currently happening" without expanding the card. The amber
+  // upgrade banner above the collapsible covers the controller-out-of-
+  // date case, so we don't repeat it here.
+  const triggerSummary = (() => {
+    if (isControllerOutOfDate) return null;
+    if (isWarmupState) return 'Instance warming up';
+    if (showScheduleDetails && briefingStatus?.cron && briefingStatus?.timezone) {
+      const schedule = formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone);
+      const last = briefingStatus.lastGeneratedDate;
+      return last ? `${schedule} · last ${last}` : schedule;
+    }
+    if (!desiredEnabled) return 'Disabled — expand to enable';
+    return null;
+  })();
+
   return (
-    <div className="rounded-lg border px-4 py-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
-          <Newspaper className="text-muted-foreground h-5 w-5 shrink-0" />
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium">Morning Briefing</p>
-              <Badge variant={statusVariant} className="px-1.5 py-0 text-[10px] leading-4">
-                {statusLabel}
-              </Badge>
-            </div>
-            {showScheduleDetails && briefingStatus?.cron && briefingStatus?.timezone && (
-              <p className="text-muted-foreground text-xs">
-                {formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone)}
-              </p>
-            )}
-            {showScheduleDetails && (
-              <p className="text-muted-foreground text-xs">
-                Last generated: {briefingStatus?.lastGeneratedDate ?? '(none)'}
-              </p>
-            )}
-            {showLastDelivery && (
-              <p className="text-muted-foreground text-xs">
-                Last delivery:{' '}
-                {lastDelivery
-                  .map(entry => {
-                    const channel = deliveryChannelLabel[entry.channel] ?? entry.channel;
-                    const status = deliveryStatusLabel[entry.status] ?? entry.status;
-                    const reason = entry.reason
-                      ? (deliveryReasonLabel[entry.reason] ?? entry.reason)
-                      : undefined;
-                    return reason ? `${channel} (${status}: ${reason})` : `${channel} (${status})`;
-                  })
-                  .join(' • ')}
-              </p>
-            )}
-
-            {isWarmupState && (
-              <p className="text-muted-foreground mt-2 text-xs">
-                Instance is still warming up. Morning Briefing controls will become available once
-                the gateway is fully ready.
-              </p>
-            )}
-
-            <p className="text-muted-foreground mt-3 text-xs">{sourceSummaryText}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={
-              !controlsEnabled || desiredEnabled || mutations.enableMorningBriefing.isPending
-            }
-            onClick={() => {
-              mutations.enableMorningBriefing.mutate(
-                {},
-                {
-                  onSuccess: () => toast.success('Morning Briefing enabled'),
-                  onError: err => toast.error(`Failed to enable Morning Briefing: ${err.message}`),
-                }
-              );
-            }}
-          >
-            {mutations.enableMorningBriefing.isPending ? 'Enabling...' : 'Enable'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={
-              !controlsEnabled || !desiredEnabled || mutations.disableMorningBriefing.isPending
-            }
-            onClick={() => {
-              mutations.disableMorningBriefing.mutate(undefined, {
-                onSuccess: () => toast.success('Morning Briefing disabled'),
-                onError: err => toast.error(`Failed to disable Morning Briefing: ${err.message}`),
-              });
-            }}
-          >
-            {mutations.disableMorningBriefing.isPending ? 'Disabling...' : 'Disable'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!canUseBriefingControls || mutations.runMorningBriefing.isPending}
-            onClick={() => {
-              mutations.runMorningBriefing.mutate(undefined, {
-                onSuccess: data => {
-                  const date = data.date ? ` for ${data.date}` : '';
-                  toast.success(`Morning Briefing generated${date}`);
-                },
-                onError: err => toast.error(`Failed to run Morning Briefing: ${err.message}`),
-              });
-            }}
-          >
-            {mutations.runMorningBriefing.isPending ? 'Running...' : 'Run Now'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!canUseBriefingControls}
-            onClick={() => setRequestedDay('today')}
-          >
-            View Today
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!canUseBriefingControls}
-            onClick={() => setRequestedDay('yesterday')}
-          >
-            View Yesterday
-          </Button>
-        </div>
-      </div>
-
-      {!desiredEnabled && controlsEnabled && (
-        <p className="text-muted-foreground mt-2 text-xs">
-          Enable Morning Briefing to get a personalized briefing everyday.
-        </p>
-      )}
-
-      {requestedDay && (
-        <div className="mt-3">
-          {isReading ? (
-            <p className="text-muted-foreground text-xs">Loading saved briefing...</p>
-          ) : readData?.markdown ? (
-            <pre className="bg-muted max-h-56 overflow-auto rounded p-3 text-xs whitespace-pre-wrap">
-              {readData.markdown}
-            </pre>
-          ) : (
+    <>
+      {/* Amber upgrade banner stays outside the collapsible so the call-to-
+          action is visible without expanding. */}
+      {isControllerOutOfDate && (
+        <div className="mb-3 flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-amber-200">Upgrade required</p>
             <p className="text-muted-foreground text-xs">
-              No saved briefing for {requestedDay === 'today' ? 'today' : 'yesterday'}.
+              Morning Briefing requires a newer KiloClaw version. Upgrade to enable scheduling and
+              delivery.
             </p>
+          </div>
+          {onRequestUpgrade && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300"
+              onClick={onRequestUpgrade}
+            >
+              Upgrade
+            </Button>
           )}
         </div>
       )}
-    </div>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <div className="rounded-lg border">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-colors"
+            >
+              <Newspaper className="text-muted-foreground h-5 w-5 shrink-0" />
+              <div className="flex min-w-0 flex-1 flex-col items-start">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Morning Briefing</span>
+                  <Badge variant={statusVariant} className="px-1.5 py-0 text-[10px] leading-4">
+                    {statusLabel}
+                  </Badge>
+                </div>
+                {triggerSummary && (
+                  <span className="text-muted-foreground text-xs">{triggerSummary}</span>
+                )}
+              </div>
+              <ChevronDown
+                className={`text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-200 ${
+                  open ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            <Separator />
+            <div className="space-y-3 px-4 py-3">
+              {showScheduleDetails && briefingStatus?.cron && briefingStatus?.timezone && (
+                <p className="text-muted-foreground text-xs">
+                  {formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone)}
+                </p>
+              )}
+              {showScheduleDetails && (
+                <p className="text-muted-foreground text-xs">
+                  Last generated: {briefingStatus?.lastGeneratedDate ?? '(none)'}
+                </p>
+              )}
+              {showLastDelivery && (
+                <p className="text-muted-foreground text-xs">
+                  Last delivery:{' '}
+                  {lastDelivery
+                    .map(entry => {
+                      const channel = deliveryChannelLabel[entry.channel] ?? entry.channel;
+                      const status = deliveryStatusLabel[entry.status] ?? entry.status;
+                      const reason = entry.reason
+                        ? (deliveryReasonLabel[entry.reason] ?? entry.reason)
+                        : undefined;
+                      return reason
+                        ? `${channel} (${status}: ${reason})`
+                        : `${channel} (${status})`;
+                    })
+                    .join(' • ')}
+                </p>
+              )}
+
+              {isWarmupState && (
+                <p className="text-muted-foreground text-xs">
+                  Instance is still warming up. Morning Briefing controls will become available once
+                  the gateway is fully ready.
+                </p>
+              )}
+
+              <p className="text-muted-foreground text-xs">{sourceSummaryText}</p>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    !controlsEnabled || desiredEnabled || mutations.enableMorningBriefing.isPending
+                  }
+                  onClick={() => {
+                    mutations.enableMorningBriefing.mutate(
+                      {},
+                      {
+                        onSuccess: () => toast.success('Morning Briefing enabled'),
+                        onError: err =>
+                          toast.error(`Failed to enable Morning Briefing: ${err.message}`),
+                      }
+                    );
+                  }}
+                >
+                  {mutations.enableMorningBriefing.isPending ? 'Enabling...' : 'Enable'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    !controlsEnabled ||
+                    !desiredEnabled ||
+                    mutations.disableMorningBriefing.isPending
+                  }
+                  onClick={() => {
+                    mutations.disableMorningBriefing.mutate(undefined, {
+                      onSuccess: () => toast.success('Morning Briefing disabled'),
+                      onError: err =>
+                        toast.error(`Failed to disable Morning Briefing: ${err.message}`),
+                    });
+                  }}
+                >
+                  {mutations.disableMorningBriefing.isPending ? 'Disabling...' : 'Disable'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!canUseBriefingControls || mutations.runMorningBriefing.isPending}
+                  onClick={() => {
+                    mutations.runMorningBriefing.mutate(undefined, {
+                      onSuccess: data => {
+                        const date = data.date ? ` for ${data.date}` : '';
+                        toast.success(`Morning Briefing generated${date}`);
+                      },
+                      onError: err => toast.error(`Failed to run Morning Briefing: ${err.message}`),
+                    });
+                  }}
+                >
+                  {mutations.runMorningBriefing.isPending ? 'Running...' : 'Run Now'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!canUseBriefingControls}
+                  onClick={() => setRequestedDay('today')}
+                >
+                  View Today
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!canUseBriefingControls}
+                  onClick={() => setRequestedDay('yesterday')}
+                >
+                  View Yesterday
+                </Button>
+              </div>
+
+              {!desiredEnabled && controlsEnabled && (
+                <p className="text-muted-foreground text-xs">
+                  Enable Morning Briefing to get a personalized briefing everyday.
+                </p>
+              )}
+
+              <MorningBriefingInterestsEditor
+                mutations={mutations}
+                briefingStatus={briefingStatus}
+                actionsReady={actionsReady}
+                supportsInterests={supportsInterests}
+                onRequestUpgrade={onRequestUpgrade}
+              />
+
+              {/* Location card only matters when the user has opted
+                  into Local News. For everyone else it's noise. Case-
+                  insensitive trim matches what the plugin's
+                  `wantsLocalNews` does so custom-cased entries like
+                  "local news" still count. */}
+              {(briefingStatus?.interestTopics ?? []).some(
+                topic => topic.trim().toLowerCase() === 'local news'
+              ) && (
+                <MorningBriefingLocationEditor
+                  mutations={mutations}
+                  userLocation={userLocation}
+                  userTimezone={userTimezone}
+                />
+              )}
+
+              {requestedDay && (
+                <div>
+                  {isReading ? (
+                    <p className="text-muted-foreground text-xs">Loading saved briefing...</p>
+                  ) : readData?.markdown ? (
+                    <>
+                      <pre className="bg-muted max-h-56 overflow-auto rounded p-3 text-xs whitespace-pre-wrap">
+                        {readData.markdown}
+                      </pre>
+                      <p className="text-muted-foreground mt-2 text-xs italic">
+                        Raw markdown output. Briefings delivered to chat are reformatted for
+                        readability.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">
+                      No saved briefing for {requestedDay === 'today' ? 'today' : 'yesterday'}.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
+    </>
   );
 }
 
@@ -1341,7 +1894,10 @@ export function SettingsTab({
   } = useClawUpdateAvailable(status);
   const { data: myPin } = useClawMyPin();
   const morningBriefingStatusQuery = useClawMorningBriefingStatus(isRunning);
-  const morningBriefingStatus = morningBriefingStatusQuery.data;
+  // Narrow off the instance-not-running sentinel that the worker returns
+  // when DO state isn't `running`. The MB card only renders meaningfully
+  // when the OK-shape payload is available.
+  const morningBriefingStatus = morningBriefingStatusOk(morningBriefingStatusQuery.data);
   const gatewayReadyQuery = useClawGatewayReady(isRunning);
   const gatewayReady = gatewayReadyQuery.data;
   const [confirmDestroy, setConfirmDestroy] = useState(false);
@@ -1432,12 +1988,30 @@ export function SettingsTab({
     cleanVersion(controllerVersion?.version),
     OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION
   );
+  // Optimistic during the version query so we don't briefly flash
+  // "Upgrade required" while loading. Matches the onboarding-flow guard
+  // in `ClawOnboardingFlow.tsx` (`controllerVersionQuery.isPending ||
+  // calverAtLeast(...)`). Important for hook stability too — the editor
+  // returns early when this is false, so a false→true transition mid-
+  // session would otherwise trip the rules-of-hooks check on the next
+  // render.
+  const supportsBriefingInterests =
+    isLoadingControllerVersion ||
+    calverAtLeast(
+      cleanVersion(controllerVersion?.version),
+      MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION
+    );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
   const braveSearchConfigured = configuredSecrets['brave-search'] ?? false;
+  // Reflects which provider is actually active. Mirrors controller arbitration
+  // in services/kiloclaw/controller/src/config-writer.ts.
   const exaSearchConfigured =
-    supportsExaSearchUi && (kiloExaSearchMode === 'kilo-proxy' || kiloExaSearchMode === null);
+    supportsExaSearchUi &&
+    (kiloExaSearchMode === 'kilo-proxy' || (kiloExaSearchMode === null && !braveSearchConfigured));
+  // Editor reflects stored intent, not the resolved active provider, so users
+  // can persist an explicit choice when their mode is unset.
   const exaSearchDisplayMode =
     supportsExaSearchUi && kiloExaSearchMode === null ? 'kilo-proxy' : kiloExaSearchMode;
   const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;
@@ -1925,6 +2499,10 @@ export function SettingsTab({
               briefingStatus={morningBriefingStatus}
               isRunning={isRunning}
               actionsReady={morningBriefingActionsReady}
+              onRequestUpgrade={onRequestUpgrade}
+              supportsInterests={supportsBriefingInterests}
+              userLocation={status.userLocation ?? null}
+              userTimezone={status.userTimezone ?? null}
               fallbackReadiness={{
                 githubConfigured: configuredSecrets.github ?? false,
                 linearConfigured: configuredSecrets.linear ?? false,

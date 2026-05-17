@@ -12,14 +12,28 @@ export type BootstrapProvisionSubscriptionParams = {
   userId: string;
   instanceId: string;
   orgId?: string | null;
+  expectedPriceVersion?: string;
 };
 
 export type BootstrapProvisionSubscriptionResult = {
   subscriptionId: string;
 };
 
+export type ResolveProvisionEntitlementParams = {
+  userId: string;
+  orgId?: string | null;
+};
+
+export type ResolveProvisionEntitlementResult = {
+  priceVersion: string;
+  selfServiceInstanceType: string;
+};
+
 export type KiloClawBillingBinding = Fetcher & {
   bootstrapProvisionSubscription(
     params: BootstrapProvisionSubscriptionParams
   ): Promise<BootstrapProvisionSubscriptionResult>;
+  resolveProvisionEntitlement(
+    params: ResolveProvisionEntitlementParams
+  ): Promise<ResolveProvisionEntitlementResult>;
 };

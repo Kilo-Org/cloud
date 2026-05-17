@@ -11,7 +11,7 @@ import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawBillingStatus } from '@/lib/hooks/use-kiloclaw-queries';
-import { formatBillingDate } from '@/lib/hooks/use-kiloclaw-billing';
+import { formatBillingDate, formatRemainingDays } from '@/lib/hooks/use-kiloclaw-billing';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -60,7 +60,7 @@ function PlanDetails({
     );
   }
   if (billing.trial && !billing.trial.expired) {
-    const daysText = `${String(billing.trial.daysRemaining)} day${billing.trial.daysRemaining === 1 ? '' : 's'} left`;
+    const daysText = formatRemainingDays(billing.trial.daysRemaining);
     return (
       <View>
         <DetailRow label="Plan" value="Free Trial" />

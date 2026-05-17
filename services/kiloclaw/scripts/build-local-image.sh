@@ -114,11 +114,21 @@ fi
 IMAGE="${IMAGE:-kiloclaw:local}"
 GIT_SHA="$(git -C "$KILOCLAW_DIR" rev-parse HEAD 2>/dev/null || echo 'unknown')"
 
+# Resolve repo root for the `workspace` build context. The Dockerfile's
+# plugin builder stages reference `COPY --from=workspace pnpm-workspace.yaml
+# ...` to bring in the monorepo's pnpm-workspace.yaml + lockfile + patches/.
+# CI passes the same `--build-context workspace=.` from the repo root (see
+# .github/workflows/deploy-kiloclaw.yml + push-dev-kiloclaw.yml); without it
+# Docker tries to pull a non-existent `workspace:latest` from Docker Hub
+# and fails with `insufficient_scope`.
+REPO_ROOT="$(cd "$KILOCLAW_DIR/../.." && pwd)"
+
 echo "Building local image $IMAGE ..."
 docker build \
   -f "$DOCKERFILE" \
   --build-arg "CONTROLLER_COMMIT=$GIT_SHA" \
   --build-arg "CONTROLLER_CACHE_BUST=$(date +%s)" \
+  --build-context "workspace=$REPO_ROOT" \
   -t "$IMAGE" \
   "$KILOCLAW_DIR"
 

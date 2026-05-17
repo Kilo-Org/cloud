@@ -14,7 +14,12 @@
   "vars": {
     "ENVIRONMENT": "production",
   },
-  "routes": ["ai-attribution.kiloapps.io/*"],
+  "routes": [
+    {
+      "pattern": "ai-attribution.kiloapps.io/*",
+      "zone_name": "kiloapps.io",
+    },
+  ],
   "durable_objects": {
     "bindings": [
       {

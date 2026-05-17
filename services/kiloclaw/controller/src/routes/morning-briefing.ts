@@ -102,6 +102,30 @@ export function registerMorningBriefingRoutes(
     return response;
   });
 
+  app.post('/_kilo/morning-briefing/interests', async c => {
+    const body = await readJsonBody(c);
+    const response = await proxyMorningBriefingRoute({
+      supervisor,
+      gatewayToken: expectedToken,
+      path: '/interests',
+      method: 'POST',
+      body,
+    });
+    return response;
+  });
+
+  app.post('/_kilo/morning-briefing/user-location', async c => {
+    const body = await readJsonBody(c);
+    const response = await proxyMorningBriefingRoute({
+      supervisor,
+      gatewayToken: expectedToken,
+      path: '/user-location',
+      method: 'POST',
+      body,
+    });
+    return response;
+  });
+
   app.get('/_kilo/morning-briefing/read/today', async c => {
     const response = await proxyMorningBriefingRoute({
       supervisor,

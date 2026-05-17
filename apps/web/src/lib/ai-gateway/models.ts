@@ -7,7 +7,7 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
-} from '@/lib/ai-gateway/kilo-auto';
+} from '@/lib/ai-gateway/auto-model';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   claude_sonnet_clawsetup_model,
@@ -38,12 +38,8 @@ import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 export const autoFreeModels = [
-  'inclusionai/ling-2.6-1t:free',
   'nvidia/nemotron-3-super-120b-a12b:free',
   'poolside/laguna-m.1:free',
-  grok_code_fast_1_optimized_free_model.status === 'public'
-    ? grok_code_fast_1_optimized_free_model.public_id
-    : null,
   stepfun_35_flash_free_model.status === 'public' ? stepfun_35_flash_free_model.public_id : null,
 ].filter(m => m !== null);
 

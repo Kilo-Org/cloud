@@ -8,7 +8,6 @@ type ClawBannerState =
   | 'trial_active'
   | 'trial_ending_soon'
   | 'trial_ending_very_soon'
-  | 'trial_expires_today'
   | 'earlybird_active'
   | 'earlybird_ending_soon'
   | 'subscription_canceling'
@@ -33,16 +32,13 @@ function deriveSubscriptionBannerState(
   return undefined;
 }
 
-function deriveTrialBannerState(
+export function deriveTrialBannerState(
   trial: NonNullable<ClawBillingStatus['trial']>
 ): ClawBannerState | undefined {
   if (trial.expired) {
     return undefined;
   }
   const d = trial.daysRemaining;
-  if (d === 0) {
-    return 'trial_expires_today';
-  }
   if (d <= 1) {
     return 'trial_ending_very_soon';
   }
@@ -89,4 +85,12 @@ export function formatBillingDate(iso: string): string {
     day: 'numeric',
     year: 'numeric',
   });
+}
+
+export function formatRemainingDays(daysRemaining: number): string {
+  if (daysRemaining <= 0) {
+    return 'Less than 1 day left';
+  }
+
+  return `${String(daysRemaining)} day${daysRemaining === 1 ? '' : 's'} left`;
 }

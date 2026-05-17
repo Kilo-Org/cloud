@@ -16,6 +16,7 @@ import { execFileSync as nodeExecFileSync, spawn as nodeSpawn } from 'node:child
 import type { ChildProcess, SpawnOptions } from 'node:child_process';
 import {
   generateBaseConfig,
+  ensureInboundEmailHookFlags,
   sanitizeLegacyStreamChatConfig,
   writeBaseConfig,
   writeMcporterConfig,
@@ -32,6 +33,7 @@ const DEVICE_PAIRED_PATH = '/root/.openclaw/devices/paired.json';
 const DEVICE_PENDING_PATH = '/root/.openclaw/devices/pending.json';
 const WORKSPACE_DIR = '/root/clawd';
 const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
+const OPENCLAW_PLUGIN_STAGE_DIR = '/usr/local/share/openclaw-plugin-runtime-deps';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
 const TOOLS_MD_DEST = '/root/.openclaw/workspace/TOOLS.md';
 const WEATHER_SKILL_SOURCE = '/usr/local/share/kiloclaw/skills/weather/SKILL.md';
@@ -275,6 +277,13 @@ export function setupDirectories(env: EnvLike, deps: BootstrapDeps = defaultDeps
   // GOG_KEYRING_PASSWORD is NOT a secret — see gog-credentials.ts for context.
   env.GOG_KEYRING_PASSWORD = 'kiloclaw';
 
+  // Keep bundled OpenClaw plugin runtime deps in the image-baked stage dir
+  // instead of mutating each bundled plugin directory or the persistent /root
+  // volume during doctor/gateway startup.
+  if (!env.OPENCLAW_PLUGIN_STAGE_DIR?.trim()) {
+    env.OPENCLAW_PLUGIN_STAGE_DIR = OPENCLAW_PLUGIN_STAGE_DIR;
+  }
+
   // Derive the API origin for the Kilo CLI from the full base URL.
   if (env.KILOCODE_API_BASE_URL) {
     env.KILO_API_URL = new URL(env.KILOCODE_API_BASE_URL).origin;
@@ -332,6 +341,19 @@ export function applyFeatureFlags(env: EnvLike, deps: BootstrapDeps = defaultDep
   if (env.KILOCLAW_KILO_CLI === 'true' && env.KILOCODE_API_KEY) {
     env.KILO_API_KEY = env.KILOCODE_API_KEY;
     console.log('Kilo CLI auto-configuration enabled');
+  }
+}
+
+export function cleanNpmCache(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
+  try {
+    deps.execFileSync('npm', ['cache', 'clean', '--force'], {
+      env: { ...process.env, ...env },
+      stdio: 'pipe',
+    });
+    console.log('[controller] npm cache clean completed');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn('[controller] npm cache clean failed, continuing:', message);
   }
 }
 
@@ -923,16 +945,24 @@ function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
     return;
   }
 
-  const before = JSON.stringify(parsed);
+  const initial = JSON.stringify(parsed);
+  const applied: string[] = [];
+
   sanitizeLegacyStreamChatConfig(parsed);
-  const serialized = JSON.stringify(parsed, null, 2);
-  if (JSON.stringify(parsed) === before) {
+  let snapshot = JSON.stringify(parsed);
+  if (snapshot !== initial) applied.push('streamChat');
+
+  ensureInboundEmailHookFlags(parsed);
+  const final = JSON.stringify(parsed);
+  if (final !== snapshot) applied.push('inboundEmailFlags');
+
+  if (applied.length === 0) {
     return;
   }
 
   atomicWrite(
     CONFIG_PATH,
-    serialized,
+    JSON.stringify(parsed, null, 2),
     {
       writeFileSync: deps.writeFileSync,
       renameSync: deps.renameSync,
@@ -941,7 +971,7 @@ function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
     },
     { mode: 0o600 }
   );
-  console.log('Removed legacy Stream Chat config before doctor');
+  console.log(`Sanitized existing config before doctor: [${applied.join(', ')}]`);
 }
 
 export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
@@ -1374,6 +1404,28 @@ When running \`openclaw doctor\` or \`openclaw security audit\`, the following f
 // OpenClaw versions, users editing openclaw.json). This section is a
 // belt-and-suspenders reminder for the agent flow, not the load-bearing
 // fix.
+// Pin the process model so agents stop hallucinating systemd-based
+// remediation. systemd packages ship in the image as apt transitive deps,
+// so `which systemctl` finds the binary, but the daemon is never running
+// and there are no unit files. Always-on, idempotent — appended to
+// existing instances on redeploy.
+export const PROCESS_MODEL_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: 'Process Model',
+  beginMarker: '<!-- BEGIN:process-model -->',
+  endMarker: '<!-- END:process-model -->',
+  section: `
+<!-- BEGIN:process-model -->
+
+## Process Model
+
+KiloClaw does NOT use systemd. Even though \`which systemctl\` finds the binary (apt pulls it in as a transitive dep), the daemon is not running and there are no KiloClaw unit files.
+
+- Do not suggest \`systemctl\`, \`journalctl\`, \`service ...\`, unit files, or any init-based remediation — none of it will work.
+- \`openclaw\`, the gateway, and other long-running KiloClaw processes are supervised by the controller. To inspect or restart them, use the controller's APIs and logs, not init.
+
+<!-- END:process-model -->`,
+};
+
 export const PLUGIN_INSTALL_SECTION_CONFIG: ToolsMdSectionConfig = {
   name: 'Plugin Install',
   beginMarker: '<!-- BEGIN:plugin-install -->',
@@ -1473,6 +1525,7 @@ export async function bootstrapNonCritical(
         // and how to keep plugins.allow in sync on plugin installs.
         updateToolsMdSection(true, KILOCLAW_MITIGATIONS_SECTION_CONFIG, deps);
         updateToolsMdSection(true, PLUGIN_INSTALL_SECTION_CONFIG, deps);
+        updateToolsMdSection(true, PROCESS_MODEL_SECTION_CONFIG, deps);
       },
     },
     {
@@ -1510,4 +1563,5 @@ export async function bootstrap(
   if (!result.ok) {
     throw new Error(result.error);
   }
+  cleanNpmCache(env, deps);
 }

@@ -11,13 +11,14 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
-  COMMIT_PERIOD_MONTHS,
+  createKiloClawSignupDisplay,
+  formatKiloClawFirstChargeLabel,
   formatMicrodollars,
-  PLAN_DISPLAY,
-  planPriceLabel,
-  STANDARD_FIRST_MONTH_DOLLARS,
-  STANDARD_FIRST_MONTH_MICRODOLLARS,
+  isKiloClawStandardIntroCost,
+  PLAN_COST_MICRODOLLARS,
   type ClawPlan,
+  type KiloClawSignupDisplay,
+  type KiloPassUpsellActivationPreview,
 } from './billing-types';
 import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
@@ -166,12 +167,12 @@ function HostingRadioGroup({
   hostingPlan,
   onSelect,
   commitDisabled,
-  creditIntroEligible,
+  signupDisplay,
 }: {
   hostingPlan: ClawPlan | null;
   onSelect: (plan: ClawPlan) => void;
   commitDisabled: boolean;
-  creditIntroEligible: boolean;
+  signupDisplay: KiloClawSignupDisplay;
 }) {
   return (
     <div className="mb-4">
@@ -199,9 +200,10 @@ function HostingRadioGroup({
         >
           {hostingPlan === 'commit' && <span className="h-2 w-2 rounded-full bg-blue-500" />}
         </span>
-        <span className="text-[13px] font-medium">Commit Plan</span>
+        <span className="text-[13px] font-medium">Commit plan</span>
         <span className="text-muted-foreground ml-auto text-xs">
-          ${PLAN_DISPLAY.commit.monthlyDollars}/mo ({COMMIT_PERIOD_MONTHS} months)
+          {signupDisplay.commit.primaryPrice}
+          {signupDisplay.commit.priceDetail}
         </span>
       </button>
 
@@ -223,20 +225,18 @@ function HostingRadioGroup({
         >
           {hostingPlan === 'standard' && <span className="h-2 w-2 rounded-full bg-blue-500" />}
         </span>
-        <span className="text-[13px] font-medium">Standard Plan</span>
+        <span className="text-[13px] font-medium">Standard plan</span>
         <span className="ml-auto flex items-center gap-1.5 text-xs">
-          {creditIntroEligible ? (
+          {signupDisplay.standard.introDetail ? (
             <>
               <span className="font-medium text-emerald-400">
-                ${STANDARD_FIRST_MONTH_DOLLARS} first month
+                {signupDisplay.standard.primaryPrice} {signupDisplay.standard.priceDetail}
               </span>
-              <span className="text-muted-foreground">
-                then ${PLAN_DISPLAY.standard.monthlyDollars}/mo
-              </span>
+              <span className="text-muted-foreground">{signupDisplay.standard.introDetail}</span>
             </>
           ) : (
             <span className="text-muted-foreground">
-              ${PLAN_DISPLAY.standard.monthlyDollars}/mo (monthly)
+              {signupDisplay.standard.primaryPrice}/month
             </span>
           )}
         </span>
@@ -244,8 +244,8 @@ function HostingRadioGroup({
 
       {commitDisabled && (
         <p className="text-muted-foreground mt-1 pl-0.5 text-[11px]">
-          Commit plan requires ${PLAN_DISPLAY.commit.totalDollars} in credits. Available with Pro,
-          Expert, or any yearly tier.
+          Commit plan requires {signupDisplay.commit.primaryPrice} in credits. Choose a tier that
+          covers the first charge.
         </p>
       )}
     </div>
@@ -256,15 +256,15 @@ function HostingOnlyPlanCard({
   plan,
   isSelected,
   onSelect,
-  creditIntroEligible,
+  signupDisplay,
 }: {
   plan: ClawPlan;
   isSelected: boolean;
   onSelect: () => void;
-  creditIntroEligible: boolean;
+  signupDisplay: KiloClawSignupDisplay;
 }) {
   const isCommit = plan === 'commit';
-  const showIntro = !isCommit && creditIntroEligible;
+  const display = isCommit ? signupDisplay.commit : signupDisplay.standard;
 
   return (
     <button
@@ -277,19 +277,15 @@ function HostingOnlyPlanCard({
     >
       <div className="text-sm font-semibold">{isCommit ? 'Commit' : 'Standard'}</div>
       <div className="mt-1 text-[22px] font-bold">
-        ${isCommit ? PLAN_DISPLAY.commit.monthlyDollars : PLAN_DISPLAY.standard.monthlyDollars}
-        <span className="text-muted-foreground text-xs font-normal">/mo</span>
+        {display.primaryPrice}
+        <span className="text-muted-foreground text-xs font-normal">{display.priceDetail}</span>
       </div>
-      {isCommit ? (
-        <div className="text-muted-foreground mt-0.5 text-[11px]">
-          ${PLAN_DISPLAY.commit.totalDollars} billed every {COMMIT_PERIOD_MONTHS} months
-        </div>
-      ) : showIntro ? (
-        <div className="mt-0.5 text-[11px] font-medium text-emerald-400">
-          ${STANDARD_FIRST_MONTH_DOLLARS} first month
-        </div>
+      {display.introDetail ? (
+        <div className="mt-0.5 text-[11px] font-medium text-emerald-400">{display.introDetail}</div>
       ) : (
-        <div className="text-muted-foreground mt-0.5 text-[11px]">Billed monthly</div>
+        <div className="text-muted-foreground mt-0.5 text-[11px]">
+          {isCommit ? signupDisplay.commit.monthlyEquivalent : 'Billed monthly'}
+        </div>
       )}
     </button>
   );
@@ -356,15 +352,12 @@ function CreditEnrollmentSection({
   onEnroll: () => void;
   isPending: boolean;
 }) {
-  const isIntro =
-    selectedPlan === 'standard' && costMicrodollars === STANDARD_FIRST_MONTH_MICRODOLLARS;
+  const priceLabel = formatKiloClawFirstChargeLabel({ plan: selectedPlan, costMicrodollars });
+  const isIntro = selectedPlan === 'standard' && isKiloClawStandardIntroCost({ costMicrodollars });
   const hasProjectedBonus = projectedKiloPassBonusMicrodollars > 0;
   const hasSufficientBalance = effectiveBalanceMicrodollars >= costMicrodollars;
   const shortfall = Math.max(0, costMicrodollars - effectiveBalanceMicrodollars);
   const planLabel = selectedPlan === 'commit' ? 'Commit' : 'Standard';
-  const priceLabel = isIntro
-    ? `$${STANDARD_FIRST_MONTH_DOLLARS} first month, then ${planPriceLabel(selectedPlan)}`
-    : planPriceLabel(selectedPlan);
 
   if (hasSufficientBalance) {
     return (
@@ -452,6 +445,61 @@ function CreditEnrollmentSection({
   );
 }
 
+function KiloPassUpsellInsufficiencyNotice({
+  plan,
+  preview,
+}: {
+  plan: ClawPlan;
+  preview: KiloPassUpsellActivationPreview;
+}) {
+  const planLabel = plan === 'commit' ? 'Commit' : 'Standard';
+  const hasProjectedBonus = preview.projectedKiloPassBonusMicrodollars > 0;
+
+  return (
+    <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3.5">
+      <div className="mb-2 flex items-center gap-2">
+        <TriangleAlert className="h-4 w-4 shrink-0 text-amber-400" />
+        <span className="text-sm font-semibold text-amber-300">
+          This Kilo Pass selection can&apos;t auto-activate {planLabel} hosting.
+        </span>
+      </div>
+      <div className="text-muted-foreground space-y-1 text-xs">
+        <div className="flex justify-between gap-3">
+          <span>First Kilo Pass base credits</span>
+          <span className="text-foreground">
+            {formatMicrodollars(preview.projectedKiloPassBaseMicrodollars)}
+          </span>
+        </div>
+        {hasProjectedBonus ? (
+          <div className="flex justify-between gap-3">
+            <span>Projected Kilo Pass bonus</span>
+            <span className="text-foreground">
+              {formatMicrodollars(preview.projectedKiloPassBonusMicrodollars)}
+            </span>
+          </div>
+        ) : null}
+        <div className="flex justify-between gap-3">
+          <span>Effective credits after checkout</span>
+          <span className="text-foreground">
+            {formatMicrodollars(preview.effectiveBalanceMicrodollars)}
+          </span>
+        </div>
+        <div className="flex justify-between gap-3">
+          <span>{planLabel} first charge</span>
+          <span className="text-foreground">{formatMicrodollars(preview.costMicrodollars)}</span>
+        </div>
+        <div className="flex justify-between gap-3 border-t border-amber-500/20 pt-1 font-medium text-amber-300">
+          <span>Shortfall</span>
+          <span>{formatMicrodollars(preview.shortfallMicrodollars)}</span>
+        </div>
+      </div>
+      <p className="text-muted-foreground mt-2 text-xs">
+        Choose a larger Kilo Pass tier or add credits before starting auto-activation.
+      </p>
+    </div>
+  );
+}
+
 export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogProps) {
   // Kilo Pass state
   const [cadence, setCadence] = useState<Cadence>('monthly');
@@ -464,7 +512,9 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const { data: billing } = useQuery(trpc.kiloclaw.getPersonalBillingSummary.queryOptions());
+  const { data: billing, isPending: billingSummaryPending } = useQuery(
+    trpc.kiloclaw.getPersonalBillingSummary.queryOptions()
+  );
   const checkout = useMutation(trpc.kiloclaw.createSubscriptionCheckout.mutationOptions());
   const kiloPassUpsell = useMutation(
     trpc.kiloclaw.createKiloPassUpsellCheckout.mutationOptions({
@@ -493,23 +543,52 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
 
   const creditBalance = billing?.creditBalanceMicrodollars ?? null;
   const hasCredits = creditBalance !== null && creditBalance > 0;
-  const creditIntroEligible = billing?.creditIntroEligible ?? false;
   const hasActiveKiloPass = billing?.hasActiveKiloPass ?? false;
   const creditEnrollmentPreview = billing?.creditEnrollmentPreview ?? null;
+  const kiloPassUpsellPreview = billing?.kiloPassUpsellPreview ?? null;
   const activeInstanceId = billing?.activeInstanceId ?? null;
   const showKiloPassUpsell = !hasActiveKiloPass;
+  const signupDisplay = createKiloClawSignupDisplay({
+    standardCostMicrodollars:
+      creditEnrollmentPreview?.standard.costMicrodollars ?? PLAN_COST_MICRODOLLARS.standard,
+    commitCostMicrodollars:
+      creditEnrollmentPreview?.commit.costMicrodollars ?? PLAN_COST_MICRODOLLARS.commit,
+  });
   const selectedCreditEnrollmentPreview =
     hostingOnlyPlan !== null ? (creditEnrollmentPreview?.[hostingOnlyPlan] ?? null) : null;
   const showCreditEnrollment =
     !!selectedCreditEnrollmentPreview && (hasCredits || hasActiveKiloPass);
 
   const hostingOnlyActive = hostingOnlyPlan !== null;
-  const commitDisabled = !isCommitAvailable(selectedTier, cadence);
+  const selectedKiloPassPreview =
+    selectedTier !== null && hostingPlan !== null
+      ? (kiloPassUpsellPreview?.[hostingPlan]?.[cadence]?.[selectedTier] ?? null)
+      : null;
+  const selectedKiloPassPreviewLoading =
+    billingSummaryPending &&
+    selectedTier !== null &&
+    hostingPlan !== null &&
+    selectedKiloPassPreview === null;
+  const selectedKiloPassInsufficient = selectedKiloPassPreview?.eligible === false;
+  const selectedCommitPreview =
+    selectedTier !== null
+      ? (kiloPassUpsellPreview?.commit?.[cadence]?.[selectedTier] ?? null)
+      : null;
+  const commitPreviewLoading = selectedTier !== null && selectedCommitPreview === null;
+  const commitDisabled = selectedCommitPreview
+    ? !selectedCommitPreview.eligible
+    : commitPreviewLoading || !isCommitAvailable(selectedTier, cadence);
+
+  function isCommitEligibleForSelection(tier: Tier | null, selectedCadence: Cadence) {
+    if (!tier) return false;
+    const preview = kiloPassUpsellPreview?.commit?.[selectedCadence]?.[tier] ?? null;
+    return preview ? preview.eligible : false;
+  }
 
   // When cadence or tier changes, reset hosting if commit becomes unavailable
   function handleCadenceChange(newCadence: Cadence) {
     setCadence(newCadence);
-    if (hostingPlan === 'commit' && !isCommitAvailable(selectedTier, newCadence)) {
+    if (hostingPlan === 'commit' && !isCommitEligibleForSelection(selectedTier, newCadence)) {
       setHostingPlan('standard');
     }
   }
@@ -517,7 +596,7 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
   function handleTierSelect(tier: Tier) {
     setSelectedTier(tier);
     setHostingOnlyPlan(null); // mutual exclusion
-    if (hostingPlan === 'commit' && !isCommitAvailable(tier, cadence)) {
+    if (hostingPlan === 'commit' && !isCommitEligibleForSelection(tier, cadence)) {
       setHostingPlan('standard');
     }
   }
@@ -580,15 +659,28 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
     }
   }
 
-  const kiloPassReady = selectedTier !== null && hostingPlan !== null;
-  const kiloPassButtonLabel = kiloPassReady
-    ? `Get Kilo Pass + Hosting`
-    : 'Select a tier and hosting plan';
+  const kiloPassReady =
+    selectedKiloPassPreview?.eligible === true ||
+    (!billingSummaryPending &&
+      selectedTier !== null &&
+      hostingPlan !== null &&
+      selectedKiloPassPreview === null);
+  const kiloPassButtonLabel = selectedKiloPassPreviewLoading
+    ? 'Checking credits…'
+    : selectedKiloPassInsufficient
+      ? 'Choose a larger tier or add credits'
+      : kiloPassReady
+        ? 'Get Kilo Pass + Hosting'
+        : 'Select a tier and hosting plan';
 
-  const hostingOnlyLabel = hostingOnlyPlan
-    ? `Subscribe to ${hostingOnlyPlan === 'commit' ? 'Commit' : 'Standard'} Plan – $${hostingOnlyPlan === 'commit' ? PLAN_DISPLAY.commit.totalDollars : PLAN_DISPLAY.standard.monthlyDollars}`
-    : 'Select a plan above';
-  const hostingSectionTitle = hasActiveKiloPass ? 'Choose a Hosting Plan' : 'Hosting Only';
+  const hostingOnlyCostMicrodollars = hostingOnlyPlan
+    ? (selectedCreditEnrollmentPreview?.costMicrodollars ?? PLAN_COST_MICRODOLLARS[hostingOnlyPlan])
+    : null;
+  const hostingOnlyLabel =
+    hostingOnlyPlan && hostingOnlyCostMicrodollars !== null
+      ? `Subscribe to ${hostingOnlyPlan === 'commit' ? 'Commit' : 'Standard'} plan, ${formatKiloClawFirstChargeLabel({ plan: hostingOnlyPlan, costMicrodollars: hostingOnlyCostMicrodollars })}`
+      : 'Select a plan above';
+  const hostingSectionTitle = hasActiveKiloPass ? 'Choose a hosting plan' : 'Hosting only';
   const hostingSectionDescription = hasActiveKiloPass
     ? 'You already have Kilo Pass. Choose a hosting plan and fund it from your credit balance or pay directly via Stripe.'
     : 'Pay for hosting directly via Stripe. You can buy credits separately for AI inference.';
@@ -662,7 +754,14 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
                     hostingPlan={hostingPlan}
                     onSelect={handleHostingPlanSelect}
                     commitDisabled={commitDisabled}
-                    creditIntroEligible={creditIntroEligible}
+                    signupDisplay={signupDisplay}
+                  />
+                )}
+
+                {selectedKiloPassInsufficient && selectedKiloPassPreview && hostingPlan && (
+                  <KiloPassUpsellInsufficiencyNotice
+                    plan={hostingPlan}
+                    preview={selectedKiloPassPreview}
                   />
                 )}
 
@@ -711,13 +810,13 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
                 plan="commit"
                 isSelected={hostingOnlyPlan === 'commit'}
                 onSelect={() => handleHostingOnlySelect('commit')}
-                creditIntroEligible={creditIntroEligible}
+                signupDisplay={signupDisplay}
               />
               <HostingOnlyPlanCard
                 plan="standard"
                 isSelected={hostingOnlyPlan === 'standard'}
                 onSelect={() => handleHostingOnlySelect('standard')}
-                creditIntroEligible={creditIntroEligible}
+                signupDisplay={signupDisplay}
               />
             </div>
 

@@ -16,9 +16,9 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": ">=24 <25",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "wrangler": "^4.73.0"
+    "wrangler": "catalog:"
   }
 }

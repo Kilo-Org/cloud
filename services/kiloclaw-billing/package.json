@@ -13,17 +13,17 @@
   "dependencies": {
     "@kilocode/db": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
-    "date-fns": "^4.1.0",
+    "date-fns": "4.1.0",
     "drizzle-orm": "catalog:",
     "jose": "catalog:",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": ">=24 <25",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^4.1.0",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

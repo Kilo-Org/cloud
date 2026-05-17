@@ -25,6 +25,8 @@ export const GITHUB_CLIENT_ID = getEnvVariable('GITHUB_CLIENT_ID');
 export const GITHUB_CLIENT_SECRET = getEnvVariable('GITHUB_CLIENT_SECRET');
 // Admin-only GitHub access (used for admin dashboards)
 export const GITHUB_ADMIN_STATS_TOKEN = getEnvVariable('GITHUB_ADMIN_STATS_TOKEN');
+export const CONTRIBUTOR_CHAMPION_TEAM_EMAILS =
+  getEnvVariable('CONTRIBUTOR_CHAMPION_TEAM_EMAILS') || '';
 export const GITLAB_CLIENT_ID = getEnvVariable('GITLAB_CLIENT_ID');
 export const GITLAB_CLIENT_SECRET = getEnvVariable('GITLAB_CLIENT_SECRET');
 export const LINKEDIN_CLIENT_ID = getEnvVariable('LINKEDIN_CLIENT_ID');
@@ -41,6 +43,15 @@ export const CODE_REVIEW_WORKER_AUTH_TOKEN = getEnvVariable('CODE_REVIEW_WORKER_
 export const IMPACT_ACCOUNT_SID = getEnvVariable('IMPACT_ACCOUNT_SID') || '';
 export const IMPACT_AUTH_TOKEN = getEnvVariable('IMPACT_AUTH_TOKEN') || '';
 export const IMPACT_CAMPAIGN_ID = getEnvVariable('IMPACT_CAMPAIGN_ID') || '';
+export const IMPACT_ADVOCATE_TENANT_ALIAS = getEnvVariable('IMPACT_ADVOCATE_TENANT_ALIAS') || '';
+export const IMPACT_ADVOCATE_PROGRAM_ID = getEnvVariable('IMPACT_ADVOCATE_PROGRAM_ID') || '';
+export const IMPACT_ADVOCATE_ACCOUNT_SID = getEnvVariable('IMPACT_ADVOCATE_ACCOUNT_SID') || '';
+export const IMPACT_ADVOCATE_AUTH_TOKEN = getEnvVariable('IMPACT_ADVOCATE_AUTH_TOKEN') || '';
+export const IMPACT_ADVOCATE_WIDGET_ID = getEnvVariable('IMPACT_ADVOCATE_WIDGET_ID') || '';
+export const IMPACT_ADVOCATE_API_BASE_URL =
+  getEnvVariable('IMPACT_ADVOCATE_API_BASE_URL') || 'https://app.referralsaasquatch.com';
+export const IMPACT_ADVOCATE_DEBUG_LOGGING =
+  getEnvVariable('IMPACT_ADVOCATE_DEBUG_LOGGING') === 'true';
 
 if (!NEXTAUTH_SECRET) throw new Error('NEXTAUTH_SECRET is required JWT signing');
 if (!TURNSTILE_SECRET_KEY) throw new Error('TURNSTILE_SECRET_KEY is required');
@@ -121,6 +132,19 @@ export const APP_BUILDER_DB_PROXY_AUTH_TOKEN = getEnvVariable('APP_BUILDER_DB_PR
 export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
 export const SLACK_CLIENT_SECRET = getEnvVariable('SLACK_CLIENT_SECRET');
 export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
+
+// Linear (bot integration)
+// @chat-adapter/linear 4.27 does not (yet) support encryption-at-rest via
+// an `encryptionKey` config option the way @chat-adapter/slack does; the
+// adapter stores installations (including OAuth tokens) via the configured
+// Chat SDK state adapter. Revisit when the adapter exposes an encryption key.
+export const LINEAR_CLIENT_ID = getEnvVariable('LINEAR_CLIENT_ID');
+export const LINEAR_CLIENT_SECRET = getEnvVariable('LINEAR_CLIENT_SECRET');
+export const LINEAR_WEBHOOK_SECRET = getEnvVariable('LINEAR_WEBHOOK_SECRET');
+
+// DoltHub (dev-only OAuth integration — app pending admin approval)
+export const DOLTHUB_APP_DEV_CLIENT_ID = getEnvVariable('DOLTHUB_APP_DEV_CLIENT_ID');
+export const DOLTHUB_APP_DEV_CLIENT_SECRET = getEnvVariable('DOLTHUB_APP_DEV_CLIENT_SECRET');
 
 // Discord (bot integration — existing)
 export const DISCORD_CLIENT_ID = getEnvVariable('DISCORD_CLIENT_ID');
@@ -306,10 +330,6 @@ export const STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID = getEnvVariable(
 export const STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID = getEnvVariable(
   'STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID'
 );
-export const STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID = getEnvVariable(
-  'STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID'
-);
-
 // Webhook Agent Ingest Worker
 export const WEBHOOK_AGENT_URL =
   getEnvVariable('WEBHOOK_AGENT_URL') || 'https://hooks.kilosessions.ai';

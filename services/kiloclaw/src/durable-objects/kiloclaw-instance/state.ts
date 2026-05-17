@@ -290,9 +290,15 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
       applyProviderState(s, s.providerState);
     }
     s.machineSize = d.machineSize;
+    s.instanceType = d.instanceType;
+    s.volumeSizeGb = d.volumeSizeGb;
+    s.adminMachineSizeOverride = d.adminMachineSizeOverride;
+    s.adminMachineSizeOverrideMetadata = d.adminMachineSizeOverrideMetadata;
     s.healthCheckFailCount = d.healthCheckFailCount;
     s.pendingDestroyMachineId = d.pendingDestroyMachineId;
     s.pendingDestroyVolumeId = d.pendingDestroyVolumeId;
+    s.destroyStartedAt = d.destroyStartedAt;
+    s.lastDestroyPendingEventAt = d.lastDestroyPendingEventAt;
     s.pendingPostgresMarkOnFinalize = d.pendingPostgresMarkOnFinalize;
     s.lastMetadataRecoveryAt = d.lastMetadataRecoveryAt;
     s.openclawVersion = d.openclawVersion;
@@ -303,6 +309,7 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.lastDestroyErrorStatus = d.lastDestroyErrorStatus;
     s.lastDestroyErrorMessage = d.lastDestroyErrorMessage;
     s.lastDestroyErrorAt = d.lastDestroyErrorAt;
+    s.destroyVolumeAttempts = d.destroyVolumeAttempts;
     s.lastStartErrorMessage = d.lastStartErrorMessage;
     s.lastStartErrorAt = d.lastStartErrorAt;
     s.lastRestartErrorMessage = d.lastRestartErrorMessage;
@@ -394,9 +401,15 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.flyVolumeId = null;
   s.flyRegion = null;
   s.machineSize = null;
+  s.instanceType = null;
+  s.volumeSizeGb = null;
+  s.adminMachineSizeOverride = null;
+  s.adminMachineSizeOverrideMetadata = null;
   s.healthCheckFailCount = 0;
   s.pendingDestroyMachineId = null;
   s.pendingDestroyVolumeId = null;
+  s.destroyStartedAt = null;
+  s.lastDestroyPendingEventAt = null;
   s.pendingPostgresMarkOnFinalize = false;
   s.lastMetadataRecoveryAt = null;
   s.openclawVersion = null;
@@ -407,6 +420,7 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.lastDestroyErrorStatus = null;
   s.lastDestroyErrorMessage = null;
   s.lastDestroyErrorAt = null;
+  s.destroyVolumeAttempts = 0;
   s.lastStartErrorMessage = null;
   s.lastStartErrorAt = null;
   s.lastRestartErrorMessage = null;
@@ -484,9 +498,15 @@ export function createMutableState(): InstanceMutableState {
     flyVolumeId: null,
     flyRegion: null,
     machineSize: null,
+    instanceType: null,
+    volumeSizeGb: null,
+    adminMachineSizeOverride: null,
+    adminMachineSizeOverrideMetadata: null,
     healthCheckFailCount: 0,
     pendingDestroyMachineId: null,
     pendingDestroyVolumeId: null,
+    destroyStartedAt: null,
+    lastDestroyPendingEventAt: null,
     pendingPostgresMarkOnFinalize: false,
     lastMetadataRecoveryAt: null,
     openclawVersion: null,
@@ -497,6 +517,7 @@ export function createMutableState(): InstanceMutableState {
     lastDestroyErrorStatus: null,
     lastDestroyErrorMessage: null,
     lastDestroyErrorAt: null,
+    destroyVolumeAttempts: 0,
     lastStartErrorMessage: null,
     lastStartErrorAt: null,
     lastRestartErrorMessage: null,

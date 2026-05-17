@@ -15,12 +15,14 @@ const getPushNotificationReceiptsAsync =
   vi.fn<(chunk: string[]) => Promise<Record<string, PushReceipt>>>();
 
 vi.mock('expo-server-sdk', () => ({
-  default: vi.fn(() => ({
-    chunkPushNotifications,
-    sendPushNotificationsAsync,
-    chunkPushNotificationReceiptIds,
-    getPushNotificationReceiptsAsync,
-  })),
+  default: vi.fn(function Expo() {
+    return {
+      chunkPushNotifications,
+      sendPushNotificationsAsync,
+      chunkPushNotificationReceiptIds,
+      getPushNotificationReceiptsAsync,
+    };
+  }),
 }));
 
 import { checkPushReceipts, sendPushNotifications } from './expo-push';

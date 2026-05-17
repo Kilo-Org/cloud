@@ -20,6 +20,8 @@ const STEPS = [
 
 type StepKey = (typeof STEPS)[number]['key'];
 
+const VALID_STEP_KEYS = new Set<string>(STEPS.map(s => s.key));
+
 function StepIndicator({ currentIndex }: { currentIndex: number }) {
   return (
     <div className="flex items-center justify-center gap-0">
@@ -146,7 +148,16 @@ function CancelButton() {
 function WizardContent() {
   const searchParams = useSearchParams();
   const orgId = searchParams.get('orgId');
-  const [currentStepKey, setCurrentStepKey] = useState<StepKey>('name');
+
+  const initialStep: StepKey = (() => {
+    const stepParam = searchParams.get('step');
+    if (stepParam && VALID_STEP_KEYS.has(stepParam)) {
+      return stepParam as StepKey;
+    }
+    return 'name';
+  })();
+
+  const [currentStepKey, setCurrentStepKey] = useState<StepKey>(initialStep);
 
   const currentIndex = STEPS.findIndex(s => s.key === currentStepKey);
 

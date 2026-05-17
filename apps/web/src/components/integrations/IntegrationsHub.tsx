@@ -31,8 +31,20 @@ export function IntegrationsHub({ organizationId }: IntegrationsHubProps) {
   const { data: gitlabInstallation, isLoading: gitlabLoading } = useQuery(
     trpc.gitlab.getInstallation.queryOptions(input)
   );
+  const { data: linearInstallation, isLoading: linearLoading } = useQuery(
+    trpc.linear.getInstallation.queryOptions(input)
+  );
+  const { data: dolthubInstallation, isLoading: dolthubLoading } = useQuery(
+    trpc.dolthub.getInstallation.queryOptions(input)
+  );
 
-  const isLoading = githubLoading || slackLoading || discordLoading || gitlabLoading;
+  const isLoading =
+    githubLoading ||
+    slackLoading ||
+    discordLoading ||
+    gitlabLoading ||
+    linearLoading ||
+    dolthubLoading;
 
   if (isLoading) {
     return (
@@ -57,6 +69,8 @@ export function IntegrationsHub({ organizationId }: IntegrationsHubProps) {
       slack: slackInstallation,
       discord: discordInstallation,
       gitlab: gitlabInstallation,
+      linear: linearInstallation,
+      dolthub: dolthubInstallation,
     },
     organizationId
   );

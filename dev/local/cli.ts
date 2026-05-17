@@ -134,7 +134,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   // Always start core (always-on) groups; additional targets are merged in
   const coreServices = resolveGroups(getAlwaysOnGroupIds());
   const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
-  const serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
+  let serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
 
   // --- Check for socat when kiloclaw-docker-tcp is requested ---
   if (serviceNames.includes('kiloclaw-docker-tcp')) {
@@ -143,6 +143,17 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     } catch {
       console.error('socat is not installed. Install it with: brew install socat');
       process.exit(1);
+    }
+  }
+
+  // --- Skip Stripe webhook forwarding when the optional Stripe CLI is absent ---
+  if (serviceNames.includes('stripe')) {
+    try {
+      execSync('stripe --version', { stdio: 'ignore' });
+    } catch {
+      console.warn('⚠ stripe CLI not found on PATH — skipping Stripe webhook forwarder.');
+      console.warn('  Install it with: brew install stripe/stripe-cli/stripe');
+      serviceNames = serviceNames.filter(name => name !== 'stripe');
     }
   }
 
@@ -177,17 +188,21 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   }
 
   // --- Create tmux session ---
-  // Pass KILO_PORT_OFFSET into the session environment so panes see it even
-  // when an existing tmux server (from a sibling worktree) is running with a
-  // different offset. Without this, new windows inherit the server env, not
-  // ours, and services bind to base ports — causing conflicts.
-  createSession(sessionName, { KILO_PORT_OFFSET: String(portOffset) });
+  // Pass critical port env into the session so panes see it even when an
+  // existing tmux server (from a sibling worktree) is running with different
+  // values. Without this, new windows inherit the server env, not ours, and
+  // services can bind to the wrong ports.
+  const sessionEnv: Record<string, string> = { KILO_PORT_OFFSET: String(portOffset) };
+  if (process.env.PORT !== undefined && process.env.PORT !== '') {
+    sessionEnv.PORT = String(getService('nextjs').port);
+  }
+  createSession(sessionName, sessionEnv);
 
   // --- Start each service in its own tmux window ---
   const SIDEBAR_WIDTH = 40;
 
   // --- Start capture services first (tunnel, stripe) and wait for output ---
-  const captureServiceSet = new Set(['kiloclaw-tunnel', 'kiloclaw-stripe', 'app-builder-tunnel']);
+  const captureServiceSet = new Set(['kiloclaw-tunnel', 'stripe', 'app-builder-tunnel']);
   const captureServices = serviceNames.filter(n => captureServiceSet.has(n));
   const otherServices = serviceNames.filter(n => !captureServiceSet.has(n));
   const startedServices: string[] = [];
@@ -205,7 +220,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
       oldMtimes.set('checkin', readEnvMtime(tunnelEnvPath));
       oldMtimes.set('kilochat', readEnvMtime(tunnelEnvPath));
     }
-    if (captureServices.includes('kiloclaw-stripe')) {
+    if (captureServices.includes('stripe')) {
       const stripeEnvPath = path.join(repoRoot, 'apps/web/.env.development.local');
       oldValues.set('stripe', readEnvValue(stripeEnvPath, 'STRIPE_WEBHOOK_SECRET'));
       oldMtimes.set('stripe', readEnvMtime(stripeEnvPath));
@@ -275,7 +290,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
       );
     }
 
-    if (captureServices.includes('kiloclaw-stripe')) {
+    if (captureServices.includes('stripe')) {
       waits.push(
         waitForEnvValueChange(
           path.join(repoRoot, 'apps/web/.env.development.local'),
@@ -287,7 +302,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
           if (ready) {
             console.log('  Stripe webhook secret captured');
           } else {
-            console.warn('  Stripe secret not captured after 30s - check kiloclaw-stripe window');
+            console.warn('  Stripe secret not captured after 30s - check stripe window');
           }
         })
       );

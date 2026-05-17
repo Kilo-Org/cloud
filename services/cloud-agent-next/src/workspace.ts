@@ -12,6 +12,7 @@ import {
   withSandboxOperationTimeoutLog,
 } from './sandbox-timeout-logging.js';
 import { withTimeout } from '@kilocode/worker-utils';
+import { isSandboxInternalServerError } from './sandbox-recovery.js';
 
 /**
  * Minimal interface for running shell commands.
@@ -48,6 +49,62 @@ function sanitizeGitUrlForLogging(gitUrl: string): string {
 // Handles patterns like `oauth2:TOKEN@`, `x-access-token:TOKEN@`, and `x-token-auth:TOKEN@`.
 function sanitizeGitOutput(output: string): string {
   return output.replace(/(oauth2|x-access-token|x-token-auth):([^@]+)@/gi, '$1:***@');
+}
+
+/**
+ * Thrown when a git remote returns "repository not found" during clone.
+ * Caused by a missing repo or a token without access — a user error, not infra.
+ */
+export class GitRepositoryNotFoundError extends Error {
+  constructor(gitUrl: string) {
+    super(`Repository not found: ${gitUrl}`);
+    this.name = 'GitRepositoryNotFoundError';
+  }
+}
+
+/**
+ * Thrown for clone failures other than "repository not found"
+ * (LFS smudge errors, network issues, etc.). Distinct from
+ * GitRepositoryNotFoundError so callers can map only the user-error
+ * cases to BAD_REQUEST.
+ */
+export class GitCloneFailedError extends Error {
+  constructor(gitUrl: string, reason: string) {
+    super(`Failed to clone repository from ${gitUrl}: ${reason}`);
+    this.name = 'GitCloneFailedError';
+  }
+}
+
+/**
+ * Thrown when an upstream branch does not exist locally or remotely.
+ * This is a user error (caller asked for a non-existent branch).
+ */
+export class BranchNotFoundError extends Error {
+  constructor(branchName: string) {
+    super(
+      `Branch "${branchName}" not found in repository. Please ensure the branch exists remotely.`
+    );
+    this.name = 'BranchNotFoundError';
+  }
+}
+
+// Detect "remote repository not found" in git stderr. The two patterns we
+// care about, observed from GitHub/GitLab/Bitbucket:
+//   "remote: Repository not found."
+//   "fatal: repository '...' not found"
+// We deliberately avoid an unanchored `.*` so the regex can't match
+// unrelated git messages that happen to contain both words.
+const REPO_NOT_FOUND_PATTERN = /repository '[^']*' not found|remote:\s+repository not found/i;
+
+/**
+ * Best-effort extraction of `stderr` from sandbox SDK errors that expose it
+ * (e.g., GitCheckoutError). Returns empty string when not present.
+ */
+function extractStderr(err: unknown): string {
+  if (err && typeof err === 'object' && 'stderr' in err && typeof err.stderr === 'string') {
+    return err.stderr;
+  }
+  return '';
 }
 
 const SESSION_HOME_ROOT = `/home`;
@@ -121,7 +178,8 @@ export type SessionPaths = {
 /**
  * Check disk space and clean up stale workspaces if low, using the sandbox
  * directly so it can run before any session or workspace directory exists.
- * Errors are caught and logged — never rethrown — so cleanup failure never blocks setup.
+ * Errors are caught and logged so cleanup failure never blocks setup, except
+ * sandbox 500s which indicate a bad container that should be destroyed.
  */
 export async function checkDiskAndCleanBeforeSetup(
   sandbox: SandboxInstance,
@@ -136,6 +194,13 @@ export async function checkDiskAndCleanBeforeSetup(
       await cleanupStaleWorkspaces(sandbox, getBaseWorkspacePath(orgId, userId), sessionId);
     }
   } catch (error) {
+    if (isSandboxInternalServerError(error)) {
+      logger
+        .withFields({ error: error instanceof Error ? error.message : String(error) })
+        .error('Pre-setup disk check hit sandbox 500, aborting workspace setup');
+      throw error;
+    }
+
     // Log and continue — a failed disk check should not block workspace setup.
     // The worst case is that mkdir fails (which it would have anyway without cleanup).
     logger
@@ -157,7 +222,8 @@ export async function setupWorkspace(
     await sandbox.mkdir(sessionWorkspacePath, { recursive: true });
   } catch (error) {
     throw new Error(
-      `Failed to create workspace directory: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to create workspace directory: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   }
 
@@ -165,7 +231,8 @@ export async function setupWorkspace(
     await sandbox.mkdir(sessionHome, { recursive: true });
   } catch (error) {
     throw new Error(
-      `Failed to prepare session home: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to prepare session home: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   }
 
@@ -546,12 +613,34 @@ export async function cloneGitRepo(
     logger.info('Successfully cloned generic git repository');
   } catch (err) {
     // Log actual error for debugging
+    const errorMessage = err instanceof Error ? err.message : String(err);
     logger.error('Git clone failed', {
-      error: err instanceof Error ? err.message : String(err),
+      error: sanitizeGitOutput(errorMessage),
       gitUrl: sanitizedGitUrl,
     });
-    // Throw generic error to avoid leaking token in response
-    throw new Error(`Failed to clone repository from ${sanitizedGitUrl}`);
+
+    if (isSandboxInternalServerError(err)) {
+      throw err;
+    }
+
+    // Detect "repository not found" — a user-caused error (bad repo or
+    // missing access). The sandbox SDK surfaces git stderr in the error
+    // message, including patterns like:
+    //   "remote: Repository not found."
+    //   "fatal: repository '...' not found"
+    // We also pull stderr from a typed GitCheckoutError if present.
+    const stderr = extractStderr(err);
+    const haystack = `${errorMessage}\n${stderr}`;
+    if (REPO_NOT_FOUND_PATTERN.test(haystack)) {
+      throw new GitRepositoryNotFoundError(sanitizedGitUrl);
+    }
+
+    // All other failures (LFS, network, timeouts, etc.) — wrap as a
+    // typed clone-failure error. Defense-in-depth: tokens shouldn't reach
+    // this point (the SDK strips them and `sanitizedGitUrl` has been
+    // masked), but we still run `sanitizeGitOutput` in case a future code
+    // path inlines an authenticated URL into the error message.
+    throw new GitCloneFailedError(sanitizedGitUrl, sanitizeGitOutput(errorMessage));
   }
 }
 
@@ -806,6 +895,16 @@ export async function manageBranch(
   // Fetch latest refs from remote
   await gitFetch(session, workspacePath);
 
+  if (
+    isUpstreamBranch &&
+    (GITHUB_PULL_REF_PATTERN.test(branchName) || GITLAB_MR_REF_PATTERN.test(branchName))
+  ) {
+    await fetchPullRefAndCheckout(session, workspacePath, branchName);
+    logger.withTags({ pullRef: branchName }).info('Checked out pull/merge-request ref');
+    logger.debug('Successfully on branch');
+    return branchName;
+  }
+
   // Check branch existence in parallel
   const [existsLocally, existsRemotely] = await Promise.all([
     branchExistsLocally(session, workspacePath, branchName),
@@ -833,16 +932,7 @@ export async function manageBranch(
   } else {
     // Case 4: Doesn't exist anywhere
     if (isUpstreamBranch) {
-      if (GITHUB_PULL_REF_PATTERN.test(branchName) || GITLAB_MR_REF_PATTERN.test(branchName)) {
-        await fetchPullRefAndCheckout(session, workspacePath, branchName);
-        logger.withTags({ pullRef: branchName }).info('Checked out pull/merge-request ref');
-        logger.debug('Successfully on branch');
-        return branchName;
-      }
-
-      throw new Error(
-        `Branch "${branchName}" not found in repository. Please ensure the branch exists remotely.`
-      );
+      throw new BranchNotFoundError(branchName);
     }
     await createNewBranch(session, workspacePath, branchName);
   }

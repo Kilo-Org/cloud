@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
+import { CURRENT_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import { kiloclaw_subscription_change_log, kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -32,6 +33,7 @@ describe('matchUsers — at_limit ineligibility', () => {
       user_id: target.id,
       plan: 'trial',
       status: 'trialing',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
       trial_started_at: new Date().toISOString(),
       trial_ends_at: new Date(Date.now() + 400 * MS_PER_DAY).toISOString(),
     });
@@ -57,6 +59,7 @@ describe('matchUsers — at_limit ineligibility', () => {
       user_id: target.id,
       plan: 'trial',
       status: 'trialing',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
       trial_started_at: new Date().toISOString(),
       trial_ends_at: oneYearPlusOneDay.toISOString(),
     });
@@ -75,6 +78,7 @@ describe('matchUsers — at_limit ineligibility', () => {
       user_id: target.id,
       plan: 'trial',
       status: 'trialing',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
       trial_started_at: new Date().toISOString(),
       trial_ends_at: new Date(Date.now() + 200 * MS_PER_DAY).toISOString(),
     });
@@ -98,6 +102,7 @@ describe('extendTrials — 1-year ceiling', () => {
       user_id: target.id,
       plan: 'trial',
       status: 'trialing',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
       trial_started_at: new Date().toISOString(),
       trial_ends_at: currentEnd.toISOString(),
     });
@@ -134,6 +139,7 @@ describe('extendTrials — normal extension', () => {
         user_id: target.id,
         plan: 'trial',
         status: 'trialing',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
         trial_started_at: new Date().toISOString(),
         trial_ends_at: new Date().toISOString(),
       })
@@ -175,6 +181,7 @@ describe('extendTrials — normal extension', () => {
         user_id: target.id,
         plan: 'trial',
         status: 'canceled',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
         trial_started_at: new Date(Date.now() - 30 * MS_PER_DAY).toISOString(),
         trial_ends_at: new Date(Date.now() - 10 * MS_PER_DAY).toISOString(),
       })

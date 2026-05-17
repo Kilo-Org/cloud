@@ -2,11 +2,17 @@ import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import * as profileService from '@/lib/agent/profile-service';
-import * as profileVarsService from '@/lib/agent/profile-vars-service';
-import * as profileCommandsService from '@/lib/agent/profile-commands-service';
-import * as repoBindingService from '@/lib/agent/repo-binding-service';
-import type { ProfileOwner } from '@/lib/agent/types';
+import * as profileService from '@kilocode/cloud-agent-profile';
+import * as profileVarsService from '@kilocode/cloud-agent-profile';
+import * as profileCommandsService from '@kilocode/cloud-agent-profile';
+import * as profileMcpService from '@kilocode/cloud-agent-profile';
+import * as profileSkillsService from '@kilocode/cloud-agent-profile';
+import * as profileAgentsService from '@kilocode/cloud-agent-profile';
+import * as repoBindingService from '@kilocode/cloud-agent-profile';
+import { AgentConfigSchema } from '@kilocode/db/schema-types';
+import type { ProfileOwner } from '@kilocode/cloud-agent-profile';
+import { db } from '@/lib/drizzle';
+import { AGENT_ENV_VARS_PUBLIC_KEY } from '@/lib/config.server';
 
 function isForeignKeyViolation(error: unknown): boolean {
   return (
@@ -50,6 +56,9 @@ const ProfileSummarySchema = z.object({
   updatedAt: z.string(),
   varCount: z.number(),
   commandCount: z.number(),
+  mcpServerCount: z.number(),
+  skillCount: z.number(),
+  agentCount: z.number(),
 });
 
 const ProfileSummaryWithOwnerSchema = ProfileSummarySchema.extend({
@@ -69,6 +78,50 @@ const ProfileCommandResponseSchema = z.object({
   command: z.string(),
 });
 
+const McpServerLocalConfigSchema = z.object({
+  command: z.array(z.string()),
+  environment: z.record(z.string(), z.string()).optional(),
+});
+
+const McpServerRemoteConfigSchema = z.object({
+  url: z.string(),
+  headers: z.record(z.string(), z.string()).optional(),
+});
+
+const ProfileMcpServerResponseSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  type: z.enum(['local', 'remote']),
+  enabled: z.boolean(),
+  timeout: z.number().nullable(),
+  /** env/header values are always the masked placeholder on GET responses. */
+  config: z.union([McpServerLocalConfigSchema, McpServerRemoteConfigSchema]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const ProfileSkillResponseSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  sourceType: z.enum(['marketplace', 'custom']),
+  sourceUrl: z.string().nullable(),
+  rawMarkdown: z.string(),
+  files: z.record(z.string(), z.string()),
+  enabled: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const ProfileAgentResponseSchema = z.object({
+  id: z.uuid(),
+  slug: z.string(),
+  name: z.string(),
+  config: AgentConfigSchema,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 const ProfileResponseSchema = z.object({
   id: z.uuid(),
   name: z.string(),
@@ -78,6 +131,9 @@ const ProfileResponseSchema = z.object({
   updatedAt: z.string(),
   vars: z.array(ProfileVarResponseSchema),
   commands: z.array(ProfileCommandResponseSchema),
+  mcpServers: z.array(ProfileMcpServerResponseSchema),
+  skills: z.array(ProfileSkillResponseSchema),
+  agents: z.array(ProfileAgentResponseSchema),
 });
 
 /**
@@ -90,6 +146,13 @@ function getOwner(organizationId: string | undefined, userId: string): ProfileOw
   }
   return { type: 'user', id: userId };
 }
+
+/**
+ * The agent env vars public key, base64-encoded. Empty string when not
+ * configured — the package helpers throw a clear error if encryption is
+ * attempted in that case, matching the pre-refactor behavior.
+ */
+const publicKey = AGENT_ENV_VARS_PUBLIC_KEY ?? '';
 
 /**
  * Agent Environment Profiles Router
@@ -110,13 +173,13 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      return profileService.listProfiles(owner);
+      return profileService.listProfiles(db, owner);
     }),
 
   /**
    * List both org and personal profiles when in org context.
    * Returns profiles grouped by owner type with effective default resolution.
-   * Org default takes precedence over personal default.
+   * Personal default takes precedence over org default.
    */
   listCombined: baseProcedure
     .input(z.object({ organizationId: z.uuid() }))
@@ -131,13 +194,13 @@ export const agentProfilesRouter = createTRPCRouter({
       await ensureOrganizationAccess(ctx, input.organizationId);
 
       const [orgProfiles, personalProfiles] = await Promise.all([
-        profileService.listProfiles({ type: 'organization', id: input.organizationId }),
-        profileService.listProfiles({ type: 'user', id: ctx.user.id }),
+        profileService.listProfiles(db, { type: 'organization', id: input.organizationId }),
+        profileService.listProfiles(db, { type: 'user', id: ctx.user.id }),
       ]);
 
-      // Effective default: org default takes precedence over personal default
+      // Effective default: personal default takes precedence over org default
       const effectiveDefault =
-        orgProfiles.find(p => p.isDefault) ?? personalProfiles.find(p => p.isDefault);
+        personalProfiles.find(p => p.isDefault) ?? orgProfiles.find(p => p.isDefault);
 
       return {
         orgProfiles: orgProfiles.map(p => ({ ...p, ownerType: 'organization' as const })),
@@ -157,7 +220,7 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      return profileService.getProfile(input.profileId, owner);
+      return profileService.getProfile(db, input.profileId, owner);
     }),
 
   /**
@@ -171,7 +234,7 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      return profileService.createProfile(owner, input.name, input.description);
+      return profileService.createProfile(db, owner, ctx.user.id, input.name, input.description);
     }),
 
   /**
@@ -191,7 +254,7 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      await profileService.updateProfile(input.profileId, owner, {
+      await profileService.updateProfile(db, input.profileId, owner, {
         name: input.name,
         description: input.description,
       });
@@ -211,7 +274,7 @@ export const agentProfilesRouter = createTRPCRouter({
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       try {
-        await profileService.deleteProfile(input.profileId, owner);
+        await profileService.deleteProfile(db, input.profileId, owner);
         return { success: true };
       } catch (error) {
         // Check for FK violation (profile referenced by webhook triggers)
@@ -237,7 +300,7 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      await profileService.setDefaultProfile(input.profileId, owner);
+      await profileService.setDefaultProfile(db, input.profileId, owner);
       return { success: true };
     }),
 
@@ -252,7 +315,7 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      await profileService.clearDefaultProfile(input.profileId, owner);
+      await profileService.clearDefaultProfile(db, input.profileId, owner);
       return { success: true };
     }),
 
@@ -273,6 +336,8 @@ export const agentProfilesRouter = createTRPCRouter({
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileVarsService.setVar(
+        db,
+        publicKey,
         input.profileId,
         input.key,
         input.value,
@@ -298,7 +363,7 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      await profileVarsService.deleteVar(input.profileId, input.key, owner);
+      await profileVarsService.deleteVar(db, input.profileId, input.key, owner);
       return { success: true };
     }),
 
@@ -317,7 +382,7 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      await profileCommandsService.setCommands(input.profileId, input.commands, owner);
+      await profileCommandsService.setCommands(db, input.profileId, input.commands, owner);
       return { success: true };
     }),
 
@@ -339,6 +404,7 @@ export const agentProfilesRouter = createTRPCRouter({
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await repoBindingService.bindProfileToRepo(
+        db,
         owner,
         input.repoFullName,
         input.platform,
@@ -362,7 +428,7 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      await repoBindingService.unbindRepo(owner, input.repoFullName, input.platform);
+      await repoBindingService.unbindRepo(db, owner, input.repoFullName, input.platform);
     }),
 
   /**
@@ -379,6 +445,296 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      return repoBindingService.listBindings(owner);
+      return repoBindingService.listBindings(db, owner);
+    }),
+
+  // ============ MCP SERVERS ============
+
+  /**
+   * Create an MCP server on a profile from a CLI-native input (local or remote).
+   * Each env/header value is encrypted at-rest with the agent env vars public key
+   * and stored inline in the server's config jsonb.
+   */
+  createMcp: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        server: profileMcpService.mcpServerFullInputSchema,
+      })
+    )
+    .output(z.object({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileMcpService.createMcpServer(db, publicKey, input.profileId, input.server, owner);
+    }),
+
+  /**
+   * Update an MCP server (replaces its config). Env/header values in the
+   * input are plaintext; they are encrypted before write.
+   */
+  updateMcp: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        mcpServerId: z.uuid(),
+        server: profileMcpService.mcpServerFullInputSchema,
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileMcpService.updateMcpServer(
+        db,
+        publicKey,
+        input.profileId,
+        input.mcpServerId,
+        input.server,
+        owner
+      );
+      return { success: true };
+    }),
+
+  /**
+   * Delete an MCP server.
+   */
+  deleteMcp: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        mcpServerId: z.uuid(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileMcpService.deleteMcpServer(db, input.profileId, input.mcpServerId, owner);
+      return { success: true };
+    }),
+
+  /**
+   * Toggle an MCP server's enabled flag.
+   */
+  setMcpEnabled: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        mcpServerId: z.uuid(),
+        enabled: z.boolean(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileMcpService.setMcpEnabled(
+        db,
+        input.profileId,
+        input.mcpServerId,
+        input.enabled,
+        owner
+      );
+      return { success: true };
+    }),
+
+  // ============ SKILLS ============
+
+  /**
+   * Create a custom skill by pasting SKILL.md directly (optionally with
+   * companion files extracted from an uploaded archive by the client).
+   */
+  createCustomSkill: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+      }).merge(profileSkillsService.skillCustomInputSchema)
+    )
+    .output(z.object({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileSkillsService.createCustomSkill(
+        db,
+        input.profileId,
+        {
+          name: input.name,
+          description: input.description,
+          rawMarkdown: input.rawMarkdown,
+          files: input.files,
+          enabled: input.enabled,
+        },
+        owner
+      );
+    }),
+
+  /**
+   * Update a skill's fields (name, description, rawMarkdown, files, enabled).
+   */
+  updateSkill: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        skillId: z.uuid(),
+      }).merge(profileSkillsService.skillUpdateInputSchema)
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileSkillsService.updateSkill(
+        db,
+        input.profileId,
+        input.skillId,
+        {
+          name: input.name,
+          description: input.description,
+          rawMarkdown: input.rawMarkdown,
+          files: input.files,
+          enabled: input.enabled,
+        },
+        owner
+      );
+      return { success: true };
+    }),
+
+  /**
+   * Delete a skill from a profile.
+   */
+  deleteSkill: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        skillId: z.uuid(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileSkillsService.deleteSkill(db, input.profileId, input.skillId, owner);
+      return { success: true };
+    }),
+
+  /**
+   * Toggle a skill's enabled flag.
+   */
+  setSkillEnabled: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        skillId: z.uuid(),
+        enabled: z.boolean(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileSkillsService.setSkillEnabled(
+        db,
+        input.profileId,
+        input.skillId,
+        input.enabled,
+        owner
+      );
+      return { success: true };
+    }),
+
+  // ============ AGENTS ============
+
+  /**
+   * Create an agent on a profile. The agent config is injected into
+   * `KILO_CONFIG_CONTENT.agent.<slug>` at session preparation time.
+   */
+  createAgent: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+      }).merge(profileAgentsService.agentCreateInputSchema)
+    )
+    .output(z.object({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileAgentsService.createAgent(
+        db,
+        input.profileId,
+        {
+          slug: input.slug,
+          name: input.name,
+          config: input.config,
+        },
+        owner
+      );
+    }),
+
+  /**
+   * Update an agent's fields (slug, name, config).
+   */
+  updateAgent: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        agentId: z.uuid(),
+      }).merge(profileAgentsService.agentUpdateInputSchema)
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileAgentsService.updateAgent(
+        db,
+        input.profileId,
+        input.agentId,
+        {
+          slug: input.slug,
+          name: input.name,
+          config: input.config,
+        },
+        owner
+      );
+      return { success: true };
+    }),
+
+  /**
+   * Delete an agent from a profile.
+   */
+  deleteAgent: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        agentId: z.uuid(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileAgentsService.deleteAgent(db, input.profileId, input.agentId, owner);
+      return { success: true };
     }),
 });

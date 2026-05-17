@@ -10,7 +10,7 @@ import { Text } from '@/components/ui/text';
 import { type MobileOnboardingState } from '@/lib/derive-mobile-onboarding-state';
 
 type EmptyStateContentProps = {
-  state: MobileOnboardingState | undefined;
+  state: MobileOnboardingState;
   foregroundColor: string;
   onCreate: () => void;
 };
@@ -39,16 +39,6 @@ export function EmptyStateContent({
   foregroundColor,
   onCreate,
 }: Readonly<EmptyStateContentProps>) {
-  if (state === undefined) {
-    return (
-      <EmptyState
-        icon={Server}
-        title="No KiloClaw instances"
-        description="You don't have any KiloClaw instances yet. Continue on kilo.ai to get started."
-      />
-    );
-  }
-
   if (state.state === 'pending_settlement') {
     return (
       <EmptyState

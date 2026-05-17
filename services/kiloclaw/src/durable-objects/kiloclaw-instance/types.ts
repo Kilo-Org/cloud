@@ -27,6 +27,11 @@ export type DestroyResult = {
   finalized: boolean;
   destroyedUserId: string | null;
   destroyedSandboxId: string | null;
+  pendingMachineId: string | null;
+  pendingVolumeId: string | null;
+  lastDestroyErrorOp: 'machine' | 'volume' | 'recover' | null;
+  lastDestroyErrorStatus: number | null;
+  lastDestroyErrorAt: number | null;
 };
 
 /**
@@ -89,9 +94,20 @@ export type InstanceMutableState = {
   flyVolumeId: string | null;
   flyRegion: string | null;
   machineSize: MachineSize | null;
+  instanceType: PersistedState['instanceType'];
+  volumeSizeGb: number | null;
+  /**
+   * Admin-only temporary CPU/RAM override. When non-null,
+   * `effectiveMachineSize(state)` returns this instead of `machineSize`.
+   * Does NOT change billable tier (`instanceType`/`volumeSizeGb`).
+   */
+  adminMachineSizeOverride: MachineSize | null;
+  adminMachineSizeOverrideMetadata: PersistedState['adminMachineSizeOverrideMetadata'];
   healthCheckFailCount: number;
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
+  destroyStartedAt: number | null;
+  lastDestroyPendingEventAt: number | null;
   pendingPostgresMarkOnFinalize: boolean;
   lastMetadataRecoveryAt: number | null;
   openclawVersion: string | null;
@@ -102,6 +118,7 @@ export type InstanceMutableState = {
   lastDestroyErrorStatus: number | null;
   lastDestroyErrorMessage: string | null;
   lastDestroyErrorAt: number | null;
+  destroyVolumeAttempts: number;
   lastStartErrorMessage: string | null;
   lastStartErrorAt: number | null;
   lastRestartErrorMessage: string | null;

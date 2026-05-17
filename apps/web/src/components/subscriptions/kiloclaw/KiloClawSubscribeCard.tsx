@@ -3,15 +3,16 @@
 import Link from 'next/link';
 import { Check } from 'lucide-react';
 import {
-  COMMIT_PERIOD_MONTHS,
-  PLAN_DISPLAY,
-  STANDARD_FIRST_MONTH_DOLLARS,
+  createKiloClawSignupDisplay,
+  PLAN_COST_MICRODOLLARS,
+  type KiloClawSignupDisplay,
 } from '@/app/(app)/claw/components/billing/billing-types';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 type KiloClawSubscribeCardProps = {
-  creditIntroEligible: boolean;
+  standardCostMicrodollars?: number;
+  commitCostMicrodollars?: number;
   hasActiveKiloPass: boolean;
 };
 
@@ -105,14 +106,17 @@ function KiloClawPlanCard({
 }
 
 export function KiloClawSubscribeCard({
-  creditIntroEligible,
+  standardCostMicrodollars = PLAN_COST_MICRODOLLARS.standard,
+  commitCostMicrodollars = PLAN_COST_MICRODOLLARS.commit,
   hasActiveKiloPass,
 }: KiloClawSubscribeCardProps) {
+  const signupDisplay: KiloClawSignupDisplay = createKiloClawSignupDisplay({
+    standardCostMicrodollars,
+    commitCostMicrodollars,
+  });
   const standardDetails = [
     'Month-to-month hosting for one personal KiloClaw instance.',
-    creditIntroEligible
-      ? `Billed at $${PLAN_DISPLAY.standard.monthlyDollars}/month after the intro month.`
-      : `$${PLAN_DISPLAY.standard.monthlyDollars}/month with no long-term commitment.`,
+    signupDisplay.standard.accessoryDetail,
     hasActiveKiloPass
       ? 'Use Kilo Pass credits during activation or pay directly with Stripe.'
       : 'Activate and manage the instance inside KiloClaw.',
@@ -120,10 +124,11 @@ export function KiloClawSubscribeCard({
 
   const commitDetails = [
     'Six-month hosting commitment for one personal KiloClaw instance.',
-    `Lower effective cost at $${PLAN_DISPLAY.commit.monthlyDollars}/month, billed $${PLAN_DISPLAY.commit.totalDollars} upfront.`,
+    signupDisplay.commit.accessoryDetail,
+    signupDisplay.commit.monthlyEquivalent,
     hasActiveKiloPass
-      ? 'Works well when your Kilo Pass balance can cover the full commit period.'
-      : 'Best for steady usage when you want the lowest effective monthly rate.',
+      ? 'Works when your Kilo Pass balance can cover the first commit charge.'
+      : 'Best for steady usage when you want the lower effective monthly rate.',
   ];
 
   const benefits = [
@@ -140,30 +145,26 @@ export function KiloClawSubscribeCard({
         <KiloClawPlanCard
           title="Standard"
           cadenceLabel="Monthly"
-          price={
-            creditIntroEligible
-              ? `$${STANDARD_FIRST_MONTH_DOLLARS}`
-              : `$${PLAN_DISPLAY.standard.monthlyDollars}`
-          }
+          price={signupDisplay.standard.primaryPrice}
           priceDetail={
-            creditIntroEligible
-              ? `first month, then $${PLAN_DISPLAY.standard.monthlyDollars}/month`
-              : '/month'
+            signupDisplay.standard.introDetail
+              ? `${signupDisplay.standard.priceDetail}, ${signupDisplay.standard.introDetail}`
+              : signupDisplay.standard.priceDetail
           }
           details={standardDetails}
           accentDetail={
-            creditIntroEligible
-              ? `First month: $${STANDARD_FIRST_MONTH_DOLLARS} intro price`
+            signupDisplay.standard.introDetail
+              ? `${signupDisplay.standard.primaryPrice} intro price preserved for this live lineage.`
               : undefined
           }
           ctaLabel="Sign up in KiloClaw"
         />
         <KiloClawPlanCard
           title="Commit"
-          cadenceLabel={`${COMMIT_PERIOD_MONTHS} months`}
+          cadenceLabel="6 months"
           badge="Best value"
-          price={`$${PLAN_DISPLAY.commit.totalDollars}`}
-          priceDetail={`/ ${COMMIT_PERIOD_MONTHS} months`}
+          price={signupDisplay.commit.primaryPrice}
+          priceDetail={signupDisplay.commit.priceDetail}
           details={commitDetails}
           ctaLabel="Sign up in KiloClaw"
           isRecommended

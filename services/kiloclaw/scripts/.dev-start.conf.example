@@ -5,9 +5,24 @@
 #   ~/.config/kiloclaw/dev-start.conf   (shared across all worktrees)
 #   kiloclaw/scripts/.dev-start.conf    (per-worktree override, gitignored)
 
-# Named Cloudflare tunnel (leave empty for temporary quick tunnel)
+# Named Cloudflare tunnel (leave empty for temporary quick tunnel).
+# Use TUNNEL_CONFIG when credentials live outside ~/.cloudflared or when a
+# config file defines multiple ingress hostnames.
 # TUNNEL_NAME=          # tunnel
+# TUNNEL_CONFIG=        # ~/.cloudflared/accounts/kilo-local-dev.yml
+#
+# Single-hostname legacy mode. Requires cloudflared ingress path routing if
+# the same hostname serves the app, KiloClaw worker, and Kilo Chat.
 # TUNNEL_HOSTNAME=      # tunnel.yourdomain.com
+#
+# Multi-hostname mode for running the full local stack over a named tunnel.
+# TUNNEL_APP_HOSTNAME=       # app-dev.yourdomain.com -> localhost:3000
+# TUNNEL_KILOCLAW_HOSTNAME=  # claw-dev.yourdomain.com -> localhost:8795
+# TUNNEL_KILOCHAT_HOSTNAME=  # chat-dev.yourdomain.com -> localhost:8808
+#
+# When true (default), named tunnel mode also writes .env.local values:
+# APP_URL_OVERRIDE, NEXTAUTH_URL, and KILOCLAW_API_URL.
+# TUNNEL_UPDATE_APP_ENV=true
 
 # RSA private key for agent env var encryption (get from 1Password, engineering vault)
 # AGENT_ENV_VARS_PRIVATE_KEY=

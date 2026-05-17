@@ -40,9 +40,14 @@ export type GetWorkerDbOptions = Omit<pg.PoolConfig, 'connectionString' | 'max'>
  * Convenience wrapper for Cloudflare Workers using Hyperdrive.
  * Hyperdrive handles connection pooling at the infrastructure level,
  * so we use max: 1 here. Pass env.HYPERDRIVE.connectionString directly.
+ * Return a fresh wrapper per call so request/DO-bound I/O state never crosses contexts.
  */
 export function getWorkerDb(connectionString: string, options: GetWorkerDbOptions = {}) {
-  const pool = new pg.Pool({ connectionString, max: 1, ...options });
+  const pool = new pg.Pool({
+    connectionString,
+    max: 1,
+    ...options,
+  });
   return drizzle(pool, { schema });
 }
 

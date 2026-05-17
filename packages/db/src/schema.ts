@@ -28,6 +28,7 @@ import * as z from 'zod';
 import {
   KiloPassTier,
   KiloPassCadence,
+  KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
   KiloPassAuditLogAction,
@@ -46,9 +47,22 @@ import {
   KiloClawSubscriptionAccessOrigin,
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionChangeAction,
+  KiloClawTerminalRenewalFailureStatus,
+  KiloClawTerminalRenewalFailureCode,
+  KiloClawTerminalRenewalFailureResolutionActorType,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
+  KiloClawAttributionTouchType,
+  KiloClawAttributionTouchProvider,
+  ImpactAdvocateRegistrationState,
+  ImpactAdvocateAttemptDeliveryState,
+  KiloClawReferralBeneficiaryRole,
+  KiloClawReferralWinningTouchType,
+  KiloClawReferralDecisionOutcome,
+  KiloClawReferralRewardStatus,
+  ImpactConversionReportState,
+  ImpactAdvocateRewardRedemptionState,
 } from './schema-types';
 import type {
   CustomLlmDefinition,
@@ -60,6 +74,7 @@ import type {
   KiloClawScheduledActionNotificationChannel,
   KiloClawScheduledActionNotificationKind,
 } from './schema-types';
+import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
   OrganizationModeConfig,
   OrganizationPlan,
@@ -84,6 +99,7 @@ import type {
   ContributorChampionTier,
 } from './schema-types';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
+import { INSTANCE_TYPE_VALUES } from '@kilocode/kiloclaw-instance-tiers';
 
 /**
  * Generates a complete check constraint for an enum column.
@@ -114,6 +130,7 @@ export function enumCheck<T extends Record<string, string>>(
 export const SCHEMA_CHECK_ENUMS = {
   KiloPassTier,
   KiloPassCadence,
+  KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
   KiloPassAuditLogAction,
@@ -128,9 +145,22 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawSubscriptionAccessOrigin,
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionChangeAction,
+  KiloClawTerminalRenewalFailureStatus,
+  KiloClawTerminalRenewalFailureCode,
+  KiloClawTerminalRenewalFailureResolutionActorType,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
+  KiloClawAttributionTouchType,
+  KiloClawAttributionTouchProvider,
+  ImpactAdvocateRegistrationState,
+  ImpactAdvocateAttemptDeliveryState,
+  KiloClawReferralBeneficiaryRole,
+  KiloClawReferralWinningTouchType,
+  KiloClawReferralDecisionOutcome,
+  KiloClawReferralRewardStatus,
+  ImpactConversionReportState,
+  ImpactAdvocateRewardRedemptionState,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -260,6 +290,10 @@ export const kilocode_users = pgTable(
      */
     kilo_pass_threshold: bigint({ mode: 'number' }),
     stripe_customer_id: text().notNull(),
+    app_store_account_token: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .notNull()
+      .unique(),
     is_admin: boolean().default(false).notNull(),
     total_microdollars_acquired: bigint({ mode: 'number' })
       .default(sql`'0'`)
@@ -432,6 +466,485 @@ export const pending_impact_sale_reversals = pgTable(
 
 export type PendingImpactSaleReversal = typeof pending_impact_sale_reversals.$inferSelect;
 
+export const deleted_user_email_tombstones = pgTable('deleted_user_email_tombstones', {
+  normalized_email_hash: text().primaryKey().notNull(),
+  created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+export type DeletedUserEmailTombstone = typeof deleted_user_email_tombstones.$inferSelect;
+
+export const kiloclaw_attribution_touches = pgTable(
+  'kiloclaw_attribution_touches',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    dedupe_key: text().notNull(),
+    anonymous_id: text(),
+    user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    touch_type: text().notNull().$type<KiloClawAttributionTouchType>(),
+    provider: text().notNull().$type<KiloClawAttributionTouchProvider>(),
+    opaque_tracking_value: text(),
+    tracking_value_length: integer().notNull(),
+    is_tracking_value_accepted: boolean().notNull().default(true),
+    rs_code: text(),
+    rs_share_medium: text(),
+    rs_engagement_medium: text(),
+    im_ref: text(),
+    landing_path: text(),
+    utm_source: text(),
+    utm_medium: text(),
+    utm_campaign: text(),
+    utm_term: text(),
+    utm_content: text(),
+    touched_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    sale_attributed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kiloclaw_attribution_touches_dedupe_key').on(table.dedupe_key),
+    index('IDX_kiloclaw_attribution_touches_user_id').on(table.user_id),
+    index('IDX_kiloclaw_attribution_touches_anonymous_id').on(table.anonymous_id),
+    index('IDX_kiloclaw_attribution_touches_expires_at').on(table.expires_at),
+    index('IDX_kiloclaw_attribution_touches_sale_attributed_at').on(table.sale_attributed_at),
+    enumCheck(
+      'kiloclaw_attribution_touches_touch_type_check',
+      table.touch_type,
+      KiloClawAttributionTouchType
+    ),
+    enumCheck(
+      'kiloclaw_attribution_touches_provider_check',
+      table.provider,
+      KiloClawAttributionTouchProvider
+    ),
+    check(
+      'kiloclaw_attribution_touches_tracking_value_length_non_negative_check',
+      sql`${table.tracking_value_length} >= 0`
+    ),
+  ]
+);
+
+export type KiloClawAttributionTouch = typeof kiloclaw_attribution_touches.$inferSelect;
+
+export const impact_advocate_participants = pgTable(
+  'impact_advocate_participants',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    advocate_id: text().notNull(),
+    advocate_account_id: text().notNull(),
+    opaque_referral_identifier: text(),
+    contact_email: text(),
+    locale: text(),
+    country_code: text(),
+    registration_state: text()
+      .notNull()
+      .$type<ImpactAdvocateRegistrationState>()
+      .default(ImpactAdvocateRegistrationState.Pending),
+    registered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_registration_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error_code: text(),
+    last_error_message: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_impact_advocate_participants_user_id').on(table.user_id),
+    unique('UQ_impact_advocate_participants_opaque_referral_identifier').on(
+      table.opaque_referral_identifier
+    ),
+    index('IDX_impact_advocate_participants_registration_state').on(table.registration_state),
+    enumCheck(
+      'impact_advocate_participants_registration_state_check',
+      table.registration_state,
+      ImpactAdvocateRegistrationState
+    ),
+  ]
+);
+
+export type ImpactAdvocateParticipant = typeof impact_advocate_participants.$inferSelect;
+
+export const impact_advocate_registration_attempts = pgTable(
+  'impact_advocate_registration_attempts',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    participant_id: uuid()
+      .notNull()
+      .references(() => impact_advocate_participants.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    dedupe_key: text().notNull(),
+    opaque_cookie_value: text(),
+    cookie_value_length: integer().notNull(),
+    delivery_state: text()
+      .notNull()
+      .$type<ImpactAdvocateAttemptDeliveryState>()
+      .default(ImpactAdvocateAttemptDeliveryState.Queued),
+    request_payload: jsonb().$type<Record<string, unknown> | null>(),
+    response_payload: jsonb().$type<Record<string, unknown> | null>(),
+    response_status_code: integer(),
+    attempt_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_impact_advocate_registration_attempts_dedupe_key').on(table.dedupe_key),
+    index('IDX_impact_advocate_registration_attempts_participant_id').on(table.participant_id),
+    index('IDX_impact_advocate_registration_attempts_delivery_state').on(table.delivery_state),
+    enumCheck(
+      'impact_advocate_registration_attempts_delivery_state_check',
+      table.delivery_state,
+      ImpactAdvocateAttemptDeliveryState
+    ),
+    check(
+      'impact_advocate_registration_attempts_cookie_value_length_non_negative_check',
+      sql`${table.cookie_value_length} >= 0`
+    ),
+    check(
+      'impact_advocate_registration_attempts_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
+export type ImpactAdvocateRegistrationAttempt =
+  typeof impact_advocate_registration_attempts.$inferSelect;
+
+export const kiloclaw_referrals = pgTable(
+  'kiloclaw_referrals',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    referee_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    referrer_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    source_touch_id: uuid().references(() => kiloclaw_attribution_touches.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    impact_referral_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kiloclaw_referrals_referee_user_id').on(table.referee_user_id),
+    index('IDX_kiloclaw_referrals_referrer_user_id').on(table.referrer_user_id),
+    index('IDX_kiloclaw_referrals_source_touch_id').on(table.source_touch_id),
+  ]
+);
+
+export type KiloClawReferral = typeof kiloclaw_referrals.$inferSelect;
+
+export const kiloclaw_referral_conversions = pgTable(
+  'kiloclaw_referral_conversions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    referee_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    referrer_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    source_touch_id: uuid().references(() => kiloclaw_attribution_touches.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    winning_touch_type: text().notNull().$type<KiloClawReferralWinningTouchType>(),
+    source_payment_id: text().notNull(),
+    qualified: boolean().notNull().default(false),
+    disqualification_reason: text(),
+    converted_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kiloclaw_referral_conversions_source_payment_id').on(table.source_payment_id),
+    index('IDX_kiloclaw_referral_conversions_referee_user_id').on(table.referee_user_id),
+    index('IDX_kiloclaw_referral_conversions_referrer_user_id').on(table.referrer_user_id),
+    enumCheck(
+      'kiloclaw_referral_conversions_winning_touch_type_check',
+      table.winning_touch_type,
+      KiloClawReferralWinningTouchType
+    ),
+  ]
+);
+
+export type KiloClawReferralConversion = typeof kiloclaw_referral_conversions.$inferSelect;
+
+export const kiloclaw_referral_reward_decisions = pgTable(
+  'kiloclaw_referral_reward_decisions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    conversion_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_referral_conversions.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    beneficiary_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    beneficiary_role: text().notNull().$type<KiloClawReferralBeneficiaryRole>(),
+    outcome: text().notNull().$type<KiloClawReferralDecisionOutcome>(),
+    reason: text(),
+    months_granted: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kiloclaw_referral_reward_decisions_conversion_role').on(
+      table.conversion_id,
+      table.beneficiary_role
+    ),
+    index('IDX_kiloclaw_referral_reward_decisions_beneficiary_user_id').on(
+      table.beneficiary_user_id
+    ),
+    enumCheck(
+      'kiloclaw_referral_reward_decisions_beneficiary_role_check',
+      table.beneficiary_role,
+      KiloClawReferralBeneficiaryRole
+    ),
+    enumCheck(
+      'kiloclaw_referral_reward_decisions_outcome_check',
+      table.outcome,
+      KiloClawReferralDecisionOutcome
+    ),
+    check(
+      'kiloclaw_referral_reward_decisions_months_granted_non_negative_check',
+      sql`${table.months_granted} >= 0`
+    ),
+  ]
+);
+
+export type KiloClawReferralRewardDecision = typeof kiloclaw_referral_reward_decisions.$inferSelect;
+
+export const kiloclaw_referral_rewards = pgTable(
+  'kiloclaw_referral_rewards',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    conversion_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_referral_conversions.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    decision_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_referral_reward_decisions.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    beneficiary_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    beneficiary_role: text().notNull().$type<KiloClawReferralBeneficiaryRole>(),
+    months_granted: integer().notNull().default(1),
+    status: text()
+      .notNull()
+      .$type<KiloClawReferralRewardStatus>()
+      .default(KiloClawReferralRewardStatus.Pending),
+    applies_to_subscription_id: uuid(),
+    earned_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    applied_at: timestamp({ withTimezone: true, mode: 'string' }),
+    reversed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    review_reason: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_kiloclaw_referral_rewards_conversion_role').on(
+      table.conversion_id,
+      table.beneficiary_role
+    ),
+    unique('UQ_kiloclaw_referral_rewards_decision_id').on(table.decision_id),
+    index('IDX_kiloclaw_referral_rewards_beneficiary_user_id').on(table.beneficiary_user_id),
+    index('IDX_kiloclaw_referral_rewards_status').on(table.status),
+    enumCheck(
+      'kiloclaw_referral_rewards_beneficiary_role_check',
+      table.beneficiary_role,
+      KiloClawReferralBeneficiaryRole
+    ),
+    enumCheck('kiloclaw_referral_rewards_status_check', table.status, KiloClawReferralRewardStatus),
+    check(
+      'kiloclaw_referral_rewards_months_granted_positive_check',
+      sql`${table.months_granted} > 0`
+    ),
+  ]
+);
+
+export type KiloClawReferralReward = typeof kiloclaw_referral_rewards.$inferSelect;
+
+export const kiloclaw_referral_reward_applications = pgTable(
+  'kiloclaw_referral_reward_applications',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    reward_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_referral_rewards.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    beneficiary_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    subscription_id: uuid(),
+    previous_renewal_boundary: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    new_renewal_boundary: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    local_operation_id: text(),
+    stripe_operation_id: text(),
+    stripe_idempotency_key: text(),
+    applied_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_kiloclaw_referral_reward_applications_reward_id').on(table.reward_id),
+    index('IDX_kiloclaw_referral_reward_applications_beneficiary_user_id').on(
+      table.beneficiary_user_id
+    ),
+  ]
+);
+
+export type KiloClawReferralRewardApplication =
+  typeof kiloclaw_referral_reward_applications.$inferSelect;
+
+export const impact_advocate_reward_redemptions = pgTable(
+  'impact_advocate_reward_redemptions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    reward_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_referral_rewards.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    dedupe_key: text().notNull(),
+    beneficiary_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    state: text()
+      .notNull()
+      .$type<ImpactAdvocateRewardRedemptionState>()
+      .default(ImpactAdvocateRewardRedemptionState.Queued),
+    impact_reward_id: text(),
+    request_payload: jsonb().$type<Record<string, unknown> | null>(),
+    lookup_response_payload: jsonb().$type<Record<string, unknown> | null>(),
+    redeem_response_payload: jsonb().$type<Record<string, unknown> | null>(),
+    response_status_code: integer(),
+    attempt_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    redeemed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_impact_advocate_reward_redemptions_reward_id').on(table.reward_id),
+    unique('UQ_impact_advocate_reward_redemptions_dedupe_key').on(table.dedupe_key),
+    index('IDX_impact_advocate_reward_redemptions_beneficiary_user_id').on(
+      table.beneficiary_user_id
+    ),
+    index('IDX_impact_advocate_reward_redemptions_state').on(table.state),
+    enumCheck(
+      'impact_advocate_reward_redemptions_state_check',
+      table.state,
+      ImpactAdvocateRewardRedemptionState
+    ),
+    check(
+      'impact_advocate_reward_redemptions_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
+export type ImpactAdvocateRewardRedemption = typeof impact_advocate_reward_redemptions.$inferSelect;
+
+export const impact_conversion_reports = pgTable(
+  'impact_conversion_reports',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    conversion_id: uuid().references(() => kiloclaw_referral_conversions.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    dedupe_key: text().notNull(),
+    action_tracker_id: integer().notNull(),
+    order_id: text().notNull(),
+    state: text()
+      .notNull()
+      .$type<ImpactConversionReportState>()
+      .default(ImpactConversionReportState.Queued),
+    request_payload: jsonb().$type<Record<string, unknown> | null>(),
+    response_payload: jsonb().$type<Record<string, unknown> | null>(),
+    response_status_code: integer(),
+    attempt_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    delivered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_impact_conversion_reports_dedupe_key').on(table.dedupe_key),
+    index('IDX_impact_conversion_reports_conversion_id').on(table.conversion_id),
+    index('IDX_impact_conversion_reports_state').on(table.state),
+    enumCheck('impact_conversion_reports_state_check', table.state, ImpactConversionReportState),
+    check(
+      'impact_conversion_reports_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
+export type ImpactConversionReport = typeof impact_conversion_reports.$inferSelect;
+
 export const kilo_pass_subscriptions = pgTable(
   'kilo_pass_subscriptions',
   {
@@ -441,7 +954,12 @@ export const kilo_pass_subscriptions = pgTable(
     kilo_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    stripe_subscription_id: text().notNull().unique(),
+    payment_provider: text()
+      .notNull()
+      .$type<KiloPassPaymentProvider>()
+      .default(KiloPassPaymentProvider.Stripe),
+    provider_subscription_id: text(),
+    stripe_subscription_id: text().unique(),
     tier: text().notNull().$type<KiloPassTier>(),
     cadence: text().notNull().$type<KiloPassCadence>(),
     status: text().notNull().$type<StripeSubscriptionStatus>(),
@@ -468,11 +986,39 @@ export const kilo_pass_subscriptions = pgTable(
   },
   table => [
     index('IDX_kilo_pass_subscriptions_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_kilo_pass_subscriptions_payment_provider').on(table.payment_provider),
     index('IDX_kilo_pass_subscriptions_status').on(table.status),
     index('IDX_kilo_pass_subscriptions_cadence').on(table.cadence),
+    uniqueIndex('UQ_kilo_pass_subscriptions_provider_subscription')
+      .on(table.payment_provider, table.provider_subscription_id)
+      .where(sql`${table.provider_subscription_id} IS NOT NULL`),
+    uniqueIndex('UQ_kilo_pass_subscriptions_store_purchase_reference').on(
+      table.id,
+      table.kilo_user_id,
+      table.payment_provider,
+      table.provider_subscription_id
+    ),
     check(
       'kilo_pass_subscriptions_current_streak_months_non_negative_check',
       sql`${table.current_streak_months} >= 0`
+    ),
+    check(
+      'kilo_pass_subscriptions_provider_ids_check',
+      sql`(
+        ${table.payment_provider} = 'stripe'
+        AND ${table.provider_subscription_id} IS NOT NULL
+        AND ${table.stripe_subscription_id} IS NOT NULL
+        AND ${table.provider_subscription_id} = ${table.stripe_subscription_id}
+      ) OR (
+        ${table.payment_provider} IN ('app_store', 'google_play')
+        AND ${table.provider_subscription_id} IS NOT NULL
+        AND ${table.stripe_subscription_id} IS NULL
+      )`
+    ),
+    enumCheck(
+      'kilo_pass_subscriptions_payment_provider_check',
+      table.payment_provider,
+      KiloPassPaymentProvider
     ),
     enumCheck('kilo_pass_subscriptions_tier_check', table.tier, KiloPassTier),
     enumCheck('kilo_pass_subscriptions_cadence_check', table.cadence, KiloPassCadence),
@@ -481,6 +1027,121 @@ export const kilo_pass_subscriptions = pgTable(
 
 export type KiloPassSubscription = typeof kilo_pass_subscriptions.$inferSelect;
 export type NewKiloPassSubscription = typeof kilo_pass_subscriptions.$inferInsert;
+
+export const kilo_pass_store_events = pgTable(
+  'kilo_pass_store_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    payment_provider: text().notNull().$type<KiloPassPaymentProvider>(),
+    event_id: text().notNull(),
+    provider_subscription_id: text(),
+    provider_transaction_id: text(),
+    app_account_token: uuid(),
+    product_id: text().notNull(),
+    environment: text().notNull(),
+    payload_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    processing_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    processed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_kilo_pass_store_events_provider_event').on(
+      table.payment_provider,
+      table.event_id
+    ),
+    index('IDX_kilo_pass_store_events_provider_subscription').on(
+      table.payment_provider,
+      table.provider_subscription_id
+    ),
+    index('IDX_kilo_pass_store_events_app_account_token').on(table.app_account_token),
+    enumCheck(
+      'kilo_pass_store_events_payment_provider_check',
+      table.payment_provider,
+      KiloPassPaymentProvider
+    ),
+  ]
+);
+
+export type KiloPassStoreEvent = typeof kilo_pass_store_events.$inferSelect;
+export type NewKiloPassStoreEvent = typeof kilo_pass_store_events.$inferInsert;
+
+export const kilo_pass_store_purchases = pgTable(
+  'kilo_pass_store_purchases',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_pass_subscription_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_subscriptions.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    payment_provider: text().notNull().$type<KiloPassPaymentProvider>(),
+    product_id: text().notNull(),
+    provider_subscription_id: text().notNull(),
+    provider_transaction_id: text().notNull(),
+    provider_original_transaction_id: text(),
+    app_account_token: uuid(),
+    purchase_token: text(),
+    environment: text().notNull(),
+    purchased_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    raw_payload_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_kilo_pass_store_purchases_provider_transaction').on(
+      table.payment_provider,
+      table.provider_transaction_id
+    ),
+    index('IDX_kilo_pass_store_purchases_subscription_id').on(table.kilo_pass_subscription_id),
+    index('IDX_kilo_pass_store_purchases_user_id').on(table.kilo_user_id),
+    index('IDX_kilo_pass_store_purchases_app_account_token').on(table.app_account_token),
+    index('IDX_kilo_pass_store_purchases_latest_subscription_purchase').on(
+      table.payment_provider,
+      table.provider_subscription_id,
+      table.purchased_at.desc()
+    ),
+    foreignKey({
+      columns: [
+        table.kilo_pass_subscription_id,
+        table.kilo_user_id,
+        table.payment_provider,
+        table.provider_subscription_id,
+      ],
+      foreignColumns: [
+        kilo_pass_subscriptions.id,
+        kilo_pass_subscriptions.kilo_user_id,
+        kilo_pass_subscriptions.payment_provider,
+        kilo_pass_subscriptions.provider_subscription_id,
+      ],
+      name: 'FK_kilo_pass_store_purchases_subscription_owner_provider',
+    })
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    check(
+      'kilo_pass_store_purchases_store_provider_check',
+      sql`${table.payment_provider} IN ('app_store', 'google_play')`
+    ),
+    enumCheck(
+      'kilo_pass_store_purchases_payment_provider_check',
+      table.payment_provider,
+      KiloPassPaymentProvider
+    ),
+  ]
+);
+
+export type KiloPassStorePurchase = typeof kilo_pass_store_purchases.$inferSelect;
+export type NewKiloPassStorePurchase = typeof kilo_pass_store_purchases.$inferInsert;
 
 export const kilo_pass_issuances = pgTable(
   'kilo_pass_issuances',
@@ -1250,7 +1911,7 @@ export const stytch_fingerprints = pgTable(
     index('idx_fingerprint_data').on(table.fingerprint_data),
     index('idx_hardware_fingerprint').on(table.hardware_fingerprint),
     index('idx_kilo_user_id').on(table.kilo_user_id),
-    index('idx_reasons').on(table.reasons),
+    index('idx_stytch_fingerprints_reasons_gin').using('gin', table.reasons),
     index('idx_verdict_action').on(table.verdict_action),
     index('idx_visitor_fingerprint').on(table.visitor_fingerprint),
   ]
@@ -1724,6 +2385,9 @@ export const platform_integrations = pgTable(
     uniqueIndex('UQ_platform_integrations_slack_platform_inst')
       .on(table.platform, table.platform_installation_id)
       .where(sql`${table.platform} = 'slack' AND ${table.platform_installation_id} IS NOT NULL`),
+    uniqueIndex('UQ_platform_integrations_linear_platform_inst')
+      .on(table.platform, table.platform_installation_id)
+      .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
     index('IDX_platform_integrations_owned_by_org_id').on(table.owned_by_organization_id),
     index('IDX_platform_integrations_owned_by_user_id').on(table.owned_by_user_id),
     index('IDX_platform_integrations_platform_inst_id').on(table.platform_installation_id),
@@ -2494,6 +3158,11 @@ export const cloud_agent_code_reviews = pgTable(
     // GitHub Check Run ID; null for GitLab or pre-feature reviews
     check_run_id: bigint({ mode: 'number' }),
 
+    // REVIEW.md usage metadata
+    repository_review_instructions_used: boolean().notNull().default(false),
+    repository_review_instructions_ref: text(),
+    repository_review_instructions_truncated: boolean().notNull().default(false),
+
     // Usage tracking (populated on completion by orchestrator)
     model: text(), // LLM model slug used (e.g., 'anthropic/claude-sonnet-4.6')
     total_tokens_in: integer(), // Total input tokens across all LLM calls
@@ -2542,6 +3211,51 @@ export const cloud_agent_code_reviews = pgTable(
 );
 
 export type CloudAgentCodeReview = typeof cloud_agent_code_reviews.$inferSelect;
+
+export const cloud_agent_code_review_attempts = pgTable(
+  'cloud_agent_code_review_attempts',
+  {
+    id: idPrimaryKeyColumn,
+    code_review_id: uuid()
+      .notNull()
+      .references(() => cloud_agent_code_reviews.id, { onDelete: 'cascade' }),
+    attempt_number: integer().notNull(),
+    retry_of_attempt_id: uuid().references((): AnyPgColumn => cloud_agent_code_review_attempts.id, {
+      onDelete: 'set null',
+    }),
+    retry_reason: text(),
+    session_id: text(),
+    cli_session_id: text(),
+    execution_id: text(),
+    status: text().notNull().default('pending'),
+    error_message: text(),
+    terminal_reason: text(),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_code_review_attempts_review_attempt_number').on(
+      table.code_review_id,
+      table.attempt_number
+    ),
+    index('idx_cloud_agent_code_review_attempts_code_review_id').on(table.code_review_id),
+    index('idx_cloud_agent_code_review_attempts_session_id').on(table.session_id),
+    index('idx_cloud_agent_code_review_attempts_cli_session_id').on(table.cli_session_id),
+    index('idx_cloud_agent_code_review_attempts_status').on(table.status),
+    index('idx_cloud_agent_code_review_attempts_retry_reason').on(table.retry_reason),
+    check(
+      'cloud_agent_code_review_attempts_attempt_number_check',
+      sql`${table.attempt_number} >= 1`
+    ),
+  ]
+);
+
+export type CloudAgentCodeReviewAttempt = typeof cloud_agent_code_review_attempts.$inferSelect;
 
 export const cliSessions = pgTable(
   'cli_sessions',
@@ -2664,11 +3378,82 @@ export const cli_sessions_v2 = pgTable(
     index('IDX_cli_sessions_v2_kilo_user_id').on(table.kilo_user_id),
     index('IDX_cli_sessions_v2_created_at').on(table.created_at),
     index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
+    // Supports joins from github_branch_pull_requests on (git_url, git_branch).
+    index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
   ]
 );
 
 export type CliSessionV2 = typeof cli_sessions_v2.$inferSelect;
 export type NewCliSessionV2 = typeof cli_sessions_v2.$inferInsert;
+
+/**
+ * Per-tenant cache of the latest GitHub pull request observed for a
+ * `(repo, branch)` pair. Written by the `pull_request` webhook handler
+ * and the manual `refreshAssociatedPullRequest` mutation; read by the
+ * cli-sessions-v2 router to attach `associatedPr` to a session.
+ *
+ * Tenancy: XOR ownership columns mirror `platform_integrations`. A webhook
+ * delivery from an org installation writes a row under that org; a user
+ * installation writes under the user. Different tenants caching the same
+ * `(git_url, git_branch)` produce separate rows and never contaminate
+ * each other's reads.
+ *
+ * `git_url` is always stored in normalized form (see `normalizeGitUrl` in
+ * `@kilocode/worker-utils`). Session rows must store `git_url` in the same
+ * normalized shape for the join to match — the session-ingest queue consumer
+ * enforces this on write for new sessions.
+ */
+export const github_branch_pull_requests = pgTable(
+  'github_branch_pull_requests',
+  {
+    git_url: text().notNull(),
+    git_branch: text().notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    // pr_url/pr_number/pr_state are nullable so we can persist a "no PR exists
+    // for this branch" sentinel row: pr_last_synced_at then throttles repeated
+    // refresh attempts even when GitHub has no matching PR.
+    pr_url: text(),
+    pr_number: integer(),
+    pr_state: text(),
+    pr_title: text(),
+    pr_head_sha: text(),
+    pr_review_decision: text(),
+    review_decision_pending: boolean().notNull().default(false),
+    review_decision_fetching_at: timestamp({ withTimezone: true, mode: 'string' }),
+    pr_last_synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    // Partial unique indexes serve as ON CONFLICT targets for the webhook
+    // upsert. Identity columns (git_url, git_branch) lead; tenant column
+    // trails since all hot-path reads supply every column anyway.
+    uniqueIndex('UQ_github_branch_prs_org')
+      .on(table.git_url, table.git_branch, table.owned_by_organization_id)
+      .where(isNotNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_github_branch_prs_user')
+      .on(table.git_url, table.git_branch, table.owned_by_user_id)
+      .where(isNotNull(table.owned_by_user_id)),
+    check(
+      'github_branch_pull_requests_owner_check',
+      sql`(
+        (${table.owned_by_organization_id} IS NOT NULL AND ${table.owned_by_user_id} IS NULL) OR
+        (${table.owned_by_organization_id} IS NULL AND ${table.owned_by_user_id} IS NOT NULL)
+      )`
+    ),
+    check(
+      'github_branch_pull_requests_review_decision_check',
+      sql`${table.pr_review_decision} IS NULL OR ${table.pr_review_decision} IN ('approved', 'changes_requested', 'review_required')`
+    ),
+  ]
+);
+
+export type GithubBranchPullRequest = typeof github_branch_pull_requests.$inferSelect;
+export type NewGithubBranchPullRequest = typeof github_branch_pull_requests.$inferInsert;
 
 export const device_auth_requests = pgTable(
   'device_auth_requests',
@@ -2773,7 +3558,7 @@ export const app_builder_project_sessions = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     ended_at: timestamp({ withTimezone: true, mode: 'string' }), // null = current/active session
     reason: text().notNull(), // 'initial', 'github_migration', 'upgrade', etc.
-    worker_version: text().notNull().default('v1'), // 'v1' (old cloud-agent) or 'v2' (cloud-agent-next)
+    worker_version: text().notNull().default('v2'), // 'v1' (legacy/R2 only) or 'v2' (cloud-agent-next)
   },
   table => [
     index('IDX_app_builder_project_sessions_project_id').on(table.project_id),
@@ -3560,6 +4345,7 @@ export const agent_environment_profiles = pgTable(
     // Ownership: exactly one must be set (org OR user) - matches platform_integrations pattern
     owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
     owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    created_by_user_id: text(), // Audit trail: the user who created this profile (useful for org-owned profiles)
 
     name: text().notNull(),
     description: text(),
@@ -3589,6 +4375,7 @@ export const agent_environment_profiles = pgTable(
     // Indexes
     index('IDX_agent_env_profiles_org_id').on(table.owned_by_organization_id),
     index('IDX_agent_env_profiles_user_id').on(table.owned_by_user_id),
+    index('IDX_agent_env_profiles_created_by_user_id').on(table.created_by_user_id),
     // Owner check constraint (exactly one must be set)
     check(
       'agent_env_profiles_owner_check',
@@ -3699,6 +4486,123 @@ export type AgentEnvironmentProfileRepoBinding =
 export type NewAgentEnvironmentProfileRepoBinding =
   typeof agent_environment_profile_repo_bindings.$inferInsert;
 
+// ============ AGENT ENVIRONMENT PROFILE MCP SERVERS ============
+// MCP servers configured on an environment profile. Materialized into the
+// CLI-native KILO_CONFIG_CONTENT.mcp block at session preparation time.
+
+export const agent_environment_profile_mcp_servers = pgTable(
+  'agent_environment_profile_mcp_servers',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    type: text({ enum: ['local', 'remote'] }).notNull(),
+    enabled: boolean().notNull().default(true),
+    timeout: integer(),
+    // CLI-native MCP config as jsonb. Non-secret fields (command, args, url, env/header keys)
+    // are stored as plain values. Each env/header *value* is stored as an RSA+AES envelope
+    // object ({ encryptedData, encryptedDEK, algorithm, version }) using the same format as
+    // agent_environment_profile_vars. Decryption happens only on the cloud-agent-next worker
+    // at session preparation time.
+    config: jsonb().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_agent_env_profile_mcp_servers_profile_id').on(table.profile_id),
+    unique('UQ_agent_env_profile_mcp_servers_profile_name').on(table.profile_id, table.name),
+  ]
+);
+
+export type AgentEnvironmentProfileMcpServer =
+  typeof agent_environment_profile_mcp_servers.$inferSelect;
+
+// ============ AGENT ENVIRONMENT PROFILE SKILLS ============
+// Kilo Code skills attached to an environment profile. Materialized into
+// ${SESSION_HOME}/.kilocode/skills/<name>/SKILL.md at session preparation time.
+
+export const agent_environment_profile_skills = pgTable(
+  'agent_environment_profile_skills',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    // Skill slug — must match the frontmatter `name` and is used as the directory name
+    name: text().notNull(),
+    description: text(),
+    source_type: text({ enum: ['marketplace', 'custom'] }).notNull(),
+    // URL the skill was imported from (marketplace entry URL, or null for 'custom')
+    source_url: text(),
+    raw_markdown: text().notNull(),
+    // Companion files for a multi-file skill. Map of relative path → file
+    // contents (text). Excludes SKILL.md itself (lives in raw_markdown).
+    // Materialized under ${sessionHome}/.kilocode/skills/<name>/<relativePath>.
+    files: jsonb().$type<Record<string, string>>().notNull().default({}),
+    enabled: boolean().notNull().default(true),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_agent_env_profile_skills_profile_id').on(table.profile_id),
+    unique('UQ_agent_env_profile_skills_profile_name').on(table.profile_id, table.name),
+  ]
+);
+
+export type AgentEnvironmentProfileSkill = typeof agent_environment_profile_skills.$inferSelect;
+
+// ============ AGENT ENVIRONMENT PROFILE AGENTS ============
+// Kilo "agents" (the modern successor to legacy custom modes) attached to an
+// environment profile. Materialized into KILO_CONFIG_CONTENT.agent.<slug> at
+// session preparation time; the stored `config` jsonb already matches the
+// CLI's AgentConfig shape so we pass through untransformed.
+
+export const agent_environment_profile_agents = pgTable(
+  'agent_environment_profile_agents',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    // Agent slug — used as KILO_CONFIG_CONTENT.agent.<slug>.
+    slug: text().notNull(),
+    // Display name shown in the picker.
+    name: text().notNull(),
+    // AgentConfig shape: prompt, description, mode, model, temperature, top_p,
+    // steps, hidden, disable, color, variant, permission, options. See
+    // AgentConfigSchema in schema-types.ts for the authoritative validator.
+    config: jsonb().notNull().default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_agent_env_profile_agents_profile_id').on(table.profile_id),
+    unique('UQ_agent_env_profile_agents_profile_slug').on(table.profile_id, table.slug),
+  ]
+);
+
+export type AgentEnvironmentProfileAgent = typeof agent_environment_profile_agents.$inferSelect;
+
 // ============ APP BUILDER FEEDBACK ============
 
 export const app_builder_feedback = pgTable(
@@ -3795,6 +4699,16 @@ export const kiloclaw_instances = pgTable(
     // can filter populations by current running version via SQL. Up to ~30min stale on
     // idle instances (matches the longest alarm interval).
     tracked_image_tag: text(),
+    // Denormalized copy of the DO's instanceType. Source of truth remains the DO;
+    // this column exists so admin tooling and future billing work can filter by tier.
+    instance_type: text(),
+    // Denormalized copy of the DO's `adminMachineSizeOverride` + metadata. Non-null
+    // means the instance is currently running with admin-supplied CPU/RAM that
+    // diverge from its billable tier hardware (`machineSize` / `instance_type`).
+    // Source of truth is the DO; written by the worker on explicit admin
+    // set/clear, plus auto-cleared as part of a tier resize.
+    // Shape: { size: { cpus, memory_mb, cpu_kind? }, reason, actorId, actorEmail, setAt }.
+    admin_size_override: jsonb(),
   },
   table => [
     // One active instance per user+sandbox combination.
@@ -3807,10 +4721,32 @@ export const kiloclaw_instances = pgTable(
     index('IDX_kiloclaw_instances_active_org_by_user_org')
       .on(table.user_id, table.organization_id)
       .where(sql`${table.organization_id} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
+    // Non-partial index over all rows (including destroyed) so we can answer
+    // "what is this user's earliest instance" without a sequential scan. Used
+    // by `userIsWithinFirstKiloClawInstanceWindow` on the AI gateway hot path;
+    // the existing partial-by-user indexes can't serve it because they exclude
+    // destroyed rows, and destroyed rows must still count for "first instance"
+    // semantics.
+    index('IDX_kiloclaw_instances_user_id_created_at').on(table.user_id, table.created_at),
     // Powers admin "instances on version X" filter; partial since destroyed rows are excluded.
     index('IDX_kiloclaw_instances_tracked_image_tag')
       .on(table.tracked_image_tag)
       .where(isNull(table.destroyed_at)),
+    index('IDX_kiloclaw_instances_instance_type')
+      .on(table.instance_type)
+      .where(isNull(table.destroyed_at)),
+    check(
+      'CHK_kiloclaw_instances_instance_type',
+      sql`${table.instance_type} IS NULL OR ${table.instance_type} IN (${sql.join(
+        INSTANCE_TYPE_VALUES.map(value => sql.raw(`'${value}'`)),
+        sql.raw(', ')
+      )})`
+    ),
+    // Powers the admin "outstanding overrides" filter. Partial (active rows
+    // only) so the index stays small.
+    index('IDX_kiloclaw_instances_admin_size_override')
+      .on(table.id)
+      .where(sql`${table.admin_size_override} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
   ]
 );
 
@@ -3917,6 +4853,94 @@ export const kiloclaw_inbound_email_aliases = pgTable(
 
 export type KiloClawInboundEmailAlias = typeof kiloclaw_inbound_email_aliases.$inferSelect;
 export type NewKiloClawInboundEmailAlias = typeof kiloclaw_inbound_email_aliases.$inferInsert;
+
+// KiloClaw Morning Briefing Configuration
+//
+// Denormalized read cache of which instances have the morning briefing
+// enabled and how it's configured (cron, timezone, interest topics). The
+// briefing plugin's local `config.json` on the instance remains the source
+// of truth for actual runtime behavior; this table mirrors the same
+// values so external readers (admin tooling, analytics, dashboard reads)
+// can answer "who has briefing enabled?" / "who picked topic X?" without
+// scanning every instance gateway.
+//
+// Write ownership: the KiloClaw worker is the sole writer (matches
+// `kiloclaw_instances` ownership). The worker pushes the same config to
+// the plugin in the same request; if the Postgres write fails the
+// briefing still works — the plugin has the config — the mirror is just
+// stale for that instance. Plugin runtime state (cronJobId, last-generated
+// timestamps, reconcile state) is NOT mirrored here.
+//
+// Backfill: pre-existing instances have no row here until the first
+// post-deploy `getMorningBriefingStatus` call lazily writes one from the
+// plugin response. Same pattern as `kiloclaw_instances.tracked_image_tag`.
+// Admin queries that scan this table are "current-best-known view," not
+// authoritative — per-instance gateway queries remain the ground truth.
+//
+// 1:1 with `kiloclaw_instances`. No surrogate id; `instance_id` is the
+// natural key (compare `kiloclaw_inbound_email_aliases`, which uses `alias`
+// as PK). Skips the join indirection from any future FK to this table.
+// Owner / org are NOT denormalized — join through `kiloclaw_instances` if
+// you need them (no precedent for denorm on the other kiloclaw_* tables).
+export const kiloclaw_morning_briefing_configs = pgTable(
+  'kiloclaw_morning_briefing_configs',
+  {
+    instance_id: uuid()
+      .primaryKey()
+      .notNull()
+      .references(() => kiloclaw_instances.id, { onDelete: 'cascade' }),
+    // Desired state. `false` means the user has not enabled briefing (or
+    // has disabled it). The plugin's `observedEnabled` (in gateway status)
+    // may lag during reconcile.
+    enabled: boolean().default(false).notNull(),
+    // Defaults match the plugin's hard-coded defaults
+    // (`services/kiloclaw/plugins/kiloclaw-morning-briefing/src/index.ts`).
+    // Keep these in sync if the plugin defaults ever change.
+    cron: text().notNull().default('0 7 * * *'),
+    timezone: text().notNull().default('UTC'),
+    // Selected by the user during onboarding (PR-4b) or from settings.
+    // Empty array means "no topics selected" — the plugin (PR-4c) falls
+    // back to its default web-search query in that case. Column is
+    // defined in PR-4a and unused until PR-4b lands. `text[]` (not jsonb)
+    // matches the existing pattern in `kiloclaw_google_oauth_connections`
+    // (`scopes`, `capabilities`); native array operators and GIN-indexable.
+    interest_topics: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    // NOTE: `$onUpdateFn` only fires on Drizzle ORM writes. Any raw
+    // `db.execute(sql\`UPDATE ...\`)` writer must set `updated_at = now()`
+    // explicitly; otherwise the column will silently miss bumps.
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    // Powers the bulk admin scan "list instance_ids where briefing is
+    // enabled" — partial so it stays small (only enabled rows occupy
+    // it). `instance_id` is the PK so this index gives no lookup
+    // benefit beyond the predicate-narrowed scan; the value is purely
+    // in skipping disabled rows.
+    //
+    // If/when an admin query also needs `interest_topics` per row,
+    // consider an INCLUDE clause (e.g.
+    // `INCLUDE (interest_topics)`) so Postgres can satisfy the scan
+    // index-only without heap fetches. Drizzle 0.45's PgIndexBuilder
+    // doesn't expose `.include()` declaratively; it would need raw
+    // SQL in the migration. Skipping for now — the table is small
+    // enough that the heap fetch is cheap, and we don't have a
+    // concrete admin query that reads topics in bulk yet.
+    index('IDX_kiloclaw_morning_briefing_configs_enabled')
+      .on(table.instance_id)
+      .where(sql`${table.enabled} = true`),
+  ]
+);
+
+export type KiloClawMorningBriefingConfig = typeof kiloclaw_morning_briefing_configs.$inferSelect;
+export type NewKiloClawMorningBriefingConfig =
+  typeof kiloclaw_morning_briefing_configs.$inferInsert;
 
 // KiloClaw Admin Audit Log — tracks admin actions on KiloClaw instances
 export const kiloclaw_admin_audit_logs = pgTable(
@@ -4331,6 +5355,12 @@ export const kiloclaw_subscriptions = pgTable(
     instance_id: uuid().references(() => kiloclaw_instances.id),
     access_origin: text().$type<KiloClawSubscriptionAccessOrigin>(),
     payment_source: text().$type<KiloClawPaymentSource>(),
+    kiloclaw_price_version: text()
+      .notNull()
+      .$type<KiloClawPriceVersion>()
+      .$defaultFn((): KiloClawPriceVersion => {
+        throw new Error('kiloclaw_price_version must be set explicitly by subscription writers');
+      }),
     plan: text().notNull().$type<KiloClawPlan>(),
     scheduled_plan: text().$type<KiloClawScheduledPlan>(),
     scheduled_by: text().$type<KiloClawScheduledBy>(),
@@ -4360,9 +5390,17 @@ export const kiloclaw_subscriptions = pgTable(
     index('IDX_kiloclaw_subscriptions_status').on(table.status),
     index('IDX_kiloclaw_subscriptions_user_id').on(table.user_id),
     index('IDX_kiloclaw_subscriptions_user_status').on(table.user_id, table.status),
+    index('IDX_kiloclaw_subscriptions_price_version').on(table.kiloclaw_price_version),
     index('IDX_kiloclaw_subscriptions_transferred_to').on(table.transferred_to_subscription_id),
     index('IDX_kiloclaw_subscriptions_stripe_schedule_id').on(table.stripe_schedule_id),
     index('IDX_kiloclaw_subscriptions_auto_resume_retry_after').on(table.auto_resume_retry_after),
+    check(
+      'kiloclaw_subscriptions_price_version_check',
+      sql`${table.kiloclaw_price_version} IN (${sql.join(
+        KILOCLAW_PRICE_VERSIONS.map(version => sql.raw(`'${version}'`)),
+        sql.raw(', ')
+      )})`
+    ),
     enumCheck('kiloclaw_subscriptions_plan_check', table.plan, KiloClawPlan),
     enumCheck(
       'kiloclaw_subscriptions_scheduled_plan_check',
@@ -4436,6 +5474,86 @@ export const kiloclaw_subscription_change_log = pgTable(
 export type KiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferSelect;
 export type NewKiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferInsert;
 
+// KiloClaw credit-renewal terminal failures — durable record of
+// (subscription_id, renewal_boundary) pairs whose automatic retry has been
+// exhausted and that require operator resolution, waiver, retry, or
+// supersession before downstream enforcement may proceed.
+//
+// Only unresolved rows protect a subscription-renewal boundary from
+// downstream enforcement. Resolved, waived, and superseded rows are kept for
+// operator history but do not block enforcement.
+//
+// Uniqueness on (subscription_id, renewal_boundary) makes duplicate
+// terminal-failure recording for the same boundary idempotent: ON CONFLICT
+// updates the existing row's attempt history and last-error fields rather
+// than inserting a duplicate.
+export const kiloclaw_terminal_renewal_failures = pgTable(
+  'kiloclaw_terminal_renewal_failures',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    subscription_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_subscriptions.id),
+    renewal_boundary: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    status: text()
+      .notNull()
+      .$type<KiloClawTerminalRenewalFailureStatus>()
+      .default(KiloClawTerminalRenewalFailureStatus.Unresolved),
+    attempt_count: integer().notNull().default(0),
+    first_failure_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_failure_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_failure_code: text().notNull().$type<KiloClawTerminalRenewalFailureCode>(),
+    last_failure_message: text(),
+    resolution_actor_type: text().$type<KiloClawTerminalRenewalFailureResolutionActorType>(),
+    resolution_actor_id: text(),
+    resolution_at: timestamp({ withTimezone: true, mode: 'string' }),
+    resolution_reason: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_kiloclaw_terminal_renewal_failures_subscription_boundary').on(
+      table.subscription_id,
+      table.renewal_boundary
+    ),
+    // Partial index optimizing the hot enforcement-protection lookup and
+    // operator diagnostics for unresolved failures only. Resolved, waived,
+    // and superseded rows are kept for history but are not in the index.
+    index('IDX_kiloclaw_terminal_renewal_failures_unresolved')
+      .on(table.subscription_id, table.renewal_boundary)
+      .where(sql`${table.status} = 'unresolved'`),
+    index('IDX_kiloclaw_terminal_renewal_failures_status_last_failure_at').on(
+      table.status,
+      table.last_failure_at
+    ),
+    enumCheck(
+      'kiloclaw_terminal_renewal_failures_status_check',
+      table.status,
+      KiloClawTerminalRenewalFailureStatus
+    ),
+    enumCheck(
+      'kiloclaw_terminal_renewal_failures_last_failure_code_check',
+      table.last_failure_code,
+      KiloClawTerminalRenewalFailureCode
+    ),
+    enumCheck(
+      'kiloclaw_terminal_renewal_failures_resolution_actor_type_check',
+      table.resolution_actor_type,
+      KiloClawTerminalRenewalFailureResolutionActorType
+    ),
+  ]
+);
+
+export type KiloClawTerminalRenewalFailure = typeof kiloclaw_terminal_renewal_failures.$inferSelect;
+export type NewKiloClawTerminalRenewalFailure =
+  typeof kiloclaw_terminal_renewal_failures.$inferInsert;
+
 // KiloClaw subscription-started emails are per paid activation, not per
 // instance lifetime. Cancel+resubscribe reuses the same subscription row (we
 // UPDATE the existing row in place), so only `period_start` — which advances
@@ -4487,9 +5605,8 @@ export const transactional_email_log = pgTable(
       .default(sql`gen_random_uuid()`)
       .primaryKey()
       .notNull(),
-    user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id),
+    user_id: text().references(() => kilocode_users.id),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
     email_type: text().notNull(),
     idempotency_key: text().notNull(),
     sent_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -4500,6 +5617,11 @@ export const transactional_email_log = pgTable(
       table.idempotency_key
     ),
     index('IDX_transactional_email_log_user_id').on(table.user_id),
+    index('IDX_transactional_email_log_organization_id').on(table.organization_id),
+    check(
+      'CHK_transactional_email_log_owner',
+      sql`${table.user_id} IS NOT NULL OR ${table.organization_id} IS NOT NULL`
+    ),
   ]
 );
 
@@ -4533,7 +5655,7 @@ export const bot_requests = pgTable(
 
     platform: text().notNull(),
     platform_thread_id: text().notNull(),
-    platform_message_id: text(),
+    platform_message_id: text().notNull(),
 
     user_message: text().notNull(),
 
@@ -4749,6 +5871,8 @@ export const exa_usage_log = pgTable(
     path: text().notNull(),
     cost_microdollars: bigint({ mode: 'number' }).notNull(),
     charged_to_balance: boolean().notNull().default(false),
+    feature_id: text(),
+    type: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [

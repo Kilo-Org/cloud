@@ -2,36 +2,40 @@ import '../lib/load-env';
 import { sql } from 'drizzle-orm';
 import { db } from '../lib/drizzle';
 
+function quotePostgresIdentifier(identifier: string): string {
+  return `"${identifier.replaceAll('"', '""')}"`;
+}
+
 async function main() {
-  console.log('Emptying database (drop all tables+views)...');
+  console.log('Resetting database (drop and recreate app schemas)...');
 
-  const { rows: tables } = await db.execute(
-    sql`SELECT schemaname, tablename FROM pg_tables WHERE schemaname NOT IN ('information_schema', 'pg_catalog')`
-  );
+  const { rows } = await db.execute(sql`
+    SELECT nspname
+    FROM pg_namespace
+    WHERE nspname NOT LIKE 'pg_%'
+      AND nspname <> 'information_schema'
+  `);
 
-  for (const { schemaname, tablename } of tables) {
-    if (typeof schemaname === 'string' && typeof tablename === 'string') {
-      console.log(`Dropping table ${schemaname}.${tablename}...`);
-      await db.execute(sql.raw(`DROP TABLE "${schemaname}"."${tablename}" CASCADE`));
+  for (const row of rows) {
+    if (typeof row.nspname !== 'string') {
+      continue;
     }
+
+    console.log(`Dropping schema ${row.nspname}...`);
+    await db.execute(
+      sql.raw(`DROP SCHEMA IF EXISTS ${quotePostgresIdentifier(row.nspname)} CASCADE`)
+    );
   }
 
-  const { rows: views } = await db.execute(
-    sql`SELECT schemaname, viewname FROM pg_views WHERE schemaname NOT IN ('information_schema', 'pg_catalog')`
+  await db.execute(sql.raw('CREATE SCHEMA "public"'));
+
+  console.log(
+    'Database reset to empty app schemas. Run "pnpm drizzle migrate" to recreate our schema.'
   );
-
-  for (const { schemaname, viewname } of views) {
-    if (typeof schemaname === 'string' && typeof viewname === 'string') {
-      console.log(`Dropping view ${schemaname}.${viewname}...`);
-      await db.execute(sql.raw(`DROP VIEW "${schemaname}"."${viewname}" CASCADE`));
-    }
-  }
-
-  console.log('Database emptied!  You should run "pnpm drizzle migrate" to recreate our schema.');
   process.exit(0);
 }
 
 main().catch(error => {
-  console.error('Database emptying failed:', error);
+  console.error('Database reset failed:', error);
   process.exit(1);
 });

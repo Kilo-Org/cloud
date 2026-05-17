@@ -2,6 +2,7 @@
 
 import { Gift } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { formatBillingDate, type ClawBillingStatus } from './billing-types';
 
 type EarlybirdCardProps = {
@@ -17,7 +18,7 @@ export function EarlybirdCard({ earlybird, onSubscribeClick }: EarlybirdCardProp
       <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🦀</span>
+            <KiloCrabIcon className="size-5 shrink-0" />
             <span className="text-foreground text-sm font-semibold">KiloClaw Hosting</span>
           </div>
           <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2 py-0.5 text-xs font-medium text-violet-400">
@@ -59,7 +60,7 @@ export function EarlybirdCard({ earlybird, onSubscribeClick }: EarlybirdCardProp
     <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xl">🦀</span>
+          <KiloCrabIcon className="size-5 shrink-0" />
           <span className="text-foreground text-sm font-semibold">KiloClaw Hosting</span>
         </div>
         <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2 py-0.5 text-xs font-medium text-violet-400">

@@ -11,18 +11,13 @@
  * cleanup and event-insertion logic.
  */
 
-import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { env, runInDurableObject } from 'cloudflare:test';
+import { describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { ExecutionId } from '../../../src/types/ids.js';
 
 describe('Disconnect handling & reaper', () => {
-  beforeEach(async () => {
-    const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    expect(ids).toHaveLength(0);
-  });
-
   // ---------------------------------------------------------------------------
   // Fix 4: Reaper inserts synthetic error events when marking executions failed
   // ---------------------------------------------------------------------------

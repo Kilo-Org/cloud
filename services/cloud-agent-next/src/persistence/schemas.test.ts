@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { ImagesSchema, MCPServerConfigSchema, MetadataSchema } from './schemas.js';
+import {
+  ImagesSchema,
+  MCPServerConfigSchema,
+  MetadataSchema,
+  RuntimeAgentSchema,
+  RuntimeSkillSchema,
+  RuntimeSkillsSchema,
+} from './schemas.js';
 import type { MCPServerConfig } from './types.js';
 
 describe('ImagesSchema', () => {
@@ -76,10 +83,16 @@ describe('MCPServerConfigSchema', () => {
     });
 
     it('should accept local config with all optional fields', () => {
+      const envelope = {
+        encryptedData: 'ciphertext',
+        encryptedDEK: 'dek',
+        algorithm: 'rsa-aes-256-gcm' as const,
+        version: 1 as const,
+      };
       const config = {
         type: 'local' as const,
         command: ['node', 'server.js'],
-        environment: { NODE_ENV: 'production' },
+        environment: { NODE_ENV: envelope },
         enabled: true,
         timeout: 30000,
       };
@@ -88,7 +101,7 @@ describe('MCPServerConfigSchema', () => {
       expect(result).toEqual({
         type: 'local',
         command: ['node', 'server.js'],
-        environment: { NODE_ENV: 'production' },
+        environment: { NODE_ENV: envelope },
         enabled: true,
         timeout: 30000,
       });
@@ -121,12 +134,18 @@ describe('MCPServerConfigSchema', () => {
     });
 
     it('should accept remote config with headers', () => {
+      const envelope = {
+        encryptedData: 'ciphertext',
+        encryptedDEK: 'dek',
+        algorithm: 'rsa-aes-256-gcm' as const,
+        version: 1 as const,
+      };
       const config = {
         type: 'remote' as const,
         url: 'https://example.com/mcp',
         headers: {
-          Authorization: 'Bearer token123',
-          'X-Custom-Header': 'value',
+          Authorization: envelope,
+          'X-Custom-Header': envelope,
         },
       };
 
@@ -135,17 +154,23 @@ describe('MCPServerConfigSchema', () => {
         type: 'remote',
         url: 'https://example.com/mcp',
         headers: {
-          Authorization: 'Bearer token123',
-          'X-Custom-Header': 'value',
+          Authorization: envelope,
+          'X-Custom-Header': envelope,
         },
       });
     });
 
     it('should accept remote config with all optional fields', () => {
+      const envelope = {
+        encryptedData: 'ciphertext',
+        encryptedDEK: 'dek',
+        algorithm: 'rsa-aes-256-gcm' as const,
+        version: 1 as const,
+      };
       const config = {
         type: 'remote' as const,
         url: 'https://example.com/mcp',
-        headers: { 'X-API-Key': 'key456' },
+        headers: { 'X-API-Key': envelope },
         enabled: false,
         timeout: 60000,
       };
@@ -154,7 +179,7 @@ describe('MCPServerConfigSchema', () => {
       expect(result).toEqual({
         type: 'remote',
         url: 'https://example.com/mcp',
-        headers: { 'X-API-Key': 'key456' },
+        headers: { 'X-API-Key': envelope },
         enabled: false,
         timeout: 60000,
       });
@@ -244,7 +269,14 @@ describe('MCPServerConfigSchema', () => {
       const config = {
         type: 'remote' as const,
         url: 'https://example.com',
-        environment: { NODE_ENV: 'production' },
+        environment: {
+          NODE_ENV: {
+            encryptedData: 'c',
+            encryptedDEK: 'k',
+            algorithm: 'rsa-aes-256-gcm',
+            version: 1,
+          },
+        },
       };
       expect(() => MCPServerConfigSchema.parse(config)).toThrow();
     });
@@ -717,5 +749,183 @@ describe('MetadataSchema', () => {
       const result = MetadataSchema.parse(metadata);
       expect(result.appendSystemPrompt).toBeUndefined();
     });
+  });
+});
+
+describe('MCPServerConfigSchema with mixed plain-string and envelope values', () => {
+  const envelope = {
+    encryptedData: 'ciphertext',
+    encryptedDEK: 'dek',
+    algorithm: 'rsa-aes-256-gcm' as const,
+    version: 1 as const,
+  };
+
+  it('accepts local config with envelope-valued environment record', () => {
+    const config = {
+      type: 'local' as const,
+      command: ['node', 'server.js'],
+      environment: { API_KEY: envelope, OTHER: envelope },
+    };
+
+    const result = MCPServerConfigSchema.parse(config);
+    expect(result.type).toBe('local');
+    if (result.type === 'local') {
+      const v = result.environment?.API_KEY;
+      expect(typeof v).toBe('object');
+      if (v && typeof v !== 'string') expect(v.algorithm).toBe('rsa-aes-256-gcm');
+    }
+  });
+
+  it('accepts remote config with envelope-valued headers record', () => {
+    const config = {
+      type: 'remote' as const,
+      url: 'https://example.com/mcp',
+      headers: { Authorization: envelope },
+    };
+
+    const result = MCPServerConfigSchema.parse(config);
+    expect(result.type).toBe('remote');
+    if (result.type === 'remote') {
+      const v = result.headers?.Authorization;
+      expect(typeof v).toBe('object');
+      if (v && typeof v !== 'string') expect(v.algorithm).toBe('rsa-aes-256-gcm');
+    }
+  });
+
+  it('accepts plain-string environment values', () => {
+    const config = {
+      type: 'local' as const,
+      command: ['node'],
+      environment: { LOCALE: 'en-US', PORT: '4000' },
+    };
+    const result = MCPServerConfigSchema.parse(config);
+    expect(result.type).toBe('local');
+    if (result.type === 'local') {
+      expect(result.environment?.LOCALE).toBe('en-US');
+      expect(result.environment?.PORT).toBe('4000');
+    }
+  });
+
+  it('accepts plain-string header values', () => {
+    const config = {
+      type: 'remote' as const,
+      url: 'https://example.com/mcp',
+      headers: { 'X-Region': 'eu-west-1' },
+    };
+    const result = MCPServerConfigSchema.parse(config);
+    expect(result.type).toBe('remote');
+    if (result.type === 'remote') {
+      expect(result.headers?.['X-Region']).toBe('eu-west-1');
+    }
+  });
+
+  it('accepts mixed plain-string and envelope environment values per key', () => {
+    const config = {
+      type: 'local' as const,
+      command: ['node'],
+      environment: { LOCALE: 'en-US', API_KEY: envelope },
+    };
+    const result = MCPServerConfigSchema.parse(config);
+    if (result.type === 'local') {
+      expect(result.environment?.LOCALE).toBe('en-US');
+      const apiKey = result.environment?.API_KEY;
+      expect(typeof apiKey).toBe('object');
+    }
+  });
+
+  it('rejects environment values that are neither strings nor envelopes', () => {
+    const bad = {
+      type: 'local' as const,
+      command: ['node'],
+      environment: { API_KEY: { not: 'an envelope' } },
+    };
+    const result = MCPServerConfigSchema.safeParse(bad);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects header values that are neither strings nor envelopes', () => {
+    const bad = {
+      type: 'remote' as const,
+      url: 'https://example.com/mcp',
+      headers: { Authorization: 12345 },
+    };
+    const result = MCPServerConfigSchema.safeParse(bad);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('RuntimeSkillSchema', () => {
+  it('accepts a well-formed runtime skill', () => {
+    const skill = {
+      name: 'my-skill',
+      rawMarkdown: '---\nname: my-skill\n---\nBody',
+    };
+    expect(RuntimeSkillSchema.parse(skill)).toEqual(skill);
+  });
+
+  it('rejects uppercase or symbols in skill names', () => {
+    const badCases = ['My-Skill', 'my skill', 'my.skill', '-leading-dash'];
+    for (const name of badCases) {
+      expect(RuntimeSkillSchema.safeParse({ name, rawMarkdown: 'body' }).success).toBe(false);
+    }
+  });
+
+  it('rejects markdown exceeding the size limit', () => {
+    const huge = 'x'.repeat(100_001);
+    expect(RuntimeSkillSchema.safeParse({ name: 'big', rawMarkdown: huge }).success).toBe(false);
+  });
+
+  it('caps the runtime skills array at 50 entries', () => {
+    const many = Array.from({ length: 51 }, (_, i) => ({
+      name: `skill-${i}`,
+      rawMarkdown: 'body',
+    }));
+    expect(RuntimeSkillsSchema.safeParse(many).success).toBe(false);
+  });
+});
+
+describe('MetadataSchema with runtimeSkills', () => {
+  it('accepts runtimeSkills on persisted metadata', () => {
+    const metadata = {
+      version: 1,
+      sessionId: 'session123',
+      userId: 'user789',
+      timestamp: Date.now(),
+      runtimeSkills: [{ name: 'demo', rawMarkdown: 'body' }],
+    };
+    const result = MetadataSchema.parse(metadata);
+    expect(result.runtimeSkills).toEqual([{ name: 'demo', rawMarkdown: 'body' }]);
+  });
+});
+
+describe('RuntimeAgentSchema', () => {
+  it('accepts a well-formed custom slug', () => {
+    const agent = { slug: 'reviewer', name: 'Reviewer', config: {} };
+    expect(RuntimeAgentSchema.parse(agent)).toEqual(agent);
+  });
+
+  it('rejects built-in slugs so they cannot override the bundled agents', () => {
+    for (const slug of ['code', 'plan', 'architect', 'custom', 'orchestrator', 'ask']) {
+      const result = RuntimeAgentSchema.safeParse({ slug, name: slug, config: {} });
+      expect(result.success).toBe(false);
+    }
+  });
+
+  it('rejects a variant without a model — variants are model-specific', () => {
+    const result = RuntimeAgentSchema.safeParse({
+      slug: 'reviewer',
+      name: 'Reviewer',
+      config: { variant: 'high' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a variant when paired with a model', () => {
+    const agent = {
+      slug: 'reviewer',
+      name: 'Reviewer',
+      config: { model: 'anthropic/claude-opus', variant: 'high' },
+    };
+    expect(RuntimeAgentSchema.parse(agent)).toEqual(agent);
   });
 });

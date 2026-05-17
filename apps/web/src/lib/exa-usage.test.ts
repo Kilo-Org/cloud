@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 import { db } from '@/lib/drizzle';
-import { exa_monthly_usage, kilocode_users } from '@kilocode/db/schema';
+import { exa_monthly_usage, exa_usage_log, kilocode_users } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { getExaMonthlyUsage, getExaFreeAllowanceMicrodollars, recordExaUsage } from './exa-usage';
@@ -272,6 +272,29 @@ describe('Exa Usage Tracking', () => {
       const orgRow = rows.find(r => r.organization_id === orgId);
       expect(personalRow!.total_cost_microdollars).toBe(3000);
       expect(orgRow!.total_cost_microdollars).toBe(5000);
+    });
+
+    test('stores featureId and type in the usage log', async () => {
+      const user = await insertTestUser();
+
+      await recordExaUsage({
+        userId: user.id,
+        organizationId: undefined,
+        path: '/search',
+        costMicrodollars: 1000,
+        chargedToBalance: false,
+        freeAllowanceMicrodollars: 10_000_000,
+        featureId: 'kiloclaw',
+        type: 'deep',
+      });
+
+      const [logRow] = await db
+        .select()
+        .from(exa_usage_log)
+        .where(eq(exa_usage_log.kilo_user_id, user.id));
+
+      expect(logRow.feature_id).toBe('kiloclaw');
+      expect(logRow.type).toBe('deep');
     });
 
     test('getExaMonthlyUsage aggregates across personal and org rows', async () => {

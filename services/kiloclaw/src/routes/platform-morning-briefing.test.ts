@@ -7,10 +7,19 @@ vi.mock('cloudflare:workers', () => ({
 }));
 
 function baseEnv(stub: Record<string, unknown>) {
+  // The /morning-briefing/status route now short-circuits if DO state isn't
+  // `running` (see services/kiloclaw/src/routes/platform.ts:shortCircuitIfNotRunning).
+  // Default `getStatus` to `running` here so existing tests that exercise the
+  // happy-path payloads keep passing; tests that want to exercise the
+  // not-running sentinel pass their own `getStatus` mock.
+  const stubWithDefaults = {
+    getStatus: vi.fn().mockResolvedValue({ status: 'running' }),
+    ...stub,
+  };
   return {
     KILOCLAW_INSTANCE: {
       idFromName: (id: string) => id,
-      get: () => stub,
+      get: () => stubWithDefaults,
     },
     KILOCLAW_AE: { writeDataPoint: vi.fn() },
     KV_CLAW_CACHE: {
@@ -99,6 +108,27 @@ describe('platform morning-briefing warm-up handling', () => {
       code: 'gateway_warming_up',
       retryAfterSec: 2,
       reconcileState: 'in_progress',
+    });
+  });
+
+  it('returns graceful unavailable payload at 200 when controller predates the status route', async () => {
+    // The DO returns null when the controller route is missing (controller
+    // predates the morning-briefing route). The dashboard polls this endpoint
+    // every 30s, so 404 here would generate continuous user-facing errors.
+    const getMorningBriefingStatus = vi.fn<() => Promise<unknown>>().mockResolvedValue(null);
+    const env = baseEnv({ getMorningBriefingStatus });
+
+    const response = await platform.request('/morning-briefing/status?userId=user-1', {}, env);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      enabled: false,
+      desiredEnabled: false,
+      observedEnabled: false,
+      reconcileState: 'idle',
+      code: 'controller_route_unavailable',
+      error: 'Morning Briefing unavailable (controller too old)',
     });
   });
 

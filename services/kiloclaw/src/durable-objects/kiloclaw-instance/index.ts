@@ -60,8 +60,22 @@ import {
   MAX_CUSTOM_SECRETS,
   type SecretFieldKey,
 } from '@kilocode/kiloclaw-secret-catalog';
+import {
+  canUpgradeTo,
+  DEFAULT_INSTANCE_TIER,
+  getTier,
+  resolveInstanceTypeLabel,
+  tryInstanceTypeLabel,
+  DEFAULT_VOLUME_SIZE_GB,
+  type InstanceTierKey,
+  type InstanceType,
+} from '@kilocode/kiloclaw-instance-tiers';
 import * as regionHelpers from '../regions';
-import { buildRuntimeSpec } from '../machine-config';
+import {
+  buildRuntimeSpec,
+  effectiveMachineSize,
+  parseMachineSizeFromFlyGuest,
+} from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
 
 // Domain modules
@@ -85,6 +99,7 @@ import * as gateway from './gateway';
 import { buildChannelConfigPatch } from './channel-config';
 import * as pairing from './pairing';
 import * as kiloCliRun from './kilo-cli-run';
+import * as doctorRun from './doctor-run';
 import {
   reconcileWithFly,
   syncStatusFromLiveCheck,
@@ -93,10 +108,16 @@ import {
   finalizeDestroyIfComplete,
   reconcileMachineMount,
   markRestartSuccessful,
+  emitDestroyPendingTelemetry,
+  maybeEmitDestroyStuckTelemetry,
 } from './reconcile';
 import {
   restoreFromPostgres,
   markDestroyedInPostgresHelper,
+  readMorningBriefingConfigFromPostgresHelper,
+  syncAdminSizeOverrideToPostgresHelper,
+  syncInstanceTypeToPostgresHelper,
+  syncMorningBriefingConfigToPostgresHelper,
   syncTrackedImageTagToPostgresHelper,
 } from './postgres';
 import {
@@ -143,6 +164,36 @@ const CHANNEL_ENV_VARS = new Set(
 );
 const BRAVE_SEARCH_FIELD_KEY = 'braveSearchApiKey';
 
+/**
+ * Resolve a coherent instanceType for the given DO state.
+ *
+ * Self-heals two pathological persisted shapes:
+ * - `instanceType === 'custom'` with `machineSize === null`: incoherent — we
+ *   can't actually tell whether it's custom without hardware to compare. Drop
+ *   the stale label and re-run inference.
+ * - `instanceType` is a known catalog key but `machineSize === null`: trust
+ *   the persisted label (catalog tier is its own evidence).
+ *
+ * For null persisted state, falls back to live inference from machineSize +
+ * volumeSizeGb, which returns null when there's nothing to infer from.
+ */
+function shallowEqualStringArrays(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function resolveInstanceTypeFromState(
+  state: Pick<InstanceMutableState, 'instanceType' | 'machineSize' | 'volumeSizeGb'>
+): InstanceType | null {
+  if (state.instanceType === 'custom' && state.machineSize === null) {
+    return tryInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
+  }
+  return state.instanceType ?? tryInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
+}
+
 export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private s: InstanceMutableState = createMutableState();
   private startInProgress = false;
@@ -154,6 +205,25 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   private async persist(patch: Partial<PersistedState>): Promise<void> {
     await this.ctx.storage.put(storageUpdate(syncProviderStateForStorage(this.s, patch)));
+  }
+
+  /**
+   * Dispatch a fire-and-forget live check against Fly when status is running
+   * and we're past the throttle window. Used by both `getStatus` (user-facing)
+   * and `getDebugState` (admin-facing) so admins see live data — including
+   * tier backfill for legacy instances — without waiting for the next alarm.
+   */
+  private maybeDispatchLiveCheck(): void {
+    if (
+      this.s.status === 'running' &&
+      this.s.provider === 'fly' &&
+      this.s.flyMachineId &&
+      (this.s.lastLiveCheckAt === null ||
+        Date.now() - this.s.lastLiveCheckAt >= LIVE_CHECK_THROTTLE_MS)
+    ) {
+      this.s.lastLiveCheckAt = Date.now();
+      this.ctx.waitUntil(syncStatusFromLiveCheck(this.ctx, this.s, this.env));
+    }
   }
 
   /**
@@ -315,6 +385,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (result.corePatch?.machineSize !== undefined) {
       this.s.machineSize = result.corePatch.machineSize;
     }
+    if (result.corePatch?.instanceType !== undefined) {
+      this.s.instanceType = result.corePatch.instanceType;
+    }
     if (result.corePatch?.restartUpdateSent !== undefined) {
       this.s.restartUpdateSent = result.corePatch.restartUpdateSent;
     }
@@ -342,6 +415,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
   }
 
+  private providerErrorStatus(err: unknown): number | null {
+    if (typeof err !== 'object' || err === null || !('status' in err)) return null;
+    const status = err.status;
+    return typeof status === 'number' ? status : null;
+  }
+
   private async retryNonFlyDestroy(): Promise<void> {
     if (this.s.provider === 'fly') {
       throw new Error('retryNonFlyDestroy should not be used for Fly providers');
@@ -357,7 +436,29 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         await this.persistProviderResultWithPatch(result, {
           pendingDestroyMachineId: null,
         });
+        if (!this.s.pendingDestroyVolumeId) {
+          this.s.lastDestroyErrorOp = null;
+          this.s.lastDestroyErrorStatus = null;
+          this.s.lastDestroyErrorMessage = null;
+          this.s.lastDestroyErrorAt = null;
+          await this.persist({
+            lastDestroyErrorOp: null,
+            lastDestroyErrorStatus: null,
+            lastDestroyErrorMessage: null,
+            lastDestroyErrorAt: null,
+          });
+        }
       } catch (err) {
+        this.s.lastDestroyErrorOp = 'machine';
+        this.s.lastDestroyErrorStatus = this.providerErrorStatus(err);
+        this.s.lastDestroyErrorMessage = err instanceof Error ? err.message : String(err);
+        this.s.lastDestroyErrorAt = Date.now();
+        await this.persist({
+          lastDestroyErrorOp: 'machine',
+          lastDestroyErrorStatus: this.s.lastDestroyErrorStatus,
+          lastDestroyErrorMessage: this.s.lastDestroyErrorMessage,
+          lastDestroyErrorAt: this.s.lastDestroyErrorAt,
+        });
         doWarn(this.s, 'Non-Fly runtime destroy failed, alarm will retry', {
           provider: this.s.provider,
           runtimeId: this.s.pendingDestroyMachineId,
@@ -376,7 +477,29 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         await this.persistProviderResultWithPatch(result, {
           pendingDestroyVolumeId: null,
         });
+        if (!this.s.pendingDestroyMachineId) {
+          this.s.lastDestroyErrorOp = null;
+          this.s.lastDestroyErrorStatus = null;
+          this.s.lastDestroyErrorMessage = null;
+          this.s.lastDestroyErrorAt = null;
+          await this.persist({
+            lastDestroyErrorOp: null,
+            lastDestroyErrorStatus: null,
+            lastDestroyErrorMessage: null,
+            lastDestroyErrorAt: null,
+          });
+        }
       } catch (err) {
+        this.s.lastDestroyErrorOp = 'volume';
+        this.s.lastDestroyErrorStatus = this.providerErrorStatus(err);
+        this.s.lastDestroyErrorMessage = err instanceof Error ? err.message : String(err);
+        this.s.lastDestroyErrorAt = Date.now();
+        await this.persist({
+          lastDestroyErrorOp: 'volume',
+          lastDestroyErrorStatus: this.s.lastDestroyErrorStatus,
+          lastDestroyErrorMessage: this.s.lastDestroyErrorMessage,
+          lastDestroyErrorAt: this.s.lastDestroyErrorAt,
+        });
         doWarn(this.s, 'Non-Fly storage destroy failed, alarm will retry', {
           provider: this.s.provider,
           storageId: this.s.pendingDestroyVolumeId,
@@ -708,6 +831,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const providerId =
       opts?.provider ?? (isNew ? resolveDefaultProvider(this.env) : this.s.provider);
     const orgId = opts?.orgId ?? null;
+    const inferredInstanceType = resolveInstanceTypeFromState(this.s);
+    const instanceType =
+      config.instanceType ?? inferredInstanceType ?? (isNew ? DEFAULT_INSTANCE_TIER : null);
+    const tier = instanceType && instanceType !== 'custom' ? getTier(instanceType) : null;
+    const nextMachineSize = tier?.machineSize ?? this.s.machineSize ?? null;
+    const nextVolumeSizeGb = tier?.volumeSizeGb ?? this.s.volumeSizeGb ?? null;
     const provider = getProviderAdapter(this.env, { provider: providerId });
     const provisioningState = {
       ...this.s,
@@ -715,13 +844,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       sandboxId,
       provider: providerId,
       orgId,
+      instanceType,
+      machineSize: nextMachineSize,
+      volumeSizeGb: nextVolumeSizeGb,
     } satisfies InstanceMutableState;
 
     const provisioning = await provider.ensureProvisioningResources({
       env: this.env,
       state: provisioningState,
       orgId,
-      machineSize: config.machineSize ?? null,
+      machineSize: nextMachineSize,
       region: config.region,
     });
     this.s.userId = userId;
@@ -765,7 +897,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       userLocation,
       kiloExaSearchMode: config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null,
       channels: config.channels ?? null,
-      machineSize: config.machineSize ?? this.s.machineSize ?? null,
+      machineSize: nextMachineSize,
+      instanceType,
+      volumeSizeGb: nextVolumeSizeGb,
     } satisfies Partial<PersistedState>;
 
     const versionFields = {
@@ -825,7 +959,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.userLocation = userLocation;
     this.s.kiloExaSearchMode = config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null;
     this.s.channels = config.channels ?? null;
-    this.s.machineSize = config.machineSize ?? this.s.machineSize ?? null;
+    this.s.machineSize = nextMachineSize;
+    this.s.instanceType = instanceType;
+    this.s.volumeSizeGb = nextVolumeSizeGb;
     if (isNew) {
       this.s.provisionedAt = Date.now();
       this.s.lastStartedAt = null;
@@ -843,6 +979,27 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         userTimezone,
         userLocation,
       });
+      // Also propagate userLocation to the morning-briefing plugin's
+      // config.json so the next brief picks up the new value without
+      // requiring a container restart. The plugin reads from
+      // config.json first and falls back to KILOCLAW_USER_LOCATION env
+      // var. Null clears the override (plugin then falls back to env);
+      // a string sets it. The gateway helper returns null on older
+      // controllers that lack the route, and that null is treated as
+      // success here — older instances boot with the env-var path
+      // anyway, so the user still gets the new value on next restart.
+      //
+      // Network / auth errors are intentionally NOT caught — they
+      // propagate up so the caller sees an error toast and can retry.
+      // Matches the `writeUserProfile` call above which also lets its
+      // errors raise. Without this, saves can silently succeed in DO
+      // state but never reach the running plugin's config.json, and
+      // the next brief uses stale data with no signal to the user.
+      if (userLocation !== previousUserLocation) {
+        await gateway.updateMorningBriefingUserLocation(this.s, this.env, {
+          userLocation,
+        });
+      }
     }
 
     if (isNew) {
@@ -1679,6 +1836,21 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return pairing.runDoctor(this.s, this.env);
   }
 
+  async startDoctorViaController(fix: boolean) {
+    await this.loadState();
+    return doctorRun.startDoctorViaController(this.s, this.env, fix);
+  }
+
+  async getDoctorViaControllerStatus() {
+    await this.loadState();
+    return doctorRun.getDoctorViaControllerStatus(this.s, this.env);
+  }
+
+  async cancelDoctorViaController() {
+    await this.loadState();
+    return doctorRun.cancelDoctorViaController(this.s, this.env);
+  }
+
   // ── Kilo CLI Run ────────────────────────────────────────────────────
 
   async startKiloCliRun(prompt: string) {
@@ -2007,36 +2179,66 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       resolveRuntimeImageRef(this.s, this.env),
       envVars,
       bootstrapEnv,
-      this.s.machineSize,
+      effectiveMachineSize(this.s),
       identity,
       this.s.provider
     );
 
-    const startResult = await this.provider().startRuntime({
-      env: this.env,
-      state: this.s,
-      runtimeSpec,
-      minSecretsVersion,
-      preferredRegion: this.env.FLY_REGION,
-      onProviderResult: result => this.persistProviderResult(result),
-      onCapacityRecovery: async err => {
-        const code = err instanceof fly.FlyApiError ? err.status : 0;
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        this.emitStartCapacityRecovery(errorMessage, this.capacityRecoveryLabel(err));
-        doError(this.s, 'Insufficient resources, replacing stranded volume', {
-          statusCode: code,
-          region: this.s.flyRegion ?? 'unknown',
-        });
+    const startRuntime = () =>
+      this.provider().startRuntime({
+        env: this.env,
+        state: this.s,
+        runtimeSpec,
+        minSecretsVersion,
+        preferredRegion: this.env.FLY_REGION,
+        onProviderResult: result => this.persistProviderResult(result),
+        onCapacityRecovery: async err => {
+          const code = err instanceof fly.FlyApiError ? err.status : 0;
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          this.emitStartCapacityRecovery(errorMessage, this.capacityRecoveryLabel(err));
+          doError(this.s, 'Insufficient resources, replacing stranded volume', {
+            statusCode: code,
+            region: this.s.flyRegion ?? 'unknown',
+          });
 
-        if (code === 403 && this.s.flyRegion) {
-          await regionHelpers.evictCapacityRegionFromKV(
-            this.env.KV_CLAW_CACHE,
-            this.env,
-            this.s.flyRegion
-          );
-        }
-      },
-    });
+          if (code === 403 && this.s.flyRegion) {
+            await regionHelpers.evictCapacityRegionFromKV(
+              this.env.KV_CLAW_CACHE,
+              this.env,
+              this.s.flyRegion
+            );
+          }
+        },
+      });
+
+    let startResult: ProviderResult;
+    try {
+      startResult = await startRuntime();
+    } catch (err) {
+      if (!isFlyProvider || this.s.flyMachineId || !fly.isFlyMissingVolume(err)) {
+        throw err;
+      }
+
+      const flyState = getFlyProviderState(this.s);
+      doWarn(this.s, 'Volume not found during machine creation, clearing', {
+        volumeId: flyState.volumeId,
+      });
+      await this.persistProviderResult({
+        providerState: {
+          ...flyState,
+          volumeId: null,
+          region: null,
+        },
+      });
+      await this.persistProviderResult(
+        await this.provider().ensureStorage({
+          env: this.env,
+          state: this.s,
+          reason: 'start_missing_volume_recovery',
+        })
+      );
+      startResult = await startRuntime();
+    }
     await this.persistProviderResult(startResult);
 
     if (getRuntimeId(this.s)) {
@@ -2323,15 +2525,25 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const machineUptimeMs = this.s.lastStartedAt ? Date.now() - this.s.lastStartedAt : 0;
     const runtimeId = getRuntimeId(this.s);
     const storageId = getStorageId(this.s);
+    const destroyStartedAt = this.s.destroyStartedAt ?? Date.now();
 
     this.s.pendingDestroyMachineId = runtimeId;
     this.s.pendingDestroyVolumeId = storageId;
+    // Counter tracks "consecutive failures on the current pendingDestroyVolumeId".
+    // Reset on every fresh destroy() invocation so a previous failing cycle's
+    // count never bleeds into a new destroy attempt's cap window.
+    this.s.destroyVolumeAttempts = 0;
+    this.s.destroyStartedAt = destroyStartedAt;
+    this.s.lastDestroyPendingEventAt = null;
     this.s.status = 'destroying';
 
     await this.persist({
       status: 'destroying',
       pendingDestroyMachineId: this.s.pendingDestroyMachineId,
       pendingDestroyVolumeId: this.s.pendingDestroyVolumeId,
+      destroyVolumeAttempts: 0,
+      destroyStartedAt,
+      lastDestroyPendingEventAt: null,
     });
 
     this.emitEvent({
@@ -2432,10 +2644,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     if (!finalized.finalized) {
-      doWarn(this.s, 'Destroy incomplete, alarm will retry', {
-        pendingMachineId: this.s.pendingDestroyMachineId,
-        pendingVolumeId: this.s.pendingDestroyVolumeId,
-      });
+      emitDestroyPendingTelemetry(this.s, destroyRctx);
       await this.scheduleAlarm();
     }
 
@@ -2466,6 +2675,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     flyVolumeId: string | null;
     flyRegion: string | null;
     machineSize: MachineSize | null;
+    instanceType: InstanceType | null;
+    volumeSizeGb: number | null;
     openclawVersion: string | null;
     imageVariant: string | null;
     trackedImageTag: string | null;
@@ -2487,20 +2698,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     botNature: string | null;
     botVibe: string | null;
     botEmoji: string | null;
+    userLocation: string | null;
+    userTimezone: string | null;
     controllerCapabilitiesVersion: number | null;
   }> {
     await this.loadState();
-
-    if (
-      this.s.status === 'running' &&
-      this.s.provider === 'fly' &&
-      this.s.flyMachineId &&
-      (this.s.lastLiveCheckAt === null ||
-        Date.now() - this.s.lastLiveCheckAt >= LIVE_CHECK_THROTTLE_MS)
-    ) {
-      this.s.lastLiveCheckAt = Date.now();
-      this.ctx.waitUntil(syncStatusFromLiveCheck(this.ctx, this.s, this.env));
-    }
+    this.maybeDispatchLiveCheck();
 
     return {
       userId: this.s.userId,
@@ -2524,6 +2727,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyVolumeId: this.s.flyVolumeId,
       flyRegion: this.s.flyRegion,
       machineSize: this.s.machineSize,
+      instanceType: resolveInstanceTypeFromState(this.s),
+      volumeSizeGb: this.s.volumeSizeGb,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
       trackedImageTag: this.s.trackedImageTag,
@@ -2545,6 +2750,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       botNature: this.s.botNature,
       botVibe: this.s.botVibe,
       botEmoji: this.s.botEmoji,
+      userLocation: this.s.userLocation ?? null,
+      userTimezone: this.s.userTimezone ?? null,
       controllerCapabilitiesVersion: this.s.controllerCapabilitiesVersion,
     };
   }
@@ -2569,10 +2776,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     flyVolumeId: string | null;
     flyRegion: string | null;
     machineSize: MachineSize | null;
+    instanceType: InstanceType | null;
+    volumeSizeGb: number | null;
     openclawVersion: string | null;
     imageVariant: string | null;
     trackedImageTag: string | null;
     trackedImageDigest: string | null;
+    adminMachineSizeOverride: MachineSize | null;
+    adminMachineSizeOverrideMetadata: InstanceMutableState['adminMachineSizeOverrideMetadata'];
     googleConnected: boolean;
     googleOAuthConnected: boolean;
     googleOAuthStatus: GoogleOAuthConnection['status'];
@@ -2586,6 +2797,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     gmailNotificationsEnabled: boolean;
     pendingDestroyMachineId: string | null;
     pendingDestroyVolumeId: string | null;
+    destroyStartedAt: number | null;
+    lastDestroyPendingEventAt: number | null;
     pendingPostgresMarkOnFinalize: boolean;
     lastMetadataRecoveryAt: number | null;
     lastLiveCheckAt: number | null;
@@ -2615,6 +2828,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     envKeyAppDOKeySet: boolean | null;
   }> {
     await this.loadState();
+    this.maybeDispatchLiveCheck();
     const alarmScheduledAt = await this.ctx.storage.getAlarm();
 
     // Fetch env key diagnostics from the App DO (best-effort, don't fail the whole response).
@@ -2655,6 +2869,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyVolumeId: this.s.flyVolumeId,
       flyRegion: this.s.flyRegion,
       machineSize: this.s.machineSize,
+      instanceType: resolveInstanceTypeFromState(this.s),
+      volumeSizeGb: this.s.volumeSizeGb,
+      adminMachineSizeOverride: this.s.adminMachineSizeOverride,
+      adminMachineSizeOverrideMetadata: this.s.adminMachineSizeOverrideMetadata,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
       trackedImageTag: this.s.trackedImageTag,
@@ -2672,6 +2890,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       gmailNotificationsEnabled: this.s.gmailNotificationsEnabled,
       pendingDestroyMachineId: this.s.pendingDestroyMachineId,
       pendingDestroyVolumeId: this.s.pendingDestroyVolumeId,
+      destroyStartedAt: this.s.destroyStartedAt,
+      lastDestroyPendingEventAt: this.s.lastDestroyPendingEventAt,
       pendingPostgresMarkOnFinalize: this.s.pendingPostgresMarkOnFinalize,
       lastMetadataRecoveryAt: this.s.lastMetadataRecoveryAt,
       lastLiveCheckAt: this.s.lastLiveCheckAt,
@@ -2723,6 +2943,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         : undefined,
       channels: this.s.channels ?? undefined,
       machineSize: this.s.machineSize ?? undefined,
+      instanceType:
+        this.s.instanceType === 'custom' ? undefined : (this.s.instanceType ?? undefined),
       customSecretMeta: this.s.customSecretMeta ?? undefined,
       vectorMemoryEnabled: this.s.vectorMemoryEnabled,
       vectorMemoryModel: this.s.vectorMemoryModel,
@@ -2868,36 +3090,397 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   // ── Machine resize (admin) ─────────────────────────────────────────
 
-  async resizeMachine(newSize: MachineSize): Promise<{
-    previousSize: MachineSize | null;
-    newSize: MachineSize;
+  async resizeMachine(input: {
+    targetTierKey: InstanceTierKey;
+    actorId: string;
+    actorEmail: string;
+  }): Promise<{
+    previousTier: InstanceType | null;
+    newTier: InstanceTierKey;
+    previousVolumeSizeGb: number | null;
+    newVolumeSizeGb: number;
+    machineSize: MachineSize;
+    clearedOverride: {
+      size: MachineSize;
+      metadata: NonNullable<InstanceMutableState['adminMachineSizeOverrideMetadata']>;
+    } | null;
   }> {
+    const { targetTierKey, actorId, actorEmail } = input;
     await this.loadState();
+    this.assertAdminSizeChangeAllowed({
+      cannotPrefix: 'resize',
+      beforePhrase: 'resizing machine tier',
+      notSupportedSubject: 'Instance tier resize',
+      // Fly tier resize calls fly.extendVolume on storage growth, which
+      // requires the machine to be stopped. Northflank uses deployment
+      // rollout semantics and does not require a stopped instance.
+      requireStopped: this.s.provider !== 'northflank',
+      allowNorthflank: true,
+    });
 
+    const targetTier = getTier(targetTierKey);
+    if (targetTier.status !== 'offered') {
+      throw new Error(`Instance tier ${targetTierKey} is not an offerable resize target`);
+    }
+
+    const previousTier = resolveInstanceTypeFromState(this.s);
+    const previousVolumeSizeGb = this.s.volumeSizeGb;
+
+    if (
+      !canUpgradeTo({
+        currentType: previousTier,
+        currentSize: this.s.machineSize,
+        currentVolumeSizeGb: previousVolumeSizeGb,
+        targetTier: targetTier.key,
+      })
+    ) {
+      throw new Error(
+        `Cannot resize from ${previousTier ?? 'custom'} to ${targetTierKey}: downgrades and sidegrades are not allowed`
+      );
+    }
+
+    if (
+      this.s.provider === 'fly' &&
+      targetTier.volumeSizeGb > (previousVolumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB)
+    ) {
+      if (!this.s.flyVolumeId) {
+        throw new Error('Cannot resize: no Fly volume is associated with this instance');
+      }
+      await fly.extendVolume(
+        getFlyConfig(this.env, this.s),
+        this.s.flyVolumeId,
+        targetTier.volumeSizeGb
+      );
+      this.s.volumeSizeGb = targetTier.volumeSizeGb;
+      await this.persist({ volumeSizeGb: targetTier.volumeSizeGb });
+    }
+
+    if (this.s.provider === 'northflank') {
+      const result = await this.provider().resizeRuntime?.({
+        env: this.env,
+        state: this.s,
+        targetTier: targetTier.key,
+      });
+      if (!result) {
+        throw new Error('Provider northflank does not support tier resize');
+      }
+      await this.persistProviderResult(result);
+    }
+
+    // Capture and clear any active admin override before applying the tier
+    // change. The customer is now paying for the new tier; carrying a
+    // pre-existing override would either silently downgrade them (override
+    // smaller than new tier) or upgrade them for free (override larger).
+    const clearedOverrideSize = this.s.adminMachineSizeOverride;
+    const clearedOverrideMetadata = this.s.adminMachineSizeOverrideMetadata;
+    const clearedOverride =
+      clearedOverrideSize !== null && clearedOverrideMetadata !== null
+        ? { size: clearedOverrideSize, metadata: clearedOverrideMetadata }
+        : null;
+
+    this.s.instanceType = targetTier.key;
+    this.s.machineSize = targetTier.machineSize;
+    this.s.volumeSizeGb = targetTier.volumeSizeGb;
+    this.s.adminMachineSizeOverride = null;
+    this.s.adminMachineSizeOverrideMetadata = null;
+    await this.persist({
+      instanceType: targetTier.key,
+      machineSize: targetTier.machineSize,
+      volumeSizeGb: targetTier.volumeSizeGb,
+      adminMachineSizeOverride: null,
+      adminMachineSizeOverrideMetadata: null,
+    });
+
+    if (this.s.userId && this.s.sandboxId) {
+      const userId = this.s.userId;
+      const sandboxId = this.s.sandboxId;
+      this.ctx.waitUntil(syncInstanceTypeToPostgresHelper(this.env, this.s, userId, sandboxId));
+      // Sync override clear to Postgres if EITHER field was populated, not just
+      // when both are. A skewed legacy state (one column populated, one null)
+      // would otherwise leave Postgres stale because we just nulled DO state.
+      // The sync helper is idempotent via `IS DISTINCT FROM`.
+      if (clearedOverrideSize !== null || clearedOverrideMetadata !== null) {
+        this.ctx.waitUntil(
+          syncAdminSizeOverrideToPostgresHelper(this.env, this.s, userId, sandboxId)
+        );
+      }
+    }
+
+    console.log(
+      `[admin-machine-resize] userId=${this.s.userId} actor=${actorEmail} (${actorId}) ` +
+        `previousTier=${previousTier ?? 'unknown'} newTier=${targetTier.key} ` +
+        `previousVolume=${previousVolumeSizeGb ?? 'unknown'} newVolume=${targetTier.volumeSizeGb}` +
+        (clearedOverride
+          ? ` clearedOverride=${clearedOverride.size.cpus}/${clearedOverride.size.memory_mb}MB`
+          : '')
+    );
+
+    return {
+      previousTier,
+      newTier: targetTier.key,
+      previousVolumeSizeGb,
+      newVolumeSizeGb: targetTier.volumeSizeGb,
+      machineSize: targetTier.machineSize,
+      clearedOverride,
+    };
+  }
+
+  /**
+   * Shared guard for admin operations that mutate hardware-related state
+   * (`resizeMachine`, `setAdminMachineSizeOverride`, `clearAdminMachineSizeOverride`).
+   *
+   * Always rejects: not-provisioned, destroying / restoring / recovering /
+   * starting / restarting transitional states, and Northflank instances
+   * (none of these paths are wired up for Northflank's async pod-rollout
+   * model yet).
+   *
+   * Optionally rejects when the instance is running (`requireStopped: true`).
+   * Tier resize requires stopped because it extends the Fly volume in place,
+   * which Fly's API only allows on stopped machines. Override set/clear are
+   * pure DO state writes — the Fly `updateMachine(guest=...)` call doesn't
+   * happen until the machine's next stop/start cycle, where Fly's own state
+   * machine enforces the constraint. So override paths pass
+   * `requireStopped: false` and let the customer or admin decide when to
+   * trigger the cycle that picks up the new override.
+   *
+   * Takes message fragments so each call site reads naturally:
+   * - `cannotPrefix` slots into "Cannot {prefix}: ..."
+   * - `beforePhrase` slots into "Instance must be stopped before {phrase}"
+   *   (only used when `requireStopped: true`)
+   * - `notSupportedSubject` slots into "{subject} is not yet supported on Northflank instances"
+   */
+  private assertAdminSizeChangeAllowed(args: {
+    cannotPrefix: string;
+    beforePhrase?: string;
+    notSupportedSubject: string;
+    requireStopped: boolean;
+    allowNorthflank?: boolean;
+  }): void {
     if (!this.s.userId) {
       throw new Error('Instance is not provisioned');
     }
     if (this.s.status === 'destroying') {
-      throw new Error('Cannot resize: instance is being destroyed');
+      throw new Error(`Cannot ${args.cannotPrefix}: instance is being destroyed`);
     }
     if (this.s.status === 'restoring') {
-      throw new Error('Cannot resize: instance is restoring from snapshot');
+      throw new Error(`Cannot ${args.cannotPrefix}: instance is restoring from snapshot`);
     }
     if (this.s.status === 'recovering') {
-      throw new Error('Cannot resize: instance is recovering from an unexpected stop');
+      throw new Error(
+        `Cannot ${args.cannotPrefix}: instance is recovering from an unexpected stop`
+      );
+    }
+    if (this.s.status === 'starting' || this.s.status === 'restarting') {
+      throw new Error(`Cannot ${args.cannotPrefix}: instance is busy (${this.s.status})`);
+    }
+    if (args.requireStopped && this.s.status !== 'stopped' && getRuntimeId(this.s)) {
+      throw Object.assign(
+        new Error(`Instance must be stopped before ${args.beforePhrase ?? args.cannotPrefix}`),
+        { status: 409 }
+      );
+    }
+    if (this.s.provider === 'northflank' && args.allowNorthflank !== true) {
+      throw new Error(`${args.notSupportedSubject} is not yet supported on Northflank instances`);
+    }
+  }
+
+  // ── Admin temporary CPU/RAM override ──────────────────────────────
+
+  /**
+   * Set a temporary admin override for the machine's CPU/RAM. Wins over
+   * the tier-derived `machineSize` for runtime spec construction without
+   * touching `instanceType` or `volumeSizeGb` (so billing stays on the
+   * customer's tier). Fly + docker-local only.
+   *
+   * Can be set on a running instance — the override is a pure DO state
+   * write and takes effect on the next stop/start cycle (manual restart,
+   * customer-initiated stop/start, or any other path that flows through
+   * `startExistingMachine`). The current container keeps running on the
+   * tier hardware until that cycle.
+   *
+   * Override is sticky until cleared explicitly or until a tier resize
+   * auto-clears it. See `~/fd-plans/kiloclaw/admin-machine-size-override.md`.
+   */
+  async setAdminMachineSizeOverride(input: {
+    size: MachineSize;
+    reason: string;
+    actorId: string;
+    actorEmail: string;
+  }): Promise<{
+    previousOverride: MachineSize | null;
+    newOverride: MachineSize;
+  }> {
+    await this.loadState();
+    this.assertAdminSizeChangeAllowed({
+      cannotPrefix: 'set admin size override',
+      notSupportedSubject: 'Admin size override',
+      // Override is a pure DO state write; it takes effect on the next
+      // stop/start cycle when `startExistingMachine` calls
+      // `fly.updateMachine(guest=...)`. Setting on a running machine is
+      // safe — current container keeps running, override applies on next
+      // restart.
+      requireStopped: false,
+    });
+    if (this.s.machineSize === null) {
+      throw new Error(
+        'Cannot set admin size override: machineSize has not been observed yet ' +
+          '(legacy instance — wait for backfill or run a tier resize first)'
+      );
     }
 
-    const previousSize = this.s.machineSize;
+    const previousOverride = this.s.adminMachineSizeOverride;
+    const metadata = {
+      reason: input.reason,
+      actorId: input.actorId,
+      actorEmail: input.actorEmail,
+      setAt: Date.now(),
+    };
 
-    this.s.machineSize = newSize;
-    await this.persist({ machineSize: newSize });
+    this.s.adminMachineSizeOverride = input.size;
+    this.s.adminMachineSizeOverrideMetadata = metadata;
+    await this.persist({
+      adminMachineSizeOverride: input.size,
+      adminMachineSizeOverrideMetadata: metadata,
+    });
+
+    if (this.s.userId && this.s.sandboxId) {
+      const userId = this.s.userId;
+      const sandboxId = this.s.sandboxId;
+      this.ctx.waitUntil(
+        syncAdminSizeOverrideToPostgresHelper(this.env, this.s, userId, sandboxId)
+      );
+    }
 
     console.log(
-      `[admin-machine-resize] userId=${this.s.userId} ` +
-        `previous=${JSON.stringify(previousSize)} new=${JSON.stringify(newSize)}`
+      `[admin-size-override] set userId=${this.s.userId} actor=${input.actorEmail} ` +
+        `previous=${
+          previousOverride ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB` : 'none'
+        } ` +
+        `new=${input.size.cpus}/${input.size.memory_mb}MB cpu_kind=${input.size.cpu_kind ?? 'shared'} ` +
+        `reason="${input.reason.replace(/"/g, '\\"')}"`
     );
 
-    return { previousSize, newSize };
+    return { previousOverride, newOverride: input.size };
+  }
+
+  async clearAdminMachineSizeOverride(input: {
+    reason: string;
+    actorId: string;
+    actorEmail: string;
+  }): Promise<{ previousOverride: MachineSize | null }> {
+    await this.loadState();
+
+    // Short-circuit BEFORE the guard. Clearing nothing is a true no-op from
+    // the DO's perspective, and admins triaging incidents shouldn't get an
+    // error for it when the instance happens to be in a transitional state
+    // (destroying / starting / recovering / Northflank). The set path still
+    // runs the guard — it mutates hardware-shaping state and needs the
+    // protection.
+    //
+    // Even when the DO has no override, still fire the Postgres sync. The
+    // `admin_size_override` column is a denormalized read cache for the
+    // admin "Has size override" filter and badge; if a prior clear's
+    // best-effort sync failed or the DO was restored without an override
+    // while Postgres still holds a stale payload, the list page would show
+    // a phantom override forever. An admin firing "Clear Size Override"
+    // expects that affordance to repair the cache. The sync is idempotent
+    // via `IS DISTINCT FROM` — when Postgres already matches DO state
+    // (both null), this is a SQL no-op.
+    const previousOverride = this.s.adminMachineSizeOverride;
+    if (previousOverride === null && this.s.adminMachineSizeOverrideMetadata === null) {
+      if (this.s.userId && this.s.sandboxId) {
+        const userId = this.s.userId;
+        const sandboxId = this.s.sandboxId;
+        this.ctx.waitUntil(
+          syncAdminSizeOverrideToPostgresHelper(this.env, this.s, userId, sandboxId)
+        );
+      }
+      console.log(
+        `[admin-size-override] clear (no-op) userId=${this.s.userId} actor=${input.actorEmail} ` +
+          `reason="${input.reason.replace(/"/g, '\\"')}"`
+      );
+      return { previousOverride: null };
+    }
+
+    this.assertAdminSizeChangeAllowed({
+      cannotPrefix: 'clear admin size override',
+      notSupportedSubject: 'Admin size override',
+      // Same as set: clear is a DO state write; revert to tier hardware
+      // happens on next restart when `startExistingMachine` calls Fly.
+      requireStopped: false,
+    });
+
+    this.s.adminMachineSizeOverride = null;
+    this.s.adminMachineSizeOverrideMetadata = null;
+    await this.persist({
+      adminMachineSizeOverride: null,
+      adminMachineSizeOverrideMetadata: null,
+    });
+
+    if (this.s.userId && this.s.sandboxId) {
+      const userId = this.s.userId;
+      const sandboxId = this.s.sandboxId;
+      this.ctx.waitUntil(
+        syncAdminSizeOverrideToPostgresHelper(this.env, this.s, userId, sandboxId)
+      );
+    }
+
+    const previousLabel = previousOverride
+      ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB`
+      : 'metadata-only (skewed state)';
+    console.log(
+      `[admin-size-override] clear userId=${this.s.userId} actor=${input.actorEmail} ` +
+        `previous=${previousLabel} reason="${input.reason.replace(/"/g, '\\"')}"`
+    );
+
+    return { previousOverride };
+  }
+
+  /**
+   * Record a Fly volume extend that's already happened on the Fly side.
+   *
+   * Used by the admin `/extend-volume` route, which performs the Fly API
+   * call directly (not through the DO) and then needs the DO to catch up
+   * its persisted `volumeSizeGb` so the resize-policy check stays honest.
+   *
+   * Sets `instanceType = 'custom'` because an arbitrary extend is by
+   * definition off the catalog ladder — even if the new shape happens to
+   * match a tier's volume size, the catalog match would be coincidental.
+   * A subsequent admin resize to a named tier replaces 'custom' via the
+   * normal path.
+   *
+   * Caller is responsible for ensuring the Fly volume actually got extended
+   * to `newSizeGb` before calling this. The DO does not double-check Fly.
+   */
+  async recordVolumeExtend(newSizeGb: number): Promise<{
+    previousVolumeSizeGb: number | null;
+    newVolumeSizeGb: number;
+    instanceType: InstanceType | null;
+  }> {
+    await this.loadState();
+    if (!this.s.userId) {
+      throw new Error('Instance is not provisioned');
+    }
+    if (!Number.isInteger(newSizeGb) || newSizeGb < 1 || newSizeGb > 500) {
+      throw new Error(`Invalid volume size: ${newSizeGb}`);
+    }
+    const previousVolumeSizeGb = this.s.volumeSizeGb;
+    this.s.volumeSizeGb = newSizeGb;
+    this.s.instanceType = 'custom';
+    await this.persist({ volumeSizeGb: newSizeGb, instanceType: 'custom' });
+    if (this.s.sandboxId) {
+      this.ctx.waitUntil(
+        syncInstanceTypeToPostgresHelper(this.env, this.s, this.s.userId, this.s.sandboxId)
+      );
+    }
+    console.log(
+      `[admin-volume-extend] userId=${this.s.userId} previousSize=${previousVolumeSizeGb ?? 'unknown'} newSize=${newSizeGb}`
+    );
+    return {
+      previousVolumeSizeGb,
+      newVolumeSizeGb: newSizeGb,
+      instanceType: this.s.instanceType,
+    };
   }
 
   // ── Snapshot restore (admin) ───────────────────────────────────────
@@ -3185,22 +3768,158 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   async getMorningBriefingStatus() {
     await this.loadState();
-    return gateway.getMorningBriefingStatus(this.s, this.env);
+    // Plugin remains the source of truth for runtime state (reconcileState,
+    // lastGeneratedAt, observedEnabled). Postgres mirrors desired-state
+    // (enabled / cron / timezone / interest_topics). Read both, surface
+    // interest_topics from Postgres (the plugin response has no such field
+    // in PR-4a), and keep the plugin's own enabled/cron/timezone for the
+    // response — those agree under steady state, and the plugin is what
+    // actually drives the cron.
+    const [pg, pluginStatus] = await Promise.all([
+      readMorningBriefingConfigFromPostgresHelper(this.env, this.s),
+      gateway.getMorningBriefingStatus(this.s, this.env),
+    ]);
+
+    // Plugin not reachable (gateway warming, route missing, etc.) → return
+    // null to preserve the existing controller_route_unavailable behavior
+    // the route handler relies on. We could synthesize a response from
+    // Postgres here, but doing so would mask the warming state from
+    // callers that branch on it.
+    if (!pluginStatus) return null;
+
+    // Lazy backfill: plugin reports a configured briefing for an instance
+    // that has no Postgres row yet (legacy instance pre-dating PR-4a, or
+    // a post-PR instance whose previous best-effort waitUntil mirror
+    // write failed). Schedule the write via `waitUntil` so it doesn't
+    // add latency to the status response. Best-effort: matches the
+    // enable/disable paths.
+    //
+    // Forward `interestTopics` from the plugin response when present.
+    // Without this, an instance with valid topics in config.json but a
+    // missing Postgres row (e.g. transient Hyperdrive failure on the
+    // interests path) would have its topics silently reset to `[]` by
+    // the backfill row's column default. Falling back to "omit" when
+    // older controllers don't include the field keeps existing
+    // interests untouched via the upsert helper's patch semantics.
+    //
+    // `pg.instanceId` was just resolved by the parallel Postgres read;
+    // pass it through so the helper skips the redundant
+    // `getInstanceBySandboxId` lookup.
+    if (
+      pg &&
+      pg.row === null &&
+      typeof pluginStatus.enabled === 'boolean' &&
+      typeof pluginStatus.cron === 'string'
+    ) {
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(
+          this.env,
+          this.s,
+          {
+            enabled: pluginStatus.enabled,
+            cron: pluginStatus.cron,
+            timezone: pluginStatus.timezone,
+            ...(Array.isArray(pluginStatus.interestTopics) && {
+              interestTopics: pluginStatus.interestTopics,
+            }),
+          },
+          pg.instanceId
+        )
+      );
+    }
+
+    // Plugin is the source of truth for interestTopics — the Postgres
+    // row is a denormalized read cache. When the plugin reports topics
+    // and Postgres disagrees (e.g. a previous best-effort `waitUntil`
+    // mirror write failed after the plugin accepted a change), the
+    // plugin response wins on this read AND we schedule a repair so
+    // subsequent admin queries against Postgres see the fresh value.
+    // Without the repair, an existing-but-stale row would survive the
+    // lazy backfill check above (which only fires when `row === null`)
+    // and serve stale topics forever.
+    const pluginTopics = Array.isArray(pluginStatus.interestTopics)
+      ? pluginStatus.interestTopics
+      : null;
+    if (pg && pluginTopics !== null) {
+      const pgTopics = pg.row?.interest_topics ?? null;
+      const pgStale = pgTopics === null || !shallowEqualStringArrays(pgTopics, pluginTopics);
+      if (pgStale) {
+        this.ctx.waitUntil(
+          syncMorningBriefingConfigToPostgresHelper(
+            this.env,
+            this.s,
+            { interestTopics: pluginTopics },
+            pg.instanceId
+          )
+        );
+      }
+    }
+
+    // Merge: plugin wins for `interestTopics` when present (plugin is
+    // authoritative); fall back to Postgres mirror when the plugin
+    // response omits it (older controller image predating the field).
+    const responseInterestTopics = pluginTopics ?? pg?.row?.interest_topics;
+    if (responseInterestTopics !== undefined) {
+      return { ...pluginStatus, interestTopics: responseInterestTopics };
+    }
+    return pluginStatus;
   }
 
   async enableMorningBriefing(input: { cron?: string; timezone?: string }) {
     await this.loadState();
-    return gateway.enableMorningBriefing(this.s, this.env, input);
+    const response = await gateway.enableMorningBriefing(this.s, this.env, input);
+    if (response && response.ok !== false) {
+      // Mirror to Postgres after the plugin accepted. Best-effort via
+      // waitUntil — the user-facing success is gated on the plugin write,
+      // not the Postgres mirror. Pass through whichever cron/timezone
+      // the plugin resolved (it echoes them on success); fall back to the
+      // request input.
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(this.env, this.s, {
+          enabled: true,
+          cron: response.cron ?? input.cron,
+          timezone: response.timezone ?? input.timezone,
+        })
+      );
+    }
+    return response;
   }
 
   async disableMorningBriefing() {
     await this.loadState();
-    return gateway.disableMorningBriefing(this.s, this.env);
+    const response = await gateway.disableMorningBriefing(this.s, this.env);
+    if (response && response.ok !== false) {
+      // Only flip `enabled`; preserve the user's last cron/timezone so a
+      // future re-enable defaults to the same schedule.
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(this.env, this.s, {
+          enabled: false,
+        })
+      );
+    }
+    return response;
   }
 
   async runMorningBriefing() {
     await this.loadState();
     return gateway.runMorningBriefing(this.s, this.env);
+  }
+
+  async updateBriefingInterests(input: { topics: string[] }) {
+    await this.loadState();
+    const response = await gateway.updateMorningBriefingInterests(this.s, this.env, input);
+    if (response && response.ok !== false) {
+      // Mirror to Postgres after the plugin accepted. Best-effort via
+      // waitUntil — the user-facing success is gated on the plugin write,
+      // not the Postgres mirror. Patch semantics: only interest_topics is
+      // touched; enabled/cron/timezone are preserved.
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(this.env, this.s, {
+          interestTopics: response.interestTopics ?? input.topics,
+        })
+      );
+    }
+    return response;
   }
 
   async readMorningBriefing(day: 'today' | 'yesterday') {
@@ -3303,14 +4022,35 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         });
       }
 
-      // Backfill machineSize from live machine for legacy instances
-      if (this.s.provider === 'fly' && this.s.machineSize === null && this.s.flyMachineId) {
+      // Backfill machineSize from live machine for legacy instances. Skipped
+      // when an admin override is active (override-shape isn't tier hardware).
+      if (
+        this.s.provider === 'fly' &&
+        this.s.machineSize === null &&
+        this.s.adminMachineSizeOverride === null &&
+        this.s.flyMachineId
+      ) {
         const flyConfig = getFlyConfig(this.env, this.s);
         const machine = await fly.getMachine(flyConfig, this.s.flyMachineId);
         if (machine.config?.guest) {
-          const { cpus, memory_mb, cpu_kind } = machine.config.guest;
-          this.s.machineSize = { cpus, memory_mb, cpu_kind };
-          await this.persist({ machineSize: this.s.machineSize });
+          const parsedSize = parseMachineSizeFromFlyGuest(machine.config.guest);
+          if (parsedSize) {
+            this.s.machineSize = parsedSize;
+            this.s.instanceType = resolveInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb);
+            await this.persist({
+              machineSize: this.s.machineSize,
+              instanceType: this.s.instanceType,
+            });
+          } else {
+            doWarn(
+              this.s,
+              'Skipping machineSize backfill: live Fly guest failed schema validation',
+              {
+                source: 'restart-backfill',
+                guest: machine.config.guest,
+              }
+            );
+          }
         }
       }
 
@@ -3408,7 +4148,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         resolveRuntimeImageRef(this.s, this.env),
         envVars,
         bootstrapEnv,
-        this.s.machineSize,
+        effectiveMachineSize(this.s),
         identity,
         this.s.provider
       );
@@ -3595,13 +4335,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       if (this.s.provider !== 'fly') {
         if (this.s.status === 'destroying') {
           await this.retryNonFlyDestroy();
-          await finalizeDestroyIfComplete(
+          const destroyRctx = createReconcileContext(this.s, this.env, 'alarm_destroy');
+          const result = await finalizeDestroyIfComplete(
             this.ctx,
             this.s,
-            createReconcileContext(this.s, this.env, 'alarm_destroy'),
+            destroyRctx,
             (userId, sandboxId) =>
               markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
           );
+          if (!result.finalized) {
+            await maybeEmitDestroyStuckTelemetry(this.ctx, this.s, destroyRctx);
+          }
         } else {
           await this.reconcileNonFlyRuntimeFromAlarm();
         }

@@ -1,7 +1,11 @@
-process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
+process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID ||= 'price_legacy_standard_intro';
+process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID ||= 'price_legacy_standard';
+process.env.STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID ||= 'price_legacy_commit';
+process.env.STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID ||= 'price_current_standard';
+process.env.STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID ||= 'price_current_commit';
 
 import { and, eq } from 'drizzle-orm';
-import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import { CURRENT_KILOCLAW_PRICE_VERSION, insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
   credit_transactions,
   kiloclaw_email_log,
@@ -515,6 +519,105 @@ describe('sendCreditsTopUpEmail payload', () => {
     expect(params.html).not.toContain('View your Stripe receipt');
   });
 
+  test('org_manual variant emits org copy and organization payment details URL', async () => {
+    await sendCreditsTopUpEmail({
+      to: 'billing@example.com',
+      variant: 'org_manual',
+      amountCents: 2500,
+      creditsCents: 2500,
+      purchaseDate: new Date('2026-04-01T00:00:00Z'),
+      receiptUrl: 'https://pay.stripe.com/receipts/org-manual',
+      organizationId: 'org_123',
+      organizationName: 'Acme Labs',
+    });
+
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.subject).toBe('Your Kilo org credit top-up');
+    expect(params.html).toContain('Team credits added');
+    expect(params.html).toContain(
+      'A Kilo credit top-up has been processed for Acme Labs. The credits are now available to the organization.'
+    );
+    expect(params.html).toContain(
+      'href="http://localhost:3000/organizations/org_123/payment-details"'
+    );
+    expect(params.html).toContain('https://pay.stripe.com/receipts/org-manual');
+  });
+
+  test('org_auto variant emits team auto-top-up copy and organization payment details URL', async () => {
+    await sendCreditsTopUpEmail({
+      to: 'billing@example.com',
+      variant: 'org_auto',
+      amountCents: 4000,
+      creditsCents: 4000,
+      purchaseDate: new Date('2026-05-01T00:00:00Z'),
+      receiptUrl: null,
+      organizationId: 'org_456',
+      organizationName: 'Globex',
+    });
+
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.subject).toBe('Kilo team auto top-up successful');
+    expect(params.html).toContain('Team auto top-up was successful');
+    expect(params.html).toContain(
+      'Globex was automatically topped up so your team can keep using Kilo without interruption. The new credits are available now.'
+    );
+    expect(params.html).toContain(
+      'href="http://localhost:3000/organizations/org_456/payment-details"'
+    );
+    expect(params.html).not.toContain('/credits');
+  });
+
+  // @ts-expect-error org top-up emails need organizationId or creditsUrl.
+  const invalidOrganizationTopUpEmailParams: Parameters<typeof sendCreditsTopUpEmail>[0] = {
+    to: 'billing@example.com',
+    variant: 'org_manual',
+    amountCents: 2500,
+    creditsCents: 2500,
+    purchaseDate: new Date('2026-04-01T00:00:00Z'),
+    receiptUrl: null,
+    organizationName: 'Acme Labs',
+  };
+
+  test('org variants require an organization destination at the type boundary', () => {
+    expect(invalidOrganizationTopUpEmailParams).toBeDefined();
+  });
+
+  test('org variants reject missing organization destination at runtime', async () => {
+    await expect(
+      sendCreditsTopUpEmail({
+        to: 'billing@example.com',
+        variant: 'org_manual',
+        amountCents: 2500,
+        creditsCents: 2500,
+        purchaseDate: new Date('2026-04-01T00:00:00Z'),
+        receiptUrl: null,
+        organizationName: 'Acme Labs',
+      } as Parameters<typeof sendCreditsTopUpEmail>[0])
+    ).rejects.toThrow('Organization top-up emails require creditsUrl or organizationId');
+
+    expect(sendViaMailgunMock).not.toHaveBeenCalled();
+  });
+
+  test('org variants ignore empty URL overrides when an organization ID is available', async () => {
+    await sendCreditsTopUpEmail({
+      to: 'billing@example.com',
+      variant: 'org_manual',
+      amountCents: 2500,
+      creditsCents: 2500,
+      purchaseDate: new Date('2026-04-01T00:00:00Z'),
+      receiptUrl: null,
+      creditsUrl: '',
+      organizationId: 'org_123',
+      organizationName: 'Acme Labs',
+    });
+
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.html).toContain(
+      'href="http://localhost:3000/organizations/org_123/payment-details"'
+    );
+    expect(params.html).not.toContain('href=""');
+  });
+
   test('null receipt URL renders an empty receipt section without breaking the template', async () => {
     await sendCreditsTopUpEmail({
       to: 'recipient@example.com',
@@ -778,6 +881,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
         instance_id: instance.id,
         stripe_subscription_id: params.stripeSubscriptionId,
         payment_source: 'stripe',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
         plan: params.plan,
         status: params.status,
         trial_started_at:
@@ -824,6 +928,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
     await db.insert(kiloclaw_subscriptions).values({
       user_id: userId,
       instance_id: instance.id,
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
       plan: 'trial',
       status: 'trialing',
       trial_started_at: new Date().toISOString(),
@@ -848,6 +953,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -859,7 +965,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
   });
 
   test('trialing trial -> credit enrollment sends one subscription-started email and writes the log row', async () => {
-    const user = await insertTestUser({ total_microdollars_acquired: 50_000_000 });
+    const user = await insertTestUser({ total_microdollars_acquired: 60_000_000 });
     const instance = await seedCreditEnrollmentAnchor(user.id);
 
     await enrollWithCredits({
@@ -908,6 +1014,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -934,6 +1041,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -960,6 +1068,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `in_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 0,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -988,6 +1097,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_first_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date(Date.now() - 60 * 86_400_000).toISOString(),
       periodEnd: new Date(Date.now() - 30 * 86_400_000).toISOString(),
@@ -1009,6 +1119,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_second_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -1056,6 +1167,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart,
       periodEnd,
@@ -1082,6 +1194,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -1109,6 +1222,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
         stripeSubscriptionId,
         stripePaymentId: `ch_${crypto.randomUUID()}`,
         plan: 'standard',
+        priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
         amountMicrodollars: 9_000_000,
         periodStart: new Date().toISOString(),
         periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -1153,6 +1267,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -1182,6 +1297,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart,
       periodEnd,
@@ -1197,6 +1313,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart,
       periodEnd,
@@ -1225,6 +1342,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart,
       periodEnd,
@@ -1249,6 +1367,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart,
       periodEnd,
@@ -1275,6 +1394,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -1302,6 +1422,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),

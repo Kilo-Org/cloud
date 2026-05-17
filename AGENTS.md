@@ -35,14 +35,35 @@ Target a specific test file: `pnpm test -- <path>`. Run tests for a specific ser
 
 **Before running tests**, ensure the test database is running. If there is no active Postgres instance, run `pnpm test:db` first — this starts the Postgres container and applies migrations. You can check whether Postgres is already running with `docker compose -f dev/docker-compose.yml ps postgres`.
 
+## apps/web UI Work
+
+Before making or reviewing UI changes under `apps/web` — components, routes/pages, layouts, styling, Storybook, visual polish, UX copy, interaction states, responsive behavior, theming, or accessibility — read `design.md` and use `.agents/skills/kilo-design/SKILL.md`. This applies even when the prompt does not explicitly mention design. Skip only for backend-only or non-visual logic changes.
+
 ## Coding Standards
 
 - Prefer `type` over `interface`.
-- **Avoid** `as` casts and `!` non-null assertions — use `satisfies` or flow-sensitive typing.
+- Use `as` casts sparingly, but do not ban them outright. Prefer `satisfies`, discriminated unions, generics, or flow-sensitive narrowing when TypeScript can be made to understand the type naturally.
+- A targeted `as` cast is acceptable when code is at a known boundary where TypeScript has lost information that the surrounding control flow guarantees. For example, inside a platform switch, casting `message` to `Message<SlackEvent>` or `Message<GitHubRawMessage>` is preferable to adding generic `Record<string, unknown>` property helpers just to read known adapter fields.
+- Avoid broad casts that hide real uncertainty, especially `as any`, double casts through `unknown`, or casting external/untrusted data without validation. Use runtime validation when the data shape is genuinely unknown, user-controlled, persisted, or coming from an API contract we do not own.
+- The above restrictions on `as` do not apply inside test files (e.g. `*.test.ts`, `*.spec.ts`, files under `__tests__/`, and other test fixtures/helpers). `as` casts are explicitly permitted in tests, where they are commonly needed for fixture construction, narrowing partial mocks, and exercising error paths. Production code conventions still apply to non-test code imported by tests.
+- Avoid `!` non-null assertions; prefer explicit checks or flow-sensitive typing.
 - Avoid mocks in tests; assert on results or check the database for side effects.
 - Prefer clear names over comments. Only comment things not obvious in context.
 - When the linter flags an unused variable, investigate the root cause — do not blindly prefix with `_`.
 - Use existing dependencies before implementing custom solutions. Check `package.json` for what's available.
+
+## Timestamp Serialization
+
+- Drizzle/Postgres `timestamp({ withTimezone: true, mode: 'string' })` rows may surface timestamp text like `2026-04-29 01:16:12.945+00`, which strict ISO validators such as `z.string().datetime()` reject.
+- Before putting DB-backed timestamp strings into HTTP bodies, queue messages, or other strict JSON contracts, normalize them to UTC ISO with an existing domain serializer or `new Date(value).toISOString()`. Do not forward raw DB timestamp text across contract boundaries.
+- Keep strict validators unless the receiving contract intentionally accepts a broader format. Add regression fixtures using production-shape Postgres timestamp text when fixing or extending these paths.
+
+## Workers & Durable Objects
+
+- Do not cache database clients, pools, or other transport-owning/request-context-bound SDK objects in module scope for Cloudflare Workers or Durable Objects. Workers reuse isolates across requests, Durable Object classes in the same Worker can share module memory across object instances, and stale module-scope I/O state can cause cross-context runtime failures.
+- Create external database clients through approved per-use helpers such as `getWorkerDb(...)`; let Hyperdrive own pooling. Only cache pure data or context-independent values in module scope.
+- Durable Object instance fields are valid for object-local state created from constructor inputs, such as SQLite/Drizzle wrappers over `state.storage`.
+- If optimization appears to require module-scope client caching, stop and document why lifetime, transport ownership, binding freshness, and Cloudflare runtime behavior make it safe before implementing it.
 
 ## Database Migrations
 
@@ -101,6 +122,7 @@ Business-rule specs live in `.specs/`. Before making **any** changes to a domain
 | Spec                                     | Governs                                                             |
 | ---------------------------------------- | ------------------------------------------------------------------- |
 | `.specs/kiloclaw-billing.md`             | KiloClaw billing, pricing, invoicing, usage metering, payment flows |
+| `.specs/kiloclaw-billing-lifecycle.md`   | KiloClaw billing lifecycle — credit-renewal orchestration safety    |
 | `.specs/kiloclaw-datamodel.md`           | KiloClaw data model — instance/subscription tables, invariants      |
 | `.specs/kiloclaw-controller.md`          | KiloClaw controller/machine lifecycle, bootstrap, Docker image      |
 | `.specs/team-enterprise-seat-billing.md` | Team and Enterprise seat billing, subscription management           |

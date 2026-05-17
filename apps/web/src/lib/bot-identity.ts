@@ -31,7 +31,7 @@ function hasRedisClient(state: StateAdapter): state is StateAdapterWithRedisClie
 export type PlatformIdentity = {
   /** e.g. "slack", "discord", "teams", "gchat" */
   platform: (typeof PLATFORM)[keyof typeof PLATFORM];
-  /** Workspace / team / guild / tenant ID */
+  /** Workspace / team / guild / tenant ID, or a platform-specific user-level sentinel. */
   teamId: string;
   /** Platform-specific user ID (e.g. Slack's "U123ABC") */
   userId: string;

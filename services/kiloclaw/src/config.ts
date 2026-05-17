@@ -61,8 +61,7 @@ export const DEFAULT_MACHINE_GUEST = {
   cpu_kind: 'performance' as const,
 };
 
-/** Default Fly Volume size in GB */
-export const DEFAULT_VOLUME_SIZE_GB = 10;
+export { DEFAULT_VOLUME_SIZE_GB } from '@kilocode/kiloclaw-instance-tiers';
 
 /** Default Fly region priority list when FLY_REGION env var is not set. */
 export const DEFAULT_FLY_REGION = 'eu,us';
@@ -88,6 +87,10 @@ export const RESTARTING_MAX_TIMEOUT_MS = 15 * 60 * 1000; // 15 min
 export const RECOVERING_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
 /** Destroying: retry pending deletes quickly */
 export const ALARM_INTERVAL_DESTROYING_MS = 60 * 1000; // 1 min
+/** Pending destroy age before emitting stuck-destroy telemetry */
+export const DESTROY_STUCK_THRESHOLD_MS = 15 * 60 * 1000; // 15 min
+/** Minimum interval between repeated stuck-destroy telemetry events */
+export const DESTROY_STUCK_TELEMETRY_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 /** Provisioned/stopped: slow drift detection */
 export const ALARM_INTERVAL_IDLE_MS = 30 * 60 * 1000; // 30 min
 /** Random jitter added to alarm scheduling to prevent Fly API bursts */

@@ -12,7 +12,11 @@ import { getKiloPassSubscriptionMetadata } from '@/lib/kilo-pass/stripe-handlers
 import { getStripeEndedAtIso } from '@/lib/kilo-pass/stripe-handlers-utils';
 import { client as stripe } from '@/lib/stripe-client';
 import type Stripe from 'stripe';
-import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
+import {
+  KiloPassAuditLogAction,
+  KiloPassAuditLogResult,
+  KiloPassPaymentProvider,
+} from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 
@@ -76,6 +80,8 @@ export async function handleKiloPassSubscriptionEvent(params: {
       .insert(kilo_pass_subscriptions)
       .values({
         ...baseValues,
+        payment_provider: KiloPassPaymentProvider.Stripe,
+        provider_subscription_id: subscription.id,
         stripe_subscription_id: subscription.id,
         started_at: dayjs.unix(subscription.start_date).utc().toISOString(),
         ended_at: endedAt,
@@ -83,7 +89,11 @@ export async function handleKiloPassSubscriptionEvent(params: {
       })
       .onConflictDoUpdate({
         target: kilo_pass_subscriptions.stripe_subscription_id,
-        set: updateSet,
+        set: {
+          ...updateSet,
+          payment_provider: KiloPassPaymentProvider.Stripe,
+          provider_subscription_id: subscription.id,
+        },
       })
       .returning({ id: kilo_pass_subscriptions.id });
 

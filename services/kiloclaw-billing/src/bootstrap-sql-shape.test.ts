@@ -14,6 +14,7 @@ describe('insertSubscriptionIdempotent SQL shape', () => {
         instance_id: '00000000-0000-4000-8000-000000000001',
         plan: 'trial',
         status: 'trialing',
+        kiloclaw_price_version: '2026-05-10',
       })
       .onConflictDoNothing({
         target: kiloclaw_subscriptions.instance_id,

@@ -24,6 +24,7 @@ import {
   code_indexing_search,
   code_indexing_manifest,
   referral_codes,
+  organizations,
   organization_memberships,
   organization_user_limits,
   organization_user_usage,
@@ -305,7 +306,7 @@ export async function findUserByEmail(email: string): Promise<User | undefined> 
   });
 }
 
-function fireAuthEvent(
+async function fireAuthEvent(
   user: Pick<
     User,
     | 'id'
@@ -330,6 +331,25 @@ function fireAuthEvent(
   requestHeaders?: Headers
 ) {
   if (!requestHeaders) return;
+
+  const [authProviderRows, membershipRows] = await Promise.all([
+    db
+      .select({ provider: user_auth_provider.provider })
+      .from(user_auth_provider)
+      .where(eq(user_auth_provider.kilo_user_id, user.id)),
+    db
+      .select({
+        organization_id: organization_memberships.organization_id,
+        role: organization_memberships.role,
+        plan: organizations.plan,
+        sso_domain: organizations.sso_domain,
+        free_trial_end_at: organizations.free_trial_end_at,
+      })
+      .from(organization_memberships)
+      .innerJoin(organizations, eq(organization_memberships.organization_id, organizations.id))
+      .where(eq(organization_memberships.kilo_user_id, user.id)),
+  ]);
+
   void reportAuthEvent({
     kilo_user_id: user.id,
     event_type: eventType,
@@ -355,6 +375,14 @@ function fireAuthEvent(
     cohorts: Object.keys(user.cohorts),
     has_validation_stytch: user.has_validation_stytch,
     has_validation_novel_card_with_hold: user.has_validation_novel_card_with_hold,
+    auth_providers: authProviderRows.map(r => r.provider),
+    org_memberships: membershipRows.map(m => ({
+      organization_id: m.organization_id,
+      role: m.role,
+      plan: m.plan,
+      has_sso: m.sso_domain != null,
+      in_free_trial: m.free_trial_end_at != null && new Date(m.free_trial_end_at) > new Date(),
+    })),
   });
 }
 
@@ -368,7 +396,7 @@ export async function createOrUpdateUser(
 ): Promise<Result<{ user: User; isNew: boolean }, AuthErrorType>> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
-    fireAuthEvent(existingUser, 'signin', args.provider, requestHeaders);
+    void fireAuthEvent(existingUser, 'signin', args.provider, requestHeaders);
 
     // User signed in or is being updated
     posthogClient.capture({
@@ -415,7 +443,7 @@ export async function createOrUpdateUser(
       if (!linkResult.success) {
         return { success: false, error: linkResult.error };
       }
-      fireAuthEvent(userByEmail, 'signin', args.provider, requestHeaders);
+      void fireAuthEvent(userByEmail, 'signin', args.provider, requestHeaders);
       // Successfully linked account, return the existing user
       posthogClient.capture({
         distinctId: userByEmail.google_user_email,
@@ -620,7 +648,7 @@ export async function createOrUpdateUser(
   }
   const savedUser = txResult.user;
 
-  fireAuthEvent(savedUser, 'signup', args.provider, requestHeaders);
+  void fireAuthEvent(savedUser, 'signup', args.provider, requestHeaders);
 
   // User created event in PostHog
   posthogClient.capture({

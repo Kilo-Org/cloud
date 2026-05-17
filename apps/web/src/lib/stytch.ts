@@ -11,6 +11,7 @@ import { updateStytchValidation } from './customerInfo';
 import { domainIsRestrictedFromStytchFreeCredits } from './domainIsRestrictedFromStytchFreeCredits';
 import { grantCreditForCategory } from './promotionalCredits';
 import PostHogClient from '@/lib/posthog';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 
 const NEXT_PUBLIC_STYTCH_PROJECT_ENV = getEnvVariable('NEXT_PUBLIC_STYTCH_PROJECT_ENV');
 const STYTCH_PROJECT_ID = getEnvVariable('STYTCH_PROJECT_ID');
@@ -149,14 +150,29 @@ export async function saveFingerprints(
 
   // Autoban users blocked by Stytch for smart rate limit abuse
   if (verdict.action === 'BLOCK' && verdict.reasons.includes('SMART_RATE_LIMIT_BANNED')) {
-    await db
+    const updateResult = await db
       .update(kilocode_users)
       .set({
         blocked_reason: 'autoban: stytch SMART_RATE_LIMIT_BANNED',
         blocked_at: new Date().toISOString(),
         blocked_by_kilo_user_id: null,
       })
-      .where(and(eq(kilocode_users.id, user.id), isNull(kilocode_users.blocked_reason)));
+      .where(and(eq(kilocode_users.id, user.id), isNull(kilocode_users.blocked_reason)))
+      .returning({ id: kilocode_users.id });
+    if (updateResult.length > 0) {
+      void reportEvents({
+        events: [
+          {
+            type: 'user.blocked',
+            data: {
+              kilo_user_id: user.id,
+              reason: 'autoban: stytch SMART_RATE_LIMIT_BANNED',
+              actor_email: null,
+            },
+          },
+        ],
+      });
+    }
     if (process.env.NODE_ENV !== 'test')
       console.log('SECURITY: autobanned user for SMART_RATE_LIMIT_BANNED:', {
         userId: user.id,

@@ -324,6 +324,20 @@ export const organizationAdminRouter = createTRPCRouter({
           .where(eq(organizations.id, organizationId));
       });
 
+      if (amountMicrodollars > 0 && existingOrg.created_by_kilo_user_id) {
+        void reportEvents({
+          events: [
+            {
+              type: 'billing.credit_purchased',
+              data: {
+                kilo_user_id: existingOrg.created_by_kilo_user_id,
+                microdollars_acquired: amountMicrodollars,
+              },
+            },
+          ],
+        });
+      }
+
       return {
         message: `Successfully granted $${amount_usd} credits to organization ${existingOrg.name}`,
         amount_usd,

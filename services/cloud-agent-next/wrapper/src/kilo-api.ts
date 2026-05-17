@@ -12,6 +12,36 @@ import type { KiloClient as SDKClient } from '@kilocode/sdk';
 import { createKiloClient as createV2Client } from '@kilocode/sdk/v2';
 import { logToFile } from './utils.js';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function formatSdkError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+
+  if (isRecord(error) && typeof error.message === 'string') {
+    return error.message;
+  }
+
+  try {
+    return JSON.stringify(error) ?? String(error);
+  } catch {
+    return String(error);
+  }
+}
+
+function requireSdkData<T>(result: { data?: T; error?: unknown }, operation: string): T {
+  if (result.error !== undefined) {
+    throw new Error(`${operation} failed: ${formatSdkError(result.error)}`);
+  }
+
+  if (result.data === undefined) {
+    throw new Error(`${operation} returned no data`);
+  }
+
+  return result.data;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -25,6 +55,13 @@ export type KiloServerHandle = {
  * Permission response type.
  */
 export type PermissionResponse = 'always' | 'once' | 'reject';
+
+export type NetworkWait = {
+  id: string;
+  sessionID: string;
+  message: string;
+  restored: boolean;
+};
 
 /**
  * The wrapper's unified kilo client interface.
@@ -67,6 +104,9 @@ export type WrapperKiloClient = {
       tool?: { messageID: string; callID: string };
     }>
   >;
+  getNetworkWaits: () => Promise<NetworkWait[]>;
+  resumeNetworkWait: (requestID: string) => Promise<boolean>;
+  rejectNetworkWait: (requestID: string) => Promise<boolean>;
   generateCommitMessage: (opts: { path: string }) => Promise<{ message: string }>;
 
   /** The underlying SDK client — used directly by connection.ts for event subscription */
@@ -205,6 +245,21 @@ export function createWrapperKiloClient(
         always: string[];
         tool?: { messageID: string; callID: string };
       }>;
+    },
+
+    getNetworkWaits: async () => {
+      const result = await v2Client.network.list();
+      return requireSdkData(result, 'Network list') as NetworkWait[];
+    },
+
+    resumeNetworkWait: async requestID => {
+      const result = await v2Client.network.reply({ requestID });
+      return requireSdkData(result, `Network reply ${requestID}`);
+    },
+
+    rejectNetworkWait: async requestID => {
+      const result = await v2Client.network.reject({ requestID });
+      return requireSdkData(result, `Network reject ${requestID}`);
     },
 
     generateCommitMessage: async opts => {

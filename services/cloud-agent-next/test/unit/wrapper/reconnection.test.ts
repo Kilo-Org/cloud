@@ -163,6 +163,9 @@ const createMockKiloClient = (overrides?: Partial<WrapperKiloClient>): WrapperKi
   getSessionStatuses: vi.fn().mockResolvedValue({}),
   getQuestions: vi.fn().mockResolvedValue([]),
   getPermissions: vi.fn().mockResolvedValue([]),
+  getNetworkWaits: vi.fn().mockResolvedValue([]),
+  resumeNetworkWait: vi.fn().mockResolvedValue(true),
+  rejectNetworkWait: vi.fn().mockResolvedValue(true),
   sdkClient: {
     event: {
       // Return a stream that never yields — keeps event subscription alive

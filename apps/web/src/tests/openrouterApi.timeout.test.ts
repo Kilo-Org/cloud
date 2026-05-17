@@ -131,6 +131,43 @@ describe('upstreamRequest timeout', () => {
     expect(capturedOptions).not.toContain('body-secret-content');
   });
 
+  it('classifies ETIMEDOUT transport failures as read timeouts', async () => {
+    const timeoutCause = Object.assign(new Error('socket read timed out'), {
+      code: 'ETIMEDOUT',
+      name: 'SocketTimeoutError',
+    });
+    const fetchError = new TypeError('fetch failed', { cause: timeoutCause });
+    const mockFetch = jest.fn().mockRejectedValue(fetchError);
+    global.fetch = mockFetch;
+
+    await expect(
+      upstreamRequest({
+        path: '/chat/completions',
+        search: '',
+        method: 'POST',
+        body: {
+          model: 'test-model',
+          messages: [{ role: 'user', content: 'test' }],
+        },
+        extraHeaders: {},
+        provider: PROVIDERS.OPENROUTER,
+      })
+    ).rejects.toBe(fetchError);
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'TypeError', message: 'fetch failed' }),
+      expect.objectContaining({
+        tags: expect.objectContaining({ failure_family: 'read_timeout' }),
+        extra: expect.objectContaining({
+          failureFamily: 'read_timeout',
+          causeCode: 'ETIMEDOUT',
+          causeName: 'SocketTimeoutError',
+          causeMessage: 'socket read timed out',
+        }),
+      })
+    );
+  });
+
   it('rethrows provider fetch failures and captures safe timeout metadata', async () => {
     const timeoutCause = Object.assign(new Error('Headers Timeout Error'), {
       code: 'UND_ERR_HEADERS_TIMEOUT',

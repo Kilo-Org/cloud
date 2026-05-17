@@ -125,6 +125,7 @@ function classifyUpstreamFetchFailure({
     case 'UND_ERR_CONNECT_TIMEOUT':
       return 'connect_timeout';
     case 'UND_ERR_BODY_TIMEOUT':
+    case 'ETIMEDOUT':
       return 'read_timeout';
     case 'ECONNRESET':
       return 'conn_reset';

@@ -54,6 +54,7 @@ import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-life
 import * as z from 'zod';
 import { eq, and, ne, or, ilike, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { toNonNullish } from '@/lib/utils';
 import { TRPCError } from '@trpc/server';
@@ -491,7 +492,8 @@ export const adminRouter = createTRPCRouter({
     updateBlockStatus: adminProcedure
       .input(UpdateUserBlockStatusSchema)
       .mutation(async ({ input, ctx }) => {
-        const blockMetadata = input.blocked_reason
+        const isBlocking = Boolean(input.blocked_reason);
+        const blockMetadata = isBlocking
           ? {
               blocked_reason: input.blocked_reason,
               blocked_at: new Date().toISOString(),
@@ -507,6 +509,19 @@ export const adminRouter = createTRPCRouter({
           .update(kilocode_users)
           .set(blockMetadata)
           .where(eq(kilocode_users.id, input.userId));
+
+        void reportEvents({
+          events: [
+            {
+              type: isBlocking ? 'user.blocked' : 'user.unblocked',
+              data: {
+                kilo_user_id: input.userId,
+                reason: input.blocked_reason ?? null,
+                actor_email: ctx.user.google_user_email,
+              },
+            },
+          ],
+        });
 
         return successResult();
       }),

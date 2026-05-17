@@ -7,7 +7,7 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
-import { reportAuthEvent } from '@/lib/ai-gateway/abuse-service';
+import { reportAuthEvent, reportEvents } from '@/lib/ai-gateway/abuse-service';
 import {
   payment_methods,
   kilocode_users,
@@ -306,7 +306,25 @@ export async function findUserByEmail(email: string): Promise<User | undefined> 
 }
 
 function fireAuthEvent(
-  user: Pick<User, 'id' | 'google_user_email' | 'created_at'>,
+  user: Pick<
+    User,
+    | 'id'
+    | 'google_user_email'
+    | 'created_at'
+    | 'hosted_domain'
+    | 'signup_ip'
+    | 'is_admin'
+    | 'is_bot'
+    | 'blocked_at'
+    | 'completed_welcome_form'
+    | 'linkedin_url'
+    | 'github_url'
+    | 'discord_server_membership_verified_at'
+    | 'customer_source'
+    | 'cohorts'
+    | 'has_validation_stytch'
+    | 'has_validation_novel_card_with_hold'
+  >,
   eventType: 'signup' | 'signin',
   provider: AuthProviderId,
   requestHeaders?: Headers
@@ -323,6 +341,20 @@ function fireAuthEvent(
     ja4_digest: requestHeaders.get('x-vercel-ja4-digest'),
     user_agent: requestHeaders.get('user-agent'),
     auth_method: provider,
+    hosted_domain: user.hosted_domain,
+    signup_ip: user.signup_ip,
+    signup_geo_country: null, // not stored on user; set at signup time only via request headers
+    is_admin: user.is_admin,
+    is_bot: user.is_bot,
+    is_blocked: user.blocked_at != null,
+    completed_welcome_form: user.completed_welcome_form,
+    has_linkedin_url: user.linkedin_url != null,
+    has_github_url: user.github_url != null,
+    has_discord_verified: user.discord_server_membership_verified_at != null,
+    customer_source: user.customer_source,
+    cohorts: Object.keys(user.cohorts),
+    has_validation_stytch: user.has_validation_stytch,
+    has_validation_novel_card_with_hold: user.has_validation_novel_card_with_hold,
   });
 }
 
@@ -751,6 +783,8 @@ export async function softDeleteUser(userId: string) {
   // magic_link_tokens and organization_invitations addressed to this user.
   const originalEmail = user.google_user_email;
   const originalAppStoreAccountToken = user.app_store_account_token;
+
+  void reportEvents({ events: [{ type: 'user.deleted', data: { kilo_user_id: userId } }] });
 
   await db.transaction(async tx => {
     // ── Precondition checks (inside tx to avoid TOCTOU races) ──────────

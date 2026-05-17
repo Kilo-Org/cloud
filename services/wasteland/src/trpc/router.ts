@@ -312,9 +312,7 @@ export const wastelandRouter = router({
   // as upstream-admin. Should only be called as part of the "create
   // your own wasteland" flow after storeCredential has run.
   //
-  // Implementation lives in `upstream-bootstrap/`; see
-  // `services/wasteland/docs/wasteland-container-retirement.md`
-  // (Phase 1) for the migration story away from the container.
+  // Implementation lives in `upstream-bootstrap/`.
   createUpstream: procedure
     .input(
       z.object({
@@ -776,9 +774,8 @@ export const wastelandRouter = router({
         await registryStub.setDolthubUpstream(input.wastelandId, next);
       }
 
-      // Phase 2: container env-var sync removed alongside the
-      // container itself. The wasm path reads the upstream off the DO
-      // config on every op, so there's nothing to sync to.
+      // No env-var sync needed: the SDK reads the upstream off the DO
+      // config on every op.
 
       meterEvent(ctx.env, {
         event: 'billing.api_operation',
@@ -827,11 +824,8 @@ export const wastelandRouter = router({
         isUpstreamAdmin: input.isUpstreamAdmin,
       });
 
-      // Container env-var sync removed (Phase 1 of the container
-      // retirement, see services/wasteland/docs/wasteland-container-retirement.md).
-      // The wasm-on-Worker wanted-board path resolves credentials from
-      // `loadContext` directly on every op; there's nothing to push into
-      // a container any more.
+      // No env-var sync needed: the SDK adapter resolves credentials
+      // from `loadContext` directly on every op.
 
       meterEvent(ctx.env, {
         event: 'billing.credential_stored',

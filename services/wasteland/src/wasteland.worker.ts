@@ -483,11 +483,9 @@ app.post('/debug/wastelands/:wastelandId/done', async c => {
   }
 });
 
-// Phase 2 of the container retirement: each lifecycle op now calls
-// the corresponding wanted-board-ops function directly (the same code
-// path the production tRPC + RPC entrypoints take). The previous
-// `debugCallContainer` proxy and its `/wl/*` container endpoints are
-// gone.
+// Each /debug/wastelands/:id/<op> route below calls the corresponding
+// wanted-board op directly (the same code path the production tRPC and
+// RPC entrypoints take), so debug exercises the real adapter.
 
 app.post('/debug/wastelands/:wastelandId/unclaim', async c => {
   const wastelandId = c.req.param('wastelandId');

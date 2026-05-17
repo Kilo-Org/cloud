@@ -71,9 +71,9 @@ export async function upstreamExistsOnDolthub(
   const { owner, db } = parseUpstream(upstream);
 
   // Stage 1: anonymous probe. Transport failures resolve to false rather
-  // than throw — callers (storeCredential, container selfInit) treat
-  // false as "skip the WL_UPSTREAM push" and shouldn't propagate
-  // network errors as an init crash.
+  // than throw — callers (e.g. storeCredential) treat a false return as
+  // "skip the optional follow-up push" and shouldn't have an init path
+  // crash on a transient network blip.
   const anonUrl = `${DOLTHUB_API_BASE}/${encodeURIComponent(owner)}/${encodeURIComponent(db)}?q=${encodeURIComponent('SELECT 1')}`;
   let anonRes: Response | null = null;
   try {

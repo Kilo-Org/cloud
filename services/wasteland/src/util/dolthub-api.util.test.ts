@@ -3,9 +3,8 @@ import { upstreamExistsOnDolthub } from './dolthub-api.util';
 
 /**
  * Tests for the two-stage upstream-existence probe used by
- * `storeCredential` (and by the container's selfInit defensive
- * check) to decide whether `WL_UPSTREAM` is safe to push at the
- * moment.
+ * `storeCredential` to decide whether the upstream is reachable
+ * before attempting follow-up writes.
  */
 describe('upstreamExistsOnDolthub', () => {
   const originalFetch = globalThis.fetch;

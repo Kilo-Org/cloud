@@ -4,10 +4,8 @@
  * Wasteland settings (owner/repo tree).
  *
  * Adapted from `apps/web/src/app/(app)/wasteland/by-id/[wastelandId]/settings/SettingsClient.tsx`,
- * minus the deprecated "Wasteland Connection" (`containerStatus`) section
- * which is being retired alongside the container runtime, and with the
- * DoltHub upstream rendered read-only — the upstream is now part of the
- * URL (`<owner>/<repo>`) rather than a settable field on this page.
+ * with the DoltHub upstream rendered read-only — the upstream is now part of
+ * the URL (`<owner>/<repo>`) rather than a settable field on this page.
  *
  * `wastelandId` is read from `WastelandRepoProvider` (populated by the
  * parent layout's `resolveOwnerRepo` query) instead of from a URL param.

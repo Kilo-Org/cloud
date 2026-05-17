@@ -1,5 +1,5 @@
 /**
- * Tests for the `@kilocode/wl-sdk` adapter (M1.8 routing seam).
+ * Tests for the `@kilocode/wl-sdk` adapter.
  *
  * Strategy: the inner `*ViaSdk` functions take a pre-resolved
  * {@link SdkContext} and an injectable fetch, so each test can drive
@@ -11,10 +11,8 @@
  *  - Each adapter (browse/claim/unclaim/post/done/accept/reject/close)
  *    issues the right DoltHub HTTPS calls in the right order on the
  *    happy path.
- *  - The shape returned to the tRPC caller matches the legacy libwl
- *    path (e.g. claim returns `{ success, pr_url }`).
- *  - The dispatcher's flag-driven routing: SDK when `WL_SDK_ENABLED`
- *    is truthy, libwl otherwise.
+ *  - The shape returned to the tRPC caller matches the historical
+ *    contract (e.g. claim returns `{ success, pr_url }`).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -29,7 +27,6 @@ import {
   unclaimViaSdk,
   type SdkContext,
 } from './wanted-board-ops-sdk-inner';
-import { useWlSdk } from './feature-flag';
 
 // ── Test-only fetch helpers ─────────────────────────────────────────────
 
@@ -333,35 +330,3 @@ describe('closeViaSdk', () => {
     expect(writes).toHaveLength(1);
   });
 });
-
-// ── Dispatcher flag routing ─────────────────────────────────────────────
-
-describe('useWlSdk', () => {
-  it('returns false when env var is missing', () => {
-    const env = {} as Env;
-    expect(useWlSdk(env)).toBe(false);
-  });
-
-  it('returns false for "0"', () => {
-    const env = { WL_SDK_ENABLED: '0' } as unknown as Env;
-    expect(useWlSdk(env)).toBe(false);
-  });
-
-  it('returns true for "1"', () => {
-    const env = { WL_SDK_ENABLED: '1' } as unknown as Env;
-    expect(useWlSdk(env)).toBe(true);
-  });
-
-  it('returns true for "true" / "yes" / "on" (case-insensitive)', () => {
-    for (const v of ['true', 'TRUE', 'Yes', 'on', 'ON']) {
-      const env = { WL_SDK_ENABLED: v } as unknown as Env;
-      expect(useWlSdk(env)).toBe(true);
-    }
-  });
-});
-
-// The dispatcher is a thin one-line-per-op switch on `useWlSdk(env)`.
-// The flag-decision tests above cover the routing logic. We don't
-// import `./dispatcher` here because it transitively pulls
-// `cloudflare:workers` (via the libwl module's DO imports), which the
-// Node vitest pool can't resolve.

@@ -267,32 +267,6 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
-    containerStatus: import('@trpc/server').TRPCQueryProcedure<{
-      input: {
-        wastelandId: string;
-      };
-      output: {
-        joined: boolean;
-        upstream: string | null;
-        dolthubOrg: string | null;
-        hasToken: boolean;
-        hasJwk: boolean;
-        doltCredPubKey: string | null;
-        wlVersion: string;
-        uptime: number;
-        lastOperation: string | null;
-      };
-      meta: object;
-    }>;
-    containerJoin: import('@trpc/server').TRPCMutationProcedure<{
-      input: {
-        wastelandId: string;
-      };
-      output: {
-        success: boolean;
-      };
-      meta: object;
-    }>;
     connectKiloTown: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         wastelandId: string;
@@ -1101,32 +1075,6 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
           meta: object;
         }>;
         deleteCredential: import('@trpc/server').TRPCMutationProcedure<{
-          input: {
-            wastelandId: string;
-          };
-          output: {
-            success: boolean;
-          };
-          meta: object;
-        }>;
-        containerStatus: import('@trpc/server').TRPCQueryProcedure<{
-          input: {
-            wastelandId: string;
-          };
-          output: {
-            joined: boolean;
-            upstream: string | null;
-            dolthubOrg: string | null;
-            hasToken: boolean;
-            hasJwk: boolean;
-            doltCredPubKey: string | null;
-            wlVersion: string;
-            uptime: number;
-            lastOperation: string | null;
-          };
-          meta: object;
-        }>;
-        containerJoin: import('@trpc/server').TRPCMutationProcedure<{
           input: {
             wastelandId: string;
           };

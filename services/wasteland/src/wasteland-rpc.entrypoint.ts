@@ -12,8 +12,8 @@
  */
 
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import * as wantedBoard from './wanted-board/wanted-board-ops';
-import { WantedBoardOpError } from './wanted-board/wanted-board-ops';
+import * as wantedBoard from './wanted-board/wanted-board-ops-sdk';
+import { WantedBoardOpError } from './wanted-board/errors';
 
 export type WastelandRpcResult<T> =
   | { success: true; data: T }

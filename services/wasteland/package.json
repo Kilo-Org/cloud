@@ -19,7 +19,6 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/wasteland/src"
   },
   "dependencies": {
-    "@cloudflare/containers": "^0.1.0",
     "@kilocode/wl-sdk": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@sentry/cloudflare": "^9",

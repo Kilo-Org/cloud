@@ -165,16 +165,14 @@ export function SettingsClient({ wastelandId }: Props) {
 
   // Active sections — filtered to match what's actually rendered so the nav
   // stays in sync with the body. Admin sections only appear for admins; the
-  // danger zone only for owners; container status only when wired up.
+  // danger zone only for owners.
   // Rig management lives on its own page (/wasteland/:id/rigs); settings is
   // just configuration.
-  const showContainer = Boolean(credential && wasteland?.dolthub_upstream);
   const showAdminSections = isUpstreamAdmin;
   const showDangerZone = isOwner;
   const navSections: SettingsNavItem[] = [
     { id: 'general', label: 'General', icon: Settings },
     { id: 'dolthub', label: 'DoltHub Connection', icon: Database },
-    ...(showContainer ? [{ id: 'container', label: 'Connection', icon: Database }] : []),
     { id: 'connected-towns', label: 'Connected Towns', icon: Building2 },
     ...(showAdminSections
       ? [{ id: 'admin-verify', label: 'Admin Access', icon: ShieldCheck }]
@@ -423,16 +421,6 @@ export function SettingsClient({ wastelandId }: Props) {
                 </div>
               </div>
             </SettingsSection>
-
-            {/* ── Wasteland Connection ──────────────────────────── */}
-            {showContainer && (
-              <ContainerStatusSection
-                id="container"
-                index={navSections.findIndex(s => s.id === 'container')}
-                wastelandId={wastelandId}
-                trpc={trpc}
-              />
-            )}
 
             {/* ── Connected Towns ────────────────────────────────── */}
             <ConnectedTownsSection
@@ -1137,114 +1125,6 @@ function ConnectTownDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-// ── Wasteland Connection ─────────────────────────────────────────────────
-// Phase 2 of the container retirement: the UI no longer surfaces
-// container-runtime fields (uptime, wl version, container "joined"
-// status) because there is no container any more. The tRPC procedure
-// is still called `containerStatus` for one release cycle so older
-// clients don't 404; this section reads only the fields that have
-// real meaning in the wasm world (upstream + DoltHub org + token
-// presence).
-
-function ContainerStatusSection({
-  id,
-  index,
-  wastelandId,
-  trpc,
-}: {
-  id?: string;
-  index?: number;
-  wastelandId: string;
-  trpc: ReturnType<typeof useWastelandTRPC>;
-}) {
-  const statusQuery = useQuery({
-    ...trpc.wasteland.containerStatus.queryOptions({ wastelandId }),
-    refetchInterval: 30_000,
-  });
-
-  const status = statusQuery.data;
-  const isLoading = statusQuery.isLoading;
-  const isReady = !!status?.upstream && !!status.hasToken;
-
-  return (
-    <SettingsSection
-      id={id}
-      index={index}
-      title="Wasteland Connection"
-      description="DoltHub upstream and credential status for this wasteland."
-      icon={Database}
-    >
-      <div className="space-y-3">
-        {isLoading ? (
-          <div className="flex items-center gap-2 py-2">
-            <Loader2 className="size-3.5 animate-spin text-white/30" />
-            <span className="text-xs text-white/40">Checking connection…</span>
-          </div>
-        ) : statusQuery.isError ? (
-          <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-            <XCircle className="size-4 text-white/30" />
-            <div className="flex-1">
-              <p className="text-sm text-white/50">Couldn't load connection status</p>
-              <p className="mt-0.5 text-[11px] text-white/30">{statusQuery.error.message}</p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => statusQuery.refetch()}
-            >
-              Retry
-            </Button>
-          </div>
-        ) : status ? (
-          <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-            {isReady ? (
-              <CheckCircle2 className="size-4 text-emerald-400" />
-            ) : (
-              <XCircle className="size-4 text-amber-400" />
-            )}
-            <div className="flex-1">
-              <p className="text-sm text-white/70">{isReady ? 'Connected' : 'Setup incomplete'}</p>
-              <div className="mt-1 space-y-0.5 text-[11px] text-white/40">
-                <p>
-                  Upstream:{' '}
-                  {status.upstream ? (
-                    <span className="font-mono text-white/60">{status.upstream}</span>
-                  ) : (
-                    <span className="text-amber-400/70">not set</span>
-                  )}
-                </p>
-                {status.dolthubOrg && (
-                  <p>
-                    DoltHub user:{' '}
-                    <span className="font-mono text-white/60">{status.dolthubOrg}</span>
-                  </p>
-                )}
-                <p>
-                  Credential:{' '}
-                  <span className={status.hasToken ? 'text-emerald-400/60' : 'text-red-400/60'}>
-                    {status.hasToken ? 'present' : 'missing'}
-                  </span>
-                </p>
-              </div>
-            </div>
-            <Badge
-              variant="outline"
-              className={
-                isReady
-                  ? 'border-emerald-500/20 text-emerald-400'
-                  : 'border-amber-500/20 text-amber-400'
-              }
-            >
-              {isReady ? 'ready' : 'pending'}
-            </Badge>
-          </div>
-        ) : null}
-      </div>
-    </SettingsSection>
   );
 }
 

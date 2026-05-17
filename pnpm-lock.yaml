@@ -2375,9 +2375,6 @@ importers:
 
   services/wasteland:
     dependencies:
-      '@cloudflare/containers':
-        specifier: ^0.1.0
-        version: 0.1.1
       '@hono/trpc-server':
         specifier: ^0.4.2
         version: 0.4.2(@trpc/server@11.13.0(typescript@5.9.3))(hono@4.12.18)
@@ -2433,12 +2430,6 @@ importers:
       wrangler:
         specifier: 'catalog:'
         version: 4.87.0(@cloudflare/workers-types@4.20260430.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-
-  services/wasteland/container/control-server:
-    dependencies:
-      zod:
-        specifier: ^3.23.0
-        version: 3.25.76
 
   services/webhook-agent-ingest:
     dependencies:

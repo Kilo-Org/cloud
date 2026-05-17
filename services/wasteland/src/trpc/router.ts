@@ -16,8 +16,8 @@ import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.
 import { resolveSecret } from '../util/secret.util';
 import { meterEvent } from '../util/billing.util';
 import { fetchFreshDoltHubToken } from '../util/dolthub-token.util';
-import * as wantedBoard from '../wanted-board/dispatcher';
-import { WantedBoardOpError } from '../wanted-board/wanted-board-ops';
+import * as wantedBoard from '../wanted-board/wanted-board-ops-sdk';
+import { WantedBoardOpError } from '../wanted-board/errors';
 import * as branchOps from '../branch-ops/branch-ops';
 import * as lifecycleOps from '../lifecycle-ops/lifecycle-ops';
 import * as doltApi from '../util/dolthub-api.util';
@@ -921,74 +921,6 @@ export const wastelandRouter = router({
       return { success: true };
     }),
 
-  // ── Container Status ────────────────────────────────────────────────
-  // Phase 2 of the container retirement
-  // (services/wasteland/docs/wasteland-container-retirement.md): the
-  // wasm path has no container to be "joined" to, so the response is
-  // synthesized from worker-side state (DO config + stored credential
-  // + a token-freshness probe). Legacy fields (`hasJwk`,
-  // `doltCredPubKey`, `wlVersion`, `uptime`, `lastOperation`,
-  // `joined`) keep their old shape but return constants so existing
-  // UI keeps rendering. Drop them once the SettingsClient stops
-  // reading them.
-  containerStatus: procedure
-    .input(z.object({ wastelandId: z.string().uuid() }))
-    .output(
-      z.object({
-        joined: z.boolean(),
-        upstream: z.string().nullable(),
-        dolthubOrg: z.string().nullable(),
-        hasToken: z.boolean(),
-        hasJwk: z.boolean(),
-        doltCredPubKey: z.string().nullable(),
-        wlVersion: z.string(),
-        uptime: z.number(),
-        lastOperation: z.string().nullable(),
-      })
-    )
-    .query(async ({ ctx, input }) => {
-      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
-
-      const doStub = getWastelandDOStub(ctx.env, input.wastelandId);
-      const config = await doStub.getConfig();
-      const credential = await doStub.getCredential(ctx.userId);
-
-      // hasToken: prefer a fresh-OAuth probe, fall back to "do we have
-      // a locally encrypted credential". Both prove the caller can
-      // talk to DoltHub on behalf of this wasteland.
-      let hasToken = !!credential;
-      if (!hasToken) {
-        const fresh = await fetchFreshDoltHubToken(ctx.env, { userId: ctx.userId });
-        hasToken = fresh.status === 'ok';
-      }
-
-      return {
-        joined: !!config?.dolthub_upstream,
-        upstream: config?.dolthub_upstream ?? null,
-        dolthubOrg: credential?.dolthub_org ?? null,
-        hasToken,
-        // Deprecated — kept for shape compatibility with the old container
-        // payload until the UI stops reading these.
-        hasJwk: false,
-        doltCredPubKey: null,
-        wlVersion: 'wasm',
-        uptime: 0,
-        lastOperation: null,
-      };
-    }),
-
-  // `containerJoin` is now a no-op (Phase 1 of the container
-  // retirement, see services/wasteland/docs/wasteland-container-retirement.md).
-  // Once the SettingsClient stops calling it, drop the procedure entirely.
-  containerJoin: procedure
-    .input(z.object({ wastelandId: z.string().uuid() }))
-    .output(z.object({ success: z.boolean() }))
-    .mutation(async ({ ctx, input }) => {
-      // Still verify access so callers can't probe DO existence.
-      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
-      return { success: true };
-    }),
-
   // ── Connected Towns ────────────────────────────────────────────────
 
   connectKiloTown: procedure
@@ -1075,7 +1007,7 @@ export const wastelandRouter = router({
     .query(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.dispatchBrowse(ctx.env, input.wastelandId, ctx.userId);
+        return await wantedBoard.browseWantedBoard(ctx.env, input.wastelandId, ctx.userId);
       } catch (err) {
         // Browse degrades to empty list if not yet configured
         if (err instanceof WantedBoardOpError && err.code === 'PRECONDITION_FAILED') {
@@ -1252,7 +1184,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.dispatchClaim(
+        return await wantedBoard.claimWantedItem(
           ctx.env,
           input.wastelandId,
           ctx.userId,
@@ -1276,7 +1208,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.dispatchUnclaim(
+        return await wantedBoard.unclaimWantedItem(
           ctx.env,
           input.wastelandId,
           ctx.userId,
@@ -1303,7 +1235,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.dispatchPost(ctx.env, input.wastelandId, ctx.userId, {
+        return await wantedBoard.postWantedItem(ctx.env, input.wastelandId, ctx.userId, {
           title: input.title,
           description: input.description,
           priority: input.priority,
@@ -1328,7 +1260,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.dispatchMarkDone(ctx.env, input.wastelandId, ctx.userId, {
+        return await wantedBoard.markWantedItemDone(ctx.env, input.wastelandId, ctx.userId, {
           itemId: input.itemId,
           evidence: input.evidence,
           direct: input.direct,
@@ -1356,7 +1288,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.dispatchAccept(ctx.env, input.wastelandId, ctx.userId, {
+        return await wantedBoard.acceptWantedItem(ctx.env, input.wastelandId, ctx.userId, {
           itemId: input.itemId,
           quality: input.quality,
           message: input.message,
@@ -1384,7 +1316,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.dispatchReject(ctx.env, input.wastelandId, ctx.userId, {
+        return await wantedBoard.rejectWantedItem(ctx.env, input.wastelandId, ctx.userId, {
           itemId: input.itemId,
           reason: input.reason,
           direct: input.direct,
@@ -1406,7 +1338,7 @@ export const wastelandRouter = router({
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.dispatchClose(
+        return await wantedBoard.closeWantedItem(
           ctx.env,
           input.wastelandId,
           ctx.userId,

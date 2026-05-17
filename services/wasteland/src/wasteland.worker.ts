@@ -17,8 +17,8 @@ import { timingMiddleware } from './middleware/analytics.middleware';
 import { wrappedWastelandRouter } from './trpc/router';
 import { getWastelandRegistryStub } from './dos/WastelandRegistry.do';
 import { getWastelandDOStub } from './dos/Wasteland.do';
-import * as wantedBoard from './wanted-board/wanted-board-ops';
-import { WantedBoardOpError } from './wanted-board/wanted-board-ops';
+import * as wantedBoard from './wanted-board/wanted-board-ops-sdk';
+import { WantedBoardOpError } from './wanted-board/errors';
 
 // ── DO Exports ──────────────────────────────────────────────────────────
 // Wrangler requires these exports to match the class_name bindings in wrangler.jsonc.
@@ -154,26 +154,6 @@ app.get('/debug/wastelands/:wastelandId/wanted', async c => {
   const board = await doStub.getWantedBoard();
   return c.json({ items: board });
 });
-
-// Container introspection routes were removed in Phase 2 of the
-// container retirement. They return a small stable payload for one
-// release cycle so external monitors don't 502; remove these once we
-// confirm nothing is polling them.
-app.get('/debug/wastelands/:wastelandId/container/config', async c => {
-  const wastelandId = c.req.param('wastelandId');
-  const doStub = getWastelandDOStub(c.env, wastelandId);
-  const config = await doStub.getConfig();
-  return c.json({
-    status: 'no container',
-    runtime: 'wasm',
-    upstream: config?.dolthub_upstream ?? null,
-    note: 'Container retired; see services/wasteland/docs/wasteland-container-retirement.md',
-  });
-});
-
-app.get('/debug/wastelands/:wastelandId/container/health', c =>
-  c.json({ status: 'no container', runtime: 'wasm' })
-);
 
 app.get('/debug/registry', async c => {
   const registry = getWastelandRegistryStub(c.env);

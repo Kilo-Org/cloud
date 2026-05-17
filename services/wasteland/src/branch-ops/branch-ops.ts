@@ -151,7 +151,6 @@ export async function discardBranch(
 ): Promise<{ success: true }> {
   const ctx = await loadContext(env, wastelandId, userId);
   const result = await discardBranchViaSdk(ctx, wantedId);
-  await ctx.doStub.refreshWantedBoard();
   meterEvent(env, { event: 'billing.api_operation', userId, wastelandId, label: 'discard' });
   return result;
 }

@@ -142,7 +142,6 @@ export async function claimWantedItem(
 ): Promise<{ success: true; pr_url: string | null }> {
   const ctx = await loadSdkContext(env, wastelandId, userId);
   const result = await claimViaSdk(ctx, itemId);
-  await ctx.doStub.refreshWantedBoard();
   meterEvent(env, { event: 'billing.api_operation', userId, wastelandId, label: 'claim' });
   return result;
 }
@@ -156,7 +155,6 @@ export async function unclaimWantedItem(
 ): Promise<{ success: true }> {
   const ctx = await loadSdkContext(env, wastelandId, userId);
   const result = await unclaimViaSdk(ctx, itemId);
-  await ctx.doStub.refreshWantedBoard();
   meterEvent(env, { event: 'billing.api_operation', userId, wastelandId, label: 'unclaim' });
   return result;
 }
@@ -174,7 +172,6 @@ export async function acceptWantedItem(
 ): Promise<{ success: true }> {
   const ctx = await loadSdkContext(env, wastelandId, userId);
   const result = await acceptViaSdk(ctx, input);
-  await ctx.doStub.refreshWantedBoard();
   meterEvent(env, { event: 'billing.api_operation', userId, wastelandId, label: 'accept' });
   return result;
 }
@@ -187,7 +184,6 @@ export async function rejectWantedItem(
 ): Promise<{ success: true }> {
   const ctx = await loadSdkContext(env, wastelandId, userId);
   const result = await rejectViaSdk(ctx, input);
-  await ctx.doStub.refreshWantedBoard();
   meterEvent(env, { event: 'billing.api_operation', userId, wastelandId, label: 'reject' });
   return result;
 }
@@ -201,7 +197,6 @@ export async function closeWantedItem(
 ): Promise<{ success: true }> {
   const ctx = await loadSdkContext(env, wastelandId, userId);
   const result = await closeViaSdk(ctx, itemId);
-  await ctx.doStub.refreshWantedBoard();
   meterEvent(env, { event: 'billing.api_operation', userId, wastelandId, label: 'close' });
   return result;
 }
@@ -220,7 +215,6 @@ export async function postWantedItem(
 ): Promise<{ success: true }> {
   const ctx = await loadSdkContext(env, wastelandId, userId);
   await postViaSdk(ctx, input);
-  await ctx.doStub.refreshWantedBoard();
   meterEvent(env, { event: 'billing.api_operation', userId, wastelandId, label: 'post' });
   return { success: true };
 }
@@ -233,7 +227,6 @@ export async function markWantedItemDone(
 ): Promise<{ success: true }> {
   const ctx = await loadSdkContext(env, wastelandId, userId);
   const result = await doneViaSdk(ctx, input);
-  await ctx.doStub.refreshWantedBoard();
   meterEvent(env, { event: 'billing.api_operation', userId, wastelandId, label: 'done' });
   return result;
 }

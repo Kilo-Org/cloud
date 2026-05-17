@@ -24,7 +24,6 @@ import { WantedBoardOpError } from './wanted-board/errors';
 // Wrangler requires these exports to match the class_name bindings in wrangler.jsonc.
 
 export { WastelandDO } from './dos/Wasteland.do';
-export { WastelandContainerDO } from './dos/WastelandContainer.do';
 export { WastelandRegistryDO } from './dos/WastelandRegistry.do';
 export { WastelandRPCEntrypoint } from './wasteland-rpc.entrypoint';
 
@@ -144,16 +143,13 @@ app.get('/debug/wastelands/:wastelandId/status', async c => {
   const config = await doStub.getConfig();
   const members = await doStub.listMembers();
   const connectedTowns = await doStub.listConnectedTowns();
-  const wantedBoard = await doStub.getWantedBoard();
-  return c.json({ config, members, connectedTowns, wantedBoardCount: wantedBoard.length });
+  return c.json({ config, members, connectedTowns });
 });
 
-app.get('/debug/wastelands/:wastelandId/wanted', async c => {
-  const wastelandId = c.req.param('wastelandId');
-  const doStub = getWastelandDOStub(c.env, wastelandId);
-  const board = await doStub.getWantedBoard();
-  return c.json({ items: board });
-});
+// `/debug/wastelands/:wastelandId/wanted` was a thin wrapper around the
+// retired `wasteland_wanted_board` cache table. It always returned `[]`
+// after the container retirement (the cache was never populated). Use
+// `/debug/wastelands/:wastelandId/browse?userId=...` for live data.
 
 app.get('/debug/registry', async c => {
   const registry = getWastelandRegistryStub(c.env);

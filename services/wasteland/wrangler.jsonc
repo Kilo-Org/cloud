@@ -33,7 +33,6 @@
   "durable_objects": {
     "bindings": [
       { "name": "WASTELAND", "class_name": "WastelandDO" },
-      { "name": "WASTELAND_CONTAINER", "class_name": "WastelandContainerDO" },
       { "name": "WASTELAND_REGISTRY", "class_name": "WastelandRegistryDO" },
     ],
   },
@@ -46,6 +45,14 @@
     {
       "tag": "v2",
       "new_sqlite_classes": ["WastelandRegistryDO"],
+    },
+    // v3: drop the retired WastelandContainerDO. The Cloudflare
+    // Container that backed this class is gone (Phase 2 of the
+    // container retirement). The DO carried no load-bearing state, so
+    // deleting any surviving instances is intentional.
+    {
+      "tag": "v3",
+      "deleted_classes": ["WastelandContainerDO"],
     },
   ],
 
@@ -110,7 +117,6 @@
       "durable_objects": {
         "bindings": [
           { "name": "WASTELAND", "class_name": "WastelandDO" },
-          { "name": "WASTELAND_CONTAINER", "class_name": "WastelandContainerDO" },
           { "name": "WASTELAND_REGISTRY", "class_name": "WastelandRegistryDO" },
         ],
       },

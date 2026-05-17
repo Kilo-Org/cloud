@@ -3,7 +3,6 @@ import * as configOps from './wasteland/config';
 import * as memberOps from './wasteland/members';
 import * as credentialOps from './wasteland/credentials';
 import * as townOps from './wasteland/towns';
-import * as wantedBoardOps from './wasteland/wanted-board';
 import { wasteland_config, WastelandConfigRecord } from '../db/tables/wasteland-config.table';
 import { query } from '../util/query.util';
 
@@ -61,19 +60,6 @@ export type ConnectedTownResult = {
   connected_at: string;
 };
 
-export type WantedItemResult = {
-  item_id: string;
-  title: string;
-  description: string;
-  status: 'open' | 'claimed' | 'done';
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  type: 'feature' | 'bug' | 'docs' | 'other';
-  claimed_by: string | null;
-  evidence: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
 export class WastelandDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private wastelandId: string | null = null;
@@ -95,7 +81,6 @@ export class WastelandDO extends DurableObject<Env> {
     memberOps.initializeDatabase(this.sql);
     credentialOps.initializeDatabase(this.sql);
     townOps.initializeDatabase(this.sql);
-    wantedBoardOps.initializeDatabase(this.sql);
   }
 
   async initializeWasteland(input: InitializeWastelandInput): Promise<WastelandConfigResult> {
@@ -205,18 +190,6 @@ export class WastelandDO extends DurableObject<Env> {
     const id = this.wastelandId ?? (await this.getConfig())?.wasteland_id;
     if (!id) return [];
     return townOps.listConnectedTowns(this.sql, id);
-  }
-
-  async getWantedBoard(): Promise<WantedItemResult[]> {
-    const id = this.wastelandId ?? (await this.getConfig())?.wasteland_id;
-    if (!id) return [];
-    return wantedBoardOps.getWantedBoard(this.sql, id);
-  }
-
-  async refreshWantedBoard(): Promise<WantedItemResult[]> {
-    const id = this.wastelandId ?? (await this.getConfig())?.wasteland_id;
-    if (!id) return [];
-    return wantedBoardOps.refreshWantedBoard(this.sql, id);
   }
 }
 

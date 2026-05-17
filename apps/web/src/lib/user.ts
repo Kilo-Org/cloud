@@ -812,8 +812,6 @@ export async function softDeleteUser(userId: string) {
   const originalEmail = user.google_user_email;
   const originalAppStoreAccountToken = user.app_store_account_token;
 
-  void reportEvents({ events: [{ type: 'user.deleted', data: { kilo_user_id: userId } }] });
-
   await db.transaction(async tx => {
     // ── Precondition checks (inside tx to avoid TOCTOU races) ──────────
     const activeSubscriptions = await tx
@@ -1234,6 +1232,8 @@ export async function softDeleteUser(userId: string) {
       .set({ kilo_user_id: 'deleted', public_ip: null })
       .where(eq(security_advisor_scans.kilo_user_id, userId));
   });
+
+  void reportEvents({ events: [{ type: 'user.deleted', data: { kilo_user_id: userId } }] });
 }
 
 // We always stytch approve users who accept organization invites

@@ -243,7 +243,7 @@ export async function cancelAndRefundKiloPassForUser({
           data: {
             kilo_user_id: userId,
             reason,
-            actor_email: adminKiloUserId,
+            actor_email: null,
           },
         },
       ],

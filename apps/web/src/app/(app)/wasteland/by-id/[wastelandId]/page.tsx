@@ -1,6 +1,7 @@
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
 import { notFound, redirect } from 'next/navigation';
 import { isWastelandEnabled } from '@/lib/wasteland/feature-flags';
+import { resolveWastelandUpstreamForUser } from '@/lib/wasteland/server-resolve';
 
 export default async function WastelandDashboardPage({
   params,
@@ -16,11 +17,13 @@ export default async function WastelandDashboardPage({
     return notFound();
   }
 
-  // Redirect to the legacy-shaped URL on purpose. The next.config.mjs
-  // `beforeFiles` rewrite catches /wasteland/<uuid>/<rest> and rewrites it
-  // to /wasteland/by-id/<uuid>/<rest>, so this path resolves correctly
-  // without exposing the `by-id` segment in the browser bar. Keeping the
-  // user-visible URL stable preserves links/bookmarks until the M2.8
-  // owner/repo cutover.
+  // M2.8: prefer the M2.2 owner/repo URL when the wasteland has an upstream
+  // set. If we can't resolve it (no upstream, lookup failure), fall back to
+  // the legacy `/wanted` view — the next.config.mjs rewrite keeps that path
+  // working.
+  const upstream = await resolveWastelandUpstreamForUser(user, wastelandId);
+  if (upstream) {
+    redirect(`/wasteland/${upstream.owner}/${upstream.repo}`);
+  }
   redirect(`/wasteland/${wastelandId}/wanted`);
 }

@@ -13,6 +13,20 @@ import {
   WastelandCard,
   WastelandListSkeleton,
 } from '@/app/(app)/wasteland/_components/WastelandListComponents';
+import { parseDolthubUpstream } from '@/lib/wasteland/upstream';
+
+// Prefer the M2.2 owner/repo URL when the wasteland has an upstream. Org
+// scope is enforced at the worker layer; the URL doesn't have to encode it.
+// Fall back to the legacy org-scoped URL when there's no upstream — the
+// legacy page renders the configure-upstream UI in that case.
+function linkForOrgWasteland(
+  wasteland: { wasteland_id: string; dolthub_upstream: string | null },
+  organizationId: string
+) {
+  const upstream = parseDolthubUpstream(wasteland.dolthub_upstream);
+  if (upstream) return `/wasteland/${upstream.owner}/${upstream.repo}`;
+  return `/organizations/${organizationId}/wasteland/${wasteland.wasteland_id}`;
+}
 
 type OrgWastelandListPageClientProps = {
   organizationId: string;
@@ -112,9 +126,7 @@ export function OrgWastelandListPageClient({ organizationId }: OrgWastelandListP
             <WastelandCard
               key={wasteland.wasteland_id}
               wasteland={wasteland}
-              onClick={() =>
-                router.push(`/organizations/${organizationId}/wasteland/${wasteland.wasteland_id}`)
-              }
+              onClick={() => router.push(linkForOrgWasteland(wasteland, organizationId))}
             />
           ))}
         </div>

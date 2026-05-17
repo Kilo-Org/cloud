@@ -1,6 +1,7 @@
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { isWastelandEnabled } from '@/lib/wasteland/feature-flags';
+import { resolveWastelandUpstreamForUser } from '@/lib/wasteland/server-resolve';
 import { RigsClient } from './RigsClient';
 
 export default async function RigsPage({ params }: { params: Promise<{ wastelandId: string }> }) {
@@ -11,6 +12,13 @@ export default async function RigsPage({ params }: { params: Promise<{ wasteland
 
   if (!(await isWastelandEnabled(user.id, { isAdmin: user.is_admin }))) {
     return notFound();
+  }
+
+  // M2.8: the new owner/repo tree has no Rigs tab. Punt to /settings on the
+  // new URL — follow-up work may surface a dedicated rigs section.
+  const upstream = await resolveWastelandUpstreamForUser(user, wastelandId);
+  if (upstream) {
+    redirect(`/wasteland/${upstream.owner}/${upstream.repo}/settings`);
   }
 
   return <RigsClient wastelandId={wastelandId} />;

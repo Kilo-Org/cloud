@@ -1,6 +1,7 @@
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { isWastelandEnabled } from '@/lib/wasteland/feature-flags';
+import { resolveWastelandUpstreamForUser } from '@/lib/wasteland/server-resolve';
 import { ClaimsClient } from './ClaimsClient';
 
 export default async function ClaimsPage({ params }: { params: Promise<{ wastelandId: string }> }) {
@@ -11,6 +12,12 @@ export default async function ClaimsPage({ params }: { params: Promise<{ wastela
 
   if (!(await isWastelandEnabled(user.id, { isAdmin: user.is_admin }))) {
     return notFound();
+  }
+
+  // M2.8: claims (your branches) live at /fork in the new owner/repo tree.
+  const upstream = await resolveWastelandUpstreamForUser(user, wastelandId);
+  if (upstream) {
+    redirect(`/wasteland/${upstream.owner}/${upstream.repo}/fork`);
   }
 
   return <ClaimsClient wastelandId={wastelandId} />;

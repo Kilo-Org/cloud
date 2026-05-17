@@ -10,6 +10,16 @@ import { SetPageTitle } from '@/components/SetPageTitle';
 import { GastownBackdrop } from '@/components/gastown/GastownBackdrop';
 import { Plus, Skull } from 'lucide-react';
 import { WastelandCard, WastelandListSkeleton } from './_components/WastelandListComponents';
+import { parseDolthubUpstream } from '@/lib/wasteland/upstream';
+
+// Prefer the M2.2 owner/repo URL when the wasteland has an upstream; fall back
+// to the legacy UUID URL (which the legacy page now redirects from when
+// possible — see /wasteland/by-id/[wastelandId]/page.tsx).
+function linkForWasteland(wasteland: { wasteland_id: string; dolthub_upstream: string | null }) {
+  const upstream = parseDolthubUpstream(wasteland.dolthub_upstream);
+  if (upstream) return `/wasteland/${upstream.owner}/${upstream.repo}`;
+  return `/wasteland/${wasteland.wasteland_id}`;
+}
 
 export function WastelandListPageClient() {
   const router = useRouter();
@@ -97,7 +107,7 @@ export function WastelandListPageClient() {
             <WastelandCard
               key={wasteland.wasteland_id}
               wasteland={wasteland}
-              onClick={() => router.push(`/wasteland/${wasteland.wasteland_id}`)}
+              onClick={() => router.push(linkForWasteland(wasteland))}
             />
           ))}
         </div>

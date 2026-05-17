@@ -12,6 +12,7 @@ import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attri
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 
 type UpstreamFetchFailureFamily =
+  | 'request_timeout'
   | 'headers_timeout'
   | 'connect_timeout'
   | 'read_timeout'
@@ -40,15 +41,19 @@ function getErrorName(error: unknown): string {
   return 'UnknownError';
 }
 
+function redactUrlsFromErrorMessage(message: string): string {
+  return message.replace(/https?:\/\/[^\s)]+/g, '[redacted-url]');
+}
+
 function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) return redactUrlsFromErrorMessage(error.message);
   if (
     typeof error === 'object' &&
     error !== null &&
     'message' in error &&
     typeof error.message === 'string'
   ) {
-    return error.message;
+    return redactUrlsFromErrorMessage(error.message);
   }
   return 'Unknown upstream fetch error';
 }
@@ -79,16 +84,22 @@ function getCauseName(cause: unknown): string | undefined {
 }
 
 function getCauseMessage(cause: unknown): string | undefined {
-  if (cause instanceof Error) return cause.message;
+  if (cause instanceof Error) return redactUrlsFromErrorMessage(cause.message);
   if (
     typeof cause === 'object' &&
     cause !== null &&
     'message' in cause &&
     typeof cause.message === 'string'
   ) {
-    return cause.message;
+    return redactUrlsFromErrorMessage(cause.message);
   }
   return undefined;
+}
+
+function createLoggedFetchFailure(errorName: string, errorMessage: string): Error {
+  const loggedError = new Error(errorMessage);
+  loggedError.name = errorName;
+  return loggedError;
 }
 
 function classifyUpstreamFetchFailure({
@@ -100,6 +111,10 @@ function classifyUpstreamFetchFailure({
   causeCode: string | undefined;
   causeName: string | undefined;
 }): UpstreamFetchFailureFamily {
+  if (errorName === 'TimeoutError' || causeName === 'TimeoutError') {
+    return 'request_timeout';
+  }
+
   if (errorName === 'AbortError' || causeName === 'AbortError' || causeCode === 'ABORT_ERR') {
     return 'abort';
   }
@@ -181,16 +196,18 @@ export async function upstreamRequest({
       ...(causeMessage && { causeMessage }),
     };
 
-    errorExceptInTest('AI gateway upstream fetch failed', failureMetadata);
-    captureException(error, {
-      level: 'error',
-      tags: {
-        source: 'ai-gateway-upstream-fetch',
-        provider: provider.id,
-        failure_family: failureFamily,
-      },
-      extra: failureMetadata,
-    });
+    if (!(failureFamily === 'abort' && signal?.aborted)) {
+      errorExceptInTest('AI gateway upstream fetch failed', failureMetadata);
+      captureException(createLoggedFetchFailure(errorName, errorMessage), {
+        level: 'error',
+        tags: {
+          source: 'ai-gateway-upstream-fetch',
+          provider: provider.id,
+          failure_family: failureFamily,
+        },
+        extra: failureMetadata,
+      });
+    }
 
     throw error;
   }

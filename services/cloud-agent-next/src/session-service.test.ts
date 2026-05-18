@@ -1719,6 +1719,10 @@ describe('SessionService', () => {
       expect(configContent.permission?.bash?.pwd).toBe('allow');
       expect(configContent.permission?.bash?.git).toBe('allow');
       expect(configContent.permission?.bash?.gh).toBe('allow');
+      for (const command of ['wc', 'sort', 'uniq', 'cut', 'tr', 'nl', 'jq', 'stat', 'file']) {
+        expect(configContent.permission?.bash?.[command]).toBe('allow');
+        expect(configContent.permission?.bash?.[`${command} *`]).toBe('allow');
+      }
       expect(configContent.permission?.bash?.sed).toBe('allow');
       expect(configContent.permission?.bash?.['ls *']).toBe('allow');
       expect(configContent.permission?.bash?.['git *']).toBe('allow');
@@ -1738,6 +1742,28 @@ describe('SessionService', () => {
       expect(configContent.permission?.bash?.['sed * -*i *']).toBe('deny');
       expect(configContent.permission?.bash?.['sed * --in-place*']).toBe('deny');
       expect(configContent.permission?.bash?.['sed * --in-place* *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort -o']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort -o *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort -o*']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort -o* *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort -*o']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort -*o *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort --output']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort --output *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort --output*']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort --output* *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * -o']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * -o *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * -o*']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * -o* *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * -*o']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * -*o *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * --output']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * --output *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * --output*']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * --output* *']).toBe('deny');
+      expect(configContent.permission?.bash?.['uniq * *']).toBe('deny');
+      expect(configContent.permission?.bash?.['uniq * * *']).toBe('deny');
       expect(configContent.permission?.bash?.['git commit *']).toBe('deny');
       expect(configContent.permission?.bash?.['git commit']).toBe('deny');
       expect(configContent.permission?.bash?.['gh pr merge *']).toBe('deny');

@@ -106,7 +106,6 @@ export type WrapperKiloClient = {
   >;
   getNetworkWaits: () => Promise<NetworkWait[]>;
   resumeNetworkWait: (requestID: string) => Promise<boolean>;
-  rejectNetworkWait: (requestID: string) => Promise<boolean>;
   generateCommitMessage: (opts: { path: string }) => Promise<{ message: string }>;
 
   /** The underlying SDK client — used directly by connection.ts for event subscription */
@@ -249,17 +248,12 @@ export function createWrapperKiloClient(
 
     getNetworkWaits: async () => {
       const result = await v2Client.network.list();
-      return requireSdkData(result, 'Network list') as NetworkWait[];
+      return (result.data ?? []) as NetworkWait[];
     },
 
     resumeNetworkWait: async requestID => {
       const result = await v2Client.network.reply({ requestID });
       return requireSdkData(result, `Network reply ${requestID}`);
-    },
-
-    rejectNetworkWait: async requestID => {
-      const result = await v2Client.network.reject({ requestID });
-      return requireSdkData(result, `Network reject ${requestID}`);
     },
 
     generateCommitMessage: async opts => {

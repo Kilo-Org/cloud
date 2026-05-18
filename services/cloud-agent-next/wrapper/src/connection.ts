@@ -13,7 +13,7 @@ import type { WrapperState } from './state.js';
 import type { IngestEvent, WrapperCommand } from '../../src/shared/protocol.js';
 import { trimPayload } from '../../src/shared/trim-payload.js';
 import { logToFile } from './utils.js';
-import type { NetworkWait, WrapperKiloClient } from './kilo-api.js';
+import type { WrapperKiloClient } from './kilo-api.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -215,24 +215,18 @@ export function createConnectionManager(
   }
 
   async function resumeRestoredNetworkWaits(): Promise<void> {
-    try {
-      const kiloSessionId = state.currentJob?.kiloSessionId;
-      if (!kiloSessionId) {
-        logToFile('skipping restored network resume: no kiloSessionId');
-        return;
-      }
-
-      const networkWaits = await config.kiloClient.getNetworkWaits();
-      await Promise.all(
-        networkWaits
-          .filter(wait => wait.sessionID === kiloSessionId && wait.restored)
-          .map(wait => resumeNetworkWait(wait.id))
-      );
-    } catch (err) {
-      logToFile(
-        `failed to resume restored network waits: ${err instanceof Error ? err.message : String(err)}`
-      );
+    const kiloSessionId = state.currentJob?.kiloSessionId;
+    if (!kiloSessionId) {
+      logToFile('skipping restored network resume: no kiloSessionId');
+      return;
     }
+
+    const networkWaits = await config.kiloClient.getNetworkWaits();
+    await Promise.all(
+      networkWaits
+        .filter(wait => wait.sessionID === kiloSessionId && wait.restored)
+        .map(wait => resumeNetworkWait(wait.id))
+    );
   }
 
   /**
@@ -248,20 +242,11 @@ export function createConnectionManager(
         return;
       }
 
-      const networkWaitsPromise: Promise<NetworkWait[]> = config.kiloClient
-        .getNetworkWaits()
-        .catch((err: unknown) => {
-          logToFile(
-            `failed to fetch network waits for kilo snapshot: ${err instanceof Error ? err.message : String(err)}`
-          );
-          return [];
-        });
-
       const [statuses, questions, permissions, networkWaits] = await Promise.all([
         config.kiloClient.getSessionStatuses(),
         config.kiloClient.getQuestions(),
         config.kiloClient.getPermissions(),
-        networkWaitsPromise,
+        config.kiloClient.getNetworkWaits(),
       ]);
 
       const statusEntry = statuses[kiloSessionId];
@@ -489,6 +474,7 @@ export function createConnectionManager(
       return;
     }
 
+    // Keep forwarding the restored event to ingest; this only unblocks the local Kilo wait.
     void resumeNetworkWait(requestID);
   }
 

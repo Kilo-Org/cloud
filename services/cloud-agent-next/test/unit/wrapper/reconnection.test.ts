@@ -165,7 +165,6 @@ const createMockKiloClient = (overrides?: Partial<WrapperKiloClient>): WrapperKi
   getPermissions: vi.fn().mockResolvedValue([]),
   getNetworkWaits: vi.fn().mockResolvedValue([]),
   resumeNetworkWait: vi.fn().mockResolvedValue(true),
-  rejectNetworkWait: vi.fn().mockResolvedValue(true),
   sdkClient: {
     event: {
       // Return a stream that connects, then never yields again.

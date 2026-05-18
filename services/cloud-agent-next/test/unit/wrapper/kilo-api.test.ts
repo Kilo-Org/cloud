@@ -18,7 +18,7 @@ describe('createWrapperKiloClient network endpoints', () => {
     vi.unstubAllGlobals();
   });
 
-  it('throws when the SDK network list response contains an error', async () => {
+  it('returns an empty list when the SDK network list response contains an error', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -31,9 +31,7 @@ describe('createWrapperKiloClient network endpoints', () => {
 
     const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0');
 
-    await expect(client.getNetworkWaits()).rejects.toThrow(
-      'Network list failed: server rejected list'
-    );
+    await expect(client.getNetworkWaits()).resolves.toEqual([]);
   });
 
   it('throws when the SDK network reply response contains an error', async () => {

@@ -142,7 +142,6 @@ function createMockKiloClient(overrides?: Partial<WrapperKiloClient>): WrapperKi
     getPermissions: vi.fn().mockResolvedValue([]),
     getNetworkWaits: vi.fn().mockResolvedValue([]),
     resumeNetworkWait: vi.fn().mockResolvedValue(true),
-    rejectNetworkWait: vi.fn().mockResolvedValue(true),
     sdkClient: {
       event: {
         subscribe: vi.fn().mockResolvedValue({
@@ -473,7 +472,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     });
   });
 
-  it('replays non-network snapshot state when network wait lookup fails', async () => {
+  it('replays non-network snapshot state when no network waits are pending', async () => {
     const pendingQuestion = {
       id: 'q_123',
       sessionID: 'kilo_sess_456',
@@ -498,7 +497,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       }),
       getQuestions: vi.fn().mockResolvedValue([pendingQuestion]),
       getPermissions: vi.fn().mockResolvedValue([pendingPermission]),
-      getNetworkWaits: vi.fn().mockRejectedValue(new Error('network unavailable')),
+      getNetworkWaits: vi.fn().mockResolvedValue([]),
     });
 
     state.startJob(createJobContext());

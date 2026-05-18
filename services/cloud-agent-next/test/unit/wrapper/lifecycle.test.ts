@@ -43,7 +43,6 @@ const createMockKiloClient = (): WrapperKiloClient => ({
   getPermissions: vi.fn().mockResolvedValue([]),
   getNetworkWaits: vi.fn().mockResolvedValue([]),
   resumeNetworkWait: vi.fn().mockResolvedValue(true),
-  rejectNetworkWait: vi.fn().mockResolvedValue(true),
   generateCommitMessage: vi.fn().mockResolvedValue({ message: 'test commit' }),
   sdkClient: {} as WrapperKiloClient['sdkClient'],
   serverUrl: 'http://127.0.0.1:0',

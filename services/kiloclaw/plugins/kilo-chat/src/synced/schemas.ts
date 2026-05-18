@@ -135,6 +135,9 @@ export const messageSchema = z.object({
 
 export const memberKindSchema = z.enum(['user', 'bot']);
 
+export const capabilitySchema = z.enum(['attachments']);
+export type Capability = z.infer<typeof capabilitySchema>;
+
 export const conversationMemberSchema = z.object({
   id: z.string(),
   kind: memberKindSchema,

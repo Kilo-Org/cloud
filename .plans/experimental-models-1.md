@@ -12,7 +12,7 @@
 
 | Phase                                | Status        | Notes                                                                                       |
 | ------------------------------------ | ------------- | ------------------------------------------------------------------------------------------- |
-| Phase 1 — Schema + Migration         | [merged-pending] | Branch `mark/experimental-models-schema`. Migration `0134_black_union_jack.sql`. PR pending. |
+| Phase 1 — Schema + Migration         | [merged-pending] | Branch `mark/experimental-models-schema`. Migration `0134_black_union_jack.sql`. PR #3299. |
 | Phase 2 — Gateway Header Capture     | [todo]        |                                                                                             |
 | Phase 3 — Variant Picker + Routing   | [todo]        |                                                                                             |
 | Phase 4 — Usage, Metrics, Reporting  | [todo]        |                                                                                             |

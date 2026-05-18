@@ -31,6 +31,12 @@ import { withSandboxInternalServerErrorRecovery } from '../sandbox-recovery.js';
 /** Maximum time allowed for workspace preparation (resume, init, fast path). */
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 
+const CODE_REVIEW_DISABLED_TOOLS = {
+  question: false,
+  plan_enter: false,
+  plan_exit: false,
+} satisfies Record<string, boolean>;
+
 function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string): Promise<T> {
   return withTimeout(
     operation,
@@ -229,6 +235,7 @@ export class ExecutionOrchestrator {
       autoCommit: wrapper.autoCommit,
       condenseOnComplete: wrapper.condenseOnComplete,
       execution,
+      tools: this.getToolOverrides(plan),
     };
 
     if (fileParts.length > 0) {
@@ -341,7 +348,7 @@ export class ExecutionOrchestrator {
             originalToken: initContext.kilocodeToken,
             kilocodeModel: initContext.kilocodeModel ?? 'default',
             originalOrgId: orgId,
-            createdOnPlatform: initContext.createdOnPlatform,
+            createdOnPlatform: this.getCreatedOnPlatform(plan),
             appendSystemPrompt: existingMetadata.appendSystemPrompt,
             profile: mergeFastPathProfile(initContext.profile, existingMetadata.profile),
           }),
@@ -485,6 +492,12 @@ export class ExecutionOrchestrator {
       plan.workspace.resumeContext.createdOnPlatform ??
       plan.workspace.existingMetadata?.createdOnPlatform
     );
+  }
+
+  private getToolOverrides(plan: ExecutionPlan): Record<string, boolean> | undefined {
+    return this.getCreatedOnPlatform(plan) === 'code-review'
+      ? CODE_REVIEW_DISABLED_TOOLS
+      : undefined;
   }
 
   /**

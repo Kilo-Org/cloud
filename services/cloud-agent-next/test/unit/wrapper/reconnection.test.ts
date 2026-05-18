@@ -127,12 +127,14 @@ const createCallbacks = (): ConnectionCallbacks & {
   onReconnected: ReturnType<typeof vi.fn>;
   onDisconnect: ReturnType<typeof vi.fn>;
   onTerminalError: ReturnType<typeof vi.fn>;
+  onSseEvent: ReturnType<typeof vi.fn>;
 } => ({
   onMessageComplete: vi.fn(),
   onTerminalError: vi.fn(),
   onCommand: vi.fn(),
   onDisconnect: vi.fn(),
   onCompletionSignal: vi.fn(),
+  onSseEvent: vi.fn(),
   onReconnecting: vi.fn(),
   onReconnected: vi.fn(),
 });
@@ -782,6 +784,7 @@ describe('ingest WS reconnection', () => {
 
     const manager = createManagerWithClient(kiloClient);
     const ws = await openConnection(manager);
+    callbacks.onSseEvent.mockClear();
     await vi.advanceTimersByTimeAsync(0);
 
     const questionEvents = parseSentMessages(ws).filter(
@@ -791,6 +794,7 @@ describe('ingest WS reconnection', () => {
     expect(rejectQuestion).toHaveBeenCalledWith('q_123');
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
     expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
+    expect(callbacks.onSseEvent).toHaveBeenCalledTimes(1);
   });
 
   it('rejects real-time code-review permissions without disconnecting', async () => {
@@ -815,6 +819,7 @@ describe('ingest WS reconnection', () => {
 
     const manager = createManagerWithClient(kiloClient);
     const ws = await openConnection(manager);
+    callbacks.onSseEvent.mockClear();
     await vi.advanceTimersByTimeAsync(0);
 
     const permissionEvents = parseSentMessages(ws).filter(
@@ -824,6 +829,7 @@ describe('ingest WS reconnection', () => {
     expect(answerPermission).toHaveBeenCalledWith('p_456', 'reject');
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
     expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
+    expect(callbacks.onSseEvent).toHaveBeenCalledTimes(1);
   });
 
   it.each(['question', 'permission'])(
@@ -848,6 +854,7 @@ describe('ingest WS reconnection', () => {
 
       const manager = createManagerWithClient(kiloClient);
       const ws = await openConnection(manager);
+      callbacks.onSseEvent.mockClear();
       await vi.advanceTimersByTimeAsync(0);
 
       const statusEvents = parseSentMessages(ws).filter(event => {
@@ -864,8 +871,35 @@ describe('ingest WS reconnection', () => {
       expect(statusEvents).toHaveLength(0);
       expect(callbacks.onDisconnect).not.toHaveBeenCalled();
       expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
+      expect(callbacks.onSseEvent).toHaveBeenCalledTimes(1);
     }
   );
+
+  it('forwards real-time interactive questions for non-code-review jobs', async () => {
+    const kiloClient = createMockKiloClient({
+      sdkClient: {
+        event: {
+          subscribe: vi.fn().mockResolvedValue({
+            stream: createEventStream([
+              { type: 'question.asked', properties: { id: 'q_123', sessionID: 'kilo_sess_456' } },
+            ]),
+          }),
+        },
+      } as unknown as WrapperKiloClient['sdkClient'],
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    const ws = await openConnection(manager);
+    callbacks.onSseEvent.mockClear();
+    await vi.advanceTimersByTimeAsync(0);
+
+    const questionEvents = parseSentMessages(ws).filter(
+      event => event.streamEventType === 'kilocode' && event.data.event === 'question.asked'
+    );
+    expect(questionEvents).toHaveLength(1);
+    expect(kiloClient.rejectQuestion).not.toHaveBeenCalled();
+    expect(callbacks.onSseEvent).toHaveBeenCalledTimes(1);
+  });
 
   it('forwards payment-style events and reports terminal errors', async () => {
     const kiloClient = createMockKiloClient({

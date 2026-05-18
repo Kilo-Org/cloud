@@ -113,29 +113,127 @@ function isTerminalStatus(status: CodeReviewStatus): boolean {
   return status === 'completed' || status === 'failed' || status === 'cancelled';
 }
 
-function isCloudAgentNextSandboxInternalServerError(error: unknown): boolean {
+type CloudAgentNextFreshRetryFailureCategory =
+  | 'billing'
+  | 'not_cloud_agent_next_error'
+  | 'non_5xx'
+  | 'cancelled'
+  | 'sandbox_api_or_storage_failure'
+  | 'wrapper_wait_for_port_timeout'
+  | 'wrapper_kilo_server_start_timeout'
+  | 'configured_session_lookup_failure'
+  | 'repo_clone_or_checkout_failure'
+  | 'other_5xx';
+
+type CloudAgentNextFreshRetryClassification = {
+  retryable: boolean;
+  failureCategory: CloudAgentNextFreshRetryFailureCategory;
+  retryClassificationReason: string;
+  retryableWrapperReadinessFailure: boolean;
+  cloudAgentNextProcedure?: string;
+  cloudAgentNextStatus?: number;
+};
+
+function cloudAgentNextFreshRetryClassification(
+  error: CloudAgentNextError | undefined,
+  retryable: boolean,
+  failureCategory: CloudAgentNextFreshRetryFailureCategory,
+  retryClassificationReason: string
+): CloudAgentNextFreshRetryClassification {
+  return {
+    retryable,
+    failureCategory,
+    retryClassificationReason,
+    retryableWrapperReadinessFailure:
+      failureCategory === 'wrapper_wait_for_port_timeout' ||
+      failureCategory === 'wrapper_kilo_server_start_timeout',
+    cloudAgentNextProcedure: error?.procedure,
+    cloudAgentNextStatus: error?.status,
+  };
+}
+
+function classifyCloudAgentNextFreshSessionRetry(
+  error: unknown
+): CloudAgentNextFreshRetryClassification {
   if (error instanceof CloudAgentNextBillingError) {
-    return false;
+    return cloudAgentNextFreshRetryClassification(error, false, 'billing', 'billing_protected');
   }
 
   if (!(error instanceof CloudAgentNextError)) {
-    return false;
+    return cloudAgentNextFreshRetryClassification(
+      undefined,
+      false,
+      'not_cloud_agent_next_error',
+      'not_cloud_agent_next_error'
+    );
   }
 
   if (error.status < 500 || error.status >= 600) {
-    return false;
+    return cloudAgentNextFreshRetryClassification(error, false, 'non_5xx', 'non_5xx');
   }
 
   if (/\b(cancelled|canceled)\b/i.test(error.body)) {
-    return false;
+    return cloudAgentNextFreshRetryClassification(error, false, 'cancelled', 'cancelled_protected');
+  }
+
+  const body = error.body.toLowerCase();
+  if (
+    body.includes('configured session') &&
+    body.includes('not found: session get returned no data')
+  ) {
+    return cloudAgentNextFreshRetryClassification(
+      error,
+      false,
+      'configured_session_lookup_failure',
+      'configured_session_lookup_not_retryable'
+    );
+  }
+
+  if (
+    body.includes('git clone timed out') ||
+    body.includes('failed to checkout pull ref') ||
+    body.includes('git-lfs filter-process') ||
+    body.includes('object does not exist on the server')
+  ) {
+    return cloudAgentNextFreshRetryClassification(
+      error,
+      false,
+      'repo_clone_or_checkout_failure',
+      'repo_clone_or_checkout_not_retryable'
+    );
   }
 
   const parsedBody = parseJsonBody(error.body);
   if (hasRetryableSandboxMarker(parsedBody)) {
-    return true;
+    return cloudAgentNextFreshRetryClassification(
+      error,
+      true,
+      'sandbox_api_or_storage_failure',
+      'sandbox_retryable_marker'
+    );
   }
 
-  const body = error.body.toLowerCase();
+  if (body.includes('failed to start kilo server: timeout waiting for server to start')) {
+    return cloudAgentNextFreshRetryClassification(
+      error,
+      true,
+      'wrapper_kilo_server_start_timeout',
+      'wrapper_kilo_server_start_timeout'
+    );
+  }
+
+  if (
+    body.includes('wrapper did not become ready on port') &&
+    body.includes('waitforport timed out')
+  ) {
+    return cloudAgentNextFreshRetryClassification(
+      error,
+      true,
+      'wrapper_wait_for_port_timeout',
+      'wrapper_wait_for_port_timeout'
+    );
+  }
+
   const hasSandboxSignal =
     body.includes('sandboxerror') ||
     body.includes('sandbox') ||
@@ -149,7 +247,28 @@ function isCloudAgentNextSandboxInternalServerError(error: unknown): boolean {
     /\bhttp\s*500\b/i.test(error.body) ||
     /\b500\b/.test(error.body);
 
-  return hasSandboxSignal && hasInternalServerSignal;
+  if (hasSandboxSignal && hasInternalServerSignal) {
+    return cloudAgentNextFreshRetryClassification(
+      error,
+      true,
+      'sandbox_api_or_storage_failure',
+      'sandbox_5xx_body_signal'
+    );
+  }
+
+  if (
+    body.includes('internal error in durable object storage') ||
+    body.includes('durable object storage operation exceeded timeout')
+  ) {
+    return cloudAgentNextFreshRetryClassification(
+      error,
+      false,
+      'sandbox_api_or_storage_failure',
+      'storage_failure_not_retryable_by_code_review_classifier'
+    );
+  }
+
+  return cloudAgentNextFreshRetryClassification(error, false, 'other_5xx', 'unclassified_5xx');
 }
 
 /**
@@ -196,15 +315,59 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     return this.cloudAgentNextClient;
   }
 
+  private logCloudAgentNextFreshSessionRetrySkipped(
+    source: string,
+    error: unknown,
+    classification: CloudAgentNextFreshRetryClassification,
+    retrySkipReason = classification.retryClassificationReason
+  ): void {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    console.info('[CodeReviewOrchestrator] Fresh session retry skipped', {
+      reviewId: this.state.reviewId,
+      source,
+      error: errorMessage,
+      retryOutcome: 'skipped',
+      retrySkipReason,
+      sandboxRetryAttempted: this.state.sandboxRetryAttempted === true,
+      reviewStatus: this.state.status,
+      cancelled: this.cancelled,
+      ...classification,
+    });
+  }
+
   private async tryRetryFreshSessionAfterSandboxError(
     source: string,
-    error: unknown
+    error: unknown,
+    classification: CloudAgentNextFreshRetryClassification
   ): Promise<boolean> {
-    if (
-      this.state.sandboxRetryAttempted === true ||
-      this.cancelled ||
-      isTerminalStatus(this.state.status)
-    ) {
+    if (this.state.sandboxRetryAttempted === true) {
+      this.logCloudAgentNextFreshSessionRetrySkipped(
+        source,
+        error,
+        classification,
+        'retry_already_attempted'
+      );
+      return false;
+    }
+
+    if (this.cancelled) {
+      this.logCloudAgentNextFreshSessionRetrySkipped(
+        source,
+        error,
+        classification,
+        'review_cancelled'
+      );
+      return false;
+    }
+
+    if (isTerminalStatus(this.state.status)) {
+      this.logCloudAgentNextFreshSessionRetrySkipped(
+        source,
+        error,
+        classification,
+        'review_already_terminal'
+      );
       return false;
     }
 
@@ -223,16 +386,21 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     this.state.updatedAt = new Date().toISOString();
     await this.saveState();
 
-    console.warn('[CodeReviewOrchestrator] Retrying with a fresh session after sandbox 500', {
-      reviewId: this.state.reviewId,
-      source,
-      error: errorMessage,
-      previousCloudAgentSessionId,
-      previousSessionId,
-      previousCliSessionId,
-      previousSandboxId,
-      sandboxRetryAttempted: true,
-    });
+    console.warn(
+      '[CodeReviewOrchestrator] Retrying with a fresh session after retryable cloud-agent-next failure',
+      {
+        reviewId: this.state.reviewId,
+        source,
+        error: errorMessage,
+        previousCloudAgentSessionId,
+        previousSessionId,
+        previousCliSessionId,
+        previousSandboxId,
+        sandboxRetryAttempted: true,
+        retryOutcome: 'attempted',
+        ...classification,
+      }
+    );
 
     await this.runFreshCloudAgentNextFallback(
       previousCloudAgentSessionId ?? previousSessionId ?? 'unknown'
@@ -1011,9 +1179,16 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const retryClassification = classifyCloudAgentNextFreshSessionRetry(error);
 
-      if (isCloudAgentNextSandboxInternalServerError(error)) {
-        if (await this.tryRetryFreshSessionAfterSandboxError('cloud-agent-next-fresh', error)) {
+      if (retryClassification.retryable) {
+        if (
+          await this.tryRetryFreshSessionAfterSandboxError(
+            'cloud-agent-next-fresh',
+            error,
+            retryClassification
+          )
+        ) {
           return;
         }
 
@@ -1026,12 +1201,20 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
           terminalReason: 'sandbox_error',
         });
 
-        console.error('[CodeReviewOrchestrator] Review failed after sandbox retry:', {
+        console.error('[CodeReviewOrchestrator] Review failed after fresh-session retry:', {
           reviewId: this.state.reviewId,
           error: errorMessage,
+          retryOutcome: 'exhausted',
+          ...retryClassification,
         });
         return;
       }
+
+      this.logCloudAgentNextFreshSessionRetrySkipped(
+        'cloud-agent-next-fresh',
+        error,
+        retryClassification
+      );
 
       const terminalReason = this.getTerminalReason(error);
 
@@ -1040,6 +1223,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       console.error('[CodeReviewOrchestrator] Review failed (cloud-agent-next):', {
         reviewId: this.state.reviewId,
         error: errorMessage,
+        ...retryClassification,
       });
     } finally {
       const totalExecutionTimeMs = Date.now() - runStartTime;
@@ -1197,9 +1381,16 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       }
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const retryClassification = classifyCloudAgentNextFreshSessionRetry(error);
 
-      if (isCloudAgentNextSandboxInternalServerError(error)) {
-        if (await this.tryRetryFreshSessionAfterSandboxError('cloud-agent-next-followup', error)) {
+      if (retryClassification.retryable) {
+        if (
+          await this.tryRetryFreshSessionAfterSandboxError(
+            'cloud-agent-next-followup',
+            error,
+            retryClassification
+          )
+        ) {
           return;
         }
 
@@ -1212,18 +1403,27 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
           terminalReason: 'sandbox_error',
         });
 
-        console.warn('[CodeReviewOrchestrator] sendMessageV2 sandbox failure after retry', {
+        console.warn('[CodeReviewOrchestrator] sendMessageV2 failure after fresh-session retry', {
           reviewId: this.state.reviewId,
           previousCloudAgentSessionId: previousSessionId,
           error: errorMessage,
+          retryOutcome: 'exhausted',
+          ...retryClassification,
         });
         return;
       }
+
+      this.logCloudAgentNextFreshSessionRetrySkipped(
+        'cloud-agent-next-followup',
+        error,
+        retryClassification
+      );
 
       console.warn('[CodeReviewOrchestrator] sendMessageV2 failed, falling back to fresh session', {
         reviewId: this.state.reviewId,
         previousCloudAgentSessionId: previousSessionId,
         error: errorMessage,
+        ...retryClassification,
       });
 
       // Reset status to running (it may have been set to running already, but ensure clean state)

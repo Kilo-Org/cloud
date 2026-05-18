@@ -334,7 +334,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     });
   });
 
-  it('replays pending questions for code-review snapshots without rejecting them', async () => {
+  it('suppresses pending questions for code-review snapshots without rejecting them', async () => {
     const pendingQuestion = {
       id: 'q_123',
       sessionID: 'kilo_sess_456',
@@ -359,16 +359,12 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       m => m.streamEventType === 'kilocode' && m.data.event === 'question.asked'
     );
 
-    expect(questionEvents).toHaveLength(1);
-    expect(questionEvents[0].data).toMatchObject({
-      event: 'question.asked',
-      properties: pendingQuestion,
-    });
+    expect(questionEvents).toHaveLength(0);
     expect(rejectQuestion).not.toHaveBeenCalled();
     expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
-  it('replays pending permissions for code-review snapshots without rejecting them', async () => {
+  it('suppresses pending permissions for code-review snapshots without rejecting them', async () => {
     const pendingPermission = {
       id: 'p_456',
       sessionID: 'kilo_sess_456',
@@ -394,16 +390,12 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       m => m.streamEventType === 'kilocode' && m.data.event === 'permission.asked'
     );
 
-    expect(permissionEvents).toHaveLength(1);
-    expect(permissionEvents[0].data).toMatchObject({
-      event: 'permission.asked',
-      properties: pendingPermission,
-    });
+    expect(permissionEvents).toHaveLength(0);
     expect(answerPermission).not.toHaveBeenCalled();
     expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
-  it('replays code-review question status snapshots as session.status events', async () => {
+  it('suppresses code-review question status snapshots', async () => {
     const kiloClient = createMockKiloClient({
       getSessionStatuses: vi.fn().mockResolvedValue({
         kilo_sess_456: { type: 'question' },
@@ -419,16 +411,11 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       m => m.streamEventType === 'kilocode' && m.data.event === 'session.status'
     );
 
-    expect(statusEvents).toHaveLength(1);
-    expect(statusEvents[0].data).toMatchObject({
-      event: 'session.status',
-      sessionID: 'kilo_sess_456',
-      status: { type: 'question' },
-    });
+    expect(statusEvents).toHaveLength(0);
     expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
-  it('replays code-review permission status snapshots as session.status events', async () => {
+  it('suppresses code-review permission status snapshots', async () => {
     const kiloClient = createMockKiloClient({
       getSessionStatuses: vi.fn().mockResolvedValue({
         kilo_sess_456: { type: 'permission' },
@@ -444,12 +431,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       m => m.streamEventType === 'kilocode' && m.data.event === 'session.status'
     );
 
-    expect(statusEvents).toHaveLength(1);
-    expect(statusEvents[0].data).toMatchObject({
-      event: 'session.status',
-      sessionID: 'kilo_sess_456',
-      status: { type: 'permission' },
-    });
+    expect(statusEvents).toHaveLength(0);
     expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 

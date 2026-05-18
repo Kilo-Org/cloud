@@ -10,6 +10,7 @@ import {
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   microdollar_usage,
+  microdollar_usage_daily,
 } from '@kilocode/db/schema';
 import {
   KiloPassCadence,
@@ -32,6 +33,7 @@ import {
 } from '@/lib/kilo-pass/constants';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import type { insertMicrodollarUsageWithDailyRollup as insertMicrodollarUsageWithDailyRollupType } from '@/tests/helpers/microdollar-usage.helper';
 import type { BillingHistoryEntry } from '@/lib/subscriptions/subscription-center';
 import type { ValidatedStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
 import type Stripe from 'stripe';
@@ -1504,7 +1506,16 @@ describe('kiloPassRouter', () => {
   });
 
   describe('getAverageMonthlyUsageLast3Months', () => {
+    let insertMicrodollarUsageWithDailyRollup: typeof insertMicrodollarUsageWithDailyRollupType;
+
+    beforeAll(async () => {
+      ({ insertMicrodollarUsageWithDailyRollup } =
+        await import('@/tests/helpers/microdollar-usage.helper'));
+    });
+
     beforeEach(async () => {
+      // eslint-disable-next-line drizzle/enforce-delete-with-where
+      await db.delete(microdollar_usage_daily);
       // eslint-disable-next-line drizzle/enforce-delete-with-where
       await db.delete(microdollar_usage);
     });
@@ -1525,28 +1536,30 @@ describe('kiloPassRouter', () => {
         google_user_email: 'kilo-pass-avg-usage-personal-only@example.com',
       });
 
-      // last 3 months total: $30 personal + $60 org => should average to $10
+      // personal-only total in last 3 months: $30 (org $60 is excluded) => average $10/month
       const now = new Date().toISOString();
-      await db.insert(microdollar_usage).values({
-        kilo_user_id: user.id,
-        organization_id: null,
-        cost: 30_000_000,
-        input_tokens: 0,
-        output_tokens: 0,
-        cache_write_tokens: 0,
-        cache_hit_tokens: 0,
-        created_at: now,
-      });
-      await db.insert(microdollar_usage).values({
-        kilo_user_id: user.id,
-        organization_id: crypto.randomUUID(),
-        cost: 60_000_000,
-        input_tokens: 0,
-        output_tokens: 0,
-        cache_write_tokens: 0,
-        cache_hit_tokens: 0,
-        created_at: now,
-      });
+      await insertMicrodollarUsageWithDailyRollup([
+        {
+          kilo_user_id: user.id,
+          organization_id: null,
+          cost: 30_000_000,
+          input_tokens: 0,
+          output_tokens: 0,
+          cache_write_tokens: 0,
+          cache_hit_tokens: 0,
+          created_at: now,
+        },
+        {
+          kilo_user_id: user.id,
+          organization_id: crypto.randomUUID(),
+          cost: 60_000_000,
+          input_tokens: 0,
+          output_tokens: 0,
+          cache_write_tokens: 0,
+          cache_hit_tokens: 0,
+          created_at: now,
+        },
+      ]);
 
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getAverageMonthlyUsageLast3Months();
@@ -1559,16 +1572,18 @@ describe('kiloPassRouter', () => {
         google_user_email: 'kilo-pass-avg-usage-excludes-old@example.com',
       });
 
-      await db.insert(microdollar_usage).values({
-        kilo_user_id: user.id,
-        organization_id: null,
-        cost: 99_000_000,
-        input_tokens: 0,
-        output_tokens: 0,
-        cache_write_tokens: 0,
-        cache_hit_tokens: 0,
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 120).toISOString(),
-      });
+      await insertMicrodollarUsageWithDailyRollup([
+        {
+          kilo_user_id: user.id,
+          organization_id: null,
+          cost: 99_000_000,
+          input_tokens: 0,
+          output_tokens: 0,
+          cache_write_tokens: 0,
+          cache_hit_tokens: 0,
+          created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 120).toISOString(),
+        },
+      ]);
 
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getAverageMonthlyUsageLast3Months();

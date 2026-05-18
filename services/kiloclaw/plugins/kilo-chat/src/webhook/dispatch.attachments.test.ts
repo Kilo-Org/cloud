@@ -96,7 +96,6 @@ describe('downloadInboundAttachments', () => {
     expect(saved[0].contentType).toBe('image/png');
 
     expect(result.mediaPaths).toEqual(['/tmp/media/inbound/saved-1', '/tmp/media/inbound/saved-2']);
-    expect(result.mediaUrls).toEqual(['https://r2/one.png', 'https://r2/two.jpg']);
     expect(result.mediaTypes).toEqual(['image/png', 'image/jpeg']);
   });
 
@@ -133,7 +132,6 @@ describe('downloadInboundAttachments', () => {
 
     expect(saveMediaBuffer).toHaveBeenCalledTimes(1);
     expect(result.mediaPaths).toEqual(['/tmp/media/inbound/a']);
-    expect(result.mediaUrls).toEqual(['https://r2/one.png']);
     expect(result.mediaTypes).toEqual(['image/png']);
   });
 
@@ -163,7 +161,6 @@ describe('downloadInboundAttachments', () => {
 
     expect(saveMediaBuffer).not.toHaveBeenCalled();
     expect(result.mediaPaths).toEqual([]);
-    expect(result.mediaUrls).toEqual([]);
     expect(result.mediaTypes).toEqual([]);
   });
 
@@ -181,7 +178,6 @@ describe('downloadInboundAttachments', () => {
     });
 
     expect(result.mediaPaths).toEqual([]);
-    expect(result.mediaUrls).toEqual([]);
     expect(result.mediaTypes).toEqual([]);
     expect(saveMediaBuffer).not.toHaveBeenCalled();
   });

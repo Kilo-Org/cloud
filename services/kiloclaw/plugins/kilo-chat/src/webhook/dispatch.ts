@@ -45,7 +45,6 @@ type SaveMediaBuffer = (
 
 export type DownloadedAttachments = {
   mediaPaths: string[];
-  mediaUrls: string[];
   mediaTypes: string[];
 };
 
@@ -64,9 +63,8 @@ export async function downloadInboundAttachments(params: {
   fetchImpl?: typeof fetch;
 }): Promise<DownloadedAttachments> {
   const mediaPaths: string[] = [];
-  const mediaUrls: string[] = [];
   const mediaTypes: string[] = [];
-  if (params.attachments.length === 0) return { mediaPaths, mediaUrls, mediaTypes };
+  if (params.attachments.length === 0) return { mediaPaths, mediaTypes };
   const fetchImpl = params.fetchImpl ?? fetch;
 
   for (const att of params.attachments) {
@@ -93,14 +91,13 @@ export async function downloadInboundAttachments(params: {
         att.filename
       );
       mediaPaths.push(saved.path);
-      mediaUrls.push(signed.url);
       mediaTypes.push(att.mimeType);
     } catch (err) {
       console.warn(`[kilo-chat] inbound attachment ${att.attachmentId} failed:`, err);
     }
   }
 
-  return { mediaPaths, mediaUrls, mediaTypes };
+  return { mediaPaths, mediaTypes };
 }
 
 export async function handleActionExecuted(
@@ -185,7 +182,7 @@ export async function dispatchInbound(
     gatewayToken: resolveGatewayToken(),
   });
 
-  const { mediaPaths, mediaUrls, mediaTypes } = await downloadInboundAttachments({
+  const { mediaPaths, mediaTypes } = await downloadInboundAttachments({
     client,
     conversationId: payload.conversationId,
     attachments: payload.attachments ?? [],
@@ -196,10 +193,8 @@ export async function dispatchInbound(
   const mediaFields: Record<string, string | string[] | undefined> = {};
   if (mediaPaths.length > 0) {
     mediaFields.MediaPath = mediaPaths[0];
-    mediaFields.MediaUrl = mediaUrls[0];
     mediaFields.MediaType = mediaTypes[0];
     mediaFields.MediaPaths = mediaPaths;
-    mediaFields.MediaUrls = mediaUrls;
     mediaFields.MediaTypes = mediaTypes;
   }
 

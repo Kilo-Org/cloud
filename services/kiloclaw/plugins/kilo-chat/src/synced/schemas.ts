@@ -96,7 +96,7 @@ export const attachmentBlockSchema = z.object({
   attachmentId: ulidSchema,
   mimeType: z.string().min(1).max(255),
   size: z.number().int().nonnegative(),
-  filename: z.string().max(512),
+  filename: z.string().min(1).max(512),
 });
 
 export const contentBlockSchema = z.discriminatedUnion('type', [

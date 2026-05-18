@@ -34,4 +34,7 @@ describe('attachmentBlockSchema', () => {
       contentBlockSchema.safeParse({ ...goodBlock, mimeType: 'x/' + 'y'.repeat(254) }).success
     ).toBe(false);
   });
+  it('rejects empty filename', () => {
+    expect(contentBlockSchema.safeParse({ ...goodBlock, filename: '' }).success).toBe(false);
+  });
 });

@@ -49,4 +49,9 @@ describe('messageCreatedWebhookSchema (attachments)', () => {
     });
     expect(r.success).toBe(false);
   });
+  it('rejects attachment with empty filename', () => {
+    const att = { attachmentId: ulid(), mimeType: 'image/png', size: 1, filename: '' };
+    const r = messageCreatedWebhookSchema.safeParse({ ...baseValid, attachments: [att] });
+    expect(r.success).toBe(false);
+  });
 });

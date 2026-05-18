@@ -6,7 +6,7 @@ import {
   payment_methods,
   transactional_email_log,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { and, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
@@ -24,11 +24,12 @@ export type ActiveKiloPassByFingerprint = {
 
 export async function findActiveKiloPassByCardFingerprint(
   fingerprint: string | null | undefined,
-  excludingUserId: string
+  excludingUserId: string,
+  dbOrTx: typeof db | DrizzleTransaction = db
 ): Promise<ActiveKiloPassByFingerprint | null> {
   if (!fingerprint) return null;
 
-  const otherPaymentMethods = await db
+  const otherPaymentMethods = await dbOrTx
     .select({
       userId: payment_methods.user_id,
     })
@@ -44,7 +45,7 @@ export async function findActiveKiloPassByCardFingerprint(
   const otherUserIds = [...new Set(otherPaymentMethods.map(pm => pm.userId))];
   if (otherUserIds.length === 0) return null;
 
-  const activeSub = await db
+  const activeSub = await dbOrTx
     .select({
       kiloUserId: kilo_pass_subscriptions.kilo_user_id,
       id: kilo_pass_subscriptions.id,
@@ -85,8 +86,9 @@ async function resolveCardFingerprint(params: {
   invoice: InvoiceWithPaymentIntent;
   stripe: Stripe;
   kiloUserId: string;
+  dbOrTx: typeof db | DrizzleTransaction;
 }): Promise<string | null> {
-  const { invoice, stripe, kiloUserId } = params;
+  const { invoice, stripe, kiloUserId, dbOrTx } = params;
 
   const paymentIntentUnion = invoice.payment_intent;
   let paymentMethodId: string | null = null;
@@ -105,7 +107,7 @@ async function resolveCardFingerprint(params: {
   }
 
   if (paymentMethodId) {
-    const localPm = await db.query.payment_methods.findFirst({
+    const localPm = await dbOrTx.query.payment_methods.findFirst({
       columns: { stripe_fingerprint: true },
       where: and(
         eq(payment_methods.stripe_id, paymentMethodId),
@@ -124,7 +126,7 @@ async function resolveCardFingerprint(params: {
     }
   }
 
-  const customerPms = await db.query.payment_methods.findMany({
+  const customerPms = await dbOrTx.query.payment_methods.findMany({
     columns: { stripe_fingerprint: true },
     where: and(
       eq(payment_methods.user_id, kiloUserId),
@@ -155,6 +157,7 @@ export async function checkDuplicateCardFingerprintGate(params: {
   stripeEventId: string;
   stripeInvoiceId: string;
   kiloPassSubscriptionId: string;
+  dbOrTx: typeof db | DrizzleTransaction;
 }): Promise<DuplicateCardGateResult> {
   const {
     invoice,
@@ -164,6 +167,7 @@ export async function checkDuplicateCardFingerprintGate(params: {
     stripeEventId,
     stripeInvoiceId,
     kiloPassSubscriptionId,
+    dbOrTx,
   } = params;
 
   const invoiceWithPi = invoice as InvoiceWithPaymentIntent;
@@ -172,12 +176,17 @@ export async function checkDuplicateCardFingerprintGate(params: {
     invoice: invoiceWithPi,
     stripe,
     kiloUserId,
+    dbOrTx,
   });
   if (!fingerprint) {
     return { blocked: false };
   }
 
-  const existingActiveKiloPass = await findActiveKiloPassByCardFingerprint(fingerprint, kiloUserId);
+  const existingActiveKiloPass = await findActiveKiloPassByCardFingerprint(
+    fingerprint,
+    kiloUserId,
+    dbOrTx
+  );
   if (!existingActiveKiloPass) {
     return { blocked: false };
   }
@@ -218,7 +227,7 @@ export async function checkDuplicateCardFingerprintGate(params: {
     }
   }
 
-  await appendKiloPassAuditLog(db, {
+  await appendKiloPassAuditLog(dbOrTx, {
     action: KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled,
     result: KiloPassAuditLogResult.Success,
     kiloUserId,
@@ -234,7 +243,7 @@ export async function checkDuplicateCardFingerprintGate(params: {
     },
   });
 
-  await maybeSendDuplicateCardCanceledEmail({ kiloUserId, stripeInvoiceId });
+  await maybeSendDuplicateCardCanceledEmail({ kiloUserId, stripeInvoiceId, dbOrTx });
 
   return {
     blocked: true,
@@ -246,14 +255,17 @@ export async function checkDuplicateCardFingerprintGate(params: {
 async function maybeSendDuplicateCardCanceledEmail(params: {
   kiloUserId: string;
   stripeInvoiceId: string;
+  dbOrTx: typeof db | DrizzleTransaction;
 }): Promise<void> {
+  const { kiloUserId, stripeInvoiceId, dbOrTx } = params;
+
   try {
-    const insertResult = await db
+    const insertResult = await dbOrTx
       .insert(transactional_email_log)
       .values({
-        user_id: params.kiloUserId,
+        user_id: kiloUserId,
         email_type: KILO_PASS_DUPLICATE_CARD_EMAIL_TYPE,
-        idempotency_key: params.stripeInvoiceId,
+        idempotency_key: stripeInvoiceId,
       })
       .onConflictDoNothing();
 
@@ -261,9 +273,9 @@ async function maybeSendDuplicateCardCanceledEmail(params: {
       return;
     }
 
-    const user = await db.query.kilocode_users.findFirst({
+    const user = await dbOrTx.query.kilocode_users.findFirst({
       columns: { google_user_email: true },
-      where: eq(kilocode_users.id, params.kiloUserId),
+      where: eq(kilocode_users.id, kiloUserId),
     });
 
     if (!user?.google_user_email) return;
@@ -271,27 +283,27 @@ async function maybeSendDuplicateCardCanceledEmail(params: {
     const sendResult = await sendKiloPassDuplicateCardCanceledEmail(user.google_user_email, {});
 
     if (!sendResult.sent && sendResult.reason === 'provider_not_configured') {
-      await db
+      await dbOrTx
         .delete(transactional_email_log)
         .where(
           and(
             eq(transactional_email_log.email_type, KILO_PASS_DUPLICATE_CARD_EMAIL_TYPE),
-            eq(transactional_email_log.idempotency_key, params.stripeInvoiceId)
+            eq(transactional_email_log.idempotency_key, stripeInvoiceId)
           )
         );
     }
   } catch (error) {
     captureException(error, {
       tags: { source: 'kilo_pass_duplicate_card_email' },
-      extra: { kiloUserId: params.kiloUserId, stripeInvoiceId: params.stripeInvoiceId },
+      extra: { kiloUserId, stripeInvoiceId },
     });
     try {
-      await db
+      await dbOrTx
         .delete(transactional_email_log)
         .where(
           and(
             eq(transactional_email_log.email_type, KILO_PASS_DUPLICATE_CARD_EMAIL_TYPE),
-            eq(transactional_email_log.idempotency_key, params.stripeInvoiceId)
+            eq(transactional_email_log.idempotency_key, stripeInvoiceId)
           )
         );
     } catch {

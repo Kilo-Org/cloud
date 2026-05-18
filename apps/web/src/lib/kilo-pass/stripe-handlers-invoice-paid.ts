@@ -359,6 +359,7 @@ export async function handleKiloPassInvoicePaid(params: {
         stripeEventId: eventId,
         stripeInvoiceId: invoice.id,
         kiloPassSubscriptionId,
+        dbOrTx: tx,
       });
 
       if (gateResult.blocked) {

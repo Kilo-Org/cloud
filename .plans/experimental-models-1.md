@@ -35,7 +35,7 @@ Run A/B tests against model checkpoints in partnership with model providers, esp
 - Deterministic hash bucketing: `apps/web/src/lib/ai-gateway/getRandomNumber.ts`.
 - Runtime A/B precedent: `apps/web/src/lib/ai-gateway/providers/vercel/index.ts`, cached in Redis for ~10 minutes.
 - Direct-to-upstream routing pattern: the `kilo-internal/...` branch in `getProvider` (`apps/web/src/lib/ai-gateway/providers/get-provider.ts`) returns a `{ provider, userByok: null, bypassAccessCheck: true }` result built from a `custom_llm2` row. The `Provider` itself has `{ id: 'custom', apiUrl, apiKey, supportedChatApis, transformRequest }`; `bypassAccessCheck` lives on the `getProvider` return value, not inside the provider. `upstream-request.ts` then `fetch`es `${provider.apiUrl}${path}${search}` with `Authorization: Bearer ${provider.apiKey}` — OpenRouter and Vercel are never contacted. Experiments reuse this direct-provider shape, with the upstream config sourced from the variant version instead of `custom_llm2`.
-- Public→internal model rewriting: `applyProviderSpecificLogic` in `apps/web/src/lib/ai-gateway/providers/apply-provider-specific-logic.ts`, called from `apps/web/src/app/api/openrouter/[...path]/route.ts` after provider resolution. It rewrites `body.model` to a Kilo-exclusive `internal_id` and may pin `body.provider.only` pre-flight. Variant selection happens earlier, inside `getProvider`; whether direct experiment providers explicitly bypass this logic or defensively remove incompatible provider fields is a follow-up routing decision before implementation.
+- Public→internal model rewriting: `applyProviderSpecificLogic` in `apps/web/src/lib/ai-gateway/providers/apply-provider-specific-logic.ts`, called from `apps/web/src/app/api/openrouter/[...path]/route.ts` after provider resolution. It rewrites `body.model` to a Kilo-exclusive `internal_id` and may pin `body.provider.only` pre-flight. Variant selection happens earlier, inside `getProvider`; direct experiment providers return `skipKiloExclusiveModelSettings: true` so route-level logic skips only that Kilo-exclusive rewrite while preserving generic request fixes and `provider.transformRequest`.
 - Usage telemetry: `microdollar_usage` and `microdollar_usage_metadata` in `packages/db/src/schema.ts`, populated by `apps/web/src/lib/ai-gateway/processUsage.ts`.
 - API metrics pipeline: `apps/web/src/lib/ai-gateway/o11y/api-metrics.server.ts` → `services/o11y/src/api-metrics-routes.ts`.
 - Admin tRPC pattern: `apps/web/src/routers/admin/gateway-config-router.ts`.
@@ -57,7 +57,8 @@ POST /api/openrouter/.../chat/completions
   │    │    │    ├─ bucket with getRandomNumber(seed, sumOfWeights)
   │    │    │    ├─ select variant by cumulative weight
   │    │    │    └─ return { experimentId, variantId, variantVersionId, upstream, allocationSubject }
-  │    │    ├─ if paused/unavailable: return a route-visible non-provider result (route.ts emits 4xx/503 before dereferencing provider)
+  │    │    ├─ if paused: return `{ kind: 'not-found' }` (route.ts emits local 404 before dereferencing provider)
+  │    │    ├─ if unavailable: return `{ kind: 'unavailable' }` (route.ts emits 503 before dereferencing provider)
   │    │    └─ return buildDirectProvider(upstream) + experiment metadata
   │    └─ else: existing branches (BYOK, kilo-internal, kiloExclusiveModels → openrouter|vercel)
   ├─ construct MicrodollarUsageContext and stash variantVersionId + allocationSubject + clientRequestId from the getProvider result
@@ -176,7 +177,7 @@ Routing behavior per status:
 
 - `draft`: experiment is invisible to the gateway; requests to the public id route as if no experiment exists.
 - `active`: gateway buckets and rewrites per the experiment.
-- `paused`: requests to the experimented public id receive an explicit "experiment paused, traffic temporarily unavailable" error response (4xx). They do **not** silently fall through to default routing — that would deliver unexperimented traffic under a public id whose pricing/availability contract was set up for the experiment.
+- `paused`: requests to the experimented public id receive a local 404/model-unavailable response. They do **not** silently fall through to default routing — that would deliver unexperimented traffic under a public id whose pricing/availability contract was set up for the experiment.
 - `completed`: historical/non-routing. Completed experiments are removed from the routing-relevant index and caches so a completed experiment can coexist with a draft or active replacement on the same `public_model_id`. Do not use `completed` as a traffic-blocking state; keep the experiment `paused` until the preview public id is removed from discovery/routing or a replacement experiment is active.
 
 Archive: `is_archived` is an orthogonal boolean. Archiving hides the experiment from default admin lists but doesn't change routing or status. Archiving an `active` experiment is forbidden (DB-level CHECK + admin-router guard); archive any non-active state freely. Unarchive is allowed.
@@ -288,8 +289,8 @@ Add `apps/web/src/lib/ai-gateway/experiments/`:
   - `getRoutingExperimentForPublicId(publicId)`: returns the routing-relevant experiment with its current status (`active` or `paused`) and resolved variant + version data, `null` when Postgres proves there is no routing-relevant experiment, or `unavailable` when cache/database/config failures prevent a safe routing decision. For each variant, the cached payload contains the current `variant_version_id`, the `upstream` JSONB blob (no key), and the **decrypted** `api_key` merged in alongside as a separate field (in-memory shape: `{ ...upstream, api_key }`). Per-public-id cache at `modelExperimentRedisKey(publicId)`, Redis-cached for 10 minutes. Pre-checks `isPublicIdExperimented` to avoid fetching when no experiment exists. The cache build resolves "current version" per variant via `SELECT DISTINCT ON (variant_id) id, variant_id, upstream, encrypted_api_key, effective_at FROM model_experiment_variant_version WHERE variant_id IN (...) AND effective_at <= now() ORDER BY variant_id, effective_at DESC, id DESC` (Postgres-specific; one query for the experiment, no per-variant round trips), then calls `decryptApiKey(encrypted_api_key, BYOK_ENCRYPTION_KEY)` per row before serialising to Redis. If `BYOK_ENCRYPTION_KEY` is unset for an active/paused experiment, return `unavailable` and log a single warn-level error per process boot.
   - `pickModelExperimentVariant({ publicModelId, userId, machineId, clientIp })`: calls `getRoutingExperimentForPublicId`. Behavior depends on returned experiment status:
     - `active`: pick a variant and return `{ status: 'active', experimentId, variantId, variantVersionId, upstream, allocationSubject }`. If no allocation subject is available (no userId/machineId/clientIp), capture the invariant violation and return `{ status: 'unavailable' }`.
-    - `paused`: returns `{ status: 'paused' }` so the caller can short-circuit with the 4xx "experiment paused" error response (see Phase 1 routing behavior).
-    - `unavailable`: returns `{ status: 'unavailable' }` so the caller can short-circuit with a 4xx/503 "temporarily unavailable" response.
+    - `paused`: returns `{ status: 'not-found' }` so the caller can short-circuit with a local 404/model-unavailable response (see Phase 1 routing behavior).
+    - `unavailable`: returns `{ status: 'unavailable' }` so the caller can short-circuit with a 503 "temporarily unavailable" response.
     - `null` (no routing-relevant experiment): returns `null` only after Postgres/cache state proves the public id is not currently routed by an experiment.
 
   Only `variantVersionId` and `allocationSubject` are persisted on the request row; `upstream` is used by `buildDirectProvider` and not snapshotted (the immutable version row is the snapshot).
@@ -314,17 +315,19 @@ Integration in `getProvider` (`apps/web/src/lib/ai-gateway/providers/get-provide
       machineId,
       clientIp,
     });
-    if (selection?.status === 'paused') {
-      return EXPERIMENT_PAUSED_ROUTING_RESULT; // route.ts maps to 4xx before dereferencing provider
+    if (selection?.status === 'not-found') {
+      return { kind: 'not-found' }; // route.ts maps to local 404 before dereferencing provider
     }
     if (selection?.status === 'unavailable') {
-      return EXPERIMENT_UNAVAILABLE_ROUTING_RESULT; // route.ts maps to temporarilyUnavailableResponse()
+      return { kind: 'unavailable' }; // route.ts maps to temporarilyUnavailableResponse()
     }
     if (selection?.status === 'active') {
       return {
+        kind: 'provider',
         provider: buildDirectProvider(selection.upstream),
         userByok: null,
         bypassAccessCheck: true,
+        skipKiloExclusiveModelSettings: true,
         experiment: {
           experimentId: selection.experimentId,
           variantId: selection.variantId,
@@ -336,10 +339,29 @@ Integration in `getProvider` (`apps/web/src/lib/ai-gateway/providers/get-provide
     // selection === null means Postgres/cache state proves this public id is not currently routed by an experiment
   }
   ```
-- `route.ts` handles paused/unavailable routing results before reading `provider.supportedChatApis`. For active selections, it constructs `usageContext` as it does today, then copies `providerResult.experiment.variantVersionId`, `allocationSubject`, and `clientRequestId` onto the context. It captures `usageContext.experimentRequestBody = structuredClone(requestBodyParsed.body)` after provider-specific/direct-provider transforms have produced the canonical upstream request body and before any later mutation.
+- `getProvider` returns a small route-visible union:
+  ```ts
+  type GetProviderResult =
+    | {
+        kind: 'provider';
+        provider: Provider;
+        userByok: BYOKResult[] | null;
+        bypassAccessCheck: boolean;
+        skipKiloExclusiveModelSettings?: boolean;
+        experiment?: {
+          experimentId: string;
+          variantId: string;
+          variantVersionId: string;
+          allocationSubject: 'user' | 'machine' | 'ip';
+        };
+      }
+    | { kind: 'not-found' }
+    | { kind: 'unavailable' };
+  ```
+- `route.ts` handles `not-found`/`unavailable` routing results before reading `provider.supportedChatApis`: `not-found` maps to local 404/model unavailable, and `unavailable` maps to 503/temporarily unavailable. For active selections, it constructs `usageContext` as it does today, then copies `providerResult.experiment.variantVersionId`, `allocationSubject`, and `clientRequestId` onto the context. It captures `usageContext.experimentRequestBody = structuredClone(requestBodyParsed.body)` after provider-specific/direct-provider transforms have produced the canonical upstream request body and before any later mutation.
 - Picking inside `getProvider` is required because `bypassAccessCheck` and the upstream `apiUrl/apiKey` must be set before `route.ts` runs balance and `checkOrganizationModelRestrictions` checks. This is the same layer where `kilo-internal/...` already integrates.
 - `bypassAccessCheck: true` intentionally skips balance and organization policy checks for v1 experiment traffic. Preview experiment traffic is free/provider-funded for v1, and org discovery remains gated by the preview public id's registry entry.
-- `applyProviderSpecificLogic` direct-provider behavior is a required implementation decision before coding: either route-level logic skips Kilo-exclusive rewriting for experiment/custom direct providers, or `buildDirectProvider` defensively removes incompatible provider fields before the upstream fetch.
+- `applyProviderSpecificLogic` accepts route metadata that skips only Kilo-exclusive model settings when `skipKiloExclusiveModelSettings` is true. Generic provider-specific request fixes still run, and `provider.transformRequest` still performs the direct experiment rewrite before the upstream fetch.
 
 Routing scope:
 
@@ -378,7 +400,7 @@ Add `apps/web/src/routers/admin/model-experiments-router.ts` with:
 - Cache invalidation for every mutation that can affect routing (status transitions, `swapVariantVersion`, `addVariant`/`removeVariant` on draft transitioning to active). Two keys are maintained:
   - Per-publicId cache: `modelExperimentRedisKey(publicId)` — invalidated on any change to the experiment matching that public id.
   - Membership key: `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY` — recomputed (`SELECT public_model_id FROM model_experiment WHERE status IN ('active', 'paused')`) and rewritten on every status transition into or out of (active, paused). Use the existing Redis string helpers with a JSON-encoded array unless this change also adds set-command helpers.
-- Paused experiments: gateway returns an explicit 4xx "experiment paused" error for requests to the experimented public id. Completed experiments are historical/non-routing and are not included in gateway caches. The paused error mapping/wording lives in `pick-variant.ts` so the gateway can short-circuit before upstream resolution.
+- Paused experiments: gateway returns a local 404/model-unavailable response for requests to the experimented public id. Completed experiments are historical/non-routing and are not included in gateway caches. The not-found mapping lives in `pick-variant.ts`/`getProvider` so the gateway can short-circuit before upstream resolution.
 - `getLiveStats(id)`: aggregate recent requests/errors/p50-p95 latency grouped by `variant_version_id`, with `variant.label` and `upstream->>'internal_id'` resolved for display. Token aggregates per RC (input/output) included; `cost_mUsd` excluded for v1 per the pricing decision.
 - `getPromptByHash(sha: string): Promise<{ content: string } | null>`: admin-gated tRPC procedure that reads from R2 via `getPromptByHash` (`apps/web/src/lib/r2/experiment-prompts.ts`). Accepts only 64-character lowercase hex hashes and returns `null` if the object doesn't exist. Used by the admin UI to inflate real hashes from `model_experiment_request` rows on demand; sentinel values are rendered without an R2 read. Page-level dedup at the call site: collect distinct real hashes, batch-fetch, join in memory.
 
@@ -400,7 +422,7 @@ Targeted tests:
 - Variant picker determinism by `userId`, `machineId`, and `clientIp`.
 - Allocation-subject precedence and recorded `allocationSubject`.
 - Weighted distribution sanity and bucket-boundary behavior.
-- Null return when no active experiment exists; unavailable return when no allocation subject exists on an active experiment.
+- Null return when no routing-relevant experiment exists; not-found return when the experiment is paused; unavailable return when no allocation subject exists on an active experiment.
 - End-to-end gateway integration for an experimented public id: assert the upstream `fetch` URL starts with the variant's `upstream.base_url` (NOT OpenRouter or Vercel), `Authorization` header carries `Bearer ${upstream.api_key}`, and `body.model` equals `upstream.internal_id`.
 - Usage persistence creates a `model_experiment_request` row with `usage_id`, `variant_version_id`, `allocation_subject`, and `client_request_id`.
 - Hot-swap test: `swapVariantVersion` inserts a new `model_experiment_variant_version` row with a different `upstream` (different `internal_id` and/or `base_url`), the picker (after cache invalidation) resolves to the new version, and old `model_experiment_request` rows still resolve through their old `variant_version_id` to the original `upstream`.
@@ -409,7 +431,7 @@ Targeted tests:
 - `model_experiment_request.created_at` exactly matches the referenced `microdollar_usage.created_at`.
 - Admin activation validation, active-experiment uniqueness, cache invalidation, and live-edit restrictions.
 - State machine: every allowed transition succeeds, every disallowed transition returns a clear error. `setArchived(activeId, true)` rejects.
-- Paused experiment requests to the experimented public id return the 4xx "experiment paused" error and do not reach upstream. Completed experiments are absent from routing caches; verify completion removes the public id from `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY` unless another active/paused experiment for that id exists.
+- Paused experiment requests to the experimented public id return a local 404/model-unavailable response and do not reach upstream. Completed experiments are absent from routing caches; verify completion removes the public id from `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY` unless another active/paused experiment for that id exists.
 - Anonymous request with machine id is bucketed; request with no allocation subject returns temporarily unavailable and does not reach upstream; BYOK request to a non-experimented id is unaffected.
 - API key never leaks: `getLiveStats`, `list`, `get`, and the reporting view never return `encrypted_api_key` or any plaintext form. Snapshot test on JSON responses; SQL-level test that `model_experiment_request_stats` does not reference the column.
 - Encryption round-trip: a key submitted via `swapVariantVersion`/`rotateApiKey` is stored as `EncryptedData` JSONB, is decrypted correctly by the cache loader, and the resulting plaintext is what reaches `buildDirectProvider` as `apiKey` (assert via mock `fetch` capturing the `Authorization` header).
@@ -504,7 +526,7 @@ Core experiment implementation:
 - `apps/web/src/app/api/openrouter/[...path]/route.ts`
 - `apps/web/src/lib/ai-gateway/providers/get-provider.ts` (refactor `kilo-internal/...` branch to share `buildDirectProvider`; add experiment branch that returns direct provider plus experiment metadata)
 - `apps/web/src/lib/ai-gateway/providers/types.ts` (add the provider-result/experiment metadata types if they do not fit locally in `get-provider.ts`)
-- `apps/web/src/lib/ai-gateway/providers/apply-provider-specific-logic.ts` (finalize direct-provider handling before implementation)
+- `apps/web/src/lib/ai-gateway/providers/apply-provider-specific-logic.ts` (honor `skipKiloExclusiveModelSettings` while keeping generic request fixes and `provider.transformRequest`)
 - `apps/web/src/lib/ai-gateway/llm-proxy-helpers.ts` (extend the existing `after()` hook around `accountForMicrodollarUsage` to also call `persistExperimentAttribution` after the microdollar write completes)
 - `apps/web/src/lib/ai-gateway/processUsage.ts` (small identity plumbing only if needed to share or return the inserted `usage_id`/`created_at`)
 - `apps/web/src/lib/ai-gateway/processUsage.types.ts` (add `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, `experimentRequestBody` fields to `MicrodollarUsageContext`)
@@ -537,7 +559,7 @@ Admin and routing:
 - Replace a live variant checkpoint via `swapVariantVersion` (which is a pure INSERT into `model_experiment_variant_version` with `effective_at = now()`); confirm old `model_experiment_request` rows still point at the original `variant_version_id` (resolving to the old `internal_id`) while new rows point at the newly inserted `variant_version_id`.
 - Confirm `model_experiment_request.created_at` exactly equals the referenced `microdollar_usage.created_at`.
 - Submit feedback from a kilocode client and verify `parentMessageID` joins to `client_request_id`.
-- Pause an experiment and confirm requests to the experimented public id return the "experiment paused" error after cache invalidation/TTL.
+- Pause an experiment and confirm requests to the experimented public id return local 404/model unavailable after cache invalidation/TTL.
 - Resume a paused experiment and confirm a returning user lands in the same `variant_id` bucket as before the pause.
 - Hot-swap during pause: pause, run `swapVariantVersion` (which inserts a new version row with `effective_at = now()`), resume, send a request from a user who was previously bucketed; confirm the bucket (variant_id) is unchanged but the served `variant_version_id`/`internal_id` resolves to the newly inserted version.
 - Archive a `completed` experiment; confirm it disappears from default admin lists. Attempt to archive an `active` experiment; confirm the admin call rejects.

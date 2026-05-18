@@ -582,7 +582,7 @@ export function buildAgentEntryFromRuntimeAgent(agent: RuntimeAgent): Record<str
   };
   if (config.prompt !== undefined) entry.prompt = config.prompt;
   if (config.description !== undefined) entry.description = config.description;
-  if (config.model !== undefined) entry.model = normalizeKilocodeModel(config.model);
+  if (config.model != null) entry.model = normalizeKilocodeModel(config.model);
   if (config.variant !== undefined) entry.variant = config.variant;
   if (config.temperature !== undefined) entry.temperature = config.temperature;
   if (config.top_p !== undefined) entry.top_p = config.top_p;
@@ -821,6 +821,7 @@ export class SessionService {
     const encryptedSecrets = profile?.encryptedSecrets;
     const mcpServers = profile?.mcpServers;
     const runtimeAgents = profile?.runtimeAgents;
+    const kiloCommands = profile?.kiloCommands;
 
     // Use override if available, otherwise use original values from API
     const kilocodeToken = env.KILOCODE_TOKEN_OVERRIDE ?? originalToken;
@@ -968,10 +969,7 @@ export class SessionService {
       });
     }
     if (kilocodeModel && kilocodeModel.trim()) {
-      const normalizedModel = kilocodeModel.startsWith('kilo/')
-        ? kilocodeModel
-        : `kilo/${kilocodeModel}`;
-      configContent.model = normalizedModel;
+      configContent.model = normalizeKilocodeModel(kilocodeModel);
     }
     // Merge custom-prompt (appendSystemPrompt) and profile-provided runtimeAgents
     // under a single `agent` map keyed by slug. The CLI looks up the mode by
@@ -991,6 +989,24 @@ export class SessionService {
     }
     if (Object.keys(agentConfig).length > 0) {
       configContent.agent = agentConfig;
+    }
+    if (kiloCommands && kiloCommands.length > 0) {
+      configContent.command = Object.fromEntries(
+        kiloCommands.map(cmd => [
+          cmd.name,
+          {
+            template: cmd.template,
+            ...(cmd.description && { description: cmd.description }),
+            ...(cmd.agent && { agent: cmd.agent }),
+            ...(cmd.model && { model: normalizeKilocodeModel(cmd.model) }),
+            subtask: cmd.subtask ?? false,
+          },
+        ])
+      );
+      logger.info('Kilo commands merged into KILO_CONFIG_CONTENT', {
+        kiloCommandNames: kiloCommands.map(c => c.name),
+        kiloCommandCount: kiloCommands.length,
+      });
     }
     const configJson = JSON.stringify(configContent);
     envVars.OPENCODE_CONFIG_CONTENT = configJson;
@@ -1390,6 +1406,7 @@ export class SessionService {
       mcpServers: profile?.mcpServers,
       runtimeSkills: profile?.runtimeSkills ?? existingProfile?.runtimeSkills,
       runtimeAgents: profile?.runtimeAgents ?? existingProfile?.runtimeAgents,
+      kiloCommands: profile?.kiloCommands ?? existingProfile?.kiloCommands,
     };
 
     const session = await this.getOrCreateSession({

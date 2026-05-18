@@ -84,6 +84,9 @@ type PromptBody = {
 type CommandBody = {
   command: string;
   args?: string;
+  messageId?: string;
+  autoCommit?: boolean;
+  condenseOnComplete?: boolean;
   /** Per-execution config — new executionId triggers setup */
   execution?: ExecutionBinding;
 };
@@ -324,7 +327,7 @@ function createPromptHandler(config: ServerConfig, deps: ServerDependencies) {
 
 function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
   return async (req: Request): Promise<Response> => {
-    const { state, kiloClient } = deps;
+    const { state, kiloClient, openConnection } = deps;
 
     let body: CommandBody;
     try {
@@ -346,16 +349,41 @@ function createCommandHandler(config: ServerConfig, deps: ServerDependencies) {
       return errorResponse('INVALID_REQUEST', 'command is required', 400);
     }
 
+    // Slash commands now enter through the same execution lifecycle as prompts
+    // (sendMessageV2 with payload.type === 'command'), so they may be the first
+    // wrapper interaction for a fresh execution. Mirror /job/prompt's
+    // connection + active-state setup so kilo's events flow back via /ingest.
+    deps.setPerTurnConfig({
+      autoCommit: body.autoCommit ?? false,
+      condenseOnComplete: body.condenseOnComplete ?? false,
+      upstreamBranch: body.execution?.upstreamBranch,
+    });
+
+    if (state.isIdle && !state.isConnected) {
+      try {
+        await openConnection();
+        logToFile('job/command: connection opened');
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logToFile(`job/command: failed to open connection: ${msg}`);
+        return errorResponse('CONNECTION_ERROR', `Failed to open connection: ${msg}`, 500);
+      }
+    }
+
+    state.setActive(true);
+
     try {
       const result = await kiloClient.sendCommand({
         sessionId: job.kiloSessionId,
         command: body.command,
         args: body.args,
+        messageId: body.messageId,
       });
-      state.updateActivity();
       logToFile(`job/command: sent command=${body.command}`);
+      state.setActive(false);
       return jsonResponse({ status: 'sent', result });
     } catch (error) {
+      state.setActive(false);
       const msg = error instanceof Error ? error.message : String(error);
       logToFile(`job/command: failed: ${msg}`);
       return errorResponse('COMMAND_ERROR', `Failed to send command: ${msg}`, 500);

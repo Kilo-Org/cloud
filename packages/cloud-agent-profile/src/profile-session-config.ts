@@ -15,6 +15,10 @@ import {
 } from './profile-mcp-service';
 import { getSkillsForSession, type SkillForSession } from './profile-skills-service';
 import { getAgentsForSession, type AgentForSession } from './profile-agents-service';
+import {
+  getKiloCommandsForSession,
+  type KiloCommandForSession,
+} from './profile-kilo-commands-service';
 import { resolveProfileLayers } from './profile-resolution';
 import { buildOwnershipCondition } from './profile-utils';
 import type { ProfileOwner } from './types';
@@ -41,6 +45,8 @@ export type MergedSkillForSession = {
 };
 
 export type MergedAgentForSession = AgentForSession;
+
+export type MergedKiloCommandForSession = KiloCommandForSession;
 
 /**
  * Permissive shape for an inline runtime skill supplied by the caller. The
@@ -94,6 +100,7 @@ export type MergeProfileConfigurationResult = {
   mcpServers?: McpServerForSession[];
   skills?: MergedSkillForSession[];
   agents?: MergedAgentForSession[];
+  kiloCommands?: KiloCommandForSession[];
 };
 
 /** Ensure a profileId belongs to the given owner (or, for org context, to the user personally). */
@@ -140,6 +147,7 @@ type Layer = {
   mcpServers: McpServerForSession[];
   skills: SkillForSession[];
   agents: AgentForSession[];
+  kiloCommands: KiloCommandForSession[];
 };
 
 type ProfileLayerData = {
@@ -148,6 +156,7 @@ type ProfileLayerData = {
   mcpServers: McpServerForSession[];
   skills: SkillForSession[];
   agents: AgentForSession[];
+  kiloCommands: KiloCommandForSession[];
 };
 
 function profileToLayer(data: ProfileLayerData): Layer {
@@ -167,6 +176,7 @@ function profileToLayer(data: ProfileLayerData): Layer {
     mcpServers: [...data.mcpServers],
     skills: [...data.skills],
     agents: [...data.agents],
+    kiloCommands: [...data.kiloCommands],
   };
 }
 
@@ -218,6 +228,11 @@ function inlineToLayer(args: MergeProfileConfigurationArgs): Layer | null {
       files: s.files ?? {},
     })),
     agents: runtimeAgents ? [...runtimeAgents] : [],
+    // Inline kilo commands are not supported — there is no `runtimeKiloCommands`
+    // argument. Commands from resolved profiles flow through the DB query path
+    // above (profileToLayer). Unresolved pass-through handles commands supplied
+    // directly by the caller without merging.
+    kiloCommands: [],
   };
 }
 
@@ -236,6 +251,7 @@ function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
   const mcpByName = new Map<string, McpServerForSession>();
   const skillByName = new Map<string, MergedSkillForSession>();
   const agentBySlug = new Map<string, MergedAgentForSession>();
+  const commandByName = new Map<string, KiloCommandForSession>();
 
   for (const layer of layers) {
     Object.assign(envVars, layer.envVars);
@@ -255,6 +271,9 @@ function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
     for (const agent of layer.agents) {
       agentBySlug.set(agent.slug, agent);
     }
+    for (const cmd of layer.kiloCommands) {
+      commandByName.set(cmd.name, cmd);
+    }
   }
 
   return {
@@ -264,6 +283,7 @@ function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
     mcpServers: mcpByName.size > 0 ? Array.from(mcpByName.values()) : undefined,
     skills: skillByName.size > 0 ? Array.from(skillByName.values()) : undefined,
     agents: agentBySlug.size > 0 ? Array.from(agentBySlug.values()) : undefined,
+    kiloCommands: commandByName.size > 0 ? Array.from(commandByName.values()) : undefined,
   };
 }
 
@@ -304,14 +324,15 @@ export async function mergeProfileConfiguration(
 
   const profileData = await Promise.all(
     profilesToLoad.map(async id => {
-      const [vars, commands, mcpServers, skills, agents] = await Promise.all([
+      const [vars, commands, mcpServers, skills, agents, kiloCommands] = await Promise.all([
         getVarsForSession(db, id),
         getCommandsForSession(db, id),
         getMcpServersForSession(db, id),
         getSkillsForSession(db, id),
         getAgentsForSession(db, id),
+        getKiloCommandsForSession(db, id),
       ]);
-      return { profileId: id, vars, commands, mcpServers, skills, agents };
+      return { profileId: id, vars, commands, mcpServers, skills, agents, kiloCommands };
     })
   );
 

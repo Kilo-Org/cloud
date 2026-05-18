@@ -4640,6 +4640,43 @@ export const agent_environment_profile_agents = pgTable(
 
 export type AgentEnvironmentProfileAgent = typeof agent_environment_profile_agents.$inferSelect;
 
+// ============ AGENT ENVIRONMENT PROFILE KILO COMMANDS ============
+// Custom slash commands attached to an environment profile. Materialized into
+// KILO_CONFIG_CONTENT.command.<name> at session preparation time.
+
+export const agent_environment_profile_kilo_commands = pgTable(
+  'agent_environment_profile_kilo_commands',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    description: text(),
+    template: text().notNull(),
+    agent: text(),
+    model: text(),
+    subtask: boolean().notNull().default(false),
+    enabled: boolean().notNull().default(true),
+    sort_order: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_agent_env_profile_kilo_cmds_profile_id').on(table.profile_id),
+    unique('UQ_agent_env_profile_kilo_cmds_profile_name').on(table.profile_id, table.name),
+  ]
+);
+
+export type AgentEnvironmentProfileKiloCommand =
+  typeof agent_environment_profile_kilo_commands.$inferSelect;
+
 // ============ APP BUILDER FEEDBACK ============
 
 export const app_builder_feedback = pgTable(

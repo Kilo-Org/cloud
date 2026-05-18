@@ -25,9 +25,12 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
+import { BrowseCommandsDialog } from './BrowseCommandsDialog';
 
 import { useProfiles, useCombinedProfiles, useProfile } from '@/hooks/useCloudAgentProfiles';
 import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
+import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
+import { commandsOrDefault } from '@cloud-agent-shared';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import {
@@ -45,9 +48,9 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { ProfilePickerPopover } from '@/components/cloud-agent/ProfilePickerPopover';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from '@/components/ui/popover';
 import {
-  Command,
+  Command as UICommand,
   CommandEmpty,
   CommandGroup,
   CommandInput,
@@ -57,6 +60,7 @@ import {
 import { Button as UIButton } from '@/components/ui/button';
 import { LinkButton } from '@/components/Button';
 import { cn } from '@/lib/utils';
+import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 import {
   extractRepoFromGitUrl,
   findAllGitPlatformUrls,
@@ -101,6 +105,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const queryClient = useQueryClient();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const commandListRef = useRef<HTMLDivElement>(null);
   const { mutateAsync: personalUploadUrl } = useMutation(
     trpc.cloudAgentNext.getImageUploadUrl.mutationOptions()
   );
@@ -566,6 +571,57 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   );
 
   // ---------------------------------------------------------------------------
+  // Slash commands
+  // ---------------------------------------------------------------------------
+  const slashCommands = useMemo<SlashCommand[]>(() => {
+    const defaults = commandsOrDefault(undefined).map(cmd => ({
+      trigger: cmd.name,
+      label: cmd.name,
+      description: cmd.description ?? '',
+      expansion: '',
+    }));
+    const profileCommands = (selectedProfileDetails?.kiloCommands ?? [])
+      .filter(cmd => cmd.enabled)
+      .map(cmd => ({
+        trigger: cmd.name,
+        label: cmd.name,
+        description: cmd.description ?? '',
+        expansion: '',
+      }));
+    return [...defaults, ...profileCommands];
+  }, [selectedProfileDetails?.kiloCommands]);
+
+  const handleSelectCommand = useCallback((command: SlashCommand, autoSend = false) => {
+    if (autoSend) {
+      setPrompt(`/${command.trigger}`);
+    } else {
+      const inserted = `/${command.trigger} `;
+      setPrompt(inserted);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, window.innerHeight * 0.5)}px`;
+        const end = inserted.length;
+        textareaRef.current.setSelectionRange(end, end);
+      }
+    }
+    textareaRef.current?.focus();
+  }, []);
+
+  const {
+    showAutocomplete,
+    selectedIndex,
+    setSelectedIndex,
+    filteredCommands,
+    handleKeyDown: handleAutocompleteKeyDown,
+    setShowAutocomplete,
+  } = useSlashCommandAutocomplete({
+    value: prompt,
+    slashCommands,
+    onSelect: handleSelectCommand,
+    listRef: commandListRef,
+  });
+
+  // ---------------------------------------------------------------------------
   // Submit
   // ---------------------------------------------------------------------------
   const isPromptTooLong = prompt.length > CLOUD_AGENT_PROMPT_MAX_LENGTH;
@@ -589,8 +645,27 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
     try {
       const initialMessageId = generateMessageId();
+      const trimmed = prompt.trim();
+
+      // Parse slash command: if the input matches a known command, send a
+      // structured initialPayload so the backend dispatches a command rather
+      // than treating the text as a free-text prompt.
+      const slashMatch = /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(trimmed);
+      const slashCommand =
+        slashMatch && slashCommands.some(c => c.trigger === slashMatch[1])
+          ? { command: slashMatch[1], args: slashMatch[2]?.trim() ?? '' }
+          : null;
+
+      if (slashCommand && imageUpload.images.length > 0) {
+        toast.error('Images cannot be attached to slash commands', {
+          description: 'Remove the images or type a plain prompt instead.',
+        });
+        setIsPreparing(false);
+        return;
+      }
+
       const baseInput = {
-        prompt: prompt.trim(),
+        prompt: trimmed,
         mode,
         model: displayModel,
         variant: displayVariant,
@@ -599,6 +674,15 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         autoInitiate: true,
         initialMessageId,
         images: imageUpload.getImagesData(),
+        ...(slashCommand
+          ? {
+              initialPayload: {
+                type: 'command' as const,
+                command: slashCommand.command,
+                arguments: slashCommand.args,
+              },
+            }
+          : {}),
       };
       let result: { kiloSessionId: string; cloudAgentSessionId: string };
 
@@ -677,6 +761,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     selectedPlatform,
     selectedProfileId,
     selectedRepo,
+    slashCommands,
     trpc.cliSessionsV2.list,
     trpcClient,
   ]);
@@ -717,6 +802,10 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+
+      if (handleAutocompleteKeyDown(e)) return;
+
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         if (isFormValid) {
@@ -724,7 +813,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         }
       }
     },
-    [isFormValid, handleStartSession]
+    [handleAutocompleteKeyDown, isFormValid, handleStartSession]
   );
 
   // ---------------------------------------------------------------------------
@@ -827,18 +916,60 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               }
             }}
           />
-          <textarea
-            ref={textareaRef}
-            className="max-h-[50dvh] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-base focus:ring-0 focus:outline-none md:text-sm"
-            placeholder="What would you like to do?"
-            rows={5}
-            value={prompt}
-            onChange={handlePromptChange}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            disabled={isPreparing}
-            maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
-          />
+          <Popover
+            open={showAutocomplete}
+            onOpenChange={open => {
+              if (!open) setShowAutocomplete(false);
+            }}
+          >
+            <PopoverAnchor asChild>
+              <textarea
+                ref={textareaRef}
+                className="max-h-[50dvh] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-base focus:ring-0 focus:outline-none md:text-sm"
+                placeholder="What would you like to do?"
+                rows={5}
+                value={prompt}
+                onChange={handlePromptChange}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                disabled={isPreparing}
+                maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
+              />
+            </PopoverAnchor>
+            <PopoverContent
+              className="w-[var(--radix-popover-trigger-width)] min-w-[min(300px,calc(100vw-2rem))] p-0"
+              side="top"
+              align="start"
+              sideOffset={4}
+              onOpenAutoFocus={e => e.preventDefault()}
+            >
+              <UICommand
+                shouldFilter={false}
+                value={filteredCommands[selectedIndex]?.trigger ?? ''}
+              >
+                <CommandList ref={commandListRef} className="max-h-64 overflow-auto">
+                  <CommandEmpty>No matching commands</CommandEmpty>
+                  {filteredCommands.map((cmd, index) => (
+                    <CommandItem
+                      key={cmd.trigger}
+                      value={cmd.trigger}
+                      onSelect={() => handleSelectCommand(cmd, false)}
+                      className="flex cursor-pointer flex-col items-start gap-1 px-3 py-2"
+                      onMouseEnter={() => setSelectedIndex(index)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-medium text-blue-400">
+                          /{cmd.trigger}
+                        </span>
+                        <span className="text-muted-foreground text-sm">{cmd.label}</span>
+                      </div>
+                      <span className="text-muted-foreground text-xs">{cmd.description}</span>
+                    </CommandItem>
+                  ))}
+                </CommandList>
+              </UICommand>
+            </PopoverContent>
+          </Popover>
           {prompt.length >= CLOUD_AGENT_PROMPT_MAX_LENGTH * 0.9 && (
             <p
               className={cn(
@@ -943,6 +1074,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                   )}
             </div>
 
+            {slashCommands.length > 0 && (
+              <div className="hidden xl:block">
+                <BrowseCommandsDialog />
+              </div>
+            )}
+
             <div className="flex-1" />
 
             {isPreparing && <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />}
@@ -1001,7 +1138,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                   No repositories found
                 </div>
               ) : (
-                <Command>
+                <UICommand>
                   <div className="flex items-center border-b pr-2 [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:border-b-0">
                     <CommandInput placeholder="Search repositories..." />
                     <button
@@ -1082,7 +1219,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                       </CommandGroup>
                     )}
                   </CommandList>
-                </Command>
+                </UICommand>
               )}
             </PopoverContent>
           </Popover>

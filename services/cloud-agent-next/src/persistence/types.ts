@@ -3,7 +3,7 @@ import type { Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './CloudAgentSession.js';
 import type { EncryptedSecrets, MCPSecretValue } from '../router/schemas.js';
 import type { CallbackTarget } from '../callbacks/index.js';
-import type { Images, SessionProfileBundle } from './schemas.js';
+import type { Images, SessionProfileBundle, InitialExecutionPayload } from './schemas.js';
 import type { SessionIngestBinding } from '../session-ingest-binding.js';
 
 /**
@@ -89,6 +89,15 @@ export type RuntimeAgent = {
   };
 };
 
+export type RuntimeKiloCommand = {
+  name: string;
+  template: string;
+  description?: string | null;
+  agent?: string | null;
+  model?: string | null;
+  subtask?: boolean;
+};
+
 export type CloudAgentSessionState = {
   /** Current version timestamp (for cache invalidation) */
   version: number;
@@ -142,6 +151,8 @@ export type CloudAgentSessionState = {
   runtimeSkills?: readonly RuntimeSkill[];
   /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).runtimeAgents`. */
   runtimeAgents?: readonly RuntimeAgent[];
+  /** @deprecated Legacy flat read-fallback. Use `readProfileBundle(state).kiloCommands`. */
+  kiloCommands?: readonly RuntimeKiloCommand[];
   /** Upstream branch to checkout when cloning the repo */
   upstreamBranch?: string;
   /** Kilo CLI session ID for continuation (from session_created event) */
@@ -194,6 +205,9 @@ export type CloudAgentSessionState = {
 
   // Initial message ID for correlation
   initialMessageId?: string;
+
+  // Discriminated payload for the first execution (prompt or command)
+  initialPayload?: InitialExecutionPayload;
 };
 
 /**

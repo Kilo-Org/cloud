@@ -21,10 +21,11 @@ import type { SessionProfileBundle } from '../session-profile.js';
 import { logger } from '../logger.js';
 import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
 import { updateGitRemoteToken } from '../workspace.js';
-import { WrapperClient, type WrapperPromptOptions } from '../kilo/wrapper-client.js';
+import { WrapperClient } from '../kilo/wrapper-client.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { normalizeAgentMode } from '../schema.js';
-import { buildImagePromptParts, downloadImagePromptParts } from './image-prompt-parts.js';
+import { downloadImagePromptParts } from './image-prompt-parts.js';
+import { dispatchToWrapper, type WrapperCallContext } from './wrapper-call.js';
 import { withTimeout } from '@kilocode/worker-utils';
 import { withSandboxInternalServerErrorRecovery } from '../sandbox-recovery.js';
 
@@ -115,7 +116,7 @@ export class ExecutionOrchestrator {
     plan: ExecutionPlan,
     options?: { onProgress?: (step: string, message: string) => void }
   ): Promise<ExecutionResult> {
-    const { executionId, sessionId, userId, orgId, prompt, mode, workspace, wrapper } = plan;
+    const { executionId, sessionId, userId, orgId, payload, mode, workspace, wrapper } = plan;
 
     logger.setTags({
       executionId,
@@ -226,34 +227,29 @@ export class ExecutionOrchestrator {
     // Normalize mode to internal mode (e.g., 'architect' -> 'plan', 'orchestrator' -> 'code')
     const normalizedMode = normalizeAgentMode(mode);
 
-    // Build prompt options, using parts when images are attached
-    const promptOptions: WrapperPromptOptions = {
-      messageId: plan.messageId,
+    const wrapperCtx: WrapperCallContext = {
+      execution,
+      normalizedMode,
       model: wrapper.model,
       variant: wrapper.variant,
-      agent: normalizedMode,
       autoCommit: wrapper.autoCommit,
       condenseOnComplete: wrapper.condenseOnComplete,
-      execution,
       tools: this.getToolOverrides(plan),
+      messageId: plan.messageId,
+      fileParts,
     };
 
-    if (fileParts.length > 0) {
-      promptOptions.parts = buildImagePromptParts(prompt, fileParts);
-    } else {
-      promptOptions.prompt = prompt;
-    }
-
     try {
-      const result = await wrapperClient.prompt(promptOptions);
+      const result = await dispatchToWrapper(wrapperClient, wrapperCtx, payload);
+      const action = payload.type === 'command' ? 'Command' : 'Prompt';
       if (result.messageId) {
-        logger.withFields({ messageId: result.messageId }).info('Prompt sent to wrapper');
+        logger.withFields({ messageId: result.messageId }).info(`${action} sent to wrapper`);
       } else {
-        logger.info('Prompt sent to wrapper');
+        logger.info(`${action} sent to wrapper`);
       }
     } catch (error) {
       throw ExecutionError.wrapperStartFailed(
-        `Failed to send prompt: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to send ${payload.type}: ${error instanceof Error ? error.message : String(error)}`,
         error
       );
     }

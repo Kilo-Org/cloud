@@ -35,7 +35,8 @@ export type StreamEventType =
   | 'kilocode' // Kilocode CLI structured events
   | 'status' // execution status updates
   | 'heartbeat' // keep-alive during idle periods
-  | 'pong'; // response to ping command from DO
+  | 'pong' // response to ping command from DO
+  | 'commands.available'; // catalog of kilo slash commands
 
 // ---------------------------------------------------------------------------
 // Server -> Client Events (/stream endpoint)

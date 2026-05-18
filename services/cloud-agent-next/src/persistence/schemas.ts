@@ -259,6 +259,52 @@ export const RuntimeAgentsSchema = z
 
 export type RuntimeAgentInput = z.infer<typeof RuntimeAgentSchema>;
 
+// --- Runtime kilo commands ---
+
+export const RuntimeKiloCommandSchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .max(Limits.MAX_RUNTIME_KILO_COMMAND_NAME_LENGTH)
+    .regex(/^[a-z][a-z0-9-]*$/, 'Command name must start with a letter and be a slug'),
+  template: z.string().min(1).max(Limits.MAX_RUNTIME_KILO_COMMAND_TEMPLATE),
+  description: z.string().max(Limits.MAX_RUNTIME_KILO_COMMAND_DESCRIPTION).nullable().optional(),
+  agent: z.string().max(Limits.MAX_RUNTIME_AGENT_SLUG_LENGTH).nullable().optional(),
+  model: z.string().max(Limits.MAX_RUNTIME_AGENT_MODEL_LENGTH).nullable().optional(),
+  subtask: z.boolean().optional(),
+});
+
+export const RuntimeKiloCommandsSchema = z
+  .array(RuntimeKiloCommandSchema)
+  .max(
+    Limits.MAX_RUNTIME_KILO_COMMANDS,
+    `Maximum ${Limits.MAX_RUNTIME_KILO_COMMANDS} runtime kilo commands allowed`
+  );
+
+export type RuntimeKiloCommandInput = z.infer<typeof RuntimeKiloCommandSchema>;
+
+/** Discriminated payload for the initial execution on a newly-prepared session. */
+export const InitialExecutionPayloadSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('prompt'),
+    prompt: z.string().min(1),
+    mode: z.string().min(1),
+    model: z.string().min(1),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
+  }),
+  z.object({
+    type: z.literal('command'),
+    command: z.string().min(1),
+    arguments: z.string().default(''),
+  }),
+]);
+
+export type InitialExecutionPayload = z.infer<typeof InitialExecutionPayloadSchema>;
+
 // --- Profile bundle ---
 
 /**
@@ -289,6 +335,7 @@ export const SessionProfileBundleSchema = z.object({
     .optional(),
   runtimeSkills: RuntimeSkillsSchema.optional(),
   runtimeAgents: RuntimeAgentsSchema.optional(),
+  kiloCommands: RuntimeKiloCommandsSchema.optional(),
 });
 
 export type SessionProfileBundle = z.infer<typeof SessionProfileBundleSchema>;
@@ -385,6 +432,9 @@ export const MetadataSchema = z.object({
 
   // Initial message ID for correlation
   initialMessageId: z.string().startsWith('msg_').length(30).optional(),
+
+  // Discriminated payload for the first execution (prompt or command)
+  initialPayload: InitialExecutionPayloadSchema.optional(),
 });
 
 /**
@@ -426,6 +476,7 @@ export const PreparationInputSchema = z.object({
   mcpServers: z.record(z.string(), MCPServerConfigSchema).optional(),
   runtimeSkills: RuntimeSkillsSchema.optional(),
   runtimeAgents: RuntimeAgentsSchema.optional(),
+  kiloCommands: RuntimeKiloCommandsSchema.optional(),
   upstreamBranch: z.string().optional(),
   autoCommit: z.boolean().optional(),
   condenseOnComplete: z.boolean().optional(),
@@ -440,6 +491,9 @@ export const PreparationInputSchema = z.object({
   autoInitiate: z.boolean(),
 
   initialMessageId: z.string().optional(),
+
+  // Discriminated payload for the first execution (prompt or command)
+  initialPayload: InitialExecutionPayloadSchema.optional(),
 });
 
 export type PreparationInput = z.infer<typeof PreparationInputSchema>;

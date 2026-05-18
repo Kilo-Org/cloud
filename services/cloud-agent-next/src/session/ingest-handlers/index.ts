@@ -10,3 +10,4 @@ export {
   type ExecutionStatus,
 } from './execution-lifecycle.js';
 export { extractEntityId } from './entity-id.js';
+export { handleCommandsAvailable, type CommandsAvailableContext } from './commands-available.js';

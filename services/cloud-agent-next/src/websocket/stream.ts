@@ -18,7 +18,12 @@ import type {
 import type { SessionId, EventId } from '../types/ids.js';
 import { parseStreamFilters, matchesFilters } from './filters.js';
 import type { EventQueries } from '../session/queries/index.js';
-import type { CloudStatusData, ConnectedEventData } from '../shared/protocol.js';
+import type {
+  CloudStatusData,
+  ConnectedEventData,
+  CommandsAvailableData,
+} from '../shared/protocol.js';
+import type { SlashCommandInfo } from '../shared/slash-commands.js';
 
 /**
  * Approximate byte budget per replay round.
@@ -74,6 +79,11 @@ export function createErrorMessage(code: StreamErrorCode, message: string): Stre
 /** Options for deriving current session state in the `connected` event. */
 export type StreamHandlerOptions = {
   deriveCloudStatus?: () => Promise<CloudStatusData['cloudStatus'] | null>;
+  /**
+   * Read the cached slash-command catalog. The DO replies from cache on every
+   * connect — it never calls back to the wrapper at this point.
+   */
+  getAvailableCommands?: () => Promise<SlashCommandInfo[]>;
 };
 
 /**
@@ -151,6 +161,9 @@ export function createStreamHandler(
         const cloudStatus = await options?.deriveCloudStatus?.();
         if (cloudStatus) connectedData.cloudStatus = cloudStatus;
 
+        // eventId: 0 is the sentinel for non-persisted synthetic events.
+        // Real SQLite-backed events carry their actual row ID; downstream
+        // clients that track a replay cursor should skip eventId 0.
         server.send(
           JSON.stringify({
             eventId: 0,
@@ -161,6 +174,33 @@ export function createStreamHandler(
             data: connectedData,
           })
         );
+      }
+
+      // Send the cached slash-command catalog on connect only when the client
+      // filters allow it. If the wrapper hasn't pushed yet the list is empty;
+      // the wrapper's later push will arrive via the normal broadcast path.
+      // We never call back to the wrapper here — the cache is the source of
+      // truth for connecting clients.
+      if (options?.getAvailableCommands) {
+        const eventTypes = filters.eventTypes;
+        const shouldSendCatalog =
+          !eventTypes || eventTypes.length === 0 || eventTypes.includes('commands.available');
+
+        if (shouldSendCatalog) {
+          const commands = await options.getAvailableCommands();
+          const data: CommandsAvailableData = { commands };
+          server.send(
+            JSON.stringify({
+              // eventId: 0 — synthetic, non-persisted (same sentinel as the connected event above)
+              eventId: 0,
+              executionId: null,
+              sessionId,
+              streamEventType: 'commands.available' as const,
+              timestamp: new Date().toISOString(),
+              data,
+            })
+          );
+        }
       }
 
       return new Response(null, { status: 101, webSocket: client });

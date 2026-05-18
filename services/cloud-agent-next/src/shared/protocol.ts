@@ -1,3 +1,5 @@
+import type { SlashCommandInfo } from './slash-commands.js';
+
 /**
  * Event types that flow through the streaming system.
  *
@@ -29,7 +31,9 @@ export type StreamEventType =
   | 'preparing' // Async preparation step progress (autoInitiate flow)
   // DO -> /stream clients (cloud infrastructure lifecycle)
   | 'cloud.status' // Cloud infrastructure status (preparing/ready/finalizing/error)
-  | 'connected'; // Sent on WebSocket connect with current service state
+  | 'connected' // Sent on WebSocket connect with current service state
+  // Wrapper -> DO -> /stream clients (slash command catalog)
+  | 'commands.available'; // Catalog of kilo slash commands available in this session
 
 /**
  * Event envelope sent by wrapper to DO via /ingest WebSocket.
@@ -134,6 +138,15 @@ export type SessionStatus =
 export type ConnectedEventData = {
   sessionStatus?: SessionStatus;
   cloudStatus?: { type: CloudStatusType; step?: string; message?: string };
+};
+
+/**
+ * Data included in 'commands.available' events.
+ * The catalog of kilo slash commands the user can invoke in this session.
+ * `template` is intentionally stripped — kilo handles substitution server-side.
+ */
+export type CommandsAvailableData = {
+  commands: SlashCommandInfo[];
 };
 
 /**

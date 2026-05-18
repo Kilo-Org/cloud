@@ -190,10 +190,13 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
       }
       try {
         await manager.send({
-          prompt: text,
-          mode: currentMode,
-          model: currentModel,
-          variant: currentVariant || undefined,
+          payload: {
+            type: 'prompt',
+            prompt: text,
+            mode: currentMode,
+            model: currentModel,
+            variant: currentVariant || undefined,
+          },
         });
       } catch {
         toast.error('Failed to send message. Please try again.');

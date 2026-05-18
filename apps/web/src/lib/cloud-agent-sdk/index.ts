@@ -65,6 +65,9 @@ export type {
   TransportFactory,
   TransportSink,
   Transport,
+  TransportSendPayload,
+  SendPromptPayload,
+  SendCommandPayload,
 } from './transport';
 
 export { createConnection } from './cloud-agent-connection';
@@ -87,6 +90,7 @@ export type {
   CloudStatus,
   QuestionState,
   PermissionState,
+  SlashCommandInfo,
   SuggestionAction,
   SuggestionState,
   ServiceStateSnapshot,

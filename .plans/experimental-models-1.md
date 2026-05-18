@@ -10,14 +10,14 @@
     [todo] not started
 -->
 
-| Phase                                | Status        | Notes                                                                                       |
-| ------------------------------------ | ------------- | ------------------------------------------------------------------------------------------- |
-| Phase 1 — Schema + Migration         | [merged-pending] | Branch `mark/experimental-models-schema`. Migration `0134_black_union_jack.sql`. PR #3299. |
-| Phase 2 — Gateway Header Capture     | [todo]        |                                                                                             |
-| Phase 3 — Variant Picker + Routing   | [todo]        |                                                                                             |
-| Phase 4 — Usage, Metrics, Reporting  | [todo]        |                                                                                             |
-| Phase 5 — Admin tRPC + UI            | [todo]        |                                                                                             |
-| Phase 6 — Specs + Tests              | [todo]        | Spec file `.specs/model-experiments.md` not yet created.                                    |
+| Phase                               | Status           | Notes                                                                                      |
+| ----------------------------------- | ---------------- | ------------------------------------------------------------------------------------------ |
+| Phase 1 — Schema + Migration        | [merged-pending] | Branch `mark/experimental-models-schema`. Migration `0134_black_union_jack.sql`. PR #3299. |
+| Phase 2 — Gateway Header Capture    | [todo]           |                                                                                            |
+| Phase 3 — Variant Picker + Routing  | [todo]           |                                                                                            |
+| Phase 4 — Usage, Metrics, Reporting | [todo]           |                                                                                            |
+| Phase 5 — Admin tRPC + UI           | [todo]           |                                                                                            |
+| Phase 6 — Specs + Tests             | [todo]           | Spec file `.specs/model-experiments.md` not yet created.                                   |
 
 **Phase 1 — concrete output (landed in `packages/db/src/schema.ts` + `0134_black_union_jack.sql`):**
 

@@ -73,4 +73,23 @@ describe('ConversationDO.initAttachment', () => {
     });
     expect(r2.attachmentId).toBe(r1.attachmentId);
   });
+
+  it('returns distinct attachmentIds when mimeType differs', async () => {
+    const conversationId = ulid();
+    const stub = getDO(conversationId);
+    await stub.bootstrapConversation({ creatorId: 'user-A', otherMembers: [] });
+    const r1 = await stub.initAttachment({
+      uploaderId: 'user-A',
+      mimeType: 'image/png',
+      size: 7,
+      filename: 'photo.bin',
+    });
+    const r2 = await stub.initAttachment({
+      uploaderId: 'user-A',
+      mimeType: 'image/jpeg',
+      size: 7,
+      filename: 'photo.bin',
+    });
+    expect(r2.attachmentId).not.toBe(r1.attachmentId);
+  });
 });

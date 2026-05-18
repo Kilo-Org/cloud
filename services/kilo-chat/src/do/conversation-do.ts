@@ -1385,6 +1385,7 @@ export class ConversationDO extends DurableObject<Env> {
           eq(attachments.uploader_id, params.uploaderId),
           eq(attachments.filename, params.filename),
           eq(attachments.size, params.size),
+          eq(attachments.mime_type, params.mimeType),
           eq(attachments.status, 'pending'),
           gte(attachments.created_at, dedupeCutoff)
         )

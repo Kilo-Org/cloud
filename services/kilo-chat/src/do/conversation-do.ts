@@ -1002,6 +1002,8 @@ export class ConversationDO extends DurableObject<Env> {
     if (next) {
       await this.ctx.storage.setAlarm(next.notifyAfter);
     }
+
+    await this.sweepOrphanAttachments();
   }
 
   setTyping(
@@ -1457,8 +1459,52 @@ export class ConversationDO extends DurableObject<Env> {
     };
   }
 
+  /**
+   * Ensures an alarm is set so the orphan sweep eventually runs. Storage
+   * alarm APIs are async; the sync `initAttachment` path schedules via
+   * `ctx.waitUntil`. The DO already shares one alarm slot with bot-
+   * notification timeouts, so we only push out (or set) the alarm — never
+   * pull it in.
+   */
   private scheduleOrphanSweepIfNeeded(): void {
-    // Stub — real implementation lands in Task 16.
+    this.ctx.waitUntil(
+      (async () => {
+        const existing = await this.ctx.storage.getAlarm();
+        const target = Date.now() + ConversationDO.ORPHAN_TTL_MS;
+        if (existing === null || existing < Date.now()) {
+          await this.ctx.storage.setAlarm(target);
+        }
+      })()
+    );
+  }
+
+  private async sweepOrphanAttachments(): Promise<void> {
+    const cutoff = Date.now() - ConversationDO.ORPHAN_TTL_MS;
+    const stale = this.db
+      .select()
+      .from(attachments)
+      .where(and(eq(attachments.status, 'pending'), lt(attachments.created_at, cutoff)))
+      .all();
+    if (stale.length > 0) {
+      const ids = stale.map(r => r.id);
+      this.db.delete(attachments).where(inArray(attachments.id, ids)).run();
+      await this.scheduleR2Deletes(stale.map(r => r.r2_key));
+    }
+
+    // If anything is still pending, re-arm the alarm so we sweep it later.
+    const remaining = this.db
+      .select({ id: attachments.id })
+      .from(attachments)
+      .where(eq(attachments.status, 'pending'))
+      .limit(1)
+      .get();
+    if (remaining) {
+      const existing = await this.ctx.storage.getAlarm();
+      const target = Date.now() + ConversationDO.ORPHAN_TTL_MS;
+      if (existing === null || existing < Date.now()) {
+        await this.ctx.storage.setAlarm(target);
+      }
+    }
   }
 
   async destroyAndReturnMembers(): Promise<DestroyResult> {

@@ -535,7 +535,7 @@ function MorningBriefingLocationEditor({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(userLocation ?? '');
-  const isSaving = mutations.updateConfig.isPending;
+  const isSaving = mutations.updateUserLocation.isPending;
   const hasLocation = userLocation !== null && userLocation.trim().length > 0;
 
   function handleSave() {
@@ -544,7 +544,7 @@ function MorningBriefingLocationEditor({
       toast.error('Location cannot be empty');
       return;
     }
-    mutations.updateConfig.mutate(
+    mutations.updateUserLocation.mutate(
       { userLocation: value },
       {
         onSuccess: () => {
@@ -559,7 +559,7 @@ function MorningBriefingLocationEditor({
   }
 
   function handleClear() {
-    mutations.updateConfig.mutate(
+    mutations.updateUserLocation.mutate(
       { userLocation: null },
       {
         onSuccess: () => {

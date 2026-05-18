@@ -6880,6 +6880,50 @@ describe('provision: auto-start after fresh provision', () => {
     );
   });
 
+  it('does not fail provision when the morning-briefing user-location sync errors', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', {
+      userTimezone: 'Europe/Amsterdam',
+      userLocation: 'Amsterdam, North Holland, Netherlands',
+    });
+    await Promise.all(waitUntilPromises);
+
+    vi.mocked(fetch).mockImplementation((url: unknown) => {
+      if (typeof url === 'string' && url.includes('/_kilo/morning-briefing/user-location')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: 'Gateway not running' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      if (typeof url === 'string' && url.includes('/_kilo/user-profile')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, path: 'workspace/USER.md' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      return Promise.resolve(new Response(null, { status: 200 }));
+    });
+
+    await expect(
+      instance.provision('user-1', { userLocation: 'Paris, France' })
+    ).resolves.toBeDefined();
+
+    expect(storage._store.get('userLocation')).toBe('Paris, France');
+  });
+
   it('leaves user location absent when weather setup is skipped', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
 

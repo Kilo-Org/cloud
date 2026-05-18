@@ -508,6 +508,11 @@ export function useOrgKiloClawMutations(
       },
     })
   );
+  const rawUpdateUserLocation = useMutation(
+    trpc.organizations.kiloclaw.updateUserLocation.mutationOptions({
+      onSuccess: invalidateStatus,
+    })
+  );
 
   const mutations = {
     start: bindVoid(rawStart),
@@ -540,6 +545,7 @@ export function useOrgKiloClawMutations(
     disableMorningBriefing: bindVoid(rawDisableMorningBriefing),
     runMorningBriefing: bindVoid(rawRunMorningBriefing),
     updateBriefingInterests: bind(rawUpdateBriefingInterests),
+    updateUserLocation: bind(rawUpdateUserLocation),
     startKiloCliRun: bind(rawStartKiloCliRun),
     cancelKiloCliRun: bind(rawCancelKiloCliRun),
     rename: bind(rawRename),

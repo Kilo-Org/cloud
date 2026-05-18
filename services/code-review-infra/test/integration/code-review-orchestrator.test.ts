@@ -592,7 +592,7 @@ describe('CodeReviewOrchestrator recovery', () => {
         if (prepareCalls === 1) {
           return trpcError(
             500,
-            'Wrapper did not become ready on port 5353 within 30000ms: waitForPort timed out | wrapperFileLog: failed to start kilo server: Timeout waiting for server to start after 30000ms'
+            'Wrapper did not become ready on port 5353 within 30000ms: waitForPort timed out | wrapperFileLog: failed to start kilo server: Timeout waiting for server to start after 45000ms'
           );
         }
         return trpcSuccess({
@@ -765,7 +765,10 @@ describe('CodeReviewOrchestrator recovery', () => {
         return Response.json({ success: true });
       }
       if (url.includes('/trpc/prepareSession')) {
-        return trpcError(500, 'Failed to checkout pull ref: Object does not exist on the server');
+        return trpcError(
+          500,
+          'SandboxError: HTTP error! status: 500 during setup | Failed to checkout pull ref: Object does not exist on the server'
+        );
       }
       return new Response('unexpected fetch', { status: 500 });
     });

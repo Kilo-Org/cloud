@@ -189,6 +189,20 @@ function classifyCloudAgentNextFreshSessionRetry(
     );
   }
 
+  if (
+    body.includes('git clone timed out') ||
+    body.includes('failed to checkout pull ref') ||
+    body.includes('git-lfs filter-process') ||
+    body.includes('object does not exist on the server')
+  ) {
+    return cloudAgentNextFreshRetryClassification(
+      error,
+      false,
+      'repo_clone_or_checkout_failure',
+      'repo_clone_or_checkout_not_retryable'
+    );
+  }
+
   const parsedBody = parseJsonBody(error.body);
   if (hasRetryableSandboxMarker(parsedBody)) {
     return cloudAgentNextFreshRetryClassification(
@@ -199,9 +213,7 @@ function classifyCloudAgentNextFreshSessionRetry(
     );
   }
 
-  if (
-    body.includes('failed to start kilo server: timeout waiting for server to start after 30000ms')
-  ) {
+  if (body.includes('failed to start kilo server: timeout waiting for server to start')) {
     return cloudAgentNextFreshRetryClassification(
       error,
       true,
@@ -241,20 +253,6 @@ function classifyCloudAgentNextFreshSessionRetry(
       true,
       'sandbox_api_or_storage_failure',
       'sandbox_5xx_body_signal'
-    );
-  }
-
-  if (
-    body.includes('git clone timed out') ||
-    body.includes('failed to checkout pull ref') ||
-    body.includes('git-lfs filter-process') ||
-    body.includes('object does not exist on the server')
-  ) {
-    return cloudAgentNextFreshRetryClassification(
-      error,
-      false,
-      'repo_clone_or_checkout_failure',
-      'repo_clone_or_checkout_not_retryable'
     );
   }
 

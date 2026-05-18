@@ -215,11 +215,7 @@ function classifyPrepareSessionWorkspaceFailure(
     return 'configured_session_lookup_failure';
   }
 
-  if (
-    message.includes(
-      'failed to start kilo server: timeout waiting for server to start after 30000ms'
-    )
-  ) {
+  if (message.includes('failed to start kilo server: timeout waiting for server to start')) {
     return 'wrapper_kilo_server_start_timeout';
   }
 

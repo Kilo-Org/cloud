@@ -91,14 +91,24 @@ export const textBlockSchema = z.object({
   text: trimmedNonEmptyString(MESSAGE_TEXT_MAX_CHARS),
 });
 
+export const attachmentBlockSchema = z.object({
+  type: z.literal('attachment'),
+  attachmentId: ulidSchema,
+  mimeType: z.string().min(1).max(255),
+  size: z.number().int().nonnegative(),
+  filename: z.string().max(512),
+});
+
 export const contentBlockSchema = z.discriminatedUnion('type', [
   textBlockSchema,
   actionsBlockSchema,
+  attachmentBlockSchema,
 ]);
 
 export const inputContentBlockSchema = z.discriminatedUnion('type', [
   textBlockSchema,
   inputActionsBlockSchema,
+  attachmentBlockSchema,
 ]);
 
 // ── Reactions ───────────────────────────────────────────────────────

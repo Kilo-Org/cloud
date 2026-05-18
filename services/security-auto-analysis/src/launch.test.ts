@@ -72,6 +72,7 @@ function createParams(retrySandboxOnly: boolean, cloudAgentFetch: typeof fetch) 
       KILOCODE_BACKEND_BASE_URL: 'https://backend.test',
       SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE: 'worker',
       SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL: 'https://app.kilo.ai',
+      SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL: 'https://security-analysis.test',
       CLOUD_AGENT_NEXT: { fetch: cloudAgentFetch },
     } as unknown as CloudflareEnv,
     findingId: finding.id,
@@ -89,19 +90,19 @@ function createParams(retrySandboxOnly: boolean, cloudAgentFetch: typeof fetch) 
 }
 
 describe('buildSecurityAnalysisCallbackTarget', () => {
-  it('routes callback delivery directly to the Worker processing plane by default', () => {
+  it('routes callback delivery to configured Worker HTTP ingress', () => {
     expect(
       buildSecurityAnalysisCallbackTarget(
         {
           SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE: 'worker',
           SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL: 'https://app.kilo.ai',
+          SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL: 'https://security-analysis.test/',
         },
         finding.id,
         'callback-token'
       )
     ).toEqual({
-      url: `https://security-auto-analysis/internal/security-analysis-callback/${finding.id}`,
-      delivery: 'security-auto-analysis',
+      url: `https://security-analysis.test/internal/security-analysis-callback/${finding.id}`,
       headers: { 'X-Callback-Token': 'callback-token' },
     });
   });
@@ -112,6 +113,7 @@ describe('buildSecurityAnalysisCallbackTarget', () => {
         {
           SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE: 'web',
           SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL: 'https://app.kilo.ai/',
+          SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL: '',
         },
         finding.id,
         'callback-token'
@@ -120,6 +122,20 @@ describe('buildSecurityAnalysisCallbackTarget', () => {
       url: `https://app.kilo.ai/api/internal/security-analysis-callback/${finding.id}`,
       headers: { 'X-Callback-Token': 'callback-token' },
     });
+  });
+
+  it('requires a public Worker base URL for Worker callback routing', () => {
+    expect(() =>
+      buildSecurityAnalysisCallbackTarget(
+        {
+          SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE: 'worker',
+          SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL: 'https://app.kilo.ai',
+          SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL: '',
+        },
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'callback-token'
+      )
+    ).toThrow('SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL');
   });
 });
 

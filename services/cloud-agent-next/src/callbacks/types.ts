@@ -1,7 +1,6 @@
 export type CallbackTarget = {
   url: string;
   headers?: Record<string, string>;
-  delivery?: 'http' | 'security-auto-analysis';
 };
 
 export type ExecutionCallbackPayload = {

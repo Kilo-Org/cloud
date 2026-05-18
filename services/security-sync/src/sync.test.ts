@@ -47,6 +47,18 @@ describe('Worker auto-analysis queue sync', () => {
         autoAnalysisMinSeverity: 'high',
       })
     ).toEqual({ eligible: false, severityRank: 1 });
+
+    expect(
+      isFindingEligibleForAutoAnalysis({
+        findingCreatedAt: '2026-05-18T10:00:00.000Z',
+        findingStatus: 'open',
+        severity: 'unexpected',
+        ownerAutoAnalysisEnabledAt: '2026-05-18T09:00:00.000Z',
+        isAgentEnabled: true,
+        autoAnalysisEnabled: true,
+        autoAnalysisMinSeverity: 'all',
+      })
+    ).toEqual({ eligible: false, severityRank: null });
   });
 
   it('enqueues eligible findings for Worker-owned automatic analysis', async () => {

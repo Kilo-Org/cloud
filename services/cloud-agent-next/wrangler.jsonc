@@ -96,10 +96,6 @@
       "service": "notifications",
       "entrypoint": "NotificationsService",
     },
-    {
-      "binding": "SECURITY_AUTO_ANALYSIS",
-      "service": "security-auto-analysis",
-    },
   ],
   "secrets_store_secrets": [
     {
@@ -302,10 +298,6 @@
           "binding": "NOTIFICATIONS",
           "service": "notifications",
           "entrypoint": "NotificationsService",
-        },
-        {
-          "binding": "SECURITY_AUTO_ANALYSIS",
-          "service": "security-auto-analysis-dev",
         },
       ],
       "secrets_store_secrets": [

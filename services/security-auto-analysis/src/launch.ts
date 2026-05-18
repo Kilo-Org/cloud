@@ -118,13 +118,14 @@ type StartSecurityAnalysisParams = {
 export function buildSecurityAnalysisCallbackTarget(
   env: Pick<
     CloudflareEnv,
-    'SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE' | 'SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL'
+    | 'SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE'
+    | 'SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL'
+    | 'SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL'
   >,
   findingId: string,
   callbackToken: string
 ): {
   url: string;
-  delivery?: 'security-auto-analysis';
   headers: { 'X-Callback-Token': string };
 } {
   if (env.SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE === 'web') {
@@ -135,9 +136,15 @@ export function buildSecurityAnalysisCallbackTarget(
     };
   }
 
+  const baseUrl = env.SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL.replace(/\/$/, '');
+  if (!baseUrl) {
+    throw new Error(
+      'SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL is required for Worker callback routing'
+    );
+  }
+
   return {
-    url: `https://security-auto-analysis/internal/security-analysis-callback/${findingId}`,
-    delivery: 'security-auto-analysis',
+    url: `${baseUrl}/internal/security-analysis-callback/${findingId}`,
     headers: { 'X-Callback-Token': callbackToken },
   };
 }

@@ -669,10 +669,11 @@ export function isFindingEligibleForAutoAnalysis(params: {
   ) {
     return { eligible: false, severityRank: normalizedSeverityRank };
   }
-  const effectiveRank = normalizedSeverityRank ?? severityRankBySeverity.low;
   return {
-    eligible: effectiveRank <= minSeverityToMaxRank(params.autoAnalysisMinSeverity),
-    severityRank: effectiveRank,
+    eligible:
+      normalizedSeverityRank !== null &&
+      normalizedSeverityRank <= minSeverityToMaxRank(params.autoAnalysisMinSeverity),
+    severityRank: normalizedSeverityRank,
   };
 }
 

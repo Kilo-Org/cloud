@@ -206,10 +206,6 @@ export type Env = {
   GIT_TOKEN_SERVICE: GitTokenService;
   /** Service binding for dispatching push notifications */
   NOTIFICATIONS: NotificationsBinding;
-  /** Direct HTTP service binding for Security Agent analysis callbacks */
-  SECURITY_AUTO_ANALYSIS?: {
-    fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
-  };
   /** GitHub Lite App slug for git commit attribution (e.g., 'kiloconnect-lite') */
   GITHUB_LITE_APP_SLUG?: string;
   /** GitHub Lite App bot user ID for git commit email */

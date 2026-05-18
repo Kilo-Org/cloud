@@ -205,8 +205,8 @@ Do not clear the block until credits are restored. After top-up, clear the block
 
 **Callback routing:**
 
-- `SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE=worker` targets direct service-binding delivery to this Worker.
-- `SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE=web` targets `${SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL}/api/internal/security-analysis-callback/:findingId` so rollout can return to the compatibility Next.js callback path without changing launch code.
+- `SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE=worker` targets `${SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL}/internal/security-analysis-callback/:findingId`; base URL must be reachable from `cloud-agent-next`.
+- `SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE=web` targets `${SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL}/api/internal/security-analysis-callback/:findingId`; this is default callback path and keeps `cloud-agent-next` domain-blind.
 
 **Owner-scoped stop** (surgical):
 

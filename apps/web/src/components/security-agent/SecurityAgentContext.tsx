@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-} from 'react';
+import { createContext, use, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -102,7 +94,7 @@ type SecurityAgentContextValue = {
 const SecurityAgentContext = createContext<SecurityAgentContextValue | null>(null);
 
 export function useSecurityAgent() {
-  const ctx = useContext(SecurityAgentContext);
+  const ctx = use(SecurityAgentContext);
   if (!ctx) {
     throw new Error('useSecurityAgent must be used within a SecurityAgentProvider');
   }

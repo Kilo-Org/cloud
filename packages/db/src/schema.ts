@@ -1948,7 +1948,6 @@ export const stytch_fingerprints = pgTable(
     http_user_agent: text(),
   },
   table => [
-    index('idx_fingerprint_data').on(table.fingerprint_data),
     index('idx_hardware_fingerprint').on(table.hardware_fingerprint),
     index('idx_kilo_user_id').on(table.kilo_user_id),
     index('idx_stytch_fingerprints_reasons_gin').using('gin', table.reasons),
@@ -2655,7 +2654,6 @@ export const code_indexing_manifest = pgTable(
     index('IDX_code_indexing_manifest_organization_id').on(table.organization_id),
     index('IDX_code_indexing_manifest_kilo_user_id').on(table.kilo_user_id),
     index('IDX_code_indexing_manifest_project_id').on(table.project_id),
-    index('IDX_code_indexing_manifest_file_hash').on(table.file_hash),
     index('IDX_code_indexing_manifest_git_branch').on(table.git_branch),
     index('IDX_code_indexing_manifest_created_at').on(table.created_at),
     // Unique index to prevent race conditions during concurrent indexing
@@ -4366,10 +4364,6 @@ export const free_model_usage = pgTable(
     index('idx_free_model_usage_ip_created_at').on(table.ip_address, table.created_at),
     // Secondary index for analytics
     index('idx_free_model_usage_created_at').on(table.created_at),
-    // Index for per-user rate limiting (server-side products); partial to exclude anonymous rows
-    index('idx_free_model_usage_user_created_at')
-      .on(table.kilo_user_id, table.created_at)
-      .where(isNotNull(table.kilo_user_id)),
   ]
 );
 

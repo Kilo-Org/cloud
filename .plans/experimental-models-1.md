@@ -64,7 +64,7 @@ POST /api/openrouter/.../chat/completions
   ├─ construct MicrodollarUsageContext and stash variantVersionId + allocationSubject + clientRequestId from the getProvider result
   ├─ balance / org access checks (bypassed for direct provider; preview traffic is free/provider-funded in v1)
   ├─ applyTrackingIds + applyProviderSpecificLogic / provider.transformRequest
-  ├─ snapshot canonical post-transform request body onto MicrodollarUsageContext for prompt storage
+  ├─ build bounded prompt capture from canonical post-transform body and store it on MicrodollarUsageContext
   ├─ upstream fetch (unchanged)
   └─ after():
        ├─ accountForMicrodollarUsage writes usage + experiment request attribution
@@ -233,12 +233,12 @@ Full request prompts (system message + canonical post-`transformRequest` body) a
 - Caps live as constants in `apps/web/src/lib/ai-gateway/experiments/persist.ts` so they are easy to bump.
 - Sentry breadcrumb (no payload) when truncation fires, so we know if it ever happens at non-trivial rates.
 
-**Write path** (runs inside the same `after()` hook as `accountForMicrodollarUsage`, after the microdollar write):
+**Capture + write path** (capture runs before upstream fetch; R2 writes run inside the same `after()` hook as `accountForMicrodollarUsage`, after the microdollar write):
 
-1. Take the canonical post-`transformRequest` body (deep-cloned via `structuredClone` immediately after `transformRequest` runs, before any further mutation; passed through `MicrodollarUsageContext` to the after-hook).
-2. Split out the single leading `system` message if present.
-3. Apply size caps (truncate; flag `was_truncated`).
-4. For each present half: compute sha256, call `putPromptIfAbsent(content)` which `HEAD`s and only `PUT`s on miss.
+1. After `applyProviderSpecificLogic` / `provider.transformRequest` has produced the canonical upstream request body, call `buildExperimentPromptCapture(requestBodyParsed.body)` before `upstreamRequest`.
+2. `buildExperimentPromptCapture` splits out the single leading `system` message if present, builds the request-body remainder, serializes the two pieces, applies the 4 MB caps, and returns only bounded strings plus `was_truncated`.
+3. Store that bounded prompt capture on `MicrodollarUsageContext`; do **not** retain a `structuredClone` of the full uncapped request body through the async `after()` path.
+4. In the `after()` hook, for each present bounded half: compute sha256, call `putPromptIfAbsent(content)` which `HEAD`s and only `PUT`s on miss.
 5. Insert one row in `model_experiment_request` with the attribution columns and the resulting prompt hashes or sentinels (single statement, single round-trip).
 
 - The R2 puts run in parallel via `Promise.allSettled`. Store each side independently: use the sha256 for successful puts/already-existing objects, `__absent__` for a missing system prompt, and `__failed__` only for the side whose R2 write failed. Log/capture the failure without prompt content. The `model_experiment_request` attribution row always exists when the microdollar usage row exists; prompt storage is best-effort analytics.
@@ -278,7 +278,7 @@ In `apps/web/src/app/api/openrouter/[...path]/route.ts`:
 - Capture `x-kilo-session` as a fallback for `session_id` when `x-kilocode-taskid` is absent.
 - Reuse the existing machine-id extraction; do not introduce a new header.
 - Pass `clientRequestId` through `MicrodollarUsageContext` and persist it in `model_experiment_request` only when an experiment is applied.
-- Note on context mutation: current `route.ts` calls `getProvider` before constructing `MicrodollarUsageContext`. `getProvider` must therefore return experiment metadata alongside the provider result, and `route.ts` assigns `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, and the prompt-storage body snapshot onto `usageContext` after it is constructed. The existing code already mutates `usageContext` later for fields such as `ttfb_ms`, `status_code`, and `abuse_request_id`; experiment fields follow that route-level mutation pattern rather than mutating context from inside `getProvider`.
+- Note on context mutation: current `route.ts` calls `getProvider` before constructing `MicrodollarUsageContext`. `getProvider` must therefore return experiment metadata alongside the provider result, and `route.ts` assigns `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, and the bounded prompt capture onto `usageContext` after it is constructed. The existing code already mutates `usageContext` later for fields such as `ttfb_ms`, `status_code`, and `abuse_request_id`; experiment fields follow that route-level mutation pattern rather than mutating context from inside `getProvider`.
 
 ### Phase 3 — Variant Picker + Routing
 
@@ -358,7 +358,7 @@ Integration in `getProvider` (`apps/web/src/lib/ai-gateway/providers/get-provide
     | { kind: 'not-found' }
     | { kind: 'unavailable' };
   ```
-- `route.ts` handles `not-found`/`unavailable` routing results before reading `provider.supportedChatApis`: `not-found` maps to local 404/model unavailable, and `unavailable` maps to 503/temporarily unavailable. For active selections, it constructs `usageContext` as it does today, then copies `providerResult.experiment.variantVersionId`, `allocationSubject`, and `clientRequestId` onto the context. It captures `usageContext.experimentRequestBody = structuredClone(requestBodyParsed.body)` after provider-specific/direct-provider transforms have produced the canonical upstream request body and before any later mutation.
+- `route.ts` handles `not-found`/`unavailable` routing results before reading `provider.supportedChatApis`: `not-found` maps to local 404/model unavailable, and `unavailable` maps to 503/temporarily unavailable. For active selections, it constructs `usageContext` as it does today, then copies `providerResult.experiment.variantVersionId`, `allocationSubject`, and `clientRequestId` onto the context. After provider-specific/direct-provider transforms have produced the canonical upstream request body and before any later mutation, it stores `usageContext.experimentPromptCapture = buildExperimentPromptCapture(requestBodyParsed.body)`. The capture is bounded before being retained for the async write.
 - Picking inside `getProvider` is required because `bypassAccessCheck` and the upstream `apiUrl/apiKey` must be set before `route.ts` runs balance and `checkOrganizationModelRestrictions` checks. This is the same layer where `kilo-internal/...` already integrates.
 - `bypassAccessCheck: true` intentionally skips balance and organization policy checks for v1 experiment traffic. Preview experiment traffic is free/provider-funded for v1, and org discovery remains gated by the preview public id's registry entry.
 - `applyProviderSpecificLogic` accepts route metadata that skips only Kilo-exclusive model settings when `skipKiloExclusiveModelSettings` is true. Generic provider-specific request fixes still run, and `provider.transformRequest` still performs the direct experiment rewrite before the upstream fetch.
@@ -375,13 +375,11 @@ Routing scope:
 
 Persist experiment attribution everywhere request-level metrics are consumed:
 
-- `MicrodollarUsageContext`: add `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, and `experimentRequestBody`. The picker also returns `variantId` and `experimentId` for in-memory use (debug logs only), but only `variantVersionId` and `allocationSubject` are persisted to `model_experiment_request`. The `upstream` blob is consumed by `buildDirectProvider` and not stored on the context. `experimentRequestBody` holds the structured-cloned canonical body used by the prompt-storage path; never re-read by anything else.
+- `MicrodollarUsageContext`: add `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, and `experimentPromptCapture`. The picker also returns `variantId` and `experimentId` for in-memory use (debug logs only), but only `variantVersionId` and `allocationSubject` are persisted to `model_experiment_request`. The `upstream` blob is consumed by `buildDirectProvider` and not stored on the context. `experimentPromptCapture` holds the bounded canonical prompt capture used by the prompt-storage path; it never stores the full uncapped request body.
 - **Decoupled experiment write.** The microdollar write remains the billing source of truth, and experiment attribution is written as a separate best-effort analytics row. Small `processUsage.ts` changes are allowed if they keep this flow simpler, such as accepting pre-generated `usageId`/`createdAt` or returning the inserted usage identity. Inside the same `after()` hook scheduled by `accountForMicrodollarUsage`, a new step runs `persistExperimentAttribution` (see `apps/web/src/lib/ai-gateway/experiments/persist.ts`) when `usageContext.modelExperimentVariantVersionId` is set. Failure of the experiment write is Sentry-reported but does not roll back the microdollar write (billing must succeed independently of analytics).
-- `persistExperimentAttribution` performs, in order:
-  1. Split the canonical body into `system_message_content` (single leading `system` message if present) and `request_body_remainder` (everything else, serialized).
-  2. Apply size caps (4 MB each); flag `was_truncated` if either side overflowed.
-  3. In parallel: `putPromptIfAbsent(system_message_content)` and `putPromptIfAbsent(request_body_remainder)`, returning sha256 hex digests.
-  4. Insert one row into `model_experiment_request` carrying both the attribution columns and the resulting prompt hashes/sentinels (single statement). On R2 put failure, only the failed side receives `__failed__`; the attribution row still lands.
+- `persistExperimentAttribution` consumes the bounded `experimentPromptCapture` from `MicrodollarUsageContext`. It performs, in order:
+  1. In parallel: `putPromptIfAbsent(system_message_content)` and `putPromptIfAbsent(request_body_remainder)` for the bounded present halves, returning sha256 hex digests.
+  2. Insert one row into `model_experiment_request` carrying both the attribution columns and the resulting prompt hashes/sentinels (single statement). On R2 put failure, only the failed side receives `__failed__`; the attribution row still lands.
 - PostHog: no change in v1. `processUsage.ts` does not emit a general per-request PostHog event today, and adding one purely for experiment fields is out of scope. Feedback joins (`Feedback Submitted.parentMessageID = client_request_id`) are queried via existing PostHog dashboards out-of-band, linked from the admin UI.
 - Analytics Engine: no v1 work. Adding experiment dimensions to `services/o11y/pipelines/api-metrics-schema.json`, `services/o11y/src/api-metrics-routes.ts`, `apps/web/src/lib/ai-gateway/o11y/api-metrics.server.ts`, `services/o11y/src/o11y-analytics.ts`, the o11y tests, and possibly `services/o11y/wrangler.jsonc` (pipeline stream recreation) is deferred until a concrete AE-backed dashboard needs experiment dimensions. v1 admin reports come from Postgres only.
 - Reporting view: add `model_experiment_request_stats`, joining `model_experiment_request → model_experiment_variant_version → model_experiment_variant → model_experiment` and `microdollar_usage` / `microdollar_usage_metadata`. The view exposes `upstream->>'internal_id' AS internal_id`, `upstream->>'base_url' AS base_url`, `variant_label`, and `experiment_id` so reports never need to recreate the join chain. **The view explicitly does not select `upstream->>'api_key'`** — keys live only in the version row JSONB and the Redis cache.
@@ -521,7 +519,7 @@ Core experiment implementation:
 - `packages/db/src/migrations/<generated>_*.sql`
 - `apps/web/src/lib/ai-gateway/experiments/pick-variant.ts` (uses `decryptApiKey` from `apps/web/src/lib/ai-gateway/byok/encryption.ts`; no new module)
 - `apps/web/src/lib/ai-gateway/experiments/build-direct-provider.ts`
-- `apps/web/src/lib/ai-gateway/experiments/persist.ts` (new — owns `persistExperimentAttribution`, size caps, sha256 hashing, R2 puts, and the single-row insert into `model_experiment_request`)
+- `apps/web/src/lib/ai-gateway/experiments/persist.ts` (new — owns `buildExperimentPromptCapture`, `persistExperimentAttribution`, size caps, sha256 hashing, R2 puts, and the single-row insert into `model_experiment_request`)
 - `apps/web/src/lib/ai-gateway/experiments/index.ts`
 - `apps/web/src/app/api/openrouter/[...path]/route.ts`
 - `apps/web/src/lib/ai-gateway/providers/get-provider.ts` (refactor `kilo-internal/...` branch to share `buildDirectProvider`; add experiment branch that returns direct provider plus experiment metadata)
@@ -529,7 +527,7 @@ Core experiment implementation:
 - `apps/web/src/lib/ai-gateway/providers/apply-provider-specific-logic.ts` (honor `skipKiloExclusiveModelSettings` while keeping generic request fixes and `provider.transformRequest`)
 - `apps/web/src/lib/ai-gateway/llm-proxy-helpers.ts` (extend the existing `after()` hook around `accountForMicrodollarUsage` to also call `persistExperimentAttribution` after the microdollar write completes)
 - `apps/web/src/lib/ai-gateway/processUsage.ts` (small identity plumbing only if needed to share or return the inserted `usage_id`/`created_at`)
-- `apps/web/src/lib/ai-gateway/processUsage.types.ts` (add `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, `experimentRequestBody` fields to `MicrodollarUsageContext`)
+- `apps/web/src/lib/ai-gateway/processUsage.types.ts` (add `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, `experimentPromptCapture` fields to `MicrodollarUsageContext`)
 
 R2 prompt store:
 

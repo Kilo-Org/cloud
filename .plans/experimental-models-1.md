@@ -143,7 +143,7 @@ const ExperimentUpstreamSchema = z.object({
 
 The `api_key` is **not** part of `ExperimentUpstreamSchema` and **not** stored in the JSONB blob. It lives in the sibling `encrypted_api_key` column (same `EncryptedData` JSONB shape as `byok_api_keys.encrypted_api_key`) and is merged into the in-memory upstream record only at cache-build time. This makes "never select the key" enforceable at the SQL/column level and allows column-level grants if we ever want them.
 
-Fields deliberately **not** included (and why): `organization_ids` (the experimented public id is registered in `kiloExclusiveModels` and gates org access there); `pricing` (per-RC pricing not used in v1, per §352); `display_name` / `context_length` / `max_completion_tokens` (these belong on the public id, identical across variants).
+Fields deliberately **not** included (and why): `organization_ids` (the experimented public id is registered in `kiloExclusiveModels` and gates org access there); `pricing` (per-RC pricing is not used in v1); `display_name` / `context_length` / `max_completion_tokens` (these belong on the public id, identical across variants).
 
 `model_experiment_variant` is the slot identity (label, weight, control flag, allocation share). `model_experiment_variant_version` is the immutable RC instance held by that slot at a point in time. Hot-swapping an RC is a pure INSERT into `model_experiment_variant_version`; the variant row is not modified. The "current version of variant V at time T" is computed as `SELECT ... FROM model_experiment_variant_version WHERE variant_id = V AND effective_at <= T ORDER BY effective_at DESC, id DESC LIMIT 1` (id used as deterministic tiebreaker for ties at the same millisecond). In practice the picker reads this from the Redis-cached experiment definition (computed once when the cache is built per publicId), not on every request. Old version rows are never modified or deleted, so per-request attribution stays exact via the `variant_version_id` FK on `model_experiment_request` with no snapshot columns and no date-comparison joins. `experiment_id` is reachable via `variant_version_id → variant_id → experiment_id`; storing it on the request row would be denormalization, omitted unless query plans show it's needed.
 
@@ -197,7 +197,7 @@ No backfill is required because pre-experiment traffic has no side-table row.
 
 ### Prompt Storage (R2)
 
-Full request prompts (system message + canonical post-`transformRequest` body) are stored in a dedicated R2 bucket using the **content-addressed** pattern from the kilo-cloud reference design: each unique blob is written once under its sha256 hex digest as the object key, and Postgres event rows reference only the hash. This piggybacks on the existing R2 setup in `apps/web` (`apps/web/src/lib/r2/client.ts` already configures the singleton `S3Client` against R2 via `@aws-sdk/client-s3`).
+Full request prompts (system message + canonical post-`transformRequest` body) are stored in a dedicated R2 bucket using a **content-addressed** pattern: each unique blob is written once under its sha256 hex digest as the object key, and Postgres event rows reference only the hash. This piggybacks on the existing R2 setup in `apps/web` (`apps/web/src/lib/r2/client.ts` already configures the singleton `S3Client` against R2 via `@aws-sdk/client-s3`).
 
 **Bucket layout: one bucket per environment.**
 
@@ -240,7 +240,7 @@ Full request prompts (system message + canonical post-`transformRequest` body) a
 
 - New tRPC procedure `admin.modelExperiments.getPromptByHash(sha: string): Promise<{ content: string } | null>` that reads via `getPromptByHash`. Admin-gated, same gate as the rest of the experiment admin surface.
 - For partner export / partner replay (Part 2), the same `getPromptByHash` is used to materialize blobs into the export bundle.
-- Page-level dedup at read time: collect distinct hashes per result page, batch-fetch, join in memory. Same pattern as the reference design.
+- Page-level dedup at read time: collect distinct hashes per result page, batch-fetch, join in memory.
 
 **GDPR and consent.**
 
@@ -354,7 +354,7 @@ Persist experiment attribution everywhere request-level metrics are consumed:
   3. In parallel: `putPromptIfAbsent(system_message_content)` and `putPromptIfAbsent(request_body_remainder)`, returning sha256 hex digests.
   4. Insert one row into `model_experiment_request` carrying both the attribution columns and the resulting prompt hashes (single statement). On R2 put failure both hash columns are left NULL and a Sentry breadcrumb is emitted; the attribution row still lands.
 - PostHog: no change in v1. `processUsage.ts` does not emit a general per-request PostHog event today, and adding one purely for experiment fields is out of scope. Feedback joins (`Feedback Submitted.parentMessageID = client_request_id`) are queried via existing PostHog dashboards out-of-band, linked from the admin UI.
-- Analytics Engine: no v1 work. Adding experiment dimensions to `services/o11y/pipelines/api-metrics-schema.json`, `services/o11y/src/api-metrics-routes.ts`, `apps/web/src/lib/ai-gateway/o11y/api-metrics.server.ts`, `services/o11y/src/o11y-analytics.ts`, the o11y tests, and possibly `services/o11y/wrangler.jsonc` (pipeline stream recreation) is real work for a write-only future hypothetical — defer until a concrete AE-backed dashboard needs experiment dimensions. v1 admin reports come from Postgres only (see Q15 decision).
+- Analytics Engine: no v1 work. Adding experiment dimensions to `services/o11y/pipelines/api-metrics-schema.json`, `services/o11y/src/api-metrics-routes.ts`, `apps/web/src/lib/ai-gateway/o11y/api-metrics.server.ts`, `services/o11y/src/o11y-analytics.ts`, the o11y tests, and possibly `services/o11y/wrangler.jsonc` (pipeline stream recreation) is deferred until a concrete AE-backed dashboard needs experiment dimensions. v1 admin reports come from Postgres only.
 - Reporting view: add `model_experiment_request_stats`, joining `model_experiment_request → model_experiment_variant_version → model_experiment_variant → model_experiment` and `microdollar_usage` / `microdollar_usage_metadata`. The view exposes `upstream->>'internal_id' AS internal_id`, `upstream->>'base_url' AS base_url`, `variant_label`, and `experiment_id` so reports never need to recreate the join chain. **The view explicitly does not select `upstream->>'api_key'`** — keys live only in the version row JSONB and the Redis cache.
 - Provider report template: document per-RC request count, error rate, p50/p95 TTFT and total latency, input/output token aggregates, and unique users. Cost per RC is excluded for v1 per the pricing decision. Thumbs-up/down rate is queried via PostHog dashboards out-of-band, linked from the admin UI.
 
@@ -448,7 +448,7 @@ These constraints exist because of how the gateway is built today. The spec must
 
 - **Intended vs served checkpoint.** The gateway is single-shot: no upstream retry, no model fallback, and the upstream `base_url` + `internal_id` are bound once at provider-resolution time. Therefore the upstream config resolved through `model_experiment_request.variant_version_id → model_experiment_variant_version.upstream` reflects both the intended and the served checkpoint. If gateway-level retry/fallback across upstreams is ever introduced, this assumption breaks and `model_experiment_request` would need a served-upstream snapshot column (or a separate served-version FK).
 - **Message-level dedup.** `client_request_id` is `MessageV2.User.id` from the kilocode client (`kilocode/packages/opencode/src/session/llm.ts` L407) — stable across all HTTP attempts and tool-loop iterations within a single user message. Message-level reports (per-message thumbs-up rate, error rate per user message, etc.) MUST use `COUNT(DISTINCT client_request_id)` for the denominator to avoid inflating numbers when an agentic turn produces many gateway calls under one user message.
-- **Error-rate undercount (accepted v1 limitation).** `model_experiment_request` is written in the same CTE as `microdollar_usage`. Today `microdollar_usage` is _not_ written for several failure modes, so those failures will be **invisible in experiment reports**:
+- **Error-rate undercount (accepted v1 limitation).** `model_experiment_request` is written only after the linked `microdollar_usage` row exists. Today `microdollar_usage` is _not_ written for several failure modes, so those failures will be **invisible in experiment reports**:
   - `fetch` throws (DNS, connection reset) — error bubbles out before `after()`.
   - 10-minute upstream timeouts and client-cancelled requests — same path.
   - Upstream 402 remapped to "temporarily unavailable" (`route.ts` ~L568–581 returns before usage accounting).
@@ -478,7 +478,7 @@ These constraints exist because of how the gateway is built today. The spec must
 - Per-variant pricing. Variants under one `public_id` share current public-id pricing.
 - BYOK traffic.
 - Custom LLM traffic (`kilo-internal/...`).
-- (No identifier-less traffic exclusion — under v1 such requests route to the experiment's control variant; reports filter on `allocation_subject = 'control'` if the cohort needs to be excluded.)
+- Identifier-less traffic exclusion; under v1 such requests route to the experiment's control variant, and reports filter on `allocation_subject = 'control'` if the cohort needs to be excluded.
 - A/B variants spanning entirely different public model ids.
 - Client-visible variant ids or variant-aware UI behavior.
 - Partner trace export, redaction, HMAC webhooks, partner auth, and warehouse coordination (see [Part 2](./experimental-models-2.md)).

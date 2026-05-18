@@ -246,7 +246,7 @@ const SECRET_CATALOG_RAW = [
       {
         key: 'composioOrg',
         label: 'Organization ID or Name',
-        placeholder: 'syn_workspace',
+        placeholder: 'username_workspace',
         placeholderConfigured: 'Enter new organization ID, name, or slug to replace',
         envVar: 'COMPOSIO_ORG',
         maxLength: 300,

@@ -12,6 +12,8 @@ import {
   registerKiloChatRenameRoute,
   registerKiloChatListConversationsRoute,
   registerKiloChatCreateConversationRoute,
+  registerKiloChatAttachmentInitRoute,
+  registerKiloChatAttachmentUrlRoute,
 } from './kilo-chat';
 
 const TOKEN = 'expected-gateway-token';
@@ -943,5 +945,150 @@ describe('POST /_kilo/kilo-chat/conversations', () => {
     expect(capturedInit?.method).toBe('POST');
     const headers = new Headers(capturedInit?.headers);
     expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
+  });
+});
+
+function makeAttachmentInitApp(fetchImpl: typeof fetch) {
+  const app = new Hono();
+  registerKiloChatAttachmentInitRoute(app, {
+    expectedToken: TOKEN,
+    sandboxId: SANDBOX_ID,
+    kiloChatBaseUrl: 'https://chat.example.test',
+    fetchImpl,
+  });
+  return app;
+}
+
+describe('POST /_kilo/kilo-chat/attachments/init', () => {
+  it('rejects requests without bearer token', async () => {
+    const app = makeAttachmentInitApp(async () => new Response('', { status: 200 }));
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/attachments/init', {
+        method: 'POST',
+        body: JSON.stringify({ conversationId: 'c1', filename: 'a.png', size: 10 }),
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('forwards authorized POST to upstream attachments/init with body intact', async () => {
+    let capturedUrl = '';
+    let capturedInit: RequestInit | undefined;
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      capturedUrl = typeof url === 'string' ? url : url.toString();
+      capturedInit = init;
+      return new Response(
+        JSON.stringify({ attachmentId: 'at_1', uploadUrl: 'https://r2.example/up' }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      );
+    }) as typeof fetch;
+
+    const app = makeAttachmentInitApp(fetchImpl);
+    const body = JSON.stringify({
+      conversationId: 'c1',
+      filename: 'a.png',
+      contentType: 'image/png',
+      size: 1234,
+    });
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/attachments/init', {
+        method: 'POST',
+        body,
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${TOKEN}`,
+        },
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(capturedUrl).toBe(
+      `https://chat.example.test/bot/v1/sandboxes/${SANDBOX_ID}/attachments/init`
+    );
+    expect(capturedInit?.method).toBe('POST');
+    const headers = new Headers(capturedInit?.headers);
+    expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
+    expect(JSON.parse((capturedInit?.body as string) ?? '{}')).toEqual({
+      conversationId: 'c1',
+      filename: 'a.png',
+      contentType: 'image/png',
+      size: 1234,
+    });
+  });
+});
+
+function makeAttachmentUrlApp(fetchImpl: typeof fetch) {
+  const app = new Hono();
+  registerKiloChatAttachmentUrlRoute(app, {
+    expectedToken: TOKEN,
+    sandboxId: SANDBOX_ID,
+    kiloChatBaseUrl: 'https://chat.example.test',
+    fetchImpl,
+  });
+  return app;
+}
+
+describe('GET /_kilo/kilo-chat/attachments/:id/url', () => {
+  it('rejects requests without bearer token', async () => {
+    const app = makeAttachmentUrlApp(async () => new Response('{}', { status: 200 }));
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/attachments/at_1/url?conversationId=c1')
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('forwards GET with conversationId query string to upstream', async () => {
+    let capturedUrl = '';
+    let capturedInit: RequestInit | undefined;
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      capturedUrl = typeof url === 'string' ? url : url.toString();
+      capturedInit = init;
+      return new Response(JSON.stringify({ url: 'https://r2.example/dl' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const app = makeAttachmentUrlApp(fetchImpl);
+    const res = await app.fetch(
+      new Request(
+        'http://x/_kilo/kilo-chat/attachments/at_1/url?conversationId=01JFZX0000000000000000ABCD',
+        {
+          headers: { authorization: `Bearer ${TOKEN}` },
+        }
+      )
+    );
+
+    expect(res.status).toBe(200);
+    expect(capturedUrl).toBe(
+      `https://chat.example.test/bot/v1/sandboxes/${SANDBOX_ID}/attachments/at_1/url?conversationId=01JFZX0000000000000000ABCD`
+    );
+    expect(capturedInit?.method).toBe('GET');
+    expect(capturedInit?.body).toBeUndefined();
+    const headers = new Headers(capturedInit?.headers);
+    expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
+  });
+
+  it('url-encodes the attachment id', async () => {
+    let capturedUrl = '';
+    const fetchImpl = (async (url: string | URL) => {
+      capturedUrl = typeof url === 'string' ? url : url.toString();
+      return new Response('{}', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const app = makeAttachmentUrlApp(fetchImpl);
+    await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/attachments/a%2Fb/url?conversationId=c1', {
+        headers: { authorization: `Bearer ${TOKEN}` },
+      })
+    );
+
+    expect(capturedUrl).toBe(
+      `https://chat.example.test/bot/v1/sandboxes/${SANDBOX_ID}/attachments/a%2Fb/url?conversationId=c1`
+    );
   });
 });

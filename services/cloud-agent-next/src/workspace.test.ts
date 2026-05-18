@@ -47,8 +47,9 @@ import type { ExecutionSession, SandboxInstance } from './types';
 describe('setupWorkspace', () => {
   it('throws a typed preparation error when workspace directory creation fails', async () => {
     const cause = new Error('FileSystemError: mkdir operation failed with exit code NaN');
+    const mkdir = vi.fn().mockRejectedValueOnce(cause);
     const sandbox = {
-      mkdir: vi.fn().mockRejectedValueOnce(cause),
+      mkdir,
     } as unknown as SandboxInstance;
 
     const promise = setupWorkspace(sandbox, 'user-123', undefined, 'agent-session');
@@ -64,8 +65,9 @@ describe('setupWorkspace', () => {
 
   it('throws a typed preparation error when session home creation fails', async () => {
     const cause = new Error('FileSystemError: mkdir operation failed with exit code NaN');
+    const mkdir = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(cause);
     const sandbox = {
-      mkdir: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(cause),
+      mkdir,
     } as unknown as SandboxInstance;
 
     const promise = setupWorkspace(sandbox, 'user-123', 'org-123', 'agent-session');
@@ -77,12 +79,10 @@ describe('setupWorkspace', () => {
         'Failed to prepare session home: FileSystemError: mkdir operation failed with exit code NaN',
       cause,
     });
-    expect(sandbox.mkdir).toHaveBeenNthCalledWith(
-      1,
-      '/workspace/org-123/user-123/sessions/agent-session',
-      { recursive: true }
-    );
-    expect(sandbox.mkdir).toHaveBeenNthCalledWith(2, '/home/agent-session', { recursive: true });
+    expect(mkdir).toHaveBeenNthCalledWith(1, '/workspace/org-123/user-123/sessions/agent-session', {
+      recursive: true,
+    });
+    expect(mkdir).toHaveBeenNthCalledWith(2, '/home/agent-session', { recursive: true });
   });
 });
 

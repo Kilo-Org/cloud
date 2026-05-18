@@ -126,6 +126,24 @@ function createEventStream(events: KiloEvent[]): AsyncIterable<KiloEvent> {
   })();
 }
 
+function createDeferredFirstEventStream(): {
+  stream: AsyncIterable<KiloEvent>;
+  emitFirstEvent: (event: KiloEvent) => void;
+} {
+  let emitFirstEvent: (event: KiloEvent) => void = () => {};
+  const firstEvent = new Promise<KiloEvent>(resolve => {
+    emitFirstEvent = resolve;
+  });
+
+  return {
+    stream: (async function* () {
+      yield await firstEvent;
+      await new Promise(() => {});
+    })(),
+    emitFirstEvent,
+  };
+}
+
 function createMockKiloClient(overrides?: Partial<WrapperKiloClient>): WrapperKiloClient {
   return {
     createSession: vi.fn().mockResolvedValue({ id: 'kilo_sess' }),
@@ -278,10 +296,11 @@ describe('network resume', () => {
     );
   });
 
-  it('resumes restored network waits after the event subscription starts', async () => {
+  it('resumes restored network waits after the event subscription receives server.connected', async () => {
     const resumeNetworkWait = vi.fn().mockResolvedValue(true);
+    const eventStream = createDeferredFirstEventStream();
     const subscribe = vi.fn().mockResolvedValue({
-      stream: createEventStream([]),
+      stream: eventStream.stream,
     });
     const kiloClient = createMockKiloClient({
       resumeNetworkWait,
@@ -310,6 +329,11 @@ describe('network resume', () => {
     await openConnection(manager);
     await vi.advanceTimersByTimeAsync(0);
 
+    expect(resumeNetworkWait).not.toHaveBeenCalled();
+
+    eventStream.emitFirstEvent({ type: 'server.connected' });
+    await vi.advanceTimersByTimeAsync(0);
+
     expect(resumeNetworkWait).toHaveBeenCalledTimes(1);
     expect(resumeNetworkWait).toHaveBeenCalledWith('net_req_restored');
     expect(subscribe.mock.invocationCallOrder[0]).toBeLessThan(
@@ -320,9 +344,11 @@ describe('network resume', () => {
 
   it('resumes restored network waits after an event-subscription-only reconnect', async () => {
     const resumeNetworkWait = vi.fn().mockResolvedValue(true);
-    const subscribe = vi.fn().mockResolvedValue({
-      stream: createEventStream([]),
-    });
+    const subscribe = vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        stream: createEventStream([{ type: 'server.connected' }]),
+      })
+    );
     const getNetworkWaits = vi
       .fn()
       .mockResolvedValueOnce([])

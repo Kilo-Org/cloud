@@ -543,9 +543,7 @@ export function createConnectionManager(
           return;
         }
 
-        logToFile('SDK event subscription started');
-        eventSubscriptionListening = true;
-        markStarted(true);
+        logToFile('SDK event subscription stream returned');
 
         for await (const event of result.stream) {
           if (abortController.signal.aborted || myGeneration !== eventSubscriptionGeneration) break;
@@ -560,6 +558,9 @@ export function createConnectionManager(
           state.updateActivity();
 
           if (eventType === 'server.connected') {
+            logToFile('SDK event subscription connected');
+            eventSubscriptionListening = true;
+            markStarted(true);
             callbacks.onSseEvent?.();
             continue;
           }

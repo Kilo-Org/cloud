@@ -1,4 +1,5 @@
 import {
+  ATTACHMENT_MAX_BYTES,
   buildReplyToMessageSnapshot,
   type ContentBlock,
   type ActionsBlock,
@@ -56,7 +57,6 @@ type StoredMessageRow = typeof messages.$inferSelect;
 type BotMessageNotificationReason = 'length' | 'typing_stop' | 'timeout';
 type StoredAttachmentRow = typeof attachments.$inferSelect;
 
-const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 const INIT_DEDUPE_WINDOW_MS = 30_000;
 const MAX_ATTACHMENTS_PER_MESSAGE = 10;
 
@@ -1349,10 +1349,10 @@ export class ConversationDO extends DurableObject<Env> {
       typeof params.size !== 'number' ||
       !Number.isFinite(params.size) ||
       params.size < 0 ||
-      params.size > MAX_ATTACHMENT_BYTES
+      params.size > ATTACHMENT_MAX_BYTES
     ) {
       throw new Error(
-        `initAttachment: invalid size ${params.size}; must be 0..${MAX_ATTACHMENT_BYTES}`
+        `initAttachment: invalid size ${params.size}; must be 0..${ATTACHMENT_MAX_BYTES}`
       );
     }
     if (

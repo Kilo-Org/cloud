@@ -7,6 +7,7 @@ import {
 import type { ChannelMessageActionContext, OpenClawConfig } from 'openclaw/plugin-sdk/core';
 import { loadOutboundMediaFromUrl } from 'openclaw/plugin-sdk/outbound-media';
 import { createKiloChatClient, type ContentBlock } from './client';
+import { ATTACHMENT_MAX_BYTES } from './synced/schemas';
 import { resolveControllerUrl, resolveGatewayToken } from './env';
 import { handleKiloChatDeleteAction } from './delete-action';
 import { handleKiloChatEditAction } from './edit-action';
@@ -34,9 +35,6 @@ const CONVERSATION_TARGET_ALIASES = ['conversationId', 'groupId'];
 function isValidUlid(raw: string): boolean {
   return ULID_RE.test(raw);
 }
-
-// Cap outbound media at 100 MiB to match the controller's attachmentInitRequestSchema.
-const OUTBOUND_MEDIA_MAX_BYTES = 100 * 1024 * 1024;
 
 // Filename fallbacks when the SDK's media loader does not produce one (e.g.
 // the source URL had no path or extension). Keep this conservative — kilo-chat
@@ -84,7 +82,7 @@ function resolveFilename(contentType: string | undefined, suggested: string | un
 async function loadOutboundMedia(mediaUrl: string): Promise<LoadedOutboundMedia> {
   if (__pluginInternals.loadMediaImpl) return __pluginInternals.loadMediaImpl(mediaUrl);
   const loaded = await loadOutboundMediaFromUrl(mediaUrl, {
-    maxBytes: OUTBOUND_MEDIA_MAX_BYTES,
+    maxBytes: ATTACHMENT_MAX_BYTES,
   });
   return {
     buffer: Buffer.isBuffer(loaded.buffer) ? loaded.buffer : Buffer.from(loaded.buffer),

@@ -12,13 +12,11 @@ import { createKiloChatClient, type KiloChatClient } from '../client.js';
 import { resolveControllerUrl, resolveGatewayToken } from '../env.js';
 import { DEFAULT_ACCOUNT_ID, PLUGIN_CAPABILITIES } from '../channel.js';
 import { readSessionUsage, toContextPayload } from '../bot-status.js';
+import { ATTACHMENT_MAX_BYTES } from '../synced/schemas.js';
 
 import { buildDeliverWiring } from './deliver.js';
 import { buildTypingParams } from './typing.js';
 import type { ActionExecutedPayload, KiloChatInboundPayload } from './schemas.js';
-
-// Inbound attachment download cap: matches the controller-side attachmentInitRequestSchema.
-const INBOUND_ATTACHMENT_MAX_BYTES = 100 * 1024 * 1024;
 
 // Test seam — allows tests to inject a fake fetch for the R2 GET path so we
 // can exercise the download loop without touching the network.
@@ -87,7 +85,7 @@ export async function downloadInboundAttachments(params: {
         buffer,
         att.mimeType,
         'inbound',
-        INBOUND_ATTACHMENT_MAX_BYTES,
+        ATTACHMENT_MAX_BYTES,
         att.filename
       );
       mediaPaths.push(saved.path);

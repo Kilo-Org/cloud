@@ -8,6 +8,8 @@ export const MESSAGE_TEXT_MAX_CHARS = 8000;
 export const CONVERSATION_TITLE_MAX_CHARS = 200;
 /** Maximum characters allowed in an action button label or group id. */
 export const ACTION_LABEL_MAX_CHARS = 200;
+/** Maximum bytes allowed for a single attachment upload (100 MiB). */
+export const ATTACHMENT_MAX_BYTES = 100 * 1024 * 1024;
 
 // ── Primitives ──────────────────────────────────────────────────────
 
@@ -378,11 +380,7 @@ export const createBotConversationRequestSchema = z.object({
 export const attachmentInitRequestSchema = z.object({
   conversationId: ulidSchema,
   mimeType: z.string().min(1).max(255),
-  size: z
-    .number()
-    .int()
-    .positive()
-    .max(100 * 1024 * 1024),
+  size: z.number().int().positive().max(ATTACHMENT_MAX_BYTES),
   filename: z.string().min(1).max(512),
 });
 

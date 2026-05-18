@@ -95,10 +95,7 @@ describe('downloadInboundAttachments', () => {
     expect(saved[0].filename).toBe('one.png');
     expect(saved[0].contentType).toBe('image/png');
 
-    expect(result.mediaPaths).toEqual([
-      '/tmp/media/inbound/saved-1',
-      '/tmp/media/inbound/saved-2',
-    ]);
+    expect(result.mediaPaths).toEqual(['/tmp/media/inbound/saved-1', '/tmp/media/inbound/saved-2']);
     expect(result.mediaUrls).toEqual(['https://r2/one.png', 'https://r2/two.jpg']);
     expect(result.mediaTypes).toEqual(['image/png', 'image/jpeg']);
   });

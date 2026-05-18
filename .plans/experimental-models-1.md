@@ -132,7 +132,6 @@ const ExperimentUpstreamSchema = z.object({
   base_url: z.string().url(),                           // upstream endpoint
   opencode_settings: z.object({ ai_sdk_provider: z.enum([...]) }).optional(),
   openclaw_settings: z.object({ api_adapter: z.enum([...]) }).optional(),
-  extra_headers: z.record(z.string()).optional(),
   extra_body: z.record(z.unknown()).optional(),
   remove_from_body: z.array(z.string()).optional(),
   add_cache_breakpoints: z.boolean().optional(),
@@ -141,6 +140,8 @@ const ExperimentUpstreamSchema = z.object({
 ```
 
 The `api_key` is **not** part of `ExperimentUpstreamSchema` and **not** stored in the JSONB blob. It lives in the sibling `encrypted_api_key` column (same `EncryptedData` JSONB shape as `byok_api_keys.encrypted_api_key`) and is merged into the in-memory upstream record only at cache-build time. This makes "never select the key" enforceable at the SQL/column level and allows column-level grants if we ever want them.
+
+`ExperimentUpstreamSchema` deliberately does not include arbitrary `extra_headers` in v1. Partner checkpoint routing should use the encrypted `api_key`, `base_url`, `internal_id`, adapter settings, `extra_body`, and `remove_from_body`. If a provider later requires a non-secret custom header, add an explicit allowlisted field for that concrete requirement rather than reopening arbitrary header storage.
 
 Fields deliberately **not** included (and why): `organization_ids` (the experimented public id is registered in `kiloExclusiveModels` and gates org access there); `pricing` (per-RC pricing is not used in v1); `display_name` / `context_length` / `max_completion_tokens` (these belong on the public id, identical across variants).
 

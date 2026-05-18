@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
+import { bootstrapConversationForTest } from './helpers';
 
 function getDO(name: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(name));
@@ -11,7 +12,7 @@ describe('ConversationDO.editMessage with attachments', () => {
   it('allows removing attachments and deletes their rows + R2 objects', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
-    await stub.bootstrapConversation({ creatorId: 'user-A', otherMembers: [] });
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
 
     const a1 = await stub.initAttachment({
       uploaderId: 'user-A',
@@ -89,7 +90,7 @@ describe('ConversationDO.editMessage with attachments', () => {
   it('rejects adding a new attachment in edit', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
-    await stub.bootstrapConversation({ creatorId: 'user-A', otherMembers: [] });
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
 
     const a1 = await stub.initAttachment({
       uploaderId: 'user-A',

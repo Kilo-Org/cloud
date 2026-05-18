@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
+import { bootstrapConversationForTest } from './helpers';
 
 function getDO(name: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(name));
@@ -11,7 +12,7 @@ describe('ConversationDO.destroyAndReturnMembers with attachments', () => {
   it('purges all attachments and their R2 objects on destroy', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
-    await stub.bootstrapConversation({ creatorId: 'user-A', otherMembers: [] });
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
 
     // Linked attachment (referenced by a message)
     const linked = await stub.initAttachment({

@@ -2,6 +2,7 @@ import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test'
 import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import type { AuthContext } from '../auth';
+import type { ConversationDO } from '../do/conversation-do';
 import { registerConversationRoutes } from '../routes/conversations';
 import {
   handleAddReaction,
@@ -74,4 +75,31 @@ export function makeApp(callerId: string, callerKind: 'user' | 'bot') {
   app.post('/v1/conversations/:conversationId/typing/stop', handleStopTyping);
 
   return withTestExecutionCtx(app);
+}
+
+/**
+ * Seeds a named ConversationDO with the given creator and any additional
+ * members. Wraps `initialize` so tests don't need to reproduce its full
+ * signature on every call. Requires a DO stub obtained via `idFromName(...)` —
+ * the conversation id is taken from the stub's name.
+ */
+export async function bootstrapConversationForTest(
+  stub: DurableObjectStub<ConversationDO>,
+  params: {
+    conversationId: string;
+    creatorId: string;
+    otherMembers?: Array<{ id: string; kind?: 'user' | 'bot' }>;
+  }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const members: Array<{ id: string; kind: 'user' | 'bot' }> = [
+    { id: params.creatorId, kind: 'user' },
+    ...(params.otherMembers ?? []).map(m => ({ id: m.id, kind: m.kind ?? 'user' })),
+  ];
+  return stub.initialize({
+    id: params.conversationId,
+    title: null,
+    createdBy: params.creatorId,
+    createdAt: Date.now(),
+    members,
+  });
 }

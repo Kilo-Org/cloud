@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
+import { bootstrapConversationForTest } from './helpers';
 import { attachments } from '../db/conversation-schema';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -14,7 +15,7 @@ describe('ConversationDO orphan attachment sweep', () => {
   it('deletes pending rows older than the TTL and purges their R2 objects', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
-    await stub.bootstrapConversation({ creatorId: 'user-A', otherMembers: [] });
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
 
     const { attachmentId, r2Key } = await stub.initAttachment({
       uploaderId: 'user-A',
@@ -58,7 +59,7 @@ describe('ConversationDO orphan attachment sweep', () => {
   it('pulls the orphan-sweep alarm in when a far-future alarm is already pending', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
-    await stub.bootstrapConversation({ creatorId: 'user-A', otherMembers: [] });
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
 
     // Pre-set a far-future alarm (48 h from now) to simulate a stale orphan-sweep alarm.
     const fortyEightHoursFromNow = Date.now() + 48 * 60 * 60 * 1000;

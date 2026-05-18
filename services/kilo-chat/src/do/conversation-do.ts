@@ -259,11 +259,6 @@ export type AttachmentForRead = {
   filename: string;
 };
 
-export type BootstrapConversationParams = {
-  creatorId: string;
-  otherMembers?: Array<{ id: string; kind?: 'user' | 'bot' }>;
-};
-
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
 export type AddReactionResult =
   | { ok: true; added: true; id: string; memberContext: MemberContext }
@@ -325,38 +320,6 @@ export class ConversationDO extends DurableObject<Env> {
         })
       )
     );
-  }
-
-  /**
-   * Test-only convenience: seeds a conversation with the named creator and
-   * any additional members. Production code should call `initialize`
-   * directly.
-   */
-  bootstrapConversation(params: BootstrapConversationParams):
-    | { ok: true }
-    | {
-        ok: false;
-        error: string;
-      } {
-    const id = this.ctx.id.name;
-    if (!id) {
-      throw new Error('bootstrapConversation requires a named DO id');
-    }
-    const createdAt = Date.now();
-    const memberList: Array<{ id: string; kind: 'user' | 'bot' }> = [
-      { id: params.creatorId, kind: 'user' },
-      ...(params.otherMembers ?? []).map(m => ({
-        id: m.id,
-        kind: m.kind ?? 'user',
-      })),
-    ];
-    return this.initialize({
-      id,
-      title: null,
-      createdBy: params.creatorId,
-      createdAt,
-      members: memberList,
-    });
   }
 
   async enqueueMessageWebhook(msg: WebhookMessage, convContext: MemberContext): Promise<void> {

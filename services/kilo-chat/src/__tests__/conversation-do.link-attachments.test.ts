@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
+import { bootstrapConversationForTest } from './helpers';
 
 function getDO(name: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(name));
@@ -11,7 +12,7 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
   it('flips referenced attachment rows to linked', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
-    await stub.bootstrapConversation({ creatorId: 'user-A', otherMembers: [] });
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
     const { attachmentId } = await stub.initAttachment({
       uploaderId: 'user-A',
       mimeType: 'image/png',
@@ -44,7 +45,8 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
   it('rejects when attachment uploaderId != sender', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
-    await stub.bootstrapConversation({
+    await bootstrapConversationForTest(stub, {
+      conversationId,
       creatorId: 'user-A',
       otherMembers: [{ id: 'user-B' }],
     });
@@ -75,7 +77,7 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
   it('rejects when status is already linked', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
-    await stub.bootstrapConversation({ creatorId: 'user-A', otherMembers: [] });
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
     const { attachmentId } = await stub.initAttachment({
       uploaderId: 'user-A',
       mimeType: 'image/png',
@@ -115,7 +117,7 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
   it('rejects more than 10 attachments per message', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
-    await stub.bootstrapConversation({ creatorId: 'user-A', otherMembers: [] });
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
     const blocks: Array<{
       type: 'attachment';
       attachmentId: string;

@@ -17,6 +17,92 @@ import { buildDeliverWiring } from './deliver.js';
 import { buildTypingParams } from './typing.js';
 import type { ActionExecutedPayload, KiloChatInboundPayload } from './schemas.js';
 
+// Inbound attachment download cap: matches the controller-side attachmentInitRequestSchema.
+const INBOUND_ATTACHMENT_MAX_BYTES = 100 * 1024 * 1024;
+
+// Test seam — allows tests to inject a fake fetch for the R2 GET path so we
+// can exercise the download loop without touching the network.
+export const __dispatchInternals: {
+  fetchImpl: typeof fetch | undefined;
+} = {
+  fetchImpl: undefined,
+};
+
+type InboundAttachmentMeta = {
+  attachmentId: string;
+  mimeType: string;
+  size: number;
+  filename: string;
+};
+
+type SaveMediaBuffer = (
+  buffer: Buffer,
+  contentType?: string,
+  subdir?: string,
+  maxBytes?: number,
+  originalFilename?: string
+) => Promise<{ id: string; path: string; size: number; contentType?: string }>;
+
+export type DownloadedAttachments = {
+  mediaPaths: string[];
+  mediaUrls: string[];
+  mediaTypes: string[];
+};
+
+/**
+ * For each inbound attachment, fetch a fresh signed GET URL from the controller,
+ * download the bytes, and persist them via `saveMediaBuffer` so the agent runner
+ * can address them as local `MediaPath` entries. Failures on individual
+ * attachments are logged and the rest of the list is still processed — webhook
+ * delivery never fails because a single attachment download flaked.
+ */
+export async function downloadInboundAttachments(params: {
+  client: KiloChatClient;
+  conversationId: string;
+  attachments: readonly InboundAttachmentMeta[];
+  saveMediaBuffer: SaveMediaBuffer;
+  fetchImpl?: typeof fetch;
+}): Promise<DownloadedAttachments> {
+  const mediaPaths: string[] = [];
+  const mediaUrls: string[] = [];
+  const mediaTypes: string[] = [];
+  if (params.attachments.length === 0) return { mediaPaths, mediaUrls, mediaTypes };
+  const fetchImpl = params.fetchImpl ?? fetch;
+
+  for (const att of params.attachments) {
+    try {
+      const signed = await params.client.getAttachmentUrl({
+        conversationId: params.conversationId,
+        attachmentId: att.attachmentId,
+      });
+      const response = await fetchImpl(signed.url);
+      if (!response.ok) {
+        console.warn(
+          `[kilo-chat] inbound attachment ${att.attachmentId} download responded ${response.status}; skipping`
+        );
+        void response.body?.cancel();
+        continue;
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const saved = await params.saveMediaBuffer(
+        buffer,
+        att.mimeType,
+        'inbound',
+        INBOUND_ATTACHMENT_MAX_BYTES,
+        att.filename
+      );
+      mediaPaths.push(saved.path);
+      mediaUrls.push(signed.url);
+      mediaTypes.push(att.mimeType);
+    } catch (err) {
+      console.warn(`[kilo-chat] inbound attachment ${att.attachmentId} failed:`, err);
+    }
+  }
+
+  return { mediaPaths, mediaUrls, mediaTypes };
+}
+
 export async function handleActionExecuted(
   api: OpenClawPluginApi,
   payload: ActionExecutedPayload
@@ -94,6 +180,29 @@ export async function dispatchInbound(
     body: payload.text,
   });
 
+  const client = createKiloChatClient({
+    controllerBaseUrl: resolveControllerUrl(),
+    gatewayToken: resolveGatewayToken(),
+  });
+
+  const { mediaPaths, mediaUrls, mediaTypes } = await downloadInboundAttachments({
+    client,
+    conversationId: payload.conversationId,
+    attachments: payload.attachments ?? [],
+    saveMediaBuffer: channelRuntime.media.saveMediaBuffer,
+    fetchImpl: __dispatchInternals.fetchImpl,
+  });
+
+  const mediaFields: Record<string, string | string[] | undefined> = {};
+  if (mediaPaths.length > 0) {
+    mediaFields.MediaPath = mediaPaths[0];
+    mediaFields.MediaUrl = mediaUrls[0];
+    mediaFields.MediaType = mediaTypes[0];
+    mediaFields.MediaPaths = mediaPaths;
+    mediaFields.MediaUrls = mediaUrls;
+    mediaFields.MediaTypes = mediaTypes;
+  }
+
   const ctxPayload = channelRuntime.reply.finalizeInboundContext({
     Body: body,
     BodyForAgent: payload.text,
@@ -114,11 +223,7 @@ export async function dispatchInbound(
     ReplyToId: payload.inReplyToMessageId,
     ReplyToBody: payload.inReplyToBody,
     ReplyToSender: payload.inReplyToSender,
-  });
-
-  const client = createKiloChatClient({
-    controllerBaseUrl: resolveControllerUrl(),
-    gatewayToken: resolveGatewayToken(),
+    ...mediaFields,
   });
 
   const wiring = buildDeliverWiring({

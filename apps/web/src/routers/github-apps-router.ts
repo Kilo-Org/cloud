@@ -403,7 +403,6 @@ export const githubAppsRouter = createTRPCRouter({
         if (!response.ok && response.status !== 404 && response.status !== 422) {
           console.error('Failed to revoke GitHub authorization:', {
             status: response.status,
-            body: await response.text(),
           });
         }
       } catch (error) {

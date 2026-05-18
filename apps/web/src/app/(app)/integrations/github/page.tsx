@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageLayout } from '@/components/PageLayout';
+import { ENABLE_GITHUB_USER_TOKENS } from '@/lib/config.server';
 
 export default async function UserGitHubIntegrationPage({
   searchParams,
@@ -50,7 +51,7 @@ export default async function UserGitHubIntegrationPage({
           error={search.error}
           pendingApproval={search.pending_approval === 'true'}
           existingPendingOrg={search.org}
-          enableUserTokens={process.env.ENABLE_GITHUB_USER_TOKENS === 'true'}
+          enableUserTokens={ENABLE_GITHUB_USER_TOKENS}
         />
       </Suspense>
     </PageLayout>

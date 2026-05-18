@@ -100,6 +100,26 @@ export const botMessageNotifications = sqliteTable(
   })
 );
 
+export const attachments = sqliteTable(
+  'attachments',
+  {
+    id: text('id').primaryKey(),
+    uploader_id: text('uploader_id').notNull(),
+    r2_key: text('r2_key').notNull().unique(),
+    mime_type: text('mime_type').notNull(),
+    size: integer('size').notNull(),
+    filename: text('filename').notNull(),
+    status: text('status').notNull(),
+    message_id: text('message_id'),
+    created_at: integer('created_at').notNull(),
+  },
+  table => ({
+    statusCheck: check('attachments_status_check', sql`${table.status} IN ('pending', 'linked')`),
+    statusCreatedIdx: index('attachments_status_created').on(table.status, table.created_at),
+    messageIdIdx: index('attachments_message_id').on(table.message_id),
+  })
+);
+
 export const reactions = sqliteTable(
   'reactions',
   {

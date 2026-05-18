@@ -15,6 +15,13 @@
       "when": 1777997350918,
       "tag": "0001_misty_shotgun",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1779109325189,
+      "tag": "0002_material_kang",
+      "breakpoints": true
     }
   ]
 }

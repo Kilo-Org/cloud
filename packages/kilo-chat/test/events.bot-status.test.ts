@@ -7,7 +7,6 @@ describe('botStatusEventSchema', () => {
       sandboxId: 'sbx-abc',
       online: true,
       at: 1,
-      updatedAt: 2,
       capabilities: ['attachments'],
     });
     expect(parsed.capabilities).toEqual(['attachments']);
@@ -17,7 +16,6 @@ describe('botStatusEventSchema', () => {
       sandboxId: 'sbx-abc',
       online: true,
       at: 1,
-      updatedAt: 2,
     });
     expect(parsed.capabilities).toBeUndefined();
   });

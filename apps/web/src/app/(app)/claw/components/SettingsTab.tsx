@@ -2236,14 +2236,13 @@ export function SettingsTab({
               </p>
               <p className="text-muted-foreground mt-2 text-xs">
                 Configure your own model provider keys in{' '}
-                <Link href="/byok" className="underline">
+                <Link href="/byok" target="_blank" className="underline">
                   Kilo BYOK settings
                 </Link>
                 .{' '}
                 <a
                   href="https://kilo.ai/docs/getting-started/byok"
                   target="_blank"
-                  rel="noopener noreferrer"
                   className="underline"
                 >
                   View the BYOK setup guide

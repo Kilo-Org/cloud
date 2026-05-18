@@ -117,6 +117,25 @@ describe('deliverCallbackJob', () => {
   });
 
   describe('successful delivery', () => {
+    it('delivers Security Agent callbacks over direct service binding without public fetch fallback', async () => {
+      const publicFetch = vi.fn();
+      globalThis.fetch = publicFetch;
+      const bindingFetch = vi.fn().mockResolvedValue(new Response('', { status: 202 }));
+      const target: CallbackTarget = {
+        url: 'https://security-auto-analysis/internal/security-analysis-callback/finding-123',
+        delivery: 'security-auto-analysis',
+        headers: { 'X-Internal-Secret': 'secret' },
+      };
+
+      const result = await deliverCallbackJob(target, mockPayload, 1, {
+        securityAutoAnalysis: { fetch: bindingFetch },
+      });
+
+      expect(result.type).toBe('success');
+      expect(bindingFetch).toHaveBeenCalledTimes(1);
+      expect(publicFetch).not.toHaveBeenCalled();
+    });
+
     it('should succeed on 200 response', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };

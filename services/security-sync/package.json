@@ -8,7 +8,8 @@
     "deploy:dev": "wrangler deploy --env dev",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/security-sync/src",
-    "types": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts"
+    "types": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
@@ -19,6 +20,7 @@
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

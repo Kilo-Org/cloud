@@ -1,18 +1,25 @@
 import type { CallbackJob } from './types.js';
 import { deliverCallbackJob } from './delivery.js';
 import { logger } from '../logger.js';
+import type { Env } from '../types.js';
 
-export function createCallbackQueueConsumer() {
+export function createCallbackQueueConsumer(env: Pick<Env, 'SECURITY_AUTO_ANALYSIS'>) {
   return async function callbackQueueConsumer(batch: MessageBatch<CallbackJob>): Promise<void> {
     for (const message of batch.messages) {
-      await processMessage(message);
+      await processMessage(message, env);
     }
   };
 }
 
-async function processMessage(message: Message<CallbackJob>): Promise<void> {
+async function processMessage(
+  message: Message<CallbackJob>,
+  env: Pick<Env, 'SECURITY_AUTO_ANALYSIS'>
+): Promise<void> {
   const job = message.body;
-  const result = await deliverCallbackJob(job.target, job.payload, message.attempts);
+
+  const result = await deliverCallbackJob(job.target, job.payload, message.attempts, {
+    securityAutoAnalysis: env.SECURITY_AUTO_ANALYSIS,
+  });
 
   switch (result.type) {
     case 'success':

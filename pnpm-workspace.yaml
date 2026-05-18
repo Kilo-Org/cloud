@@ -41,7 +41,7 @@ catalog:
   wrangler: 4.90.1
   zod: 4.4.3
 
-minimumReleaseAge: 6842
+minimumReleaseAge: 4320
 minimumReleaseAgeExclude:
   - tsx
   - expo-dev-client

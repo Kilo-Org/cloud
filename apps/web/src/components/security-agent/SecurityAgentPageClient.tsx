@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ type SecurityAgentPageClientProps = {
 };
 
 const PAGE_SIZE = 20;
+const ACCEPTED_QUEUE_REFRESH_DELAYS_MS = [1000, 5000, 15000] as const;
 
 function getOptionalStringField(source: unknown, key: string): string | undefined {
   if (typeof source !== 'object' || source === null) {
@@ -57,9 +58,30 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
   const [startingAnalysisIds, setStartingAnalysisIds] = useState<Set<string>>(new Set());
   const [gitHubError, setGitHubError] = useState<string | null>(null);
   const toggleEnabledInFlightRef = useRef(false);
+  const acceptedQueueRefreshTimersRef = useRef<number[]>([]);
   const [sortBy, setSortBy] = useState<'severity_desc' | 'severity_asc' | 'sla_due_at_asc'>(
     'severity_desc'
   );
+
+  useEffect(
+    () => () => {
+      for (const timer of acceptedQueueRefreshTimersRef.current) {
+        window.clearTimeout(timer);
+      }
+      acceptedQueueRefreshTimersRef.current = [];
+    },
+    []
+  );
+
+  const refreshAcceptedQueueMutation = useCallback(() => {
+    void queryClient.invalidateQueries();
+    for (const delay of ACCEPTED_QUEUE_REFRESH_DELAYS_MS) {
+      const timer = window.setTimeout(() => {
+        void queryClient.invalidateQueries();
+      }, delay);
+      acceptedQueueRefreshTimersRef.current.push(timer);
+    }
+  }, [queryClient]);
 
   const handleSortByChange = useCallback(
     (newSortBy: 'severity_desc' | 'severity_asc' | 'sla_due_at_asc') => {
@@ -163,8 +185,8 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
     trpc.organizations.securityAgent.triggerSync.mutationOptions({
       onSuccess: () => {
         setGitHubError(null); // Clear any previous error on success
-        toast.success('Sync completed successfully');
-        void queryClient.invalidateQueries();
+        toast.success('Sync queued');
+        refreshAcceptedQueueMutation();
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
@@ -185,7 +207,7 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
     trpc.organizations.securityAgent.dismissFinding.mutationOptions({
       onSuccess: () => {
         toast.success('Finding dismissed');
-        void queryClient.invalidateQueries();
+        refreshAcceptedQueueMutation();
         setDismissDialogOpen(false);
         setDetailDialogOpen(false);
         setSelectedFinding(null);
@@ -211,9 +233,9 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
   const { mutate: orgSetEnabledMutate, isPending: isOrgSetEnabledPending } = useMutation(
     trpc.organizations.securityAgent.setEnabled.mutationOptions({
       onSuccess: async data => {
-        if ('syncResult' in data && data.syncResult) {
+        if ('initialSync' in data && data.initialSync) {
           toast.success('Security Agent enabled', {
-            description: `Initial sync completed: ${data.syncResult.synced} alerts synced${data.syncResult.errors > 0 ? `, ${data.syncResult.errors} errors` : ''}`,
+            description: 'Initial sync queued. Findings update as processing completes.',
           });
         } else {
           toast.success('Security Agent setting updated');
@@ -235,8 +257,8 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
     trpc.securityAgent.triggerSync.mutationOptions({
       onSuccess: () => {
         setGitHubError(null); // Clear any previous error on success
-        toast.success('Sync completed successfully');
-        void queryClient.invalidateQueries();
+        toast.success('Sync queued');
+        refreshAcceptedQueueMutation();
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
@@ -257,7 +279,7 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
     trpc.securityAgent.dismissFinding.mutationOptions({
       onSuccess: () => {
         toast.success('Finding dismissed');
-        void queryClient.invalidateQueries();
+        refreshAcceptedQueueMutation();
         setDismissDialogOpen(false);
         setDetailDialogOpen(false);
         setSelectedFinding(null);
@@ -283,9 +305,9 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
   const { mutate: personalSetEnabledMutate, isPending: isPersonalSetEnabledPending } = useMutation(
     trpc.securityAgent.setEnabled.mutationOptions({
       onSuccess: async data => {
-        if ('syncResult' in data && data.syncResult) {
+        if ('initialSync' in data && data.initialSync) {
           toast.success('Security Agent enabled', {
-            description: `Initial sync completed: ${data.syncResult.synced} alerts synced${data.syncResult.errors > 0 ? `, ${data.syncResult.errors} errors` : ''}`,
+            description: 'Initial sync queued. Findings update as processing completes.',
           });
         } else {
           toast.success('Security Agent setting updated');
@@ -308,7 +330,7 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
       onSuccess: async (_data, variables) => {
         setGitHubError(null); // Clear any previous error on success
         toast.success('Analysis started');
-        void queryClient.invalidateQueries();
+        refreshAcceptedQueueMutation();
         setStartingAnalysisIds(prev => {
           const next = new Set(prev);
           next.delete(variables.findingId);
@@ -347,7 +369,7 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
         onSuccess: async (_data, variables) => {
           setGitHubError(null); // Clear any previous error on success
           toast.success('Analysis started');
-          void queryClient.invalidateQueries();
+          refreshAcceptedQueueMutation();
           setStartingAnalysisIds(prev => {
             const next = new Set(prev);
             next.delete(variables.findingId);

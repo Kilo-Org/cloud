@@ -10,6 +10,20 @@ type TokenUser = {
 
 const JWT_TOKEN_VERSION = 3;
 
+export async function generateInternalServiceToken(
+  userId: string,
+  secret: string
+): Promise<string> {
+  return signJwt(
+    {
+      kiloUserId: userId,
+      version: JWT_TOKEN_VERSION,
+    },
+    secret,
+    { expiresIn: '1h' }
+  );
+}
+
 export async function generateApiToken(
   user: TokenUser,
   secret: string,

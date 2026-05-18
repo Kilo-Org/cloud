@@ -38,7 +38,7 @@ type ClaimRowsForOwnerResult = {
   blocked: boolean;
 };
 
-function parseSecurityConfig(config: unknown): SecurityAgentConfig {
+export function parseSecurityConfig(config: unknown): SecurityAgentConfig {
   let configValue: unknown = config;
 
   if (typeof configValue === 'string') {
@@ -54,10 +54,21 @@ function parseSecurityConfig(config: unknown): SecurityAgentConfig {
     return DEFAULT_SECURITY_AGENT_CONFIG;
   }
 
-  return {
+  const resolvedConfig: SecurityAgentConfig = {
     ...DEFAULT_SECURITY_AGENT_CONFIG,
     ...parsed.data,
   };
+
+  if (parsed.data.model_slug !== undefined) {
+    if (parsed.data.triage_model_slug === undefined) {
+      resolvedConfig.triage_model_slug = undefined;
+    }
+    if (parsed.data.analysis_model_slug === undefined) {
+      resolvedConfig.analysis_model_slug = undefined;
+    }
+  }
+
+  return resolvedConfig;
 }
 
 function ownerWhereQueue(owner: QueueOwner) {
@@ -76,6 +87,26 @@ function ownerWhereOwnerState(owner: QueueOwner) {
   return owner.type === 'org'
     ? eq(security_analysis_owner_state.owned_by_organization_id, owner.id)
     : eq(security_analysis_owner_state.owned_by_user_id, owner.id);
+}
+
+export async function getSecurityAgentConfigForOwner(
+  db: WorkerDb,
+  owner: QueueOwner
+): Promise<SecurityAgentConfig> {
+  const rows = await db
+    .select({ config: agent_configs.config })
+    .from(agent_configs)
+    .where(
+      and(
+        eq(agent_configs.agent_type, 'security_scan'),
+        eq(agent_configs.platform, 'github'),
+        owner.type === 'org'
+          ? eq(agent_configs.owned_by_organization_id, owner.id)
+          : eq(agent_configs.owned_by_user_id, owner.id)
+      )
+    )
+    .limit(1);
+  return parseSecurityConfig(rows[0]?.config);
 }
 
 export async function discoverDueOwners(db: WorkerDb, limit: number): Promise<QueueOwner[]> {
@@ -320,6 +351,85 @@ export async function updateQueueFromPending(
   };
 }
 
+export async function countOwnerInflightAnalyses(db: WorkerDb, owner: QueueOwner): Promise<number> {
+  const rows = await db
+    .select({ total: count() })
+    .from(security_findings)
+    .where(
+      and(
+        ownerWhereFindings(owner),
+        inArray(security_findings.analysis_status, ['pending', 'running'])
+      )
+    );
+  return rows[0]?.total ?? 0;
+}
+
+export async function ensureManualAnalysisQueueRow(
+  db: WorkerDb,
+  params: { finding: SecurityFindingRecord; claimToken: string; jobId: string }
+): Promise<boolean> {
+  const severityRank =
+    params.finding.severity === 'critical'
+      ? 0
+      : params.finding.severity === 'high'
+        ? 1
+        : params.finding.severity === 'medium'
+          ? 2
+          : 3;
+  const rows = await db
+    .insert(security_analysis_queue)
+    .values({
+      finding_id: params.finding.id,
+      owned_by_organization_id: params.finding.owned_by_organization_id,
+      owned_by_user_id: params.finding.owned_by_user_id,
+      queue_status: 'pending',
+      severity_rank: severityRank,
+      queued_at: sql`now()`.mapWith(String),
+      claimed_at: sql`now()`.mapWith(String),
+      claimed_by_job_id: params.jobId,
+      claim_token: params.claimToken,
+      updated_at: sql`now()`.mapWith(String),
+    })
+    .onConflictDoNothing()
+    .returning({ id: security_analysis_queue.id });
+  return rows.length > 0;
+}
+
+export async function transitionManualAnalysisQueueFromStart(
+  db: WorkerDb,
+  params: {
+    findingId: string;
+    claimToken: string;
+    status: 'running' | 'completed' | 'failed';
+    failureCode: string | null;
+    errorMessage: string | null;
+  }
+): Promise<void> {
+  await db.execute(sql`
+    UPDATE security_analysis_queue
+    SET
+      queue_status = ${params.status},
+      failure_code = ${params.failureCode},
+      last_error_redacted = ${params.errorMessage},
+      updated_at = now()
+    WHERE finding_id = ${params.findingId}::uuid
+      AND claim_token = ${params.claimToken}
+      AND queue_status = 'pending'
+  `);
+}
+
+export async function getAnalysisActorById(
+  db: WorkerDb,
+  userId: string
+): Promise<ActorUser | null> {
+  const rows = await db
+    .select({ id: kilocode_users.id, api_token_pepper: kilocode_users.api_token_pepper })
+    .from(kilocode_users)
+    .where(and(eq(kilocode_users.id, userId), isNull(kilocode_users.blocked_reason)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function resolveAutoAnalysisActor(
   db: WorkerDb,
   owner: QueueOwner
@@ -434,7 +544,10 @@ export async function getSecurityFindingById(db: WorkerDb, findingId: string) {
   const rows = await db
     .select({
       id: security_findings.id,
+      platform_integration_id: security_findings.platform_integration_id,
       repo_full_name: security_findings.repo_full_name,
+      source: security_findings.source,
+      source_id: security_findings.source_id,
       created_at: security_findings.created_at,
       status: security_findings.status,
       severity: security_findings.severity,
@@ -450,6 +563,11 @@ export async function getSecurityFindingById(db: WorkerDb, findingId: string) {
       manifest_path: security_findings.manifest_path,
       raw_data: security_findings.raw_data,
       analysis_status: security_findings.analysis_status,
+      analysis: security_findings.analysis,
+      analysis_started_at: security_findings.analysis_started_at,
+      session_id: security_findings.session_id,
+      cli_session_id: security_findings.cli_session_id,
+      ignored_reason: security_findings.ignored_reason,
       owned_by_organization_id: security_findings.owned_by_organization_id,
       owned_by_user_id: security_findings.owned_by_user_id,
     })
@@ -620,4 +738,81 @@ export async function clearAnalysisStatus(db: WorkerDb, findingId: string): Prom
       updated_at: sql`now()`.mapWith(String),
     })
     .where(eq(security_findings.id, findingId));
+}
+
+export async function transitionAnalysisQueueFromCallback(
+  db: WorkerDb,
+  params: {
+    findingId: string;
+    toStatus: 'completed' | 'failed';
+    failureCode: string | null;
+    errorMessage: string | null;
+  }
+): Promise<void> {
+  await db.execute(sql`
+    UPDATE security_analysis_queue
+    SET
+      queue_status = ${params.toStatus},
+      failure_code = ${params.failureCode},
+      last_error_redacted = ${params.errorMessage},
+      updated_at = now()
+    WHERE finding_id = ${params.findingId}::uuid
+      AND queue_status IN ('running', 'pending')
+  `);
+}
+
+export async function reconcileStaleAnalysisQueueRows(db: WorkerDb): Promise<{
+  requeuedPendingCount: number;
+  failedRunningCount: number;
+}> {
+  const requeuedPending = await db.execute<{ id: string }>(sql`
+    WITH requeued_rows AS (
+      UPDATE security_analysis_queue
+      SET
+        queue_status = 'queued',
+        claim_token = NULL,
+        claimed_at = NULL,
+        claimed_by_job_id = NULL,
+        failure_code = NULL,
+        last_error_redacted = NULL,
+        next_retry_at = NULL,
+        updated_at = now()
+      WHERE queue_status = 'pending'
+        AND claimed_at <= now() - interval '15 minutes'
+      RETURNING finding_id
+    )
+    UPDATE security_findings
+    SET
+      analysis_status = NULL,
+      updated_at = now()
+    WHERE id IN (SELECT finding_id FROM requeued_rows)
+    RETURNING id
+  `);
+
+  const failedRunning = await db.execute<{ id: string }>(sql`
+    WITH failed_rows AS (
+      UPDATE security_analysis_queue
+      SET
+        queue_status = 'failed',
+        failure_code = 'RUN_LOST',
+        last_error_redacted = 'Automated stale running reconciliation',
+        updated_at = now()
+      WHERE queue_status = 'running'
+        AND updated_at <= now() - interval '2 hours'
+      RETURNING finding_id
+    )
+    UPDATE security_findings
+    SET
+      analysis_status = 'failed',
+      analysis_error = 'Analysis run lost during stale-row reconciliation',
+      analysis_completed_at = now(),
+      updated_at = now()
+    WHERE id IN (SELECT finding_id FROM failed_rows)
+    RETURNING id
+  `);
+
+  return {
+    requeuedPendingCount: requeuedPending.rows.length,
+    failedRunningCount: failedRunning.rows.length,
+  };
 }

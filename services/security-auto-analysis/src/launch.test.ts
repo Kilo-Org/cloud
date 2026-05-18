@@ -1,136 +1,235 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
-import type { WorkerDb } from '@kilocode/db/client';
-
-const {
-  mockGetSecurityFindingById,
-  mockTryAcquireAnalysisStartLease,
-  mockSetFindingPending,
-  mockSetFindingCompleted,
-  mockSetFindingFailed,
-  mockSetFindingRunning,
-  mockClearAnalysisStatus,
-  mockGenerateApiToken,
-  mockTriageSecurityFinding,
-} = vi.hoisted(() => ({
-  mockGetSecurityFindingById: vi.fn(),
-  mockTryAcquireAnalysisStartLease: vi.fn(),
-  mockSetFindingPending: vi.fn(),
-  mockSetFindingCompleted: vi.fn(),
-  mockSetFindingFailed: vi.fn(),
-  mockSetFindingRunning: vi.fn(),
-  mockClearAnalysisStatus: vi.fn(),
-  mockGenerateApiToken: vi.fn(),
-  mockTriageSecurityFinding: vi.fn(),
-}));
+import {
+  clearAnalysisStatus,
+  getSecurityFindingById,
+  setFindingCompleted,
+  setFindingFailed,
+  setFindingPending,
+  setFindingRunning,
+  tryAcquireAnalysisStartLease,
+} from './db/queries.js';
+import { buildSecurityAnalysisCallbackTarget, startSecurityAnalysis } from './launch.js';
+import { generateApiToken } from './token.js';
+import { triageSecurityFinding } from './triage.js';
 
 vi.mock('./db/queries.js', () => ({
-  getSecurityFindingById: mockGetSecurityFindingById,
-  tryAcquireAnalysisStartLease: mockTryAcquireAnalysisStartLease,
-  setFindingPending: mockSetFindingPending,
-  setFindingCompleted: mockSetFindingCompleted,
-  setFindingFailed: mockSetFindingFailed,
-  setFindingRunning: mockSetFindingRunning,
-  clearAnalysisStatus: mockClearAnalysisStatus,
+  clearAnalysisStatus: vi.fn(),
+  getSecurityFindingById: vi.fn(),
+  setFindingCompleted: vi.fn(),
+  setFindingFailed: vi.fn(),
+  setFindingPending: vi.fn(),
+  setFindingRunning: vi.fn(),
+  tryAcquireAnalysisStartLease: vi.fn(),
 }));
+vi.mock('./token.js', () => ({ generateApiToken: vi.fn() }));
+vi.mock('./triage.js', () => ({ triageSecurityFinding: vi.fn() }));
 
-vi.mock('./token.js', () => ({
-  generateApiToken: mockGenerateApiToken,
-}));
-
-vi.mock('./triage.js', () => ({
-  triageSecurityFinding: mockTriageSecurityFinding,
-}));
-
-import { startSecurityAnalysis } from './launch.js';
-
-const INTERNAL_SECRET = 'test-internal-api-secret';
 const CALLBACK_SECRET = 'test-callback-token-secret';
-const FINDING_ID = 'finding-1';
 
-function finding() {
+const finding = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  platform_integration_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+  repo_full_name: 'kilo/repo',
+  source: 'dependabot',
+  source_id: '42',
+  created_at: '2026-05-18T08:00:00.000Z',
+  status: 'open',
+  severity: 'high',
+  package_name: 'package-name',
+  package_ecosystem: 'npm',
+  dependency_scope: 'runtime',
+  cve_id: null,
+  ghsa_id: null,
+  title: 'Finding title',
+  description: 'Finding description',
+  vulnerable_version_range: '<1.0.0',
+  patched_version: '1.0.0',
+  manifest_path: 'package.json',
+  raw_data: null,
+  analysis_status: 'failed',
+  analysis_started_at: null,
+  session_id: null,
+  cli_session_id: null,
+  ignored_reason: null,
+  owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  owned_by_user_id: null,
+};
+
+const existingTriage = {
+  needsSandboxAnalysis: true,
+  needsSandboxReasoning: 'Existing triage requests sandbox.',
+  suggestedAction: 'analyze_codebase' as const,
+  confidence: 'high' as const,
+  triageAt: '2026-05-18T08:00:00.000Z',
+};
+
+function createParams(retrySandboxOnly: boolean, cloudAgentFetch: typeof fetch) {
   return {
-    id: FINDING_ID,
-    status: 'open',
-    repo_full_name: 'owner/repo',
-    package_name: 'package',
-    package_ecosystem: 'npm',
-    severity: 'high',
-    dependency_scope: 'runtime',
-    cve_id: null,
-    ghsa_id: null,
-    title: 'Finding',
-    description: null,
-    vulnerable_version_range: null,
-    patched_version: null,
-    manifest_path: null,
+    db: {} as never,
+    env: {
+      ENVIRONMENT: 'development',
+      KILOCODE_BACKEND_BASE_URL: 'https://backend.test',
+      SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE: 'worker',
+      SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL: 'https://app.kilo.ai',
+      CLOUD_AGENT_NEXT: { fetch: cloudAgentFetch },
+    } as unknown as CloudflareEnv,
+    findingId: finding.id,
+    actorUser: { id: 'user-123', api_token_pepper: null },
+    githubToken: 'github-token',
+    triageModel: 'triage/model',
+    analysisModel: 'analysis/model',
+    analysisMode: 'auto' as const,
+    organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    nextAuthSecret: 'next-auth-secret',
+    internalApiSecret: 'internal-api-secret',
+    callbackTokenSecret: CALLBACK_SECRET,
+    retrySandboxOnly,
   };
 }
 
-describe('security auto-analysis launch callback target', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockGetSecurityFindingById.mockResolvedValue(finding());
-    mockTryAcquireAnalysisStartLease.mockResolvedValue(true);
-    mockSetFindingPending.mockResolvedValue(true);
-    mockSetFindingCompleted.mockResolvedValue(true);
-    mockSetFindingFailed.mockResolvedValue(true);
-    mockSetFindingRunning.mockResolvedValue(true);
-    mockClearAnalysisStatus.mockResolvedValue(undefined);
-    mockGenerateApiToken.mockResolvedValue('api-token');
-    mockTriageSecurityFinding.mockResolvedValue({
-      needsSandboxAnalysis: true,
-      needsSandboxReasoning: 'needs sandbox',
-      suggestedAction: 'analyze_codebase',
-      confidence: 'high',
-      triageAt: '2026-05-20T00:00:00.000Z',
+describe('buildSecurityAnalysisCallbackTarget', () => {
+  it('routes callback delivery directly to the Worker processing plane by default', () => {
+    expect(
+      buildSecurityAnalysisCallbackTarget(
+        {
+          SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE: 'worker',
+          SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL: 'https://app.kilo.ai',
+        },
+        finding.id,
+        'callback-token'
+      )
+    ).toEqual({
+      url: `https://security-auto-analysis/internal/security-analysis-callback/${finding.id}`,
+      delivery: 'security-auto-analysis',
+      headers: { 'X-Callback-Token': 'callback-token' },
     });
   });
 
+  it('routes callback delivery through the compatibility web ingress when configured', () => {
+    expect(
+      buildSecurityAnalysisCallbackTarget(
+        {
+          SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE: 'web',
+          SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL: 'https://app.kilo.ai/',
+        },
+        finding.id,
+        'callback-token'
+      )
+    ).toEqual({
+      url: `https://app.kilo.ai/api/internal/security-analysis-callback/${finding.id}`,
+      headers: { 'X-Callback-Token': 'callback-token' },
+    });
+  });
+});
+
+describe('startSecurityAnalysis retrySandboxOnly', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(tryAcquireAnalysisStartLease).mockResolvedValue(true);
+    vi.mocked(generateApiToken).mockResolvedValue('auth-token');
+    vi.mocked(setFindingCompleted).mockResolvedValue(true);
+    vi.mocked(setFindingFailed).mockResolvedValue(true);
+    vi.mocked(setFindingPending).mockResolvedValue(true);
+    vi.mocked(setFindingRunning).mockResolvedValue(true);
+    vi.mocked(clearAnalysisStatus).mockResolvedValue(undefined);
+  });
+
   it('stores scoped callback token instead of raw internal API secret', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
     const requests: Request[] = [];
     const cloudAgentFetch = vi.fn(async (request: Request) => {
       requests.push(request);
       if (request.url.includes('/trpc/prepareSession')) {
         return Response.json({
-          result: { data: { cloudAgentSessionId: 'cloud-session-1', kiloSessionId: 'kilo-1' } },
+          result: { data: { cloudAgentSessionId: 'agent-session', kiloSessionId: 'ses-123' } },
         });
       }
-      return Response.json({ result: { data: { executionId: 'exec-1', status: 'running' } } });
-    });
-    const env = {
-      ENVIRONMENT: 'development',
-      KILOCODE_BACKEND_BASE_URL: 'https://api.test',
-      CLOUD_AGENT_NEXT: { fetch: cloudAgentFetch },
-    } as unknown as CloudflareEnv;
-
-    const result = await startSecurityAnalysis({
-      db: {} as WorkerDb,
-      env,
-      findingId: FINDING_ID,
-      actorUser: { id: 'user-1', api_token_pepper: null },
-      model: 'model-1',
-      analysisMode: 'deep',
-      nextAuthSecret: 'next-auth-secret',
-      internalApiSecret: INTERNAL_SECRET,
-      callbackTokenSecret: CALLBACK_SECRET,
+      return Response.json({ result: { data: { executionId: 'exec-123', status: 'running' } } });
     });
 
-    expect(result).toEqual({ started: true, triageOnly: false });
+    await expect(startSecurityAnalysis(createParams(false, cloudAgentFetch as never))).resolves.toEqual({
+      started: true,
+      triageOnly: false,
+    });
+
     const prepareBody = await requests[0]?.json();
     const expectedCallbackToken = await deriveCallbackToken({
       secret: CALLBACK_SECRET,
       scope: 'security-analysis-callback',
-      resourceParts: [FINDING_ID],
+      resourceParts: [finding.id],
     });
     expect(prepareBody).toMatchObject({
       callbackTarget: {
-        url: `https://api.test/api/internal/security-analysis-callback/${FINDING_ID}`,
         headers: { 'X-Callback-Token': expectedCallbackToken },
       },
     });
     expect(prepareBody).not.toMatchObject({
       callbackTarget: { headers: { 'X-Internal-Secret': expect.any(String) } },
     });
+  });
+
+  it('reuses existing triage and launches sandbox without retriaging', async () => {
+    const previousAnalysis = {
+      triage: existingTriage,
+      analyzedAt: '2026-05-18T08:00:00.000Z',
+      correlationId: 'previous-correlation',
+    };
+    vi.mocked(getSecurityFindingById).mockResolvedValue({
+      ...finding,
+      analysis: previousAnalysis,
+    } as never);
+    const cloudAgentFetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            result: { data: { cloudAgentSessionId: 'agent-session', kiloSessionId: 'ses-123' } },
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ result: { data: { executionId: 'exec-123', status: 'running' } } }),
+          { status: 200 }
+        )
+      );
+
+    await expect(startSecurityAnalysis(createParams(true, cloudAgentFetch as never))).resolves.toEqual({
+      started: true,
+      triageOnly: false,
+    });
+
+    expect(triageSecurityFinding).not.toHaveBeenCalled();
+    expect(setFindingPending).toHaveBeenNthCalledWith(1, {}, finding.id, previousAnalysis);
+    expect(setFindingPending).toHaveBeenNthCalledWith(
+      2,
+      {},
+      finding.id,
+      expect.objectContaining({ triage: existingTriage })
+    );
+    expect(setFindingRunning).toHaveBeenCalledWith({}, finding.id, 'agent-session', 'ses-123');
+  });
+
+  it('falls back to full triage when sandbox-only retry has no prior triage', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue({ ...finding, analysis: null } as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue({
+      ...existingTriage,
+      needsSandboxAnalysis: false,
+      suggestedAction: 'manual_review',
+    });
+
+    await expect(startSecurityAnalysis(createParams(true, vi.fn() as never))).resolves.toEqual({
+      started: true,
+      triageOnly: true,
+    });
+
+    expect(triageSecurityFinding).toHaveBeenCalledTimes(1);
+    expect(setFindingPending).toHaveBeenCalledWith({}, finding.id, null);
+    expect(setFindingCompleted).toHaveBeenCalledTimes(1);
+    expect(setFindingFailed).not.toHaveBeenCalled();
+    expect(clearAnalysisStatus).not.toHaveBeenCalled();
   });
 });

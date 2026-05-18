@@ -360,6 +360,12 @@ export const MODEL_EVAL_INGEST_URL = getEnvVariable('MODEL_EVAL_INGEST_URL') || 
 // Session ingest worker (public share proxy)
 export const SESSION_INGEST_WORKER_URL = getEnvVariable('SESSION_INGEST_WORKER_URL') || '';
 
+// Security Agent sync Worker command ingress
+export const SECURITY_SYNC_WORKER_URL = getEnvVariable('SECURITY_SYNC_WORKER_URL') || '';
+// Security Agent auto-analysis Worker command ingress
+export const SECURITY_AUTO_ANALYSIS_WORKER_URL =
+  getEnvVariable('SECURITY_AUTO_ANALYSIS_WORKER_URL') || '';
+
 // Google Web Risk API
 export const GOOGLE_WEB_RISK_API_KEY = getEnvVariable('GOOGLE_WEB_RISK_API_KEY');
 

@@ -17,9 +17,16 @@ export type DeliveryResult =
   | { type: 'retry'; delaySeconds: number }
   | { type: 'failed'; error: string };
 
+type CallbackDeliveryBindings = {
+  securityAutoAnalysis?: {
+    fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+  };
+};
+
 async function deliverToTarget(
   target: CallbackTarget,
-  payload: ExecutionCallbackPayload
+  payload: ExecutionCallbackPayload,
+  bindings: CallbackDeliveryBindings
 ): Promise<{ ok: boolean; status?: number; error?: string }> {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -27,12 +34,20 @@ async function deliverToTarget(
   };
 
   try {
-    const response = await fetch(target.url, {
+    const requestInit: RequestInit = {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
-    });
+    };
+    const response =
+      target.delivery === 'security-auto-analysis'
+        ? await bindings.securityAutoAnalysis?.fetch(target.url, requestInit)
+        : await fetch(target.url, requestInit);
+
+    if (!response) {
+      throw new Error('Security Auto Analysis callback binding is unavailable');
+    }
 
     logger
       .withFields({
@@ -63,9 +78,10 @@ async function deliverToTarget(
 export async function deliverCallbackJob(
   target: CallbackTarget,
   payload: ExecutionCallbackPayload,
-  attempts: number
+  attempts: number,
+  bindings: CallbackDeliveryBindings = {}
 ): Promise<DeliveryResult> {
-  const result = await deliverToTarget(target, payload);
+  const result = await deliverToTarget(target, payload, bindings);
 
   if (result.ok) {
     return { type: 'success' };

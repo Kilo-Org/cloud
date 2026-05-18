@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getWorkerDb } from '@kilocode/db/client';
-import { discoverDueOwners } from './db/queries.js';
+import { discoverDueOwners, reconcileStaleAnalysisQueueRows } from './db/queries.js';
 import { logger } from './logger.js';
 
 const DISPATCH_OWNER_LIMIT = 100;
@@ -12,6 +12,12 @@ export async function dispatchDueOwners(env: CloudflareEnv): Promise<{
 }> {
   const dispatchId = randomUUID();
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
+
+  const reconciliation = await reconcileStaleAnalysisQueueRows(db);
+  logger.info('Reconciled stale analysis queue rows before owner dispatch', {
+    requeued_pending_count: reconciliation.requeuedPendingCount,
+    failed_running_count: reconciliation.failedRunningCount,
+  });
 
   const owners = await discoverDueOwners(db, DISPATCH_OWNER_LIMIT);
 

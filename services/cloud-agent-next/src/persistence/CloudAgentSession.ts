@@ -356,6 +356,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           error: err instanceof Error ? err.message : String(err),
         })
         .error('Failed to enqueue callback job');
+      throw err;
     }
   }
 

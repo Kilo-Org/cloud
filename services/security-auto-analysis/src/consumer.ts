@@ -16,6 +16,7 @@ import {
   AutoAnalysisOwnerMessageSchema,
   AUTO_ANALYSIS_MAX_ATTEMPTS,
   AUTO_ANALYSIS_OWNER_CAP,
+  resolveSecurityAgentModels,
   type ActorResolutionMode,
   type AutoAnalysisFailureCode,
   type ProcessCounters,
@@ -479,13 +480,15 @@ async function processOwnerMessage(params: {
         continue;
       }
 
+      const models = resolveSecurityAgentModels(claim.config);
       const startResult = await startSecurityAnalysis({
         db,
         env: params.env,
         findingId: finding.id,
         actorUser: actorResolution.user,
         githubToken,
-        model: claim.config.model_slug ?? 'anthropic/claude-opus-4.6',
+        triageModel: models.triageModel,
+        analysisModel: models.analysisModel,
         analysisMode: claim.config.analysis_mode,
         organizationId: launchOwner.type === 'org' ? launchOwner.id : undefined,
         nextAuthSecret,

@@ -10,6 +10,7 @@ import type { SandboxId } from '../types.js';
 export const CallbackTargetSchema = z.object({
   url: z.string().url(),
   headers: z.record(z.string(), z.string()).optional(),
+  delivery: z.enum(['http', 'security-auto-analysis']).optional(),
 });
 
 /**

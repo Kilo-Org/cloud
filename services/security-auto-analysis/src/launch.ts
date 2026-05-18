@@ -105,13 +105,42 @@ type StartSecurityAnalysisParams = {
     api_token_pepper: string | null;
   };
   githubToken?: string;
-  model: string;
+  triageModel: string;
+  analysisModel: string;
   analysisMode: AnalysisMode;
   organizationId?: string;
   nextAuthSecret: string;
   internalApiSecret: string;
   callbackTokenSecret: string;
+  retrySandboxOnly?: boolean;
 };
+
+export function buildSecurityAnalysisCallbackTarget(
+  env: Pick<
+    CloudflareEnv,
+    'SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE' | 'SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL'
+  >,
+  findingId: string,
+  callbackToken: string
+): {
+  url: string;
+  delivery?: 'security-auto-analysis';
+  headers: { 'X-Callback-Token': string };
+} {
+  if (env.SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE === 'web') {
+    const baseUrl = env.SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL.replace(/\/$/, '');
+    return {
+      url: `${baseUrl}/api/internal/security-analysis-callback/${findingId}`,
+      headers: { 'X-Callback-Token': callbackToken },
+    };
+  }
+
+  return {
+    url: `https://security-auto-analysis/internal/security-analysis-callback/${findingId}`,
+    delivery: 'security-auto-analysis',
+    headers: { 'X-Callback-Token': callbackToken },
+  };
+}
 
 export async function startSecurityAnalysis(
   params: StartSecurityAnalysisParams
@@ -134,20 +163,30 @@ export async function startSecurityAnalysis(
     return { started: false, error: 'Analysis already in progress' };
   }
 
-  await setFindingPending(params.db, params.findingId, null);
+  const existingTriage = params.retrySandboxOnly ? finding.analysis?.triage : undefined;
+  const skipTriage = params.retrySandboxOnly === true && existingTriage !== undefined;
+
+  await setFindingPending(
+    params.db,
+    params.findingId,
+    skipTriage ? (finding.analysis ?? null) : null
+  );
 
   try {
     const environment = params.env.ENVIRONMENT === 'production' ? 'production' : 'development';
     const authToken = await generateApiToken(params.actorUser, params.nextAuthSecret, environment);
-    const triage = await triageSecurityFinding({
-      finding,
-      authToken,
-      model: params.model,
-      backendBaseUrl: params.env.KILOCODE_BACKEND_BASE_URL,
-      organizationId: params.organizationId,
-    });
+    const triage = skipTriage
+      ? existingTriage
+      : await triageSecurityFinding({
+          finding,
+          authToken,
+          model: params.triageModel,
+          backendBaseUrl: params.env.KILOCODE_BACKEND_BASE_URL,
+          organizationId: params.organizationId,
+        });
 
     const runSandbox =
+      skipTriage ||
       params.analysisMode === 'deep' ||
       (params.analysisMode === 'auto' && triage.needsSandboxAnalysis);
 
@@ -155,7 +194,9 @@ export async function startSecurityAnalysis(
       const triageOnlyAnalysis: SecurityFindingAnalysis = {
         triage,
         analyzedAt: new Date().toISOString(),
-        modelUsed: params.model,
+        modelUsed: params.triageModel,
+        triageModel: params.triageModel,
+        analysisModel: params.analysisModel,
         triggeredByUserId: params.actorUser.id,
         correlationId,
       };
@@ -172,34 +213,35 @@ export async function startSecurityAnalysis(
     const partialAnalysis: SecurityFindingAnalysis = {
       triage,
       analyzedAt: new Date().toISOString(),
-      modelUsed: params.model,
+      modelUsed: params.analysisModel,
+      triageModel: params.triageModel,
+      analysisModel: params.analysisModel,
       triggeredByUserId: params.actorUser.id,
       correlationId,
     };
 
     await setFindingPending(params.db, params.findingId, partialAnalysis);
 
-    const callbackUrl = `${params.env.KILOCODE_BACKEND_BASE_URL}/api/internal/security-analysis-callback/${params.findingId}`;
     const callbackToken = await deriveCallbackToken({
       secret: params.callbackTokenSecret,
       scope: 'security-analysis-callback',
       resourceParts: [params.findingId],
     });
+    const callbackTarget = buildSecurityAnalysisCallbackTarget(
+      params.env,
+      params.findingId,
+      callbackToken
+    );
 
     const prepareInput = {
       prompt: buildAnalysisPrompt(finding),
       mode: 'code',
-      model: params.model,
+      model: params.analysisModel,
       githubRepo: finding.repo_full_name,
       githubToken: params.githubToken,
       kilocodeOrganizationId: params.organizationId,
       createdOnPlatform: 'security-agent',
-      callbackTarget: {
-        url: callbackUrl,
-        headers: {
-          'X-Callback-Token': callbackToken,
-        },
-      },
+      callbackTarget,
     };
 
     const prepareResponse = await params.env.CLOUD_AGENT_NEXT.fetch(

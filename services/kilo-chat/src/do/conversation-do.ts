@@ -676,30 +676,30 @@ export class ConversationDO extends DurableObject<Env> {
     const messageId = this.nextUlid();
 
     try {
-      this.db
-        .insert(messages)
-        .values({
-          id: messageId,
-          sender_id: params.senderId,
-          content: JSON.stringify(params.content),
-          in_reply_to_message_id: params.inReplyToMessageId ?? null,
-          version: 1,
-          deleted: 0,
-        })
-        .run();
+      this.db.transaction(tx => {
+        tx.insert(messages)
+          .values({
+            id: messageId,
+            sender_id: params.senderId,
+            content: JSON.stringify(params.content),
+            in_reply_to_message_id: params.inReplyToMessageId ?? null,
+            version: 1,
+            deleted: 0,
+          })
+          .run();
+
+        for (const row of attachmentRows) {
+          tx.update(attachments)
+            .set({ status: 'linked', message_id: messageId })
+            .where(eq(attachments.id, row.id))
+            .run();
+        }
+      });
     } catch (err) {
       if (err instanceof Error && /constraint/i.test(err.message)) {
         return { ok: false, code: 'internal', error: err.message };
       }
       throw err;
-    }
-
-    for (const row of attachmentRows) {
-      this.db
-        .update(attachments)
-        .set({ status: 'linked', message_id: messageId })
-        .where(eq(attachments.id, row.id))
-        .run();
     }
 
     const row = this.db.select().from(messages).where(eq(messages.id, messageId)).get();

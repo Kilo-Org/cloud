@@ -1,5 +1,37 @@
 # Experimental Models — Part 1: Core A/B Experiment System
 
+## Implementation Status (read this first)
+
+<!--
+  Update this block when phases land. Format:
+    [done]  in main, with PR/commit ref
+    [merged-pending] PR open, awaiting merge
+    [in-progress] partially landed, see notes
+    [todo] not started
+-->
+
+| Phase                                | Status        | Notes                                                                                       |
+| ------------------------------------ | ------------- | ------------------------------------------------------------------------------------------- |
+| Phase 1 — Schema + Migration         | [merged-pending] | Branch `mark/experimental-models-schema`. Migration `0134_black_union_jack.sql`. PR pending. |
+| Phase 2 — Gateway Header Capture     | [todo]        |                                                                                             |
+| Phase 3 — Variant Picker + Routing   | [todo]        |                                                                                             |
+| Phase 4 — Usage, Metrics, Reporting  | [todo]        |                                                                                             |
+| Phase 5 — Admin tRPC + UI            | [todo]        |                                                                                             |
+| Phase 6 — Specs + Tests              | [todo]        | Spec file `.specs/model-experiments.md` not yet created.                                    |
+
+**Phase 1 — concrete output (landed in `packages/db/src/schema.ts` + `0134_black_union_jack.sql`):**
+
+- `model_experiment` table with partial unique index on `public_model_id` where status in (`active`, `paused`), status CHECK, and "active not archived" CHECK.
+- `model_experiment_variant` table with `(experiment_id, label)` unique constraint and `weight > 0` CHECK.
+- `model_experiment_variant_version` table with `(variant_id, effective_at desc)` index. `upstream` is plain `jsonb` (validation by `ExperimentUpstreamSchema` in app code, not yet written). `encrypted_api_key` is `jsonb` typed `EncryptedData` (matches `byok_api_keys.encrypted_api_key`).
+- `model_experiment_request` table with `usage_id` PK FK to `microdollar_usage(id) on delete cascade`, `(variant_version_id, created_at)` index, partial index on `client_request_id` where not null, allocation-subject CHECK, and sha256/sentinel format CHECKs for both prompt hash columns.
+- Drizzle types exported: `ModelExperiment` / `New…`, `ModelExperimentVariant` / `New…`, `ModelExperimentVariantVersion` / `New…`, `ModelExperimentRequest` / `New…`.
+
+**Not yet done in Phase 1 (still owed by future PRs):**
+
+- `ExperimentUpstreamSchema` zod schema (lives in app code, not in `packages/db`).
+- The `model_experiment_request_stats` reporting view (Phase 4).
+
 > **Scope: preview/experimental models only.** This system exists to A/B test
 > unreleased model checkpoints in partnership with model providers. It is **not**
 > a general traffic-splitting mechanism for production models.

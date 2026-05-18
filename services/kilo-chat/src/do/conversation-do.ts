@@ -880,6 +880,34 @@ export class ConversationDO extends DurableObject<Env> {
       return { ok: true, stale: true, messageId: params.messageId };
     }
 
+    // Attachment reconciliation: edits may drop existing attachments but
+    // never add new ones (uploads must go through initAttachment + a fresh
+    // createMessage). Rows removed from the message are deleted and their
+    // R2 objects are purged best-effort.
+    const existingAttachmentRows = this.db
+      .select()
+      .from(attachments)
+      .where(eq(attachments.message_id, params.messageId))
+      .all();
+    const existingIds = new Set(existingAttachmentRows.map(r => r.id));
+    const newAttachmentIds = new Set(
+      params.content
+        .filter((b): b is Extract<ContentBlock, { type: 'attachment' }> => b.type === 'attachment')
+        .map(b => b.attachmentId)
+    );
+    for (const id of newAttachmentIds) {
+      if (!existingIds.has(id)) {
+        throw new Error(`editMessage: cannot add new attachment ${id}`);
+      }
+    }
+    const removedRows = existingAttachmentRows.filter(r => !newAttachmentIds.has(r.id));
+    if (removedRows.length > 0) {
+      const removedIds = removedRows.map(r => r.id);
+      this.db.delete(attachments).where(inArray(attachments.id, removedIds)).run();
+      const removedKeys = removedRows.map(r => r.r2_key);
+      this.ctx.waitUntil(this.scheduleR2Deletes(removedKeys));
+    }
+
     const newVersion = row.version + 1;
     this.db
       .update(messages)

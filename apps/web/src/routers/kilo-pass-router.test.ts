@@ -33,6 +33,7 @@ import {
 } from '@/lib/kilo-pass/constants';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import type { insertMicrodollarUsageWithDailyRollup as insertMicrodollarUsageWithDailyRollupType } from '@/tests/helpers/microdollar-usage.helper';
 import type { BillingHistoryEntry } from '@/lib/subscriptions/subscription-center';
 import type { ValidatedStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
 import type Stripe from 'stripe';
@@ -1505,7 +1506,7 @@ describe('kiloPassRouter', () => {
   });
 
   describe('getAverageMonthlyUsageLast3Months', () => {
-    let insertMicrodollarUsageWithDailyRollup: typeof import('@/tests/helpers/microdollar-usage.helper').insertMicrodollarUsageWithDailyRollup;
+    let insertMicrodollarUsageWithDailyRollup: typeof insertMicrodollarUsageWithDailyRollupType;
 
     beforeAll(async () => {
       ({ insertMicrodollarUsageWithDailyRollup } =

@@ -1348,6 +1348,30 @@ export class ConversationDO extends DurableObject<Env> {
     return { attachmentId, r2Key, row };
   }
 
+  getAttachmentForRead(params: {
+    requesterId: string;
+    attachmentId: string;
+  }): AttachmentForRead | null {
+    if (!this.isMember(params.requesterId)) {
+      throw new Error(
+        `getAttachmentForRead: requester ${params.requesterId} is not a member of this conversation`
+      );
+    }
+    const row = this.db
+      .select()
+      .from(attachments)
+      .where(eq(attachments.id, params.attachmentId))
+      .get();
+    if (!row || row.status !== 'linked') return null;
+    return {
+      id: row.id,
+      r2Key: row.r2_key,
+      mimeType: row.mime_type,
+      size: row.size,
+      filename: row.filename,
+    };
+  }
+
   private scheduleOrphanSweepIfNeeded(): void {
     // Stub — real implementation lands in Task 16.
   }

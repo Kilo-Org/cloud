@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { env } from 'cloudflare:test';
+import { env, runInDurableObject } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
 
@@ -27,28 +27,32 @@ describe('ConversationDO.initAttachment', () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
     await stub.bootstrapConversation({ creatorId: 'user-A', otherMembers: [] });
-    await expect(
-      stub.initAttachment({
-        uploaderId: 'user-A',
-        mimeType: 'image/png',
-        size: 101 * 1024 * 1024,
-        filename: 'big.png',
-      })
-    ).rejects.toThrow(/size/i);
+    await runInDurableObject(stub, async (instance: ConversationDO) => {
+      expect(() =>
+        instance.initAttachment({
+          uploaderId: 'user-A',
+          mimeType: 'image/png',
+          size: 101 * 1024 * 1024,
+          filename: 'big.png',
+        })
+      ).toThrow(/size/i);
+    });
   });
 
   it('rejects non-member', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
     await stub.bootstrapConversation({ creatorId: 'user-A', otherMembers: [] });
-    await expect(
-      stub.initAttachment({
-        uploaderId: 'stranger',
-        mimeType: 'image/png',
-        size: 1,
-        filename: 'a.png',
-      })
-    ).rejects.toThrow(/member/i);
+    await runInDurableObject(stub, async (instance: ConversationDO) => {
+      expect(() =>
+        instance.initAttachment({
+          uploaderId: 'stranger',
+          mimeType: 'image/png',
+          size: 1,
+          filename: 'a.png',
+        })
+      ).toThrow(/member/i);
+    });
   });
 
   it('returns same attachmentId for duplicate init within 30s', async () => {

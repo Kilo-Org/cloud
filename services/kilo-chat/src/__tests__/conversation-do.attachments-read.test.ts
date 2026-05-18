@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { env } from 'cloudflare:test';
+import { env, runInDurableObject } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
 
@@ -34,8 +34,10 @@ describe('ConversationDO.getAttachmentForRead', () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
     await stub.bootstrapConversation({ creatorId: 'user-A', otherMembers: [] });
-    await expect(
-      stub.getAttachmentForRead({ requesterId: 'stranger', attachmentId: ulid() })
-    ).rejects.toThrow(/member/i);
+    await runInDurableObject(stub, async (instance: ConversationDO) => {
+      expect(() =>
+        instance.getAttachmentForRead({ requesterId: 'stranger', attachmentId: ulid() })
+      ).toThrow(/member/i);
+    });
   });
 });

@@ -118,28 +118,30 @@ describe('ConversationDO.editMessage with attachments', () => {
       size: 2,
       filename: 'a2',
     });
-    await expect(
-      stub.editMessage({
-        messageId,
-        senderId: 'user-A',
-        clientTimestamp: Date.now() + 1,
-        content: [
-          {
-            type: 'attachment',
-            attachmentId: a1.attachmentId,
-            mimeType: 'image/png',
-            size: 1,
-            filename: 'a1',
-          },
-          {
-            type: 'attachment',
-            attachmentId: a2.attachmentId,
-            mimeType: 'image/png',
-            size: 2,
-            filename: 'a2',
-          },
-        ],
-      })
-    ).rejects.toThrow(/add/i);
+    await runInDurableObject(stub, async instance => {
+      expect(() =>
+        instance.editMessage({
+          messageId,
+          senderId: 'user-A',
+          clientTimestamp: Date.now() + 1,
+          content: [
+            {
+              type: 'attachment',
+              attachmentId: a1.attachmentId,
+              mimeType: 'image/png',
+              size: 1,
+              filename: 'a1',
+            },
+            {
+              type: 'attachment',
+              attachmentId: a2.attachmentId,
+              mimeType: 'image/png',
+              size: 2,
+              filename: 'a2',
+            },
+          ],
+        })
+      ).toThrow(/add/i);
+    });
   });
 });

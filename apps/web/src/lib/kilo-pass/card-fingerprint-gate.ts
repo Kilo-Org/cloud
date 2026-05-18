@@ -1,17 +1,73 @@
 import 'server-only';
 
-import { payment_methods, transactional_email_log } from '@kilocode/db/schema';
+import {
+  kilocode_users,
+  kilo_pass_subscriptions,
+  payment_methods,
+  transactional_email_log,
+} from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
-import { findActiveKiloPassByCardFingerprint } from '@/lib/stripe';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
 import { captureException } from '@sentry/nextjs';
 import { sendKiloPassDuplicateCardCanceledEmail } from '@/lib/email';
-import { kilocode_users } from '@kilocode/db/schema';
 
 const KILO_PASS_DUPLICATE_CARD_EMAIL_TYPE = 'kilo_pass_duplicate_card_canceled';
+
+export type ActiveKiloPassByFingerprint = {
+  kiloUserId: string;
+  subscriptionId: string;
+  stripeSubscriptionId: string | null;
+};
+
+export async function findActiveKiloPassByCardFingerprint(
+  fingerprint: string | null | undefined,
+  excludingUserId: string
+): Promise<ActiveKiloPassByFingerprint | null> {
+  if (!fingerprint) return null;
+
+  const otherPaymentMethods = await db
+    .select({
+      userId: payment_methods.user_id,
+    })
+    .from(payment_methods)
+    .where(
+      and(
+        eq(payment_methods.stripe_fingerprint, fingerprint),
+        ne(payment_methods.user_id, excludingUserId)
+      )
+    )
+    .limit(10);
+
+  const otherUserIds = [...new Set(otherPaymentMethods.map(pm => pm.userId))];
+  if (otherUserIds.length === 0) return null;
+
+  const activeSub = await db
+    .select({
+      kiloUserId: kilo_pass_subscriptions.kilo_user_id,
+      id: kilo_pass_subscriptions.id,
+      stripeSubscriptionId: kilo_pass_subscriptions.stripe_subscription_id,
+    })
+    .from(kilo_pass_subscriptions)
+    .where(
+      and(
+        inArray(kilo_pass_subscriptions.kilo_user_id, otherUserIds),
+        isNull(kilo_pass_subscriptions.ended_at),
+        sql`${kilo_pass_subscriptions.status} NOT IN ('canceled', 'unpaid', 'incomplete_expired')`
+      )
+    )
+    .limit(1);
+
+  if (activeSub.length === 0) return null;
+
+  return {
+    kiloUserId: activeSub[0].kiloUserId,
+    subscriptionId: activeSub[0].id,
+    stripeSubscriptionId: activeSub[0].stripeSubscriptionId,
+  };
+}
 
 type InvoiceWithPaymentIntent = Stripe.Invoice & {
   payment_intent?: Stripe.PaymentIntent | string | null;

@@ -753,7 +753,8 @@ describe('card fingerprint gate', () => {
 
 describe('findActiveKiloPassByCardFingerprint', () => {
   test('returns null when no other user has the fingerprint', async () => {
-    const { findActiveKiloPassByCardFingerprint } = await import('@/lib/stripe');
+    const { findActiveKiloPassByCardFingerprint } =
+      await import('@/lib/kilo-pass/card-fingerprint-gate');
 
     const result = await findActiveKiloPassByCardFingerprint(
       'fp_nonexistent',
@@ -763,7 +764,8 @@ describe('findActiveKiloPassByCardFingerprint', () => {
   });
 
   test('returns active subscription when another user has active Kilo Pass with same fingerprint', async () => {
-    const { findActiveKiloPassByCardFingerprint } = await import('@/lib/stripe');
+    const { findActiveKiloPassByCardFingerprint } =
+      await import('@/lib/kilo-pass/card-fingerprint-gate');
 
     const otherUser = await insertTestUser();
     const fingerprint = `fp_find_${Math.random()}`;
@@ -790,7 +792,8 @@ describe('findActiveKiloPassByCardFingerprint', () => {
   });
 
   test('returns null when other user has same fingerprint but ended Kilo Pass', async () => {
-    const { findActiveKiloPassByCardFingerprint } = await import('@/lib/stripe');
+    const { findActiveKiloPassByCardFingerprint } =
+      await import('@/lib/kilo-pass/card-fingerprint-gate');
 
     const otherUser = await insertTestUser();
     const fingerprint = `fp_ended_find_${Math.random()}`;
@@ -815,7 +818,8 @@ describe('findActiveKiloPassByCardFingerprint', () => {
   });
 
   test('excludes the excludingUserId from the lookup', async () => {
-    const { findActiveKiloPassByCardFingerprint } = await import('@/lib/stripe');
+    const { findActiveKiloPassByCardFingerprint } =
+      await import('@/lib/kilo-pass/card-fingerprint-gate');
 
     const user = await insertTestUser();
     const fingerprint = `fp_self_${Math.random()}`;

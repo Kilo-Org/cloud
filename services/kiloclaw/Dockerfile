@@ -56,11 +56,11 @@ RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.co
 
 # Install global CLI tools in a single invocation, then patch openclaw and clean cache once.
 # Packages: pnpm (package manager), openclaw (pinned for reproducible builds; patched below),
-#   clawhub, mcporter, @steipete/summarize, @kilocode/cli (runtime tooling).
+#   clawhub, mcporter, @steipete/summarize, @kilocode/cli, @composio/cli (runtime tooling).
 # Patch: bump model discovery timeout from 5s to 60s — shared-cpu machines
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Remove this sed patch once openclaw exposes a configurable timeout.
-RUN npm install -g pnpm openclaw@2026.4.23 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
+RUN npm install -g pnpm openclaw@2026.4.23 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 @composio/cli@0.2.30 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && FOUND_FILES=$(find "$OC_DIST" -name 'provider-models-*.js' | wc -l | tr -d ' ') \
     && if [ "$FOUND_FILES" -eq 0 ]; then echo "ERROR: provider-models-*.js not found in openclaw dist" >&2; exit 1; fi \
@@ -78,6 +78,7 @@ RUN npm install -g pnpm openclaw@2026.4.23 clawhub mcporter@0.7.3 @steipete/summ
     && if grep -q 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$CT_FILE"; then echo "ERROR: actionRequiresTarget patch failed" >&2; exit 1; fi \
     && echo "OK: patched actionRequiresTarget in $(basename "$CT_FILE")" \
     && openclaw --version \
+    && composio --version \
     && npm cache clean --force
 
 # Bake bundled plugin runtime deps into OpenClaw's external stage dir so first

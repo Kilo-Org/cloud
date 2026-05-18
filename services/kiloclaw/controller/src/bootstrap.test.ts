@@ -24,6 +24,7 @@ import {
   KILO_CLI_SECTION_CONFIG,
   OP_SECTION_CONFIG,
   LINEAR_SECTION_CONFIG,
+  COMPOSIO_SECTION_CONFIG,
   KILOCLAW_MITIGATIONS_SECTION_CONFIG,
   PLUGIN_INSTALL_SECTION_CONFIG,
   PROCESS_MODEL_SECTION_CONFIG,
@@ -1669,6 +1670,7 @@ describe('TOOLS.md section configs', () => {
     KILO_CLI_SECTION_CONFIG,
     OP_SECTION_CONFIG,
     LINEAR_SECTION_CONFIG,
+    COMPOSIO_SECTION_CONFIG,
     KILOCLAW_MITIGATIONS_SECTION_CONFIG,
     PLUGIN_INSTALL_SECTION_CONFIG,
     PROCESS_MODEL_SECTION_CONFIG,
@@ -1756,6 +1758,14 @@ describe('TOOLS.md section configs', () => {
     );
     expect(GOG_SECTION_CONFIG.section).toContain('gog drive ls --account <email> --json');
     expect(GOG_SECTION_CONFIG.section).not.toContain('gog drive files list');
+  });
+
+  it('Composio section references core CLI commands', () => {
+    const section = COMPOSIO_SECTION_CONFIG.section;
+    expect(section).toContain('composio whoami');
+    expect(section).toContain('composio search');
+    expect(section).toContain('composio connections list');
+    expect(section).toContain('composio link <toolkit>');
   });
 });
 

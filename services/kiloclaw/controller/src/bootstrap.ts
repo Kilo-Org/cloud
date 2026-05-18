@@ -1168,6 +1168,24 @@ You can interact with the \`Linear\` MCP server using your \`mcporter\` skill.
   <!-- END:linear -->`,
 };
 
+export const COMPOSIO_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: 'Composio',
+  beginMarker: '<!-- BEGIN:composio -->',
+  endMarker: '<!-- END:composio -->',
+  section: `
+<!-- BEGIN:composio -->
+## Composio
+
+The \`composio\` CLI is configured for this sandbox. Use it to discover and run Composio tools, or to create connection links for external services.
+
+- Check account: \`composio whoami\`
+- Search tools: \`composio search "send email"\`
+- List connections: \`composio connections list\`
+- Connect a toolkit: \`composio link <toolkit>\`
+- Run \`composio --help\` and \`composio <command> --help\` for all available commands.
+<!-- END:composio -->`,
+};
+
 // Additional KiloClaw-mitigated OpenClaw audit findings beyond the
 // gateway.control_ui.insecure_auth one already documented in the base
 // TOOLS.md. Mirrors the list in apps/web/src/lib/shell-security/
@@ -1324,6 +1342,11 @@ export async function bootstrapNonCritical(
         updateToolsMdSection(googleWorkspaceToolsEnabled, GOG_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.OP_SERVICE_ACCOUNT_TOKEN, OP_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.LINEAR_API_KEY, LINEAR_SECTION_CONFIG, deps);
+        updateToolsMdSection(
+          !!env.COMPOSIO_USER_API_KEY && !!env.COMPOSIO_ORG,
+          COMPOSIO_SECTION_CONFIG,
+          deps
+        );
         // Always-on: agent context about KiloClaw-mitigated audit findings
         // and how to keep plugins.allow in sync on plugin installs.
         updateToolsMdSection(true, KILOCLAW_MITIGATIONS_SECTION_CONFIG, deps);

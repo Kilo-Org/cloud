@@ -1461,11 +1461,28 @@ export class ConversationDO extends DurableObject<Env> {
     // Stub — real implementation lands in Task 16.
   }
 
-  destroyAndReturnMembers(): DestroyResult {
+  async destroyAndReturnMembers(): Promise<DestroyResult> {
     const info = this.getInfo();
     if (!info) return null;
     const membersCopy = info.members;
+
+    // Walk every R2 object under this conversation's prefix and delete it.
+    // This covers attachments whose DB rows we'll wipe below as well as any
+    // orphaned objects (e.g. uploads that completed after the row was
+    // expired by the orphan sweeper).
+    const prefix = `${this.keyPrefix}attachments/${info.id}/`;
+    let cursor: string | undefined;
+    do {
+      const listed = await this.env.MEDIA_BUCKET.list({ prefix, cursor });
+      const keys = listed.objects.map(o => o.key);
+      if (keys.length > 0) {
+        await this.scheduleR2Deletes(keys);
+      }
+      cursor = listed.truncated ? listed.cursor : undefined;
+    } while (cursor);
+
     this.db.transaction(tx => {
+      tx.delete(attachments).run();
       tx.delete(reactions).run();
       tx.delete(botMessageNotifications).run();
       tx.delete(messages).run();

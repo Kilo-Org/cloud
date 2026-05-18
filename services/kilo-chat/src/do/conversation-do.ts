@@ -33,14 +33,16 @@ function parseStoredContent(rawContent: string, messageId: string): ContentBlock
 }
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { eq, lt, desc, and, sql, inArray } from 'drizzle-orm';
+import { eq, lt, gte, desc, and, sql, inArray } from 'drizzle-orm';
 import {
+  attachments,
   botMessageNotifications,
   conversation,
   members,
   messages,
   reactions,
 } from '../db/conversation-schema';
+import { buildAttachmentR2Key } from '../util/attachment-key';
 import {
   BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS,
   BOT_MESSAGE_NOTIFICATION_TIMEOUT_MS,
@@ -52,6 +54,10 @@ import { monotonicFactory } from 'ulid';
 
 type StoredMessageRow = typeof messages.$inferSelect;
 type BotMessageNotificationReason = 'length' | 'typing_stop' | 'timeout';
+type StoredAttachmentRow = typeof attachments.$inferSelect;
+
+const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
+const INIT_DEDUPE_WINDOW_MS = 30_000;
 
 function buildReplySnapshot(
   messageId: string,
@@ -231,6 +237,32 @@ export type NotifyDeliveryFailedResult =
   | { ok: true; changed: boolean }
   | { ok: false; code: 'not_found'; error: string };
 
+export type InitAttachmentParams = {
+  uploaderId: string;
+  mimeType: string;
+  size: number;
+  filename: string;
+};
+
+export type InitAttachmentResult = {
+  attachmentId: string;
+  r2Key: string;
+  row: StoredAttachmentRow;
+};
+
+export type AttachmentForRead = {
+  id: string;
+  r2Key: string;
+  mimeType: string;
+  size: number;
+  filename: string;
+};
+
+export type BootstrapConversationParams = {
+  creatorId: string;
+  otherMembers?: Array<{ id: string; kind?: 'user' | 'bot' }>;
+};
+
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
 export type AddReactionResult =
   | { ok: true; added: true; id: string; memberContext: MemberContext }
@@ -245,6 +277,8 @@ export type RemoveReactionResult =
 export class ConversationDO extends DurableObject<Env> {
   private db;
   private nextUlid = monotonicFactory();
+  private keyPrefix: string;
+  private static readonly ORPHAN_TTL_MS = 24 * 60 * 60 * 1000;
 
   // Per-conversation serializer for outbound bot webhooks. createMessage
   // RPCs are already serialized by the DO's single-threaded model, so the
@@ -264,7 +298,64 @@ export class ConversationDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { logger: false });
+    this.keyPrefix = env.KEY_PREFIX ?? '';
     void ctx.blockConcurrencyWhile(() => migrate(this.db, migrations));
+  }
+
+  /**
+   * Returns the canonical conversation id used for R2 key construction.
+   * Falls back to `ctx.id.name` (set when the DO is referenced via
+   * `idFromName`) if `initialize` has not been called.
+   */
+  private getConversationId(): string {
+    const info = this.getInfo();
+    const id = info?.id ?? this.ctx.id.name;
+    if (!id) {
+      throw new Error('ConversationDO: conversation id not available');
+    }
+    return id;
+  }
+
+  private async scheduleR2Deletes(keys: readonly string[]): Promise<void> {
+    await Promise.all(
+      keys.map(k =>
+        this.env.MEDIA_BUCKET.delete(k).catch((err: unknown) => {
+          logger.warn('R2 delete failed', { key: k, error: String(err) });
+        })
+      )
+    );
+  }
+
+  /**
+   * Test-only convenience: seeds a conversation with the named creator and
+   * any additional members. Production code should call `initialize`
+   * directly.
+   */
+  bootstrapConversation(params: BootstrapConversationParams):
+    | { ok: true }
+    | {
+        ok: false;
+        error: string;
+      } {
+    const id = this.ctx.id.name;
+    if (!id) {
+      throw new Error('bootstrapConversation requires a named DO id');
+    }
+    const createdAt = Date.now();
+    const memberList: Array<{ id: string; kind: 'user' | 'bot' }> = [
+      { id: params.creatorId, kind: 'user' },
+      ...(params.otherMembers ?? []).map(m => ({
+        id: m.id,
+        kind: m.kind ?? 'user',
+      })),
+    ];
+    return this.initialize({
+      id,
+      title: null,
+      createdBy: params.creatorId,
+      createdAt,
+      members: memberList,
+    });
   }
 
   async enqueueMessageWebhook(msg: WebhookMessage, convContext: MemberContext): Promise<void> {
@@ -1164,6 +1255,101 @@ export class ConversationDO extends DurableObject<Env> {
       remainingUsers,
       botMembers,
     };
+  }
+
+  initAttachment(params: InitAttachmentParams): InitAttachmentResult {
+    if (
+      typeof params.size !== 'number' ||
+      !Number.isFinite(params.size) ||
+      params.size < 0 ||
+      params.size > MAX_ATTACHMENT_BYTES
+    ) {
+      throw new Error(
+        `initAttachment: invalid size ${params.size}; must be 0..${MAX_ATTACHMENT_BYTES}`
+      );
+    }
+    if (
+      typeof params.mimeType !== 'string' ||
+      params.mimeType.length < 1 ||
+      params.mimeType.length > 255
+    ) {
+      throw new Error('initAttachment: mimeType must be 1..255 chars');
+    }
+    if (
+      typeof params.filename !== 'string' ||
+      params.filename.length < 1 ||
+      params.filename.length > 512
+    ) {
+      throw new Error('initAttachment: filename must be 1..512 chars');
+    }
+    if (!this.isMember(params.uploaderId)) {
+      throw new Error(
+        `initAttachment: uploader ${params.uploaderId} is not a member of this conversation`
+      );
+    }
+
+    const now = Date.now();
+    const dedupeCutoff = now - INIT_DEDUPE_WINDOW_MS;
+    const existing = this.db
+      .select()
+      .from(attachments)
+      .where(
+        and(
+          eq(attachments.uploader_id, params.uploaderId),
+          eq(attachments.filename, params.filename),
+          eq(attachments.size, params.size),
+          eq(attachments.status, 'pending'),
+          gte(attachments.created_at, dedupeCutoff)
+        )
+      )
+      .orderBy(desc(attachments.created_at))
+      .limit(1)
+      .get();
+
+    if (existing) {
+      return {
+        attachmentId: existing.id,
+        r2Key: existing.r2_key,
+        row: existing,
+      };
+    }
+
+    const conversationId = this.getConversationId();
+    const attachmentId = this.nextUlid();
+    const r2Key = buildAttachmentR2Key({
+      keyPrefix: this.keyPrefix,
+      conversationId,
+      uploaderId: params.uploaderId,
+      attachmentId,
+    });
+
+    this.db
+      .insert(attachments)
+      .values({
+        id: attachmentId,
+        uploader_id: params.uploaderId,
+        r2_key: r2Key,
+        mime_type: params.mimeType,
+        size: params.size,
+        filename: params.filename,
+        status: 'pending',
+        message_id: null,
+        created_at: now,
+      })
+      .run();
+
+    const row = this.db.select().from(attachments).where(eq(attachments.id, attachmentId)).get();
+    if (!row) {
+      throw new Error(`initAttachment: row ${attachmentId} not found after insert`);
+    }
+
+    this.scheduleOrphanSweepIfNeeded();
+
+    return { attachmentId, r2Key, row };
+  }
+
+  private scheduleOrphanSweepIfNeeded(): void {
+    // Stub — real implementation lands in Task 16.
   }
 
   destroyAndReturnMembers(): DestroyResult {

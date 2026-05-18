@@ -7,9 +7,25 @@ import type {
   ConversationStatusRecord,
   BotStatusRequest,
   ConversationStatusRequest,
+  Capability,
 } from '@kilocode/kilo-chat';
 import { botStatus, conversationStatus } from '../db/sandbox-status-schema';
 import migrations from '../../drizzle/sandbox-status/migrations';
+
+// Defensive parser: the column stores a JSON-encoded Capability[] (or NULL).
+// Malformed JSON or non-array shapes return undefined so a corrupt row never
+// breaks bot status reads.
+function parseCapabilities(raw: string | null): Capability[] | undefined {
+  if (raw === null || raw === '') return undefined;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed) || parsed.length === 0) return undefined;
+    if (!parsed.every(c => typeof c === 'string')) return undefined;
+    return parsed as Capability[];
+  } catch {
+    return undefined;
+  }
+}
 
 // Internal RPC input shapes derived from the shared zod schemas. The
 // conversation-status request body has no conversationId (it lives in the
@@ -31,12 +47,16 @@ export class SandboxStatusDO extends DurableObject<Env> {
   // where the incoming `at` is strictly newer.
   putBotStatus(input: PutBotStatusInput): void {
     const updatedAt = Date.now();
+    const capabilities =
+      input.capabilities && input.capabilities.length > 0
+        ? JSON.stringify(input.capabilities)
+        : null;
     this.db
       .insert(botStatus)
-      .values({ id: 1, online: input.online, at: input.at, updatedAt })
+      .values({ id: 1, online: input.online, at: input.at, updatedAt, capabilities })
       .onConflictDoUpdate({
         target: botStatus.id,
-        set: { online: input.online, at: input.at, updatedAt },
+        set: { online: input.online, at: input.at, updatedAt, capabilities },
         setWhere: sql`${botStatus.at} < excluded.at`,
       })
       .run();
@@ -45,7 +65,13 @@ export class SandboxStatusDO extends DurableObject<Env> {
   getBotStatus(): BotStatusRecord | null {
     const row = this.db.select().from(botStatus).where(eq(botStatus.id, 1)).get();
     if (!row) return null;
-    return { online: row.online, at: row.at, updatedAt: row.updatedAt };
+    const capabilities = parseCapabilities(row.capabilities);
+    return {
+      online: row.online,
+      at: row.at,
+      updatedAt: row.updatedAt,
+      ...(capabilities !== undefined ? { capabilities } : {}),
+    };
   }
 
   putConversationStatus(input: PutConversationStatusInput): void {

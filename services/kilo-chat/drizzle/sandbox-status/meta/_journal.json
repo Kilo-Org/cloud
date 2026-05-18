@@ -8,6 +8,13 @@
       "when": 1777295151147,
       "tag": "0000_wooden_toxin",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1779109410934,
+      "tag": "0001_awesome_cable",
+      "breakpoints": true
     }
   ]
 }

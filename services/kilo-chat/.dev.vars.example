@@ -1,2 +1,10 @@
 # Local worker auth must match Kilo JWTs minted by the Next.js dev server.
 WORKER_ENV=development
+
+# R2 access key for the kilo-chat-media bucket (presigned PUT/GET for attachments).
+# @from R2_ACCESS_KEY_ID_KILOCHAT_MEDIA
+R2_ACCESS_KEY_ID_KILOCHAT_MEDIA=your-r2-access-key-id
+
+# R2 secret key for the kilo-chat-media bucket.
+# @from R2_SECRET_ACCESS_KEY_KILOCHAT_MEDIA
+R2_SECRET_ACCESS_KEY_KILOCHAT_MEDIA=your-r2-secret-access-key

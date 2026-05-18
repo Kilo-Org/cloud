@@ -8,6 +8,8 @@ CREATE TABLE `attachments` (
 	`status` text NOT NULL,
 	`message_id` text,
 	`created_at` integer NOT NULL,
+	FOREIGN KEY (`message_id`) REFERENCES `messages`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`uploader_id`) REFERENCES `members`(`id`) ON UPDATE no action ON DELETE no action,
 	CONSTRAINT "attachments_status_check" CHECK("attachments"."status" IN ('pending', 'linked'))
 );
 --> statement-breakpoint

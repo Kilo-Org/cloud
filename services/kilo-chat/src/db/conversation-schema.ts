@@ -114,6 +114,14 @@ export const attachments = sqliteTable(
     created_at: integer('created_at').notNull(),
   },
   table => ({
+    messageFk: foreignKey({
+      columns: [table.message_id],
+      foreignColumns: [messages.id],
+    }),
+    uploaderFk: foreignKey({
+      columns: [table.uploader_id],
+      foreignColumns: [members.id],
+    }),
     statusCheck: check('attachments_status_check', sql`${table.status} IN ('pending', 'linked')`),
     statusCreatedIdx: index('attachments_status_created').on(table.status, table.created_at),
     messageIdIdx: index('attachments_message_id').on(table.message_id),

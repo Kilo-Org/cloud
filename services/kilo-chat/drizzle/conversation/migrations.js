@@ -1,7 +1,7 @@
 import journal from './meta/_journal.json';
 import m0000 from './0000_funny_black_queen.sql';
 import m0001 from './0001_misty_shotgun.sql';
-import m0002 from './0002_material_kang.sql';
+import m0002 from './0002_luxuriant_shen.sql';
 
 export default {
   journal,

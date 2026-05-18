@@ -334,7 +334,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     });
   });
 
-  it('rejects pending questions for code-review snapshots without forwarding them', async () => {
+  it('suppresses pending questions for code-review snapshots without rejecting them', async () => {
     const pendingQuestion = {
       id: 'q_123',
       sessionID: 'kilo_sess_456',
@@ -360,11 +360,11 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     );
 
     expect(questionEvents).toHaveLength(0);
-    expect(rejectQuestion).toHaveBeenCalledWith('q_123');
+    expect(rejectQuestion).not.toHaveBeenCalled();
     expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
-  it('rejects pending permissions for code-review snapshots without forwarding them', async () => {
+  it('suppresses pending permissions for code-review snapshots without rejecting them', async () => {
     const pendingPermission = {
       id: 'p_456',
       sessionID: 'kilo_sess_456',
@@ -391,7 +391,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     );
 
     expect(permissionEvents).toHaveLength(0);
-    expect(answerPermission).toHaveBeenCalledWith('p_456', 'reject');
+    expect(answerPermission).not.toHaveBeenCalled();
     expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 

@@ -97,13 +97,22 @@ describe('buildAgentEnv', () => {
 
 describe('buildKiloConfigContent', () => {
   it('includes kilocodeOrganizationId when organizationId is provided', () => {
-    const json = buildKiloConfigContent('tok', 'anthropic/claude-sonnet-4.6', 'anthropic/claude-haiku-4.5', 'org-xyz');
+    const json = buildKiloConfigContent(
+      'tok',
+      'anthropic/claude-sonnet-4.6',
+      'anthropic/claude-haiku-4.5',
+      'org-xyz'
+    );
     const parsed = JSON.parse(json);
     expect(parsed.provider.kilo.options.kilocodeOrganizationId).toBe('org-xyz');
   });
 
   it('omits kilocodeOrganizationId when organizationId is absent', () => {
-    const json = buildKiloConfigContent('tok', 'anthropic/claude-sonnet-4.6', 'anthropic/claude-haiku-4.5');
+    const json = buildKiloConfigContent(
+      'tok',
+      'anthropic/claude-sonnet-4.6',
+      'anthropic/claude-haiku-4.5'
+    );
     const parsed = JSON.parse(json);
     expect(parsed.provider.kilo.options.kilocodeOrganizationId).toBeUndefined();
   });

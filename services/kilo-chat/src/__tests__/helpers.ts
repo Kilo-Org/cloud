@@ -78,6 +78,21 @@ export function makeApp(callerId: string, callerKind: 'user' | 'bot') {
 }
 
 /**
+ * Awaits a DO RPC result that follows the `{ ok: true, ... } | { ok: false, code, error }`
+ * convention and returns the success branch, throwing on failure. Use in tests
+ * where you only care about the happy path.
+ */
+export async function unwrap<T extends { ok: true }>(
+  result: Promise<T | { ok: false; code: string; error: string }>
+): Promise<T> {
+  const r = await result;
+  if (!r.ok) {
+    throw new Error(`unwrap: expected ok, got ${r.code}: ${r.error}`);
+  }
+  return r;
+}
+
+/**
  * Seeds a named ConversationDO with the given creator and any additional
  * members. Wraps `initialize` so tests don't need to reproduce its full
  * signature on every call. Requires a DO stub obtained via `idFromName(...)` —

@@ -245,11 +245,18 @@ export type InitAttachmentParams = {
   filename: string;
 };
 
-export type InitAttachmentResult = {
+export type InitAttachmentOk = {
+  ok: true;
   attachmentId: string;
   r2Key: string;
   row: StoredAttachmentRow;
 };
+export type InitAttachmentErr = {
+  ok: false;
+  code: 'forbidden' | 'invalid';
+  error: string;
+};
+export type InitAttachmentResult = InitAttachmentOk | InitAttachmentErr;
 
 export type AttachmentForRead = {
   id: string;
@@ -258,6 +265,11 @@ export type AttachmentForRead = {
   size: number;
   filename: string;
 };
+
+export type GetAttachmentForReadParams = { requesterId: string; attachmentId: string };
+export type GetAttachmentForReadResult =
+  | { ok: true; row: AttachmentForRead | null }
+  | { ok: false; code: 'forbidden'; error: string };
 
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
 export type AddReactionResult =
@@ -1314,28 +1326,28 @@ export class ConversationDO extends DurableObject<Env> {
       params.size < 0 ||
       params.size > ATTACHMENT_MAX_BYTES
     ) {
-      throw new Error(
-        `initAttachment: invalid size ${params.size}; must be 0..${ATTACHMENT_MAX_BYTES}`
-      );
+      return {
+        ok: false,
+        code: 'invalid',
+        error: `Invalid size ${params.size}; must be 0..${ATTACHMENT_MAX_BYTES}`,
+      };
     }
     if (
       typeof params.mimeType !== 'string' ||
       params.mimeType.length < 1 ||
       params.mimeType.length > 255
     ) {
-      throw new Error('initAttachment: mimeType must be 1..255 chars');
+      return { ok: false, code: 'invalid', error: 'mimeType must be 1..255 chars' };
     }
     if (
       typeof params.filename !== 'string' ||
       params.filename.length < 1 ||
       params.filename.length > 512
     ) {
-      throw new Error('initAttachment: filename must be 1..512 chars');
+      return { ok: false, code: 'invalid', error: 'filename must be 1..512 chars' };
     }
     if (!this.isMember(params.uploaderId)) {
-      throw new Error(
-        `initAttachment: uploader ${params.uploaderId} is not a member of this conversation`
-      );
+      return { ok: false, code: 'forbidden', error: 'Forbidden' };
     }
 
     const now = Date.now();
@@ -1359,6 +1371,7 @@ export class ConversationDO extends DurableObject<Env> {
 
     if (existing) {
       return {
+        ok: true,
         attachmentId: existing.id,
         r2Key: existing.r2_key,
         row: existing,
@@ -1396,30 +1409,28 @@ export class ConversationDO extends DurableObject<Env> {
 
     this.scheduleOrphanSweepIfNeeded();
 
-    return { attachmentId, r2Key, row };
+    return { ok: true, attachmentId, r2Key, row };
   }
 
-  getAttachmentForRead(params: {
-    requesterId: string;
-    attachmentId: string;
-  }): AttachmentForRead | null {
+  getAttachmentForRead(params: GetAttachmentForReadParams): GetAttachmentForReadResult {
     if (!this.isMember(params.requesterId)) {
-      throw new Error(
-        `getAttachmentForRead: requester ${params.requesterId} is not a member of this conversation`
-      );
+      return { ok: false, code: 'forbidden', error: 'Forbidden' };
     }
     const row = this.db
       .select()
       .from(attachments)
       .where(eq(attachments.id, params.attachmentId))
       .get();
-    if (!row || row.status !== 'linked') return null;
+    if (!row || row.status !== 'linked') return { ok: true, row: null };
     return {
-      id: row.id,
-      r2Key: row.r2_key,
-      mimeType: row.mime_type,
-      size: row.size,
-      filename: row.filename,
+      ok: true,
+      row: {
+        id: row.id,
+        r2Key: row.r2_key,
+        mimeType: row.mime_type,
+        size: row.size,
+        filename: row.filename,
+      },
     };
   }
 

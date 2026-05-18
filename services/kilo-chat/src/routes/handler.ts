@@ -11,6 +11,11 @@ import type { Context } from 'hono';
 import { type ZodSchema } from 'zod';
 import type { AuthContext } from '../auth';
 import { withDORetry } from '@kilocode/worker-utils';
+import type {
+  ConversationDO,
+  GetAttachmentForReadResult,
+  InitAttachmentResult,
+} from '../do/conversation-do';
 import { createBotConversationFor, renameConversationFor } from '../services/conversations';
 import type { DeferCtx } from '../services/messages';
 import {
@@ -598,20 +603,14 @@ export async function handleAttachmentInit(c: HonoCtx) {
   const callerId = c.get('callerId');
   const { conversationId, mimeType, size, filename } = body.data;
 
-  let init: { attachmentId: string; r2Key: string };
-  try {
-    init = await withDORetry(
-      () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId)),
-      stub => stub.initAttachment({ uploaderId: callerId, mimeType, size, filename }),
-      'ConversationDO.initAttachment'
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (/member/i.test(msg)) return c.json({ error: 'Forbidden' }, 403);
-    if (/size|mimeType|filename/i.test(msg)) {
-      return c.json({ error: msg }, 400);
-    }
-    throw err;
+  const init = await withDORetry<DurableObjectStub<ConversationDO>, InitAttachmentResult>(
+    () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId)),
+    stub => stub.initAttachment({ uploaderId: callerId, mimeType, size, filename }),
+    'ConversationDO.initAttachment'
+  );
+  if (!init.ok) {
+    if (init.code === 'forbidden') return c.json({ error: init.error }, 403);
+    return c.json({ error: init.error }, 400);
   }
 
   const accessKeyId = await c.env.R2_ACCESS_KEY_ID.get();
@@ -676,25 +675,15 @@ export async function handleAttachmentGetUrl(c: HonoCtx) {
 
   const callerId = c.get('callerId');
 
-  let row: {
-    id: string;
-    r2Key: string;
-    mimeType: string;
-    size: number;
-    filename: string;
-  } | null;
-  try {
-    row = await withDORetry(
-      () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId)),
-      stub => stub.getAttachmentForRead({ requesterId: callerId, attachmentId }),
-      'ConversationDO.getAttachmentForRead'
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (/member/i.test(msg)) return c.json({ error: 'Forbidden' }, 403);
-    throw err;
+  const lookup = await withDORetry<DurableObjectStub<ConversationDO>, GetAttachmentForReadResult>(
+    () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId)),
+    stub => stub.getAttachmentForRead({ requesterId: callerId, attachmentId }),
+    'ConversationDO.getAttachmentForRead'
+  );
+  if (!lookup.ok) {
+    return c.json({ error: lookup.error }, 403);
   }
-
+  const row = lookup.row;
   if (!row) {
     return c.json({ error: 'Attachment not found' }, 404);
   }

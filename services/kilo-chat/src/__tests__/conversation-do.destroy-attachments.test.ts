@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
-import { bootstrapConversationForTest } from './helpers';
+import { bootstrapConversationForTest, unwrap } from './helpers';
 
 function getDO(name: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(name));
@@ -15,12 +15,14 @@ describe('ConversationDO.destroyAndReturnMembers with attachments', () => {
     await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
 
     // Linked attachment (referenced by a message)
-    const linked = await stub.initAttachment({
-      uploaderId: 'user-A',
-      mimeType: 'image/png',
-      size: 1,
-      filename: 'linked',
-    });
+    const linked = await unwrap(
+      stub.initAttachment({
+        uploaderId: 'user-A',
+        mimeType: 'image/png',
+        size: 1,
+        filename: 'linked',
+      })
+    );
     const create = await stub.createMessage({
       senderId: 'user-A',
       content: [
@@ -36,12 +38,14 @@ describe('ConversationDO.destroyAndReturnMembers with attachments', () => {
     expect(create.ok).toBe(true);
 
     // Pending (never linked) attachment
-    const pending = await stub.initAttachment({
-      uploaderId: 'user-A',
-      mimeType: 'image/png',
-      size: 2,
-      filename: 'pending',
-    });
+    const pending = await unwrap(
+      stub.initAttachment({
+        uploaderId: 'user-A',
+        mimeType: 'image/png',
+        size: 2,
+        filename: 'pending',
+      })
+    );
 
     // Pre-populate R2 so list() returns them (otherwise list will be empty).
     await env.MEDIA_BUCKET.put(linked.r2Key, new Uint8Array([0x01]));

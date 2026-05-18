@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
-import { bootstrapConversationForTest } from './helpers';
+import { bootstrapConversationForTest, unwrap } from './helpers';
 
 function getDO(name: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(name));
@@ -14,18 +14,22 @@ describe('ConversationDO.editMessage with attachments', () => {
     const stub = getDO(conversationId);
     await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
 
-    const a1 = await stub.initAttachment({
-      uploaderId: 'user-A',
-      mimeType: 'image/png',
-      size: 1,
-      filename: 'a1',
-    });
-    const a2 = await stub.initAttachment({
-      uploaderId: 'user-A',
-      mimeType: 'image/png',
-      size: 2,
-      filename: 'a2',
-    });
+    const a1 = await unwrap(
+      stub.initAttachment({
+        uploaderId: 'user-A',
+        mimeType: 'image/png',
+        size: 1,
+        filename: 'a1',
+      })
+    );
+    const a2 = await unwrap(
+      stub.initAttachment({
+        uploaderId: 'user-A',
+        mimeType: 'image/png',
+        size: 2,
+        filename: 'a2',
+      })
+    );
 
     const create = await stub.createMessage({
       senderId: 'user-A',
@@ -79,11 +83,13 @@ describe('ConversationDO.editMessage with attachments', () => {
     // Give waitUntil a tick.
     await new Promise(r => setTimeout(r, 50));
 
-    const stillLinked = await stub.getAttachmentForRead({
-      requesterId: 'user-A',
-      attachmentId: a2.attachmentId,
-    });
-    expect(stillLinked).toBeNull();
+    const stillLinked = await unwrap(
+      stub.getAttachmentForRead({
+        requesterId: 'user-A',
+        attachmentId: a2.attachmentId,
+      })
+    );
+    expect(stillLinked.row).toBeNull();
     expect(deleted.some(k => k.endsWith(`/${a2.attachmentId}`))).toBe(true);
   });
 
@@ -92,12 +98,14 @@ describe('ConversationDO.editMessage with attachments', () => {
     const stub = getDO(conversationId);
     await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
 
-    const a1 = await stub.initAttachment({
-      uploaderId: 'user-A',
-      mimeType: 'image/png',
-      size: 1,
-      filename: 'a1',
-    });
+    const a1 = await unwrap(
+      stub.initAttachment({
+        uploaderId: 'user-A',
+        mimeType: 'image/png',
+        size: 1,
+        filename: 'a1',
+      })
+    );
     const create = await stub.createMessage({
       senderId: 'user-A',
       content: [
@@ -113,12 +121,14 @@ describe('ConversationDO.editMessage with attachments', () => {
     expect(create.ok).toBe(true);
     const messageId = create.ok ? create.messageId : '';
 
-    const a2 = await stub.initAttachment({
-      uploaderId: 'user-A',
-      mimeType: 'image/png',
-      size: 2,
-      filename: 'a2',
-    });
+    const a2 = await unwrap(
+      stub.initAttachment({
+        uploaderId: 'user-A',
+        mimeType: 'image/png',
+        size: 2,
+        filename: 'a2',
+      })
+    );
     await runInDurableObject(stub, async instance => {
       expect(() =>
         instance.editMessage({

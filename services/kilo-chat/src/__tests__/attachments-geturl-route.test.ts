@@ -9,7 +9,7 @@ import { registerConversationRoutes } from '../routes/conversations';
 import { handleAttachmentGetUrl } from '../routes/handler';
 import { deriveGatewayToken } from '../lib/gateway-token';
 import type { ConversationDO } from '../do/conversation-do';
-import { makeApp, withTestExecutionCtx } from './helpers';
+import { makeApp, unwrap, withTestExecutionCtx } from './helpers';
 
 const ownershipMap = new Map<string, Set<string>>();
 const sandboxOwnerMap = new Map<string, string>();
@@ -104,12 +104,14 @@ async function seedLinkedAttachment(
   opts: { mimeType: string; filename: string; size: number }
 ): Promise<{ attachmentId: string }> {
   const stub = getConvStub(conversationId);
-  const init = await stub.initAttachment({
-    uploaderId,
-    mimeType: opts.mimeType,
-    size: opts.size,
-    filename: opts.filename,
-  });
+  const init = await unwrap(
+    stub.initAttachment({
+      uploaderId,
+      mimeType: opts.mimeType,
+      size: opts.size,
+      filename: opts.filename,
+    })
+  );
   const result = await stub.createMessage({
     senderId: uploaderId,
     content: [
@@ -131,12 +133,14 @@ async function seedPendingAttachment(
   uploaderId: string
 ): Promise<{ attachmentId: string }> {
   const stub = getConvStub(conversationId);
-  const init = await stub.initAttachment({
-    uploaderId,
-    mimeType: 'image/png',
-    size: 1,
-    filename: 'pending.png',
-  });
+  const init = await unwrap(
+    stub.initAttachment({
+      uploaderId,
+      mimeType: 'image/png',
+      size: 1,
+      filename: 'pending.png',
+    })
+  );
   return { attachmentId: init.attachmentId };
 }
 

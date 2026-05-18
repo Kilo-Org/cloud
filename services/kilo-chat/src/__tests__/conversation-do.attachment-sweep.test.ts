@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
-import { bootstrapConversationForTest } from './helpers';
+import { bootstrapConversationForTest, unwrap } from './helpers';
 import { attachments } from '../db/conversation-schema';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -17,12 +17,14 @@ describe('ConversationDO orphan attachment sweep', () => {
     const stub = getDO(conversationId);
     await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
 
-    const { attachmentId, r2Key } = await stub.initAttachment({
-      uploaderId: 'user-A',
-      mimeType: 'image/png',
-      size: 10,
-      filename: 'orphan.png',
-    });
+    const { attachmentId, r2Key } = await unwrap(
+      stub.initAttachment({
+        uploaderId: 'user-A',
+        mimeType: 'image/png',
+        size: 10,
+        filename: 'orphan.png',
+      })
+    );
 
     // Back-date the pending row to 25 hours ago.
     const twentyFiveHoursAgo = Date.now() - 25 * 60 * 60 * 1000;

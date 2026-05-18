@@ -11,7 +11,10 @@ FROM debian:trixie-slim AS runtime
 # Install Node.js 24 (required by OpenClaw)
 ENV NODE_VERSION=24.15.0
 ENV OPENCLAW_PLUGIN_STAGE_DIR=/usr/local/share/openclaw-plugin-runtime-deps
+ENV COMPOSIO_INSTALL_DIR=/usr/local/lib/composio
+ENV PATH="${COMPOSIO_INSTALL_DIR}:${PATH}"
 ARG APT_CACHE_BUST
+ARG COMPOSIO_CLI_VERSION=0.2.28
 RUN echo "apt cache bust: ${APT_CACHE_BUST}" \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -56,11 +59,11 @@ RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.co
 
 # Install global CLI tools in a single invocation, then patch openclaw and clean cache once.
 # Packages: pnpm (package manager), openclaw (pinned for reproducible builds; patched below),
-#   clawhub, mcporter, @steipete/summarize, @kilocode/cli, @composio/cli (runtime tooling).
+#   clawhub, mcporter, @steipete/summarize, @kilocode/cli (runtime tooling).
 # Patch: bump model discovery timeout from 5s to 60s — shared-cpu machines
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Remove this sed patch once openclaw exposes a configurable timeout.
-RUN npm install -g pnpm openclaw@2026.4.23 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 @composio/cli@0.2.30 \
+RUN npm install -g pnpm openclaw@2026.4.23 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && FOUND_FILES=$(find "$OC_DIST" -name 'provider-models-*.js' | wc -l | tr -d ' ') \
     && if [ "$FOUND_FILES" -eq 0 ]; then echo "ERROR: provider-models-*.js not found in openclaw dist" >&2; exit 1; fi \
@@ -78,8 +81,17 @@ RUN npm install -g pnpm openclaw@2026.4.23 clawhub mcporter@0.7.3 @steipete/summ
     && if grep -q 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$CT_FILE"; then echo "ERROR: actionRequiresTarget patch failed" >&2; exit 1; fi \
     && echo "OK: patched actionRequiresTarget in $(basename "$CT_FILE")" \
     && openclaw --version \
-    && composio --version \
     && npm cache clean --force
+
+# Composio publishes CLI binaries as GitHub release artifacts rather than as a
+# usable npm package. Pin the tagged install script and stable release so image
+# builds verify the upstream checksum while keeping this install isolated.
+RUN COMPOSIO_INSTALL_TAG="%40composio%2Fcli%40${COMPOSIO_CLI_VERSION}" \
+    && curl -fsSL "https://raw.githubusercontent.com/ComposioHQ/composio/${COMPOSIO_INSTALL_TAG}/install.sh" \
+       -o /tmp/install-composio.sh \
+    && bash /tmp/install-composio.sh "@composio/cli@${COMPOSIO_CLI_VERSION}" \
+    && composio --version \
+    && rm -f /tmp/install-composio.sh
 
 # Bake bundled plugin runtime deps into OpenClaw's external stage dir so first
 # boot is pure startup — no npm install from `openclaw doctor` or gateway plugin

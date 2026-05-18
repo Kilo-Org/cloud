@@ -62,12 +62,12 @@ describe('buildAgentEnv', () => {
     }
   });
 
-  it('sets KILO_PLATFORM to agent-manager', () => {
+  it('sets KILO_PLATFORM to gastown', () => {
     const prev = process.env.KILOCODE_TOKEN;
     delete process.env.KILOCODE_TOKEN;
     try {
       const env = buildAgentEnv(baseRequest());
-      expect(env.KILO_PLATFORM).toBe('agent-manager');
+      expect(env.KILO_PLATFORM).toBe('gastown');
     } finally {
       if (prev !== undefined) process.env.KILOCODE_TOKEN = prev;
     }

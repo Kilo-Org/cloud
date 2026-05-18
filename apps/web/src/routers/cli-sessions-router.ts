@@ -49,6 +49,7 @@ export const KNOWN_PLATFORMS = [
   'agent-manager',
   'app-builder',
   'slack',
+  'gastown',
 ] as const;
 
 const PAGE_SIZE = 10;

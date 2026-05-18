@@ -58,6 +58,7 @@ type StoredAttachmentRow = typeof attachments.$inferSelect;
 
 const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 const INIT_DEDUPE_WINDOW_MS = 30_000;
+const MAX_ATTACHMENTS_PER_MESSAGE = 10;
 
 function buildReplySnapshot(
   messageId: string,
@@ -639,6 +640,39 @@ export class ConversationDO extends DurableObject<Env> {
       };
     }
 
+    // Validate attachment blocks (status must be pending, uploader must match
+    // sender). The actual link UPDATE is performed after the message INSERT.
+    const attachmentBlocks = params.content.filter(
+      (b): b is Extract<ContentBlock, { type: 'attachment' }> => b.type === 'attachment'
+    );
+    if (attachmentBlocks.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+      throw new Error(
+        `createMessage: at most ${MAX_ATTACHMENTS_PER_MESSAGE} attachments per message`
+      );
+    }
+    const attachmentRows: StoredAttachmentRow[] = [];
+    for (const block of attachmentBlocks) {
+      const row = this.db
+        .select()
+        .from(attachments)
+        .where(eq(attachments.id, block.attachmentId))
+        .get();
+      if (!row) {
+        throw new Error(`createMessage: attachment ${block.attachmentId} not found`);
+      }
+      if (row.status !== 'pending') {
+        throw new Error(
+          `createMessage: attachment ${block.attachmentId} is not pending (status=${row.status})`
+        );
+      }
+      if (row.uploader_id !== params.senderId) {
+        throw new Error(
+          `createMessage: attachment ${block.attachmentId} uploader ${row.uploader_id} does not match sender ${params.senderId}`
+        );
+      }
+      attachmentRows.push(row);
+    }
+
     const messageId = this.nextUlid();
 
     try {
@@ -658,6 +692,14 @@ export class ConversationDO extends DurableObject<Env> {
         return { ok: false, code: 'internal', error: err.message };
       }
       throw err;
+    }
+
+    for (const row of attachmentRows) {
+      this.db
+        .update(attachments)
+        .set({ status: 'linked', message_id: messageId })
+        .where(eq(attachments.id, row.id))
+        .run();
     }
 
     const row = this.db.select().from(messages).where(eq(messages.id, messageId)).get();

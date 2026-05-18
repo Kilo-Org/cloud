@@ -54,4 +54,35 @@ describe('ConversationDO orphan attachment sweep', () => {
     expect(rowAfter).toBeUndefined();
     expect(deleted).toContain(r2Key);
   });
+
+  it('pulls the orphan-sweep alarm in when a far-future alarm is already pending', async () => {
+    const conversationId = ulid();
+    const stub = getDO(conversationId);
+    await stub.bootstrapConversation({ creatorId: 'user-A', otherMembers: [] });
+
+    // Pre-set a far-future alarm (48 h from now) to simulate a stale orphan-sweep alarm.
+    const fortyEightHoursFromNow = Date.now() + 48 * 60 * 60 * 1000;
+    await runInDurableObject(stub, async (_inst, state) => {
+      await state.storage.setAlarm(fortyEightHoursFromNow);
+    });
+
+    // initAttachment calls scheduleOrphanSweepIfNeeded which should pull the alarm in.
+    await stub.initAttachment({
+      uploaderId: 'user-A',
+      mimeType: 'image/png',
+      size: 10,
+      filename: 'test.png',
+    });
+
+    const alarmAfter = await runInDurableObject(stub, async (_inst, state) => {
+      return state.storage.getAlarm();
+    });
+
+    // The alarm should now be ~24 h from now, not 48 h.
+    const twentyFourHoursFromNow = Date.now() + 24 * 60 * 60 * 1000;
+    expect(alarmAfter).not.toBeNull();
+    expect(alarmAfter!).toBeLessThan(fortyEightHoursFromNow);
+    // Allow a small margin (10 s) for test execution time.
+    expect(alarmAfter!).toBeGreaterThan(twentyFourHoursFromNow - 10_000);
+  });
 });

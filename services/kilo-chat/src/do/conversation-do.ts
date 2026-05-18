@@ -1462,16 +1462,19 @@ export class ConversationDO extends DurableObject<Env> {
   /**
    * Ensures an alarm is set so the orphan sweep eventually runs. Storage
    * alarm APIs are async; the sync `initAttachment` path schedules via
-   * `ctx.waitUntil`. The DO already shares one alarm slot with bot-
-   * notification timeouts, so we only push out (or set) the alarm — never
-   * pull it in.
+   * `ctx.waitUntil`. The DO shares one alarm slot with bot-notification
+   * timeouts. Bot-notification alarms always fire within seconds-to-minutes,
+   * so they are always earlier than the ~24h orphan-sweep target. We set the
+   * alarm when there is none, when the existing alarm is already past, or when
+   * the existing alarm is *later* than our target (which only happens when the
+   * existing alarm is itself an old orphan-sweep alarm — safe to pull in).
    */
   private scheduleOrphanSweepIfNeeded(): void {
     this.ctx.waitUntil(
       (async () => {
         const existing = await this.ctx.storage.getAlarm();
         const target = Date.now() + ConversationDO.ORPHAN_TTL_MS;
-        if (existing === null || existing < Date.now()) {
+        if (existing === null || existing < Date.now() || existing > target) {
           await this.ctx.storage.setAlarm(target);
         }
       })()
@@ -1501,7 +1504,7 @@ export class ConversationDO extends DurableObject<Env> {
     if (remaining) {
       const existing = await this.ctx.storage.getAlarm();
       const target = Date.now() + ConversationDO.ORPHAN_TTL_MS;
-      if (existing === null || existing < Date.now()) {
+      if (existing === null || existing < Date.now() || existing > target) {
         await this.ctx.storage.setAlarm(target);
       }
     }

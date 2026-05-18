@@ -34,7 +34,7 @@ export function loginComposioCli(
 
   deps.execFileSync('composio', ['login', '--user-api-key', userApiKey, '--org', org], {
     stdio: 'ignore',
-    env: process.env,
+    env: env as NodeJS.ProcessEnv,
   });
   console.log('[composio] CLI login completed');
   return true;

@@ -6,7 +6,11 @@ import {
 } from './composio-cli-config';
 
 function fakeDeps() {
-  const execCalls: { cmd: string; args: string[]; opts: { stdio: 'ignore' } }[] = [];
+  const execCalls: {
+    cmd: string;
+    args: string[];
+    opts: { stdio: 'ignore'; env: NodeJS.ProcessEnv };
+  }[] = [];
   const deps: ComposioCliLoginDeps = {
     execFileSync: vi.fn((cmd, args, opts) => {
       execCalls.push({ cmd, args, opts });
@@ -40,14 +44,13 @@ describe('loginComposioCli', () => {
 
   it('runs composio login when both values are present', () => {
     const { deps, execCalls } = fakeDeps();
+    const env = {
+      COMPOSIO_USER_API_KEY: ' uak_FAKE_TEST_KEY_1234567890 ',
+      COMPOSIO_ORG: ' syn_workspace ',
+      KILOCODE_API_KEY: 'kc_keep',
+    };
 
-    const result = loginComposioCli(
-      {
-        COMPOSIO_USER_API_KEY: ' uak_FAKE_TEST_KEY_1234567890 ',
-        COMPOSIO_ORG: ' syn_workspace ',
-      },
-      deps
-    );
+    const result = loginComposioCli(env, deps);
 
     expect(result).toBe(true);
     expect(execCalls).toHaveLength(1);
@@ -60,6 +63,7 @@ describe('loginComposioCli', () => {
       'syn_workspace',
     ]);
     expect(execCalls[0].opts.stdio).toBe('ignore');
+    expect(execCalls[0].opts.env).toBe(env);
   });
 });
 

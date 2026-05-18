@@ -8,9 +8,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SyncProvidersContent } from '@/app/admin/sync-providers/SyncProvidersContent';
 import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
 import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
+import { ModelExperimentsContent } from '@/app/admin/model-experiments/ModelExperimentsContent';
 
-const VALID_TABS: readonly string[] = ['sync-providers', 'custom-llms', 'routing'];
-type Tab = 'sync-providers' | 'custom-llms' | 'routing';
+const VALID_TABS: readonly string[] = [
+  'sync-providers',
+  'custom-llms',
+  'routing',
+  'model-experiments',
+];
+type Tab = 'sync-providers' | 'custom-llms' | 'routing' | 'model-experiments';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -60,6 +66,9 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="routing" className={tabTriggerClass}>
               Routing
             </TabsTrigger>
+            <TabsTrigger value="model-experiments" className={tabTriggerClass}>
+              Model Experiments
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
             <SyncProvidersContent />
@@ -69,6 +78,9 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="routing" className="mt-4">
             <RoutingContent />
+          </TabsContent>
+          <TabsContent value="model-experiments" className="mt-4">
+            <ModelExperimentsContent />
           </TabsContent>
         </Tabs>
       </div>

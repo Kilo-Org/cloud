@@ -1,0 +1,486 @@
+import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { db } from '@/lib/drizzle';
+import {
+  model_experiment,
+  model_experiment_variant,
+  model_experiment_variant_version,
+} from '@kilocode/db/schema';
+import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { ExperimentUpstreamSchema } from '@/lib/ai-gateway/experiments/upstream-schema';
+import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, modelExperimentRedisKey } from '@/lib/redis-keys';
+import { redisDel, redisSet } from '@/lib/redis';
+import { TRPCError } from '@trpc/server';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import * as z from 'zod';
+
+const RoutingStatuses = ['active', 'paused'] as const;
+const AllStatuses = ['draft', 'active', 'paused', 'completed'] as const;
+type Status = (typeof AllStatuses)[number];
+
+const idSchema = z.object({ id: z.string().uuid() });
+const variantIdSchema = z.object({ variantId: z.string().uuid() });
+
+const labelSchema = z.string().min(1).max(64);
+const weightSchema = z.number().int().positive();
+
+const apiKeySchema = z.string().min(1);
+
+function ensureEncryptionKey(): string {
+  if (!BYOK_ENCRYPTION_KEY) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'BYOK encryption is not configured',
+    });
+  }
+  return BYOK_ENCRYPTION_KEY;
+}
+
+async function loadExperimentOrThrow(id: string) {
+  const row = await db.query.model_experiment.findFirst({
+    where: eq(model_experiment.id, id),
+  });
+  if (!row) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Experiment not found' });
+  }
+  return row;
+}
+
+async function recomputeExperimentedPublicIds() {
+  const rows = await db
+    .select({ public_model_id: model_experiment.public_model_id })
+    .from(model_experiment)
+    .where(inArray(model_experiment.status, RoutingStatuses as readonly Status[] as Status[]));
+  const ids = Array.from(new Set(rows.map(r => r.public_model_id))).sort();
+  await redisSet(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, JSON.stringify(ids));
+}
+
+async function invalidateExperimentCaches(publicModelId: string) {
+  // Per-public-id cache and the membership set are both touched by every
+  // routing-affecting mutation. Best-effort — Redis being down does not block
+  // admin writes.
+  try {
+    await redisDel(modelExperimentRedisKey(publicModelId));
+  } catch {
+    // already captured by redis helper
+  }
+  try {
+    await recomputeExperimentedPublicIds();
+  } catch {
+    // already captured by redis helper
+  }
+}
+
+// ---- Selectors ----------------------------------------------------------
+
+// NEVER select encrypted_api_key here. Plaintext keys are decrypted only by
+// the gateway-side cache loader (Phase 3); admin reads must not see them.
+const variantVersionPublicColumns = {
+  id: model_experiment_variant_version.id,
+  variant_id: model_experiment_variant_version.variant_id,
+  upstream: model_experiment_variant_version.upstream,
+  effective_at: model_experiment_variant_version.effective_at,
+  created_by: model_experiment_variant_version.created_by,
+  created_at: model_experiment_variant_version.created_at,
+} as const;
+
+async function listVariantsWithCurrentVersion(experimentId: string) {
+  const variants = await db
+    .select()
+    .from(model_experiment_variant)
+    .where(eq(model_experiment_variant.experiment_id, experimentId))
+    .orderBy(asc(model_experiment_variant.id));
+
+  if (variants.length === 0) return [];
+
+  const variantIds = variants.map(v => v.id);
+  const versions = await db
+    .select(variantVersionPublicColumns)
+    .from(model_experiment_variant_version)
+    .where(inArray(model_experiment_variant_version.variant_id, variantIds))
+    .orderBy(
+      asc(model_experiment_variant_version.variant_id),
+      desc(model_experiment_variant_version.effective_at),
+      desc(model_experiment_variant_version.id)
+    );
+
+  const latestByVariant = new Map<string, (typeof versions)[number]>();
+  for (const v of versions) {
+    if (!latestByVariant.has(v.variant_id)) {
+      latestByVariant.set(v.variant_id, v);
+    }
+  }
+
+  return variants.map(v => ({
+    ...v,
+    current_version: latestByVariant.get(v.id) ?? null,
+  }));
+}
+
+// ---- Validation helpers -------------------------------------------------
+
+function assertDraft(status: Status, op: string) {
+  if (status !== 'draft') {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `${op} is only allowed on draft experiments`,
+    });
+  }
+}
+
+function assertNonTerminal(status: Status, op: string) {
+  if (status === 'completed') {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `${op} is not allowed on completed experiments`,
+    });
+  }
+}
+
+async function assertActivatable(experimentId: string, publicModelId: string) {
+  const variants = await listVariantsWithCurrentVersion(experimentId);
+  if (variants.length < 2) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Active experiments must have at least 2 variants',
+    });
+  }
+  if (variants.some(v => v.weight <= 0)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Every variant must have a positive weight',
+    });
+  }
+  const now = new Date();
+  if (variants.some(v => !v.current_version || new Date(v.current_version.effective_at) > now)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Every variant must have at least one variant_version with effective_at <= now()',
+    });
+  }
+  // Routing-relevant uniqueness per public_model_id (active|paused). The DB
+  // partial unique index will also enforce this; we check first to surface a
+  // friendlier error.
+  const conflict = await db
+    .select({ id: model_experiment.id })
+    .from(model_experiment)
+    .where(
+      and(
+        eq(model_experiment.public_model_id, publicModelId),
+        inArray(model_experiment.status, RoutingStatuses as readonly Status[] as Status[]),
+        sql`${model_experiment.id} <> ${experimentId}`
+      )
+    )
+    .limit(1);
+  if (conflict.length > 0) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: `Another active or paused experiment exists for ${publicModelId}`,
+    });
+  }
+}
+
+// ---- Router -------------------------------------------------------------
+
+const CreateExperimentSchema = z.object({
+  public_model_id: z.string().min(1),
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+});
+
+const UpdateExperimentSchema = idSchema.extend({
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  // public_model_id is editable only on draft.
+  public_model_id: z.string().min(1).optional(),
+});
+
+const AddVariantSchema = idSchema.extend({
+  label: labelSchema,
+  weight: weightSchema,
+});
+
+const UpdateVariantLabelSchema = z.object({
+  variantId: z.string().uuid(),
+  label: labelSchema,
+});
+
+const SwapVariantVersionSchema = z.object({
+  variantId: z.string().uuid(),
+  upstream: ExperimentUpstreamSchema,
+  apiKey: apiKeySchema,
+});
+
+const RotateApiKeySchema = z.object({
+  variantId: z.string().uuid(),
+  apiKey: apiKeySchema,
+});
+
+const SetArchivedSchema = idSchema.extend({
+  archived: z.boolean(),
+});
+
+export const adminModelExperimentsRouter = createTRPCRouter({
+  // ---- Experiment-level ------------------------------------------------
+
+  list: adminProcedure
+    .input(z.object({ includeArchived: z.boolean().optional() }).optional())
+    .query(async ({ input }) => {
+      const includeArchived = input?.includeArchived ?? false;
+      const rows = await db
+        .select()
+        .from(model_experiment)
+        .where(includeArchived ? sql`true` : eq(model_experiment.is_archived, false))
+        .orderBy(desc(model_experiment.created_at));
+      return { items: rows };
+    }),
+
+  get: adminProcedure.input(idSchema).query(async ({ input }) => {
+    const experiment = await loadExperimentOrThrow(input.id);
+    const variants = await listVariantsWithCurrentVersion(input.id);
+    return { experiment, variants };
+  }),
+
+  create: adminProcedure.input(CreateExperimentSchema).mutation(async ({ input, ctx }) => {
+    const [row] = await db
+      .insert(model_experiment)
+      .values({
+        public_model_id: input.public_model_id,
+        name: input.name,
+        description: input.description ?? null,
+        status: 'draft',
+        created_by_user_id: ctx.user.id,
+      })
+      .returning();
+    return row;
+  }),
+
+  update: adminProcedure.input(UpdateExperimentSchema).mutation(async ({ input }) => {
+    const existing = await loadExperimentOrThrow(input.id);
+    const next: Partial<typeof model_experiment.$inferInsert> = {};
+    if (input.name !== undefined) next.name = input.name;
+    if (input.description !== undefined) next.description = input.description;
+    if (input.public_model_id !== undefined) {
+      assertDraft(existing.status as Status, 'Changing public_model_id');
+      next.public_model_id = input.public_model_id;
+    }
+    if (Object.keys(next).length === 0) return existing;
+    const [updated] = await db
+      .update(model_experiment)
+      .set(next)
+      .where(eq(model_experiment.id, input.id))
+      .returning();
+    await invalidateExperimentCaches(updated.public_model_id);
+    if (existing.public_model_id !== updated.public_model_id) {
+      await invalidateExperimentCaches(existing.public_model_id);
+    }
+    return updated;
+  }),
+
+  delete: adminProcedure.input(idSchema).mutation(async ({ input }) => {
+    const existing = await loadExperimentOrThrow(input.id);
+    assertDraft(existing.status as Status, 'Deleting');
+    await db.delete(model_experiment).where(eq(model_experiment.id, input.id));
+    return { success: true };
+  }),
+
+  activate: adminProcedure.input(idSchema).mutation(async ({ input }) => {
+    const existing = await loadExperimentOrThrow(input.id);
+    if (existing.status === 'completed') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Cannot activate a completed experiment',
+      });
+    }
+    if (existing.status === 'active') return existing;
+    await assertActivatable(input.id, existing.public_model_id);
+    const [updated] = await db
+      .update(model_experiment)
+      .set({
+        status: 'active',
+        started_at: existing.started_at ?? sql`now()`,
+      })
+      .where(eq(model_experiment.id, input.id))
+      .returning();
+    await invalidateExperimentCaches(updated.public_model_id);
+    return updated;
+  }),
+
+  pause: adminProcedure.input(idSchema).mutation(async ({ input }) => {
+    const existing = await loadExperimentOrThrow(input.id);
+    if (existing.status === 'paused') return existing;
+    if (existing.status !== 'active') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Only active experiments can be paused',
+      });
+    }
+    const [updated] = await db
+      .update(model_experiment)
+      .set({ status: 'paused' })
+      .where(eq(model_experiment.id, input.id))
+      .returning();
+    await invalidateExperimentCaches(updated.public_model_id);
+    return updated;
+  }),
+
+  complete: adminProcedure.input(idSchema).mutation(async ({ input }) => {
+    const existing = await loadExperimentOrThrow(input.id);
+    if (existing.status === 'completed') return existing;
+    if (existing.status !== 'active' && existing.status !== 'paused') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Only active or paused experiments can be completed',
+      });
+    }
+    const [updated] = await db
+      .update(model_experiment)
+      .set({ status: 'completed', ended_at: sql`now()` })
+      .where(eq(model_experiment.id, input.id))
+      .returning();
+    await invalidateExperimentCaches(updated.public_model_id);
+    return updated;
+  }),
+
+  setArchived: adminProcedure.input(SetArchivedSchema).mutation(async ({ input }) => {
+    const existing = await loadExperimentOrThrow(input.id);
+    if (input.archived && existing.status === 'active') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Cannot archive an active experiment',
+      });
+    }
+    const [updated] = await db
+      .update(model_experiment)
+      .set({ is_archived: input.archived })
+      .where(eq(model_experiment.id, input.id))
+      .returning();
+    return updated;
+  }),
+
+  // ---- Variant-level ---------------------------------------------------
+
+  addVariant: adminProcedure.input(AddVariantSchema).mutation(async ({ input }) => {
+    const experiment = await loadExperimentOrThrow(input.id);
+    assertDraft(experiment.status as Status, 'Adding variants');
+    const [row] = await db
+      .insert(model_experiment_variant)
+      .values({
+        experiment_id: experiment.id,
+        label: input.label,
+        weight: input.weight,
+      })
+      .returning();
+    return row;
+  }),
+
+  removeVariant: adminProcedure.input(variantIdSchema).mutation(async ({ input }) => {
+    const variant = await db.query.model_experiment_variant.findFirst({
+      where: eq(model_experiment_variant.id, input.variantId),
+    });
+    if (!variant) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Variant not found' });
+    }
+    const experiment = await loadExperimentOrThrow(variant.experiment_id);
+    assertDraft(experiment.status as Status, 'Removing variants');
+    await db.delete(model_experiment_variant).where(eq(model_experiment_variant.id, variant.id));
+    return { success: true };
+  }),
+
+  updateVariantLabel: adminProcedure.input(UpdateVariantLabelSchema).mutation(async ({ input }) => {
+    const variant = await db.query.model_experiment_variant.findFirst({
+      where: eq(model_experiment_variant.id, input.variantId),
+    });
+    if (!variant) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Variant not found' });
+    }
+    const experiment = await loadExperimentOrThrow(variant.experiment_id);
+    assertNonTerminal(experiment.status as Status, 'Updating variant label');
+    const [updated] = await db
+      .update(model_experiment_variant)
+      .set({ label: input.label })
+      .where(eq(model_experiment_variant.id, variant.id))
+      .returning();
+    // Label is cosmetic only; no cache invalidation needed (cache keys on
+    // variant_id, not label).
+    return updated;
+  }),
+
+  swapVariantVersion: adminProcedure
+    .input(SwapVariantVersionSchema)
+    .mutation(async ({ input, ctx }) => {
+      const key = ensureEncryptionKey();
+      const variant = await db.query.model_experiment_variant.findFirst({
+        where: eq(model_experiment_variant.id, input.variantId),
+      });
+      if (!variant) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Variant not found' });
+      }
+      const experiment = await loadExperimentOrThrow(variant.experiment_id);
+      assertNonTerminal(experiment.status as Status, 'Swapping variant version');
+
+      const encrypted = encryptApiKey(input.apiKey, key);
+      const [inserted] = await db
+        .insert(model_experiment_variant_version)
+        .values({
+          variant_id: variant.id,
+          upstream: input.upstream,
+          encrypted_api_key: encrypted,
+          created_by: ctx.user.id,
+        })
+        .returning(variantVersionPublicColumns);
+      await invalidateExperimentCaches(experiment.public_model_id);
+      return inserted;
+    }),
+
+  rotateApiKey: adminProcedure.input(RotateApiKeySchema).mutation(async ({ input, ctx }) => {
+    const key = ensureEncryptionKey();
+    const variant = await db.query.model_experiment_variant.findFirst({
+      where: eq(model_experiment_variant.id, input.variantId),
+    });
+    if (!variant) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Variant not found' });
+    }
+    const experiment = await loadExperimentOrThrow(variant.experiment_id);
+    assertNonTerminal(experiment.status as Status, 'Rotating api key');
+
+    const latest = await db
+      .select(variantVersionPublicColumns)
+      .from(model_experiment_variant_version)
+      .where(eq(model_experiment_variant_version.variant_id, variant.id))
+      .orderBy(
+        desc(model_experiment_variant_version.effective_at),
+        desc(model_experiment_variant_version.id)
+      )
+      .limit(1);
+    const previousUpstream = latest[0]?.upstream;
+    if (!previousUpstream) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message:
+          'Cannot rotate api key: variant has no existing version. Use swapVariantVersion to seed.',
+      });
+    }
+
+    const validated = ExperimentUpstreamSchema.safeParse(previousUpstream);
+    if (!validated.success) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Latest variant version has an invalid upstream blob',
+      });
+    }
+
+    const encrypted = encryptApiKey(input.apiKey, key);
+    const [inserted] = await db
+      .insert(model_experiment_variant_version)
+      .values({
+        variant_id: variant.id,
+        upstream: validated.data,
+        encrypted_api_key: encrypted,
+        created_by: ctx.user.id,
+      })
+      .returning(variantVersionPublicColumns);
+    await invalidateExperimentCaches(experiment.public_model_id);
+    return inserted;
+  }),
+});

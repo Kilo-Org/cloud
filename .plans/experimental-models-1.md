@@ -10,14 +10,14 @@
     [todo] not started
 -->
 
-| Phase                               | Status           | Notes                                                                                      |
-| ----------------------------------- | ---------------- | ------------------------------------------------------------------------------------------ |
-| Phase 1 — Schema + Migration        | [merged-pending] | Branch `mark/experimental-models-schema`. Migration `0134_black_union_jack.sql`. PR #3299. |
-| Phase 2 — Gateway Header Capture    | [todo]           |                                                                                            |
-| Phase 3 — Variant Picker + Routing  | [todo]           |                                                                                            |
-| Phase 4 — Usage, Metrics, Reporting | [todo]           |                                                                                            |
-| Phase 5 — Admin tRPC + UI           | [todo]           |                                                                                            |
-| Phase 6 — Specs + Tests             | [todo]           | Spec file `.specs/model-experiments.md` not yet created.                                   |
+| Phase                               | Status        | Notes                                                                                                                                   |
+| ----------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 1 — Schema + Migration        | [done]        | Migration `0134_black_union_jack.sql` in main. PR #3299.                                                                                |
+| Phase 2 — Gateway Header Capture    | [todo]        |                                                                                                                                         |
+| Phase 3 — Variant Picker + Routing  | [todo]        |                                                                                                                                         |
+| Phase 4 — Usage, Metrics, Reporting | [todo]        |                                                                                                                                         |
+| Phase 5 — Admin tRPC + UI           | [in-progress] | Branch `mark/experimental-models-admin`. tRPC router + UI tab landed; `getLiveStats` and `getPromptByHash` deferred to Phase 4/R2 work. |
+| Phase 6 — Specs + Tests             | [todo]        | Spec file `.specs/model-experiments.md` not yet created.                                                                                |
 
 **Phase 1 — concrete output (landed in `packages/db/src/schema.ts` + `0134_black_union_jack.sql`):**
 
@@ -29,8 +29,25 @@
 
 **Not yet done in Phase 1 (still owed by future PRs):**
 
-- `ExperimentUpstreamSchema` zod schema (lives in app code, not in `packages/db`).
+- ~~`ExperimentUpstreamSchema` zod schema (lives in app code, not in `packages/db`).~~ Landed with Phase 5 admin work in `apps/web/src/lib/ai-gateway/experiments/upstream-schema.ts`.
 - The `model_experiment_request_stats` reporting view (Phase 4).
+
+**Phase 5 — concrete output (in PR — see status table for branch/PR):**
+
+- `apps/web/src/lib/ai-gateway/experiments/upstream-schema.ts` — `ExperimentUpstreamSchema` (strict subset of `CustomLlmDefinitionSchema`, no `api_key`, no `extra_headers`).
+- `apps/web/src/lib/redis-keys.ts` — `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY` and `modelExperimentRedisKey(publicId)` helpers (used by Phase 3 gateway code, also by admin cache invalidation on every routing-affecting mutation).
+- `apps/web/src/lib/redis.ts` — added `redisDel(key)` helper.
+- `apps/web/src/routers/admin/model-experiments-router.ts` — full CRUD + state machine (`activate`, `pause`, `complete`, `setArchived`, `delete`-on-draft) + variant ops (`addVariant`, `removeVariant`, `updateVariantLabel`, `swapVariantVersion`, `rotateApiKey`). All routing-affecting mutations invalidate per-public-id cache and recompute the membership set. `encrypted_api_key` is **never** selected by `list`/`get`/`swapVariantVersion`/`rotateApiKey` — admin response shapers explicitly enumerate non-key columns. `BYOK_ENCRYPTION_KEY` missing → `INTERNAL_SERVER_ERROR` on key-touching ops.
+- Wired into `apps/web/src/routers/admin-router.ts` as `trpc.admin.modelExperiments.*`.
+- `apps/web/src/app/admin/api/model-experiments/hooks.ts` — react-query hooks for every procedure.
+- `apps/web/src/app/admin/model-experiments/ModelExperimentsContent.tsx` — list + detail (inline) + create dialog + add-variant dialog + Monaco-based hot-swap dialog (validates `ExperimentUpstreamSchema` strict before submit) + rotate-key dialog. Status badges, share = `weight / sum(weights)`, structural-edit lock for non-draft.
+- `apps/web/src/app/admin/gateway/page.tsx` — added "Model Experiments" as the fourth tab inside `/admin/gateway`.
+- `apps/web/src/app/admin/model-experiments/page.tsx` — redirects to `/admin/gateway?tab=model-experiments` (mirrors `custom-llms`).
+
+**Phase 5 — deferred (still owed by later PRs):**
+
+- `getLiveStats(id)` tRPC procedure — needs `model_experiment_request` rows (Phase 4 wiring) before it returns anything useful. UI placeholder not yet wired.
+- `getPromptByHash(sha)` tRPC procedure — needs the R2 `experiment-prompts` helper module (Phase 1 prompt-storage section, gated on env-var/bucket setup). Admin UI surface for inflating prompts not yet built.
 
 > **Scope: preview/experimental models only.** This system exists to A/B test
 > unreleased model checkpoints in partnership with model providers. It is **not**

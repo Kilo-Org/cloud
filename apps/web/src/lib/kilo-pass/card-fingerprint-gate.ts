@@ -79,6 +79,7 @@ export type DuplicateCardGateResult =
       blocked: true;
       otherKiloUserId: string;
       otherSubscriptionId: string;
+      stripeInvoiceId: string;
     };
 
 async function resolveCardFingerprint(params: {
@@ -236,16 +237,15 @@ export async function checkDuplicateCardFingerprintGate(params: {
     },
   });
 
-  await maybeSendDuplicateCardCanceledEmail({ kiloUserId, stripeInvoiceId });
-
   return {
     blocked: true,
     otherKiloUserId: existingActiveKiloPass.kiloUserId,
     otherSubscriptionId: existingActiveKiloPass.subscriptionId,
+    stripeInvoiceId,
   };
 }
 
-async function maybeSendDuplicateCardCanceledEmail(params: {
+export async function maybeSendDuplicateCardCanceledEmail(params: {
   kiloUserId: string;
   stripeInvoiceId: string;
 }): Promise<void> {

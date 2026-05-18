@@ -1046,12 +1046,22 @@ export class ConversationDO extends DurableObject<Env> {
       return { ok: true, memberContext };
     }
 
+    const attachmentRows = this.db
+      .select()
+      .from(attachments)
+      .where(eq(attachments.message_id, params.messageId))
+      .all();
+
     const clearPendingBotNotification = this.isBotMember(params.senderId);
     this.db.transaction(tx => {
       tx.update(messages)
         .set({ deleted: 1, updated_at: Date.now() })
         .where(eq(messages.id, params.messageId))
         .run();
+
+      if (attachmentRows.length > 0) {
+        tx.delete(attachments).where(eq(attachments.message_id, params.messageId)).run();
+      }
 
       if (clearPendingBotNotification) {
         tx.delete(botMessageNotifications)
@@ -1064,6 +1074,11 @@ export class ConversationDO extends DurableObject<Env> {
           .run();
       }
     });
+
+    if (attachmentRows.length > 0) {
+      const keys = attachmentRows.map(r => r.r2_key);
+      this.ctx.waitUntil(this.scheduleR2Deletes(keys));
+    }
 
     return { ok: true, memberContext };
   }

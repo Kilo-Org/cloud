@@ -362,12 +362,14 @@ export async function handleKiloPassInvoicePaid(params: {
   const affiliateSaleState: { context: KiloPassAffiliateSaleContext | null } = {
     context: null,
   };
-  let blockedGateResult: { kiloUserId: string; stripeInvoiceId: string } | null = null;
+
 
   // Track context for failure audit logging
   let kiloUserIdForAudit: string | null = null;
   let kiloPassSubscriptionIdForAudit: string | null = null;
   let stripeSubscriptionIdForAudit: string | null = null;
+
+  let blockedEmailParams: { kiloUserId: string; stripeInvoiceId: string } | null = null;
 
   try {
     await db.transaction(async tx => {
@@ -514,7 +516,7 @@ export async function handleKiloPassInvoicePaid(params: {
           .set({ status: 'canceled', ended_at: dayjs().utc().toISOString() })
           .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
 
-        blockedGateResult = { kiloUserId, stripeInvoiceId: invoice.id };
+        blockedEmailParams = { kiloUserId, stripeInvoiceId: invoice.id };
         kiloUserIdForCache = null;
         return;
       }
@@ -654,10 +656,10 @@ export async function handleKiloPassInvoicePaid(params: {
     context: affiliateSaleState.context,
   });
 
-  if (blockedGateResult) {
+  if (blockedEmailParams) {
     await maybeSendDuplicateCardCanceledEmail({
-      kiloUserId: blockedGateResult.kiloUserId,
-      stripeInvoiceId: blockedGateResult.stripeInvoiceId,
+      kiloUserId: blockedEmailParams.kiloUserId,
+      stripeInvoiceId: blockedEmailParams.stripeInvoiceId,
     });
   }
 

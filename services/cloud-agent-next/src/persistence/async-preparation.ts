@@ -25,7 +25,7 @@ import { WrapperClient } from '../kilo/wrapper-client.js';
 import type { PreparingStep } from '../shared/protocol.js';
 import type { PreparationInput } from './schemas.js';
 import { readProfileBundle } from '../session-profile.js';
-import { withSandboxInternalServerErrorRecovery } from '../sandbox-recovery.js';
+import { withPreparationInfrastructureRecovery } from '../sandbox-recovery.js';
 import type { Env as WorkerEnv, SandboxId, SessionId as AgentSessionId } from '../types.js';
 
 type EmitProgress = (step: PreparingStep, message: string) => void;
@@ -119,7 +119,7 @@ export async function executePreparationSteps(
   const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId, {
     sleepAfter: SANDBOX_SLEEP_AFTER_SECONDS,
   });
-  return withSandboxInternalServerErrorRecovery(
+  return withPreparationInfrastructureRecovery(
     {
       sandbox,
       sandboxId,

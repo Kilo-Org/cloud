@@ -26,7 +26,7 @@ import { withDORetry } from '../utils/do-retry.js';
 import { normalizeAgentMode } from '../schema.js';
 import { buildImagePromptParts, downloadImagePromptParts } from './image-prompt-parts.js';
 import { withTimeout } from '@kilocode/worker-utils';
-import { withSandboxInternalServerErrorRecovery } from '../sandbox-recovery.js';
+import { withPreparationInfrastructureRecovery } from '../sandbox-recovery.js';
 
 /** Maximum time allowed for workspace preparation (resume, init, fast path). */
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -200,7 +200,7 @@ export class ExecutionOrchestrator {
     };
 
     const { prepared, wrapperClient, kiloSessionId, fileParts } =
-      await withSandboxInternalServerErrorRecovery(
+      await withPreparationInfrastructureRecovery(
         {
           sandbox,
           sandboxId,

@@ -13,6 +13,7 @@ import {
 } from './sandbox-timeout-logging.js';
 import { withTimeout } from '@kilocode/worker-utils';
 import { isSandboxInternalServerError } from './sandbox-recovery.js';
+import { WorkspaceFilesystemPreparationError } from './workspace-errors.js';
 
 /**
  * Minimal interface for running shell commands.
@@ -221,18 +222,20 @@ export async function setupWorkspace(
   try {
     await sandbox.mkdir(sessionWorkspacePath, { recursive: true });
   } catch (error) {
-    throw new Error(
+    throw new WorkspaceFilesystemPreparationError(
+      'workspace_directory',
       `Failed to create workspace directory: ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error }
+      error
     );
   }
 
   try {
     await sandbox.mkdir(sessionHome, { recursive: true });
   } catch (error) {
-    throw new Error(
+    throw new WorkspaceFilesystemPreparationError(
+      'session_home',
       `Failed to prepare session home: ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error }
+      error
     );
   }
 

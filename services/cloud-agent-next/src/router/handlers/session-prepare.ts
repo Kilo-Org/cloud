@@ -52,8 +52,8 @@ import {
 import { getPgDb } from '../../db/pg.js';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import {
-  destroySandboxAfterInternalServerError,
-  isSandboxInternalServerError,
+  destroySandboxAfterPreparationInfrastructureFailure,
+  getPreparationInfrastructureFailure,
 } from '../../sandbox-recovery.js';
 
 type SessionPrepareHandlers = {
@@ -621,8 +621,8 @@ const prepareSessionHandler = internalApiProtectedProcedure
       try {
         preparedWorkspace = await prepareWorkspace();
       } catch (error) {
-        const sandboxInternalServerError = isSandboxInternalServerError(error);
-        await destroySandboxAfterInternalServerError(
+        const preparationFailure = getPreparationInfrastructureFailure(error);
+        await destroySandboxAfterPreparationInfrastructureFailure(
           {
             sandbox,
             sandboxId,
@@ -631,10 +631,10 @@ const prepareSessionHandler = internalApiProtectedProcedure
           },
           error
         );
-        if (sandboxInternalServerError) {
+        if (preparationFailure) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: 'Sandbox returned 500 during workspace preparation',
+            message: preparationFailure.message,
             cause: { error: 'sandbox_internal_server_error', retryable: true },
           });
         }

@@ -37,10 +37,54 @@ import {
   checkDiskAndCleanBeforeSetup,
   cleanupStaleWorkspaces,
   createSandboxUsageEvent,
+  setupWorkspace,
   LOW_DISK_THRESHOLD_MB,
   STALE_DIR_MIN_AGE_SECONDS,
 } from './workspace';
+import { WorkspaceFilesystemPreparationError } from './workspace-errors';
 import type { ExecutionSession, SandboxInstance } from './types';
+
+describe('setupWorkspace', () => {
+  it('throws a typed preparation error when workspace directory creation fails', async () => {
+    const cause = new Error('FileSystemError: mkdir operation failed with exit code NaN');
+    const sandbox = {
+      mkdir: vi.fn().mockRejectedValueOnce(cause),
+    } as unknown as SandboxInstance;
+
+    const promise = setupWorkspace(sandbox, 'user-123', undefined, 'agent-session');
+
+    await expect(promise).rejects.toBeInstanceOf(WorkspaceFilesystemPreparationError);
+    await expect(promise).rejects.toMatchObject({
+      target: 'workspace_directory',
+      message:
+        'Failed to create workspace directory: FileSystemError: mkdir operation failed with exit code NaN',
+      cause,
+    });
+  });
+
+  it('throws a typed preparation error when session home creation fails', async () => {
+    const cause = new Error('FileSystemError: mkdir operation failed with exit code NaN');
+    const sandbox = {
+      mkdir: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(cause),
+    } as unknown as SandboxInstance;
+
+    const promise = setupWorkspace(sandbox, 'user-123', 'org-123', 'agent-session');
+
+    await expect(promise).rejects.toBeInstanceOf(WorkspaceFilesystemPreparationError);
+    await expect(promise).rejects.toMatchObject({
+      target: 'session_home',
+      message:
+        'Failed to prepare session home: FileSystemError: mkdir operation failed with exit code NaN',
+      cause,
+    });
+    expect(sandbox.mkdir).toHaveBeenNthCalledWith(
+      1,
+      '/workspace/org-123/user-123/sessions/agent-session',
+      { recursive: true }
+    );
+    expect(sandbox.mkdir).toHaveBeenNthCalledWith(2, '/home/agent-session', { recursive: true });
+  });
+});
 
 describe('manageBranch', () => {
   let fakeSession: ExecutionSession;

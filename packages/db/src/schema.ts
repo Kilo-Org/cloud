@@ -3564,6 +3564,10 @@ export const app_builder_projects = pgTable(
     index('IDX_app_builder_projects_owned_by_organization_id').on(table.owned_by_organization_id),
     index('IDX_app_builder_projects_created_at').on(table.created_at),
     index('IDX_app_builder_projects_last_message_at').on(table.last_message_at),
+    index('IDX_app_builder_projects_git_repo_integration').on(
+      table.git_repo_full_name,
+      table.git_platform_integration_id
+    ),
     check(
       'app_builder_projects_owner_check',
       sql`(

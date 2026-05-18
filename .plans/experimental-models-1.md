@@ -250,10 +250,11 @@ Full request prompts (system message + canonical post-`transformRequest` body) a
 
 **GDPR and consent.**
 
-- The user explicitly opts in to participate in any given experiment, and that opt-in includes consent to retain prompts for the duration of the experiment plus any agreed retention window. Prompts collected under experiment opt-in are therefore **not** subject to the GDPR soft-delete flow that governs `microdollar_usage_metadata`.
-- Concretely: `softDeleteUser` does **not** delete `model_experiment_request` rows and does **not** delete the referencing R2 objects. The `on delete cascade` on `usage_id` only fires if the underlying `microdollar_usage` row is hard-deleted (which `softDeleteUser` does not do today).
+- Prompts collected for model experiments may contain PII, secrets, customer data, source code, file paths, and other sensitive project context. The retention basis is explicit opt-in to the dedicated preview/experiment model, not an assumption that prompt data is non-PII.
+- The opt-in copy for each preview model must disclose that prompts may be retained for experiment analysis and partner evaluation for the configured retention window. v1 must not run a real partner experiment until that model-specific opt-in/disclosure exists.
+- Prompts collected under experiment opt-in use a dedicated experiment retention policy and are not governed by the default `microdollar_usage_metadata` soft-delete policy.
+- Concretely: `softDeleteUser` does **not** delete `model_experiment_request` rows and does **not** delete the referencing R2 objects. The `on delete cascade` on `usage_id` only fires if the underlying `microdollar_usage` row is hard-deleted (which `softDeleteUser` does not do today). A dedicated experiment-data wipe path removes prompt references by setting prompt hash columns to `__deleted__`, then relying on R2 GC for blob cleanup.
 - The spec documents this explicitly as the policy. A test in `apps/web/src/lib/user.test.ts` locks the policy in code: after `softDeleteUser` runs, an experiment-attributed user's `model_experiment_request` rows (and the referenced R2 objects) are still present.
-- **Prerequisite (out of scope for Part 1):** the experiment opt-in flow must record a timestamped, per-user, per-experiment consent record (UX + ToS work). v1 must not run a real partner experiment until that consent capture exists. Tracked as a separate v1-prerequisite task; this plan adds a one-line note in the spec under "Prerequisites."
 
 **Wipe semantics.**
 
@@ -428,7 +429,7 @@ Targeted tests:
 
 - Prompt-cache behavior needs no change. `applyTrackingIds` salts by provider/user/task, while upstream providers key on `(model, cache_key)`, so different internal checkpoints naturally separate caches.
 - `model_experiment`, `model_experiment_variant`, `model_experiment_variant_version`, and `model_experiment_request` hold no direct PII.
-- The prompt-hash columns on `model_experiment_request` and the R2 prompt bucket together **do** hold dense PII (full system + user prompts: code, file paths, project context, sometimes secrets pasted by users). Retention is governed by experiment opt-in consent, not GDPR soft-delete (see Prompt Storage > GDPR and consent). The policy is locked in by a test in `apps/web/src/lib/user.test.ts` asserting that `softDeleteUser` does not delete experiment rows or R2 objects.
+- The prompt-hash columns on `model_experiment_request` and the R2 prompt bucket together **may** hold dense PII and other sensitive data (full system + user prompts: code, file paths, project context, sometimes secrets pasted by users). Retention is governed by explicit experiment opt-in and the dedicated experiment retention policy, not the default `microdollar_usage_metadata` soft-delete policy (see Prompt Storage > GDPR and consent). The policy is locked in by a test in `apps/web/src/lib/user.test.ts` asserting that `softDeleteUser` does not delete experiment rows or R2 objects.
 - `client_request_id` is opaque and per-message. It is joinable to user activity through `model_experiment_request.usage_id`. The `on delete cascade` on `usage_id` only fires for hard deletes of `microdollar_usage`, which `softDeleteUser` does not perform.
 - Do not log full request bodies for experimental traffic into `api_request_log`. The dedicated R2 prompt store is the only persistence mechanism for experiment prompt content; `api_request_log` remains allowlist-only and unrelated to experiments.
 - Do not put `client_request_id` or experiment fields into Sentry input payloads; keep them to usage/metrics storage.
@@ -475,7 +476,7 @@ These constraints exist because of how the gateway is built today. The spec must
 - API key handling: see dedicated section.
 - Provider blinding: provider-facing exports must not include `kilo_user_id` or user-identifying fields.
 - R2 prompt-store credential exposure: the same `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` already used by `apps/web/src/lib/r2/client.ts` is reused. Adding an experiment-prompts bucket extends the blast radius of those credentials. Acceptable for v1 because the same trust boundary already covers cli-sessions and cloud-agent-attachments. If/when scoped per-bucket credentials become available cheaply, narrow them.
-- Prerequisite (before first real partner experiment): UX + ToS work to capture timestamped per-user, per-experiment consent. Out of scope for Part 1; flagged in spec under "Prerequisites."
+- Prerequisite (before first real partner experiment): model-specific opt-in/disclosure that tells users prompts may be retained for experiment analysis and partner evaluation for the configured retention window. Flagged in the spec under "Prerequisites."
 
 > Partner-specific risks (cross-model session contamination, capture fidelity) are covered in [Part 2](./experimental-models-2.md).
 

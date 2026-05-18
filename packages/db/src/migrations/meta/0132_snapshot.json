@@ -1,5 +1,5 @@
 {
-  "id": "60f644e3-f66a-4485-845d-d45ee370bc06",
+  "id": "d6f97cc5-f908-4522-9840-0225314ccff6",
   "prevId": "bd761c76-545f-451b-9d23-8c5bfbbf4cf4",
   "version": "7",
   "dialect": "postgresql",
@@ -1654,6 +1654,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_app_builder_projects_git_repo_integration": {
+          "name": "IDX_app_builder_projects_git_repo_integration",
+          "columns": [
+            {
+              "expression": "git_repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "git_platform_integration_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"app_builder_projects\".\"git_repo_full_name\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -15520,6 +15542,7 @@
             }
           ],
           "isUnique": false,
+          "where": "\"microdollar_usage_metadata\".\"session_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

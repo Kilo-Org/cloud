@@ -1600,10 +1600,9 @@ export const microdollar_usage_metadata = pgTable(
   },
   table => [
     index('idx_microdollar_usage_metadata_created_at').on(table.created_at),
-    index('idx_microdollar_usage_metadata_session_id_created_at').on(
-      table.session_id,
-      table.created_at
-    ),
+    index('idx_microdollar_usage_metadata_session_id_created_at')
+      .on(table.session_id, table.created_at)
+      .where(isNotNull(table.session_id)),
   ]
 );
 
@@ -3564,10 +3563,9 @@ export const app_builder_projects = pgTable(
     index('IDX_app_builder_projects_owned_by_organization_id').on(table.owned_by_organization_id),
     index('IDX_app_builder_projects_created_at').on(table.created_at),
     index('IDX_app_builder_projects_last_message_at').on(table.last_message_at),
-    index('IDX_app_builder_projects_git_repo_integration').on(
-      table.git_repo_full_name,
-      table.git_platform_integration_id
-    ),
+    index('IDX_app_builder_projects_git_repo_integration')
+      .on(table.git_repo_full_name, table.git_platform_integration_id)
+      .where(isNotNull(table.git_repo_full_name)),
     check(
       'app_builder_projects_owner_check',
       sql`(

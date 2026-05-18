@@ -533,6 +533,98 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(failedStatusUpdates).toHaveLength(0);
   });
 
+  it('retries prepareSession once after wrapper waitForPort readiness timeout', async () => {
+    const stub = getReviewStub();
+    let prepareCalls = 0;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        prepareCalls += 1;
+        if (prepareCalls === 1) {
+          return trpcError(
+            500,
+            'Wrapper did not become ready on port 5353 within 30000ms: waitForPort timed out'
+          );
+        }
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-wrapper-timeout-retry',
+          kiloSessionId: 'ses_wrapper_timeout_retry',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-wrapper-timeout-retry', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-wrapper-timeout-retry',
+      cliSessionId: 'ses_wrapper_timeout_retry',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+    await expect(storedReview(stub)).resolves.toMatchObject({ sandboxRetryAttempted: true });
+  });
+
+  it('retries prepareSession once after wrapper kilo server startup timeout', async () => {
+    const stub = getReviewStub();
+    let prepareCalls = 0;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        prepareCalls += 1;
+        if (prepareCalls === 1) {
+          return trpcError(
+            500,
+            'Wrapper did not become ready on port 5353 within 30000ms: waitForPort timed out | wrapperFileLog: failed to start kilo server: Timeout waiting for server to start after 45000ms'
+          );
+        }
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-kilo-startup-retry',
+          kiloSessionId: 'ses_kilo_startup_retry',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-kilo-startup-retry', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-kilo-startup-retry',
+      cliSessionId: 'ses_kilo_startup_retry',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+    await expect(storedReview(stub)).resolves.toMatchObject({ sandboxRetryAttempted: true });
+  });
+
   it('fails after a second sandbox 500 without initiating', async () => {
     const stub = getReviewStub();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
@@ -611,6 +703,72 @@ describe('CodeReviewOrchestrator recovery', () => {
       }
       if (url.includes('/trpc/prepareSession')) {
         return trpcError(400, 'Branch not found: main', 'BAD_REQUEST');
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'failed' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    const stored = await storedReview(stub);
+    expect(stored).toMatchObject({ status: 'failed' });
+    expect(stored?.sandboxRetryAttempted).toBeUndefined();
+  });
+
+  it('does not retry configured-session lookup failures nested in wrapper readiness output', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(
+          500,
+          'Wrapper did not become ready on port 5353 within 30000ms: waitForPort timed out | wrapperFileLog: configured session ses_missing not found: Session get returned no data for ses_missing'
+        );
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'failed' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    const stored = await storedReview(stub);
+    expect(stored).toMatchObject({ status: 'failed' });
+    expect(stored?.sandboxRetryAttempted).toBeUndefined();
+  });
+
+  it('does not retry repo-specific checkout failures that surface as prepareSession 500s', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(
+          500,
+          'SandboxError: HTTP error! status: 500 during setup | Failed to checkout pull ref: Object does not exist on the server'
+        );
       }
       return new Response('unexpected fetch', { status: 500 });
     });

@@ -176,6 +176,13 @@ export const MorningBriefingInterestsResponseSchema = z.object({
   error: z.string().optional(),
 });
 
+export const MorningBriefingUserLocationResponseSchema = z.object({
+  ok: z.boolean(),
+  userLocation: z.string().nullable().optional(),
+  code: z.string().optional(),
+  error: z.string().optional(),
+});
+
 export const MorningBriefingReadResponseSchema = z.object({
   ok: z.boolean(),
   dateKey: z.string().optional(),

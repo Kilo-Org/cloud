@@ -358,6 +358,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
         botNature: null,
         botVibe: null,
         botEmoji: null,
+        userLocation: null,
+        userTimezone: null,
         workerUrl: legacyWorkerUrl,
         controllerCapabilitiesVersion: null,
         name: null,
@@ -1259,6 +1261,23 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
       return client.updateBriefingInterests(ctx.user.id, input.topics, workerInstanceId(instance));
+    }),
+
+  // Post-provisioning location edit from Settings. Onboarding's initial
+  // location set still flows through `updateConfig`/`provision`; this
+  // mutation is for edits after the instance is already running.
+  updateUserLocation: organizationMemberMutationProcedure
+    .input(z.object({ organizationId: z.uuid(), userLocation: userLocationSchema.nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user.is_admin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Morning briefing is admin-only',
+        });
+      }
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.updateUserLocation(ctx.user.id, input.userLocation, workerInstanceId(instance));
     }),
 
   readMorningBriefing: organizationMemberProcedure

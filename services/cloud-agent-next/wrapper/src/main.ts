@@ -325,6 +325,7 @@ async function main() {
       sessionId: kiloSessionId,
       agentSessionId,
       userId,
+      platform: process.env.KILO_PLATFORM,
     },
     {
       state,

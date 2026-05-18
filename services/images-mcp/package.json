@@ -11,20 +11,20 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@modelcontextprotocol/sdk": "1.27.1",
     "aws4fetch": "catalog:",
-    "fast-xml-parser": "^5.7.3",
-    "fetch-to-node": "^2.1.0",
+    "fast-xml-parser": "5.7.3",
+    "fetch-to-node": "2.1.0",
     "jsonwebtoken": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
     "@types/jsonwebtoken": "catalog:",
-    "@types/node": ">=24 <25",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^3.2.4",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

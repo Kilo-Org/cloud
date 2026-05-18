@@ -127,7 +127,8 @@ export type CloudStatusData = {
 export type SessionStatus =
   | { type: 'busy' }
   | { type: 'idle' }
-  | { type: 'retry'; attempt: number; message: string; next: number };
+  | { type: 'retry'; attempt: number; message: string; next: number }
+  | { type: 'offline'; requestID: string; message: string };
 
 /** Data included in 'connected' events. */
 export type ConnectedEventData = {

@@ -68,6 +68,8 @@ const fakeStatus = {
   botNature: 'Operator',
   botVibe: 'Focused, capable, effective',
   botEmoji: '🤖',
+  userLocation: null,
+  userTimezone: null,
   workerUrl: 'https://claw.kilo.ai',
   controllerCapabilitiesVersion: null,
   name: 'Fake KiloClaw',

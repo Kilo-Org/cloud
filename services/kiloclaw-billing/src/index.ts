@@ -6,6 +6,7 @@ import {
   BILLING_HOURLY_CRON,
   BILLING_QUEUE_MAX_RETRIES,
   BILLING_SWEEP_ORDER,
+  INSTANCE_DESTRUCTION_QUARTER_HOURLY_CRON,
   TRIAL_INACTIVITY_DAILY_CRON,
   TRIAL_INACTIVITY_STOP_CANDIDATE_SWEEP,
   TRIAL_INACTIVITY_SWEEP,
@@ -14,7 +15,14 @@ import {
   type LifecycleQueueMessage,
   type BillingWorkerEnv,
 } from './types.js';
-import { processTrialInactivityStopCandidate, runSweep } from './lifecycle.js';
+import {
+  processCreditRenewalDiscovery,
+  processCreditRenewalItem,
+  processTrialExpiryPage,
+  processTrialInactivityStopCandidate,
+  recordCreditRenewalTerminalFailure,
+  runSweep,
+} from './lifecycle.js';
 import { logger, withLogTags, type BillingLogFields } from './logger.js';
 import { bootstrapProvisionSubscription, resolveProvisionEntitlement } from './bootstrap.js';
 
@@ -36,6 +44,12 @@ const LifecycleQueueMessageSchema = z.object({
   sweep: z.enum(BILLING_SWEEP_ORDER),
 });
 
+const StandaloneInstanceDestructionQueueMessageSchema = z.object({
+  kind: z.literal('standalone_instance_destruction'),
+  runId: z.string().uuid(),
+  sweep: z.literal('instance_destruction'),
+});
+
 const TrialInactivityQueueMessageSchema = z.object({
   kind: z.literal('trial_inactivity_stop'),
   runId: z.string().uuid(),
@@ -51,10 +65,89 @@ const TrialInactivityStopCandidateQueueMessageSchema = z.object({
   instanceId: z.string().uuid(),
 });
 
+const CreditRenewalDiscoveryQueueMessageSchema = z.object({
+  kind: z.literal('credit_renewal_discovery'),
+  runId: z.string().uuid(),
+  sweep: z.literal('credit_renewal_discovery'),
+  cutoffTime: z.string().datetime().optional(),
+  cursorSubscriptionId: z.string().uuid().optional(),
+  cursorRenewalBoundary: z.string().datetime().optional(),
+  pageBudget: z.number().int().min(1).max(1000).optional(),
+  wallClockBudgetMs: z.number().int().min(1).max(110_000).optional(),
+});
+
+const CreditRenewalDiscoveryContinuationQueueMessageSchema = z.object({
+  kind: z.literal('credit_renewal_discovery_continuation'),
+  runId: z.string().uuid(),
+  sweep: z.literal('credit_renewal_discovery'),
+  cutoffTime: z.string().datetime(),
+  cursorSubscriptionId: z.string().uuid(),
+  cursorRenewalBoundary: z.string().datetime(),
+  pageBudget: z.number().int().min(1).max(1000).optional(),
+  wallClockBudgetMs: z.number().int().min(1).max(110_000).optional(),
+});
+
+const TrialExpiryPageQueueMessageSchema = z.object({
+  kind: z.literal('trial_expiry_page'),
+  runId: z.string().uuid(),
+  sweep: z.literal('trial_expiry'),
+  cutoffTime: z.string().datetime().optional(),
+  cursorSubscriptionId: z.string().uuid().optional(),
+  cursorTrialEndsAt: z.string().datetime().optional(),
+  pageBudget: z.number().int().min(1).max(1000).optional(),
+  wallClockBudgetMs: z.number().int().min(1).max(110_000).optional(),
+});
+
+const TrialExpiryContinuationQueueMessageSchema = z.object({
+  kind: z.literal('trial_expiry_continuation'),
+  runId: z.string().uuid(),
+  sweep: z.literal('trial_expiry'),
+  cutoffTime: z.string().datetime(),
+  cursorSubscriptionId: z.string().uuid(),
+  cursorTrialEndsAt: z.string().datetime(),
+  pageBudget: z.number().int().min(1).max(1000).optional(),
+  wallClockBudgetMs: z.number().int().min(1).max(110_000).optional(),
+});
+
+const CreditRenewalItemQueueMessageSchema = z.object({
+  kind: z.literal('credit_renewal_item'),
+  runId: z.string().uuid(),
+  sweep: z.literal('credit_renewal_item'),
+  subscriptionId: z.string().uuid(),
+  userId: z.string().min(1).optional(),
+  renewalBoundary: z.string().datetime(),
+  discoveredAt: z.string().datetime().optional(),
+  resolveTerminalFailureOnExpectedOutcome: z.boolean().optional(),
+  diagnostics: z
+    .object({
+      instanceId: z.string().uuid().nullable(),
+      plan: z.string().min(1),
+      status: z.string().min(1),
+    })
+    .optional(),
+});
+
+const CreditRenewalTerminalFailureQueueMessageSchema = z.object({
+  kind: z.literal('credit_renewal_terminal_failure'),
+  runId: z.string().uuid(),
+  sweep: z.literal('credit_renewal_terminal_failure'),
+  subscriptionId: z.string().uuid(),
+  renewalBoundary: z.string().datetime(),
+  attempts: z.number().int().min(BILLING_QUEUE_MAX_RETRIES),
+  failureMessage: z.string().optional(),
+});
+
 const BillingQueueMessageSchema = z.discriminatedUnion('kind', [
   LifecycleQueueMessageSchema,
+  StandaloneInstanceDestructionQueueMessageSchema,
   TrialInactivityQueueMessageSchema,
   TrialInactivityStopCandidateQueueMessageSchema,
+  CreditRenewalDiscoveryQueueMessageSchema,
+  CreditRenewalDiscoveryContinuationQueueMessageSchema,
+  TrialExpiryPageQueueMessageSchema,
+  TrialExpiryContinuationQueueMessageSchema,
+  CreditRenewalItemQueueMessageSchema,
+  CreditRenewalTerminalFailureQueueMessageSchema,
 ]);
 
 function nextSweep(current: BillingSweepKind): BillingSweepKind | null {
@@ -259,6 +352,36 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
       return;
     }
 
+    if (controller.cron === INSTANCE_DESTRUCTION_QUARTER_HOURLY_CRON) {
+      const message = {
+        kind: 'standalone_instance_destruction',
+        runId,
+        sweep: 'instance_destruction',
+      } satisfies BillingQueueMessage;
+
+      await withLogTags(
+        {
+          source: 'scheduled',
+          tags: {
+            billingFlow: BILLING_FLOW,
+            billingComponent: 'worker',
+            billingRunId: runId,
+            billingSweep: message.sweep,
+          },
+        },
+        async () => {
+          await env.LIFECYCLE_QUEUE.send(message);
+
+          log('info', 'Enqueued standalone instance destruction sweep', {
+            event: 'run_started',
+            outcome: 'started',
+            cron: controller.cron,
+          });
+        }
+      );
+      return;
+    }
+
     if (controller.cron !== BILLING_HOURLY_CRON) {
       await withLogTags(
         {
@@ -356,6 +479,85 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
                 userId: parsed.data.userId,
                 instanceId: parsed.data.instanceId,
               });
+            } else if (
+              parsed.data.kind === 'credit_renewal_discovery' ||
+              parsed.data.kind === 'credit_renewal_discovery_continuation'
+            ) {
+              await processCreditRenewalDiscovery(env, parsed.data, message.attempts);
+              log('info', 'Completed credit-renewal discovery message', {
+                event: 'run_completed',
+                outcome: 'completed',
+              });
+            } else if (
+              parsed.data.kind === 'trial_expiry_page' ||
+              parsed.data.kind === 'trial_expiry_continuation'
+            ) {
+              const result = await processTrialExpiryPage(env, parsed.data, message.attempts);
+              if (!result.continuationEnqueued) {
+                const next = nextSweep('trial_expiry');
+                if (next) {
+                  await env.LIFECYCLE_QUEUE.send({
+                    kind: 'lifecycle',
+                    runId: parsed.data.runId,
+                    sweep: next,
+                  });
+                }
+              }
+              log('info', 'Completed trial-expiry page message', {
+                event: 'run_completed',
+                outcome: 'completed',
+                continuationEnqueued: result.continuationEnqueued,
+              });
+            } else if (parsed.data.kind === 'credit_renewal_item') {
+              await processCreditRenewalItem(env, parsed.data, message.attempts);
+              log('info', 'Completed credit-renewal item message', {
+                event: 'run_completed',
+                outcome: 'completed',
+                subscriptionId: parsed.data.subscriptionId,
+                renewalBoundary: parsed.data.renewalBoundary,
+              });
+            } else if (parsed.data.kind === 'credit_renewal_terminal_failure') {
+              await recordCreditRenewalTerminalFailure(env, parsed.data);
+              log('info', 'Completed credit-renewal terminal-failure message', {
+                event: 'run_completed',
+                outcome: 'completed',
+                subscriptionId: parsed.data.subscriptionId,
+                renewalBoundary: parsed.data.renewalBoundary,
+              });
+            } else if (parsed.data.kind === 'standalone_instance_destruction') {
+              await runSweep(env, parsed.data, message.attempts);
+              log('info', 'Completed standalone instance destruction run', {
+                event: 'run_completed',
+                outcome: 'completed',
+              });
+            } else if (parsed.data.kind === 'lifecycle' && parsed.data.sweep === 'credit_renewal') {
+              await env.LIFECYCLE_QUEUE.send({
+                kind: 'credit_renewal_discovery',
+                runId: parsed.data.runId,
+                sweep: 'credit_renewal_discovery',
+              });
+              const next = nextSweep(parsed.data.sweep);
+              if (next) {
+                await env.LIFECYCLE_QUEUE.send({
+                  kind: 'lifecycle',
+                  runId: parsed.data.runId,
+                  sweep: next,
+                });
+              }
+              log('info', 'Started credit-renewal fanout discovery', {
+                event: 'run_started',
+                outcome: 'started',
+              });
+            } else if (parsed.data.kind === 'lifecycle' && parsed.data.sweep === 'trial_expiry') {
+              await env.LIFECYCLE_QUEUE.send({
+                kind: 'trial_expiry_page',
+                runId: parsed.data.runId,
+                sweep: 'trial_expiry',
+              });
+              log('info', 'Started trial-expiry paginated processing', {
+                event: 'run_started',
+                outcome: 'started',
+              });
             } else {
               await runSweep(env, parsed.data, message.attempts);
 
@@ -402,6 +604,37 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
                 willGoToDlq: true,
                 error: errorMessage,
               });
+
+              if (parsed.data.kind === 'credit_renewal_item') {
+                try {
+                  await recordCreditRenewalTerminalFailure(env, {
+                    kind: 'credit_renewal_terminal_failure',
+                    runId: parsed.data.runId,
+                    sweep: 'credit_renewal_terminal_failure',
+                    subscriptionId: parsed.data.subscriptionId,
+                    renewalBoundary: parsed.data.renewalBoundary,
+                    attempts: message.attempts,
+                    failureMessage: errorMessage,
+                  });
+                } catch (terminalFailureError) {
+                  log('error', 'Failed to record credit-renewal terminal failure before DLQ', {
+                    event: 'terminal_failure_record_failed',
+                    outcome: 'failed',
+                    attempts: message.attempts,
+                    subscriptionId: parsed.data.subscriptionId,
+                    renewalBoundary: parsed.data.renewalBoundary,
+                    error:
+                      terminalFailureError instanceof Error
+                        ? terminalFailureError.message
+                        : String(terminalFailureError),
+                  });
+                  message.retry();
+                  return;
+                }
+
+                message.ack();
+                return;
+              }
             }
 
             message.retry();

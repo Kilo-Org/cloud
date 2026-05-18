@@ -14,6 +14,7 @@ import {
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   microdollar_usage,
+  microdollar_usage_daily,
 } from '@kilocode/db/schema';
 import {
   KiloPassCadence,
@@ -787,9 +788,6 @@ export const kiloPassRouter = createTRPCRouter({
   getAverageMonthlyUsageLast3Months: baseProcedure
     .output(GetAverageMonthlyUsageLast3MonthsOutputSchema)
     .query(async ({ ctx }) => {
-      // Use last 3 months from now (rolling window).
-      const startInclusive = sql`(NOW() - INTERVAL '3 months')`;
-
       const result = await timedUsageQuery(
         {
           db: readDb,
@@ -801,14 +799,14 @@ export const kiloPassRouter = createTRPCRouter({
         tx =>
           tx
             .select({
-              totalCost_mUsd: sql<unknown>`COALESCE(${sum(microdollar_usage.cost)}, 0)`,
+              totalCost_mUsd: sql<unknown>`COALESCE(${sum(microdollar_usage_daily.total_cost_microdollars)}, 0)`,
             })
-            .from(microdollar_usage)
+            .from(microdollar_usage_daily)
             .where(
               and(
-                eq(microdollar_usage.kilo_user_id, ctx.user.id),
-                isNull(microdollar_usage.organization_id),
-                sql`${microdollar_usage.created_at} >= ${startInclusive}`
+                eq(microdollar_usage_daily.kilo_user_id, ctx.user.id),
+                isNull(microdollar_usage_daily.organization_id),
+                sql`${microdollar_usage_daily.usage_date} >= (CURRENT_DATE - INTERVAL '3 months')::date`
               )
             )
       );

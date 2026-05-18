@@ -1,5 +1,5 @@
 {
-  "id": "be3523cb-2334-44fa-90a9-17219419091d",
+  "id": "af5d83c0-81a8-46e3-80f0-852da00082d4",
   "prevId": "fc135682-02f6-42d4-91c4-f671b33dc41c",
   "version": "7",
   "dialect": "postgresql",
@@ -14194,6 +14194,206 @@
       },
       "isRLSEnabled": false
     },
+    "public.kiloclaw_terminal_renewal_failures": {
+      "name": "kiloclaw_terminal_renewal_failures",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "subscription_id": {
+          "name": "subscription_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "renewal_boundary": {
+          "name": "renewal_boundary",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unresolved'"
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "first_failure_at": {
+          "name": "first_failure_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_failure_at": {
+          "name": "last_failure_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_failure_code": {
+          "name": "last_failure_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_failure_message": {
+          "name": "last_failure_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolution_actor_type": {
+          "name": "resolution_actor_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolution_actor_id": {
+          "name": "resolution_actor_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolution_at": {
+          "name": "resolution_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolution_reason": {
+          "name": "resolution_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_kiloclaw_terminal_renewal_failures_subscription_boundary": {
+          "name": "UQ_kiloclaw_terminal_renewal_failures_subscription_boundary",
+          "columns": [
+            {
+              "expression": "subscription_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "renewal_boundary",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_terminal_renewal_failures_unresolved": {
+          "name": "IDX_kiloclaw_terminal_renewal_failures_unresolved",
+          "columns": [
+            {
+              "expression": "subscription_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "renewal_boundary",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kiloclaw_terminal_renewal_failures\".\"status\" = 'unresolved'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_terminal_renewal_failures_status_last_failure_at": {
+          "name": "IDX_kiloclaw_terminal_renewal_failures_status_last_failure_at",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "last_failure_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "kiloclaw_terminal_renewal_failures_subscription_id_kiloclaw_subscriptions_id_fk": {
+          "name": "kiloclaw_terminal_renewal_failures_subscription_id_kiloclaw_subscriptions_id_fk",
+          "tableFrom": "kiloclaw_terminal_renewal_failures",
+          "tableTo": "kiloclaw_subscriptions",
+          "columnsFrom": [
+            "subscription_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "kiloclaw_terminal_renewal_failures_status_check": {
+          "name": "kiloclaw_terminal_renewal_failures_status_check",
+          "value": "\"kiloclaw_terminal_renewal_failures\".\"status\" IN ('unresolved', 'resolved', 'waived', 'superseded')"
+        },
+        "kiloclaw_terminal_renewal_failures_last_failure_code_check": {
+          "name": "kiloclaw_terminal_renewal_failures_last_failure_code_check",
+          "value": "\"kiloclaw_terminal_renewal_failures\".\"last_failure_code\" IN ('credit_balance_read_failed', 'renewal_transaction_failed', 'auto_top_up_marker_write_failed', 'worker_timeout', 'poison_payload', 'queue_delivery_exhausted')"
+        },
+        "kiloclaw_terminal_renewal_failures_resolution_actor_type_check": {
+          "name": "kiloclaw_terminal_renewal_failures_resolution_actor_type_check",
+          "value": "\"kiloclaw_terminal_renewal_failures\".\"resolution_actor_type\" IN ('operator', 'system')"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.kiloclaw_version_pins": {
       "name": "kiloclaw_version_pins",
       "schema": "",
@@ -15591,239 +15791,6 @@
           "nullsNotDistinct": false,
           "columns": [
             "slug"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.model_eval_ingestions": {
-      "name": "model_eval_ingestions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "bench_eval_name": {
-          "name": "bench_eval_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "bench_eval_url": {
-          "name": "bench_eval_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "model": {
-          "name": "model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "model_stats_id": {
-          "name": "model_stats_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "variant": {
-          "name": "variant",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "task_source": {
-          "name": "task_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "n_total_trials": {
-          "name": "n_total_trials",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "total_score": {
-          "name": "total_score",
-          "type": "numeric(14, 6)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "overall_score": {
-          "name": "overall_score",
-          "type": "numeric(12, 8)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "n_errored": {
-          "name": "n_errored",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "avg_cost_microdollars": {
-          "name": "avg_cost_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "avg_input_tokens": {
-          "name": "avg_input_tokens",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "avg_output_tokens": {
-          "name": "avg_output_tokens",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "avg_cache_read_tokens": {
-          "name": "avg_cache_read_tokens",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "avg_execution_ms": {
-          "name": "avg_execution_ms",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "promoted_at": {
-          "name": "promoted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "promoted_by_email": {
-          "name": "promoted_by_email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "promotion_note": {
-          "name": "promotion_note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "IDX_model_eval_ingestions_lookup": {
-          "name": "IDX_model_eval_ingestions_lookup",
-          "columns": [
-            {
-              "expression": "provider",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "model",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "variant",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "task_source",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "promoted_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_model_eval_ingestions_model_stats": {
-          "name": "IDX_model_eval_ingestions_model_stats",
-          "columns": [
-            {
-              "expression": "model_stats_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_model_eval_ingestions_promoted_by_email_lower": {
-          "name": "IDX_model_eval_ingestions_promoted_by_email_lower",
-          "columns": [
-            {
-              "expression": "LOWER(\"promoted_by_email\")",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "model_eval_ingestions_model_stats_id_model_stats_id_fk": {
-          "name": "model_eval_ingestions_model_stats_id_model_stats_id_fk",
-          "tableFrom": "model_eval_ingestions",
-          "tableTo": "model_stats",
-          "columnsFrom": [
-            "model_stats_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "model_eval_ingestions_bench_eval_name_unique": {
-          "name": "model_eval_ingestions_bench_eval_name_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "bench_eval_name"
           ]
         }
       },

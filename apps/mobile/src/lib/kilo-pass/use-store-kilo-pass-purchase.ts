@@ -146,8 +146,7 @@ function getKiloPassPurchaseErrorMessage(error: unknown, fallback: string): stri
 function showDedupedPurchaseError(message: string) {
   const now = Date.now();
   if (
-    lastPurchaseErrorToast &&
-    lastPurchaseErrorToast.message === message &&
+    lastPurchaseErrorToast?.message === message &&
     now - lastPurchaseErrorToast.shownAt < PURCHASE_ERROR_TOAST_DEDUPE_MS
   ) {
     return;

@@ -1,32 +1,30 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { signKiloToken } from '@kilocode/worker-utils';
-import { authenticateToken } from '../auth';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { clearSecretCacheForTest, signKiloToken } from '@kilocode/worker-utils';
+import { type AuthEnv, authenticateToken } from '../auth';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
-const currentPepperByUserId = vi.hoisted(() => new Map<string, string | null>());
+const currentPepperByUserId = new Map<string, string | null>();
 
-vi.mock('@kilocode/db/client', () => ({
-  getWorkerDb: () => ({
-    select: () => ({
-      from: () => ({
-        where: () => ({
-          limit: async () => [{ api_token_pepper: currentPepperByUserId.get('user-xyz-789') }],
-        }),
-      }),
-    }),
-  }),
-}));
-
-function makeEnv(): Env {
+function makeEnv(): AuthEnv {
   return {
     NEXTAUTH_SECRET: { get: async () => TEST_JWT_SECRET },
     HYPERDRIVE: { connectionString: 'postgres://test' },
     WORKER_ENV: 'production',
-  } as Env;
+  };
+}
+
+async function getUserPepper(_connectionString: string, userId: string) {
+  return currentPepperByUserId.get(userId);
+}
+
+function authenticateTestToken(token: string | null) {
+  return authenticateToken(token, makeEnv(), { getUserPepper });
 }
 
 describe('authenticateToken', () => {
   beforeEach(() => {
+    clearSecretCacheForTest();
+    currentPepperByUserId.clear();
     currentPepperByUserId.set('user-xyz-789', 'pepper-current');
   });
 
@@ -40,7 +38,7 @@ describe('authenticateToken', () => {
       extra: { tokenSource: 'kilo-chat' },
     });
 
-    await expect(authenticateToken(token, makeEnv())).resolves.toEqual({ userId: 'user-xyz-789' });
+    await expect(authenticateTestToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
   });
 
   it('authenticates a valid JWT from another token source', async () => {
@@ -53,7 +51,7 @@ describe('authenticateToken', () => {
       extra: { tokenSource: 'cloud-agent' },
     });
 
-    await expect(authenticateToken(token, makeEnv())).resolves.toEqual({
+    await expect(authenticateTestToken(token)).resolves.toEqual({
       userId: 'user-xyz-789',
     });
   });
@@ -68,7 +66,7 @@ describe('authenticateToken', () => {
       extra: { tokenSource: 'kilo-chat' },
     });
 
-    await expect(authenticateToken(token, makeEnv())).resolves.toBeNull();
+    await expect(authenticateTestToken(token)).resolves.toBeNull();
   });
 
   it('rejects a valid kilo-chat JWT minted for a different environment', async () => {
@@ -81,6 +79,6 @@ describe('authenticateToken', () => {
       extra: { tokenSource: 'kilo-chat' },
     });
 
-    await expect(authenticateToken(token, makeEnv())).resolves.toBeNull();
+    await expect(authenticateTestToken(token)).resolves.toBeNull();
   });
 });

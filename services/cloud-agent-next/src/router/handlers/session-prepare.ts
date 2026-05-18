@@ -190,6 +190,71 @@ function setCollectionUpdate<T>(
   updates[key] = isEmpty(value) ? null : value;
 }
 
+type PrepareSessionWorkspaceFailureCategory =
+  | 'sandbox_api_or_storage_failure'
+  | 'wrapper_wait_for_port_timeout'
+  | 'wrapper_kilo_server_start_timeout'
+  | 'configured_session_lookup_failure'
+  | 'repo_clone_or_checkout_failure'
+  | 'other_workspace_preparation_failure';
+
+function prepareSessionErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function classifyPrepareSessionWorkspaceFailure(
+  error: unknown,
+  sandboxInternalServerError: boolean
+): PrepareSessionWorkspaceFailureCategory {
+  const message = prepareSessionErrorMessage(error).toLowerCase();
+
+  if (
+    message.includes('configured session') &&
+    message.includes('not found: session get returned no data')
+  ) {
+    return 'configured_session_lookup_failure';
+  }
+
+  if (message.includes('failed to start kilo server: timeout waiting for server to start')) {
+    return 'wrapper_kilo_server_start_timeout';
+  }
+
+  if (
+    message.includes('wrapper did not become ready on port') &&
+    message.includes('waitforport timed out')
+  ) {
+    return 'wrapper_wait_for_port_timeout';
+  }
+
+  if (
+    message.includes('git clone timed out') ||
+    message.includes('failed to checkout pull ref') ||
+    message.includes('git-lfs filter-process') ||
+    message.includes('object does not exist on the server')
+  ) {
+    return 'repo_clone_or_checkout_failure';
+  }
+
+  if (
+    sandboxInternalServerError ||
+    message.includes('internal error in durable object storage') ||
+    message.includes('durable object storage operation exceeded timeout')
+  ) {
+    return 'sandbox_api_or_storage_failure';
+  }
+
+  return 'other_workspace_preparation_failure';
+}
+
+function isRetryableWrapperReadinessFailure(
+  failureCategory: PrepareSessionWorkspaceFailureCategory
+): boolean {
+  return (
+    failureCategory === 'wrapper_wait_for_port_timeout' ||
+    failureCategory === 'wrapper_kilo_server_start_timeout'
+  );
+}
+
 /**
  * Creates session preparation handlers.
  * These handlers are protected by internal API authentication (backend-to-backend).
@@ -249,6 +314,8 @@ const prepareSessionHandler = internalApiProtectedProcedure
         userId: ctx.userId,
         orgId: input.kilocodeOrganizationId ?? '(personal)',
         sandboxId,
+        botId: ctx.botId,
+        sandboxKind: ctx.botId ? 'bot' : 'user',
       });
       logger.info('Preparing new session with workspace setup');
 
@@ -622,6 +689,20 @@ const prepareSessionHandler = internalApiProtectedProcedure
         preparedWorkspace = await prepareWorkspace();
       } catch (error) {
         const sandboxInternalServerError = isSandboxInternalServerError(error);
+        const failureCategory = classifyPrepareSessionWorkspaceFailure(
+          error,
+          sandboxInternalServerError
+        );
+        logger
+          .withFields({
+            error: prepareSessionErrorMessage(error),
+            failureCategory,
+            retryableSandboxInternalServerError: sandboxInternalServerError,
+            retryableWrapperReadinessFailure: isRetryableWrapperReadinessFailure(failureCategory),
+            sandboxKind: ctx.botId ? 'bot' : 'user',
+            logTag: 'prepare_session_workspace_preparation_failed',
+          })
+          .error('prepareSession workspace preparation failed');
         await destroySandboxAfterInternalServerError(
           {
             sandbox,
@@ -683,7 +764,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
       const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${cloudAgentSessionId}`);
       const stub = ctx.env.CLOUD_AGENT_SESSION.get(doId);
 
-      let prepareResult;
+      let prepareResult: Awaited<ReturnType<typeof stub.prepare>>;
       try {
         prepareResult = await stub.prepare({
           sessionId: cloudAgentSessionId,

@@ -979,6 +979,28 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         userTimezone,
         userLocation,
       });
+      // Best-effort propagation to the morning-briefing plugin's
+      // config.json so the next brief picks up the new value without
+      // waiting for a container restart. `writeUserProfile` above
+      // already persisted the location in USER.md, and the plugin's
+      // KILOCLAW_USER_LOCATION env-var path picks it up on next deploy.
+      // Failures here (plugin restarting, write-queue contention, old
+      // controller image missing the route, gateway proxy hiccup) are
+      // logged but do NOT fail the user's save. Failing the whole
+      // tRPC mutation on a transient plugin-side issue means the user
+      // sees a 500 in the UI even though the location was accepted by
+      // the DO and persisted to USER.md.
+      if (userLocation !== previousUserLocation) {
+        try {
+          await gateway.updateMorningBriefingUserLocation(this.s, this.env, {
+            userLocation,
+          });
+        } catch (err) {
+          doWarn(this.s, 'updateMorningBriefingUserLocation failed', {
+            error: toLoggable(err),
+          });
+        }
+      }
     }
 
     if (isNew) {
@@ -2677,6 +2699,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     botNature: string | null;
     botVibe: string | null;
     botEmoji: string | null;
+    userLocation: string | null;
+    userTimezone: string | null;
     controllerCapabilitiesVersion: number | null;
   }> {
     await this.loadState();
@@ -2727,6 +2751,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       botNature: this.s.botNature,
       botVibe: this.s.botVibe,
       botEmoji: this.s.botEmoji,
+      userLocation: this.s.userLocation ?? null,
+      userTimezone: this.s.userTimezone ?? null,
       controllerCapabilitiesVersion: this.s.controllerCapabilitiesVersion,
     };
   }
@@ -3878,6 +3904,69 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async runMorningBriefing() {
     await this.loadState();
     return gateway.runMorningBriefing(this.s, this.env);
+  }
+
+  /**
+   * Post-provisioning user-location update from the Settings UI. Mirrors
+   * the shape of `updateBriefingInterests`: a focused mutation that
+   * bypasses the heavy `provision()` lock + envvar rebuild path. The
+   * onboarding flow still routes userLocation through `provision()`
+   * because it's bundled with the rest of the initial config; this method
+   * is for edits after the instance is already running.
+   *
+   * Two gateway calls happen here:
+   *   - writeUserProfile (USER.md write — fast file I/O, must succeed)
+   *   - updateMorningBriefingUserLocation (plugin config.json — best-effort)
+   *
+   * The morning-briefing call is logged-and-swallowed because the env-var
+   * path (KILOCLAW_USER_LOCATION, set at container start from DO state)
+   * already covers the worst case: on next deploy the plugin reads the
+   * new value regardless. Failing the user-facing save on a transient
+   * plugin write-queue stall is worse than silently degrading to "takes
+   * effect on next deploy."
+   *
+   * Rejects when the instance is not running. The plugin reads
+   * `config.json.userLocation` first and a non-empty string there wins
+   * over the env var, so silently persisting a clear/update while
+   * stopped (or during a `starting`/`restarting` window after env vars
+   * were already built for the boot) can result in success toasts that
+   * never affect the next briefing. The Settings UI greys out the
+   * editor when the instance is not running.
+   *
+   * Ordering matters: do not persist the new location to DO state until
+   * the required gateway write has succeeded. If we persisted first and
+   * `writeUserProfile` failed, a retry would short-circuit on the
+   * `previous === input.userLocation` check and report success while
+   * USER.md remained stale.
+   */
+  async updateUserLocation(input: { userLocation: string | null }) {
+    await this.loadState();
+    if (this.s.status !== 'running') {
+      throw new Error('Instance is not running');
+    }
+    const previous = this.s.userLocation ?? null;
+    if (input.userLocation === previous) {
+      return { ok: true, userLocation: previous };
+    }
+
+    await gateway.writeUserProfile(this.s, this.env, {
+      userLocation: input.userLocation,
+    });
+
+    this.s.userLocation = input.userLocation;
+    await this.ctx.storage.put({ userLocation: input.userLocation });
+
+    try {
+      await gateway.updateMorningBriefingUserLocation(this.s, this.env, {
+        userLocation: input.userLocation,
+      });
+    } catch (err) {
+      doWarn(this.s, 'updateMorningBriefingUserLocation failed', {
+        error: toLoggable(err),
+      });
+    }
+
+    return { ok: true, userLocation: input.userLocation };
   }
 
   async updateBriefingInterests(input: { topics: string[] }) {

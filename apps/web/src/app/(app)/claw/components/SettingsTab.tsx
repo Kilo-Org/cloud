@@ -502,6 +502,186 @@ function GoogleAccountCard({
   );
 }
 
+/**
+ * Inline editor for the user's free-text location, surfaced inside the
+ * Morning Briefing card. Drives the Local News source of the brief.
+ *
+ * When no location is set, surfaces an amber-bordered nudge with an
+ * inline input. When a location is set, renders a read-only value with
+ * an Edit affordance and a Clear button.
+ *
+ * Saves via the existing `updateConfig` mutation. Two delivery paths
+ * downstream:
+ *   - Instance running: the worker DO calls
+ *     `gateway.updateMorningBriefingUserLocation`, which writes the
+ *     new value into the plugin's `config.json`. The plugin reads
+ *     that file at the start of every brief via
+ *     `resolveLocationContextWithOverride`, so the next brief uses
+ *     the new location with no restart.
+ *   - Instance stopped: the DO updates state + Postgres, and the
+ *     `KILOCLAW_USER_LOCATION` env var is rewritten on next boot so
+ *     the plugin picks it up via the env-var fallback.
+ * Either way, the next briefing run picks up the new value — no
+ * manual restart needed.
+ */
+function MorningBriefingLocationEditor({
+  mutations,
+  userLocation,
+  userTimezone,
+  isRunning,
+}: {
+  mutations: ClawMutations;
+  userLocation: string | null;
+  userTimezone: string | null;
+  /**
+   * Editor is disabled when the instance is not running. The DO method
+   * rejects saves while not running because the plugin reads
+   * `config.json.userLocation` first and silently persisting a change
+   * here would not affect the next briefing on the current boot.
+   */
+  isRunning: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(userLocation ?? '');
+  const isSaving = mutations.updateUserLocation.isPending;
+  const hasLocation = userLocation !== null && userLocation.trim().length > 0;
+  const controlsDisabled = !isRunning || isSaving;
+
+  function handleSave() {
+    const value = draft.trim();
+    if (value.length === 0) {
+      toast.error('Location cannot be empty');
+      return;
+    }
+    mutations.updateUserLocation.mutate(
+      { userLocation: value },
+      {
+        onSuccess: () => {
+          toast.success('Location saved. Changes take effect on your next morning brief.', {
+            duration: 6000,
+          });
+          setEditing(false);
+        },
+        onError: err => toast.error(`Failed to save location: ${err.message}`),
+      }
+    );
+  }
+
+  function handleClear() {
+    mutations.updateUserLocation.mutate(
+      { userLocation: null },
+      {
+        onSuccess: () => {
+          // Note: clearing the override only removes the Settings-side
+          // value. The plugin still falls back to the onboarding
+          // `KILOCLAW_USER_LOCATION` env var if one was set there, so
+          // Local News may keep running off the old onboarding
+          // location. To fully disable Local News, deselect it from
+          // the Interests list above.
+          toast.success(
+            'Override cleared. Local News will fall back to your onboarding location until you set a new one. To fully disable, deselect "Local News" from Interests.',
+            { duration: 8000 }
+          );
+          setDraft('');
+          setEditing(false);
+        },
+        onError: err => toast.error(`Failed to clear location: ${err.message}`),
+      }
+    );
+  }
+
+  function handleCancel() {
+    setDraft(userLocation ?? '');
+    setEditing(false);
+  }
+
+  const containerClass = hasLocation
+    ? 'rounded-lg border p-4'
+    : 'rounded-lg border border-amber-500/50 bg-amber-500/5 p-4';
+  const dimmedClass = !isRunning ? ' opacity-60' : '';
+
+  return (
+    <div className={containerClass + dimmedClass}>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-foreground text-sm font-semibold">Location for Local News</h3>
+        {hasLocation && !editing && (
+          <Button size="sm" variant="ghost" onClick={() => setEditing(true)} disabled={!isRunning}>
+            Edit
+          </Button>
+        )}
+      </div>
+      {!isRunning && (
+        <p className="text-muted-foreground mb-2 text-xs">
+          Start your instance to update Location.
+        </p>
+      )}
+
+      {hasLocation && !editing && (
+        <>
+          <p className="text-foreground text-sm">{userLocation}</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            Used by the Local News source in your morning briefing.
+            {userTimezone ? ` Timezone: ${userTimezone}.` : ''}
+          </p>
+        </>
+      )}
+
+      {!hasLocation && !editing && (
+        <>
+          <p className="text-foreground text-sm">
+            No location set. Local News is disabled until you provide one.
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {userTimezone
+              ? `We know your timezone is ${userTimezone}, but that's too coarse for local news — a city or address works much better.`
+              : 'Add a city or address (e.g. "San Francisco, CA") and we\'ll surface local headlines.'}
+          </p>
+          <div className="mt-3">
+            <Button size="sm" onClick={() => setEditing(true)} disabled={!isRunning}>
+              Set location
+            </Button>
+          </div>
+        </>
+      )}
+
+      {editing && (
+        <div className="flex flex-col gap-2">
+          <Input
+            placeholder="e.g. San Francisco, CA"
+            value={draft}
+            onChange={event => setDraft(event.target.value)}
+            disabled={controlsDisabled}
+            maxLength={200}
+            autoFocus
+          />
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleSave} disabled={controlsDisabled}>
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={handleCancel} disabled={isSaving}>
+              Cancel
+            </Button>
+            {hasLocation && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleClear}
+                disabled={controlsDisabled}
+                className="text-destructive hover:text-destructive"
+              >
+                Clear
+              </Button>
+            )}
+            <p className="text-muted-foreground text-xs">
+              Changes take effect on your next morning brief.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MorningBriefingInterestsEditor({
   mutations,
   briefingStatus,
@@ -754,6 +934,8 @@ function MorningBriefingCard({
   actionsReady,
   onRequestUpgrade,
   supportsInterests,
+  userLocation,
+  userTimezone,
 }: {
   mutations: ClawMutations;
   briefingStatus: MorningBriefingStatusLite | undefined;
@@ -773,6 +955,14 @@ function MorningBriefingCard({
    * of the controls so users on stale images don't hit a 404 on save.
    */
   supportsInterests: boolean;
+  /**
+   * Current user-provided location (e.g. "San Francisco, CA"). Drives
+   * the Local News source — when null the brief surfaces a "set a
+   * location" nudge. Editable via the Location section below.
+   */
+  userLocation: string | null;
+  /** IANA timezone, shown as context next to the location editor. */
+  userTimezone: string | null;
 }) {
   const [requestedDay, setRequestedDay] = useState<'today' | 'yesterday' | null>(null);
   // Card starts collapsed — matches the OpenClaw Manage Version section. The
@@ -1109,14 +1299,36 @@ function MorningBriefingCard({
                 onRequestUpgrade={onRequestUpgrade}
               />
 
+              {/* Location card only matters when the user has opted
+                  into Local News. For everyone else it's noise. Case-
+                  insensitive trim matches what the plugin's
+                  `wantsLocalNews` does so custom-cased entries like
+                  "local news" still count. */}
+              {(briefingStatus?.interestTopics ?? []).some(
+                topic => topic.trim().toLowerCase() === 'local news'
+              ) && (
+                <MorningBriefingLocationEditor
+                  mutations={mutations}
+                  userLocation={userLocation}
+                  userTimezone={userTimezone}
+                  isRunning={isRunning}
+                />
+              )}
+
               {requestedDay && (
                 <div>
                   {isReading ? (
                     <p className="text-muted-foreground text-xs">Loading saved briefing...</p>
                   ) : readData?.markdown ? (
-                    <pre className="bg-muted max-h-56 overflow-auto rounded p-3 text-xs whitespace-pre-wrap">
-                      {readData.markdown}
-                    </pre>
+                    <>
+                      <pre className="bg-muted max-h-56 overflow-auto rounded p-3 text-xs whitespace-pre-wrap">
+                        {readData.markdown}
+                      </pre>
+                      <p className="text-muted-foreground mt-2 text-xs italic">
+                        Raw markdown output. Briefings delivered to chat are reformatted for
+                        readability.
+                      </p>
+                    </>
                   ) : (
                     <p className="text-muted-foreground text-xs">
                       No saved briefing for {requestedDay === 'today' ? 'today' : 'yesterday'}.
@@ -2183,7 +2395,7 @@ export function SettingsTab({
       )}
 
       {/* ── Developer Tools ── */}
-      {toolEntries.some(e => e.id === 'github' || e.id === 'linear') && (
+      {toolEntries.some(e => e.id === 'github' || e.id === 'linear' || e.id === 'composio') && (
         <div>
           <h2 className="text-foreground mb-3 text-base font-semibold">Developer Tools</h2>
           <div className="space-y-3">
@@ -2226,6 +2438,19 @@ export function SettingsTab({
               ))}
             {toolEntries
               .filter(e => e.id === 'linear')
+              .map(entry => (
+                <SecretEntrySection
+                  key={entry.id}
+                  entry={entry}
+                  configured={configuredSecrets[entry.id] ?? false}
+                  mutations={mutations}
+                  onSecretsChanged={onSecretsChanged}
+                  isDirty={dirtySecrets.has(entry.id)}
+                  onRedeploy={onRedeploy}
+                />
+              ))}
+            {toolEntries
+              .filter(e => e.id === 'composio')
               .map(entry => (
                 <SecretEntrySection
                   key={entry.id}
@@ -2305,6 +2530,8 @@ export function SettingsTab({
               actionsReady={morningBriefingActionsReady}
               onRequestUpgrade={onRequestUpgrade}
               supportsInterests={supportsBriefingInterests}
+              userLocation={status.userLocation ?? null}
+              userTimezone={status.userTimezone ?? null}
               fallbackReadiness={{
                 githubConfigured: configuredSecrets.github ?? false,
                 linearConfigured: configuredSecrets.linear ?? false,

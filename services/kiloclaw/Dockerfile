@@ -11,7 +11,10 @@ FROM debian:trixie-slim AS runtime
 # Install Node.js 24 (required by OpenClaw)
 ENV NODE_VERSION=24.15.0
 ENV OPENCLAW_PLUGIN_STAGE_DIR=/usr/local/share/openclaw-plugin-runtime-deps
+ENV COMPOSIO_INSTALL_DIR=/usr/local/lib/composio
+ENV PATH="${COMPOSIO_INSTALL_DIR}:${PATH}"
 ARG APT_CACHE_BUST
+ARG COMPOSIO_CLI_VERSION=0.2.28
 RUN echo "apt cache bust: ${APT_CACHE_BUST}" \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -80,6 +83,16 @@ RUN npm install -g pnpm openclaw@2026.4.23 clawhub mcporter@0.7.3 @steipete/summ
     && openclaw --version \
     && npm cache clean --force
 
+# Composio publishes CLI binaries as GitHub release artifacts rather than as a
+# usable npm package. Pin the tagged install script and stable release so image
+# builds verify the upstream checksum while keeping this install isolated.
+RUN COMPOSIO_INSTALL_TAG="%40composio%2Fcli%40${COMPOSIO_CLI_VERSION}" \
+    && curl -fsSL "https://raw.githubusercontent.com/ComposioHQ/composio/${COMPOSIO_INSTALL_TAG}/install.sh" \
+       -o /tmp/install-composio.sh \
+    && bash /tmp/install-composio.sh "@composio/cli@${COMPOSIO_CLI_VERSION}" \
+    && composio --version \
+    && rm -f /tmp/install-composio.sh
+
 # Bake bundled plugin runtime deps into OpenClaw's external stage dir so first
 # boot is pure startup — no npm install from `openclaw doctor` or gateway plugin
 # load on shared-cpu Fly machines. The stage-root naming mirrors OpenClaw
@@ -137,36 +150,39 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/b
 # dependencies do not inflate the runtime image layers.
 FROM runtime AS customizer-builder
 
-COPY plugins/kiloclaw-customizer/ /tmp/kiloclaw-customizer/
-RUN cd /tmp/kiloclaw-customizer \
-    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
-    && PKG_TGZ="$(npm pack --silent)" \
-    && mv "${PKG_TGZ}" /tmp/kiloclaw-customizer.tgz \
-    && cd / \
-    && rm -rf /tmp/kiloclaw-customizer /root/.npm
+COPY --from=workspace pnpm-workspace.yaml pnpm-lock.yaml /tmp/plugin-workspace/
+COPY --from=workspace patches/ /tmp/plugin-workspace/patches/
+COPY plugins/kiloclaw-customizer/ /tmp/plugin-workspace/services/kiloclaw/plugins/kiloclaw-customizer/
+RUN cd /tmp/plugin-workspace \
+    && pnpm install --filter @kiloclaw/kiloclaw-customizer --frozen-lockfile --ignore-scripts \
+    && pnpm --dir services/kiloclaw/plugins/kiloclaw-customizer pack --out /tmp/kiloclaw-customizer.tgz \
+    && pnpm store prune \
+    && rm -rf /tmp/plugin-workspace /root/.npm
 
 # ── Builder stage: package kilo-chat plugin ────────────────────────────
 # Build the vendored plugin tarball in an isolated stage so dev-time
 # dependencies do not inflate the runtime image layers.
 FROM runtime AS kilo-chat-builder
 
-COPY plugins/kilo-chat/ /tmp/kilo-chat/
-RUN cd /tmp/kilo-chat \
-    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
-    && PKG_TGZ="$(npm pack --silent)" \
-    && mv "${PKG_TGZ}" /tmp/kilo-chat.tgz \
-    && cd / \
-    && rm -rf /tmp/kilo-chat /root/.npm
+COPY --from=workspace pnpm-workspace.yaml pnpm-lock.yaml /tmp/plugin-workspace/
+COPY --from=workspace patches/ /tmp/plugin-workspace/patches/
+COPY plugins/kilo-chat/ /tmp/plugin-workspace/services/kiloclaw/plugins/kilo-chat/
+RUN cd /tmp/plugin-workspace \
+    && pnpm install --filter @kiloclaw/kilo-chat --frozen-lockfile --ignore-scripts \
+    && pnpm --dir services/kiloclaw/plugins/kilo-chat pack --out /tmp/kilo-chat.tgz \
+    && pnpm store prune \
+    && rm -rf /tmp/plugin-workspace /root/.npm
 
 FROM runtime AS morning-briefing-builder
 
-COPY plugins/kiloclaw-morning-briefing/ /tmp/kiloclaw-morning-briefing/
-RUN cd /tmp/kiloclaw-morning-briefing \
-    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
-    && PKG_TGZ="$(npm pack --silent)" \
-    && mv "${PKG_TGZ}" /tmp/kiloclaw-morning-briefing.tgz \
-    && cd / \
-    && rm -rf /tmp/kiloclaw-morning-briefing /root/.npm
+COPY --from=workspace pnpm-workspace.yaml pnpm-lock.yaml /tmp/plugin-workspace/
+COPY --from=workspace patches/ /tmp/plugin-workspace/patches/
+COPY plugins/kiloclaw-morning-briefing/ /tmp/plugin-workspace/services/kiloclaw/plugins/kiloclaw-morning-briefing/
+RUN cd /tmp/plugin-workspace \
+    && pnpm install --filter @kiloclaw/kiloclaw-morning-briefing --frozen-lockfile --ignore-scripts \
+    && pnpm --dir services/kiloclaw/plugins/kiloclaw-morning-briefing pack --out /tmp/kiloclaw-morning-briefing.tgz \
+    && pnpm store prune \
+    && rm -rf /tmp/plugin-workspace /root/.npm
 
 # ── Builder stage: compile the controller with Bun ────────────────────
 # Bun is only needed to bundle the controller TypeScript into a single JS
@@ -175,8 +191,19 @@ RUN cd /tmp/kiloclaw-morning-briefing \
 # Fly Volume mount at /root, so it was unreachable at runtime anyway.
 FROM debian:trixie-slim AS controller-builder
 
+ENV NODE_VERSION=24.15.0
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl unzip \
+    && apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils \
+    && ARCH="$(dpkg --print-architecture)" \
+    && case "${ARCH}" in \
+         amd64) NODE_ARCH="x64" ;; \
+         arm64) NODE_ARCH="arm64" ;; \
+         *) echo "Unsupported architecture: ${ARCH}" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz -o /tmp/node.tar.xz \
+    && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
+    && rm /tmp/node.tar.xz \
+    && npm install --global pnpm@11.1.2 \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.13" \
     && rm -rf /var/lib/apt/lists/*
 ENV PATH="/root/.bun/bin:$PATH"
@@ -184,15 +211,19 @@ ENV PATH="/root/.bun/bin:$PATH"
 # Re-declare global ARGs to make them available in this stage
 ARG CONTROLLER_COMMIT
 ARG CONTROLLER_CACHE_BUST
-COPY controller/ /tmp/controller-build/
-RUN cd /tmp/controller-build \
-    && bun install --frozen-lockfile \
+COPY --from=workspace pnpm-workspace.yaml pnpm-lock.yaml /tmp/controller-workspace/
+COPY --from=workspace patches/ /tmp/controller-workspace/patches/
+COPY controller/ /tmp/controller-workspace/services/kiloclaw/controller/
+RUN cd /tmp/controller-workspace \
+    && pnpm install --filter kiloclaw-controller --frozen-lockfile --ignore-scripts \
+    && cd services/kiloclaw/controller \
     && CONTROLLER_VERSION="$(date -u +'%Y.%-m.%-d.%H%M')" \
     && bun build src/index.ts --outfile=/usr/local/bin/kiloclaw-controller.js --target=node --minify \
        --define "KILOCLAW_CONTROLLER_VERSION=\"${CONTROLLER_VERSION}\"" \
        --define "KILOCLAW_CONTROLLER_COMMIT=\"${CONTROLLER_COMMIT}\"" \
     && bun pm cache rm \
-    && rm -rf /tmp/controller-build
+    && pnpm store prune \
+    && rm -rf /tmp/controller-workspace
 
 # ── Final stage: runtime image ────────────────────────────────────────
 FROM runtime AS final

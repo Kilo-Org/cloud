@@ -48,7 +48,7 @@ jobs:
         id: content-hash
         working-directory: services/kiloclaw
         run: |
-          for path in Dockerfile controller container plugins/kiloclaw-customizer plugins/kilo-chat plugins/kiloclaw-morning-briefing skills \
+          for path in Dockerfile ../../pnpm-workspace.yaml ../../pnpm-lock.yaml ../../patches controller container plugins/kiloclaw-customizer plugins/kilo-chat plugins/kiloclaw-morning-briefing skills \
                       openclaw-pairing-list.js openclaw-device-pairing-list.js; do
             if [ ! -e "$path" ]; then
               echo "::error::Required path not found: $path"
@@ -57,7 +57,7 @@ jobs:
           done
 
           CONTENT_HASH=$(
-            find Dockerfile controller/ container/ plugins/kiloclaw-customizer/ plugins/kilo-chat/ plugins/kiloclaw-morning-briefing/ skills/ \
+            find Dockerfile ../../pnpm-workspace.yaml ../../pnpm-lock.yaml ../../patches controller/ container/ plugins/kiloclaw-customizer/ plugins/kilo-chat/ plugins/kiloclaw-morning-briefing/ skills/ \
               openclaw-pairing-list.js openclaw-device-pairing-list.js \
               -type f \
               | sort \
@@ -76,6 +76,8 @@ jobs:
         with:
           context: services/kiloclaw
           file: services/kiloclaw/Dockerfile
+          build-contexts: |
+            workspace=.
           platforms: linux/amd64
           push: true
           tags: |

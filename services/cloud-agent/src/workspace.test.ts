@@ -34,6 +34,7 @@ describe('configureKilocode', () => {
     const config = JSON.parse(configJson) as {
       autoApproval?: {
         execute?: {
+          allowed?: string[];
           denied?: string[];
         };
         write?: {
@@ -43,8 +44,19 @@ describe('configureKilocode', () => {
       };
     };
 
+    expect(config.autoApproval?.execute?.allowed).toContain('sed');
+    for (const command of ['wc', 'sort', 'uniq', 'cut', 'tr', 'nl', 'jq', 'stat', 'file']) {
+      expect(config.autoApproval?.execute?.allowed).toContain(command);
+    }
     expect(config.autoApproval?.execute?.denied).toContain('git commit');
     expect(config.autoApproval?.execute?.denied).toContain('gh pr merge');
+    expect(config.autoApproval?.execute?.denied).toContain('sed -i');
+    expect(config.autoApproval?.execute?.denied).toContain('sed -*i');
+    expect(config.autoApproval?.execute?.denied).toContain('sed --in-place');
+    expect(config.autoApproval?.execute?.denied).toContain('sed --in-place*');
+    expect(config.autoApproval?.execute?.denied).toContain('sort -o');
+    expect(config.autoApproval?.execute?.denied).toContain('sort --output');
+    expect(config.autoApproval?.execute?.denied).toContain('uniq * *');
     expect(config.autoApproval?.write?.enabled).toBe(false);
     expect(config.autoApproval?.write?.protected).toBe(true);
   });
@@ -646,11 +658,18 @@ describe('disk space checking', () => {
 describe('autoCommitChangesStream', () => {
   let fakeSession: ExecutionSession;
   let mockExec: ReturnType<typeof vi.fn>;
-  let mockStreamKilocodeExec: ReturnType<typeof vi.fn>;
+  let mockStreamKilocodeExec: ReturnType<
+    typeof vi.fn<
+      (mode: string, prompt: string, options?: { sessionId?: string }) => AsyncGenerator<any>
+    >
+  >;
 
   beforeEach(() => {
     mockExec = vi.fn();
-    mockStreamKilocodeExec = vi.fn();
+    mockStreamKilocodeExec =
+      vi.fn<
+        (mode: string, prompt: string, options?: { sessionId?: string }) => AsyncGenerator<any>
+      >();
     fakeSession = {
       exec: mockExec,
     } as unknown as ExecutionSession;

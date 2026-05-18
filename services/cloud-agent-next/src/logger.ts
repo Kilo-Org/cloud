@@ -8,6 +8,7 @@ export type CloudAgentTags = {
   sessionId?: string;
   userId?: string;
   sandboxId?: string;
+  sandboxKind?: 'bot' | 'user';
   orgId?: string;
   executionId?: string;
   botId?: string;

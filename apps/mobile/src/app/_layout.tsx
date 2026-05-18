@@ -31,6 +31,7 @@ import { subscribeToConsentChanges } from '@/lib/consent';
 import { useAppsFlyerConsentGate } from '@/lib/hooks/use-appsflyer-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
 import {
   checkInitialNotification,
   getPendingNotificationLink,
@@ -155,6 +156,7 @@ function RootLayoutNav() {
     return unsubscribe;
   }, [token, userId]);
 
+  useTrackingPermissionPrompt(!isLoading);
   useAppsFlyerConsentGate({ hasToken: token != null, consentChecked, needsConsent });
 
   useEffect(() => {

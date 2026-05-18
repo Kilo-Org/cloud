@@ -1018,6 +1018,8 @@ function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDash
     botNature: null,
     botVibe: null,
     botEmoji: null,
+    userLocation: null,
+    userTimezone: null,
     workerUrl,
     controllerCapabilitiesVersion: null,
     name: null,
@@ -3052,6 +3054,25 @@ export const kiloclawRouter = createTRPCRouter({
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       return client.updateBriefingInterests(ctx.user.id, input.topics, workerInstanceId(instance));
+    }),
+
+  // Post-provisioning location edit from Settings. Onboarding's initial
+  // location set still flows through `updateConfig`/`provision` because
+  // it's bundled with the rest of the initial config; this mutation is
+  // for edits after the instance is already running, mirroring the
+  // shape of `updateBriefingInterests`.
+  updateUserLocation: clawAccessProcedure
+    .input(z.object({ userLocation: userLocationSchema.nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user.is_admin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Morning briefing is admin-only',
+        });
+      }
+      const instance = await getActiveInstance(ctx.user.id);
+      const client = new KiloClawInternalClient();
+      return client.updateUserLocation(ctx.user.id, input.userLocation, workerInstanceId(instance));
     }),
 
   readMorningBriefing: clawAccessProcedure

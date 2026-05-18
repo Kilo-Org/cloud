@@ -405,6 +405,11 @@ export function useKiloClawMutations() {
         },
       })
     ),
+    updateUserLocation: useMutation(
+      trpc.kiloclaw.updateUserLocation.mutationOptions({
+        onSuccess: invalidateStatus,
+      })
+    ),
     rename: useMutation(
       trpc.kiloclaw.renameInstance.mutationOptions({ onSuccess: invalidateStatus })
     ),

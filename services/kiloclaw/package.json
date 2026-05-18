@@ -27,19 +27,19 @@
     "@kilocode/kiloclaw-secret-catalog": "workspace:*",
     "@kilocode/notifications": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
-    "@northflank/js-client": "^0.9.3",
+    "@northflank/js-client": "0.9.5",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
-    "jose": "^6.2.1",
+    "jose": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": ">=24 <25",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "@vitest/coverage-v8": "^4.1.0",
+    "@vitest/coverage-v8": "catalog:",
     "drizzle-kit": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^4.1.0",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

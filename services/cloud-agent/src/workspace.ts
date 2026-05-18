@@ -74,12 +74,21 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'date',
   'head',
   'tail',
+  'sed',
   'cd',
   'mkdir',
   'touch',
 ];
 
 const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
+  'sed -i',
+  'sed -*i',
+  'sed --in-place',
+  'sed --in-place*',
+  'sed * -i',
+  'sed * -*i',
+  'sed * --in-place',
+  'sed * --in-place*',
   'git add',
   'git commit',
   'git push',

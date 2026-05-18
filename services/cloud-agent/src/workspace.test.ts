@@ -34,6 +34,7 @@ describe('configureKilocode', () => {
     const config = JSON.parse(configJson) as {
       autoApproval?: {
         execute?: {
+          allowed?: string[];
           denied?: string[];
         };
         write?: {
@@ -43,8 +44,13 @@ describe('configureKilocode', () => {
       };
     };
 
+    expect(config.autoApproval?.execute?.allowed).toContain('sed');
     expect(config.autoApproval?.execute?.denied).toContain('git commit');
     expect(config.autoApproval?.execute?.denied).toContain('gh pr merge');
+    expect(config.autoApproval?.execute?.denied).toContain('sed -i');
+    expect(config.autoApproval?.execute?.denied).toContain('sed -*i');
+    expect(config.autoApproval?.execute?.denied).toContain('sed --in-place');
+    expect(config.autoApproval?.execute?.denied).toContain('sed --in-place*');
     expect(config.autoApproval?.write?.enabled).toBe(false);
     expect(config.autoApproval?.write?.protected).toBe(true);
   });

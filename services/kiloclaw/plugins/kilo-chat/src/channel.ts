@@ -22,6 +22,11 @@ import { stripPrefix } from './action-schemas';
 
 const CHANNEL_ID = 'kilo-chat';
 export const DEFAULT_ACCOUNT_ID = 'default';
+
+// Capabilities advertised to the kilo-chat backend so clients can render
+// matching affordances (e.g. attachment upload UI). Threaded through every
+// bot-status ping the plugin emits.
+export const PLUGIN_CAPABILITIES = ['attachments'] as const;
 const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
 const CONVERSATION_TARGET_ALIASES = ['conversationId', 'groupId'];
 
@@ -128,7 +133,11 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         // waiting for cache staleness.
         const client = makeClient();
         const sendPresence = (online: boolean) => {
-          void client.sendBotStatus({ online, at: Date.now() });
+          void client.sendBotStatus({
+            online,
+            at: Date.now(),
+            capabilities: [...PLUGIN_CAPABILITIES],
+          });
         };
         sendPresence(true);
         abortSignal.addEventListener(

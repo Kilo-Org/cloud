@@ -10,7 +10,7 @@ import { resolveApprovalOverGateway } from 'openclaw/plugin-sdk/approval-gateway
 
 import { createKiloChatClient, type KiloChatClient } from '../client.js';
 import { resolveControllerUrl, resolveGatewayToken } from '../env.js';
-import { DEFAULT_ACCOUNT_ID } from '../channel.js';
+import { DEFAULT_ACCOUNT_ID, PLUGIN_CAPABILITIES } from '../channel.js';
 import { readSessionUsage, toContextPayload } from '../bot-status.js';
 
 import { buildDeliverWiring } from './deliver.js';
@@ -42,7 +42,11 @@ export async function handleBotStatusRequest(client?: KiloChatClient): Promise<v
       controllerBaseUrl: resolveControllerUrl(),
       gatewayToken: resolveGatewayToken(),
     });
-  await c.sendBotStatus({ online: true, at: Date.now() });
+  await c.sendBotStatus({
+    online: true,
+    at: Date.now(),
+    capabilities: [...PLUGIN_CAPABILITIES],
+  });
 }
 
 function readSessionStore(cfg: unknown): string | undefined {

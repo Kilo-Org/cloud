@@ -432,6 +432,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
       const body = {
         online: params.online,
         at: params.at,
+        ...(params.capabilities !== undefined && { capabilities: params.capabilities }),
       } satisfies z.input<typeof botStatusRequestSchema>;
 
       const response = await fetchImpl(`${base}/_kilo/kilo-chat/bot-status`, {

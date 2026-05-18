@@ -17,6 +17,11 @@ import { and, eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { randomUUID } from 'node:crypto';
 
+jest.mock('@/lib/email', () => ({
+  ...jest.requireActual('@/lib/email'),
+  sendKiloPassDuplicateCardCanceledEmail: jest.fn(async () => ({ sent: true })),
+}));
+
 function ensureKiloPassStripePriceIdEnv(): void {
   const env = process.env;
   env.STRIPE_KILO_PASS_TIER_19_MONTHLY_PRICE_ID ||= 'price_test_kilo_pass_tier_19_monthly';

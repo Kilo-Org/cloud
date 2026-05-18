@@ -7,7 +7,7 @@ import {
   transactional_email_log,
 } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { and, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, ne, notInArray } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
@@ -55,7 +55,7 @@ export async function findActiveKiloPassByCardFingerprint(
       and(
         inArray(kilo_pass_subscriptions.kilo_user_id, otherUserIds),
         isNull(kilo_pass_subscriptions.ended_at),
-        sql`${kilo_pass_subscriptions.status} NOT IN ('canceled', 'unpaid', 'incomplete_expired')`
+        notInArray(kilo_pass_subscriptions.status, ['canceled', 'unpaid', 'incomplete_expired'])
       )
     )
     .limit(1);

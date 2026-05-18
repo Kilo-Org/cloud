@@ -248,29 +248,37 @@ export function createConnectionManager(
         });
       }
 
-      // Replay pending questions/permissions as regular events
-      // (same format as real-time delivery — matches CLI behavior)
-      if (pendingQuestion && !codeReviewJob) {
-        sendToIngest({
-          streamEventType: 'kilocode',
-          data: {
-            event: 'question.asked',
-            type: 'question.asked',
-            properties: pendingQuestion,
-          },
-          timestamp: new Date().toISOString(),
-        });
+      // Handle pending questions/permissions the same way as real-time delivery.
+      // Code-review jobs must never wait on hidden interactive state.
+      if (pendingQuestion) {
+        if (codeReviewJob) {
+          rejectCodeReviewQuestion(pendingQuestion.id, config.kiloClient);
+        } else {
+          sendToIngest({
+            streamEventType: 'kilocode',
+            data: {
+              event: 'question.asked',
+              type: 'question.asked',
+              properties: pendingQuestion,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
       }
-      if (pendingPermission && !codeReviewJob) {
-        sendToIngest({
-          streamEventType: 'kilocode',
-          data: {
-            event: 'permission.asked',
-            type: 'permission.asked',
-            properties: pendingPermission,
-          },
-          timestamp: new Date().toISOString(),
-        });
+      if (pendingPermission) {
+        if (codeReviewJob) {
+          rejectCodeReviewPermission(pendingPermission.id, config.kiloClient);
+        } else {
+          sendToIngest({
+            streamEventType: 'kilocode',
+            data: {
+              event: 'permission.asked',
+              type: 'permission.asked',
+              properties: pendingPermission,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
       }
 
       logToFile(

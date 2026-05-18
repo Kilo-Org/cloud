@@ -1625,9 +1625,17 @@ describe('SessionService', () => {
         };
       };
 
-      // Denied commands use "cmd *" glob pattern format
+      expect(configContent.permission?.bash?.ls).toBe('allow');
+      expect(configContent.permission?.bash?.pwd).toBe('allow');
+      expect(configContent.permission?.bash?.git).toBe('allow');
+      expect(configContent.permission?.bash?.gh).toBe('allow');
+      expect(configContent.permission?.bash?.['ls *']).toBe('allow');
+      expect(configContent.permission?.bash?.['git *']).toBe('allow');
+      expect(configContent.permission?.bash?.['gh *']).toBe('allow');
       expect(configContent.permission?.bash?.['git commit *']).toBe('deny');
+      expect(configContent.permission?.bash?.['git commit']).toBe('deny');
       expect(configContent.permission?.bash?.['gh pr merge *']).toBe('deny');
+      expect(configContent.permission?.bash?.['gh pr merge']).toBe('deny');
       expect(configContent.permission?.bash?.bash).toBe('deny');
       expect(configContent.permission?.bash?.['bash *']).toBe('deny');
       expect(configContent.permission?.bash?.['vim *']).toBe('deny');

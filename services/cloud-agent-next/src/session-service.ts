@@ -866,17 +866,17 @@ export class SessionService {
     };
 
     if (commandGuardPolicy) {
-      // Build bash permission rules from guard policy.
-      // Denied patterns (e.g. "git add *") are more specific than allowed patterns
-      // (e.g. "git *"); the CLI resolves overlapping globs most-specific-first,
-      // so denied sub-commands correctly override broader allows.
+      // Build bash permission rules from guard policy. Denies are inserted after
+      // allows so exact duplicates still fail closed; more-specific denied
+      // sub-commands also override broader allowed commands in the CLI matcher.
       const bashPermissions: Record<string, string> = {};
+      for (const cmd of commandGuardPolicy.allowed) {
+        bashPermissions[cmd] = 'allow';
+        bashPermissions[`${cmd} *`] = 'allow';
+      }
       for (const cmd of commandGuardPolicy.denied) {
         bashPermissions[cmd] = 'deny';
         bashPermissions[`${cmd} *`] = 'deny';
-      }
-      for (const cmd of commandGuardPolicy.allowed) {
-        bashPermissions[`${cmd} *`] = 'allow';
       }
 
       // Parity with old autoApproval config:

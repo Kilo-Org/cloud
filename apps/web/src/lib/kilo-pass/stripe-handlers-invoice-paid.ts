@@ -40,6 +40,7 @@ import {
   KiloPassPaymentProvider,
 } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+import { checkDuplicateCardFingerprintGate } from '@/lib/kilo-pass/card-fingerprint-gate';
 import { processTopUp } from '@/lib/credits';
 import { randomUUID } from 'node:crypto';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
@@ -343,6 +344,32 @@ export async function handleKiloPassInvoicePaid(params: {
       const kiloPassSubscriptionId = row.id;
       kiloPassSubscriptionIdForAudit = kiloPassSubscriptionId;
       const priorStatus = existingSubscription?.status ?? null;
+
+      // Card fingerprint gate: block if another user already has an active
+      // Kilo Pass subscription on the same card fingerprint. This runs after
+      // the Stripe charge succeeds (so we can refund it) and after the
+      // upsert (so we have a kiloPassSubscriptionId for audit logging).
+      // If blocked, the subscription is canceled on Stripe, the invoice is
+      // refunded, and credits are NOT issued.
+      const gateResult = await checkDuplicateCardFingerprintGate({
+        invoice,
+        stripe,
+        kiloUserId,
+        stripeSubscriptionId: subscription.id,
+        stripeEventId: eventId,
+        stripeInvoiceId: invoice.id,
+        kiloPassSubscriptionId,
+      });
+
+      if (gateResult.blocked) {
+        await tx
+          .update(kilo_pass_subscriptions)
+          .set({ status: 'canceled', ended_at: dayjs().utc().toISOString() })
+          .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
+
+        kiloUserIdForCache = null;
+        return;
+      }
 
       const issuanceHeader = await createOrGetIssuanceHeader(tx, {
         subscriptionId: kiloPassSubscriptionId,

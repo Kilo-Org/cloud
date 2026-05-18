@@ -627,7 +627,7 @@ export async function handleAttachmentInit(c: HonoCtx) {
     secretAccessKey,
     key: init.r2Key,
     contentType: mimeType,
-    expiresSeconds: 900,
+    expiresSeconds: PUT_URL_TTL_SECONDS,
   });
 
   return c.json({
@@ -654,6 +654,7 @@ function safeQuotedFilename(filename: string): string {
   return cleaned.length > 0 ? cleaned : 'download';
 }
 
+const PUT_URL_TTL_SECONDS = 900;
 const GET_URL_TTL_SECONDS = 3600;
 
 export async function handleAttachmentGetUrl(c: HonoCtx) {

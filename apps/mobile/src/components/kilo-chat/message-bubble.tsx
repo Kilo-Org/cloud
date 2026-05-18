@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- message bubble grows with each new content-block type */
 import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
 import { AlertCircle, CheckCircle2, Paperclip, Reply, XCircle } from 'lucide-react-native';
 import { memo } from 'react';

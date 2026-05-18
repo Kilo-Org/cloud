@@ -646,8 +646,8 @@ export async function handleAttachmentInit(c: HonoCtx) {
  * empty.
  */
 function safeQuotedFilename(filename: string): string {
-  // eslint-disable-next-line no-control-regex
   const cleaned = filename
+    // eslint-disable-next-line no-control-regex -- intentionally strip control chars from header value
     .replace(/[\\"\r\n\x00-\x1f]/g, '')
     .replace(/[/\\]/g, '_')
     .trim();

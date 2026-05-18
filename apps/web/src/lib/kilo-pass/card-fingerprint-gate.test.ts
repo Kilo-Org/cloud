@@ -3,10 +3,7 @@ import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
 import {
   credit_transactions,
-  kilocode_users,
   kilo_pass_audit_log,
-  kilo_pass_issuance_items,
-  kilo_pass_issuances,
   kilo_pass_subscriptions,
   payment_methods,
   transactional_email_log,
@@ -631,7 +628,10 @@ describe('card fingerprint gate', () => {
     });
 
     const emailLogRows = await db
-      .select({ email_type: transactional_email_log.email_type, idempotency_key: transactional_email_log.idempotency_key })
+      .select({
+        email_type: transactional_email_log.email_type,
+        idempotency_key: transactional_email_log.idempotency_key,
+      })
       .from(transactional_email_log)
       .where(
         and(

@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { OpenclawImportCard } from './OpenclawImportCard';
 
 import { usePostHog } from 'posthog-js/react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { useUser } from '@/hooks/useUser';
@@ -2232,6 +2233,22 @@ export function SettingsTab({
               <p className="text-sm font-medium">Default Model</p>
               <p className="text-muted-foreground text-xs">
                 Used for new conversations. Can be changed per-conversation.
+              </p>
+              <p className="text-muted-foreground mt-2 text-xs">
+                Configure your own model provider keys in{' '}
+                <Link href="/byok" className="underline">
+                  Kilo BYOK settings
+                </Link>
+                .{' '}
+                <a
+                  href="https://kilo.ai/docs/getting-started/byok"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  View the BYOK setup guide
+                </a>
+                .
               </p>
             </div>
             <div className="flex items-center gap-2">

@@ -1,6 +1,7 @@
 export {
   KiloPassTier,
   KiloPassCadence,
+  KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
   KiloPassAuditLogAction,

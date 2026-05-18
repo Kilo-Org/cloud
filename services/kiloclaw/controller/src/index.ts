@@ -45,11 +45,12 @@ import { registerDoctorRoutes } from './routes/doctor';
 import { registerMorningBriefingRoutes } from './routes/morning-briefing';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 import { writeKiloCliConfig } from './kilo-cli-config';
+import { clearComposioCliEnv, loginComposioCli } from './composio-cli-config';
 import { writeGogCredentials } from './gog-credentials';
 import { installGogShim } from './gog-shim';
 import { migrateLegacyGoogleCredentialsToBroker } from './legacy-google-migration';
 import { startWatchRenewal, stopWatchRenewal } from './gmail-watch-renewal';
-import { bootstrapCritical, bootstrapNonCritical } from './bootstrap';
+import { bootstrapCritical, bootstrapNonCritical, cleanNpmCache } from './bootstrap';
 import type { ControllerStateRef, ControllerState } from './bootstrap';
 import { getOpenclawVersion } from './openclaw-version';
 import { startCheckin } from './checkin';
@@ -506,11 +507,21 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     return;
   }
 
+  cleanNpmCache(env);
+
   // ── Phase 6: Best-effort pre-gateway setup ──────────────────────────
   try {
     writeKiloCliConfig(env as Record<string, string | undefined>);
   } catch (err) {
     console.error('[kilo-cli] Failed to write config:', err);
+  }
+
+  try {
+    loginComposioCli(env as Record<string, string | undefined>);
+  } catch {
+    console.error('[composio] CLI login failed');
+  } finally {
+    clearComposioCliEnv(env as Record<string, string | undefined>);
   }
 
   try {

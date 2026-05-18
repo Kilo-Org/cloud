@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
+import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
 import {
   type ProjectFilterOption,
@@ -202,10 +203,7 @@ export function AgentSessionListScreen() {
           <View className="flex-row items-center gap-4">
             <Pressable
               onPress={() => {
-                const path = organizationId
-                  ? `/(app)/agent-chat/new?organizationId=${organizationId}`
-                  : '/(app)/agent-chat/new';
-                router.push(path as Href);
+                router.push(getNewAgentSessionPath(organizationId) as Href);
               }}
               hitSlop={8}
               accessibilityLabel="New session"
@@ -251,6 +249,9 @@ export function AgentSessionListScreen() {
           refetch={refetch}
           onSessionPress={navigateToSession}
           onSearchChange={handleSearchChange}
+          onCreateSession={() => {
+            router.push(getNewAgentSessionPath(organizationId) as Href);
+          }}
         />
       </Animated.View>
       {showFilterModal && (

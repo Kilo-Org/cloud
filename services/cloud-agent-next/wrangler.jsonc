@@ -51,7 +51,7 @@
     "STALE_THRESHOLD_MS": "600000",
     "PENDING_START_TIMEOUT_MS": "300000",
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
-    "WS_ALLOWED_ORIGINS": "https://app.kilo.ai",
+    "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
   },
   "placement": { "mode": "smart" },
@@ -140,7 +140,7 @@
       "image": "./Dockerfile",
       "instance_type": "standard-4",
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.1.23",
+        "KILOCODE_CLI_VERSION": "7.2.52",
       },
       "max_instances": 250,
       "rollout_active_grace_period": 1800,
@@ -150,7 +150,7 @@
       "image": "./Dockerfile",
       "instance_type": "standard-2",
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.1.23",
+        "KILOCODE_CLI_VERSION": "7.2.52",
       },
       "max_instances": 400,
       "rollout_active_grace_period": 1800,
@@ -279,7 +279,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.1.23",
+            "KILOCODE_CLI_VERSION": "7.2.52",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -289,7 +289,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-2",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.1.23",
+            "KILOCODE_CLI_VERSION": "7.2.52",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,

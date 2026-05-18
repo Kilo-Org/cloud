@@ -13,6 +13,7 @@ choices belong in plan documents and code, not here.
 ## Status
 
 Draft -- created 2026-03-31.
+Updated 2026-05-12 -- KiloClaw price-version display behavior.
 
 ## Conventions
 
@@ -230,6 +231,20 @@ future, the system MUST redirect from the old path to the new one.
     - Link to the Stripe customer portal for payment method management
       (if Stripe-funded)
 
+KiloClaw Subscription Card price display MUST use the subscription
+row's price version and renewal amount, when available, so live legacy
+lineages show legacy pricing and current lineages show current pricing.
+KiloClaw detail price and plan-switch displays MUST use the
+subscription row's price version for both the current plan and any
+scheduled or requested target plan.
+
+The KiloClaw Available Product Card MUST use the fresh current-price
+enrollment preview when the group has no non-terminal KiloClaw
+subscription. Canceled KiloClaw history MUST NOT cause legacy pricing
+or legacy entitlement to appear on subscribe surfaces. Stripe-funded
+KiloClaw checkout pending invoice settlement MUST be displayed as
+pending settlement rather than fully active.
+
 ### Coding Plans Subscriptions (Personal Route)
 
 27. A user MAY have multiple Coding Plans subscriptions — one per
@@ -400,19 +415,22 @@ not yet enforced in the current codebase:
    initial four. The group-based layout SHOULD accommodate new product
    types without structural changes to the page.
 
-2. The system SHOULD support multiple KiloClaw instances per user,
-   each with independent billing. (Currently the schema supports this
-   but the UI has not been built.)
-
-3. The system SHOULD surface upcoming renewals or billing events on
+2. The system SHOULD surface upcoming renewals or billing events on
    the landing page (e.g. "renews in 3 days") to help users
    anticipate charges.
 
-4. The system SHOULD allow org members (non-billing-admins) to view a
+3. The system SHOULD allow org members (non-billing-admins) to view a
    read-only version of the organization Subscription Center showing
    the current plan and seat count without management actions.
 
 ## Changelog
+
+### 2026-05-12 -- KiloClaw price-version display behavior
+
+- Added KiloClaw Subscription Card, detail, plan-switch, and Available
+  Product Card display rules for price-versioned billing.
+- Removed stale not-yet-implemented text for multiple personal
+  KiloClaw subscriptions now covered by KiloClaw group behavior.
 
 ### 2026-04-10 -- Kilo Pass cancellation flow
 

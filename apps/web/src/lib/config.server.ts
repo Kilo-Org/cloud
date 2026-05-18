@@ -142,6 +142,10 @@ export const LINEAR_CLIENT_ID = getEnvVariable('LINEAR_CLIENT_ID');
 export const LINEAR_CLIENT_SECRET = getEnvVariable('LINEAR_CLIENT_SECRET');
 export const LINEAR_WEBHOOK_SECRET = getEnvVariable('LINEAR_WEBHOOK_SECRET');
 
+// DoltHub (dev-only OAuth integration — app pending admin approval)
+export const DOLTHUB_APP_DEV_CLIENT_ID = getEnvVariable('DOLTHUB_APP_DEV_CLIENT_ID');
+export const DOLTHUB_APP_DEV_CLIENT_SECRET = getEnvVariable('DOLTHUB_APP_DEV_CLIENT_SECRET');
+
 // Discord (bot integration — existing)
 export const DISCORD_CLIENT_ID = getEnvVariable('DISCORD_CLIENT_ID');
 export const DISCORD_CLIENT_SECRET = getEnvVariable('DISCORD_CLIENT_SECRET');
@@ -326,10 +330,6 @@ export const STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID = getEnvVariable(
 export const STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID = getEnvVariable(
   'STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID'
 );
-export const STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID = getEnvVariable(
-  'STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID'
-);
-
 // Webhook Agent Ingest Worker
 export const WEBHOOK_AGENT_URL =
   getEnvVariable('WEBHOOK_AGENT_URL') || 'https://hooks.kilosessions.ai';

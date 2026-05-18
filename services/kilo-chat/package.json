@@ -16,12 +16,12 @@
     "db:generate": "pnpm db:generate:conversation && pnpm db:generate:membership && pnpm db:generate:sandbox-status"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.21",
-    "@types/node": "^25.5.0",
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
     "typescript": "catalog:",
-    "vitest": "~3.2.4",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   },
   "dependencies": {
@@ -33,9 +33,9 @@
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
-    "lru-cache": "^11.2.7",
+    "lru-cache": "11.2.7",
     "p-limit": "catalog:",
-    "ulid": "3.0.1",
+    "ulid": "catalog:",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   }

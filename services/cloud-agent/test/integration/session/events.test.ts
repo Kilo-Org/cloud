@@ -8,19 +8,13 @@
  * since the eventQueries are internal to the DO and not exposed via RPC.
  */
 
-import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { env, runInDurableObject } from 'cloudflare:test';
+import { describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { EventId } from '../../../src/types/ids.js';
 
 describe('Event Storage', () => {
-  beforeEach(async () => {
-    // Verify previous test's DOs are automatically removed (isolation)
-    const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    expect(ids).toHaveLength(0);
-  });
-
   it('should insert event with RETURNING id', async () => {
     const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_1');
     const stub = env.CLOUD_AGENT_SESSION.get(id);

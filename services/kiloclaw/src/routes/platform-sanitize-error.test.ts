@@ -35,6 +35,12 @@ function envWithDOError(error: Error, writeDataPoint = vi.fn()) {
         ),
     },
     KILOCLAW_AE: { writeDataPoint },
+    KILOCLAW_BILLING: {
+      resolveProvisionEntitlement: vi.fn().mockResolvedValue({
+        priceVersion: '2026-05-10',
+        selfServiceInstanceType: 'perf-1-3',
+      }),
+    },
     KV_CLAW_CACHE: {
       get: vi.fn().mockResolvedValue(null),
       put: vi.fn().mockResolvedValue(undefined),

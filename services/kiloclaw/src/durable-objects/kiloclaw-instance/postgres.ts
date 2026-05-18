@@ -214,6 +214,8 @@ export async function restoreFromPostgres(
         healthCheckFailCount: 0,
         pendingDestroyMachineId: null,
         pendingDestroyVolumeId: null,
+        destroyStartedAt: null,
+        lastDestroyPendingEventAt: null,
         pendingPostgresMarkOnFinalize: false,
         openclawVersion: null,
         imageVariant: null,
@@ -240,6 +242,8 @@ export async function restoreFromPostgres(
     state.healthCheckFailCount = 0;
     state.pendingDestroyMachineId = null;
     state.pendingDestroyVolumeId = null;
+    state.destroyStartedAt = null;
+    state.lastDestroyPendingEventAt = null;
     state.pendingPostgresMarkOnFinalize = false;
     state.lastMetadataRecoveryAt = null;
     state.openclawVersion = null;

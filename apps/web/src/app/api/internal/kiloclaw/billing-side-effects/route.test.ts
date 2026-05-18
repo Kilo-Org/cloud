@@ -203,6 +203,73 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
     );
   });
 
+  it('rejects Postgres timestamp text in paid conversion event dates', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'process_paid_conversion',
+        input: {
+          userId: 'user-123',
+          dedupeKey: 'affiliate:impact:sale:period-123',
+          eventDateIso: '2026-04-29 01:16:12.945+00',
+          orderId: 'period-123',
+          amount: 9,
+          currencyCode: 'usd',
+          itemCategory: 'kiloclaw-standard',
+          itemName: 'KiloClaw Standard Plan',
+          itemSku: 'price_standard',
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+    expect(mockProcessPersonalKiloClawPaidConversion).not.toHaveBeenCalled();
+  });
+
+  it('rejects Postgres timestamp text in auto top-up user update timestamps', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'trigger_user_auto_top_up',
+        input: {
+          user: {
+            id: 'user-123',
+            total_microdollars_acquired: 100,
+            microdollars_used: 50,
+            next_credit_expiration_at: null,
+            updated_at: '2026-04-29 01:16:12.945+00',
+            auto_top_up_enabled: true,
+          },
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+    expect(mockMaybePerformAutoTopUp).not.toHaveBeenCalled();
+  });
+
+  it('rejects Postgres timestamp text in auto top-up credit expiration timestamps', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'trigger_user_auto_top_up',
+        input: {
+          user: {
+            id: 'user-123',
+            total_microdollars_acquired: 100,
+            microdollars_used: 50,
+            next_credit_expiration_at: '2026-04-29 01:16:12.945+00',
+            updated_at: '2026-04-07T00:00:00.000Z',
+            auto_top_up_enabled: true,
+          },
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+    expect(mockMaybePerformAutoTopUp).not.toHaveBeenCalled();
+  });
+
   it('forwards sale affiliate enqueue requests with monetized fields', async () => {
     const response = await POST(
       createRequest({

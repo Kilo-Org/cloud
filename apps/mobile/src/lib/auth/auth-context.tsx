@@ -11,6 +11,8 @@ import {
 
 import { trackEvent } from '@/lib/appsflyer';
 import { queryClient } from '@/lib/query-client';
+import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
+import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import {
   AUTH_TOKEN_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
@@ -49,6 +51,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const signIn = useCallback(async (tokenValue: string) => {
     await SecureStore.setItemAsync(AUTH_TOKEN_KEY, tokenValue);
     trackEvent('login');
+    resetPurchaseErrorToastDedup();
     setToken(tokenValue);
   }, []);
 
@@ -61,6 +64,8 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     queryClient.clear();
     setToken(undefined);
   }, []);
+
+  useEffect(() => setTrpcUnauthorizedHandler(signOut), [signOut]);
 
   const value = useMemo<AuthContextValue>(
     () => ({ token, isLoading, signIn, signOut }),

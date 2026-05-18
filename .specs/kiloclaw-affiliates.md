@@ -15,6 +15,7 @@ Updated 2026-04-06 -- clarify that conversion events require an affiliate attrib
 Updated 2026-04-09 -- treat pure-credit KiloClaw periods as sale events and exclude admin/org flows.
 Updated 2026-04-09 -- require a 5-minute delay after SIGNUP delivery before child dispatch.
 Updated 2026-04-17 -- define dispute-triggered sale reversals.
+Updated 2026-05-12 -- note price-versioned billing preserves affiliate semantics.
 
 ## Conventions
 
@@ -54,6 +55,10 @@ conversion reporting resistant to ad blockers and browser tracking prevention.
 
 This integration applies only to personal KiloClaw subscriptions. Organization-scoped KiloClaw instances are not
 eligible for affiliate tracking.
+
+Price-versioned KiloClaw billing does not change affiliate eligibility, attribution, event ordering, or conversion
+triggers. SALE amounts continue to use the monetized amount reported by KiloClaw billing, and plan/category values may
+include billing's version-aware classification without changing this spec's attribution semantics.
 
 For KiloClaw conversions also governed by `.specs/kiloclaw-referrals.md`, that referral spec's conversion-time
 referral-priority rules override this document's default first-touch affiliate behavior for the initial paid conversion
@@ -209,6 +214,11 @@ renewal reporting after the winning attribution is established.
    record exists but its stored click ID is empty or null, the event MUST still be sent with an empty or null click ID.
 
 ## Changelog
+
+### 2026-05-12 -- Price-versioned billing preserves affiliate semantics
+
+Reviewed against KiloClaw price-versioned billing. Eligibility, attribution, event ordering, and conversion triggers are
+unchanged; SALE reporting continues to use the monetized amount supplied by billing.
 
 ### 2026-03-31 -- Initial spec
 

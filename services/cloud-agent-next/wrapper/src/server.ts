@@ -32,6 +32,8 @@ export type ServerConfig = {
   agentSessionId: string;
   /** Stable Cloud Agent user ID, passed at wrapper startup */
   userId: string;
+  /** Product surface that created the session, e.g. code-review. */
+  platform?: string;
 };
 
 export type ServerDependencies = {
@@ -89,6 +91,7 @@ type CommandBody = {
 type AnswerPermissionBody = {
   permissionId: string;
   response: 'always' | 'once' | 'reject';
+  message?: string;
 };
 
 type AnswerQuestionBody = {
@@ -177,6 +180,7 @@ async function bindExecutionContext(
     ingestUrl: execution.ingestUrl,
     ingestToken: execution.ingestToken,
     workerAuthToken: execution.workerAuthToken,
+    platform: config.platform,
   };
 
   // Close stale ingest connection from the prior execution. The prior execution's
@@ -379,7 +383,11 @@ function createAnswerPermissionHandler(deps: ServerDependencies) {
     }
 
     try {
-      const success = await kiloClient.answerPermission(body.permissionId, body.response);
+      const success = await kiloClient.answerPermission(
+        body.permissionId,
+        body.response,
+        body.message
+      );
       state.updateActivity();
       logToFile(
         `job/answer-permission: permissionId=${body.permissionId} response=${body.response}`

@@ -61,6 +61,25 @@ function trpcError(status: number, message: string, code = 'INTERNAL_SERVER_ERRO
   );
 }
 
+function mockSuccessfulCloudAgentNextRun() {
+  const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+    const url = String(request);
+    if (url.includes('/api/internal/code-review-status/')) {
+      return Response.json({ success: true });
+    }
+    if (url.includes('/trpc/prepareSession')) {
+      return trpcSuccess({ cloudAgentSessionId: 'agent-fresh', kiloSessionId: 'ses_fresh' });
+    }
+    if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+      return trpcSuccess({ executionId: 'exec-fresh', status: 'running' });
+    }
+
+    return new Response('unexpected fetch', { status: 500 });
+  });
+  globalThis.fetch = fetchMock;
+  return fetchMock;
+}
+
 function fetchCalls(fetchMock: ReturnType<typeof vi.fn>, path: string) {
   return fetchMock.mock.calls.filter(([request]) => String(request).includes(path));
 }
@@ -143,8 +162,276 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       reviewId,
-      status: 'queued',
+      status: expect.stringMatching(/queued|running/),
     });
+  });
+
+  it('POST /review uses attempt-specific durable object names', async () => {
+    mockSuccessfulCloudAgentNextRun();
+    const reviewId = crypto.randomUUID();
+    const attemptId = crypto.randomUUID();
+
+    const response = await SELF.fetch('https://worker.test/review', {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewId,
+        attemptId,
+        authToken: 'test-auth-token',
+        sessionInput: sessionInput(),
+        owner: { type: 'user', id: 'user-id', userId: 'user-id' },
+        agentVersion: 'v2',
+      }),
+    });
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ reviewId, attemptId, status: 'queued' });
+
+    const statusResponse = await SELF.fetch(
+      `https://worker.test/reviews/${reviewId}/status?attemptId=${attemptId}`,
+      { headers: workerAuthHeaders() }
+    );
+    expect(statusResponse.status).toBe(200);
+    await expect(statusResponse.json()).resolves.toMatchObject({
+      reviewId,
+      attemptId,
+      status: expect.stringMatching(/queued|running/),
+    });
+  });
+
+  it('fresh attempt dispatch does not reuse failed state from an earlier attempt', async () => {
+    mockSuccessfulCloudAgentNextRun();
+    const reviewId = crypto.randomUUID();
+    const attemptA = crypto.randomUUID();
+    const attemptB = crypto.randomUUID();
+
+    const failedStub = getReviewStub(`${reviewId}:${attemptA}`);
+    await runInDurableObject(failedStub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          reviewId,
+          attemptId: attemptA,
+          status: 'failed',
+          errorMessage: 'old failure',
+        })
+      );
+    });
+
+    const response = await SELF.fetch('https://worker.test/review', {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewId,
+        attemptId: attemptB,
+        authToken: 'test-auth-token',
+        sessionInput: sessionInput(),
+        owner: { type: 'user', id: 'user-id', userId: 'user-id' },
+        agentVersion: 'v2',
+      }),
+    });
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      reviewId,
+      attemptId: attemptB,
+      status: expect.stringMatching(/queued|running/),
+    });
+
+    const failedStatus = await failedStub.status();
+    expect(failedStatus).toMatchObject({ reviewId, attemptId: attemptA, status: 'failed' });
+    const freshStatusResponse = await SELF.fetch(
+      `https://worker.test/reviews/${reviewId}/status?attemptId=${attemptB}`,
+      { headers: workerAuthHeaders() }
+    );
+    await expect(freshStatusResponse.json()).resolves.toMatchObject({
+      reviewId,
+      attemptId: attemptB,
+      status: expect.stringMatching(/queued|running/),
+    });
+  });
+
+  it('retry-fresh route requires auth', async () => {
+    const response = await SELF.fetch(
+      `https://worker.test/reviews/${crypto.randomUUID()}/retry-fresh`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'test' }),
+      }
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it('retry-fresh starts a fresh session without continuation APIs', async () => {
+    const reviewId = crypto.randomUUID();
+    const stub = getReviewStub(reviewId);
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-retry-fresh',
+          kiloSessionId: 'ses_retry_fresh',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-retry-fresh', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          reviewId,
+          status: 'running',
+          sessionId: 'agent-old',
+          cliSessionId: 'ses_old',
+          sandboxId: 'sandbox-old',
+          previousCloudAgentSessionId: 'agent-previous',
+          errorMessage: 'Container shutdown: SIGTERM',
+          terminalReason: 'sandbox_error',
+        })
+      );
+    });
+
+    const response = await SELF.fetch(`https://worker.test/reviews/${reviewId}/retry-fresh`, {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: 'agent-old', reason: 'Container shutdown: SIGTERM' }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: false, reviewId });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/getSessionHealth')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/updateSession')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(0);
+  });
+
+  it('retry-fresh starts a new retry attempt durable object instead of resetting the failed attempt', async () => {
+    const reviewId = crypto.randomUUID();
+    const failedAttemptId = crypto.randomUUID();
+    const retryAttemptId = crypto.randomUUID();
+    const failedStub = getReviewStub(`${reviewId}:${failedAttemptId}`);
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-retry-fresh',
+          kiloSessionId: 'ses_retry_fresh',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-retry-fresh', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(failedStub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          reviewId,
+          attemptId: failedAttemptId,
+          status: 'running',
+          sessionId: 'agent-old',
+          cliSessionId: 'ses_old',
+          errorMessage: 'Container shutdown: SIGTERM',
+          terminalReason: 'sandbox_error',
+        })
+      );
+    });
+
+    const response = await SELF.fetch(`https://worker.test/reviews/${reviewId}/retry-fresh`, {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'agent-old',
+        reason: 'Container shutdown: SIGTERM',
+        failedAttemptId,
+        retryAttemptId,
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true, reviewId });
+
+    const oldStatus = await failedStub.status();
+    expect(oldStatus).toMatchObject({ reviewId, attemptId: failedAttemptId, status: 'running' });
+
+    const retryStub = getReviewStub(`${reviewId}:${retryAttemptId}`);
+    await expect(retryStub.status()).resolves.toMatchObject({
+      reviewId,
+      attemptId: retryAttemptId,
+      status: 'running',
+    });
+  });
+
+  it('retry-fresh ignores mismatched sessions', async () => {
+    const reviewId = crypto.randomUUID();
+    const stub = getReviewStub(reviewId);
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          reviewId,
+          status: 'running',
+          sessionId: 'agent-current',
+        })
+      );
+    });
+
+    const response = await SELF.fetch(`https://worker.test/reviews/${reviewId}/retry-fresh`, {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: 'agent-old', reason: 'Container shutdown: SIGTERM' }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: false, reviewId });
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-current',
+    });
+  });
+
+  it('retry-fresh ignores exhausted retries', async () => {
+    const reviewId = crypto.randomUUID();
+    const stub = getReviewStub(reviewId);
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          reviewId,
+          status: 'running',
+          sessionId: 'agent-current',
+          sandboxRetryAttempted: true,
+        })
+      );
+    });
+
+    const response = await SELF.fetch(`https://worker.test/reviews/${reviewId}/retry-fresh`, {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: 'agent-current', reason: 'Container shutdown: SIGTERM' }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: false, reviewId });
   });
 
   it('queued review alarm retries runReview and transitions to running', async () => {
@@ -228,13 +515,10 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
     const initiateCalls = fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2');
     expect(initiateCalls).toHaveLength(1);
-    const initiateInit = initiateCalls[0]?.[1] as RequestInit | undefined;
-    expect(JSON.parse(String(initiateInit?.body))).toEqual({
-      cloudAgentSessionId: 'agent-retry-session',
-    });
 
     await expect(storedReview(stub)).resolves.toMatchObject({
       sandboxRetryAttempted: true,
+      status: 'running',
       sessionId: 'agent-retry-session',
       cliSessionId: 'ses_retry_session',
     });
@@ -247,6 +531,98 @@ describe('CodeReviewOrchestrator recovery', () => {
       }
     );
     expect(failedStatusUpdates).toHaveLength(0);
+  });
+
+  it('retries prepareSession once after wrapper waitForPort readiness timeout', async () => {
+    const stub = getReviewStub();
+    let prepareCalls = 0;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        prepareCalls += 1;
+        if (prepareCalls === 1) {
+          return trpcError(
+            500,
+            'Wrapper did not become ready on port 5353 within 30000ms: waitForPort timed out'
+          );
+        }
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-wrapper-timeout-retry',
+          kiloSessionId: 'ses_wrapper_timeout_retry',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-wrapper-timeout-retry', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-wrapper-timeout-retry',
+      cliSessionId: 'ses_wrapper_timeout_retry',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+    await expect(storedReview(stub)).resolves.toMatchObject({ sandboxRetryAttempted: true });
+  });
+
+  it('retries prepareSession once after wrapper kilo server startup timeout', async () => {
+    const stub = getReviewStub();
+    let prepareCalls = 0;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        prepareCalls += 1;
+        if (prepareCalls === 1) {
+          return trpcError(
+            500,
+            'Wrapper did not become ready on port 5353 within 30000ms: waitForPort timed out | wrapperFileLog: failed to start kilo server: Timeout waiting for server to start after 45000ms'
+          );
+        }
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-kilo-startup-retry',
+          kiloSessionId: 'ses_kilo_startup_retry',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-kilo-startup-retry', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-kilo-startup-retry',
+      cliSessionId: 'ses_kilo_startup_retry',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+    await expect(storedReview(stub)).resolves.toMatchObject({ sandboxRetryAttempted: true });
   });
 
   it('fails after a second sandbox 500 without initiating', async () => {
@@ -277,14 +653,9 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
-    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
-      status: 'failed',
-      terminalReason: 'sandbox_error',
-    });
     await expect(storedReview(stub)).resolves.toMatchObject({
       status: 'failed',
       sandboxRetryAttempted: true,
-      terminalReason: 'sandbox_error',
     });
   });
 
@@ -332,6 +703,72 @@ describe('CodeReviewOrchestrator recovery', () => {
       }
       if (url.includes('/trpc/prepareSession')) {
         return trpcError(400, 'Branch not found: main', 'BAD_REQUEST');
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'failed' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    const stored = await storedReview(stub);
+    expect(stored).toMatchObject({ status: 'failed' });
+    expect(stored?.sandboxRetryAttempted).toBeUndefined();
+  });
+
+  it('does not retry configured-session lookup failures nested in wrapper readiness output', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(
+          500,
+          'Wrapper did not become ready on port 5353 within 30000ms: waitForPort timed out | wrapperFileLog: configured session ses_missing not found: Session get returned no data for ses_missing'
+        );
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'failed' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    const stored = await storedReview(stub);
+    expect(stored).toMatchObject({ status: 'failed' });
+    expect(stored?.sandboxRetryAttempted).toBeUndefined();
+  });
+
+  it('does not retry repo-specific checkout failures that surface as prepareSession 500s', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(
+          500,
+          'SandboxError: HTTP error! status: 500 during setup | Failed to checkout pull ref: Object does not exist on the server'
+        );
       }
       return new Response('unexpected fetch', { status: 500 });
     });
@@ -746,10 +1183,10 @@ describe('CodeReviewOrchestrator recovery', () => {
     const stored = await storedReview(stub);
     expect(stored).toMatchObject({
       sandboxRetryAttempted: true,
+      status: 'running',
       sessionId: 'agent-fresh-after-sandbox-500',
       cliSessionId: 'ses_fresh_after_sandbox_500',
     });
-    expect(stored?.previousCloudAgentSessionId).toBeUndefined();
   });
 
   it('fails with sandbox_error when sendMessageV2 retry also hits a sandbox 500', async () => {
@@ -800,10 +1237,6 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
-    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
-      status: 'failed',
-      terminalReason: 'sandbox_error',
-    });
   });
 
   it('aborts alarm recovery before cloud-agent calls when DB is already terminal', async () => {

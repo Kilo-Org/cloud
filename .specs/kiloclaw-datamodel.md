@@ -20,6 +20,7 @@ background jobs). All consumers MUST comply with the rules below.
 ## Status
 
 Draft — created 2026-04-15.
+Updated 2026-05-12 -- required KiloClaw price-version lineage invariants.
 
 ## Conventions
 
@@ -36,6 +37,13 @@ capitals, as shown here.
   (CF worker Durable Object and infra provider resources) still exists.
 - **Subscription record**: A row in `kiloclaw_subscription`
   representing a billing subscription tied to a specific instance.
+- **KiloClaw price version**: The required catalog key recorded on a
+  subscription row as `kiloclaw_price_version`. It selects the row's
+  KiloClaw prices, trial duration, and self-service instance
+  entitlement.
+- **Subscription lineage**: The live chain formed by a subscription row
+  and any successor rows created during personal reprovision transfer.
+  A lineage has one immutable price version.
 - **Destroyed instance**: An instance record whose underlying
   infrastructure has been torn down. The record persists with a
   destroyed marker.
@@ -137,6 +145,29 @@ on application logs that may be rotated or incomplete.
    access from purchase-table fallback once migration cleanup is
    complete; users without canonical rows are treated as exceptions
    requiring manual remediation.
+
+### Subscription Price Version
+
+Every `kiloclaw_subscription` row MUST have a required, non-null
+`kiloclaw_price_version`. Subscription writers MUST set
+`kiloclaw_price_version` explicitly when creating rows; they MUST NOT
+rely on an implicit application or database default to select pricing.
+
+A subscription lineage MUST keep one immutable price version. Renewals,
+plan switches, payment-source transitions, pending cancellation,
+reactivation before final cancellation, and live personal reprovision
+successor transfer MUST preserve the recorded version.
+
+A live successor row MUST copy the predecessor row's
+`kiloclaw_price_version` when transferring an access-granting personal
+lineage to a replacement instance. The transferred-out predecessor row
+remains historical and is excluded from live subscription selection.
+
+Canceled historical rows MUST retain their recorded
+`kiloclaw_price_version` for audit and reporting, but they MUST NOT
+seed legacy eligibility for later fresh subscription rows. Fresh rows
+after fully canceled history use the current price version defined by
+KiloClaw billing.
 
 ### Multi-Instance Support
 
@@ -305,11 +336,17 @@ not yet enforced in the current codebase:
    existing. (Currently, the onboarding flow may complete before
    subscription creation.)
 3. The subscription change log (rules 12–18) SHOULD be implemented
-   across all services that mutate subscription records. (Currently,
-   no change log exists; subscription history can only be
-   reconstructed from application logs.)
+   across all services that mutate subscription records. Some
+   subscription-creation paths may already write change-log entries;
+   complete cross-service coverage remains the intended invariant.
 
 ## Changelog
+
+### 2026-05-12 -- Required KiloClaw price-version lineage invariants
+
+- Added required `kiloclaw_price_version` row semantics.
+- Documented lineage immutability, live-successor copying, and
+  canceled-row historical semantics.
 
 ### 2026-04-15 -- Initial spec
 

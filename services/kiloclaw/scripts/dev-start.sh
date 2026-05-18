@@ -48,6 +48,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 KILOCLAW_DIR="$(dirname "$SCRIPT_DIR")"
 MONOREPO_ROOT="$(cd "$KILOCLAW_DIR/../.." && pwd)"
 APPS_WEB_DIR="$MONOREPO_ROOT/apps/web"
+REQUIRED_PNPM_VERSION="$(sed -n 's/.*"packageManager"[[:space:]]*:[[:space:]]*"pnpm@\([^"]*\)".*/\1/p' "$MONOREPO_ROOT/package.json" | head -n 1)"
+REQUIRED_PNPM_VERSION="${REQUIRED_PNPM_VERSION:-11.1.1}"
 
 # ---------- OS detection ----------
 
@@ -159,7 +161,7 @@ if [ "$missing_cli" = true ]; then
   echo ""
   echo "Install missing tools before running this script."
   echo "  vercel:      npm i -g vercel"
-  echo "  pnpm:        corepack enable && corepack prepare pnpm@latest --activate"
+  echo "  pnpm:        corepack enable && corepack prepare pnpm@${REQUIRED_PNPM_VERSION} --activate"
   echo "  docker:      https://docs.docker.com/get-docker/"
   if [ "$OS_TYPE" = "Darwin" ]; then
     echo "  cloudflared: brew install cloudflare/cloudflare/cloudflared"

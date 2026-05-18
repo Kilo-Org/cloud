@@ -20,11 +20,13 @@ async function insertTestSubscription(params: {
   kiloUserId: string;
   status?: StripeSubscriptionStatus;
 }): Promise<string> {
+  const stripeSubscriptionId = `test-stripe-sub-${crypto.randomUUID()}`;
   const inserted = await db
     .insert(kilo_pass_subscriptions)
     .values({
       kilo_user_id: params.kiloUserId,
-      stripe_subscription_id: `test-stripe-sub-${crypto.randomUUID()}`,
+      provider_subscription_id: stripeSubscriptionId,
+      stripe_subscription_id: stripeSubscriptionId,
       tier: KiloPassTier.Tier49,
       cadence: KiloPassCadence.Monthly,
       status: params.status ?? 'active',

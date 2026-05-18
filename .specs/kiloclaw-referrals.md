@@ -11,7 +11,7 @@ and other implementation details belong in plans and code.
 ## Status
 
 Draft -- created 2026-04-21. Updated 2026-05-06 -- require Impact Advocate reward redemption after local reward
-application.
+application. Updated 2026-05-12 -- note price-versioned billing preserves referral semantics.
 
 ## Conventions
 
@@ -95,6 +95,10 @@ Existing Impact Performance Program conversion events drive Impact Advocate conv
 
 This program applies only to personal KiloClaw subscriptions. Organization-scoped KiloClaw instances, team plans, admin
 interventions, and non-KiloClaw purchases are out of scope.
+
+Price-versioned KiloClaw billing does not change referral eligibility, attribution priority, first-paid-conversion
+timing, reward caps, or free-month fulfillment. A first paid KiloClaw conversion remains governed by monetized
+payment-period rules, regardless of the subscription price version.
 
 ## Rules
 
@@ -541,6 +545,12 @@ interventions, and non-KiloClaw purchases are out of scope.
     retry unchanged payloads, except an already-redeemed response MAY be treated as idempotent success.
 
 ## Changelog
+
+### 2026-05-12 -- Price-versioned billing preserves referral semantics
+
+Reviewed against KiloClaw price-versioned billing. Referral eligibility, attribution priority, first-paid-conversion
+timing, reward caps, and free-month fulfillment are unchanged; monetized payment-period rules still define qualifying
+paid conversions regardless of price version.
 
 ### 2026-05-06 -- Redeem applied rewards in Impact Advocate
 

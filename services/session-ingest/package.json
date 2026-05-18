@@ -15,20 +15,20 @@
   "dependencies": {
     "@kilocode/db": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
-    "@streamparser/json": "^0.0.22",
+    "@streamparser/json": "0.0.22",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.21",
+    "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "catalog:",
-    "@types/node": ">=24 <25",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
     "jose": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^3.2.4",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

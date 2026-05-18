@@ -515,6 +515,7 @@ describe('handleKiloPassInvoicePaid', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
@@ -703,6 +704,7 @@ describe('handleKiloPassInvoicePaid', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Yearly,
@@ -846,6 +848,7 @@ describe('handleKiloPassInvoicePaid', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Yearly,
@@ -1015,6 +1018,7 @@ describe('handleKiloPassInvoicePaid', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Yearly,
@@ -1138,6 +1142,7 @@ describe('handleKiloPassInvoicePaid', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Yearly,
@@ -1273,6 +1278,7 @@ describe('handleKiloPassInvoicePaid', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Yearly,
@@ -1373,6 +1379,7 @@ describe('handleKiloPassInvoicePaid', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Yearly,
@@ -1488,6 +1495,7 @@ describe('handleKiloPassInvoicePaid', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Yearly,
@@ -1591,6 +1599,7 @@ describe('handleKiloPassInvoicePaid', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
         // Already upgraded to tier_49 (first upgrade happened earlier)
         tier: KiloPassTier.Tier49,
@@ -1695,6 +1704,7 @@ describe('handleKiloPassInvoicePaid', () => {
 
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
+      provider_subscription_id: stripeSubId,
       stripe_subscription_id: stripeSubId,
       tier: KiloPassTier.Tier49,
       cadence: KiloPassCadence.Monthly,
@@ -1803,6 +1813,7 @@ describe('handleKiloPassInvoicePaid', () => {
     const canceledAt = 1_767_312_000; // 2026-01-02T00:00:00Z
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
+      provider_subscription_id: stripeSubId,
       stripe_subscription_id: stripeSubId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,

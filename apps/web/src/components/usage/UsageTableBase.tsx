@@ -1,14 +1,21 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ChevronDown, ChevronRight, ChevronUp, ChevronsUpDown } from 'lucide-react';
+
+export type SortDirection = 'asc' | 'desc';
 
 export type UsageTableColumn = {
   key: string;
   label: string;
   align?: 'left' | 'right';
   render?: (value: unknown, row: UsageTableRow) => React.ReactNode;
+  /** When false on a sortable table, this column cannot be sorted. */
+  sortable?: boolean;
+  /** Custom accessor used when sorting; defaults to row[column.key]. */
+  sortAccessor?: (row: UsageTableRow) => string | number | null | undefined;
 };
 
 export type UsageTableRow = {
@@ -24,6 +31,10 @@ type UsageTableBaseProps = {
   emptyMessage?: string;
   headerContent?: React.ReactNode;
   headerActions?: React.ReactNode;
+  /** When true, column headers become clickable to toggle sort. */
+  sortable?: boolean;
+  /** Initial sort state when sortable is true. */
+  defaultSort?: { key: string; direction: SortDirection };
 };
 
 export function UsageTableBase({
@@ -33,8 +44,13 @@ export function UsageTableBase({
   emptyMessage = 'No data available',
   headerContent,
   headerActions,
+  sortable = false,
+  defaultSort,
 }: UsageTableBaseProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [sort, setSort] = useState<{ key: string; direction: SortDirection } | null>(
+    defaultSort ?? null
+  );
 
   const toggleRowExpansion = (rowKey: string) => {
     const newExpanded = new Set(expandedRows);
@@ -48,6 +64,54 @@ export function UsageTableBase({
 
   const getRowKey = (row: UsageTableRow, index: number) => {
     return (row.id as string) || (row.date as string) || `row-${index}`;
+  };
+
+  const columnByKey = useMemo(() => {
+    const m = new Map<string, UsageTableColumn>();
+    for (const c of columns) m.set(c.key, c);
+    return m;
+  }, [columns]);
+
+  const toggleSort = (key: string): void => {
+    if (!sortable) return;
+    const col = columnByKey.get(key);
+    if (col && col.sortable === false) return;
+    setSort(prev => {
+      if (!prev || prev.key !== key) return { key, direction: 'desc' };
+      if (prev.direction === 'desc') return { key, direction: 'asc' };
+      return null;
+    });
+  };
+
+  const sortedData = useMemo(() => {
+    if (!sortable || !sort) return data;
+    const col = columnByKey.get(sort.key);
+    if (!col) return data;
+    const accessor = col.sortAccessor ?? ((row: UsageTableRow) => row[sort.key] as unknown);
+    const dir = sort.direction === 'asc' ? 1 : -1;
+    return [...data].sort((a, b) => {
+      const av = accessor(a);
+      const bv = accessor(b);
+      if (av === bv) return 0;
+      if (av === null || av === undefined) return 1;
+      if (bv === null || bv === undefined) return -1;
+      if (typeof av === 'number' && typeof bv === 'number') {
+        return (av - bv) * dir;
+      }
+      return String(av).localeCompare(String(bv)) * dir;
+    });
+  }, [data, sortable, sort, columnByKey]);
+
+  const renderSortIcon = (columnKey: string, columnSortable: boolean) => {
+    if (!sortable || !columnSortable) return null;
+    if (sort?.key !== columnKey) {
+      return <ChevronsUpDown className="ml-1 inline h-3 w-3 opacity-40" />;
+    }
+    return sort.direction === 'asc' ? (
+      <ChevronUp className="ml-1 inline h-3 w-3" />
+    ) : (
+      <ChevronDown className="ml-1 inline h-3 w-3" />
+    );
   };
 
   return (
@@ -65,25 +129,32 @@ export function UsageTableBase({
           <table className="w-full">
             <thead>
               <tr className="bg-background border-muted border-b">
-                {data.some(row => row.expandable) && (
+                {sortedData.some(row => row.expandable) && (
                   <th className="text-muted-foreground w-12 px-6 py-3 text-left text-xs font-medium tracking-wider uppercase"></th>
                 )}
-                {columns.map(column => (
-                  <th
-                    key={column.key}
-                    className={`text-muted-foreground px-6 py-3 text-xs font-medium tracking-wider uppercase ${
-                      column.align === 'right' ? 'text-right' : 'text-left'
-                    }`}
-                  >
-                    {column.label}
-                  </th>
-                ))}
+                {columns.map(column => {
+                  const columnSortable = sortable && column.sortable !== false;
+                  return (
+                    <th
+                      key={column.key}
+                      className={cn(
+                        'text-muted-foreground px-6 py-3 text-xs font-medium tracking-wider uppercase',
+                        column.align === 'right' ? 'text-right' : 'text-left',
+                        columnSortable && 'hover:text-foreground cursor-pointer select-none'
+                      )}
+                      onClick={columnSortable ? () => toggleSort(column.key) : undefined}
+                    >
+                      {column.label}
+                      {renderSortIcon(column.key, columnSortable)}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-muted divide-y rounded-b-lg">
-              {data.map((row, index) => {
+              {sortedData.map((row, index) => {
                 const rowKey = getRowKey(row, index);
-                const isLastRow = index === data.length - 1;
+                const isLastRow = index === sortedData.length - 1;
                 const isExpanded = expandedRows.has(rowKey);
 
                 return (
@@ -95,7 +166,7 @@ export function UsageTableBase({
                       }`}
                       onClick={row.expandable ? () => toggleRowExpansion(rowKey) : undefined}
                     >
-                      {data.some(r => r.expandable) && (
+                      {sortedData.some(r => r.expandable) && (
                         <td className="px-6 py-4">
                           {row.expandable && (
                             <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
@@ -123,7 +194,7 @@ export function UsageTableBase({
                               column.align === 'right' ? 'text-right' : 'text-left'
                             } ${
                               isLastRow && !isExpanded
-                                ? isFirstCol && !data.some(r => r.expandable)
+                                ? isFirstCol && !sortedData.some(r => r.expandable)
                                   ? 'rounded-bl-lg'
                                   : isLastCol
                                     ? 'rounded-br-lg'
@@ -142,7 +213,7 @@ export function UsageTableBase({
                           const expandedRowKey = `${rowKey}-expanded-${expandedIndex}`;
                           const isLastExpandedRow =
                             expandedIndex === (row.expandedContent?.length || 0) - 1;
-                          const isLastMainRow = index === data.length - 1;
+                          const isLastMainRow = index === sortedData.length - 1;
 
                           return (
                             <tr
@@ -151,7 +222,7 @@ export function UsageTableBase({
                                 isLastExpandedRow && isLastMainRow ? 'rounded-b-lg' : ''
                               }`}
                             >
-                              {data.some(r => r.expandable) && <td></td>}
+                              {sortedData.some(r => r.expandable) && <td></td>}
                               {columns.map((column, colIndex) => {
                                 const isFirstCol = colIndex === 0;
                                 const isLastCol = colIndex === columns.length - 1;
@@ -167,7 +238,7 @@ export function UsageTableBase({
                                       column.align === 'right' ? 'text-right' : 'text-left'
                                     } ${isFirstCol ? 'pl-14' : ''} ${
                                       isLastExpandedRow && isLastMainRow
-                                        ? isFirstCol && !data.some(r => r.expandable)
+                                        ? isFirstCol && !sortedData.some(r => r.expandable)
                                           ? 'rounded-bl-lg'
                                           : isLastCol
                                             ? 'rounded-br-lg'
@@ -191,7 +262,7 @@ export function UsageTableBase({
           </table>
         </div>
 
-        {data.length === 0 && (
+        {sortedData.length === 0 && (
           <div className="text-muted-foreground px-6 py-12 text-center">{emptyMessage}</div>
         )}
       </CardContent>

@@ -2,6 +2,7 @@ import { getWorkerDb } from '@kilocode/db';
 import type { BillingWorkerEnv } from './types.js';
 import {
   bootstrapProvisionSubscriptionWithDb,
+  resolveProvisionEntitlementWithDb,
   type BootstrapProvisionInput,
 } from './provision-bootstrap-shared.js';
 
@@ -29,4 +30,12 @@ export async function bootstrapProvisionSubscription(
       });
     },
   });
+}
+
+export async function resolveProvisionEntitlement(
+  env: BillingWorkerEnv,
+  input: Pick<BootstrapProvisionInput, 'userId' | 'orgId'>
+) {
+  const db = getWorkerDb(env.HYPERDRIVE.connectionString);
+  return await resolveProvisionEntitlementWithDb({ db, input });
 }

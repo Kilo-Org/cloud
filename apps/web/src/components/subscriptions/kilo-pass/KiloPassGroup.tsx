@@ -22,7 +22,10 @@ import {
   isKiloPassTerminal,
   isWarningStatus,
 } from '@/components/subscriptions/helpers';
-import { getKiloPassSubscriptionDisplayModel } from './KiloPassDetail.logic';
+import {
+  getKiloPassProviderManagementModel,
+  getKiloPassSubscriptionDisplayModel,
+} from './KiloPassDetail.logic';
 
 function getShowKiloPassTwoMonthPromo(showFirstMonthPromo: boolean): boolean {
   return (
@@ -87,6 +90,9 @@ export function KiloPassGroup({
         resumesAtLabel: formatDateLabel(subscription.resumesAt),
       })
     : null;
+  const providerManagement = subscription
+    ? getKiloPassProviderManagementModel(subscription.paymentProvider)
+    : null;
 
   return (
     <SubscriptionGroup
@@ -99,7 +105,7 @@ export function KiloPassGroup({
       onRetry={() => void query.refetch()}
       accordionValue={accordionValue}
     >
-      {shouldShowSubscription && subscriptionDisplay ? (
+      {shouldShowSubscription && subscriptionDisplay && providerManagement ? (
         <SubscriptionCard
           icon={<Crown className="h-5 w-5" />}
           title={`Kilo Pass ${formatKiloPassTierLabel(subscription.tier)}`}
@@ -108,7 +114,7 @@ export function KiloPassGroup({
           price={formatKiloPassPrice(subscription.tier, subscription.cadence)}
           billingDate={subscriptionDisplay.cardDateValue}
           billingDateLabel={subscriptionDisplay.cardDateLabel}
-          paymentMethod="Stripe"
+          paymentMethod={providerManagement.paymentMethodLabel}
           href="/subscriptions/kilo-pass"
           isTerminal={isKiloPassTerminal(subscription.status)}
           warningTone={

@@ -4,6 +4,7 @@ import {
   extractEmbeddingPromptInfo,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
+  parseTranscriptionUsageFromResponse,
 } from './llm-proxy-helpers';
 
 describe('checkOrganizationModelRestrictions', () => {
@@ -355,6 +356,94 @@ describe('parseEmbeddingUsageFromResponse', () => {
     const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.inputTokens).toBe(42);
+  });
+});
+
+describe('parseTranscriptionUsageFromResponse', () => {
+  function makeResponse(overrides: Record<string, unknown> = {}) {
+    return JSON.stringify({
+      id: 'stt-123',
+      model: 'openai/gpt-4o-mini-transcribe',
+      text: 'hello world',
+      usage: {
+        seconds: 2.5,
+        input_tokens: 10,
+        output_tokens: 4,
+        total_tokens: 14,
+        cost: 0.00002,
+        is_byok: false,
+      },
+      ...overrides,
+    });
+  }
+
+  it('uses upstream cost and token fields', () => {
+    const result = parseTranscriptionUsageFromResponse(
+      makeResponse(),
+      200,
+      'openai/gpt-4o-mini-transcribe'
+    );
+
+    expect(result.cost_mUsd).toBe(20);
+    expect(result.inputTokens).toBe(10);
+    expect(result.outputTokens).toBe(4);
+  });
+
+  it('uses BYOK upstream inference cost when present', () => {
+    const result = parseTranscriptionUsageFromResponse(
+      makeResponse({
+        usage: {
+          seconds: 2.5,
+          input_tokens: 10,
+          output_tokens: 4,
+          total_tokens: 14,
+          cost: 0,
+          is_byok: true,
+          cost_details: { upstream_inference_cost: 0.00004 },
+        },
+      }),
+      200,
+      'openai/gpt-4o-mini-transcribe'
+    );
+
+    expect(result.cost_mUsd).toBe(40);
+    expect(result.is_byok).toBe(true);
+  });
+
+  it('stores duration as generation time', () => {
+    const result = parseTranscriptionUsageFromResponse(
+      makeResponse(),
+      200,
+      'openai/gpt-4o-mini-transcribe'
+    );
+
+    expect(result.generation_time).toBe(2.5);
+  });
+
+  it('falls back to requested model when response model is absent', () => {
+    const parsed = JSON.parse(makeResponse());
+    delete parsed.model;
+
+    const result = parseTranscriptionUsageFromResponse(
+      JSON.stringify(parsed),
+      200,
+      'openai/whisper-1'
+    );
+
+    expect(result.model).toBe('openai/whisper-1');
+  });
+
+  it('marks non-text responses as errors', () => {
+    const parsed = JSON.parse(makeResponse());
+    delete parsed.text;
+
+    const result = parseTranscriptionUsageFromResponse(
+      JSON.stringify(parsed),
+      200,
+      'openai/gpt-4o-mini-transcribe'
+    );
+
+    expect(result.hasError).toBe(true);
   });
 });
 

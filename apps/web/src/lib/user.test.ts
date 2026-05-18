@@ -7,6 +7,8 @@ import {
   user_affiliate_events,
   user_auth_provider,
   credit_transactions,
+  kilo_pass_store_events,
+  kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   kilo_pass_issuances,
   kilo_pass_issuance_items,
@@ -82,6 +84,7 @@ import {
   KiloPassCadence,
   KiloPassIssuanceItemKind,
   KiloPassIssuanceSource,
+  KiloPassPaymentProvider,
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
@@ -111,6 +114,8 @@ describe('User', () => {
     await db.delete(kiloclaw_referrals);
     await db.delete(deleted_user_email_tombstones);
     await db.delete(payment_methods);
+    await db.delete(kilo_pass_store_events);
+    await db.delete(kilo_pass_store_purchases);
     await db.delete(kilo_pass_issuance_items);
     await db.delete(kilo_pass_issuances);
     await db.delete(kilo_pass_subscriptions);
@@ -381,6 +386,158 @@ describe('User', () => {
       expect(softDeleted!.is_admin).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
+    });
+
+    it('should rotate and scrub App Store account-linked Kilo Pass data', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'app-store-delete@example.com',
+      });
+      const otherUser = await insertTestUser({
+        google_user_email: 'app-store-delete-other@example.com',
+      });
+      const originalAppStoreAccountToken = user.app_store_account_token;
+      const providerSubscriptionId = 'orig-soft-delete';
+      const providerTransactionId = 'tx-soft-delete';
+      const [subscription] = await db
+        .insert(kilo_pass_subscriptions)
+        .values({
+          kilo_user_id: user.id,
+          payment_provider: KiloPassPaymentProvider.AppStore,
+          provider_subscription_id: providerSubscriptionId,
+          stripe_subscription_id: null,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'canceled',
+          cancel_at_period_end: false,
+          started_at: '2026-01-01T00:00:00.000Z',
+          ended_at: '2026-02-01T00:00:00.000Z',
+        })
+        .returning({ id: kilo_pass_subscriptions.id });
+
+      if (!subscription) {
+        throw new Error('Failed to insert App Store subscription for soft delete test');
+      }
+
+      await db.insert(kilo_pass_store_purchases).values({
+        kilo_pass_subscription_id: subscription.id,
+        kilo_user_id: user.id,
+        payment_provider: KiloPassPaymentProvider.AppStore,
+        product_id: 'kilopass.tier19.monthly.v1',
+        provider_subscription_id: providerSubscriptionId,
+        provider_transaction_id: providerTransactionId,
+        provider_original_transaction_id: providerSubscriptionId,
+        app_account_token: originalAppStoreAccountToken,
+        purchase_token: 'signed-transaction-jws',
+        environment: 'Sandbox',
+        purchased_at: '2026-01-01T00:00:00.000Z',
+        expires_at: '2026-02-01T00:00:00.000Z',
+        raw_payload_json: {
+          appAccountToken: originalAppStoreAccountToken,
+          purchaseToken: 'signed-transaction-jws',
+          signedTransactionInfo: 'signed-transaction-info',
+          transactionId: providerTransactionId,
+          originalTransactionId: providerSubscriptionId,
+          nested: {
+            appAccountToken: originalAppStoreAccountToken,
+            providerTransactionId,
+          },
+        },
+      });
+
+      await db.insert(kilo_pass_store_events).values([
+        {
+          payment_provider: KiloPassPaymentProvider.AppStore,
+          event_id: 'event-soft-delete',
+          provider_subscription_id: providerSubscriptionId,
+          provider_transaction_id: providerTransactionId,
+          app_account_token: originalAppStoreAccountToken,
+          product_id: 'kilopass.tier19.monthly.v1',
+          environment: 'Sandbox',
+          payload_json: {
+            notificationType: 'DID_RENEW',
+            signedTransactionInfo: 'signed-transaction-info',
+            transaction: {
+              appAccountToken: originalAppStoreAccountToken,
+              providerSubscriptionId,
+              providerTransactionId,
+            },
+            rawTransaction: {
+              appAccountToken: originalAppStoreAccountToken,
+              transactionId: providerTransactionId,
+            },
+          },
+        },
+        {
+          payment_provider: KiloPassPaymentProvider.AppStore,
+          event_id: 'event-other-user',
+          provider_subscription_id: 'orig-other-user',
+          provider_transaction_id: 'tx-other-user',
+          app_account_token: otherUser.app_store_account_token,
+          product_id: 'kilopass.tier19.monthly.v1',
+          environment: 'Sandbox',
+          payload_json: {
+            transaction: {
+              appAccountToken: otherUser.app_store_account_token,
+              providerTransactionId: 'tx-other-user',
+            },
+          },
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const softDeleted = await findUserById(user.id);
+      expect(softDeleted?.app_store_account_token).toEqual(expect.any(String));
+      expect(softDeleted?.app_store_account_token).not.toBe(originalAppStoreAccountToken);
+
+      const [purchase] = await db
+        .select()
+        .from(kilo_pass_store_purchases)
+        .where(eq(kilo_pass_store_purchases.kilo_user_id, user.id));
+      expect(purchase?.app_account_token).toBeNull();
+      expect(purchase?.purchase_token).toBeNull();
+      expect(purchase?.provider_subscription_id).toBe(providerSubscriptionId);
+      expect(purchase?.provider_transaction_id).toBe(providerTransactionId);
+
+      const rawPurchasePayload = purchase?.raw_payload_json as Record<string, unknown>;
+      expect(rawPurchasePayload.appAccountToken).toBeNull();
+      expect(rawPurchasePayload.purchaseToken).toBeNull();
+      expect(rawPurchasePayload.signedTransactionInfo).toBeNull();
+      expect(rawPurchasePayload.transactionId).toBe(providerTransactionId);
+      expect((rawPurchasePayload.nested as Record<string, unknown>).appAccountToken).toBeNull();
+
+      const [event] = await db
+        .select()
+        .from(kilo_pass_store_events)
+        .where(eq(kilo_pass_store_events.event_id, 'event-soft-delete'));
+      expect(event?.app_account_token).toBeNull();
+      expect(event?.provider_subscription_id).toBe(providerSubscriptionId);
+      expect(event?.provider_transaction_id).toBe(providerTransactionId);
+
+      const eventPayload = event?.payload_json as Record<string, unknown>;
+      expect(eventPayload.signedTransactionInfo).toBeNull();
+      expect((eventPayload.transaction as Record<string, unknown>).appAccountToken).toBeNull();
+      expect((eventPayload.rawTransaction as Record<string, unknown>).appAccountToken).toBeNull();
+      expect((eventPayload.transaction as Record<string, unknown>).providerTransactionId).toBe(
+        providerTransactionId
+      );
+
+      const [otherEvent] = await db
+        .select()
+        .from(kilo_pass_store_events)
+        .where(eq(kilo_pass_store_events.event_id, 'event-other-user'));
+      if (!otherEvent) {
+        throw new Error('Expected other user store event');
+      }
+      expect(otherEvent?.app_account_token).toBe(otherUser.app_store_account_token);
+      expect(
+        (
+          (otherEvent.payload_json as Record<string, unknown>).transaction as Record<
+            string,
+            unknown
+          >
+        ).appAccountToken
+      ).toBe(otherUser.app_store_account_token);
     });
 
     it('should clear block attribution on other users', async () => {
@@ -1616,10 +1773,12 @@ describe('User', () => {
       });
 
       const subId = randomUUID();
+      const stripeSubscriptionId = `sub_test_${randomUUID()}`;
       await db.insert(kilo_pass_subscriptions).values({
         id: subId,
         kilo_user_id: user.id,
-        stripe_subscription_id: `sub_test_${randomUUID()}`,
+        provider_subscription_id: stripeSubscriptionId,
+        stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'canceled',
@@ -1678,9 +1837,11 @@ describe('User', () => {
 
     it('should throw SoftDeletePreconditionError for active subscription', async () => {
       const user = await insertTestUser();
+      const stripeSubscriptionId = `sub_test_${randomUUID()}`;
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: user.id,
-        stripe_subscription_id: `sub_test_${randomUUID()}`,
+        provider_subscription_id: stripeSubscriptionId,
+        stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'active',
@@ -1695,9 +1856,11 @@ describe('User', () => {
 
     it('should allow soft-delete when subscription is pending cancellation', async () => {
       const user = await insertTestUser();
+      const stripeSubscriptionId = `sub_test_${randomUUID()}`;
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: user.id,
-        stripe_subscription_id: `sub_test_${randomUUID()}`,
+        provider_subscription_id: stripeSubscriptionId,
+        stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'active',

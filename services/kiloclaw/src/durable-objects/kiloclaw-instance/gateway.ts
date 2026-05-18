@@ -16,6 +16,7 @@ import {
   MorningBriefingStatusResponseSchema,
   MorningBriefingActionResponseSchema,
   MorningBriefingInterestsResponseSchema,
+  MorningBriefingUserLocationResponseSchema,
   MorningBriefingReadResponseSchema,
   OpenclawWorkspaceImportResponseSchema,
   GatewayControllerError,
@@ -577,6 +578,27 @@ export async function updateMorningBriefingInterests(
       '/_kilo/morning-briefing/interests',
       'POST',
       MorningBriefingInterestsResponseSchema,
+      input,
+      { timeoutMs: 8_000 }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function updateMorningBriefingUserLocation(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  input: { userLocation: string | null }
+): Promise<z.infer<typeof MorningBriefingUserLocationResponseSchema> | null> {
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/morning-briefing/user-location',
+      'POST',
+      MorningBriefingUserLocationResponseSchema,
       input,
       { timeoutMs: 8_000 }
     );

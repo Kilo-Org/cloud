@@ -207,6 +207,7 @@ export function ReviewConfigForm({
   const [gateThreshold, setGateThreshold] = useState<'off' | 'all' | 'warning' | 'critical'>('off');
   const [repositorySelectionMode, setRepositorySelectionMode] = useState<'all' | 'selected'>('all');
   const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<number[]>([]);
+  const [useReviewMd, setUseReviewMd] = useState(true);
   // Repositories added from search results (for GitLab where pagination limits initial results)
   const [searchAddedRepos, setSearchAddedRepos] = useState<Repository[]>([]);
   // GitLab-specific: auto-configure webhooks
@@ -308,6 +309,7 @@ export function ReviewConfigForm({
       const repoMode = configData.repositorySelectionMode || 'all';
       setRepositorySelectionMode(isGitLab ? 'selected' : repoMode);
       setSelectedRepositoryIds(configData.selectedRepositoryIds || []);
+      setUseReviewMd(!(configData.disableReviewMd ?? false));
       // Load repositories that were added from search results
       if (configData.manuallyAddedRepositories) {
         setSearchAddedRepos(
@@ -458,6 +460,7 @@ export function ReviewConfigForm({
         repositorySelectionMode,
         selectedRepositoryIds,
         manuallyAddedRepositories,
+        disableReviewMd: !useReviewMd,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
       });
@@ -474,6 +477,7 @@ export function ReviewConfigForm({
         repositorySelectionMode,
         selectedRepositoryIds,
         manuallyAddedRepositories,
+        disableReviewMd: !useReviewMd,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
       });
@@ -617,6 +621,24 @@ export function ReviewConfigForm({
                   </div>
                 ))}
               </RadioGroup>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="use-review-md" className="text-base font-semibold">
+                  Use REVIEW.md
+                </Label>
+                <p className="text-muted-foreground text-sm">
+                  Load REVIEW.md from the base branch when present and use it for
+                  repository-specific review guidance.
+                </p>
+              </div>
+              <Switch
+                id="use-review-md"
+                checked={useReviewMd}
+                onCheckedChange={setUseReviewMd}
+                disabled={orgSaveMutation.isPending || personalSaveMutation.isPending || !isEnabled}
+              />
             </div>
 
             {/* Repository Selection */}

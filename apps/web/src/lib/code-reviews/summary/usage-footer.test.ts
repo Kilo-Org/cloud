@@ -1,4 +1,10 @@
-import { buildUsageFooter, appendUsageFooter } from './usage-footer';
+import {
+  appendReviewSummaryFooter,
+  appendUsageFooter,
+  buildReviewGuidanceFooter,
+  buildUsageFooter,
+  stripReviewSummaryFooter,
+} from './usage-footer';
 
 describe('buildUsageFooter', () => {
   it('strips provider prefix from model slug', () => {
@@ -17,57 +23,164 @@ describe('buildUsageFooter', () => {
     expect(footer).toContain('12,345 tokens');
   });
 
-  it('includes horizontal rule and marker comment', () => {
+  it('includes usage marker comment', () => {
     const footer = buildUsageFooter('model', 1, 2);
-    expect(footer).toContain('---');
     expect(footer).toContain('<!-- kilo-usage -->');
   });
 });
 
-describe('appendUsageFooter', () => {
-  it('appends footer to body with no existing footer', () => {
+describe('buildReviewGuidanceFooter', () => {
+  it('renders guidance when REVIEW.md was used', () => {
+    const footer = buildReviewGuidanceFooter({ used: true, ref: 'main', truncated: false });
+
+    expect(footer).toContain('<!-- kilo-review-guidance -->');
+    expect(footer).toContain('Review guidance: REVIEW.md from base branch `main`');
+  });
+
+  it('includes truncated marker when applicable', () => {
+    const footer = buildReviewGuidanceFooter({ used: true, ref: 'main', truncated: true });
+
+    expect(footer).toContain('`main` (truncated)');
+  });
+
+  it('escapes unusual base refs safely', () => {
+    const footer = buildReviewGuidanceFooter({
+      used: true,
+      ref: 'feat/`tick`-<tag>&',
+      truncated: false,
+    });
+
+    expect(footer).toContain('&lt;tag&gt;&amp;');
+    expect(footer).not.toContain('<tag>');
+    expect(footer).toContain('`` feat/`tick`-&lt;tag&gt;&amp; ``');
+  });
+});
+
+describe('appendReviewSummaryFooter', () => {
+  it('appends usage and guidance in one footer block', () => {
     const body = '## Code Review Summary\n\nLooks good!';
-    const result = appendUsageFooter(body, 'anthropic/claude-sonnet-4.6', 5000, 1000);
+    const result = appendReviewSummaryFooter(body, {
+      usage: { model: 'anthropic/claude-sonnet-4.6', tokensIn: 5000, tokensOut: 1000 },
+      reviewGuidance: { used: true, ref: 'main', truncated: false },
+    });
+
     expect(result).toMatch(/^## Code Review Summary\n\nLooks good!\n\n---\n<!-- kilo-usage -->/);
     expect(result).toContain('6,000 tokens');
+    expect(result).toContain('<!-- kilo-review-guidance -->');
+    expect(result).toContain('Review guidance: REVIEW.md from base branch `main`');
+    expect(result.match(/^---$/gm)?.length).toBe(1);
   });
 
-  it('replaces existing footer (exact pattern match)', () => {
-    const body =
-      '## Summary\n\nContent\n\n---\n<!-- kilo-usage -->\n<sub>Reviewed by old-model · 100 tokens</sub>';
-    const result = appendUsageFooter(body, 'new/new-model', 2000, 500);
+  it('replaces old footer content with exactly one usage marker and one guidance marker', () => {
+    const body = [
+      '## Summary',
+      '',
+      'Content',
+      '',
+      '---',
+      '<!-- kilo-usage -->',
+      '<sub>Reviewed by old-model · 100 tokens</sub>',
+      '<!-- kilo-review-guidance -->',
+      '<sub>Review guidance: REVIEW.md from base branch `develop`</sub>',
+    ].join('\n');
+    const result = appendReviewSummaryFooter(body, {
+      usage: { model: 'new/new-model', tokensIn: 2000, tokensOut: 500 },
+      reviewGuidance: { used: true, ref: 'main', truncated: true },
+    });
+
     expect(result).toContain('new-model');
     expect(result).toContain('2,500 tokens');
+    expect(result).toContain('`main` (truncated)');
     expect(result).not.toContain('old-model');
-    // Should only have one marker
+    expect(result).not.toContain('develop');
     expect(result.match(/<!-- kilo-usage -->/g)?.length).toBe(1);
+    expect(result.match(/<!-- kilo-review-guidance -->/g)?.length).toBe(1);
+    expect(result.match(/^---$/gm)?.length).toBe(1);
   });
 
-  it('replaces footer with different leading whitespace', () => {
-    // Simulate a case where the marker exists but with extra newlines before ---
-    const body = '## Summary\n\nContent\n\n\n---\n\n<!-- kilo-usage -->\n<sub>old footer</sub>';
-    const result = appendUsageFooter(body, 'x/model', 100, 50);
-    expect(result).toContain('model');
-    expect(result).toContain('150 tokens');
-    expect(result).not.toContain('old footer');
-    expect(result.match(/<!-- kilo-usage -->/g)?.length).toBe(1);
-  });
+  it('does not append guidance when metadata says unused', () => {
+    const result = appendReviewSummaryFooter('body', {
+      reviewGuidance: { used: false, ref: 'main', truncated: false },
+    });
 
-  it('handles empty body', () => {
-    const result = appendUsageFooter('', 'provider/model', 10, 5);
-    expect(result).toContain('<!-- kilo-usage -->');
-    expect(result).toContain('15 tokens');
+    expect(result).toBe('body');
+    expect(result).not.toContain('<!-- kilo-review-guidance -->');
   });
 
   it('preserves unrelated horizontal rules in the body', () => {
     const body = '## Summary\n\n---\n\nSome section\n\nMore content';
-    const result = appendUsageFooter(body, 'x/m', 1, 1);
-    // The original --- should still be present
+    const result = appendReviewSummaryFooter(body, {
+      usage: { model: 'x/m', tokensIn: 1, tokensOut: 1 },
+    });
+
     expect(result).toContain('## Summary\n\n---\n\nSome section\n\nMore content');
+    expect(result.match(/^---$/gm)?.length).toBe(2);
   });
 
-  it('handles model slug with multiple slashes', () => {
+  it('does not truncate the body when a marker appears outside the backend footer block', () => {
+    const body = [
+      '## Summary',
+      '',
+      'Agent mentioned <!-- kilo-usage --> as text.',
+      '',
+      'More body content that must stay.',
+    ].join('\n');
+    const result = appendReviewSummaryFooter(body, {
+      reviewGuidance: { used: true, ref: 'main', truncated: false },
+    });
+
+    expect(result).toContain('Agent mentioned <!-- kilo-usage --> as text.');
+    expect(result).toContain('More body content that must stay.');
+    expect(result.match(/<!-- kilo-usage -->/g)?.length).toBe(1);
+    expect(result.match(/<!-- kilo-review-guidance -->/g)?.length).toBe(1);
+  });
+
+  it('replaces footer when only guidance existed previously', () => {
+    const body = [
+      'body',
+      '',
+      '---',
+      '<!-- kilo-review-guidance -->',
+      '<sub>Review guidance: REVIEW.md from base branch `old`</sub>',
+    ].join('\n');
+    const result = appendReviewSummaryFooter(body, {
+      reviewGuidance: { used: true, ref: 'new', truncated: false },
+    });
+
+    expect(result).toContain('`new`');
+    expect(result).not.toContain('`old`');
+    expect(result.match(/<!-- kilo-review-guidance -->/g)?.length).toBe(1);
+  });
+});
+
+describe('appendUsageFooter', () => {
+  it('keeps backward-compatible usage-only footer behavior', () => {
     const result = appendUsageFooter('body', 'provider/org/model-name', 100, 200);
+
     expect(result).toContain('org/model-name');
+    expect(result).toContain('300 tokens');
+    expect(result).toContain('<!-- kilo-usage -->');
+  });
+});
+
+describe('stripReviewSummaryFooter', () => {
+  it('removes backend usage and guidance footer', () => {
+    const body = [
+      'summary body',
+      '',
+      '---',
+      '<!-- kilo-usage -->',
+      '<sub>Reviewed by model · 100 tokens</sub>',
+      '<!-- kilo-review-guidance -->',
+      '<sub>Review guidance: REVIEW.md from base branch `main`</sub>',
+    ].join('\n');
+
+    expect(stripReviewSummaryFooter(body)).toBe('summary body');
+  });
+
+  it('does not remove marker text without a backend footer block', () => {
+    const body = 'summary body\n\n<!-- kilo-review-guidance --> appears in text';
+
+    expect(stripReviewSummaryFooter(body)).toBe(body);
   });
 });

@@ -27,8 +27,8 @@
     "typecheck": "tsgo --noEmit && pnpm -C wrapper run typecheck"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.9.2",
-    "@hono/trpc-server": "^0.4.2",
+    "@cloudflare/sandbox": "0.9.4",
+    "@hono/trpc-server": "0.4.2",
     "@kilocode/cloud-agent-profile": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
@@ -37,20 +37,20 @@
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "jsonwebtoken": "catalog:",
-    "ulid": "3.0.1",
+    "ulid": "catalog:",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/containers": "0.3.3",
-    "@cloudflare/vitest-pool-workers": "^0.12.21",
+    "@cloudflare/containers": "0.3.4",
+    "@cloudflare/vitest-pool-workers": "catalog:",
     "@types/jsonwebtoken": "catalog:",
-    "@types/node": ">=24 <25",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "@vitest/ui": "^3.2.4",
+    "@vitest/ui": "catalog:",
     "drizzle-kit": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^3.2.4",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

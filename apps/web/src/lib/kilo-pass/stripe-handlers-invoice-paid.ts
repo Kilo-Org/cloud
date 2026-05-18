@@ -2,7 +2,6 @@ import 'server-only';
 
 import {
   credit_transactions,
-  kilo_pass_issuances,
   kilo_pass_scheduled_changes,
   kilo_pass_subscriptions,
   kilocode_users,
@@ -10,7 +9,7 @@ import {
 
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
-import { and, desc, eq, isNull, lte, sql } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
@@ -29,10 +28,8 @@ import { invoiceLooksLikeKiloPassByPriceId } from '@/lib/kilo-pass/stripe-invoic
 import {
   getInvoiceIssueMonth,
   getInvoiceSubscription,
-  getPreviousIssueMonth,
   getStripeEndedAtIso,
 } from '@/lib/kilo-pass/stripe-handlers-utils';
-import { toMicrodollars } from '@/lib/utils';
 import type Stripe from 'stripe';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import {
@@ -40,12 +37,16 @@ import {
   KiloPassAuditLogResult,
   KiloPassCadence,
   KiloPassIssuanceSource,
+  KiloPassPaymentProvider,
 } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { processTopUp } from '@/lib/credits';
 import { randomUUID } from 'node:crypto';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
-import { getPausedMonthSet } from '@/lib/kilo-pass/pause-events';
+import {
+  computeMonthlyKiloPassStreak,
+  updateKiloPassThresholdAfterBaseCredits,
+} from '@/lib/kilo-pass/subscription-accounting';
 
 async function maybeIssueYearlyRemainingCredits(params: {
   tx: DrizzleTransaction;
@@ -303,6 +304,8 @@ export async function handleKiloPassInvoicePaid(params: {
         .insert(kilo_pass_subscriptions)
         .values({
           kilo_user_id: kiloUserId,
+          payment_provider: KiloPassPaymentProvider.Stripe,
+          provider_subscription_id: subscription.id,
           stripe_subscription_id: subscription.id,
           tier,
           cadence,
@@ -314,6 +317,8 @@ export async function handleKiloPassInvoicePaid(params: {
           target: kilo_pass_subscriptions.stripe_subscription_id,
           set: {
             kilo_user_id: kiloUserId,
+            payment_provider: KiloPassPaymentProvider.Stripe,
+            provider_subscription_id: subscription.id,
             tier,
             cadence,
             status: subscription.status,
@@ -382,13 +387,10 @@ export async function handleKiloPassInvoicePaid(params: {
       didMutateBalance ||= baseCreditsResult.wasIssued;
 
       if (baseCreditsResult.wasIssued) {
-        await tx
-          .update(kilocode_users)
-          .set({
-            // Bonus credits are issued later (on usage), after the user has consumed one month of base credits.
-            kilo_pass_threshold: sql`${kilocode_users.microdollars_used} + ${toMicrodollars(tierConfig.monthlyPriceUsd)}`,
-          })
-          .where(eq(kilocode_users.id, kiloUserId));
+        await updateKiloPassThresholdAfterBaseCredits(tx, {
+          kiloUserId,
+          baseAmountUsd: tierConfig.monthlyPriceUsd,
+        });
       }
 
       if (cadence === KiloPassCadence.Yearly) {
@@ -422,43 +424,10 @@ export async function handleKiloPassInvoicePaid(params: {
 
       const wasInactivePreviously = priorStatus !== null && isStripeSubscriptionEnded(priorStatus);
 
-      const issuanceMonths = await tx
-        .select({ issueMonth: kilo_pass_issuances.issue_month })
-        .from(kilo_pass_issuances)
-        .where(
-          and(
-            eq(kilo_pass_issuances.kilo_pass_subscription_id, kiloPassSubscriptionId),
-            lte(kilo_pass_issuances.issue_month, issueMonth)
-          )
-        )
-        .orderBy(desc(kilo_pass_issuances.issue_month))
-        // Must match maxIterations in the streak walk below so the set covers the full window
-        .limit(36);
-
-      const issueMonthSet = new Set(issuanceMonths.map(x => x.issueMonth));
-
-      const pausedMonthSet = await getPausedMonthSet(tx, {
-        kiloPassSubscriptionId,
-        fromIssueMonth: issueMonth,
-        maxMonthsBack: 36,
+      const computedStreak = await computeMonthlyKiloPassStreak(tx, {
+        subscriptionId: kiloPassSubscriptionId,
+        issueMonth,
       });
-
-      let computedStreak = 0;
-      let cursor = issueMonth;
-      const maxIterations = 36;
-      let iterations = 0;
-      while (iterations < maxIterations) {
-        if (issueMonthSet.has(cursor)) {
-          computedStreak += 1;
-          cursor = getPreviousIssueMonth(cursor);
-        } else if (pausedMonthSet.has(cursor)) {
-          cursor = getPreviousIssueMonth(cursor);
-        } else {
-          break;
-        }
-        iterations += 1;
-      }
-
       const newStreakMonths = wasInactivePreviously ? 1 : Math.max(1, computedStreak);
 
       await tx

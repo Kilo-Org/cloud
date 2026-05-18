@@ -318,6 +318,7 @@ export const listMessagesQuerySchema = z.object({
 export const botStatusRequestSchema = z.object({
   online: z.boolean(),
   at: nonNegativeIntegerSchema,
+  capabilities: z.array(capabilitySchema).optional(),
 });
 
 export const conversationStatusRequestSchema = z.object({
@@ -332,6 +333,7 @@ export const botStatusRecordSchema = z.object({
   online: z.boolean(),
   at: nonNegativeIntegerSchema,
   updatedAt: nonNegativeIntegerSchema,
+  capabilities: z.array(capabilitySchema).optional(),
 });
 
 export const conversationStatusRecordSchema = z.object({

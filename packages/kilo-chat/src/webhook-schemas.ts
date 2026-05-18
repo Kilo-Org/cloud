@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { execApprovalDecisionSchema } from './schemas';
+import { execApprovalDecisionSchema, ulidSchema } from './schemas';
 
 // ── Inbound webhook payloads (kilo-chat → kiloclaw plugin) ──────────
 
@@ -9,11 +9,22 @@ export const messageCreatedWebhookSchema = z.object({
   conversationId: z.string().min(1),
   messageId: z.string().min(1),
   from: z.string().min(1),
-  text: z.string().min(1),
+  text: z.string(),
   sentAt: z.string().datetime(),
   inReplyToMessageId: z.string().min(1).optional(),
   inReplyToBody: z.string().min(1).optional(),
   inReplyToSender: z.string().min(1).optional(),
+  attachments: z
+    .array(
+      z.object({
+        attachmentId: ulidSchema,
+        mimeType: z.string().min(1).max(255),
+        size: z.number().int().nonnegative(),
+        filename: z.string().max(512),
+      })
+    )
+    .max(10)
+    .optional(),
 });
 
 export const actionExecutedWebhookSchema = z.object({

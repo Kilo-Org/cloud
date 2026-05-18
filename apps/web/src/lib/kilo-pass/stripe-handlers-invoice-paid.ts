@@ -45,7 +45,10 @@ import {
   KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
-import { checkDuplicateCardFingerprintGate } from '@/lib/kilo-pass/card-fingerprint-gate';
+import {
+  checkDuplicateCardFingerprintGate,
+  maybeSendDuplicateCardCanceledEmail,
+} from '@/lib/kilo-pass/card-fingerprint-gate';
 import { processTopUp } from '@/lib/credits';
 import { randomUUID } from 'node:crypto';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
@@ -359,6 +362,7 @@ export async function handleKiloPassInvoicePaid(params: {
   const affiliateSaleState: { context: KiloPassAffiliateSaleContext | null } = {
     context: null,
   };
+  let blockedGateResult: { kiloUserId: string; stripeInvoiceId: string } | null = null;
 
   // Track context for failure audit logging
   let kiloUserIdForAudit: string | null = null;
@@ -510,6 +514,7 @@ export async function handleKiloPassInvoicePaid(params: {
           .set({ status: 'canceled', ended_at: dayjs().utc().toISOString() })
           .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
 
+        blockedGateResult = { kiloUserId, stripeInvoiceId: gateResult.stripeInvoiceId };
         kiloUserIdForCache = null;
         return;
       }
@@ -648,6 +653,13 @@ export async function handleKiloPassInvoicePaid(params: {
     stripe,
     context: affiliateSaleState.context,
   });
+
+  if (blockedGateResult) {
+    await maybeSendDuplicateCardCanceledEmail({
+      kiloUserId: blockedGateResult.kiloUserId,
+      stripeInvoiceId: blockedGateResult.stripeInvoiceId,
+    });
+  }
 
   if (didMutateBalance && kiloUserIdForCache !== null) {
     await forceImmediateExpirationRecomputation(kiloUserIdForCache);

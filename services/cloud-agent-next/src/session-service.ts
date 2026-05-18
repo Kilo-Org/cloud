@@ -863,6 +863,7 @@ export class SessionService {
       skill: 'allow',
       todowrite: 'allow',
       todoread: 'allow',
+      suggest: 'deny',
     };
 
     if (commandGuardPolicy) {

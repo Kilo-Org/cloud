@@ -188,8 +188,8 @@ describe('SessionService', () => {
           KILO_PLATFORM: 'cloud-agent',
           KILO_DISABLE_AUTOUPDATE: 'true',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
@@ -345,8 +345,8 @@ describe('SessionService', () => {
           KILO_PLATFORM: 'cloud-agent',
           KILO_DISABLE_AUTOUPDATE: 'true',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
@@ -1391,8 +1391,8 @@ describe('SessionService', () => {
           KILO_PLATFORM: 'cloud-agent',
           KILO_DISABLE_AUTOUPDATE: 'true',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
           API_KEY: 'test-key-123',
           DATABASE_URL: 'postgres://localhost:5432/test',
           NODE_ENV: 'development',
@@ -1497,8 +1497,8 @@ describe('SessionService', () => {
           KILO_PLATFORM: 'cloud-agent',
           KILO_DISABLE_AUTOUPDATE: 'true',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow","/home/${sessionId}/.kilocode/skills/**":"allow"},"question":"deny","read":"allow","edit":"allow","glob":"allow","grep":"allow","list":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow","codesearch":"allow","lsp":"allow","skill":"allow","todowrite":"allow","todoread":"allow","suggest":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"autoupdate":false,"model":"kilo/test-model"}`,
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
@@ -1526,7 +1526,11 @@ describe('SessionService', () => {
     const getConfigContent = (sandboxCreateSession: ReturnType<typeof vi.fn>) => {
       const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
       return JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
-        permission: { question?: string; external_directory?: Record<string, string> };
+        permission: {
+          question?: string;
+          suggest?: string;
+          external_directory?: Record<string, string>;
+        };
       };
     };
 
@@ -1592,6 +1596,42 @@ describe('SessionService', () => {
 
       const config = getConfigContent(sandboxCreateSession);
       expect(config.permission.question).toBe('deny');
+    });
+
+    it.each([
+      'cloud-agent-web',
+      'cloud-agent',
+      'app-builder',
+      'slack',
+      'security-agent',
+      'webhook',
+      'code-review',
+      'auto-triage',
+      'autofix',
+    ])('should deny suggest tool for platform %s', async createdOnPlatform => {
+      const { sandbox, sandboxCreateSession } = setupForPlatformTest();
+      const sessionId: SessionId = 'agent_suggest_permission_test';
+      mockedSetupWorkspace.mockResolvedValue({
+        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
+        sessionHome: `/home/${sessionId}`,
+      });
+
+      const service = new SessionService();
+      await service.initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        githubRepo: 'acme/repo',
+        env: mockEnv,
+        createdOnPlatform,
+      });
+
+      const config = getConfigContent(sandboxCreateSession);
+      expect(config.permission.suggest).toBe('deny');
     });
 
     it('should include read-only command guard policy for code-review sessions', async () => {

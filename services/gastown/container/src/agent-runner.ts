@@ -187,9 +187,9 @@ GASTOWN_TOWN_ID="${env.GASTOWN_TOWN_ID}"`);
   }
 
   // Set KILO_PLATFORM so session-ingest writes created_on_platform =
-  // 'agent-manager'. The /cloud/sessions page already has an "Agent
-  // Manager" filter that matches this value.
-  env.KILO_PLATFORM = 'agent-manager';
+  // 'gastown'. The /cloud/sessions page has a "Gastown" filter that
+  // matches this value.
+  env.KILO_PLATFORM = 'gastown';
 
   // Set KILO_ORG_ID so session-ingest populates organization_id for
   // org-scoped filtering. Falls back to the auth file's accountId

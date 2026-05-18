@@ -1,7 +1,9 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import {
   actionDeliveryFailedRequestSchema,
   addReactionResponseSchema,
+  attachmentInitRequestSchema,
+  attachmentInitResponseSchema,
   botGetMembersResponseSchema,
   botListConversationsResponseSchema,
   botListMessagesResponseSchema,
@@ -25,6 +27,17 @@ import {
   type enrichedConversationMemberSchema,
   type messageSchema,
 } from './synced/schemas.js';
+
+// Response shape for GET /_kilo/kilo-chat/attachments/:id/url. The controller
+// proxies kilo-chat's bot endpoint verbatim; this is the contract returned by
+// the kilo-chat backend (see services/kilo-chat handleAttachmentGetUrl).
+export const attachmentGetUrlResponseSchema = z.object({
+  url: z.string().min(1),
+  mimeType: z.string().min(1),
+  size: z.number().int().nonnegative(),
+  filename: z.string(),
+  expiresAt: z.number().int().nonnegative(),
+});
 
 export type ContentBlock = z.infer<typeof contentBlockSchema>;
 export type Message = z.infer<typeof messageSchema>;
@@ -92,6 +105,12 @@ export type ReportActionDeliveryFailedParams = {
   groupId: string;
 } & z.input<typeof actionDeliveryFailedRequestSchema>;
 
+export type InitAttachmentParams = z.input<typeof attachmentInitRequestSchema>;
+export type InitAttachmentResult = z.infer<typeof attachmentInitResponseSchema>;
+
+export type GetAttachmentUrlParams = { conversationId: string; attachmentId: string };
+export type GetAttachmentUrlResult = z.infer<typeof attachmentGetUrlResponseSchema>;
+
 export type KiloChatClient = {
   createMessage(p: CreateMessageParams): Promise<CreateMessageResult>;
   editMessage(p: EditMessageParams): Promise<EditMessageResult>;
@@ -121,6 +140,17 @@ export type KiloChatClient = {
    * Best-effort "action delivery failed" report. Never throws; errors are logged.
    */
   reportActionDeliveryFailed(p: ReportActionDeliveryFailedParams): Promise<void>;
+  /**
+   * Reserves an attachment id and returns a presigned R2 PUT URL the bot uses
+   * to upload bytes directly. The conversation is locked to the caller bot;
+   * the attachment is unlinked until the next createMessage references it.
+   */
+  initAttachment(p: InitAttachmentParams): Promise<InitAttachmentResult>;
+  /**
+   * Returns a short-lived presigned R2 GET URL for downloading an attachment's
+   * bytes. Caller must be a member of the conversation that owns the attachment.
+   */
+  getAttachmentUrl(p: GetAttachmentUrlParams): Promise<GetAttachmentUrlResult>;
 };
 
 function authHeaders(token: string): HeadersInit {
@@ -512,6 +542,43 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     }
   }
 
+  async function initAttachment(params: InitAttachmentParams): Promise<InitAttachmentResult> {
+    const body = {
+      conversationId: params.conversationId,
+      mimeType: params.mimeType,
+      size: params.size,
+      filename: params.filename,
+    } satisfies z.input<typeof attachmentInitRequestSchema>;
+
+    const response = await fetchImpl(`${base}/_kilo/kilo-chat/attachments/init`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `kilo-chat: controller POST attachments/init responded ${response.status}: ${await response.text()}`
+      );
+    }
+    return parseOrThrow(attachmentInitResponseSchema, await response.json(), 'initAttachment', {
+      attachmentId: 'attachmentId',
+      putUrl: 'putUrl',
+      putHeaders: 'putHeaders',
+    });
+  }
+
+  async function getAttachmentUrl(params: GetAttachmentUrlParams): Promise<GetAttachmentUrlResult> {
+    const qs = new URLSearchParams({ conversationId: params.conversationId });
+    const url = `${base}/_kilo/kilo-chat/attachments/${encodeURIComponent(params.attachmentId)}/url?${qs}`;
+    const response = await fetchImpl(url, { method: 'GET', headers });
+    if (!response.ok) {
+      throw new Error(
+        `kilo-chat: controller GET attachments/:id/url responded ${response.status}: ${await response.text()}`
+      );
+    }
+    return attachmentGetUrlResponseSchema.parse(await response.json());
+  }
+
   return {
     createMessage,
     editMessage,
@@ -529,5 +596,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     sendConversationStatus,
     reportMessageDeliveryFailed,
     reportActionDeliveryFailed,
+    initAttachment,
+    getAttachmentUrl,
   };
 }

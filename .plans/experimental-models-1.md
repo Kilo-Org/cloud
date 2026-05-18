@@ -120,7 +120,17 @@ model_experiment_request
   allocation_subject              text not null -- user | machine | ip
   client_request_id               text nullable
   created_at                      timestamp not null
+
+model_experiment_request_prompt
+  usage_id                        uuid pk fk → microdollar_usage(id) on delete cascade
+  system_prompt_sha256            text nullable  -- R2 object key in experiment-prompts bucket; null if request had no system message
+  request_body_sha256             text nullable  -- R2 object key for the canonical post-transformRequest body excluding messages[0] when system
+  was_truncated                   boolean not null default false
+  created_at                      timestamp not null
 ```
+
+IKEB NEM RAK
+
 
 The `upstream` JSONB blob is validated by `ExperimentUpstreamSchema` (a strict subset of `CustomLlmDefinitionSchema` — see `packages/db/src/schema-types.ts:779-798`):
 
@@ -184,9 +194,68 @@ Indexes for `model_experiment_request`:
 
 Experiment- and variant-level reports go through join: `request → variant_version → variant → experiment`. The served upstream config is read from `model_experiment_variant_version.upstream` JSONB; reports surface `upstream->>'internal_id'` and (where useful) `upstream->>'base_url'`. **Never select `upstream->>'api_key'` in any reporting view, admin query, or response payload.** If query plans show the join hop is hot, add a covering index or denormalize `variant_id` and/or `experiment_id` onto the request row later — defer until measured.
 
-`model_experiment_request.created_at` is copied from the corresponding `microdollar_usage.created_at` value during the same CTE insert, not generated independently. This keeps time-window joins exact and avoids timestamp drift between usage and experiment attribution rows.
+`model_experiment_request.created_at` and `model_experiment_request_prompt.created_at` are both pre-generated in app code at the start of the after-hook (see Phase 4) along with `usage_id`, then copied into all three tables by the writers. This keeps time-window joins exact and avoids the previous "same-CTE" coupling between `processUsage.ts` and the experiment write.
+
+`model_experiment_request_prompt` stores **only hashes**, never prompt content. The bodies live in R2 (see Prompt Storage below), keyed by sha256. Storing only hashes keeps the Postgres row tiny (~80 bytes), keeps PG TOAST out of the picture entirely, and lets the experiment data wipe cleanly without coordinating with the primary datastore.
 
 No backfill is required because pre-experiment traffic has no side-table row.
+
+### Prompt Storage (R2)
+
+Full request prompts (system message + canonical post-`transformRequest` body) are stored in a dedicated R2 bucket using the **content-addressed** pattern from the kilo-cloud reference design: each unique blob is written once under its sha256 hex digest as the object key, and Postgres event rows reference only the hash. This piggybacks on the existing R2 setup in `apps/web` (`apps/web/src/lib/r2/client.ts` already configures the singleton `S3Client` against R2 via `@aws-sdk/client-s3`).
+
+**Bucket layout: one bucket per environment.**
+- New env var: `R2_EXPERIMENT_PROMPTS_BUCKET_NAME`.
+- Dev value: `kilo-experiment-prompts-dev`.
+- Prod value: `kilo-experiment-prompts-prod`.
+- The two buckets are fully isolated — no cross-env keys, no cross-env reads. Set up the same way `R2_CLI_SESSIONS_BUCKET_NAME` and `CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME` are configured today.
+- New helper module: `apps/web/src/lib/r2/experiment-prompts.ts`. Exports `putPromptIfAbsent(content: string): Promise<string>` (returns the sha256 used as the object key; uses `HeadObjectCommand` to check existence, then `PutObjectCommand` to upload — same pattern as `copyBlobs` in `apps/web/src/lib/r2/cli-sessions.ts:156`) and `getPromptByHash(sha: string): Promise<string | null>` (read via `GetObjectCommand` + `transformToString()`).
+
+**What is stored in R2:**
+- One object per unique system message (`messages[0]` when its role is `system`). Object key = sha256 hex of the raw content. Same content from a thousand requests = one R2 object. This is where dedup pays off massively (system prompts are byte-stable across requests within a client version, often 50–200 KB).
+- One object per request_body remainder: the canonical post-`transformRequest` body with the system message removed (i.e. `{ ...body, messages: body.messages.filter(m => m.role !== 'system') }` when there is exactly one system message; otherwise the full `messages` array is retained as-is). Object key = sha256 hex. Dedup is incidental for this blob (each request's tail is mostly unique), but storing it in R2 alongside the system blob keeps the storage backend uniform and avoids PG TOAST entirely.
+
+**What is stored in Postgres (`model_experiment_request_prompt`):**
+- `usage_id`, `system_prompt_sha256`, `request_body_sha256`, `was_truncated`, `created_at`.
+- Either hash column may be null (e.g. a request with no system message yields `system_prompt_sha256 = null`).
+- Row is ~80 bytes; the table never holds prompt content.
+
+**Size caps and truncation.**
+- `system` content cap: 4 MB. Beyond this the content is truncated to a deterministic prefix before hashing; `was_truncated = true`.
+- Non-system body cap: 4 MB serialized JSON. Beyond this the longest individual message is tail-truncated until the total fits, then re-serialized and hashed; `was_truncated = true`.
+- 4 MB on each side comfortably exceeds the bytes needed by any current frontier model with a 1M-token context window (~3–6 MB total request size in pathological cases).
+- Caps live as constants in `apps/web/src/lib/ai-gateway/experiments/persist.ts` so they are easy to bump.
+- Sentry breadcrumb (no payload) when truncation fires, so we know if it ever happens at non-trivial rates.
+
+**Write path** (runs inside the same `after()` hook as `accountForMicrodollarUsage`, after the microdollar write):
+1. Take the canonical post-`transformRequest` body (deep-cloned via `structuredClone` immediately after `transformRequest` runs, before any further mutation; passed through `MicrodollarUsageContext` to the after-hook).
+2. Split out the single leading `system` message if present.
+3. Apply size caps (truncate; flag `was_truncated`).
+4. For each non-null half: compute sha256, call `putPromptIfAbsent(content)` which `HEAD`s and only `PUT`s on miss.
+5. Insert one row in `model_experiment_request_prompt` with the resulting hashes.
+- The R2 puts run in parallel via `Promise.all`. If a put fails, log to Sentry and skip the prompt write (the `model_experiment_request` attribution row still exists; the prompt-side row is best-effort analytics).
+
+**Read path** (out-of-band, never on the request hot path):
+- New tRPC procedure `admin.modelExperiments.getPromptByHash(sha: string): Promise<{ content: string } | null>` that reads via `getPromptByHash`. Admin-gated, same gate as the rest of the experiment admin surface.
+- For partner export / partner replay (Part 2), the same `getPromptByHash` is used to materialize blobs into the export bundle.
+- Page-level dedup at read time: collect distinct hashes per result page, batch-fetch, join in memory. Same pattern as the reference design.
+
+**GDPR and consent.**
+- The user explicitly opts in to participate in any given experiment, and that opt-in includes consent to retain prompts for the duration of the experiment plus any agreed retention window. Prompts collected under experiment opt-in are therefore **not** subject to the GDPR soft-delete flow that governs `microdollar_usage_metadata`.
+- Concretely: `softDeleteUser` does **not** delete `model_experiment_request_prompt` rows, does **not** delete the referencing R2 objects, and does **not** delete `model_experiment_request` rows. The `on delete cascade` on `usage_id` only fires if the underlying `microdollar_usage` row is hard-deleted (which `softDeleteUser` does not do today).
+- The spec documents this explicitly as the policy. A test in `apps/web/src/lib/user.test.ts` locks the policy in code: after `softDeleteUser` runs, an experiment-attributed user's `model_experiment_request` and `model_experiment_request_prompt` rows are still present.
+- **Prerequisite (out of scope for Part 1):** the experiment opt-in flow must record a timestamped, per-user, per-experiment consent record (UX + ToS work). v1 must not run a real partner experiment until that consent capture exists. Tracked as a separate v1-prerequisite task; this plan adds a one-line note in the spec under "Prerequisites."
+
+**Wipe semantics.**
+- `TRUNCATE model_experiment_request_prompt` is independent of `microdollar_usage` and safe to run.
+- After wiping rows, R2 objects are orphaned. Run a periodic GC sweep (cron / one-off) that lists the bucket and deletes any object whose key does not appear in `SELECT system_prompt_sha256 FROM model_experiment_request_prompt UNION SELECT request_body_sha256 FROM model_experiment_request_prompt`.
+- Deleting an entire experiment's prompts: `DELETE FROM model_experiment_request_prompt USING model_experiment_request mer WHERE mep.usage_id = mer.usage_id AND mer.variant_version_id IN (...experiment's versions...)`, then run the GC sweep.
+
+**Why R2 (not KV, not Vercel Blob, not Postgres).**
+- **R2** is already used elsewhere in `apps/web` (cli-sessions, cloud-agent-attachments). Same `S3Client`, same credential type, same env-var pattern.
+- **R2 storage cost** ($0.015/GB-mo) is ~33× cheaper than Cloudflare KV ($0.50/GB-mo) at this access pattern (write-once, read rarely, no edge-distribution benefit). KV is optimized for hot, small, globally-replicated config data — the wrong shape for bulk prompt blobs.
+- **Vercel Blob** is ~3× more expensive than R2 at this workload and adds another vendor surface.
+- **Postgres** would also work and is functionally free at v1 scale, but offloading multi-MB blobs to R2 keeps the primary DB lean (no TOAST traffic on hot paths) and gives a clean independent retention/wipe knob from the start. The "swap to R2 later" migration is avoided.
 
 ### Phase 2 — Gateway Header Capture
 
@@ -233,6 +302,9 @@ Integration in `getProvider` (`apps/web/src/lib/ai-gateway/providers/index.ts`):
       // record selection on usageContext for later persistence
       usageContext.modelExperimentVariantVersionId = selection.variantVersionId
       usageContext.modelExperimentAllocationSubject = selection.allocationSubject
+      // capture canonical post-transformRequest body for prompt storage; structuredClone defended against
+      // later in-place mutation in the request pipeline. Stored on the context so the after-hook can persist.
+      usageContext.experimentRequestBody = structuredClone(body)
       return { provider: buildDirectProvider(selection.upstream), userByok: null, bypassAccessCheck: true }
     }
     // selection === null is unreachable for an experimented id under v1 (control fallback always returns active)
@@ -253,8 +325,13 @@ Routing scope:
 
 Persist experiment attribution everywhere request-level metrics are consumed:
 
-- `MicrodollarUsageContext`: add `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, and `clientRequestId`. The picker also returns `variantId` and `experimentId` for in-memory use (debug logs only), but only `variantVersionId` and `allocationSubject` are persisted to `model_experiment_request`. The `upstream` blob is consumed by `buildDirectProvider` and not stored on the context.
-- `processUsage.ts`: insert `model_experiment_request` in the same CTE statement as `microdollar_usage` and `microdollar_usage_metadata` when experiment fields are present. Reuse the generated `microdollar_usage.id` as `usage_id` and copy `microdollar_usage.created_at` exactly into `model_experiment_request.created_at`.
+- `MicrodollarUsageContext`: add `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, and `experimentRequestBody`. The picker also returns `variantId` and `experimentId` for in-memory use (debug logs only), but only `variantVersionId` and `allocationSubject` are persisted to `model_experiment_request`. The `upstream` blob is consumed by `buildDirectProvider` and not stored on the context. `experimentRequestBody` holds the structured-cloned canonical body used by the prompt-storage path; never re-read by anything else.
+- **Decoupled experiment write.** `processUsage.ts` is **not modified** by this feature. The microdollar write retains its existing single-CTE shape. Inside the same `after()` hook scheduled by `accountForMicrodollarUsage`, a new step runs `persistExperimentAttribution` (see `apps/web/src/lib/ai-gateway/experiments/persist.ts`) when `usageContext.modelExperimentVariantVersionId` is set. The hook pre-generates `usageId` (`randomUUID()`) and `createdAt` once at the start and passes them into both the microdollar write and the experiment write — no read-back, no timestamp drift. Failure of the experiment write is Sentry-reported but does not roll back the microdollar write (billing must succeed independently of analytics).
+- `persistExperimentAttribution` performs, in order:
+  1. Split the canonical body into `system_message_content` (single leading `system` message if present) and `request_body_remainder` (everything else, serialized).
+  2. Apply size caps (4 MB each); flag `was_truncated` if either side overflowed.
+  3. In parallel: `putPromptIfAbsent(system_message_content)` and `putPromptIfAbsent(request_body_remainder)`, returning sha256 hex digests.
+  4. Insert one row into `model_experiment_request` (attribution) and one row into `model_experiment_request_prompt` (hashes only) — single statement, both rows reference the same `usage_id`.
 - PostHog: no change in v1. `processUsage.ts` does not emit a general per-request PostHog event today, and adding one purely for experiment fields is out of scope. Feedback joins (`Feedback Submitted.parentMessageID = client_request_id`) are queried via existing PostHog dashboards out-of-band, linked from the admin UI.
 - Analytics Engine: no v1 work. Adding experiment dimensions to `services/o11y/pipelines/api-metrics-schema.json`, `services/o11y/src/api-metrics-routes.ts`, `apps/web/src/lib/ai-gateway/o11y/api-metrics.server.ts`, `services/o11y/src/o11y-analytics.ts`, the o11y tests, and possibly `services/o11y/wrangler.jsonc` (pipeline stream recreation) is real work for a write-only future hypothetical — defer until a concrete AE-backed dashboard needs experiment dimensions. v1 admin reports come from Postgres only (see Q15 decision).
 - Reporting view: add `model_experiment_request_stats`, joining `model_experiment_request → model_experiment_variant_version → model_experiment_variant → model_experiment` and `microdollar_usage` / `microdollar_usage_metadata`. The view exposes `upstream->>'internal_id' AS internal_id`, `upstream->>'base_url' AS base_url`, `variant_label`, and `experiment_id` so reports never need to recreate the join chain. **The view explicitly does not select `upstream->>'api_key'`** — keys live only in the version row JSONB and the Redis cache.
@@ -275,6 +352,7 @@ Add `apps/web/src/routers/admin/model-experiments-router.ts` with:
   - Membership SET: `ai-gateway:experimented-public-ids` — recomputed (`SELECT public_model_id FROM model_experiment WHERE status IN ('active', 'paused')`) and re-SET on every status transition into or out of (active, paused). Single Redis SET write.
 - Paused/completed experiments: gateway returns an explicit 4xx "experiment paused" error for requests to the experimented public id. The error mapping/wording lives in `pick-variant.ts` so the gateway can short-circuit before upstream resolution.
 - `getLiveStats(id)`: aggregate recent requests/errors/p50-p95 latency grouped by `variant_version_id`, with `variant.label` and `upstream->>'internal_id'` resolved for display. Token aggregates per RC (input/output) included; `cost_mUsd` excluded for v1 per the pricing decision.
+- `getPromptByHash(sha: string): Promise<{ content: string } | null>`: admin-gated tRPC procedure that reads from R2 via `getPromptByHash` (`apps/web/src/lib/r2/experiment-prompts.ts`). Returns `null` if the object doesn't exist. Used by the admin UI to inflate hashes from `model_experiment_request_prompt` rows on demand. Page-level dedup at the call site: collect distinct hashes, batch-fetch, join in memory.
 
 Wire the router into `apps/web/src/routers/root-router.ts`.
 
@@ -312,13 +390,20 @@ Targeted tests:
 - Bypass routing: an experimented public id never produces a `fetch` against OpenRouter (`openrouter.ai`) or the Vercel AI gateway, regardless of `shouldRouteToVercel` state.
 - Membership SET maintenance: activating/pausing/completing an experiment correctly adds/removes its `public_model_id` from `ai-gateway:experimented-public-ids`.
 - Custom-LLM regression: existing `kilo-internal/...` traffic still routes correctly via the refactored `buildDirectProvider` helper.
+- Prompt storage write path: an experimented request produces exactly one row in `model_experiment_request_prompt`, with `system_prompt_sha256` and `request_body_sha256` populated when the corresponding content is non-null, and the referenced R2 objects exist with content matching the original (post-`transformRequest`) bytes.
+- Content-addressing dedup: two distinct requests with the same system prompt produce two `model_experiment_request_prompt` rows pointing at the **same** `system_prompt_sha256`, and only one R2 `PUT` was issued (assert via mocked R2 client capturing call counts).
+- Prompt write decoupling: simulating an R2 `PUT` failure does not roll back the `microdollar_usage` write; `model_experiment_request` row may exist without a corresponding `model_experiment_request_prompt` row (best-effort analytics), and Sentry is notified.
+- Truncation: a request body exceeding 4 MB on the system or non-system side is truncated deterministically, the resulting hash is stable across runs, and `was_truncated = true` is recorded.
+- `getPromptByHash` admin tRPC procedure returns the original content for a known hash and `null` for an unknown hash; non-admin callers are rejected.
+- Soft-delete policy: after `softDeleteUser` runs against a user who participated in an experiment, that user's `model_experiment_request` and `model_experiment_request_prompt` rows are still present, and the referenced R2 objects are still present. (Locks the consent-based retention policy in code.)
 
 ## Caching, Privacy, and Logging
 
 - Prompt-cache behavior needs no change. `applyTrackingIds` salts by provider/user/task, while upstream providers key on `(model, cache_key)`, so different internal checkpoints naturally separate caches.
 - `model_experiment`, `model_experiment_variant`, `model_experiment_variant_version`, and `model_experiment_request` hold no direct PII.
-- `client_request_id` is opaque and per-message. It is joinable to user activity through `model_experiment_request.usage_id`, so it should follow existing `microdollar_usage` retention. Use `on delete cascade` from `model_experiment_request.usage_id` to keep `softDeleteUser` behavior aligned with usage deletion.
-- Do not log full request bodies for experimental traffic. `api_request_log` remains allowlist-only.
+- `model_experiment_request_prompt` and the R2 prompt bucket **do** hold dense PII (full system + user prompts: code, file paths, project context, sometimes secrets pasted by users). Retention is governed by experiment opt-in consent, not GDPR soft-delete (see Prompt Storage > GDPR and consent). The policy is locked in by a test in `apps/web/src/lib/user.test.ts` asserting that `softDeleteUser` does not delete experiment prompt rows or R2 objects.
+- `client_request_id` is opaque and per-message. It is joinable to user activity through `model_experiment_request.usage_id`. The `on delete cascade` on `usage_id` only fires for hard deletes of `microdollar_usage`, which `softDeleteUser` does not perform.
+- Do not log full request bodies for experimental traffic into `api_request_log`. The dedicated R2 prompt store is the only persistence mechanism for experiment prompt content; `api_request_log` remains allowlist-only and unrelated to experiments.
 - Do not put `client_request_id` or experiment fields into Sentry input payloads; keep them to usage/metrics storage.
 - `upstream.api_key` MUST never be logged, returned by tRPC reads, included in error messages, included in Sentry breadcrumbs, or persisted outside the encrypted JSONB column and the gateway-side Redis cache. See "API Keys" section.
 
@@ -362,6 +447,8 @@ These constraints exist because of how the gateway is built today. The spec must
 - Cache invalidation: admin mutations that affect routing must clear the per-public-id Redis key. The cached value contains decrypted `api_key`s, so the cache TTL doubles as a key-rotation lag bound (see "API Keys").
 - API key handling: see dedicated section.
 - Provider blinding: provider-facing exports must not include `kilo_user_id` or user-identifying fields.
+- R2 prompt-store credential exposure: the same `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` already used by `apps/web/src/lib/r2/client.ts` is reused. Adding an experiment-prompts bucket extends the blast radius of those credentials. Acceptable for v1 because the same trust boundary already covers cli-sessions and cloud-agent-attachments. If/when scoped per-bucket credentials become available cheaply, narrow them.
+- Prerequisite (before first real partner experiment): UX + ToS work to capture timestamped per-user, per-experiment consent. Out of scope for Part 1; flagged in spec under "Prerequisites."
 
 > Partner-specific risks (cross-model session contamination, capture fidelity) are covered in [Part 2](./experimental-models-2.md).
 
@@ -384,14 +471,28 @@ Core experiment implementation:
 - `packages/db/src/migrations/<generated>_*.sql`
 - `apps/web/src/lib/ai-gateway/experiments/pick-variant.ts` (uses `decryptApiKey` from `apps/web/src/lib/ai-gateway/byok/encryption.ts`; no new module)
 - `apps/web/src/lib/ai-gateway/experiments/build-direct-provider.ts`
+- `apps/web/src/lib/ai-gateway/experiments/persist.ts` (new — owns `persistExperimentAttribution`, size caps, sha256 hashing, R2 puts, and the two-row insert)
 - `apps/web/src/lib/ai-gateway/experiments/index.ts`
 - `apps/web/src/app/api/openrouter/[...path]/route.ts`
-- `apps/web/src/lib/ai-gateway/providers/index.ts` (refactor `kilo-internal/...` branch to share `buildDirectProvider`; add experiment branch)
-- `apps/web/src/lib/ai-gateway/processUsage.ts`
-- `apps/web/src/lib/ai-gateway/processUsage.types.ts`
+- `apps/web/src/lib/ai-gateway/providers/index.ts` (refactor `kilo-internal/...` branch to share `buildDirectProvider`; add experiment branch; capture `structuredClone(body)` onto `usageContext.experimentRequestBody`)
+- `apps/web/src/lib/ai-gateway/llm-proxy-helpers.ts` (extend the existing `after()` hook around `accountForMicrodollarUsage` to also call `persistExperimentAttribution` after the microdollar write completes; pre-generate `usageId` + `createdAt`)
+- `apps/web/src/lib/ai-gateway/processUsage.types.ts` (add `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, `experimentRequestBody` fields to `MicrodollarUsageContext`)
+- **`processUsage.ts` is intentionally not modified** — the experiment write is fully decoupled.
+
+R2 prompt store:
+
+- `apps/web/src/lib/r2/experiment-prompts.ts` (new — `putPromptIfAbsent`, `getPromptByHash`, sha256 helper)
+- `apps/web/src/lib/r2/client.ts` (add `r2ExperimentPromptsBucketName` export reading from `R2_EXPERIMENT_PROMPTS_BUCKET_NAME`)
+- Env config: add `R2_EXPERIMENT_PROMPTS_BUCKET_NAME` to local `.env.local`, Vercel project envs (preview + production), and the dev env-sync manifest. Two buckets to provision in Cloudflare R2: `kilo-experiment-prompts-dev` and `kilo-experiment-prompts-prod`.
+
+GDPR test:
+
+- `apps/web/src/lib/user.test.ts` (add test asserting `softDeleteUser` does **not** delete `model_experiment_request_prompt` rows or referenced R2 objects)
+
+Admin and routing:
 
 - `apps/web/src/lib/redis-keys.ts`
-- `apps/web/src/routers/admin/model-experiments-router.ts`
+- `apps/web/src/routers/admin/model-experiments-router.ts` (includes `getPromptByHash` procedure)
 - `apps/web/src/routers/root-router.ts`
 - `apps/web/src/app/admin/model-experiments/page.tsx`
 - `apps/web/src/app/admin/model-experiments/[id]/page.tsx`
@@ -412,4 +513,8 @@ Core experiment implementation:
 - Resume a paused experiment and confirm a returning user lands in the same `variant_id` bucket as before the pause.
 - Hot-swap during pause: pause, run `swapVariantVersion` (which inserts a new version row with `effective_at = now()`), resume, send a request from a user who was previously bucketed; confirm the bucket (variant_id) is unchanged but the served `variant_version_id`/`internal_id` resolves to the newly inserted version.
 - Archive a `completed` experiment; confirm it disappears from default admin lists. Attempt to archive an `active` experiment; confirm the admin call rejects.
+- Send an experimented request, then in the admin UI navigate to the experiment's request browser, pick a row, and confirm the system + user prompts inflate from R2 via `getPromptByHash`. Verify the dev bucket (`kilo-experiment-prompts-dev`) actually receives the object.
+- Send 100 experimented requests with the same system prompt; confirm only one R2 object exists for that system-prompt hash (R2 console object count or `aws s3 ls` against the bucket via the configured endpoint).
+- Pause/resume + hot-swap flow continues to populate prompt rows correctly across the transition.
+- Run the prompt-orphan GC sweep against the dev bucket after `TRUNCATE model_experiment_request_prompt`; confirm all objects are deleted and no production data is touched (separate bucket).
 

@@ -17,7 +17,7 @@ describe('mintPutUrl', () => {
       expiresSeconds: 900,
     });
     expect(url).toContain(
-      'https://test-account.r2.cloudflarestorage.com/kilo-chat-media/attachments/c/u/a',
+      'https://test-account.r2.cloudflarestorage.com/kilo-chat-media/attachments/c/u/a'
     );
     expect(url).toContain('X-Amz-Expires=900');
     expect(url).toContain('X-Amz-Signature=');
@@ -44,7 +44,7 @@ describe('mintGetUrl', () => {
       expiresSeconds: 3600,
     });
     expect(url).toContain(
-      'https://test-account.r2.cloudflarestorage.com/kilo-chat-media/attachments/c/u/a',
+      'https://test-account.r2.cloudflarestorage.com/kilo-chat-media/attachments/c/u/a'
     );
     expect(url).toContain('X-Amz-Expires=3600');
   });

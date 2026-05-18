@@ -27,9 +27,7 @@ describe('ConversationDO.getAttachmentForRead', () => {
       size: 1,
       filename: 'a.png',
     });
-    expect(
-      await stub.getAttachmentForRead({ requesterId: 'user-A', attachmentId })
-    ).toBeNull();
+    expect(await stub.getAttachmentForRead({ requesterId: 'user-A', attachmentId })).toBeNull();
   });
 
   it('rejects requester who is not a member', async () => {

@@ -9,7 +9,7 @@ describe('buildAttachmentR2Key', () => {
         conversationId: 'CONV',
         uploaderId: 'U',
         attachmentId: 'A',
-      }),
+      })
     ).toBe('attachments/CONV/U/A');
   });
 
@@ -20,7 +20,7 @@ describe('buildAttachmentR2Key', () => {
         conversationId: 'CONV',
         uploaderId: 'U',
         attachmentId: 'A',
-      }),
+      })
     ).toBe('dev/attachments/CONV/U/A');
   });
 
@@ -31,7 +31,7 @@ describe('buildAttachmentR2Key', () => {
         conversationId: 'C',
         uploaderId: 'U',
         attachmentId: 'A',
-      }),
+      })
     ).not.toMatch(/\/\//);
   });
 
@@ -42,7 +42,7 @@ describe('buildAttachmentR2Key', () => {
         conversationId: '',
         uploaderId: 'U',
         attachmentId: 'A',
-      }),
+      })
     ).toThrow();
   });
 });

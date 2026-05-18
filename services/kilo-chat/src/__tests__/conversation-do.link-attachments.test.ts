@@ -134,8 +134,6 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
         filename: `a${i}.png`,
       });
     }
-    await expect(
-      stub.createMessage({ senderId: 'user-A', content: blocks })
-    ).rejects.toThrow(/10/);
+    await expect(stub.createMessage({ senderId: 'user-A', content: blocks })).rejects.toThrow(/10/);
   });
 });

@@ -25,7 +25,7 @@ export async function mintPutUrl(
     key: string;
     contentType: string;
     expiresSeconds: number;
-  },
+  }
 ): Promise<{ url: string; headers: Record<string, string> }> {
   const url = new URL(`${r2Origin(params.accountId)}/${params.bucket}/${params.key}`);
   url.searchParams.set('X-Amz-Expires', String(params.expiresSeconds));
@@ -34,7 +34,7 @@ export async function mintPutUrl(
       method: 'PUT',
       headers: { 'Content-Type': params.contentType },
     }),
-    { aws: { signQuery: true, allHeaders: true } },
+    { aws: { signQuery: true, allHeaders: true } }
   );
   return {
     url: signed.url,
@@ -47,7 +47,7 @@ export async function mintGetUrl(
     key: string;
     expiresSeconds: number;
     responseContentDisposition?: string;
-  },
+  }
 ): Promise<{ url: string }> {
   const url = new URL(`${r2Origin(params.accountId)}/${params.bucket}/${params.key}`);
   url.searchParams.set('X-Amz-Expires', String(params.expiresSeconds));

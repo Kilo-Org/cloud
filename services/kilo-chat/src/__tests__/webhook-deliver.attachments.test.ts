@@ -19,7 +19,13 @@ describe('webhook buildPayload', () => {
       ...baseMsg,
       content: [
         { type: 'text', text: 'hi' },
-        { type: 'attachment', attachmentId: aid, mimeType: 'image/png', size: 1, filename: 'a.png' },
+        {
+          type: 'attachment',
+          attachmentId: aid,
+          mimeType: 'image/png',
+          size: 1,
+          filename: 'a.png',
+        },
       ],
     });
     expect(payload.text).toBe('hi');
@@ -41,7 +47,13 @@ describe('webhook buildPayload', () => {
     const payload = buildPayload({
       ...baseMsg,
       content: [
-        { type: 'attachment', attachmentId: aid, mimeType: 'image/png', size: 1, filename: 'a.png' },
+        {
+          type: 'attachment',
+          attachmentId: aid,
+          mimeType: 'image/png',
+          size: 1,
+          filename: 'a.png',
+        },
       ],
     });
     expect(payload.text).toBe('');

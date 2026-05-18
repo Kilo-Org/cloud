@@ -92,7 +92,11 @@ describe('bot-status route -> service -> DO -> read end-to-end capabilities', ()
           'content-type': 'application/json',
           authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ online: true, at: 1_700_000_000_000, capabilities: ['attachments'] }),
+        body: JSON.stringify({
+          online: true,
+          at: 1_700_000_000_000,
+          capabilities: ['attachments'],
+        }),
       },
       testEnv
     );
@@ -105,11 +109,7 @@ describe('bot-status route -> service -> DO -> read end-to-end capabilities', ()
 
     // GET returns capabilities
     const readApp = makeReadAppAs(userId);
-    const getRes = await readApp.request(
-      `/v1/sandboxes/${sandboxId}/bot-status`,
-      {},
-      testEnv
-    );
+    const getRes = await readApp.request(`/v1/sandboxes/${sandboxId}/bot-status`, {}, testEnv);
     expect(getRes.status).toBe(200);
     const body = await getRes.json<{
       status: { online: boolean; at: number; capabilities?: string[] } | null;

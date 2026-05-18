@@ -125,8 +125,6 @@ model_experiment_request
   created_at                      timestamp not null
 ```
 
-IKEB NEM RAK
-
 The `upstream` JSONB blob is validated by `ExperimentUpstreamSchema` (a strict subset of `CustomLlmDefinitionSchema` — see `packages/db/src/schema-types.ts:779-798`):
 
 ```ts

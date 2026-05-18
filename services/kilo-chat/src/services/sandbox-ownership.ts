@@ -4,6 +4,7 @@ import { and, eq, isNull, or } from 'drizzle-orm';
 import {
   instanceIdFromSandboxId,
   isInstanceKeyedSandboxId,
+  isValidInstanceId,
 } from '@kilocode/worker-utils/instance-id';
 
 async function queryOwnsSandbox(
@@ -18,9 +19,17 @@ async function queryOwnsSandbox(
   // form by matching against `id` so ownership keeps working across the
   // migration window. Ownership is still strictly scoped to the caller's
   // own active rows (user_id + destroyed_at filters are unchanged).
-  const candidateInstanceId = isInstanceKeyedSandboxId(sandboxId)
+  // `isInstanceKeyedSandboxId` only checks prefix + total length, so a value
+  // like `ki_<35 chars of non-hex>` would pass through and then format into
+  // a UUID-shaped string with non-hex characters — comparing that to a uuid
+  // column would make Postgres throw `invalid input syntax for type uuid`,
+  // turning a 403 into a 500 on attacker-controlled input. Re-validate the
+  // derived UUID and skip the id-match branch if it doesn't pass.
+  const derivedInstanceId = isInstanceKeyedSandboxId(sandboxId)
     ? instanceIdFromSandboxId(sandboxId)
     : null;
+  const candidateInstanceId =
+    derivedInstanceId && isValidInstanceId(derivedInstanceId) ? derivedInstanceId : null;
   const rows = await db
     .select({ sandbox_id: kiloclaw_instances.sandbox_id })
     .from(kiloclaw_instances)

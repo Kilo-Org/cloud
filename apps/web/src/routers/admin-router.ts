@@ -506,23 +506,26 @@ export const adminRouter = createTRPCRouter({
               blocked_by_kilo_user_id: null,
             };
 
-        await db
+        const updated = await db
           .update(kilocode_users)
           .set(blockMetadata)
-          .where(eq(kilocode_users.id, input.userId));
+          .where(eq(kilocode_users.id, input.userId))
+          .returning({ id: kilocode_users.id });
 
-        void reportEvents({
-          events: [
-            {
-              type: isBlocking ? 'user.blocked' : 'user.unblocked',
-              data: {
-                kilo_user_id: input.userId,
-                reason: input.blocked_reason ?? null,
-                actor_email: ctx.user.google_user_email,
+        if (updated.length > 0) {
+          void reportEvents({
+            events: [
+              {
+                type: isBlocking ? 'user.blocked' : 'user.unblocked',
+                data: {
+                  kilo_user_id: input.userId,
+                  reason: input.blocked_reason ?? null,
+                  actor_email: ctx.user.google_user_email,
+                },
               },
-            },
-          ],
-        });
+            ],
+          });
+        }
 
         return successResult();
       }),

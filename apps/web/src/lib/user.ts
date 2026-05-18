@@ -332,7 +332,7 @@ async function fireAuthEvent(
 ) {
   if (!requestHeaders) return;
 
-  const [authProviderRows, membershipRows] = await Promise.all([
+  const enrichmentResult = await Promise.all([
     db
       .select({ provider: user_auth_provider.provider })
       .from(user_auth_provider)
@@ -348,7 +348,11 @@ async function fireAuthEvent(
       .from(organization_memberships)
       .innerJoin(organizations, eq(organization_memberships.organization_id, organizations.id))
       .where(eq(organization_memberships.kilo_user_id, user.id)),
-  ]);
+  ]).catch(() => null);
+
+  // DB enrichment failures must not abort auth telemetry; fall through with empty arrays
+  const authProviderRows = enrichmentResult?.[0] ?? [];
+  const membershipRows = enrichmentResult?.[1] ?? [];
 
   void reportAuthEvent({
     kilo_user_id: user.id,

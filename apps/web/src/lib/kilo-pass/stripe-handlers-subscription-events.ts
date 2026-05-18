@@ -138,7 +138,6 @@ export async function handleKiloPassSubscriptionEvent(params: {
     events: [
       {
         type: 'billing.kilo_pass_changed',
-        occurred_at: subscription.created * 1000,
         data: {
           kilo_user_id: kiloUserId,
           tier,

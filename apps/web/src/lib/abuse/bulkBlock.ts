@@ -64,7 +64,7 @@ export async function bulkBlockUsers(
     void reportEvents({
       events: updated.map(u => ({
         type: 'user.blocked' as const,
-        data: { kilo_user_id: u.id, reason, actor_email: blockedByKiloUserId ?? null },
+        data: { kilo_user_id: u.id, reason, actor_email: null },
       })),
     });
   }

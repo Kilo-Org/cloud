@@ -818,7 +818,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
           {
             type: 'stripe.charge.dispute.created',
             occurred_at: event.created * 1000,
-            data: { id: event.id, type: event.type, customer: dispute.charge },
+            data: { id: event.id, type: event.type, customer: dispute.customer },
           },
         ],
       });

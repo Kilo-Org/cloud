@@ -595,6 +595,7 @@ export async function acceptOrganizationInvite(
           invitation: updatedInvitation,
           organizationId: invitation.organization_id,
           role: invitation.role,
+          membershipInserted: false,
         });
       }
 
@@ -639,10 +640,11 @@ export async function acceptOrganizationInvite(
         invitation: updatedInvitation,
         organizationId: invitation.organization_id,
         role: invitation.role,
+        membershipInserted: true,
       });
     });
 
-    if (result.success) {
+    if (result.success && result.membershipInserted) {
       void reportEvents({
         events: [
           {

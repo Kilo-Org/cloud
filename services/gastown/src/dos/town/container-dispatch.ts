@@ -608,6 +608,12 @@ export async function startMergeInContainer(
 ): Promise<boolean> {
   try {
     const userId = params.townConfig.owner_user_id ?? params.townId;
+    if (!params.townConfig.owner_user_id) {
+      console.warn(
+        `${TOWN_LOG} startMergeInContainer: owner_user_id missing from town config for town ${params.townId}. ` +
+          'Falling back to townId — this breaks session-ingest authorization and should not happen for properly provisioned towns.'
+      );
+    }
     const containerToken = await ensureContainerToken(env, params.townId, userId);
     const agentToken = await mintAgentToken(env, {
       agentId: params.agentId,

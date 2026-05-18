@@ -29,6 +29,18 @@ describe('messageCreatedWebhookSchema (attachments)', () => {
     });
     expect(r.success).toBe(true);
   });
+  it('rejects empty text with no attachments', () => {
+    const r = messageCreatedWebhookSchema.safeParse({
+      ...baseValid,
+      text: '',
+      attachments: undefined,
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      const paths = r.error.issues.map(i => i.path.join('.'));
+      expect(paths).toContain('text');
+    }
+  });
   it('rejects more than 10 attachments', () => {
     const att = { attachmentId: ulid(), mimeType: 'image/png', size: 1, filename: 'a.png' };
     const r = messageCreatedWebhookSchema.safeParse({

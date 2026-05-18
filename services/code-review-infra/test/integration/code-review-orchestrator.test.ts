@@ -625,6 +625,141 @@ describe('CodeReviewOrchestrator recovery', () => {
     await expect(storedReview(stub)).resolves.toMatchObject({ sandboxRetryAttempted: true });
   });
 
+  it('retries prepareSession once after sandbox mkdir returns invalid exit code', async () => {
+    const stub = getReviewStub();
+    let prepareCalls = 0;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        prepareCalls += 1;
+        if (prepareCalls === 1) {
+          return trpcError(
+            500,
+            'Failed to create workspace directory: FileSystemError: mkdir operation failed with exit code NaN'
+          );
+        }
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-mkdir-retry',
+          kiloSessionId: 'ses_mkdir_retry',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-mkdir-retry', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-mkdir-retry',
+      cliSessionId: 'ses_mkdir_retry',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+    await expect(storedReview(stub)).resolves.toMatchObject({ sandboxRetryAttempted: true });
+  });
+
+  it('retries prepareSession once after sandbox network connection lost', async () => {
+    const stub = getReviewStub();
+    let prepareCalls = 0;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        prepareCalls += 1;
+        if (prepareCalls === 1) {
+          return trpcError(500, 'Network connection lost.');
+        }
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-network-retry',
+          kiloSessionId: 'ses_network_retry',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-network-retry', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-network-retry',
+      cliSessionId: 'ses_network_retry',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+    await expect(storedReview(stub)).resolves.toMatchObject({ sandboxRetryAttempted: true });
+  });
+
+  it('retries prepareSession once after sandbox command timeout during workspace setup', async () => {
+    const stub = getReviewStub();
+    let prepareCalls = 0;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        prepareCalls += 1;
+        if (prepareCalls === 1) {
+          return trpcError(
+            500,
+            "CommandError: Failed to execute command 'cd /workspace && git checkout -B refs/pull/3/head FETCH_HEAD' in session session-123: Command timeout after 30000ms"
+          );
+        }
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-cmd-timeout-retry',
+          kiloSessionId: 'ses_cmd_timeout_retry',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-cmd-timeout-retry', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-cmd-timeout-retry',
+      cliSessionId: 'ses_cmd_timeout_retry',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+    await expect(storedReview(stub)).resolves.toMatchObject({ sandboxRetryAttempted: true });
+  });
+
   it('fails after a second sandbox 500 without initiating', async () => {
     const stub = getReviewStub();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {

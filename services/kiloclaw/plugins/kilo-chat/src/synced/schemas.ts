@@ -95,7 +95,7 @@ export const attachmentBlockSchema = z.object({
   type: z.literal('attachment'),
   attachmentId: ulidSchema,
   mimeType: z.string().min(1).max(255),
-  size: z.number().int().nonnegative(),
+  size: z.number().int().positive(),
   filename: z.string().min(1).max(512),
 });
 

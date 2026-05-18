@@ -54,4 +54,9 @@ describe('messageCreatedWebhookSchema (attachments)', () => {
     const r = messageCreatedWebhookSchema.safeParse({ ...baseValid, attachments: [att] });
     expect(r.success).toBe(false);
   });
+  it('rejects attachment with zero size', () => {
+    const att = { attachmentId: ulid(), mimeType: 'image/png', size: 0, filename: 'a.png' };
+    const r = messageCreatedWebhookSchema.safeParse({ ...baseValid, attachments: [att] });
+    expect(r.success).toBe(false);
+  });
 });

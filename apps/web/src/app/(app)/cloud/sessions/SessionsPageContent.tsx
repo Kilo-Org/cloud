@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Cloud, Terminal, Puzzle, Bot } from 'lucide-react';
+import { Search, Cloud, Terminal, Puzzle, Bot, Workflow } from 'lucide-react';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import type { SessionsListItem } from '@/components/cloud-agent/SessionsList';
 import { SessionsList } from '@/components/cloud-agent/SessionsList';
@@ -40,10 +40,11 @@ const PLATFORM_OPTIONS: readonly {
   { value: 'cloud-agent', label: 'Cloud', icon: Cloud },
   { value: 'cli', label: 'CLI', icon: Terminal },
   { value: 'agent-manager', label: 'Agent Manager', icon: Bot },
+  { value: 'gastown', label: 'Gastown', icon: Workflow },
   { value: 'other', label: 'Other', icon: Puzzle },
 ];
 
-type PlatformFilterValue = 'all' | 'cloud-agent' | 'cli' | 'agent-manager' | 'other';
+type PlatformFilterValue = 'all' | 'cloud-agent' | 'cli' | 'agent-manager' | 'gastown' | 'other';
 
 export function SessionsPageContent() {
   const trpc = useTRPC();

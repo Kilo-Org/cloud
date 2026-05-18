@@ -119,12 +119,8 @@ model_experiment_request
   variant_version_id              uuid not null fk → model_experiment_variant_version(id)
   allocation_subject              text not null -- user | machine | ip
   client_request_id               text nullable
-  created_at                      timestamp not null
-
-model_experiment_request_prompt
-  usage_id                        uuid pk fk → microdollar_usage(id) on delete cascade
-  system_prompt_sha256            text nullable  -- R2 object key in experiment-prompts bucket; null if request had no system message
-  request_body_sha256             text nullable  -- R2 object key for the canonical post-transformRequest body excluding messages[0] when system
+  system_prompt_sha256            text nullable  -- R2 object key in experiment-prompts bucket; null if request had no system message OR R2 put failed
+  request_body_sha256             text nullable  -- R2 object key for the canonical post-transformRequest body excluding messages[0] when system; null if R2 put failed
   was_truncated                   boolean not null default false
   created_at                      timestamp not null
 ```
@@ -194,9 +190,9 @@ Indexes for `model_experiment_request`:
 
 Experiment- and variant-level reports go through join: `request → variant_version → variant → experiment`. The served upstream config is read from `model_experiment_variant_version.upstream` JSONB; reports surface `upstream->>'internal_id'` and (where useful) `upstream->>'base_url'`. **Never select `upstream->>'api_key'` in any reporting view, admin query, or response payload.** If query plans show the join hop is hot, add a covering index or denormalize `variant_id` and/or `experiment_id` onto the request row later — defer until measured.
 
-`model_experiment_request.created_at` and `model_experiment_request_prompt.created_at` are both pre-generated in app code at the start of the after-hook (see Phase 4) along with `usage_id`, then copied into all three tables by the writers. This keeps time-window joins exact and avoids the previous "same-CTE" coupling between `processUsage.ts` and the experiment write.
+`model_experiment_request.created_at` and `usage_id` are pre-generated in app code at the start of the after-hook (see Phase 4), then copied into both the microdollar write and the experiment write. This keeps time-window joins exact and avoids the previous "same-CTE" coupling between `processUsage.ts` and the experiment write.
 
-`model_experiment_request_prompt` stores **only hashes**, never prompt content. The bodies live in R2 (see Prompt Storage below), keyed by sha256. Storing only hashes keeps the Postgres row tiny (~80 bytes), keeps PG TOAST out of the picture entirely, and lets the experiment data wipe cleanly without coordinating with the primary datastore.
+`model_experiment_request` stores **only hashes** for prompts, never prompt content. The bodies live in R2 (see Prompt Storage below), keyed by sha256. Storing only hashes keeps the Postgres row tiny (~80 bytes overhead beyond the existing attribution columns), keeps PG TOAST out of the picture entirely, and lets the experiment data wipe cleanly without coordinating with the primary datastore.
 
 No backfill is required because pre-experiment traffic has no side-table row.
 
@@ -217,11 +213,11 @@ Full request prompts (system message + canonical post-`transformRequest` body) a
 - One object per unique system message (`messages[0]` when its role is `system`). Object key = sha256 hex of the raw content. Same content from a thousand requests = one R2 object. This is where dedup pays off massively (system prompts are byte-stable across requests within a client version, often 50–200 KB).
 - One object per request_body remainder: the canonical post-`transformRequest` body with the system message removed (i.e. `{ ...body, messages: body.messages.filter(m => m.role !== 'system') }` when there is exactly one system message; otherwise the full `messages` array is retained as-is). Object key = sha256 hex. Dedup is incidental for this blob (each request's tail is mostly unique), but storing it in R2 alongside the system blob keeps the storage backend uniform and avoids PG TOAST entirely.
 
-**What is stored in Postgres (`model_experiment_request_prompt`):**
+**What is stored in Postgres (`model_experiment_request`):**
 
-- `usage_id`, `system_prompt_sha256`, `request_body_sha256`, `was_truncated`, `created_at`.
-- Either hash column may be null (e.g. a request with no system message yields `system_prompt_sha256 = null`).
-- Row is ~80 bytes; the table never holds prompt content.
+- The existing attribution columns (`usage_id`, `variant_version_id`, `allocation_subject`, `client_request_id`, `created_at`) plus `system_prompt_sha256`, `request_body_sha256`, `was_truncated` on the same row. One row per experimented request, keyed on `usage_id`.
+- Either hash column may be null (e.g. a request with no system message yields `system_prompt_sha256 = null`; an R2 put failure leaves both hash columns null with a Sentry breadcrumb).
+- The table never holds prompt content; prompt fields are small fixed-size additions to the existing attribution row.
 
 **Size caps and truncation.**
 
@@ -237,7 +233,7 @@ Full request prompts (system message + canonical post-`transformRequest` body) a
 2. Split out the single leading `system` message if present.
 3. Apply size caps (truncate; flag `was_truncated`).
 4. For each non-null half: compute sha256, call `putPromptIfAbsent(content)` which `HEAD`s and only `PUT`s on miss.
-5. Insert one row in `model_experiment_request_prompt` with the resulting hashes.
+5. Insert one row in `model_experiment_request` with the attribution columns and the resulting prompt hashes (single statement, single round-trip).
 
 - The R2 puts run in parallel via `Promise.all`. If a put fails, log to Sentry and skip the prompt write (the `model_experiment_request` attribution row still exists; the prompt-side row is best-effort analytics).
 
@@ -250,15 +246,15 @@ Full request prompts (system message + canonical post-`transformRequest` body) a
 **GDPR and consent.**
 
 - The user explicitly opts in to participate in any given experiment, and that opt-in includes consent to retain prompts for the duration of the experiment plus any agreed retention window. Prompts collected under experiment opt-in are therefore **not** subject to the GDPR soft-delete flow that governs `microdollar_usage_metadata`.
-- Concretely: `softDeleteUser` does **not** delete `model_experiment_request_prompt` rows, does **not** delete the referencing R2 objects, and does **not** delete `model_experiment_request` rows. The `on delete cascade` on `usage_id` only fires if the underlying `microdollar_usage` row is hard-deleted (which `softDeleteUser` does not do today).
-- The spec documents this explicitly as the policy. A test in `apps/web/src/lib/user.test.ts` locks the policy in code: after `softDeleteUser` runs, an experiment-attributed user's `model_experiment_request` and `model_experiment_request_prompt` rows are still present.
+- Concretely: `softDeleteUser` does **not** delete `model_experiment_request` rows and does **not** delete the referencing R2 objects. The `on delete cascade` on `usage_id` only fires if the underlying `microdollar_usage` row is hard-deleted (which `softDeleteUser` does not do today).
+- The spec documents this explicitly as the policy. A test in `apps/web/src/lib/user.test.ts` locks the policy in code: after `softDeleteUser` runs, an experiment-attributed user's `model_experiment_request` rows (and the referenced R2 objects) are still present.
 - **Prerequisite (out of scope for Part 1):** the experiment opt-in flow must record a timestamped, per-user, per-experiment consent record (UX + ToS work). v1 must not run a real partner experiment until that consent capture exists. Tracked as a separate v1-prerequisite task; this plan adds a one-line note in the spec under "Prerequisites."
 
 **Wipe semantics.**
 
-- `TRUNCATE model_experiment_request_prompt` is independent of `microdollar_usage` and safe to run.
-- After wiping rows, R2 objects are orphaned. Run a periodic GC sweep (cron / one-off) that lists the bucket and deletes any object whose key does not appear in `SELECT system_prompt_sha256 FROM model_experiment_request_prompt UNION SELECT request_body_sha256 FROM model_experiment_request_prompt`.
-- Deleting an entire experiment's prompts: `DELETE FROM model_experiment_request_prompt USING model_experiment_request mer WHERE mep.usage_id = mer.usage_id AND mer.variant_version_id IN (...experiment's versions...)`, then run the GC sweep.
+- `TRUNCATE model_experiment_request` is independent of `microdollar_usage` and safe to run; this also drops attribution. To wipe only prompts while keeping attribution, run `UPDATE model_experiment_request SET system_prompt_sha256 = NULL, request_body_sha256 = NULL` (optionally scoped to specific experiments).
+- After wiping rows or nulling hashes, R2 objects are orphaned. Run a periodic GC sweep (cron / one-off) that lists the bucket and deletes any object whose key does not appear in `SELECT system_prompt_sha256 FROM model_experiment_request WHERE system_prompt_sha256 IS NOT NULL UNION SELECT request_body_sha256 FROM model_experiment_request WHERE request_body_sha256 IS NOT NULL`.
+- Deleting an entire experiment's prompts: `UPDATE model_experiment_request SET system_prompt_sha256 = NULL, request_body_sha256 = NULL WHERE variant_version_id IN (...experiment's versions...)`, then run the GC sweep. To also drop attribution, `DELETE FROM model_experiment_request WHERE variant_version_id IN (...)` first.
 
 **Why R2 (not KV, not Vercel Blob, not Postgres).**
 
@@ -351,7 +347,7 @@ Persist experiment attribution everywhere request-level metrics are consumed:
   1. Split the canonical body into `system_message_content` (single leading `system` message if present) and `request_body_remainder` (everything else, serialized).
   2. Apply size caps (4 MB each); flag `was_truncated` if either side overflowed.
   3. In parallel: `putPromptIfAbsent(system_message_content)` and `putPromptIfAbsent(request_body_remainder)`, returning sha256 hex digests.
-  4. Insert one row into `model_experiment_request` (attribution) and one row into `model_experiment_request_prompt` (hashes only) — single statement, both rows reference the same `usage_id`.
+  4. Insert one row into `model_experiment_request` carrying both the attribution columns and the resulting prompt hashes (single statement). On R2 put failure both hash columns are left NULL and a Sentry breadcrumb is emitted; the attribution row still lands.
 - PostHog: no change in v1. `processUsage.ts` does not emit a general per-request PostHog event today, and adding one purely for experiment fields is out of scope. Feedback joins (`Feedback Submitted.parentMessageID = client_request_id`) are queried via existing PostHog dashboards out-of-band, linked from the admin UI.
 - Analytics Engine: no v1 work. Adding experiment dimensions to `services/o11y/pipelines/api-metrics-schema.json`, `services/o11y/src/api-metrics-routes.ts`, `apps/web/src/lib/ai-gateway/o11y/api-metrics.server.ts`, `services/o11y/src/o11y-analytics.ts`, the o11y tests, and possibly `services/o11y/wrangler.jsonc` (pipeline stream recreation) is real work for a write-only future hypothetical — defer until a concrete AE-backed dashboard needs experiment dimensions. v1 admin reports come from Postgres only (see Q15 decision).
 - Reporting view: add `model_experiment_request_stats`, joining `model_experiment_request → model_experiment_variant_version → model_experiment_variant → model_experiment` and `microdollar_usage` / `microdollar_usage_metadata`. The view exposes `upstream->>'internal_id' AS internal_id`, `upstream->>'base_url' AS base_url`, `variant_label`, and `experiment_id` so reports never need to recreate the join chain. **The view explicitly does not select `upstream->>'api_key'`** — keys live only in the version row JSONB and the Redis cache.
@@ -372,7 +368,7 @@ Add `apps/web/src/routers/admin/model-experiments-router.ts` with:
   - Membership SET: `ai-gateway:experimented-public-ids` — recomputed (`SELECT public_model_id FROM model_experiment WHERE status IN ('active', 'paused')`) and re-SET on every status transition into or out of (active, paused). Single Redis SET write.
 - Paused/completed experiments: gateway returns an explicit 4xx "experiment paused" error for requests to the experimented public id. The error mapping/wording lives in `pick-variant.ts` so the gateway can short-circuit before upstream resolution.
 - `getLiveStats(id)`: aggregate recent requests/errors/p50-p95 latency grouped by `variant_version_id`, with `variant.label` and `upstream->>'internal_id'` resolved for display. Token aggregates per RC (input/output) included; `cost_mUsd` excluded for v1 per the pricing decision.
-- `getPromptByHash(sha: string): Promise<{ content: string } | null>`: admin-gated tRPC procedure that reads from R2 via `getPromptByHash` (`apps/web/src/lib/r2/experiment-prompts.ts`). Returns `null` if the object doesn't exist. Used by the admin UI to inflate hashes from `model_experiment_request_prompt` rows on demand. Page-level dedup at the call site: collect distinct hashes, batch-fetch, join in memory.
+- `getPromptByHash(sha: string): Promise<{ content: string } | null>`: admin-gated tRPC procedure that reads from R2 via `getPromptByHash` (`apps/web/src/lib/r2/experiment-prompts.ts`). Returns `null` if the object doesn't exist. Used by the admin UI to inflate hashes from `model_experiment_request` rows on demand. Page-level dedup at the call site: collect distinct hashes, batch-fetch, join in memory.
 
 Wire the router into `apps/web/src/routers/root-router.ts`.
 
@@ -410,18 +406,18 @@ Targeted tests:
 - Bypass routing: an experimented public id never produces a `fetch` against OpenRouter (`openrouter.ai`) or the Vercel AI gateway, regardless of `shouldRouteToVercel` state.
 - Membership SET maintenance: activating/pausing/completing an experiment correctly adds/removes its `public_model_id` from `ai-gateway:experimented-public-ids`.
 - Custom-LLM regression: existing `kilo-internal/...` traffic still routes correctly via the refactored `buildDirectProvider` helper.
-- Prompt storage write path: an experimented request produces exactly one row in `model_experiment_request_prompt`, with `system_prompt_sha256` and `request_body_sha256` populated when the corresponding content is non-null, and the referenced R2 objects exist with content matching the original (post-`transformRequest`) bytes.
-- Content-addressing dedup: two distinct requests with the same system prompt produce two `model_experiment_request_prompt` rows pointing at the **same** `system_prompt_sha256`, and only one R2 `PUT` was issued (assert via mocked R2 client capturing call counts).
-- Prompt write decoupling: simulating an R2 `PUT` failure does not roll back the `microdollar_usage` write; `model_experiment_request` row may exist without a corresponding `model_experiment_request_prompt` row (best-effort analytics), and Sentry is notified.
+- Prompt storage write path: an experimented request produces exactly one row in `model_experiment_request`, with `system_prompt_sha256` and `request_body_sha256` populated when the corresponding content is non-null, and the referenced R2 objects exist with content matching the original (post-`transformRequest`) bytes.
+- Content-addressing dedup: two distinct requests with the same system prompt produce two `model_experiment_request` rows pointing at the **same** `system_prompt_sha256`, and only one R2 `PUT` was issued (assert via mocked R2 client capturing call counts).
+- Prompt write decoupling: simulating an R2 `PUT` failure does not roll back the `microdollar_usage` write; the `model_experiment_request` row still lands with both hash columns NULL, and Sentry is notified.
 - Truncation: a request body exceeding 4 MB on the system or non-system side is truncated deterministically, the resulting hash is stable across runs, and `was_truncated = true` is recorded.
 - `getPromptByHash` admin tRPC procedure returns the original content for a known hash and `null` for an unknown hash; non-admin callers are rejected.
-- Soft-delete policy: after `softDeleteUser` runs against a user who participated in an experiment, that user's `model_experiment_request` and `model_experiment_request_prompt` rows are still present, and the referenced R2 objects are still present. (Locks the consent-based retention policy in code.)
+- Soft-delete policy: after `softDeleteUser` runs against a user who participated in an experiment, that user's `model_experiment_request` rows are still present (including their prompt hash columns), and the referenced R2 objects are still present. (Locks the consent-based retention policy in code.)
 
 ## Caching, Privacy, and Logging
 
 - Prompt-cache behavior needs no change. `applyTrackingIds` salts by provider/user/task, while upstream providers key on `(model, cache_key)`, so different internal checkpoints naturally separate caches.
 - `model_experiment`, `model_experiment_variant`, `model_experiment_variant_version`, and `model_experiment_request` hold no direct PII.
-- `model_experiment_request_prompt` and the R2 prompt bucket **do** hold dense PII (full system + user prompts: code, file paths, project context, sometimes secrets pasted by users). Retention is governed by experiment opt-in consent, not GDPR soft-delete (see Prompt Storage > GDPR and consent). The policy is locked in by a test in `apps/web/src/lib/user.test.ts` asserting that `softDeleteUser` does not delete experiment prompt rows or R2 objects.
+- The prompt-hash columns on `model_experiment_request` and the R2 prompt bucket together **do** hold dense PII (full system + user prompts: code, file paths, project context, sometimes secrets pasted by users). Retention is governed by experiment opt-in consent, not GDPR soft-delete (see Prompt Storage > GDPR and consent). The policy is locked in by a test in `apps/web/src/lib/user.test.ts` asserting that `softDeleteUser` does not delete experiment rows or R2 objects.
 - `client_request_id` is opaque and per-message. It is joinable to user activity through `model_experiment_request.usage_id`. The `on delete cascade` on `usage_id` only fires for hard deletes of `microdollar_usage`, which `softDeleteUser` does not perform.
 - Do not log full request bodies for experimental traffic into `api_request_log`. The dedicated R2 prompt store is the only persistence mechanism for experiment prompt content; `api_request_log` remains allowlist-only and unrelated to experiments.
 - Do not put `client_request_id` or experiment fields into Sentry input payloads; keep them to usage/metrics storage.
@@ -491,7 +487,7 @@ Core experiment implementation:
 - `packages/db/src/migrations/<generated>_*.sql`
 - `apps/web/src/lib/ai-gateway/experiments/pick-variant.ts` (uses `decryptApiKey` from `apps/web/src/lib/ai-gateway/byok/encryption.ts`; no new module)
 - `apps/web/src/lib/ai-gateway/experiments/build-direct-provider.ts`
-- `apps/web/src/lib/ai-gateway/experiments/persist.ts` (new — owns `persistExperimentAttribution`, size caps, sha256 hashing, R2 puts, and the two-row insert)
+- `apps/web/src/lib/ai-gateway/experiments/persist.ts` (new — owns `persistExperimentAttribution`, size caps, sha256 hashing, R2 puts, and the single-row insert into `model_experiment_request`)
 - `apps/web/src/lib/ai-gateway/experiments/index.ts`
 - `apps/web/src/app/api/openrouter/[...path]/route.ts`
 - `apps/web/src/lib/ai-gateway/providers/index.ts` (refactor `kilo-internal/...` branch to share `buildDirectProvider`; add experiment branch; capture `structuredClone(body)` onto `usageContext.experimentRequestBody`)
@@ -507,7 +503,7 @@ R2 prompt store:
 
 GDPR test:
 
-- `apps/web/src/lib/user.test.ts` (add test asserting `softDeleteUser` does **not** delete `model_experiment_request_prompt` rows or referenced R2 objects)
+- `apps/web/src/lib/user.test.ts` (add test asserting `softDeleteUser` does **not** delete `model_experiment_request` rows or referenced R2 objects)
 
 Admin and routing:
 
@@ -534,4 +530,4 @@ Admin and routing:
 - Send an experimented request, then in the admin UI navigate to the experiment's request browser, pick a row, and confirm the system + user prompts inflate from R2 via `getPromptByHash`. Verify the dev bucket (`kilo-experiment-prompts-dev`) actually receives the object.
 - Send 100 experimented requests with the same system prompt; confirm only one R2 object exists for that system-prompt hash (R2 console object count or `aws s3 ls` against the bucket via the configured endpoint).
 - Pause/resume + hot-swap flow continues to populate prompt rows correctly across the transition.
-- Run the prompt-orphan GC sweep against the dev bucket after `TRUNCATE model_experiment_request_prompt`; confirm all objects are deleted and no production data is touched (separate bucket).
+- Run the prompt-orphan GC sweep against the dev bucket after `UPDATE model_experiment_request SET system_prompt_sha256 = NULL, request_body_sha256 = NULL`; confirm all R2 objects are deleted and no production data is touched (separate bucket).

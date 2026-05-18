@@ -372,7 +372,7 @@ export async function handleKiloPassInvoicePaid(params: {
   let blockedEmailParams: { kiloUserId: string; stripeInvoiceId: string } | null = null;
 
   try {
-    await db.transaction(async tx => {
+    blockedEmailParams = await db.transaction(async tx => {
       const subscription = await getInvoiceSubscription({ invoice, stripe });
       if (!subscription) {
         throw new KiloPassError('Kilo Pass invoice has no subscription reference', {
@@ -516,9 +516,8 @@ export async function handleKiloPassInvoicePaid(params: {
           .set({ status: 'canceled', ended_at: dayjs().utc().toISOString() })
           .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
 
-        blockedEmailParams = { kiloUserId, stripeInvoiceId: invoice.id };
         kiloUserIdForCache = null;
-        return;
+        return { kiloUserId, stripeInvoiceId: invoice.id };
       }
 
       const issuanceHeader = await createOrGetIssuanceHeader(tx, {
@@ -614,7 +613,7 @@ export async function handleKiloPassInvoicePaid(params: {
             current_streak_months: 0,
           })
           .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
-        return;
+        return null;
       }
 
       const wasInactivePreviously = priorStatus !== null && isStripeSubscriptionEnded(priorStatus);
@@ -629,6 +628,8 @@ export async function handleKiloPassInvoicePaid(params: {
         .update(kilo_pass_subscriptions)
         .set({ current_streak_months: newStreakMonths, next_yearly_issue_at: null })
         .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
+
+      return null;
     });
   } catch (error) {
     // Write failure audit log outside the transaction (non-transactional)

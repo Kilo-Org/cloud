@@ -18,5 +18,6 @@ export {
   updateConversationPages,
   filterConversationPages,
   conversationsKey,
+  createConversationMutationKey,
 } from '@kilocode/kilo-chat-hooks';
 export type { ConversationListInfiniteData } from '@kilocode/kilo-chat-hooks';

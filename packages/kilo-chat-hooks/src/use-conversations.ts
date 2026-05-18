@@ -60,7 +60,15 @@ type RegisterConversationListCacheHandlersOptions = {
   sandboxId: string | null;
 };
 
-export function useConversations(client: KiloChatClient, sandboxId: string | null) {
+type UseConversationsOptions = {
+  refetchOnMount?: boolean | 'always';
+};
+
+export function useConversations(
+  client: KiloChatClient,
+  sandboxId: string | null,
+  options?: UseConversationsOptions
+) {
   return useInfiniteQuery({
     queryKey: conversationsKey(sandboxId),
     queryFn: ({ pageParam }) =>
@@ -72,6 +80,7 @@ export function useConversations(client: KiloChatClient, sandboxId: string | nul
     initialPageParam: null as string | null,
     getNextPageParam: lastPage => lastPage.nextCursor,
     enabled: !!sandboxId,
+    refetchOnMount: options?.refetchOnMount,
     select: data => ({
       ...data,
       conversations: data.pages.flatMap(p => p.conversations),
@@ -87,9 +96,12 @@ export function useConversationDetail(client: KiloChatClient, conversationId: st
   });
 }
 
+export const createConversationMutationKey = ['kilo-chat', 'create-conversation'] as const;
+
 export function useCreateConversation(client: KiloChatClient, options?: MutationErrorOptions) {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: createConversationMutationKey,
     mutationFn: (req: CreateConversationRequest) => client.createConversation(req),
     onSuccess: (response, variables) => {
       settleCreateConversation(queryClient, variables, response);

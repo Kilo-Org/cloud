@@ -1,13 +1,20 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useQueryClient } from '@tanstack/react-query';
 import { formatKiloChatError } from '@kilocode/kilo-chat';
 import { usePresenceSubscription } from '@kilocode/kilo-chat-hooks';
 import { ConversationList } from './ConversationList';
 import { KiloChatContext, type KiloChatContextValue } from './kiloChatContext';
+import {
+  CHAT_ROOT_AUTO_OPEN_SUPPRESSION_PARAM,
+  getChatRootLandingDecision,
+  getSuppressedChatRootPath,
+  shouldIgnoreRootEmptyConversationCreateResult,
+  shouldStartRootEmptyConversationCreate,
+} from './chat-root-selection-state';
 import { kiloclawInstanceContext } from '@kilocode/event-service';
 import { useEventServiceClient } from '@/contexts/EventServiceContext';
 import { cn } from '@/lib/utils';
@@ -17,8 +24,27 @@ import {
   useRenameConversation,
   useLeaveConversation,
   conversationsKey,
+  createConversationMutationKey,
   registerConversationListCacheHandlers,
 } from '../hooks/useConversations';
+
+type RootLandingState = {
+  hasResolvedRootLanding: boolean;
+  hasAttemptedEmptyConversationCreate: boolean;
+};
+
+function hasCreateConversationSandboxId(
+  variables: unknown,
+  sandboxId: string | null
+): variables is { sandboxId: string } {
+  return (
+    sandboxId !== null &&
+    typeof variables === 'object' &&
+    variables !== null &&
+    'sandboxId' in variables &&
+    variables.sandboxId === sandboxId
+  );
+}
 
 // ── Layout component ────────────────────────────────────────────────
 type KiloChatLayoutProps = {
@@ -62,12 +88,25 @@ export function KiloChatLayout({
 
   const queryClient = useQueryClient();
   const params = useParams<{ conversationId?: string }>();
+  const searchParams = useSearchParams();
+  const isRootAutoOpenSuppressed = searchParams.get(CHAT_ROOT_AUTO_OPEN_SUPPRESSION_PARAM) === '1';
   const [leavingConversationId, setLeavingConversationId] = useState<string | null>(null);
   const conversationsQueryKey = useMemo(() => conversationsKey(sandboxId), [sandboxId]);
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useConversations(
-    kiloChatClient,
-    sandboxId
-  );
+  const {
+    data,
+    isError: isConversationHistoryQueryError,
+    isFetching: isFetchingConversationHistory,
+    isRefetchError: hasConversationHistoryRefetchError,
+    isFetchNextPageError: hasConversationPaginationError,
+    isLoading,
+    fetchNextPage,
+    refetch: refetchConversationHistory,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useConversations(kiloChatClient, sandboxId, { refetchOnMount: 'always' });
+  const hasConversationHistoryError =
+    (isConversationHistoryQueryError && data === undefined) ||
+    (hasConversationHistoryRefetchError && !hasConversationPaginationError);
 
   // Update loaded conversation-list cache rows in-place when instance events arrive.
   // Unknown conversations still invalidate so they can be fetched into the list.
@@ -95,6 +134,21 @@ export function KiloChatLayout({
   const renameConversation = useRenameConversation(kiloChatClient);
   const leaveConversation = useLeaveConversation(kiloChatClient);
   const [newConversationError, setNewConversationError] = useState<string | null>(null);
+  const pendingCreateConversationCount = useIsMutating({
+    mutationKey: createConversationMutationKey,
+    predicate: mutation => hasCreateConversationSandboxId(mutation.state.variables, sandboxId),
+  });
+  const isCreatingConversation = pendingCreateConversationCount > 0;
+  const latestSandboxId = useRef(sandboxId);
+  latestSandboxId.current = sandboxId;
+  const latestActiveConversationId = useRef(params?.conversationId ?? null);
+  latestActiveConversationId.current = params?.conversationId ?? null;
+  const latestIsRootAutoOpenSuppressed = useRef(isRootAutoOpenSuppressed);
+  latestIsRootAutoOpenSuppressed.current = isRootAutoOpenSuppressed;
+  const rootLandingState = useRef<RootLandingState>({
+    hasResolvedRootLanding: false,
+    hasAttemptedEmptyConversationCreate: false,
+  });
 
   const handleRename = useCallback(
     (conversationId: string, title: string) => {
@@ -116,7 +170,7 @@ export function KiloChatLayout({
           onSettled: () => setLeavingConversationId(null),
           onSuccess: () => {
             if (isActiveConversation) {
-              router.push(basePath);
+              router.push(getSuppressedChatRootPath(basePath));
             }
           },
           onError: err => {
@@ -129,16 +183,27 @@ export function KiloChatLayout({
   );
 
   const handleNewConversation = useCallback(() => {
-    if (!sandboxId || createConversation.isPending) return;
+    if (!sandboxId || isCreatingConversation) return;
+    if (!params?.conversationId) {
+      rootLandingState.current.hasResolvedRootLanding = true;
+      rootLandingState.current.hasAttemptedEmptyConversationCreate = true;
+    }
     setNewConversationError(null);
     createConversation.mutate(
       { sandboxId },
       {
         onSuccess: res => {
+          if (latestSandboxId.current !== sandboxId) {
+            return;
+          }
+          rootLandingState.current.hasAttemptedEmptyConversationCreate = false;
           setNewConversationError(null);
           router.push(`${basePath}/${res.conversationId}`);
         },
         onError: err => {
+          if (latestSandboxId.current !== sandboxId) {
+            return;
+          }
           const message = formatKiloChatError(
             err,
             "Couldn't create conversation. Check your connection and try again."
@@ -151,10 +216,10 @@ export function KiloChatLayout({
   }, [
     sandboxId,
     basePath,
-    createConversation.isPending,
+    isCreatingConversation,
     createConversation.mutate,
+    params?.conversationId,
     router,
-    setNewConversationError,
   ]);
 
   const contextValue = useMemo<KiloChatContextValue>(
@@ -192,41 +257,116 @@ export function KiloChatLayout({
     ]
   );
 
-  // First-run auto-create: when a user lands on the chat root with zero
-  // conversations (e.g. straight after onboarding), kick off a fresh
-  // conversation so they never sit on a blank index page. Reset the guard
-  // when sandboxId changes so switching between instances (e.g. between
-  // organizations) re-evaluates without remounting.
-  //
-  // The ref intentionally stays set even after a failed mutation: if the
-  // server-side create fails, retrying via this effect would loop on
-  // persistent errors. The manual "+ New conversation" button in
-  // ConversationList is the recovery path.
-  const hasAutoCreatedConversation = useRef(false);
   useEffect(() => {
-    hasAutoCreatedConversation.current = false;
+    rootLandingState.current = {
+      hasResolvedRootLanding: false,
+      hasAttemptedEmptyConversationCreate: false,
+    };
+    setNewConversationError(null);
   }, [sandboxId]);
+
   useEffect(() => {
+    if (params?.conversationId) {
+      rootLandingState.current.hasResolvedRootLanding = false;
+    }
+  }, [params?.conversationId]);
+
+  useEffect(() => {
+    const latestConversationId = data?.conversations[0]?.conversationId ?? null;
+    const landingDecision = getChatRootLandingDecision({
+      activeConversationId: params?.conversationId ?? null,
+      hasConversationHistoryData: data !== undefined,
+      hasConversationHistoryError,
+      hasResolvedRootLanding: rootLandingState.current.hasResolvedRootLanding,
+      isAutoOpenSuppressed: isRootAutoOpenSuppressed,
+      isFetchingConversationHistory,
+      isLoading,
+      latestConversationId,
+      sandboxId,
+    });
+
+    if (landingDecision === 'wait' || landingDecision === 'stay') {
+      return;
+    }
+
     if (
-      hasAutoCreatedConversation.current ||
-      params?.conversationId ||
-      isLoading ||
-      !sandboxId ||
-      createConversation.isPending ||
-      !data ||
-      data.conversations.length > 0
+      landingDecision === 'create-empty-conversation' &&
+      !shouldStartRootEmptyConversationCreate({
+        hasAttemptedEmptyConversationCreate:
+          rootLandingState.current.hasAttemptedEmptyConversationCreate,
+        isCreatePending: isCreatingConversation,
+        landingDecision,
+        sandboxId,
+      })
     ) {
       return;
     }
-    hasAutoCreatedConversation.current = true;
-    handleNewConversation();
+
+    if (landingDecision === 'open-latest') {
+      rootLandingState.current.hasResolvedRootLanding = true;
+      if (latestConversationId !== null) {
+        router.replace(`${basePath}/${latestConversationId}`);
+      }
+      return;
+    }
+
+    if (sandboxId === null) {
+      return;
+    }
+    rootLandingState.current.hasAttemptedEmptyConversationCreate = true;
+    setNewConversationError(null);
+    createConversation.mutate(
+      { sandboxId },
+      {
+        onSuccess: res => {
+          if (
+            shouldIgnoreRootEmptyConversationCreateResult({
+              activeConversationId: latestActiveConversationId.current,
+              currentSandboxId: latestSandboxId.current,
+              hasResolvedRootLanding: rootLandingState.current.hasResolvedRootLanding,
+              isAutoOpenSuppressed: latestIsRootAutoOpenSuppressed.current,
+              mutationSandboxId: sandboxId,
+            })
+          ) {
+            return;
+          }
+          rootLandingState.current.hasAttemptedEmptyConversationCreate = false;
+          setNewConversationError(null);
+          router.replace(`${basePath}/${res.conversationId}`);
+        },
+        onError: err => {
+          if (
+            shouldIgnoreRootEmptyConversationCreateResult({
+              activeConversationId: latestActiveConversationId.current,
+              currentSandboxId: latestSandboxId.current,
+              hasResolvedRootLanding: rootLandingState.current.hasResolvedRootLanding,
+              isAutoOpenSuppressed: latestIsRootAutoOpenSuppressed.current,
+              mutationSandboxId: sandboxId,
+            })
+          ) {
+            return;
+          }
+          const message = formatKiloChatError(
+            err,
+            "Couldn't create conversation. Check your connection and try again."
+          );
+          setNewConversationError(message);
+          toast.error(message);
+        },
+      }
+    );
   }, [
-    params?.conversationId,
-    isLoading,
-    sandboxId,
-    createConversation.isPending,
+    basePath,
+    createConversation.mutate,
     data,
-    handleNewConversation,
+    hasConversationHistoryError,
+    isCreatingConversation,
+    isFetchingConversationHistory,
+    isLoading,
+    isRootAutoOpenSuppressed,
+    params?.conversationId,
+    router,
+    sandboxId,
   ]);
 
   return (
@@ -236,12 +376,15 @@ export function KiloChatLayout({
         <div className="border-border flex w-64 shrink-0 flex-col overflow-hidden border-r">
           <ConversationList
             conversations={data?.conversations ?? []}
+            hasConversationHistoryError={hasConversationHistoryError}
+            hasConversationPaginationError={hasConversationPaginationError}
             isLoading={isLoading}
             hasNextPage={!!hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
-            isCreatingConversation={createConversation.isPending}
+            isCreatingConversation={isCreatingConversation}
             newConversationError={newConversationError}
             onLoadMore={() => void fetchNextPage()}
+            onRetryConversationHistory={() => void refetchConversationHistory()}
             onNewConversation={handleNewConversation}
             onRename={handleRename}
             onLeave={handleLeave}

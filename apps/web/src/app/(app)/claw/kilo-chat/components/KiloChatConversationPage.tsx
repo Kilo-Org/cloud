@@ -8,6 +8,7 @@ import { useKiloChatContext } from './kiloChatContext';
 import { useConversationDetail } from '../hooks/useConversations';
 import { MessageArea } from './MessageArea';
 import { KiloChatStatusError } from './KiloChatStatusError';
+import { getSuppressedChatRootPath } from './chat-root-selection-state';
 import { conversationRouteDecision } from '../[conversationId]/conversation-route-guard';
 
 export function KiloChatConversationPage() {
@@ -44,7 +45,7 @@ export function KiloChatConversationPage() {
     }
     if (routeDecision === 'not-found') {
       toast.error('Conversation not found');
-      router.replace(basePath);
+      router.replace(getSuppressedChatRootPath(basePath));
       return;
     }
     if (conversationDetail.isError && !isLeaving) {
@@ -57,7 +58,7 @@ export function KiloChatConversationPage() {
           ? 'Conversation not found'
           : 'Failed to load conversation';
       toast.error(message);
-      router.replace(basePath);
+      router.replace(getSuppressedChatRootPath(basePath));
     }
   }, [
     conversationDetail.isError,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { AlertTriangle, Loader2, Plus } from 'lucide-react';
+import { AlertTriangle, Loader2, Plus, RefreshCw } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
 import { ConversationItem } from './ConversationItem';
@@ -45,39 +45,57 @@ function groupConversations(
 
 type ConversationListProps = {
   conversations: ConversationListItem[];
+  hasConversationHistoryError?: boolean;
+  hasConversationPaginationError?: boolean;
   isLoading: boolean;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   isCreatingConversation?: boolean;
   newConversationError?: string | null;
   onLoadMore?: () => void;
+  onRetryConversationHistory?: () => void;
   onNewConversation: () => void;
   onRename: (id: string, title: string) => void;
   onLeave: (id: string) => void;
 };
 
-type NewConversationUiState = {
+type ConversationListUiState = {
   buttonLabel: string;
   buttonTitle: string;
   disabled: boolean;
   emptyText: string;
+  historyErrorText: string | null;
   showError: boolean;
 };
 
-export function buildNewConversationUiState({
+export function buildConversationListUiState({
+  hasConversationHistoryError = false,
   isCreatingConversation,
   newConversationError,
 }: {
+  hasConversationHistoryError?: boolean;
   isCreatingConversation: boolean;
   newConversationError: string | null;
-}): NewConversationUiState {
+}): ConversationListUiState {
   if (isCreatingConversation) {
     return {
       buttonLabel: 'Creating conversation',
       buttonTitle: 'Creating conversation',
       disabled: true,
       emptyText: 'Creating conversation...',
+      historyErrorText: null,
       showError: false,
+    };
+  }
+
+  if (hasConversationHistoryError) {
+    return {
+      buttonLabel: 'New conversation',
+      buttonTitle: 'New conversation',
+      disabled: false,
+      emptyText: 'Failed to load conversations',
+      historyErrorText: 'Failed to load conversations',
+      showError: newConversationError !== null,
     };
   }
 
@@ -89,18 +107,22 @@ export function buildNewConversationUiState({
       newConversationError === null
         ? 'No conversations yet'
         : 'No conversations yet. Create one to start chatting.',
+    historyErrorText: null,
     showError: newConversationError !== null,
   };
 }
 
 export function ConversationList({
   conversations,
+  hasConversationHistoryError = false,
+  hasConversationPaginationError = false,
   isLoading,
   hasNextPage,
   isFetchingNextPage,
   isCreatingConversation = false,
   newConversationError = null,
   onLoadMore,
+  onRetryConversationHistory,
   onNewConversation,
   onRename,
   onLeave,
@@ -108,20 +130,22 @@ export function ConversationList({
   const params = useParams<{ conversationId?: string }>();
   const activeId = params?.conversationId;
   const groups = useMemo(() => groupConversations(conversations), [conversations]);
-  const newConversationUi = buildNewConversationUiState({
+  const conversationListUi = buildConversationListUiState({
+    hasConversationHistoryError,
     isCreatingConversation,
     newConversationError,
   });
 
   const handleScroll = useCallback(
     (e: React.UIEvent<HTMLDivElement>) => {
-      if (!hasNextPage || isFetchingNextPage || !onLoadMore) return;
+      if (!hasNextPage || isFetchingNextPage || hasConversationPaginationError || !onLoadMore)
+        return;
       const el = e.currentTarget;
       if (el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
         onLoadMore();
       }
     },
-    [hasNextPage, isFetchingNextPage, onLoadMore]
+    [hasNextPage, isFetchingNextPage, hasConversationPaginationError, onLoadMore]
   );
 
   return (
@@ -130,11 +154,11 @@ export function ConversationList({
         <span className="text-muted-foreground text-xs font-medium uppercase">Conversations</span>
         <button
           type="button"
-          disabled={newConversationUi.disabled}
+          disabled={conversationListUi.disabled}
           onClick={onNewConversation}
           aria-busy={isCreatingConversation}
-          aria-label={newConversationUi.buttonLabel}
-          title={newConversationUi.buttonTitle}
+          aria-label={conversationListUi.buttonLabel}
+          title={conversationListUi.buttonTitle}
           className="hover:bg-muted focus-visible:ring-ring rounded p-1 cursor-pointer transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isCreatingConversation ? (
@@ -145,10 +169,30 @@ export function ConversationList({
         </button>
       </div>
 
-      {newConversationUi.showError && (
+      {conversationListUi.showError && (
         <div className="text-destructive mx-3 mb-2 flex gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-xs">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>{newConversationError}</span>
+        </div>
+      )}
+
+      {conversationListUi.historyErrorText !== null && conversations.length > 0 && (
+        <div
+          role="alert"
+          className="text-destructive mx-3 mb-2 flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-xs"
+        >
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0 flex-1">{conversationListUi.historyErrorText}</span>
+          {onRetryConversationHistory && (
+            <button
+              type="button"
+              onClick={onRetryConversationHistory}
+              className="border-input text-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring inline-flex items-center gap-1 rounded-md border px-1.5 py-1 font-medium transition-colors focus-visible:ring-1 focus-visible:outline-none"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Retry
+            </button>
+          )}
         </div>
       )}
 
@@ -156,8 +200,28 @@ export function ConversationList({
         {isLoading ? (
           <div className="text-muted-foreground px-3 py-4 text-center text-xs">Loading...</div>
         ) : conversations.length === 0 ? (
-          <div className="text-muted-foreground px-3 py-4 text-center text-xs">
-            {newConversationUi.emptyText}
+          <div
+            role={conversationListUi.historyErrorText === null ? undefined : 'alert'}
+            className={
+              conversationListUi.historyErrorText === null
+                ? 'text-muted-foreground flex flex-col items-center gap-2 px-3 py-4 text-center text-xs'
+                : 'text-destructive mx-1 my-2 flex flex-col items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-3 text-center text-xs'
+            }
+          >
+            {conversationListUi.historyErrorText !== null && (
+              <AlertTriangle className="h-3.5 w-3.5" />
+            )}
+            <span>{conversationListUi.emptyText}</span>
+            {conversationListUi.historyErrorText !== null && onRetryConversationHistory && (
+              <button
+                type="button"
+                onClick={onRetryConversationHistory}
+                className="border-input text-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs font-medium transition-colors focus-visible:ring-1 focus-visible:outline-none"
+              >
+                <RefreshCw className="h-3 w-3" />
+                Retry
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -179,6 +243,25 @@ export function ConversationList({
             ))}
             {isFetchingNextPage && (
               <div className="text-muted-foreground px-3 py-2 text-center text-xs">Loading...</div>
+            )}
+            {hasConversationPaginationError && !isFetchingNextPage && (
+              <div
+                role="alert"
+                className="text-destructive mx-1 my-2 flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-xs"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 flex-1">Failed to load more conversations</span>
+                {onLoadMore && (
+                  <button
+                    type="button"
+                    onClick={onLoadMore}
+                    className="border-input text-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring inline-flex items-center gap-1 rounded-md border px-1.5 py-1 font-medium transition-colors focus-visible:ring-1 focus-visible:outline-none"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    Retry
+                  </button>
+                )}
+              </div>
             )}
           </>
         )}

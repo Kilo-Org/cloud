@@ -18,7 +18,6 @@ import type Stripe from 'stripe';
 import { randomUUID } from 'node:crypto';
 
 jest.mock('@/lib/email', () => ({
-  ...jest.requireActual('@/lib/email'),
   sendKiloPassDuplicateCardCanceledEmail: jest.fn(async () => ({ sent: true })),
 }));
 

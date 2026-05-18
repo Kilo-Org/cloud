@@ -33,7 +33,6 @@ import {
 } from '@/lib/kilo-pass/constants';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { insertMicrodollarUsageWithDailyRollup } from '@/tests/helpers/microdollar-usage.helper';
 import type { BillingHistoryEntry } from '@/lib/subscriptions/subscription-center';
 import type { ValidatedStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
 import type Stripe from 'stripe';
@@ -1506,6 +1505,13 @@ describe('kiloPassRouter', () => {
   });
 
   describe('getAverageMonthlyUsageLast3Months', () => {
+    let insertMicrodollarUsageWithDailyRollup: typeof import('@/tests/helpers/microdollar-usage.helper').insertMicrodollarUsageWithDailyRollup;
+
+    beforeAll(async () => {
+      ({ insertMicrodollarUsageWithDailyRollup } =
+        await import('@/tests/helpers/microdollar-usage.helper'));
+    });
+
     beforeEach(async () => {
       // eslint-disable-next-line drizzle/enforce-delete-with-where
       await db.delete(microdollar_usage_daily);

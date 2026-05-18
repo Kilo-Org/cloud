@@ -202,4 +202,31 @@ describe('POST /bot/v1/sandboxes/:sandboxId/attachments/init (bot)', () => {
     expect(body.putUrl).toContain('.r2.cloudflarestorage.com/');
     expect(body.putHeaders['Content-Type']).toBe('image/png');
   });
+
+  it('rejects bot from sandbox-B accessing a conversation owned by sandbox-A with 403', async () => {
+    const { conversationId, testEnv } = await createConversationAsUser('att-init-bot-xsandbox-a');
+    const sandboxB = 'sandbox-att-init-bot-xsandbox-b';
+    const app = makeBotApp();
+    const tokenB = await tokenFor(sandboxB);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxB}/attachments/init`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${tokenB}`,
+        },
+        body: JSON.stringify({
+          conversationId,
+          mimeType: 'image/png',
+          size: 100,
+          filename: 'x.png',
+        }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(403);
+  });
 });

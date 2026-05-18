@@ -252,4 +252,24 @@ describe('GET /bot/v1/sandboxes/:sandboxId/attachments/:id/url (bot)', () => {
     expect(body.url).toContain('.r2.cloudflarestorage.com/');
     expect(body.mimeType).toBe('image/png');
   });
+
+  it('rejects bot from sandbox-B reading an attachment from a conversation owned by sandbox-A with 403', async () => {
+    const { userId, conversationId, testEnv } = await setupConversation('att-get-bot-xsandbox-a');
+    const { attachmentId } = await seedLinkedAttachment(conversationId, userId, {
+      mimeType: 'image/png',
+      filename: 'secret.png',
+      size: 10,
+    });
+    const sandboxB = 'sandbox-att-get-bot-xsandbox-b';
+    const app = makeBotApp();
+    const tokenB = await tokenFor(sandboxB);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxB}/attachments/${attachmentId}/url?conversationId=${conversationId}`,
+      { headers: { authorization: `Bearer ${tokenB}` } },
+      testEnv
+    );
+
+    expect(res.status).toBe(403);
+  });
 });

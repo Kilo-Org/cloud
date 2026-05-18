@@ -76,6 +76,33 @@ describe('upstreamRequest timeout', () => {
     );
   });
 
+  it('preserves fetch failures when diagnostic enrichment throws', async () => {
+    const fetchError = new TypeError('fetch failed');
+    Object.defineProperty(fetchError, 'cause', {
+      get() {
+        throw new Error('cause getter failed');
+      },
+    });
+    const mockFetch = jest.fn().mockRejectedValue(fetchError);
+    global.fetch = mockFetch;
+
+    await expect(
+      upstreamRequest({
+        path: '/chat/completions',
+        search: '',
+        method: 'POST',
+        body: {
+          model: 'test-model',
+          messages: [{ role: 'user', content: 'test' }],
+        },
+        extraHeaders: {},
+        provider: PROVIDERS.OPENROUTER,
+      })
+    ).rejects.toBe(fetchError);
+
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
   it('redacts URLs from captured fetch and cause messages', async () => {
     const resetCause = Object.assign(
       new Error('socket reset at https://gateway.example.test/v1?cause=cause-secret'),

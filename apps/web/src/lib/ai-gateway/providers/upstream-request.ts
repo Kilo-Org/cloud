@@ -178,36 +178,40 @@ export async function upstreamRequest({
       signal: combinedSignal,
     });
   } catch (error) {
-    const cause = error instanceof Error ? error.cause : undefined;
-    const errorName = getErrorName(error);
-    const errorMessage = getErrorMessage(error);
-    const causeCode = getCauseCode(cause);
-    const causeName = getCauseName(cause);
-    const causeMessage = getCauseMessage(cause);
-    const failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
-    const failureMetadata = {
-      providerId: provider.id,
-      targetHost: getProviderTargetHost(provider.apiUrl),
-      path,
-      failureFamily,
-      errorName,
-      errorMessage,
-      ...(causeCode && { causeCode }),
-      ...(causeName && { causeName }),
-      ...(causeMessage && { causeMessage }),
-    };
+    try {
+      const cause = error instanceof Error ? error.cause : undefined;
+      const errorName = getErrorName(error);
+      const errorMessage = getErrorMessage(error);
+      const causeCode = getCauseCode(cause);
+      const causeName = getCauseName(cause);
+      const causeMessage = getCauseMessage(cause);
+      const failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
+      const failureMetadata = {
+        providerId: provider.id,
+        targetHost: getProviderTargetHost(provider.apiUrl),
+        path,
+        failureFamily,
+        errorName,
+        errorMessage,
+        ...(causeCode && { causeCode }),
+        ...(causeName && { causeName }),
+        ...(causeMessage && { causeMessage }),
+      };
 
-    if (!(failureFamily === 'abort' && signal?.aborted)) {
-      errorExceptInTest('AI gateway upstream fetch failed', failureMetadata);
-      captureException(createLoggedFetchFailure(errorName, errorMessage), {
-        level: 'error',
-        tags: {
-          source: 'ai-gateway-upstream-fetch',
-          provider: provider.id,
-          failure_family: failureFamily,
-        },
-        extra: failureMetadata,
-      });
+      if (!(failureFamily === 'abort' && signal?.aborted)) {
+        errorExceptInTest('AI gateway upstream fetch failed', failureMetadata);
+        captureException(createLoggedFetchFailure(errorName, errorMessage), {
+          level: 'error',
+          tags: {
+            source: 'ai-gateway-upstream-fetch',
+            provider: provider.id,
+            failure_family: failureFamily,
+          },
+          extra: failureMetadata,
+        });
+      }
+    } catch {
+      // Fetch failure must remain caller-visible even when diagnostic enrichment fails.
     }
 
     throw error;

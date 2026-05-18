@@ -39,6 +39,13 @@ describe('shouldRetryAnonymously', () => {
     expect(shouldRetryAnonymously(400, null, 'something: no such repository here')).toBe(true);
   });
 
+  it('retries on DoltHub token-authenticated branchless read errors', () => {
+    const text = JSON.stringify({
+      query_execution_message: 'Calls authenticated with a token must include a refName',
+    });
+    expect(shouldRetryAnonymously(400, null, text)).toBe(true);
+  });
+
   it('does not retry on 5xx', () => {
     expect(shouldRetryAnonymously(500, null, 'no such repository')).toBe(false);
     expect(shouldRetryAnonymously(503, null, 'whatever')).toBe(false);
@@ -129,6 +136,37 @@ describe('doltRead anonymous fallback', () => {
     });
     expect(result.servedAnonymously).toBe(true);
     expect(calls).toHaveLength(2);
+  });
+
+  it('retries anonymously on token-authenticated branchless read errors', async () => {
+    const { fetch: fakeFetch, calls } = makeFetch([
+      {
+        status: 400,
+        body: {
+          query_execution_status: 'Error',
+          query_execution_message: 'Calls authenticated with a token must include a refName',
+          repository_owner: 'hop',
+          repository_name: 'wl-commons',
+          commit_ref: '',
+          rows: [],
+        },
+      },
+      { status: 200, body: { rows: [{ id: 'w-1' }], query_execution_status: 'Success' } },
+    ]);
+
+    const result = await doltRead({
+      auth: { token: 'tok' },
+      owner: 'hop',
+      db: 'wl-commons',
+      query: 'SELECT * FROM wanted',
+      fetch: fakeFetch,
+    });
+
+    expect(result.rows).toEqual([{ id: 'w-1' }]);
+    expect(result.servedAnonymously).toBe(true);
+    expect(calls).toHaveLength(2);
+    expect(getAuthHeader(calls[0])).toBe('token tok');
+    expect(getAuthHeader(calls[1])).toBeUndefined();
   });
 
   it('does NOT retry on 5xx — preserves the original error', async () => {

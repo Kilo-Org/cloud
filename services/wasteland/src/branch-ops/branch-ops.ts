@@ -9,7 +9,7 @@
  *  3. Refreshes the WastelandDO's wanted-board cache (where needed)
  *     and emits a billing meter event.
  *
- *   - listMyForkBranches — enumerate `wl/<rig>/*` branches on the fork,
+ *   - listMyForkBranches — enumerate `wl/<any-rig>/<wantedId>` branches on the fork,
  *     cross-referenced with each item's status on `main` and on the
  *     branch tip, plus an open-PR flag. Powers the M2.3 fork page.
  *   - publishBranch       — open or update a PR for a branch (idempotent).

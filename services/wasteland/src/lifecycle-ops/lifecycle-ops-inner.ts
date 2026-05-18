@@ -61,11 +61,12 @@ function wrapSdkError(err: unknown, label: string): WantedBoardOpError {
           : err.code === 'internal'
             ? 'INTERNAL_SERVER_ERROR'
             : 'UPSTREAM_ERROR';
-    return new WantedBoardOpError(`${label} failed: ${err.message}`, code);
+    return new WantedBoardOpError(`${label} failed: ${err.message}`, code, err.cause ?? err);
   }
   return new WantedBoardOpError(
     `${label} failed: ${err instanceof Error ? err.message : String(err)}`,
-    'UPSTREAM_ERROR'
+    'UPSTREAM_ERROR',
+    err
   );
 }
 

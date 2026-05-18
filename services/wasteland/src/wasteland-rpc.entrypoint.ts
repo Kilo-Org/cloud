@@ -70,6 +70,7 @@ export class WastelandRPCEntrypoint extends WorkerEntrypoint<Env> {
     priority?: 'low' | 'medium' | 'high' | 'critical';
     type?: 'feature' | 'bug' | 'docs' | 'other';
     direct?: boolean;
+    publish?: boolean;
   }) {
     return wrap(() =>
       wantedBoard.postWantedItem(this.env, params.wastelandId, params.userId, {
@@ -78,6 +79,7 @@ export class WastelandRPCEntrypoint extends WorkerEntrypoint<Env> {
         priority: params.priority,
         type: params.type,
         direct: params.direct,
+        publish: params.publish,
       })
     );
   }

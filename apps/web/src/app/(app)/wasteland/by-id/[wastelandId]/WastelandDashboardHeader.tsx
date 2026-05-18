@@ -3,10 +3,10 @@
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
-import { Badge } from '@/components/ui/badge';
+import { WastelandBetaBadge } from '@/components/wasteland/WastelandBetaBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { Skull, Globe, Lock } from 'lucide-react';
+import { Skull } from 'lucide-react';
 import { useWastelandPageHeader } from './WastelandPageHeaderContext';
 
 export function WastelandDashboardHeader() {
@@ -40,16 +40,7 @@ export function WastelandDashboardHeader() {
             <h1 className="text-lg font-semibold tracking-tight text-white/90">
               {wasteland?.name ?? 'Wasteland'}
             </h1>
-            {wasteland && (
-              <Badge variant="outline" className="gap-1 border-white/10 text-white/50">
-                {wasteland.visibility === 'public' ? (
-                  <Globe className="size-3" />
-                ) : (
-                  <Lock className="size-3" />
-                )}
-                {wasteland.visibility}
-              </Badge>
-            )}
+            <WastelandBetaBadge />
           </div>
         )}
 

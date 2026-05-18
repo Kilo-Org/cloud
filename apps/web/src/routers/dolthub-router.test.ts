@@ -4,8 +4,8 @@ jest.mock('@/lib/config.server', () => {
   const actual = jest.requireActual<typeof ConfigServerModule>('@/lib/config.server');
   return {
     ...actual,
-    DOLTHUB_APP_DEV_CLIENT_ID: 'dolthub-client-id-test',
-    DOLTHUB_APP_DEV_CLIENT_SECRET: 'dolthub-client-secret-test',
+    DOLTHUB_APP_CLIENT_ID: 'dolthub-client-id-test',
+    DOLTHUB_APP_CLIENT_SECRET: 'dolthub-client-secret-test',
   };
 });
 
@@ -30,16 +30,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { PLATFORM, INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 
-function setNodeEnv(value: string) {
-  Object.defineProperty(process.env, 'NODE_ENV', {
-    value,
-    configurable: true,
-    writable: true,
-  });
-}
-
 describe('dolthubRouter', () => {
-  const originalNodeEnv = process.env.NODE_ENV;
   const originalFetch = globalThis.fetch;
   let user: User;
 
@@ -52,7 +43,6 @@ describe('dolthubRouter', () => {
 
   afterEach(async () => {
     globalThis.fetch = originalFetch;
-    setNodeEnv(originalNodeEnv);
     await db
       .delete(platform_integrations)
       .where(
@@ -64,14 +54,7 @@ describe('dolthubRouter', () => {
   });
 
   describe('getInstallation', () => {
-    test('returns installed: false in production', async () => {
-      setNodeEnv('production');
-      const caller = await createCallerForUser(user.id);
-      const result = await caller.dolthub.getInstallation();
-      expect(result).toEqual({ installed: false, installation: null });
-    });
-
-    test('returns the persisted row when present in dev', async () => {
+    test('returns the persisted row when present', async () => {
       await db.insert(platform_integrations).values({
         owned_by_user_id: user.id,
         owned_by_organization_id: null,
@@ -93,7 +76,7 @@ describe('dolthubRouter', () => {
       expect(result.installation?.installedAt).toBeTruthy();
     });
 
-    test('returns installed: false when no integration exists in dev', async () => {
+    test('returns installed: false when no integration exists', async () => {
       const caller = await createCallerForUser(user.id);
       const result = await caller.dolthub.getInstallation();
       expect(result).toEqual({ installed: false, installation: null });
@@ -101,15 +84,7 @@ describe('dolthubRouter', () => {
   });
 
   describe('disconnect', () => {
-    test('throws in production', async () => {
-      setNodeEnv('production');
-      const caller = await createCallerForUser(user.id);
-      await expect(caller.dolthub.disconnect()).rejects.toMatchObject({
-        code: 'NOT_FOUND',
-      });
-    });
-
-    test('removes the integration in dev', async () => {
+    test('removes the integration', async () => {
       await db.insert(platform_integrations).values({
         owned_by_user_id: user.id,
         owned_by_organization_id: null,
@@ -138,13 +113,6 @@ describe('dolthubRouter', () => {
   });
 
   describe('getInstallationCredentials', () => {
-    test('returns null in production', async () => {
-      setNodeEnv('production');
-      const caller = await createCallerForUser(user.id);
-      const result = await caller.dolthub.getInstallationCredentials();
-      expect(result).toBeNull();
-    });
-
     test('returns null when no integration exists', async () => {
       const caller = await createCallerForUser(user.id);
       const result = await caller.dolthub.getInstallationCredentials();
@@ -210,14 +178,6 @@ describe('dolthubRouter', () => {
   });
 
   describe('rememberUsername', () => {
-    test('throws in production', async () => {
-      setNodeEnv('production');
-      const caller = await createCallerForUser(user.id);
-      await expect(caller.dolthub.rememberUsername({ username: 'me' })).rejects.toMatchObject({
-        code: 'NOT_FOUND',
-      });
-    });
-
     test('errors with PRECONDITION_FAILED when no integration exists', async () => {
       const caller = await createCallerForUser(user.id);
       await expect(caller.dolthub.rememberUsername({ username: 'me' })).rejects.toMatchObject({
@@ -277,13 +237,6 @@ describe('dolthubRouter', () => {
   });
 
   describe('resolveUsername', () => {
-    test('returns null in production', async () => {
-      setNodeEnv('production');
-      const caller = await createCallerForUser(user.id);
-      const result = await caller.dolthub.resolveUsername();
-      expect(result).toBeNull();
-    });
-
     test('returns null when no integration exists', async () => {
       const caller = await createCallerForUser(user.id);
       const result = await caller.dolthub.resolveUsername();
@@ -431,16 +384,6 @@ describe('dolthubRouter', () => {
       await expect(caller.dolthub.verifyUpstream({ upstream: 'no-slash' })).rejects.toThrow(
         /Must be in the format owner\/repo/
       );
-    });
-
-    test('returns exists=false with a dev-only message in production', async () => {
-      setNodeEnv('production');
-      const caller = await createCallerForUser(user.id);
-      const result = await caller.dolthub.verifyUpstream({ upstream: 'foo/bar' });
-      expect(result).toEqual({
-        exists: false,
-        reason: 'DoltHub integration unavailable in production',
-      });
     });
   });
 });

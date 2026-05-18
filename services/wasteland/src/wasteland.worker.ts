@@ -337,9 +337,7 @@ app.get('/debug/wastelands/:wastelandId/auth-probe', async c => {
     }
   }
 
-  // Resolve a fresh OAuth token via apps/web's internal endpoint
-  // (returns 'unavailable' / 'not-installed' in production where OAuth
-  // is dev-only).
+  // Resolve a fresh OAuth token via apps/web's internal endpoint.
   const { fetchFreshDoltHubToken } = await import('./util/dolthub-token.util');
   const fresh = await fetchFreshDoltHubToken(c.env, { userId });
   const freshToken = fresh.status === 'ok' ? fresh.data.token : null;
@@ -767,7 +765,32 @@ app.use(
       orgMemberships: c.get('kiloOrgMemberships') ?? [],
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {
-      console.error(`[wasteland-trpc] error on ${path ?? 'unknown'}:`, error.message);
+      // Walk the cause chain so the underlying DoltHub error (or whatever
+      // the real failure was) is visible in the dev-server log, not just
+      // the wrapped envelope's outer message.
+      const chain: string[] = [];
+      let cur: unknown = error;
+      while (cur instanceof Error) {
+        const next: {
+          message: string;
+          code?: string;
+          status?: number;
+          body?: unknown;
+          url?: string;
+        } = {
+          message: cur.message,
+        };
+        const c = cur as { code?: unknown; status?: unknown; body?: unknown; url?: unknown };
+        if (typeof c.code === 'string') next.code = c.code;
+        if (typeof c.status === 'number') next.status = c.status;
+        if (typeof c.url === 'string') next.url = c.url;
+        if (c.body !== undefined) next.body = c.body;
+        chain.push(JSON.stringify(next));
+        cur = (cur as { cause?: unknown }).cause;
+      }
+      console.error(
+        `[wasteland-trpc] error on ${path ?? 'unknown'}: ${chain.join(' \u2190 caused by \u2190 ')}`
+      );
       if (!(error instanceof TRPCError)) {
         Sentry.captureException(error);
       }

@@ -13,11 +13,6 @@
  * (same pattern as other `/api/internal/...` routes — see
  * `apps/web/src/app/api/internal/triage/post-comment/route.ts`).
  *
- * Dev-only: the underlying `dolthub-service` is `assertDevOnly` because
- * the OAuth integration isn't yet GA. In production wastelands use
- * manual long-lived API tokens stored at connect time, which never
- * need refresh, so this endpoint is not reached.
- *
  * URL: POST /api/internal/integrations/dolthub/token
  */
 
@@ -41,13 +36,6 @@ export async function POST(req: NextRequest) {
   const secret = req.headers.get('X-Internal-Secret');
   if (!INTERNAL_API_SECRET || secret !== INTERNAL_API_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  if (process.env.NODE_ENV === 'production') {
-    // The DoltHub OAuth path is dev-only. Returning 404 (not 501) keeps
-    // this endpoint indistinguishable from a missing route on prod, so a
-    // misconfigured wasteland talking to a prod web app fails closed.
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   let body: unknown;

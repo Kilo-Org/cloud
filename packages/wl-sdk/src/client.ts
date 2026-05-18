@@ -34,10 +34,12 @@ import { join, type JoinOptions, type JoinResult } from './ops/join';
 import { leave, type LeaveResult } from './ops/leave';
 import { browse, type BrowseEntry, type BrowseFilter } from './ops/browse';
 import { post, type PostOptions } from './ops/post';
+import { edit, type EditOptions } from './ops/edit';
 import { claim } from './ops/claim';
 import { unclaim } from './ops/unclaim';
 import { done } from './ops/done';
 import { accept, type AcceptOptions } from './ops/accept';
+import { acceptUpstream, type AcceptUpstreamOptions } from './ops/accept-upstream';
 import { reject, type RejectOptions } from './ops/reject';
 import { close } from './ops/close';
 import { publish, type PublishOptions } from './ops/publish';
@@ -81,6 +83,9 @@ export type WlClientConfig = {
 /** Plain inputs accepted by {@link WlClient.post}. */
 export type PostInput = Omit<PostOptions, 'ctx'>;
 
+/** Plain inputs accepted by {@link WlClient.edit}. */
+export type EditInput = Omit<EditOptions, 'ctx'>;
+
 /**
  * Plain inputs accepted by {@link WlClient.done}.
  *
@@ -95,6 +100,8 @@ export type DoneInput = {
 
 /** Plain inputs accepted by {@link WlClient.accept}. */
 export type AcceptInput = Omit<AcceptOptions, 'ctx' | 'wantedId'>;
+
+export type AcceptUpstreamClientInput = Omit<AcceptUpstreamOptions, 'ctx' | 'wantedId'>;
 
 /** Plain inputs accepted by {@link WlClient.reject}. */
 export type RejectInput = Omit<RejectOptions, 'ctx' | 'wantedId'>;
@@ -254,6 +261,10 @@ export class WlClient {
     return unwrap(await post({ ...input, ctx: this.#ctx() }), this.#config.onError);
   }
 
+  async edit(input: EditInput): Promise<MutationOutcome> {
+    return unwrap(await edit({ ...input, ctx: this.#ctx() }), this.#config.onError);
+  }
+
   async claim(wantedId: string): Promise<MutationOutcome> {
     return unwrap(await claim({ ctx: this.#ctx(), wantedId }), this.#config.onError);
   }
@@ -280,6 +291,13 @@ export class WlClient {
 
   async accept(wantedId: string, input: AcceptInput): Promise<AcceptOutcome> {
     return unwrap(await accept({ ...input, ctx: this.#ctx(), wantedId }), this.#config.onError);
+  }
+
+  async acceptUpstream(wantedId: string, input: AcceptUpstreamClientInput): Promise<AcceptOutcome> {
+    return unwrap(
+      await acceptUpstream({ ...input, ctx: this.#ctx(), wantedId }),
+      this.#config.onError
+    );
   }
 
   async reject(wantedId: string, input: RejectInput = {}): Promise<MutationOutcome> {
@@ -349,6 +367,7 @@ export class WlClient {
     unwrap(
       await discardBranch({
         auth: this.#auth,
+        upstream: this.#upstream,
         fork: this.#fork,
         branchName: makeWlBranch(this.#config.rigHandle, wantedId),
         fetch: this.#config.fetch,

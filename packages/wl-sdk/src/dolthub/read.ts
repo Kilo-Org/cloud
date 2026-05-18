@@ -2,11 +2,12 @@
  * DoltHub read API — `GET /{owner}/{db}[/{ref}]?q=...`.
  *
  * Implements the **anonymous-read fallback**: if a token-authenticated
- * request returns 404 or a 4xx body containing `"no such repository"`,
- * retry the same request anonymously. This works around DoltHub's
- * habit of returning "repository not found" when an authenticated token
- * reads a public repo whose identity it doesn't own. Mirrors `doGet`
- * in `wasteland/internal/backend/remote.go`.
+ * request returns 404, a 4xx body containing `"no such repository"`, or
+ * DoltHub's branchless-read `"must include a refName"` error, retry the
+ * same request anonymously. This works around DoltHub's habit of returning
+ * auth-path-only errors when a token reads a public repo whose identity it
+ * doesn't own. Mirrors `doGet` in `wasteland/internal/backend/remote.go`
+ * plus the branchless-read behavior observed in the TypeScript SDK path.
  */
 
 import { z } from 'zod';
@@ -54,13 +55,16 @@ export type DoltReadOptions = {
  * the auth header. Mirrors `shouldRetryAnonymously` in remote.go:
  *   - HTTP 404 always retries.
  *   - any 4xx whose body contains `"no such repository"` retries.
+ *   - any 4xx whose body contains `"must include a refName"` retries;
+ *     DoltHub requires refs on token-authenticated reads but accepts the
+ *     same public-repo read anonymously.
  * 5xx never retries (transient upstream failure).
  */
 export function shouldRetryAnonymously(status: number, body: unknown, text: string): boolean {
   if (status === 404) return true;
   if (status < 400 || status >= 500) return false;
   const haystack = typeof body === 'string' ? body : text;
-  return /no such repository/i.test(haystack);
+  return /no such repository/i.test(haystack) || /must include a refName/i.test(haystack);
 }
 
 function buildReadPath(owner: string, db: string, ref: string | undefined): string {

@@ -119,6 +119,8 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       output: {
         success: boolean;
+        wantedId: string;
+        pr_url: string | null;
       };
       meta: object;
     }>;
@@ -352,10 +354,30 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
         branchName: string;
         wantedId: string;
         wantedTitle: string | null;
+        wantedRowOnBranch: {
+          id: string;
+          title: string;
+          description: string | null;
+          project: string | null;
+          type: string | null;
+          priority: string | number | null;
+          tags: string | null;
+          posted_by: string | null;
+          claimed_by: string | null;
+          status: string;
+          effort_level: string | null;
+          evidence_url: string | null;
+          sandbox_required: string | number | null;
+          sandbox_scope: string | null;
+          sandbox_min_tier: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        } | null;
         wantedStatusOnBranch: 'open' | 'claimed' | 'in_review' | 'completed' | 'unknown';
         wantedStatusOnMain: 'open' | 'claimed' | 'in_review' | 'completed' | 'unknown';
         divergence: 'in-sync' | 'ahead' | 'diverged';
         hasOpenPR: boolean;
+        pullState: 'closed' | 'merged' | 'open' | null;
         prUrl: string | null;
         lastCommitAt: string | null;
       }>;
@@ -436,6 +458,21 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
+    editWantedItem: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        itemId: string;
+        title?: string | undefined;
+        description?: string | undefined;
+        priority?: 'critical' | 'high' | 'low' | 'medium' | undefined;
+        type?: 'bug' | 'docs' | 'feature' | 'other' | undefined;
+      };
+      output: {
+        success: boolean;
+        pr_url: string | null;
+      };
+      meta: object;
+    }>;
     markWantedItemDone: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         wastelandId: string;
@@ -453,6 +490,9 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
         wastelandId: string;
         itemId: string;
         quality: 'excellent' | 'fair' | 'good' | 'poor';
+        reliability?: 'excellent' | 'fair' | 'good' | 'poor' | undefined;
+        severity?: 'branch' | 'leaf' | 'root' | undefined;
+        skillTags?: string[] | undefined;
         message?: string | undefined;
         direct?: boolean | undefined;
       };
@@ -1168,10 +1208,30 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
             branchName: string;
             wantedId: string;
             wantedTitle: string | null;
+            wantedRowOnBranch: {
+              id: string;
+              title: string;
+              description: string | null;
+              project: string | null;
+              type: string | null;
+              priority: string | number | null;
+              tags: string | null;
+              posted_by: string | null;
+              claimed_by: string | null;
+              status: string;
+              effort_level: string | null;
+              evidence_url: string | null;
+              sandbox_required: string | number | null;
+              sandbox_scope: string | null;
+              sandbox_min_tier: string | null;
+              created_at: string | null;
+              updated_at: string | null;
+            } | null;
             wantedStatusOnBranch: 'open' | 'claimed' | 'in_review' | 'completed' | 'unknown';
             wantedStatusOnMain: 'open' | 'claimed' | 'in_review' | 'completed' | 'unknown';
             divergence: 'in-sync' | 'ahead' | 'diverged';
             hasOpenPR: boolean;
+            pullState: 'closed' | 'merged' | 'open' | null;
             prUrl: string | null;
             lastCommitAt: string | null;
           }>;
@@ -1249,6 +1309,23 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
           };
           output: {
             success: boolean;
+            wantedId: string;
+            pr_url: string | null;
+          };
+          meta: object;
+        }>;
+        editWantedItem: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+            itemId: string;
+            title?: string | undefined;
+            description?: string | undefined;
+            priority?: 'critical' | 'high' | 'low' | 'medium' | undefined;
+            type?: 'bug' | 'docs' | 'feature' | 'other' | undefined;
+          };
+          output: {
+            success: boolean;
+            pr_url: string | null;
           };
           meta: object;
         }>;
@@ -1269,6 +1346,9 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
             wastelandId: string;
             itemId: string;
             quality: 'excellent' | 'fair' | 'good' | 'poor';
+            reliability?: 'excellent' | 'fair' | 'good' | 'poor' | undefined;
+            severity?: 'branch' | 'leaf' | 'root' | undefined;
+            skillTags?: string[] | undefined;
             message?: string | undefined;
             direct?: boolean | undefined;
           };

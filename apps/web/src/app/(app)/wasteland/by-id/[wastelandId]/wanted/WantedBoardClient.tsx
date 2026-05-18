@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import type { WastelandOutputs } from '@/lib/wasteland/trpc';
@@ -36,6 +36,9 @@ type WantedItem = WastelandOutputs['wasteland']['browseWantedBoard'][number];
 
 type SortField = 'priority' | 'activity';
 
+const STATUS_FILTERS = ['open', 'claimed', 'in_review', 'completed'] as const;
+type StatusFilter = (typeof STATUS_FILTERS)[number];
+
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   claimed: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -68,6 +71,16 @@ const TYPE_COLORS: Record<string, string> = {
   other: 'bg-white/[0.04] text-white/40 border-white/10',
 };
 
+function parseStatusFilter(value: string | null | undefined): StatusFilter | 'all' {
+  if (value === 'all') return 'all';
+  if (value && STATUS_FILTERS.includes(value as StatusFilter)) return value as StatusFilter;
+  return 'open';
+}
+
+function parseSortField(value: string | null | undefined): SortField {
+  return value === 'priority' ? 'priority' : 'activity';
+}
+
 // ── Slow operation toast helper ──────────────────────────────────────────
 
 const COLD_START_DELAY_MS = 3000;
@@ -76,7 +89,7 @@ const COLD_START_DELAY_MS = 3000;
  * Shows a "Starting wasteland container..." toast if an operation takes
  * longer than 3 seconds (likely a cold start).
  */
-function useSlowOperationToast(isPending: boolean) {
+export function useSlowOperationToast(isPending: boolean) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastIdRef = useRef<string | number | null>(null);
 
@@ -134,24 +147,36 @@ export function WantedBoardClient({
   const trpc = useWastelandTRPC();
   const queryClient = useQueryClient();
   const { open: openDrawer } = useDrawerStack();
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Auto-open the wanted-item drawer when the page is loaded with
-  // `?itemId=...` (e.g. from a deep link in the gastown bead drawer).
-  // The `wanted-item-by-id` entry fetches the item directly so we don't
-  // have to wait for the board query before opening.
-  const autoOpenedItemRef = useRef<string | null>(null);
-  useEffect(() => {
-    const itemId = searchParams?.get('itemId');
-    if (!itemId) return;
-    if (autoOpenedItemRef.current === itemId) return;
-    autoOpenedItemRef.current = itemId;
-    openDrawer({ type: 'wanted-item-by-id', wastelandId, itemId });
-  }, [searchParams, openDrawer, wastelandId]);
+  const statusFilter = parseStatusFilter(searchParams?.get('status'));
+  const search = searchParams?.get('q') ?? '';
+  const sortField = parseSortField(searchParams?.get('sort'));
 
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [sortField, setSortField] = useState<SortField>('activity');
+  const updateFilterParams = useCallback(
+    (updates: { status?: StatusFilter | 'all'; q?: string; sort?: SortField }) => {
+      const next = new URLSearchParams(searchParams?.toString());
+      if (updates.status !== undefined) {
+        if (updates.status === 'all') next.set('status', 'all');
+        else if (updates.status === 'open') next.delete('status');
+        else next.set('status', updates.status);
+      }
+      if (updates.q !== undefined) {
+        const trimmed = updates.q.trim();
+        if (trimmed) next.set('q', trimmed);
+        else next.delete('q');
+      }
+      if (updates.sort !== undefined) {
+        if (updates.sort === 'activity') next.delete('sort');
+        else next.set('sort', updates.sort);
+      }
+      const query = next.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
   // Dialog state
   const [doneItem, setDoneItem] = useState<WantedItem | null>(null);
@@ -159,7 +184,6 @@ export function WantedBoardClient({
   const [rejectItem, setRejectItem] = useState<WantedItem | null>(null);
   const [closeItem, setCloseItem] = useState<WantedItem | null>(null);
   const [unclaimItem, setUnclaimItem] = useState<WantedItem | null>(null);
-  const [showPostDialog, setShowPostDialog] = useState(false);
 
   const wantedQuery = useQuery({
     ...trpc.wasteland.browseWantedBoard.queryOptions({ wastelandId }),
@@ -172,6 +196,33 @@ export function WantedBoardClient({
     trpc.wasteland.getCredentialStatus.queryOptions({ wastelandId })
   );
   const isAdmin = credentialQuery.data?.is_upstream_admin ?? false;
+
+  // Auto-open the wanted-item drawer when the page is loaded with
+  // `?itemId=...` (e.g. from a deep link in the gastown bead drawer).
+  // The `wanted-item-by-id` entry fetches the item directly so we don't
+  // have to wait for the board query before opening.
+  const autoOpenedItemRef = useRef<string | null>(null);
+  useEffect(() => {
+    const itemId = searchParams?.get('itemId');
+    if (!itemId) return;
+    if (autoOpenedItemRef.current === itemId) return;
+    autoOpenedItemRef.current = itemId;
+    openDrawer({
+      type: 'wanted-item-by-id',
+      wastelandId,
+      itemId,
+      actions: isUpstream
+        ? null
+        : {
+            isAdmin,
+            onDone: setDoneItem,
+            onAccept: setAcceptItem,
+            onReject: setRejectItem,
+            onCloseItem: setCloseItem,
+            onUnclaim: setUnclaimItem,
+          },
+    });
+  }, [searchParams, openDrawer, wastelandId, isUpstream, isAdmin]);
 
   // This user's open claim/done/edit PRs on upstream. Used to decorate
   // rows with a "Pending review" badge between submit-click and admin-
@@ -252,7 +303,7 @@ export function WantedBoardClient({
   const filteredItems = useMemo(() => {
     let result = items;
 
-    if (statusFilter) {
+    if (statusFilter !== 'all') {
       result = result.filter(item => item.status === statusFilter);
     }
 
@@ -278,8 +329,8 @@ export function WantedBoardClient({
   }, [refreshMutation, wastelandId]);
 
   const toggleSort = useCallback(() => {
-    setSortField(prev => (prev === 'priority' ? 'activity' : 'priority'));
-  }, []);
+    updateFilterParams({ sort: sortField === 'priority' ? 'activity' : 'priority' });
+  }, [sortField, updateFilterParams]);
 
   const handleOpenItem = useCallback(
     (item: WantedItem) => {
@@ -299,6 +350,10 @@ export function WantedBoardClient({
               onCloseItem: setCloseItem,
               onUnclaim: setUnclaimItem,
             },
+        links:
+          isUpstream && workshopBasePath
+            ? { workshopHref: `${workshopBasePath}/fork?wantedId=${encodeURIComponent(item.id)}` }
+            : undefined,
         // Default-tab selection: the upstream view opens on Upstream
         // (read-only), the legacy fork view opens on My branch so the
         // user lands on actionable affordances. The drawer falls back
@@ -310,23 +365,26 @@ export function WantedBoardClient({
   );
 
   // Contribute page title, item count, and CTAs into the wasteland navbar.
-  // In upstream mode we hide "Post Wanted Item" — posting is fork-only.
   useSetWastelandPageHeader({
     title: headerTitle ?? (isUpstream ? 'Upstream' : 'Wanted Board'),
     icon: <ScrollText className="size-4 text-[color:oklch(70%_0.15_30_/_0.6)]" />,
     count: items.length,
     actions: (
       <>
-        {!isUpstream && (
-          <button
-            type="button"
-            onClick={() => setShowPostDialog(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/80"
-          >
-            <Plus className="size-3" />
-            Post Wanted Item
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() =>
+            openDrawer({
+              type: 'post-wanted-item',
+              wastelandId,
+              onSuccess: invalidateBoard,
+            })
+          }
+          className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/80"
+        >
+          <Plus className="size-3" />
+          Post Wanted Item
+        </button>
         <button
           type="button"
           onClick={handleRefresh}
@@ -353,7 +411,7 @@ export function WantedBoardClient({
               type="text"
               placeholder="Search wanted items..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => updateFilterParams({ q: e.target.value })}
               className="w-48 bg-transparent text-xs text-white/80 outline-none placeholder:text-white/25"
             />
           </div>
@@ -363,16 +421,18 @@ export function WantedBoardClient({
             <FilterChip
               label="All"
               count={items.length}
-              active={statusFilter === null}
-              onClick={() => setStatusFilter(null)}
+              active={statusFilter === 'all'}
+              onClick={() => updateFilterParams({ status: 'all' })}
             />
-            {(['open', 'claimed', 'in_review', 'completed'] as const).map(status => (
+            {STATUS_FILTERS.map(status => (
               <FilterChip
                 key={status}
                 label={status}
                 count={statusCounts[status] ?? 0}
                 active={statusFilter === status}
-                onClick={() => setStatusFilter(statusFilter === status ? null : status)}
+                onClick={() =>
+                  updateFilterParams({ status: statusFilter === status ? 'all' : status })
+                }
                 dotColor={STATUS_DOT[status]}
               />
             ))}
@@ -397,7 +457,7 @@ export function WantedBoardClient({
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <ScrollText className="mb-3 size-8 text-white/10" />
               <p className="text-sm text-white/30">
-                {search || statusFilter
+                {search || statusFilter !== 'all'
                   ? 'No wanted items match your filters.'
                   : 'No wanted items yet.'}
               </p>
@@ -493,9 +553,8 @@ export function WantedBoardClient({
         </div>
       </div>
 
-      {/* Mutation dialogs are fork-only. In upstream mode the drawer
-          passes `actions: null`, so these dialogs can never open — we
-          skip mounting them entirely to keep the read-only view honest. */}
+      {/* Drawer item actions are fork/workshop-only, but posting a wanted
+          item should be available from the upstream board too. */}
       {!isUpstream && (
         <>
           <MarkDoneDialog
@@ -528,12 +587,6 @@ export function WantedBoardClient({
             onClose={() => setUnclaimItem(null)}
             onSuccess={invalidateBoard}
           />
-          <PostWantedItemDialog
-            wastelandId={wastelandId}
-            open={showPostDialog}
-            onClose={() => setShowPostDialog(false)}
-            onSuccess={invalidateBoard}
-          />
         </>
       )}
     </div>
@@ -542,7 +595,7 @@ export function WantedBoardClient({
 
 // ── Mark done dialog ─────────────────────────────────────────────────────
 
-function MarkDoneDialog({
+export function MarkDoneDialog({
   wastelandId,
   item,
   onClose,
@@ -651,7 +704,7 @@ function MarkDoneDialog({
 
 // ── Accept dialog ────────────────────────────────────────────────────────
 
-function AcceptDialog({
+export function AcceptDialog({
   wastelandId,
   item,
   onClose,
@@ -664,6 +717,9 @@ function AcceptDialog({
 }) {
   const trpc = useWastelandTRPC();
   const [quality, setQuality] = useState<'excellent' | 'good' | 'fair' | 'poor'>('good');
+  const [reliability, setReliability] = useState<'excellent' | 'good' | 'fair' | 'poor'>('good');
+  const [severity, setSeverity] = useState<'leaf' | 'branch' | 'root'>('leaf');
+  const [skillTags, setSkillTags] = useState('');
   // `message` maps to `wl accept --message` — it's recorded on the stamp,
   // not as a free-form PR comment.
   const [message, setMessage] = useState('');
@@ -682,6 +738,9 @@ function AcceptDialog({
 
   const handleClose = useCallback(() => {
     setQuality('good');
+    setReliability('good');
+    setSeverity('leaf');
+    setSkillTags('');
     setMessage('');
     onClose();
   }, [onClose]);
@@ -694,10 +753,13 @@ function AcceptDialog({
         wastelandId,
         itemId: item.id,
         quality,
+        reliability,
+        severity,
+        skillTags: splitSkillTags(skillTags),
         message: message.trim() || undefined,
       });
     },
-    [acceptMutation, wastelandId, item, quality, message]
+    [acceptMutation, wastelandId, item, quality, reliability, severity, skillTags, message]
   );
 
   return (
@@ -742,6 +804,63 @@ function AcceptDialog({
             </select>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label
+                htmlFor="accept-reliability"
+                className="mb-1.5 block text-xs font-medium text-white/60"
+              >
+                Reliability
+              </label>
+              <select
+                id="accept-reliability"
+                value={reliability}
+                onChange={e => setReliability(e.target.value as typeof reliability)}
+                className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none focus:border-white/20"
+              >
+                <option value="excellent">Excellent</option>
+                <option value="good">Good</option>
+                <option value="fair">Fair</option>
+                <option value="poor">Poor</option>
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="accept-severity"
+                className="mb-1.5 block text-xs font-medium text-white/60"
+              >
+                Severity
+              </label>
+              <select
+                id="accept-severity"
+                value={severity}
+                onChange={e => setSeverity(e.target.value as typeof severity)}
+                className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none focus:border-white/20"
+              >
+                <option value="leaf">Leaf</option>
+                <option value="branch">Branch</option>
+                <option value="root">Root</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="accept-skills"
+              className="mb-1.5 block text-xs font-medium text-white/60"
+            >
+              Skill tags (optional)
+            </label>
+            <input
+              id="accept-skills"
+              value={skillTags}
+              onChange={e => setSkillTags(e.target.value)}
+              placeholder="go, federation"
+              className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none placeholder:text-white/25 focus:border-white/20"
+            />
+          </div>
+
           <div>
             <label
               htmlFor="accept-message"
@@ -783,9 +902,17 @@ function AcceptDialog({
   );
 }
 
+function splitSkillTags(value: string): string[] | undefined {
+  const tags = value
+    .split(',')
+    .map(tag => tag.trim())
+    .filter(Boolean);
+  return tags.length > 0 ? tags : undefined;
+}
+
 // ── Reject dialog ────────────────────────────────────────────────────────
 
-function RejectDialog({
+export function RejectDialog({
   wastelandId,
   item,
   onClose,
@@ -898,7 +1025,7 @@ function RejectDialog({
 
 // ── Close-item dialog ────────────────────────────────────────────────────
 
-function CloseItemDialog({
+export function CloseItemDialog({
   wastelandId,
   item,
   onClose,
@@ -976,7 +1103,7 @@ function CloseItemDialog({
 
 // ── Unclaim dialog ───────────────────────────────────────────────────────
 
-function UnclaimDialog({
+export function UnclaimDialog({
   wastelandId,
   item,
   onClose,
@@ -1052,176 +1179,6 @@ function UnclaimDialog({
             Unclaim
           </button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Post wanted item dialog ──────────────────────────────────────────────
-
-function PostWantedItemDialog({
-  wastelandId,
-  open,
-  onClose,
-  onSuccess,
-}: {
-  wastelandId: string;
-  open: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const trpc = useWastelandTRPC();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
-  const [type, setType] = useState<'feature' | 'bug' | 'docs' | 'other'>('feature');
-
-  const postMutation = useMutation({
-    ...trpc.wasteland.postWantedItem.mutationOptions(),
-    onSuccess: () => {
-      toast.success('Wanted item posted');
-      onSuccess();
-      handleClose();
-    },
-    onError: err => {
-      toast.error(err.message || 'Failed to post wanted item');
-    },
-  });
-
-  useSlowOperationToast(postMutation.isPending);
-
-  const handleClose = useCallback(() => {
-    setTitle('');
-    setDescription('');
-    setPriority('medium');
-    setType('feature');
-    onClose();
-  }, [onClose]);
-
-  const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (title.trim() && description.trim()) {
-        postMutation.mutate({
-          wastelandId,
-          title: title.trim(),
-          description: description.trim(),
-          priority,
-          type,
-        });
-      }
-    },
-    [postMutation, wastelandId, title, description, priority, type]
-  );
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={openState => {
-        if (!openState) handleClose();
-      }}
-    >
-      <DialogContent className="border-white/10 bg-[color:oklch(0.155_0_0)]">
-        <DialogHeader>
-          <DialogTitle className="text-white/90">Post wanted item</DialogTitle>
-          <DialogDescription className="text-white/50">
-            Post a new item to the wanted board.
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="post-title" className="mb-1.5 block text-xs font-medium text-white/60">
-              Title
-            </label>
-            <input
-              id="post-title"
-              type="text"
-              required
-              maxLength={256}
-              placeholder="Brief title for the wanted item"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none placeholder:text-white/25 focus:border-white/20"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="post-description"
-              className="mb-1.5 block text-xs font-medium text-white/60"
-            >
-              Description
-            </label>
-            <textarea
-              id="post-description"
-              required
-              maxLength={4096}
-              rows={4}
-              placeholder="Detailed description of what's needed..."
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              className="w-full resize-none rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none placeholder:text-white/25 focus:border-white/20"
-            />
-          </div>
-
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label
-                htmlFor="post-priority"
-                className="mb-1.5 block text-xs font-medium text-white/60"
-              >
-                Priority
-              </label>
-              <select
-                id="post-priority"
-                value={priority}
-                onChange={e => setPriority(e.target.value as typeof priority)}
-                className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none focus:border-white/20"
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </div>
-
-            <div className="flex-1">
-              <label htmlFor="post-type" className="mb-1.5 block text-xs font-medium text-white/60">
-                Type
-              </label>
-              <select
-                id="post-type"
-                value={type}
-                onChange={e => setType(e.target.value as typeof type)}
-                className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none focus:border-white/20"
-              >
-                <option value="feature">Feature</option>
-                <option value="bug">Bug</option>
-                <option value="docs">Docs</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={postMutation.isPending}
-              className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-white/60 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={postMutation.isPending || !title.trim() || !description.trim()}
-              className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-500 disabled:opacity-50"
-            >
-              {postMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
-              Post
-            </button>
-          </DialogFooter>
-        </form>
       </DialogContent>
     </Dialog>
   );

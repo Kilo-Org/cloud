@@ -7,18 +7,12 @@ import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
-import { DOLTHUB_APP_DEV_CLIENT_ID, DOLTHUB_APP_DEV_CLIENT_SECRET } from '@/lib/config.server';
+import { DOLTHUB_APP_CLIENT_ID, DOLTHUB_APP_CLIENT_SECRET } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
 
 const DOLTHUB_TOKEN_URL = 'https://www.dolthub.com/api/oauth/access_token';
 const DOLTHUB_AUTHORIZE_URL = 'https://www.dolthub.com/oauth/authorize';
 const DOLTHUB_API_BASE = 'https://www.dolthub.com/api/v1alpha1';
-
-function assertDevOnly(): void {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('DoltHub integration is dev-only and not available in production');
-  }
-}
 
 function getOwnershipConditions(owner: Owner) {
   return owner.type === 'user'
@@ -46,10 +40,8 @@ export const DOLTHUB_SCOPES = ['api_read_write'];
 export const DOLTHUB_REDIRECT_URI = `${APP_URL}/api/integrations/dolthub/callback`;
 
 export function getDoltHubOAuthUrl(state: string): string {
-  assertDevOnly();
-
   const params = new URLSearchParams({
-    client_id: DOLTHUB_APP_DEV_CLIENT_ID,
+    client_id: DOLTHUB_APP_CLIENT_ID,
     response_type: 'code',
     scope: DOLTHUB_SCOPES.join(','),
     redirect_uri: DOLTHUB_REDIRECT_URI,
@@ -91,8 +83,6 @@ function parseDoltHubTokenPayload(
 }
 
 export async function exchangeDoltHubOAuthCode(code: string): Promise<DoltHubTokenResponse> {
-  assertDevOnly();
-
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
@@ -103,7 +93,7 @@ export async function exchangeDoltHubOAuthCode(code: string): Promise<DoltHubTok
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: `Basic ${btoa(`${DOLTHUB_APP_DEV_CLIENT_ID}:${DOLTHUB_APP_DEV_CLIENT_SECRET}`)}`,
+      Authorization: `Basic ${btoa(`${DOLTHUB_APP_CLIENT_ID}:${DOLTHUB_APP_CLIENT_SECRET}`)}`,
     },
     body: body.toString(),
   });
@@ -118,8 +108,6 @@ export async function exchangeDoltHubOAuthCode(code: string): Promise<DoltHubTok
 export async function refreshDoltHubAccessToken(
   refreshToken: string
 ): Promise<DoltHubTokenResponse> {
-  assertDevOnly();
-
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
@@ -130,7 +118,7 @@ export async function refreshDoltHubAccessToken(
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: `Basic ${btoa(`${DOLTHUB_APP_DEV_CLIENT_ID}:${DOLTHUB_APP_DEV_CLIENT_SECRET}`)}`,
+      Authorization: `Basic ${btoa(`${DOLTHUB_APP_CLIENT_ID}:${DOLTHUB_APP_CLIENT_SECRET}`)}`,
     },
     body: body.toString(),
   });
@@ -143,8 +131,6 @@ export async function refreshDoltHubAccessToken(
 }
 
 export async function getInstallation(owner: Owner): Promise<PlatformIntegration | null> {
-  assertDevOnly();
-
   const [integration] = await db
     .select()
     .from(platform_integrations)
@@ -164,8 +150,6 @@ export async function upsertDoltHubInstallation({
   owner: Owner;
   tokens: DoltHubTokenResponse;
 }): Promise<PlatformIntegration> {
-  assertDevOnly();
-
   const expiresAt = tokens.expiresIn ? Date.now() + tokens.expiresIn * 1000 : null;
 
   const metadata = {
@@ -233,8 +217,6 @@ export async function upsertDoltHubInstallation({
 }
 
 export async function uninstall(owner: Owner): Promise<{ success: boolean }> {
-  assertDevOnly();
-
   const ownershipConditions = getOwnershipConditions(owner);
 
   await db
@@ -268,8 +250,6 @@ function readMetadata(integration: PlatformIntegration): DoltHubMetadata {
 export async function getValidDoltHubToken(
   integration: PlatformIntegration
 ): Promise<string | null> {
-  assertDevOnly();
-
   const metadata = readMetadata(integration);
 
   if (!metadata.access_token) {
@@ -337,8 +317,6 @@ const DoltHubUserResponse = z
 export async function getDoltHubUser(
   integration: PlatformIntegration
 ): Promise<{ username: string } | null> {
-  assertDevOnly();
-
   const cached = getCachedDoltHubUsername(integration);
   if (cached) return { username: cached };
 
@@ -440,8 +418,6 @@ export async function verifyDoltHubUpstreamExists(
   upstream: string,
   token: string | null
 ): Promise<VerifyUpstreamResult> {
-  assertDevOnly();
-
   // Stage 1: anonymous probe. Branch is omitted so DoltHub auto-resolves
   // the default branch and surfaces it in `commit_ref` on success.
   const stage1 = await runProbe(buildProbeUrl(upstream), null);
@@ -508,8 +484,6 @@ export async function rememberDoltHubUsername(
   integration: PlatformIntegration,
   username: string
 ): Promise<void> {
-  assertDevOnly();
-
   const metadata = readMetadata(integration);
   await db
     .update(platform_integrations)

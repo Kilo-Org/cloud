@@ -32,6 +32,7 @@ import {
   claimViaSdk,
   closeViaSdk,
   doneViaSdk,
+  editViaSdk,
   postViaSdk,
   rejectViaSdk,
   unclaimViaSdk,
@@ -160,6 +161,9 @@ export async function acceptWantedItem(
   input: {
     itemId: string;
     quality: 'excellent' | 'good' | 'fair' | 'poor';
+    reliability?: 'excellent' | 'good' | 'fair' | 'poor';
+    severity?: 'leaf' | 'branch' | 'root';
+    skillTags?: readonly string[];
     message?: string;
     direct?: boolean;
   }
@@ -205,12 +209,31 @@ export async function postWantedItem(
     priority?: z.infer<typeof PriorityEnum>;
     type?: z.infer<typeof TypeEnum>;
     direct?: boolean;
+    publish?: boolean;
   }
-): Promise<{ success: true }> {
+): Promise<{ success: true; wantedId: string; pr_url: string | null }> {
   const ctx = await loadSdkContext(env, wastelandId, userId);
-  await postViaSdk(ctx, input);
+  const result = await postViaSdk(ctx, input);
   meterEvent(env, { event: 'billing.api_operation', userId, wastelandId, label: 'post' });
-  return { success: true };
+  return result;
+}
+
+export async function editWantedItem(
+  env: Env,
+  wastelandId: string,
+  userId: string,
+  input: {
+    itemId: string;
+    title?: string;
+    description?: string;
+    priority?: z.infer<typeof PriorityEnum>;
+    type?: z.infer<typeof TypeEnum>;
+  }
+): Promise<{ success: true; pr_url: string | null }> {
+  const ctx = await loadSdkContext(env, wastelandId, userId);
+  const result = await editViaSdk(ctx, input);
+  meterEvent(env, { event: 'billing.api_operation', userId, wastelandId, label: 'edit' });
+  return result;
 }
 
 export async function markWantedItemDone(

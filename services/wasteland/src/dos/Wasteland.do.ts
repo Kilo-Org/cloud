@@ -191,6 +191,12 @@ export class WastelandDO extends DurableObject<Env> {
     if (!id) return [];
     return townOps.listConnectedTowns(this.sql, id);
   }
+
+  async listConnectedTownsForUser(userId: string): Promise<ConnectedTownResult[]> {
+    const id = this.wastelandId ?? (await this.getConfig())?.wasteland_id;
+    if (!id) return [];
+    return townOps.listConnectedTownsForUser(this.sql, id, userId);
+  }
 }
 
 export function getWastelandDOStub(env: Env, wastelandId: string) {

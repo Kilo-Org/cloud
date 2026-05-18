@@ -6,10 +6,13 @@ import { resolveWastelandUpstreamForUser } from '@/lib/wasteland/server-resolve'
 
 export default async function OrgWantedBoardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; wastelandId: string }>;
+  searchParams: Promise<{ itemId?: string }>;
 }) {
   const { id, wastelandId } = await params;
+  const { itemId } = await searchParams;
   const user = await getUserFromAuthOrRedirect(
     `/users/sign_in?callbackPath=/organizations/${id}/wasteland/${wastelandId}/wanted`
   );
@@ -18,7 +21,8 @@ export default async function OrgWantedBoardPage({
   // /wanted segment).
   const upstream = await resolveWastelandUpstreamForUser(user, wastelandId);
   if (upstream) {
-    redirect(`/wasteland/${upstream.owner}/${upstream.repo}`);
+    const query = itemId ? `?itemId=${encodeURIComponent(itemId)}` : '';
+    redirect(`/wasteland/${upstream.owner}/${upstream.repo}${query}`);
   }
 
   return (

@@ -8,7 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import type { WastelandOutputs } from '@/lib/wasteland/trpc';
-import type { WantedItem, WantedItemTab, WantedPanelActions, WastelandDrawerRef } from './types';
+import type {
+  WantedItem,
+  WantedItemTab,
+  WantedPanelActions,
+  WantedPanelLinks,
+  WastelandDrawerRef,
+} from './types';
 import { WantedItemUpstreamTab } from './WantedItemUpstreamTab';
 import { WantedItemBranchTab } from './WantedItemBranchTab';
 import { WantedItemPullTab } from './WantedItemPullTab';
@@ -38,6 +44,7 @@ export function WantedItemPanel({
   wastelandId,
   item,
   actions,
+  links,
   push,
   initialTab,
 }: {
@@ -45,6 +52,7 @@ export function WantedItemPanel({
   item: WantedItem;
   /** `null` means the panel was pushed as a cross-reference — render read-only. */
   actions: WantedPanelActions | null;
+  links?: WantedPanelLinks;
   push: DrawerStackHelpers<WastelandDrawerRef>['push'];
   initialTab?: WantedItemTab;
 }) {
@@ -84,12 +92,7 @@ export function WantedItemPanel({
   const hasBranch = branch !== null;
   const hasPull = pull !== null;
 
-  const resolvedInitial = useMemo<WantedItemTab>(() => {
-    const requested: WantedItemTab = initialTab ?? 'upstream';
-    if (requested === 'branch' && !hasBranch && !branchLoading) return 'upstream';
-    if (requested === 'pull' && !hasPull && !pullLoading) return 'upstream';
-    return requested;
-  }, [initialTab, hasBranch, hasPull, branchLoading, pullLoading]);
+  const resolvedInitial = useMemo<WantedItemTab>(() => initialTab ?? 'upstream', [initialTab]);
 
   // Once the user manually switches tabs we stop reacting to changes in
   // `resolvedInitial`. But during the initial load the resolved value
@@ -101,15 +104,6 @@ export function WantedItemPanel({
   useEffect(() => {
     if (!userOverrodeRef.current) setTab(resolvedInitial);
   }, [resolvedInitial]);
-
-  // Belt-and-braces: if the currently-selected tab disappears (e.g. the
-  // user clicked My branch while it was loading and the load resolved
-  // to "no branch"), fall back to upstream so we don't render an empty
-  // Tabs body.
-  useEffect(() => {
-    if (tab === 'branch' && !hasBranch && !branchLoading) setTab('upstream');
-    if (tab === 'pull' && !hasPull && !pullLoading) setTab('upstream');
-  }, [tab, hasBranch, branchLoading, hasPull, pullLoading]);
 
   return (
     <div className="flex h-full flex-col">
@@ -140,26 +134,37 @@ export function WantedItemPanel({
         }}
         className="mt-3 flex flex-1 flex-col overflow-hidden"
       >
-        <div className="border-b border-white/[0.06] px-4">
-          <TabsList className="bg-transparent p-0">
-            <TabsTrigger value="upstream" className="data-[state=active]:bg-white/[0.06]">
+        <div className="border-b border-border px-4">
+          <TabsList className="h-auto justify-start rounded-none bg-transparent p-0 text-muted-foreground">
+            <TabsTrigger
+              value="upstream"
+              className="relative -mb-px rounded-none border-x-0 border-t-0 border-b-2 border-transparent bg-transparent px-0 py-2.5 text-xs font-medium shadow-none transition-colors hover:text-foreground data-[state=active]:border-x-0 data-[state=active]:border-t-0 data-[state=active]:border-b-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
               Upstream
             </TabsTrigger>
-            {(hasBranch || branchLoading) && (
-              <TabsTrigger value="branch" className="data-[state=active]:bg-white/[0.06]">
-                My branch
-              </TabsTrigger>
-            )}
-            {(hasPull || pullLoading) && (
-              <TabsTrigger value="pull" className="data-[state=active]:bg-white/[0.06]">
-                Pull request
-              </TabsTrigger>
-            )}
+            <TabsTrigger
+              value="branch"
+              className="relative -mb-px ml-5 rounded-none border-x-0 border-t-0 border-b-2 border-transparent bg-transparent px-0 py-2.5 text-xs font-medium shadow-none transition-colors hover:text-foreground data-[state=active]:border-x-0 data-[state=active]:border-t-0 data-[state=active]:border-b-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              My branch
+            </TabsTrigger>
+            <TabsTrigger
+              value="pull"
+              className="relative -mb-px ml-5 rounded-none border-x-0 border-t-0 border-b-2 border-transparent bg-transparent px-0 py-2.5 text-xs font-medium shadow-none transition-colors hover:text-foreground data-[state=active]:border-x-0 data-[state=active]:border-t-0 data-[state=active]:border-b-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              Pull request
+            </TabsTrigger>
           </TabsList>
         </div>
 
         <TabsContent value="upstream" className="mt-0 flex-1 overflow-y-auto p-4">
-          <WantedItemUpstreamTab wastelandId={wastelandId} item={item} push={push} />
+          <WantedItemUpstreamTab
+            wastelandId={wastelandId}
+            item={item}
+            actions={actions}
+            links={links}
+            push={push}
+          />
         </TabsContent>
 
         <TabsContent value="branch" className="mt-0 flex-1 overflow-y-auto p-4">
@@ -171,18 +176,41 @@ export function WantedItemPanel({
               item={item}
               branch={branch}
               actions={actions}
+              push={push}
             />
           )}
         </TabsContent>
 
         <TabsContent value="pull" className="mt-0 flex-1 overflow-y-auto p-4">
           {pullLoading || !pull ? (
-            <TabSkeleton />
+            pullLoading ? (
+              <TabSkeleton />
+            ) : (
+              <PullEmptyState hasBranch={hasBranch} />
+            )
           ) : (
             <WantedItemPullTab wastelandId={wastelandId} pull={pull} />
           )}
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function PullEmptyState({ hasBranch }: { hasBranch: boolean }) {
+  return (
+    <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
+      <div className="flex size-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03]">
+        <ExternalLink className="size-5 text-white/40" />
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-white/80">No pull request yet.</p>
+        <p className="max-w-sm text-xs text-white/45">
+          {hasBranch
+            ? 'Publish your branch from the My branch tab to open a pull request upstream.'
+            : 'Claim this item from the My branch tab first, then publish your branch upstream.'}
+        </p>
+      </div>
     </div>
   );
 }

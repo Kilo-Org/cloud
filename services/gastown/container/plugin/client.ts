@@ -605,16 +605,19 @@ export class MayorGastownClient {
     description: string;
     priority?: string;
     type?: string;
-  }): Promise<{ success: boolean }> {
-    return this.request<{ success: boolean }>(this.mayorPath(`/wasteland/post`), {
-      method: 'POST',
-      body: JSON.stringify({
-        title: input.title,
-        description: input.description,
-        priority: input.priority,
-        type: input.type,
-      }),
-    });
+  }): Promise<{ success: boolean; wantedId: string; pr_url: string | null }> {
+    return this.request<{ success: boolean; wantedId: string; pr_url: string | null }>(
+      this.mayorPath(`/wasteland/post`),
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          title: input.title,
+          description: input.description,
+          priority: input.priority,
+          type: input.type,
+        }),
+      }
+    );
   }
 
   async wastelandDone(input: { item_id: string; evidence: string }): Promise<{ success: boolean }> {

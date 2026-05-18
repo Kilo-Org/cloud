@@ -32,7 +32,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { ArrowUpDown, CheckCircle2, Inbox, Loader2, Search, ShieldCheck } from 'lucide-react';
+import {
+  ArrowUpDown,
+  CheckCircle2,
+  ExternalLink,
+  Inbox,
+  Loader2,
+  Search,
+  ShieldCheck,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -238,6 +246,9 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
     });
   };
 
+  const dolthubPullUrl = (item: InboxItem) =>
+    upstream ? buildDolthubPullUrl(upstream, item.pull_id) : null;
+
   return (
     <div className="flex h-full">
       {/* Main list */}
@@ -353,6 +364,18 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
                 <span className="shrink-0 text-[10px] font-medium text-white/40">
                   {rowAccent(item)}
                 </span>
+                {dolthubPullUrl(item) && (
+                  <a
+                    href={dolthubPullUrl(item) ?? undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[10px] font-medium text-white/35 transition-colors hover:bg-white/[0.04] hover:text-white/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20"
+                  >
+                    Open on DoltHub
+                    <ExternalLink className="size-3" />
+                  </a>
+                )}
               </motion.div>
             ))}
           </AnimatePresence>
@@ -675,6 +698,12 @@ function itemSearchHaystack(item: InboxItem): string {
       break;
   }
   return parts.filter(Boolean).join(' ').toLowerCase();
+}
+
+function buildDolthubPullUrl(upstream: string, pullId: string): string {
+  const [owner, repo] = upstream.split('/');
+  if (!owner || !repo) return `https://www.dolthub.com/repositories/${upstream}/pulls/${pullId}`;
+  return `https://www.dolthub.com/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${encodeURIComponent(pullId)}`;
 }
 
 function countByKind(items: InboxItem[]): Partial<Record<InboxKind, number>> {

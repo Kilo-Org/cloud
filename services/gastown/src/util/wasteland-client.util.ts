@@ -243,8 +243,14 @@ export function createWastelandClient(deps: WastelandClientDeps) {
       description: string;
       priority?: string;
       type?: string;
+      publish?: boolean;
     }) {
-      return trpcMutation(deps, 'postWantedItem', input, z.object({ success: z.boolean() }));
+      return trpcMutation(
+        deps,
+        'postWantedItem',
+        input,
+        z.object({ success: z.boolean(), wantedId: z.string(), pr_url: z.string().nullable() })
+      );
     },
 
     markWantedItemDone(input: { wastelandId: string; itemId: string; evidence: string }) {

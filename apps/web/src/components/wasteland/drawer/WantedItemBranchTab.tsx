@@ -5,8 +5,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import {
-  CheckCircle2,
   ExternalLink,
+  Pencil,
   GitBranch,
   Hand,
   Loader2,
@@ -20,9 +20,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
+import type { DrawerStackHelpers } from '@/components/drawer';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import type { WastelandOutputs } from '@/lib/wasteland/trpc';
-import type { WantedItem, WantedPanelActions } from './types';
+import type { WantedItem, WantedPanelActions, WastelandDrawerRef } from './types';
 
 type ForkBranch = WastelandOutputs['wasteland']['listMyForkBranches'][number];
 type Status = ForkBranch['wantedStatusOnBranch'];
@@ -79,6 +80,7 @@ export function WantedItemBranchTab({
   item,
   branch,
   actions,
+  push,
 }: {
   wastelandId: string;
   item: WantedItem;
@@ -94,6 +96,7 @@ export function WantedItemBranchTab({
    * a cross-reference — render the read-only summary instead.
    */
   actions: WantedPanelActions | null;
+  push: DrawerStackHelpers<WastelandDrawerRef>['push'];
 }) {
   if (!branch) {
     return <BranchEmptyState wastelandId={wastelandId} item={item} actions={actions} />;
@@ -102,7 +105,16 @@ export function WantedItemBranchTab({
   return (
     <div className="space-y-4">
       <BranchHeader branch={branch} />
-      {actions && <BranchActionButtons wastelandId={wastelandId} item={item} actions={actions} />}
+      {actions && (
+        <BranchActionButtons
+          wastelandId={wastelandId}
+          item={item}
+          branch={branch}
+          status={branch.wantedStatusOnBranch}
+          actions={actions}
+          push={push}
+        />
+      )}
       {actions && <PublishOrUpdateRow wastelandId={wastelandId} branch={branch} />}
       {actions && <DiscardRow wastelandId={wastelandId} branch={branch} />}
     </div>
@@ -153,31 +165,48 @@ function BranchHeader({ branch }: { branch: ForkBranch }) {
 function BranchActionButtons({
   wastelandId,
   item,
+  branch,
+  status,
   actions,
+  push,
 }: {
   wastelandId: string;
   item: WantedItem;
+  branch: ForkBranch;
+  status: Status;
   actions: WantedPanelActions;
+  push: DrawerStackHelpers<WastelandDrawerRef>['push'];
 }) {
-  const { isAdmin, onDone, onAccept, onReject, onCloseItem, onUnclaim } = actions;
+  const { isAdmin, onAccept, onReject, onCloseItem, onUnclaim } = actions;
+  const canEditPostedItem =
+    status === 'open' && branch.hasOpenPR && branch.wantedRowOnBranch !== null;
 
   return (
     <div className="flex flex-col gap-2 border-t border-white/[0.06] pt-3">
       <p className="text-[10px] font-semibold tracking-[0.08em] text-white/30 uppercase">
         Stack a change
       </p>
-      {item.status === 'open' && <ClaimAction wastelandId={wastelandId} item={item} />}
-      {item.status === 'claimed' && (
-        <button
+      {canEditPostedItem && (
+        <Button
           type="button"
-          onClick={() => onDone(item)}
-          className="inline-flex items-center justify-center gap-1.5 rounded-md border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-400 transition-colors hover:bg-sky-500/20"
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            push({
+              type: 'edit-wanted-item',
+              wastelandId,
+              item: branch.wantedRowOnBranch ?? item,
+            })
+          }
+          className="h-8 gap-1.5"
         >
-          <CheckCircle2 className="size-3.5" />
-          Mark as done
-        </button>
+          <Pencil className="size-3.5" />
+          Edit wanted item
+        </Button>
       )}
-      {isAdmin && item.status === 'claimed' && (
+      {status === 'open' && <ClaimAction wastelandId={wastelandId} item={item} />}
+      {status === 'claimed' && <MarkDoneInlineForm wastelandId={wastelandId} item={item} />}
+      {isAdmin && status === 'claimed' && (
         <button
           type="button"
           onClick={() => onUnclaim(item)}
@@ -187,7 +216,7 @@ function BranchActionButtons({
           Unclaim (admin)
         </button>
       )}
-      {isAdmin && item.status === 'in_review' && (
+      {isAdmin && status === 'in_review' && (
         <>
           <button
             type="button"
@@ -207,23 +236,95 @@ function BranchActionButtons({
           </button>
         </>
       )}
-      {item.status === 'in_review' && !isAdmin && (
+      {status === 'in_review' && !isAdmin && (
         <p className="rounded-md border border-violet-500/20 bg-violet-500/[0.04] px-3 py-2 text-[11px] text-white/55">
           In review with the maintainers — no action needed from you right now.
         </p>
       )}
-      {isAdmin &&
-        (item.status === 'open' || item.status === 'claimed' || item.status === 'in_review') && (
-          <button
-            type="button"
-            onClick={() => onCloseItem(item)}
-            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.08]"
-          >
-            <XCircle className="size-3.5" />
-            Close (admin)
-          </button>
-        )}
+      {isAdmin && (status === 'open' || status === 'claimed' || status === 'in_review') && (
+        <button
+          type="button"
+          onClick={() => onCloseItem(item)}
+          className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.08]"
+        >
+          <XCircle className="size-3.5" />
+          Close (admin)
+        </button>
+      )}
     </div>
+  );
+}
+
+function MarkDoneInlineForm({ wastelandId, item }: { wastelandId: string; item: WantedItem }) {
+  const trpc = useWastelandTRPC();
+  const queryClient = useQueryClient();
+  const [evidence, setEvidence] = useState('');
+
+  const doneMutation = useMutation({
+    ...trpc.wasteland.markWantedItemDone.mutationOptions(),
+    onSuccess: () => {
+      toast.success('Item marked as done');
+      setEvidence('');
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.getWantedItem.queryKey({ wastelandId, itemId: item.id }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.listMyForkBranches.queryKey({ wastelandId }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.listMyPendingClaims.queryKey({ wastelandId }),
+      });
+    },
+    onError: err => toast.error(err.message || 'Failed to mark item as done'),
+  });
+
+  return (
+    <form
+      onSubmit={e => {
+        e.preventDefault();
+        const trimmed = evidence.trim();
+        if (!trimmed) return;
+        doneMutation.mutate({ wastelandId, itemId: item.id, evidence: trimmed });
+      }}
+      className="space-y-2 rounded-md border border-sky-500/20 bg-sky-500/[0.04] p-3"
+    >
+      <div className="space-y-1">
+        <label
+          htmlFor={`evidence-url-${item.id}`}
+          className="block text-[10px] font-semibold tracking-[0.08em] text-sky-200/70 uppercase"
+        >
+          Submit evidence
+        </label>
+        <p className="text-[11px] leading-relaxed text-white/50">
+          Paste a PR, commit, or artifact URL proving this item is complete.
+        </p>
+      </div>
+      <input
+        id={`evidence-url-${item.id}`}
+        type="url"
+        required
+        placeholder="https://github.com/org/repo/pull/123"
+        value={evidence}
+        onChange={e => setEvidence(e.target.value)}
+        className="w-full rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/80 placeholder:text-white/25 focus:border-sky-500/40 focus:outline-none"
+      />
+      <Button
+        type="submit"
+        size="sm"
+        disabled={doneMutation.isPending || !evidence.trim()}
+        className="h-8 w-full gap-1.5"
+      >
+        {doneMutation.isPending ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Send className="size-3.5" />
+        )}
+        Submit evidence
+      </Button>
+    </form>
   );
 }
 
@@ -312,9 +413,17 @@ function DiscardRow({ wastelandId, branch }: { wastelandId: string; branch: Fork
   const discardMutation = useMutation({
     ...trpc.wasteland.discardBranch.mutationOptions(),
     onSuccess: () => {
-      toast.success('Branch discarded');
+      toast.success('Branch discarded', {
+        description: 'Any open DoltHub PR for the branch was closed.',
+      });
       void queryClient.invalidateQueries({
         queryKey: trpc.wasteland.listMyForkBranches.queryKey({ wastelandId }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.listMyPulls.queryKey({ wastelandId }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.listMyPendingClaims.queryKey({ wastelandId }),
       });
       setOpen(false);
     },
@@ -331,7 +440,7 @@ function DiscardRow({ wastelandId, branch }: { wastelandId: string; branch: Fork
           isLoading={discardMutation.isPending}
           confirmText="Discard branch"
           cancelText="Cancel"
-          warningText="Deletes this branch from your fork. Cannot be undone."
+          warningText="Closes the open PR for this branch, then deletes the branch from your fork. Cannot be undone."
         />
       ) : (
         <Button
@@ -384,6 +493,12 @@ function BranchEmptyState({
         </p>
       </div>
       {item.status === 'open' && <ClaimAction wastelandId={wastelandId} item={item} />}
+      {item.status !== 'open' && (
+        <p className="rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[11px] text-white/55">
+          No branch exists for you yet. This upstream item is currently {item.status}, so it cannot
+          be claimed from this fork.
+        </p>
+      )}
     </div>
   );
 }
@@ -396,7 +511,7 @@ function BranchEmptyState({
  * (rather than as a Dialog) because the drawer stack sits at z-[60]
  * and a Dialog overlay would render behind it.
  */
-function ClaimAction({ wastelandId, item }: { wastelandId: string; item: WantedItem }) {
+export function ClaimAction({ wastelandId, item }: { wastelandId: string; item: WantedItem }) {
   const trpc = useWastelandTRPC();
   const queryClient = useQueryClient();
   const [isConfirming, setIsConfirming] = useState(false);

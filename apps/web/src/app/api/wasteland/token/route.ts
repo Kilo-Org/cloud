@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { generateApiToken } from '@/lib/tokens';
 import { getUserOrgMemberships } from '@/lib/organizations/organizations';
-import { isWastelandEnabled } from '@/lib/wasteland/feature-flags';
 
 const ONE_HOUR_SECONDS = 60 * 60;
 
@@ -24,11 +23,6 @@ export async function POST() {
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse) return authFailedResponse;
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const enabled = await isWastelandEnabled(user.id, { isAdmin: user.is_admin });
-  if (!enabled) {
-    return NextResponse.json({ error: 'Wasteland access not enabled' }, { status: 403 });
-  }
 
   const orgMemberships = await getUserOrgMemberships(user.id);
 

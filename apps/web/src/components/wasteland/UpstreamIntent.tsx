@@ -25,7 +25,7 @@ import {
 import { useTRPC } from '@/lib/trpc/utils';
 
 /**
- * The canonical Kilo commons upstream — all "join the commons" flows
+ * The canonical Commons upstream — all "join The Commons" flows
  * land here. Single source of truth so we don't drift between surfaces.
  */
 export const KILO_COMMONS_UPSTREAM = 'hop/wl-commons';
@@ -87,6 +87,8 @@ type Props = {
   dolthubUsername?: string | null;
   /** Per-field disabled state — used when a parent submission is in flight. */
   disabled?: boolean;
+  /** Disable the fixed commons card when the caller is already connected. */
+  commonsDisabled?: boolean;
   /**
    * Wastelands the caller already has credentials stored on. When the
    * list is non-empty, the picker shows a "Reuse existing connection"
@@ -106,7 +108,7 @@ type Props = {
  * non-empty — typically only the Gastown connect flow passes it):
  *
  *   0. Reuse existing connection    — wire to a wasteland already set up
- *   1. Join the Kilo Commons        — fixed upstream `hop/wl-commons`
+ *   1. Join The Commons             — fixed upstream `hop/wl-commons`
  *   2. Connect to an existing repo  — typed `{owner}/{repo}` + verify probe
  *   3. Create a brand-new upstream  — typed `{owner}/{repo}` (must NOT exist)
  *
@@ -123,6 +125,7 @@ export function UpstreamIntentPicker({
   organizationId,
   dolthubUsername,
   disabled,
+  commonsDisabled,
   reusableWastelands,
 }: Props) {
   const reuseList = reusableWastelands ?? [];
@@ -130,6 +133,7 @@ export function UpstreamIntentPicker({
 
   const handleKindChange = (kind: Kind) => {
     if (kind === value.kind) return;
+    if (kind === 'commons' && commonsDisabled) return;
     if (kind === 'commons') {
       onChange({ kind: 'commons', isUpstreamAdmin: false });
       return;
@@ -177,7 +181,10 @@ export function UpstreamIntentPicker({
         intent={value.kind === 'commons' ? value : null}
         onSelect={() => handleKindChange('commons')}
         onChange={onChange}
-        disabled={disabled}
+        disabled={disabled || commonsDisabled}
+        disabledReason={
+          commonsDisabled ? 'You already have a connection to The Commons.' : undefined
+        }
       />
       <ConnectCard
         selected={value.kind === 'connect'}
@@ -436,16 +443,28 @@ function ReuseCard({
   );
 }
 
-function CommonsCard({ selected, intent, onSelect, onChange, disabled }: CardProps<'commons'>) {
+function CommonsCard({
+  selected,
+  intent,
+  onSelect,
+  onChange,
+  disabled,
+  disabledReason,
+}: CardProps<'commons'> & { disabledReason?: string }) {
   return (
     <CardShell
       selected={selected}
       onSelect={onSelect}
       icon={<Globe className="size-3.5" />}
-      title="Join the Kilo Commons"
-      description="Contribute to the shared bounty board at hop/wl-commons. Your wasteland forks the commons; contributions go upstream as pull requests."
+      title="Join The Commons"
+      description="Contribute to the shared bounty board at hop/wl-commons. Your wasteland forks The Commons; contributions go upstream as pull requests."
       disabled={disabled}
     >
+      {disabledReason && (
+        <p className="mb-3 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[11px] text-white/45">
+          {disabledReason}
+        </p>
+      )}
       <p className="mb-3 flex items-center gap-2 text-[11px] text-white/40">
         <span className="font-mono text-white/55">{KILO_COMMONS_UPSTREAM}</span>
       </p>

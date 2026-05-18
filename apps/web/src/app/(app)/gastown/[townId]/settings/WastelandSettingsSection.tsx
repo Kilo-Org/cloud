@@ -255,7 +255,7 @@ function ConnectWastelandDialog({
   const wastelandsQuery = useQuery(wastelandTrpc.wasteland.listWastelands.queryOptions({}));
   const wastelands = wastelandsQuery.data ?? [];
 
-  // Default to "Join the Kilo Commons" so the common case is a single
+  // Default to "Join The Commons" so the common case is a single
   // click: open the dialog, hit Connect, done. The picker also shows
   // the reuse and connect/create cards inline so the user can deviate
   // without going back a step.
@@ -269,7 +269,7 @@ function ConnectWastelandDialog({
   // OAuth path — hydrated from the dolthub integration when it's installed.
   // Manual path — same fields the dialog used before the OAuth integration
   // shipped, kept available behind an "Advanced" toggle for users who can't
-  // install the dev-only OAuth app.
+  // or don't want to use OAuth.
   const [manualOpen, setManualOpen] = useState(false);
   const [dolthubToken, setDolthubToken] = useState('');
   const [dolthubOrg, setDolthubOrg] = useState('');
@@ -292,6 +292,11 @@ function ConnectWastelandDialog({
   const installationQuery = useQuery({
     ...mainTrpc.dolthub.getInstallation.queryOptions(undefined),
     enabled: open,
+    refetchInterval: query => {
+      const installed = query.state.data?.installed === true;
+      return open && step === 'credentials' && !installed ? 3_000 : false;
+    },
+    refetchIntervalInBackground: true,
   });
   const dolthubCredentialsQuery = useQuery({
     ...mainTrpc.dolthub.getInstallationCredentials.queryOptions(undefined),
@@ -553,8 +558,7 @@ function ConnectWastelandDialog({
   //     and the user hasn't toggled the manual fallback open), plus a
   //     username so we can label commits and contribution branches; or
   //   - a manually pasted API token + username when the user opted in to
-  //     the "Advanced" disclosure (e.g. they don't have the dev-only
-  //     OAuth app installed).
+  //     the "Advanced" disclosure.
   const oauthCredentialsValid =
     !manualOpen && Boolean(oauthDolthubToken) && dolthubOrg.trim().length > 0;
   const manualCredentialsValid =
@@ -574,6 +578,7 @@ function ConnectWastelandDialog({
       name: w.name,
       dolthub_upstream: w.dolthub_upstream,
     }));
+  const hasCommonsConnection = wastelands.some(w => w.dolthub_upstream === KILO_COMMONS_UPSTREAM);
 
   // Whether the primary action proceeds via the reuse short-circuit
   // (no credentials / identity steps) or the full provision flow.
@@ -593,7 +598,7 @@ function ConnectWastelandDialog({
             <DialogHeader>
               <DialogTitle className="text-white/90">Connect to a wasteland</DialogTitle>
               <DialogDescription className="text-white/50">
-                Pick what this town's upstream should be. We default to the Kilo Commons —
+                Pick what this town&apos;s upstream should be. We default to The Commons —
                 contributions go upstream as pull requests.
               </DialogDescription>
             </DialogHeader>
@@ -607,6 +612,7 @@ function ConnectWastelandDialog({
                   null
                 }
                 reusableWastelands={reusableWastelands}
+                commonsDisabled={hasCommonsConnection}
               />
               {!isReuseIntent && (
                 <FieldGroup

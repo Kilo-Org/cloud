@@ -1,7 +1,7 @@
 import type { WastelandOutputs } from '@/lib/wasteland/trpc';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ExternalLink, Eye, EyeOff } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export type WastelandItem = WastelandOutputs['wasteland']['listWastelands'][number];
@@ -22,7 +22,6 @@ export function WastelandCard({
         <h3 className="truncate text-base font-medium text-white/90">{wasteland.name}</h3>
 
         <div className="flex flex-wrap items-center gap-2">
-          <VisibilityBadge visibility={wasteland.visibility} />
           {wasteland.dolthub_upstream && <DoltHubLink upstream={wasteland.dolthub_upstream} />}
         </div>
 
@@ -33,23 +32,6 @@ export function WastelandCard({
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-export function VisibilityBadge({ visibility }: { visibility: 'public' | 'private' }) {
-  if (visibility === 'public') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-md bg-white/5 px-2 py-0.5 text-xs text-white/50">
-        <Eye className="size-3" />
-        Public
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-md bg-white/5 px-2 py-0.5 text-xs text-white/50">
-      <EyeOff className="size-3" />
-      Private
-    </span>
   );
 }
 

@@ -70,3 +70,23 @@ export function listConnectedTowns(sql: SqlStorage, wastelandId: string): Connec
   ];
   return WastelandConnectedTownRecord.array().parse(rows);
 }
+
+export function listConnectedTownsForUser(
+  sql: SqlStorage,
+  wastelandId: string,
+  userId: string
+): ConnectedTownResult[] {
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT * FROM ${wasteland_connected_towns}
+        WHERE ${wasteland_connected_towns.wasteland_id} = ?
+          AND ${wasteland_connected_towns.connected_by} = ?
+        ORDER BY ${wasteland_connected_towns.columns.connected_at} DESC
+      `,
+      [wastelandId, userId]
+    ),
+  ];
+  return WastelandConnectedTownRecord.array().parse(rows);
+}

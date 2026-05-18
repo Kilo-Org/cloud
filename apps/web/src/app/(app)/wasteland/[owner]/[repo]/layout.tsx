@@ -1,6 +1,4 @@
-import { notFound } from 'next/navigation';
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
-import { isWastelandEnabled } from '@/lib/wasteland/feature-flags';
 import { RepoLayoutShell } from './_components/RepoLayoutShell';
 
 /**
@@ -26,13 +24,7 @@ export default async function WastelandRepoLayout({
   children: React.ReactNode;
 }) {
   const { owner, repo } = await params;
-  const user = await getUserFromAuthOrRedirect(
-    `/users/sign_in?callbackPath=/wasteland/${owner}/${repo}`
-  );
-
-  if (!(await isWastelandEnabled(user.id, { isAdmin: user.is_admin }))) {
-    return notFound();
-  }
+  await getUserFromAuthOrRedirect(`/users/sign_in?callbackPath=/wasteland/${owner}/${repo}`);
 
   return (
     <RepoLayoutShell owner={owner} repo={repo}>

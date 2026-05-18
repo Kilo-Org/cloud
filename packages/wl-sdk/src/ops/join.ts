@@ -11,22 +11,28 @@
  *   1. Fork upstream `<owner>/<repo>` to user's `<dolthubOrg>/<repo>`.
  *      Idempotent — DoltHub returns "already exists" on a re-fork,
  *      which `forkDatabase` resolves as `created: false`.
- *   2. Run the registration INSERT through the DoltHub write API,
+ *   2. If the rig is already present on upstream `main`, return without
+ *      creating a registration branch or PR.
+ *   3. If an open registration PR already exists for this rig, return
+ *      it without writing another registration commit.
+ *   4. Run the registration INSERT through the DoltHub write API,
  *      targeting `wl/register/<handle>` so the registration lands on
  *      a branch and a maintainer can review it before merging into
  *      `rigs` on upstream.
- *   3. Open a PR from the fork's registration branch to upstream
+ *   5. Open a PR from the fork's registration branch to upstream
  *      `main`. We don't auto-close the PR if registration is later
  *      rerun — `ON DUPLICATE KEY UPDATE` makes the INSERT idempotent
  *      anyway, and the upstream maintainer is the one who decides.
  */
 
 import { forkDatabase } from '../dolthub/database';
+import { doltRead } from '../dolthub/read';
 import { doltWrite } from '../dolthub/write';
 import { createPull, listPulls } from '../dolthub/pulls';
 import { buildRegistrationDML } from '../commons/registration';
+import { escapeSqlString } from '../commons/escape';
 import { makeRegisterBranch } from './branch';
-import type { DoltHubAuth, DoltFetchHooks } from '../dolthub/api';
+import { WlDoltHubError, type DoltHubAuth, type DoltFetchHooks } from '../dolthub/api';
 import type { RigHandle, WastelandRef, WlResult } from './types';
 import { WlError } from './types';
 import { DOLTHUB_WEB_BASE } from '../dolthub/api';
@@ -46,6 +52,10 @@ export type JoinOptions = {
   version: string;
   /** Polling timeout for fork creation. Defaults to 2 minutes. */
   forkTimeoutMs?: number;
+  /** Retry timeout for registration writes while a fresh fork settles. */
+  registrationWriteTimeoutMs?: number;
+  /** Initial retry backoff for registration writes. */
+  registrationWriteInitialBackoffMs?: number;
   /** Inject sleep for tests. */
   sleep?: (ms: number) => Promise<void>;
   fetch?: typeof fetch;
@@ -80,35 +90,25 @@ export async function join(opts: JoinOptions): Promise<WlResult<JoinResult>> {
     });
 
     const branchName = makeRegisterBranch(opts.rigHandle);
-
-    // Step 2: write registration onto wl/register/<handle> (creates
-    // the branch from main on the first call).
-    const dml = buildRegistrationDML({
-      handle: opts.rigHandle,
-      dolthubOrg: opts.dolthubOrg,
-      displayName: opts.displayName,
-      ownerEmail: opts.ownerEmail,
-      version: opts.version,
-    });
-    try {
-      await doltWrite({
-        auth: opts.auth,
-        owner: forkResult.owner,
-        db: forkResult.db,
-        fromBranch: 'main',
-        toBranch: branchName,
-        query: `${dml}; -- wl register: ${opts.rigHandle}`,
-        fetch: opts.fetch,
-        hooks: opts.hooks,
-      });
-    } catch (err) {
-      throw new WlError('Registration write failed', 'upstream', err);
-    }
-
     const forkUrl = `${DOLTHUB_WEB_BASE}/repositories/${encodeURIComponent(forkResult.owner)}/${encodeURIComponent(forkResult.db)}`;
 
-    // Step 3: open a PR. If a registration PR already exists for
-    // this branch, return its id rather than opening another.
+    // Step 2: if the rig is already on upstream main, there is nothing
+    // to register and no PR should be opened.
+    if (await rigAlreadyRegistered(opts)) {
+      return {
+        ok: true,
+        data: {
+          forkUrl,
+          branchName,
+          registrationPrUrl: '',
+          registrationPullId: '',
+          forkCreated: forkResult.created,
+        },
+      };
+    }
+
+    // Step 3: if a registration PR already exists for this branch,
+    // do not write another registration commit.
     const existing = await findOpenRegistrationPr(opts, branchName);
     if (existing !== null) {
       return {
@@ -123,6 +123,28 @@ export async function join(opts: JoinOptions): Promise<WlResult<JoinResult>> {
       };
     }
 
+    // Step 4: write registration onto wl/register/<handle> (creates
+    // the branch from main on the first call).
+    const dml = buildRegistrationDML({
+      handle: opts.rigHandle,
+      dolthubOrg: opts.dolthubOrg,
+      displayName: opts.displayName,
+      ownerEmail: opts.ownerEmail,
+      version: opts.version,
+    });
+    try {
+      await writeRegistrationWithRetry({
+        join: opts,
+        forkOwner: forkResult.owner,
+        forkDb: forkResult.db,
+        branchName,
+        dml,
+      });
+    } catch (err) {
+      throw new WlError('Registration write failed', 'upstream', err);
+    }
+
+    // Step 5: open a PR.
     try {
       const pr = await createPull({
         auth: opts.auth,
@@ -166,6 +188,71 @@ export async function join(opts: JoinOptions): Promise<WlResult<JoinResult>> {
   } catch (err) {
     if (err instanceof WlError) return { ok: false, error: err };
     return { ok: false, error: new WlError('join failed', 'upstream', err) };
+  }
+}
+
+async function writeRegistrationWithRetry(opts: {
+  join: JoinOptions;
+  forkOwner: string;
+  forkDb: string;
+  branchName: string;
+  dml: string;
+}): Promise<void> {
+  const timeoutMs = opts.join.registrationWriteTimeoutMs ?? 10_000;
+  const initialBackoffMs = opts.join.registrationWriteInitialBackoffMs ?? 500;
+  const sleep =
+    opts.join.sleep ?? ((ms: number) => new Promise(resolve => setTimeout(resolve, ms)));
+  const startedAt = Date.now();
+  let attempt = 0;
+  let lastError: unknown;
+
+  while (Date.now() - startedAt <= timeoutMs) {
+    try {
+      await doltWrite({
+        auth: opts.join.auth,
+        owner: opts.forkOwner,
+        db: opts.forkDb,
+        fromBranch: 'main',
+        toBranch: opts.branchName,
+        query: `${opts.dml}; -- wl register: ${opts.join.rigHandle}`,
+        fetch: opts.join.fetch,
+        hooks: opts.join.hooks,
+      });
+      return;
+    } catch (err) {
+      lastError = err;
+      if (!isTransientRegistrationWriteError(err)) throw err;
+    }
+
+    attempt += 1;
+    await sleep(Math.min(initialBackoffMs * attempt, 2_000));
+  }
+
+  throw lastError;
+}
+
+function isTransientRegistrationWriteError(err: unknown): boolean {
+  if (!(err instanceof WlDoltHubError)) return false;
+  if (err.status === 404 || err.status === 409 || err.status === 429 || err.status >= 500) {
+    return true;
+  }
+  const bodyText = typeof err.body === 'string' ? err.body : JSON.stringify(err.body);
+  return /branch|database|repo|not found|not ready|already exists|timeout|temporar/i.test(bodyText);
+}
+
+async function rigAlreadyRegistered(opts: JoinOptions): Promise<boolean> {
+  try {
+    const res = await doltRead({
+      auth: opts.auth,
+      owner: opts.upstream.owner,
+      db: opts.upstream.db,
+      query: `SELECT handle FROM rigs WHERE handle = '${escapeSqlString(opts.rigHandle)}' LIMIT 1`,
+      fetch: opts.fetch,
+      hooks: opts.hooks,
+    });
+    return res.rows.length > 0;
+  } catch {
+    return false;
   }
 }
 

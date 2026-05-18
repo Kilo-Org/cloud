@@ -26,10 +26,6 @@ const DOLTHUB_UPSTREAM_PATTERN = /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/;
 
 export const dolthubRouter = createTRPCRouter({
   getInstallation: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
-    if (process.env.NODE_ENV === 'production') {
-      return { installed: false, installation: null };
-    }
-
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
     }
@@ -64,10 +60,6 @@ export const dolthubRouter = createTRPCRouter({
   getInstallationCredentials: baseProcedure
     .input(optionalOrgInput)
     .query(async ({ ctx, input }) => {
-      if (process.env.NODE_ENV === 'production') {
-        return null;
-      }
-
       const owner = await resolveAuthorizedOwner(ctx, input?.organizationId);
       const integration = await dolthubService.getInstallation(owner);
       if (!integration || integration.integration_status !== INTEGRATION_STATUS.ACTIVE) {
@@ -100,10 +92,6 @@ export const dolthubRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (process.env.NODE_ENV === 'production') {
-        throw new TRPCError({ code: 'NOT_FOUND' });
-      }
-
       const owner = await resolveAuthorizedOwner(ctx, input.organizationId);
       const integration = await dolthubService.getInstallation(owner);
       if (!integration) {
@@ -127,8 +115,6 @@ export const dolthubRouter = createTRPCRouter({
   resolveUsername: baseProcedure
     .input(optionalOrgInput)
     .query(async ({ ctx, input }): Promise<{ username: string } | null> => {
-      if (process.env.NODE_ENV === 'production') return null;
-
       const owner = await resolveAuthorizedOwner(ctx, input?.organizationId);
       const integration = await dolthubService.getInstallation(owner);
       if (!integration || integration.integration_status !== INTEGRATION_STATUS.ACTIVE) {
@@ -155,10 +141,6 @@ export const dolthubRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      if (process.env.NODE_ENV === 'production') {
-        return { exists: false as const, reason: 'DoltHub integration unavailable in production' };
-      }
-
       const owner = await resolveAuthorizedOwner(ctx, input.organizationId);
       const integration = await dolthubService.getInstallation(owner);
       const token =
@@ -180,10 +162,6 @@ export const dolthubRouter = createTRPCRouter({
     }),
 
   disconnect: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
-    if (process.env.NODE_ENV === 'production') {
-      throw new TRPCError({ code: 'NOT_FOUND' });
-    }
-
     const owner = await resolveAuthorizedOwner(ctx, input?.organizationId);
     return dolthubService.uninstall(owner);
   }),

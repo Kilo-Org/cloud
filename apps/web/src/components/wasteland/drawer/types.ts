@@ -33,6 +33,10 @@ export type WantedPanelActions = {
  */
 export type WantedItemTab = 'upstream' | 'branch' | 'pull';
 
+export type WantedPanelLinks = {
+  workshopHref?: string;
+};
+
 export type ReviewPanelActions = {
   upstream: string | null;
   busy: boolean;
@@ -47,6 +51,7 @@ export type WastelandDrawerRef =
       wastelandId: string;
       item: WantedItem;
       actions: WantedPanelActions | null;
+      links?: WantedPanelLinks;
       /** Default tab. Falls back to `upstream` when unavailable. */
       initialTab?: WantedItemTab;
     }
@@ -54,6 +59,8 @@ export type WastelandDrawerRef =
       type: 'wanted-item-by-id';
       wastelandId: string;
       itemId: string;
+      actions?: WantedPanelActions | null;
+      links?: WantedPanelLinks;
       /** Default tab. Falls back to `upstream` when unavailable. */
       initialTab?: WantedItemTab;
     }
@@ -63,4 +70,15 @@ export type WastelandDrawerRef =
       item: InboxItem;
       actions: ReviewPanelActions | null;
     }
-  | { type: 'rig'; wastelandId: string; handle: string };
+  | { type: 'rig'; wastelandId: string; handle: string }
+  | {
+      type: 'post-wanted-item';
+      wastelandId: string;
+      onSuccess?: () => void;
+    }
+  | {
+      type: 'edit-wanted-item';
+      wastelandId: string;
+      item: WantedItem;
+      onSuccess?: () => void;
+    };

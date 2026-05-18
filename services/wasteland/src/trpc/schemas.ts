@@ -203,17 +203,19 @@ export const RigActivityOutput = z.object({
 
 // ── Workshop: fork branch entry ────────────────────────────────────────
 // Powers the fork (workshop) view at /wasteland/:owner/:repo/fork.
-// One row per `wl/<rigHandle>/<wantedId>` branch on the user's fork,
+// One row per `wl/<any-rig>/<wantedId>` branch on the user's fork,
 // cross-referenced with upstream `main` and the branch tip.
 
 export const ForkBranchOutput = z.object({
   branchName: z.string(),
   wantedId: z.string(),
   wantedTitle: z.string().nullable(),
+  wantedRowOnBranch: WantedBoardRowOutput.nullable(),
   wantedStatusOnBranch: z.enum(['open', 'claimed', 'in_review', 'completed', 'unknown']),
   wantedStatusOnMain: z.enum(['open', 'claimed', 'in_review', 'completed', 'unknown']),
   divergence: z.enum(['in-sync', 'ahead', 'diverged']),
   hasOpenPR: z.boolean(),
+  pullState: z.enum(['open', 'closed', 'merged']).nullable(),
   prUrl: z.string().nullable(),
   lastCommitAt: z.string().nullable(),
 });

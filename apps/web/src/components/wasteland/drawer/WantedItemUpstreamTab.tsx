@@ -1,12 +1,16 @@
 'use client';
 
 import { formatDistanceToNow } from 'date-fns';
+import Link from 'next/link';
+import { ArrowUpRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import type { DrawerStackHelpers } from '@/components/drawer';
 import { MarkdownProse } from '@/components/security-agent/MarkdownProse';
 import { parseDoltDate } from '@/lib/wasteland/date';
-import type { WantedItem, WastelandDrawerRef } from './types';
+import type { WantedItem, WantedPanelActions, WantedPanelLinks, WastelandDrawerRef } from './types';
 import { RigLink } from './CrossRefs';
+import { ClaimAction } from './WantedItemBranchTab';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
@@ -40,10 +44,14 @@ const TYPE_COLORS: Record<string, string> = {
 export function WantedItemUpstreamTab({
   wastelandId,
   item,
+  actions,
+  links,
   push,
 }: {
   wastelandId: string;
   item: WantedItem;
+  actions: WantedPanelActions | null;
+  links?: WantedPanelLinks;
   push: DrawerStackHelpers<WastelandDrawerRef>['push'];
 }) {
   return (
@@ -121,6 +129,32 @@ export function WantedItemUpstreamTab({
       <div className="border-t border-white/[0.06] pt-3">
         <DetailRow label="Item ID" value={item.id} mono />
       </div>
+
+      {links?.workshopHref && item.status === 'open' && (
+        <div className="border-t border-white/[0.06] pt-3">
+          <Button asChild size="sm" className="h-8 gap-1.5">
+            <Link href={links.workshopHref}>
+              Take to my workshop
+              <ArrowUpRight className="size-3.5" />
+            </Link>
+          </Button>
+          <p className="mt-1.5 text-[11px] text-white/40">
+            Opens your fork workspace for this item. Claim and evidence actions live there.
+          </p>
+        </div>
+      )}
+
+      {actions && item.status === 'open' && !links?.workshopHref && (
+        <div className="border-t border-white/[0.06] pt-3">
+          <p className="mb-2 text-[10px] font-semibold tracking-[0.08em] text-white/30 uppercase">
+            Workshop action
+          </p>
+          <ClaimAction wastelandId={wastelandId} item={item} />
+          <p className="mt-1.5 text-[11px] text-white/40">
+            Claiming creates your branch and submits the claim upstream for review.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

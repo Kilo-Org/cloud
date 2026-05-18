@@ -1,6 +1,5 @@
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
-import { notFound, redirect } from 'next/navigation';
-import { isWastelandEnabled } from '@/lib/wasteland/feature-flags';
+import { redirect } from 'next/navigation';
 import { resolveWastelandUpstreamForUser } from '@/lib/wasteland/server-resolve';
 
 export default async function WastelandDashboardPage({
@@ -12,10 +11,6 @@ export default async function WastelandDashboardPage({
   const user = await getUserFromAuthOrRedirect(
     `/users/sign_in?callbackPath=/wasteland/${wastelandId}`
   );
-
-  if (!(await isWastelandEnabled(user.id, { isAdmin: user.is_admin }))) {
-    return notFound();
-  }
 
   // M2.8: prefer the M2.2 owner/repo URL when the wasteland has an upstream
   // set. If we can't resolve it (no upstream, lookup failure), fall back to

@@ -43,7 +43,8 @@ type WastelandService = {
 		description: string;
 		priority?: 'low' | 'medium' | 'high' | 'critical';
 		type?: 'feature' | 'bug' | 'docs' | 'other';
-	}): Promise<WastelandRpcResult<{ success: true }>>;
+		publish?: boolean;
+	}): Promise<WastelandRpcResult<{ success: true; wantedId: string; pr_url: string | null }>>;
 	markWantedItemDone(params: {
 		wastelandId: string;
 		userId: string;

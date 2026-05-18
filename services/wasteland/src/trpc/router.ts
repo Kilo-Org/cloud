@@ -108,6 +108,16 @@ function parseStampRows(rows: unknown[]) {
 /** Translate a WantedBoardOpError into the matching TRPCError. */
 function wantedBoardErrorToTRPC(err: unknown): never {
   if (err instanceof WantedBoardOpError) {
+    console.warn('[wasteland-trpc] wanted board operation failed', {
+      code: err.code,
+      message: err.message,
+      cause:
+        err.cause instanceof Error
+          ? { name: err.cause.name, message: err.cause.message }
+          : err.cause === undefined
+            ? undefined
+            : String(err.cause),
+    });
     const code =
       err.code === 'PRECONDITION_FAILED'
         ? 'PRECONDITION_FAILED'
@@ -251,7 +261,7 @@ export const wastelandRouter = router({
         ownerType: z.enum(['user', 'org']),
         organizationId: z.string().uuid().optional(),
         dolthubUpstream: z.string().optional(),
-        visibility: z.enum(['public', 'private']).default('private'),
+        visibility: z.enum(['public', 'private']).optional(),
       })
     )
     .output(RpcWastelandOutput)
@@ -277,7 +287,7 @@ export const wastelandRouter = router({
         owner_user_id: ctx.userId,
         organization_id: input.organizationId ?? null,
         dolthub_upstream: input.dolthubUpstream ?? null,
-        visibility: input.visibility,
+        visibility: 'public',
       });
 
       // Auto-register the creator as the wasteland's 'owner' member with
@@ -321,7 +331,6 @@ export const wastelandRouter = router({
         rigHandle: z.string().optional(),
         rigDisplayName: z.string().optional(),
         rigEmail: z.string().email().optional(),
-        visibility: z.enum(['public', 'private']).optional(),
       })
     )
     .output(z.object({ success: z.boolean(), databaseCreated: z.boolean() }))
@@ -399,7 +408,7 @@ export const wastelandRouter = router({
           ownerEmail,
           dolthubOrg,
           wastelandName: config?.name,
-          visibility: input.visibility,
+          visibility: 'public',
         });
       } catch (err) {
         throw new TRPCError({
@@ -749,7 +758,6 @@ export const wastelandRouter = router({
       z.object({
         wastelandId: z.string().uuid(),
         name: z.string().min(1).max(128).optional(),
-        visibility: z.enum(['public', 'private']).optional(),
         dolthubUpstream: z.string().optional(),
       })
     )
@@ -761,7 +769,6 @@ export const wastelandRouter = router({
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
       const config = await stub.updateConfig({
         ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
         ...(input.dolthubUpstream !== undefined ? { dolthub_upstream: input.dolthubUpstream } : {}),
       });
 
@@ -987,10 +994,12 @@ export const wastelandRouter = router({
     .input(z.object({ wastelandId: z.string().uuid() }))
     .output(z.array(RpcConnectedTownOutput))
     .query(async ({ ctx, input }) => {
-      // Any member or owner can list connected towns
+      // Privacy boundary: connected towns are user-owned Gastown metadata.
+      // Upstream owners/admins can inspect public rig rows, but should not
+      // see other users' town IDs or connection records here.
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
-      return stub.listConnectedTowns();
+      return stub.listConnectedTownsForUser(ctx.userId);
     }),
 
   // ── Wanted Board ──────────────────────────────────────────────────
@@ -1241,6 +1250,33 @@ export const wastelandRouter = router({
       }
     }),
 
+  editWantedItem: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        itemId: z.string().min(1),
+        title: z.string().min(1).max(256).optional(),
+        description: z.string().min(1).max(4096).optional(),
+        priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+        type: z.enum(['feature', 'bug', 'docs', 'other']).optional(),
+      })
+    )
+    .output(z.object({ success: z.boolean(), pr_url: z.string().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      try {
+        return await wantedBoard.editWantedItem(ctx.env, input.wastelandId, ctx.userId, {
+          itemId: input.itemId,
+          title: input.title,
+          description: input.description,
+          priority: input.priority,
+          type: input.type,
+        });
+      } catch (err) {
+        return wantedBoardErrorToTRPC(err);
+      }
+    }),
+
   markWantedItemDone: procedure
     .input(
       z.object({
@@ -1270,6 +1306,9 @@ export const wastelandRouter = router({
         wastelandId: z.string().uuid(),
         itemId: z.string().min(1),
         quality: z.enum(['excellent', 'good', 'fair', 'poor']),
+        reliability: z.enum(['excellent', 'good', 'fair', 'poor']).optional(),
+        severity: z.enum(['leaf', 'branch', 'root']).optional(),
+        skillTags: z.array(z.string().min(1).max(64)).max(16).optional(),
         /**
          * Free-form message attached to the reputation stamp
          * (`stamps.message`). Maps to `wl accept --message`.
@@ -1285,6 +1324,9 @@ export const wastelandRouter = router({
         return await wantedBoard.acceptWantedItem(ctx.env, input.wastelandId, ctx.userId, {
           itemId: input.itemId,
           quality: input.quality,
+          reliability: input.reliability,
+          severity: input.severity,
+          skillTags: input.skillTags,
           message: input.message,
           direct: input.direct,
         });

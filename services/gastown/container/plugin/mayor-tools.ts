@@ -608,9 +608,14 @@ export function createMayorTools(client: MayorGastownClient) {
           priority: args.priority,
           type: args.type,
         });
-        return result.success
-          ? `Posted new wanted item: "${args.title}".`
-          : `Failed to post wanted item.`;
+        if (!result.success) return `Failed to post wanted item.`;
+        return [
+          `Posted new wanted item: "${args.title}".`,
+          `Wanted item ID: ${result.wantedId}`,
+          result.pr_url ? `Pull request: ${result.pr_url}` : null,
+        ]
+          .filter(line => line !== null)
+          .join('\n');
       },
     }),
 

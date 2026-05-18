@@ -57,7 +57,6 @@ const NAME_MAX_LENGTH = 128;
 const RIG_HANDLE_PATTERN = /^[a-z0-9_-]+$/;
 
 type OwnershipType = 'personal' | 'organization';
-type Visibility = 'public' | 'private';
 
 /** Wizard steps. The exact set varies by intent — see {@link visibleSteps}. */
 type Step = 'intent' | 'credentials' | 'rig' | 'preview' | 'work' | 'success';
@@ -132,8 +131,6 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
     }
     return { kind: 'commons', isUpstreamAdmin: false };
   });
-  const [visibility, setVisibility] = useState<Visibility>('private');
-
   // Credentials step state
   const [manualOpen, setManualOpen] = useState(false);
   const [dolthubToken, setDolthubToken] = useState('');
@@ -156,6 +153,9 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
   // ── Queries ───────────────────────────────────────────────────────
 
   const orgsQuery = useQuery(mainTrpc.organizations.list.queryOptions());
+  const existingWastelandsQuery = useQuery(
+    trpc.wasteland.listWastelands.queryOptions(lockedOrgId ? { organizationId: lockedOrgId } : {})
+  );
 
   const verifyOrgId = ownership === 'organization' ? selectedOrgId || undefined : undefined;
 
@@ -165,6 +165,11 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
     ...mainTrpc.dolthub.getInstallation.queryOptions(
       verifyOrgId ? { organizationId: verifyOrgId } : undefined
     ),
+    refetchInterval: query => {
+      const installed = query.state.data?.installed === true;
+      return step === 'credentials' && !installed ? 3_000 : false;
+    },
+    refetchIntervalInBackground: true,
   });
   const installationCredentialsQuery = useQuery({
     ...mainTrpc.dolthub.getInstallationCredentials.queryOptions(
@@ -213,7 +218,7 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
   useEffect(() => {
     if (pendingWastelandId === null) return;
     setPendingWastelandId(null);
-  }, [name, ownership, selectedOrgId, intent, visibility, pendingWastelandId]);
+  }, [name, ownership, selectedOrgId, intent, pendingWastelandId]);
 
   // Auto-prefill the rig handle from the DoltHub username, but only
   // until the user explicitly edits it. Truncating non-conforming
@@ -228,6 +233,9 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
   // ── Validation ────────────────────────────────────────────────────
 
   const nameError = getNameError(name);
+  const hasCommonsConnection =
+    existingWastelandsQuery.data?.some(w => w.dolthub_upstream === KILO_COMMONS_UPSTREAM) ?? false;
+  const commonsIntentBlocked = intent.kind === 'commons' && hasCommonsConnection;
   const orgError = getOrgError(ownership, selectedOrgId, orgsQuery.data);
   const intentValid = isUpstreamIntentValid(intent);
   const upstreamProbeBlocked =
@@ -236,7 +244,12 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
     (intent.kind === 'create' &&
       (createVerification.status === 'pending' || createVerification.status === 'exists'));
   const intentStepValid =
-    !nameError && !orgError && intentValid && !upstreamProbeBlocked && name.trim().length > 0;
+    !nameError &&
+    !orgError &&
+    intentValid &&
+    !upstreamProbeBlocked &&
+    !commonsIntentBlocked &&
+    name.trim().length > 0;
 
   const oauthCredentialsValid =
     !manualOpen && Boolean(oauthDolthubToken) && dolthubOrg.trim().length > 0;
@@ -316,7 +329,6 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
           ownerType: ownership === 'organization' ? 'org' : 'user',
           organizationId: ownership === 'organization' ? selectedOrgId : undefined,
           dolthubUpstream: upstream,
-          visibility,
         });
         wastelandId = created.wasteland_id;
         setPendingWastelandId(wastelandId);
@@ -443,12 +455,11 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
           intent={intent}
           setIntent={setIntent}
           dolthubUsername={cachedDolthubUsername}
-          visibility={visibility}
-          setVisibility={setVisibility}
           canContinue={intentStepValid}
           continueLabel={needsJoinCeremony ? 'Next' : 'Create wasteland'}
           onContinue={goToCredentials}
           isPending={createMutation.isPending}
+          commonsDisabled={hasCommonsConnection}
         />
       )}
 
@@ -587,12 +598,11 @@ function IntentStep({
   intent,
   setIntent,
   dolthubUsername,
-  visibility,
-  setVisibility,
   canContinue,
   continueLabel,
   onContinue,
   isPending,
+  commonsDisabled,
 }: {
   name: string;
   setName: (v: string) => void;
@@ -608,12 +618,11 @@ function IntentStep({
   intent: UpstreamIntent;
   setIntent: (next: UpstreamIntent) => void;
   dolthubUsername: string | null;
-  visibility: Visibility;
-  setVisibility: (v: Visibility) => void;
   canContinue: boolean;
   continueLabel: string;
   onContinue: () => void;
   isPending: boolean;
+  commonsDisabled: boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -705,6 +714,7 @@ function IntentStep({
           organizationId={ownership === 'organization' ? selectedOrgId || undefined : undefined}
           dolthubUsername={dolthubUsername}
           disabled={isPending}
+          commonsDisabled={commonsDisabled}
         />
         {intent.kind === 'create' && (
           <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
@@ -715,25 +725,6 @@ function IntentStep({
             </span>
           </div>
         )}
-      </div>
-
-      {/* Visibility */}
-      <div className="space-y-2">
-        <Label>Visibility</Label>
-        <RadioGroup value={visibility} onValueChange={v => setVisibility(v as Visibility)}>
-          <div className="flex items-center gap-2">
-            <RadioGroupItem value="private" id="visibility-private" />
-            <Label htmlFor="visibility-private" className="cursor-pointer font-normal">
-              Private
-            </Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <RadioGroupItem value="public" id="visibility-public" />
-            <Label htmlFor="visibility-public" className="cursor-pointer font-normal">
-              Public
-            </Label>
-          </div>
-        </RadioGroup>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">

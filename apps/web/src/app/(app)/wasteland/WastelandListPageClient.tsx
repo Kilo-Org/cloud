@@ -5,9 +5,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { Button } from '@/components/Button';
-import { Badge } from '@/components/ui/badge';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { GastownBackdrop } from '@/components/gastown/GastownBackdrop';
+import { WastelandBetaBadge } from '@/components/wasteland/WastelandBetaBadge';
 import { Plus, Skull } from 'lucide-react';
 import { WastelandCard, WastelandListSkeleton } from './_components/WastelandListComponents';
 import { parseDolthubUpstream } from '@/lib/wasteland/upstream';
@@ -39,7 +39,7 @@ export function WastelandListPageClient() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <SetPageTitle title="Wastelands">
-                <Badge variant="beta">beta</Badge>
+                <WastelandBetaBadge />
               </SetPageTitle>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/60">
                 A hosted bounty board backed by DoltHub. Post wanted items, claim work, and track

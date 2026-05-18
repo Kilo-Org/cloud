@@ -13,8 +13,10 @@ export { WlClient } from './client';
 export type {
   WlClientConfig,
   PostInput,
+  EditInput,
   DoneInput,
   AcceptInput,
+  AcceptUpstreamClientInput,
   RejectInput,
   PublishInput,
   PublishOutcome,
@@ -34,6 +36,8 @@ export { browse } from './ops/browse';
 export type { BrowseEntry, BrowseFilter, BrowseOptions } from './ops/browse';
 export { post } from './ops/post';
 export type { PostOptions } from './ops/post';
+export { edit } from './ops/edit';
+export type { EditOptions } from './ops/edit';
 export { claim } from './ops/claim';
 export type { ClaimOptions } from './ops/claim';
 export { unclaim } from './ops/unclaim';
@@ -42,6 +46,8 @@ export { done } from './ops/done';
 export type { DoneOptions } from './ops/done';
 export { accept } from './ops/accept';
 export type { AcceptOptions } from './ops/accept';
+export { acceptUpstream } from './ops/accept-upstream';
+export type { AcceptUpstreamOptions } from './ops/accept-upstream';
 export { reject } from './ops/reject';
 export type { RejectOptions } from './ops/reject';
 export { close } from './ops/close';

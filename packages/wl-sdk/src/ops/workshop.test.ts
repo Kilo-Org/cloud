@@ -3,7 +3,7 @@ import { discardBranch, listMyBranches } from './workshop';
 import { makeFetch, type MockResponse } from './test-helpers';
 
 describe('listMyBranches', () => {
-  it('filters to wl/<rig>/* and pairs with open PRs', async () => {
+  it('keeps all wanted wl branches on the fork and pairs with open PRs', async () => {
     const responses: MockResponse[] = [
       // listBranches
       {
@@ -22,8 +22,16 @@ describe('listMyBranches', () => {
           ],
         },
       },
-      // listPulls (open) → 1 open
-      { status: 200, body: { pulls: [{ pull_id: '5', title: 'x', state: 'open' }] } },
+      // listPulls (all) → 1 open, 1 closed
+      {
+        status: 200,
+        body: {
+          pulls: [
+            { pull_id: '5', title: 'x', state: 'open' },
+            { pull_id: '6', title: 'closed', state: 'closed' },
+          ],
+        },
+      },
       // getPull #5 → matches alice/w-1
       {
         status: 200,
@@ -32,6 +40,18 @@ describe('listMyBranches', () => {
           title: 'x',
           state: 'open',
           from_branch_name: 'wl/alice/w-1',
+          from_branch_owner_name: 'alice',
+          to_branch_name: 'main',
+        },
+      },
+      // getPull #6 → matches alice/w-3 but is closed
+      {
+        status: 200,
+        body: {
+          pull_id: '6',
+          title: 'closed',
+          state: 'closed',
+          from_branch_name: 'wl/alice/w-3',
           from_branch_owner_name: 'alice',
           to_branch_name: 'main',
         },
@@ -47,11 +67,14 @@ describe('listMyBranches', () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data).toHaveLength(2);
+    expect(result.data).toHaveLength(3);
     const w1 = result.data.find(e => e.wantedId === 'w-1');
     expect(w1?.openPullId).toBe('5');
+    expect(w1?.pullState).toBe('open');
     const w3 = result.data.find(e => e.wantedId === 'w-3');
     expect(w3?.openPullId).toBeNull();
+    expect(w3?.pullState).toBe('closed');
+    expect(result.data.find(e => e.wantedId === 'w-2')?.branchName).toBe('wl/bob/w-2');
   });
 });
 

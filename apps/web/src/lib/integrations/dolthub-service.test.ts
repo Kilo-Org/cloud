@@ -30,18 +30,9 @@ import {
   DOLTHUB_REDIRECT_URI,
   DOLTHUB_SCOPES,
 } from '@/lib/integrations/dolthub-service';
-import { DOLTHUB_APP_DEV_CLIENT_ID } from '@/lib/config.server';
-
-function setNodeEnv(value: string) {
-  Object.defineProperty(process.env, 'NODE_ENV', {
-    value,
-    configurable: true,
-    writable: true,
-  });
-}
+import { DOLTHUB_APP_CLIENT_ID } from '@/lib/config.server';
 
 describe('dolthub-service', () => {
-  const originalNodeEnv = process.env.NODE_ENV;
   const originalFetch = globalThis.fetch;
   let user: User;
 
@@ -54,7 +45,6 @@ describe('dolthub-service', () => {
 
   afterEach(async () => {
     globalThis.fetch = originalFetch;
-    setNodeEnv(originalNodeEnv);
     await db
       .delete(platform_integrations)
       .where(
@@ -69,18 +59,11 @@ describe('dolthub-service', () => {
     test('includes the required OAuth parameters', () => {
       const url = getDoltHubOAuthUrl('test-state-123');
       expect(url).toMatch(/^https:\/\/www\.dolthub\.com\/oauth\/authorize/);
-      expect(url).toContain(`client_id=${encodeURIComponent(DOLTHUB_APP_DEV_CLIENT_ID)}`);
+      expect(url).toContain(`client_id=${encodeURIComponent(DOLTHUB_APP_CLIENT_ID)}`);
       expect(url).toContain('response_type=code');
       expect(url).toContain(`redirect_uri=${encodeURIComponent(DOLTHUB_REDIRECT_URI)}`);
       expect(url).toContain(`scope=${encodeURIComponent(DOLTHUB_SCOPES.join(','))}`);
       expect(url).toContain('state=test-state-123');
-    });
-
-    test('throws in production', () => {
-      setNodeEnv('production');
-      expect(() => getDoltHubOAuthUrl('state')).toThrow(
-        'DoltHub integration is dev-only and not available in production'
-      );
     });
   });
 
@@ -133,13 +116,6 @@ describe('dolthub-service', () => {
         'DoltHub token exchange returned invalid payload'
       );
     });
-
-    test('throws in production', async () => {
-      setNodeEnv('production');
-      await expect(exchangeDoltHubOAuthCode('code')).rejects.toThrow(
-        'DoltHub integration is dev-only and not available in production'
-      );
-    });
   });
 
   describe('refreshDoltHubAccessToken', () => {
@@ -168,13 +144,6 @@ describe('dolthub-service', () => {
       expect(result.refreshToken).toBe('new-refresh-token');
       expect(result.expiresIn).toBe(7200);
     });
-
-    test('throws in production', async () => {
-      setNodeEnv('production');
-      await expect(refreshDoltHubAccessToken('token')).rejects.toThrow(
-        'DoltHub integration is dev-only and not available in production'
-      );
-    });
   });
 
   describe('getInstallation', () => {
@@ -197,13 +166,6 @@ describe('dolthub-service', () => {
     test('returns null when not found', async () => {
       const result = await getInstallation({ type: 'user', id: user.id });
       expect(result).toBeNull();
-    });
-
-    test('throws in production', async () => {
-      setNodeEnv('production');
-      await expect(getInstallation({ type: 'user', id: user.id })).rejects.toThrow(
-        'DoltHub integration is dev-only and not available in production'
-      );
     });
   });
 
@@ -272,21 +234,6 @@ describe('dolthub-service', () => {
       expect(meta.refresh_token).toBe('refresh-updated');
     });
 
-    test('throws in production', async () => {
-      setNodeEnv('production');
-      await expect(
-        upsertDoltHubInstallation({
-          owner: { type: 'user', id: user.id },
-          tokens: {
-            accessToken: 't',
-            refreshToken: null,
-            expiresIn: null,
-            scope: null,
-          },
-        })
-      ).rejects.toThrow('DoltHub integration is dev-only and not available in production');
-    });
-
     test('concurrent upserts for the same owner produce a single row', async () => {
       const tokens = (suffix: string) => ({
         accessToken: `token-${suffix}`,
@@ -344,13 +291,6 @@ describe('dolthub-service', () => {
     test('succeeds when no installation exists', async () => {
       const result = await uninstall({ type: 'user', id: user.id });
       expect(result.success).toBe(true);
-    });
-
-    test('throws in production', async () => {
-      setNodeEnv('production');
-      await expect(uninstall({ type: 'user', id: user.id })).rejects.toThrow(
-        'DoltHub integration is dev-only and not available in production'
-      );
     });
   });
 
@@ -516,26 +456,6 @@ describe('dolthub-service', () => {
       const token = await getValidDoltHubToken(integration);
       expect(token).toBeNull();
     });
-
-    test('throws in production', async () => {
-      setNodeEnv('production');
-      const [integration] = await db
-        .insert(platform_integrations)
-        .values({
-          owned_by_user_id: user.id,
-          owned_by_organization_id: null,
-          platform: PLATFORM.DOLTHUB,
-          integration_type: 'oauth',
-          platform_account_login: 'testuser',
-          integration_status: INTEGRATION_STATUS.ACTIVE,
-          metadata: { access_token: 'token' },
-        })
-        .returning();
-
-      await expect(getValidDoltHubToken(integration)).rejects.toThrow(
-        'DoltHub integration is dev-only and not available in production'
-      );
-    });
   });
 
   describe('getCachedDoltHubUsername / rememberDoltHubUsername', () => {
@@ -627,27 +547,6 @@ describe('dolthub-service', () => {
         .from(platform_integrations)
         .where(eq(platform_integrations.id, integration.id));
       expect(getCachedDoltHubUsername(reloaded!)).toBe('new-name');
-    });
-
-    test('rememberDoltHubUsername throws in production', async () => {
-      const [integration] = await db
-        .insert(platform_integrations)
-        .values({
-          owned_by_user_id: user.id,
-          owned_by_organization_id: null,
-          platform: PLATFORM.DOLTHUB,
-          integration_type: 'oauth',
-          integration_status: INTEGRATION_STATUS.ACTIVE,
-          metadata: { access_token: 'token' },
-          installed_at: new Date().toISOString(),
-        })
-        .returning();
-
-      setNodeEnv('production');
-
-      await expect(rememberDoltHubUsername(integration, 'x')).rejects.toThrow(
-        'DoltHub integration is dev-only and not available in production'
-      );
     });
   });
 
@@ -755,26 +654,6 @@ describe('dolthub-service', () => {
 
       const result = await getDoltHubUser(integration!);
       expect(result).toBeNull();
-    });
-
-    test('throws in production', async () => {
-      const [integration] = await db
-        .insert(platform_integrations)
-        .values({
-          owned_by_user_id: user.id,
-          owned_by_organization_id: null,
-          platform: PLATFORM.DOLTHUB,
-          integration_type: 'oauth',
-          integration_status: INTEGRATION_STATUS.ACTIVE,
-          metadata: { access_token: 'tok' },
-          installed_at: new Date().toISOString(),
-        })
-        .returning();
-
-      setNodeEnv('production');
-      await expect(getDoltHubUser(integration!)).rejects.toThrow(
-        'DoltHub integration is dev-only and not available in production'
-      );
     });
   });
 
@@ -924,13 +803,6 @@ describe('dolthub-service', () => {
       if (!result.exists) {
         expect(result.reason).toContain('502');
       }
-    });
-
-    test('throws in production', async () => {
-      setNodeEnv('production');
-      await expect(verifyDoltHubUpstreamExists('owner/repo', null)).rejects.toThrow(
-        'DoltHub integration is dev-only and not available in production'
-      );
     });
   });
 });

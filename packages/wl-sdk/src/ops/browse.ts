@@ -13,6 +13,7 @@
 import { z } from 'zod';
 import { doltRead } from '../dolthub/read';
 import { listBranches } from '../dolthub/branches';
+import { WlDoltHubError } from '../dolthub/api';
 import { escapeSqlString } from '../commons/escape';
 import { WantedRowSchema, type WantedRow } from '../commons/schema.generated';
 import { parseWlBranch, rigBranchPrefix } from './branch';
@@ -32,7 +33,7 @@ export type BrowseFilter = {
   search?: string;
   /** ISO8601 / SQL timestamp string; rows with `updated_at >= since`. */
   since?: string;
-  /** Defaults to 50, matching the Go reference. */
+  /** Omit to return every matching row. */
   limit?: number;
 };
 
@@ -61,6 +62,25 @@ export type BrowseOptions = {
 };
 
 const RowSchema = WantedRowSchema;
+const BoardStatuses = [
+  'open',
+  'claimed',
+  'in_review',
+  'completed',
+  'validated',
+  'withdrawn',
+] as const;
+
+function formatBrowseError(err: unknown): string {
+  if (err instanceof WlDoltHubError) {
+    const body = typeof err.body === 'string' ? err.body : JSON.stringify(err.body);
+    return `browse read failed: ${err.message}${body ? `: ${body}` : ''}`;
+  }
+  if (err instanceof z.ZodError) {
+    return `browse row validation failed: ${err.message}`;
+  }
+  return err instanceof Error ? err.message : String(err);
+}
 
 function buildBrowseSql(filter: BrowseFilter | undefined): string {
   const conditions: string[] = [];
@@ -80,30 +100,56 @@ function buildBrowseSql(filter: BrowseFilter | undefined): string {
     );
   }
 
-  const limit = filter?.limit && filter.limit > 0 ? filter.limit : 50;
   let sql = 'SELECT * FROM wanted';
   if (conditions.length > 0) sql += ` WHERE ${conditions.join(' AND ')}`;
-  sql += ` ORDER BY priority ASC, created_at DESC LIMIT ${limit}`;
+  sql += ' ORDER BY priority ASC, created_at DESC';
+  if (filter?.limit && filter.limit > 0) sql += ` LIMIT ${filter.limit}`;
   return sql;
+}
+
+function buildStatusBrowseSql(status: string): string {
+  return `SELECT * FROM wanted WHERE status = '${escapeSqlString(status)}' ORDER BY priority ASC, created_at DESC`;
+}
+
+async function readWantedRows(opts: BrowseOptions): Promise<WantedRow[]> {
+  if (opts.filter) {
+    const filteredRes = await doltRead({
+      auth: opts.auth,
+      owner: opts.upstream.owner,
+      db: opts.upstream.db,
+      // No ref: take advantage of the anonymous-fallback in doltRead so
+      // this works even with a user token whose identity differs from the
+      // upstream owner.
+      query: buildBrowseSql(opts.filter),
+      fetch: opts.fetch,
+      hooks: opts.hooks,
+    });
+    return z.array(RowSchema).parse(filteredRes.rows);
+  }
+
+  // DoltHub caps large SELECT results with `query_execution_status: RowLimit`.
+  // Fetch each status separately so low-volume open/in-review rows are not
+  // hidden behind thousands of completed rows in the unfiltered board query.
+  const results = await Promise.all(
+    BoardStatuses.map(status =>
+      doltRead({
+        auth: opts.auth,
+        owner: opts.upstream.owner,
+        db: opts.upstream.db,
+        query: buildStatusBrowseSql(status),
+        fetch: opts.fetch,
+        hooks: opts.hooks,
+      })
+    )
+  );
+
+  return z.array(RowSchema).parse(results.flatMap(result => result.rows));
 }
 
 export async function browse(opts: BrowseOptions): Promise<WlResult<BrowseEntry[]>> {
   try {
-    const sql = buildBrowseSql(opts.filter);
-
     // 1. Upstream main rows.
-    const mainRes = await doltRead({
-      auth: opts.auth,
-      owner: opts.upstream.owner,
-      db: opts.upstream.db,
-      // No ref: take advantage of the anonymous-fallback in
-      // doltRead so this works even with a user token whose
-      // identity differs from the upstream owner.
-      query: sql,
-      fetch: opts.fetch,
-      hooks: opts.hooks,
-    });
-    const mainRows = z.array(RowSchema).parse(mainRes.rows);
+    const mainRows = await readWantedRows(opts);
     const byId = new Map<string, BrowseEntry>();
     for (const row of mainRows) {
       byId.set(row.id, { wantedId: row.id, upstream: row, fork: null, source: 'main' });
@@ -165,6 +211,6 @@ export async function browse(opts: BrowseOptions): Promise<WlResult<BrowseEntry[
     return { ok: true, data: Array.from(byId.values()) };
   } catch (err) {
     if (err instanceof WlError) return { ok: false, error: err };
-    return { ok: false, error: new WlError('browse failed', 'upstream', err) };
+    return { ok: false, error: new WlError(formatBrowseError(err), 'upstream', err) };
   }
 }

@@ -10,11 +10,8 @@
  * refresh. Wasteland calling the web app on every op keeps tokens
  * fresh and removes the need for refresh-token logic on the worker.
  *
- * Production note: the DoltHub OAuth integration is dev-only. In
- * production the corresponding internal route returns 404 and we fall
- * back to whatever credential is stored locally (which is a
- * long-lived manual API token, not an OAuth access token, so it never
- * expires). The fallback path is the responsibility of the caller —
+ * When OAuth is unavailable, callers can fall back to whatever credential
+ * is stored locally. The fallback path is the responsibility of the caller —
  * see `loadSdkContext` in `wanted-board/wanted-board-ops-sdk.ts` and
  * `loadContext` in `branch-ops/branch-ops.ts` /
  * `lifecycle-ops/lifecycle-ops.ts`.
@@ -48,9 +45,9 @@ export type FetchFreshTokenResult =
  *   should fall back to the locally stored credential.
  * - `'not-active'` — integration exists but is disconnected. Same
  *   fallback.
- * - `'unavailable'` — secret missing, web app down, route disabled in
- *   prod, etc. Caller should fall back to the locally stored
- *   credential and surface the reason in logs.
+ * - `'unavailable'` — secret missing, web app down, etc. Caller should
+ *   fall back to the locally stored credential and surface the reason in
+ *   logs.
  */
 export async function fetchFreshDoltHubToken(
   env: Env,

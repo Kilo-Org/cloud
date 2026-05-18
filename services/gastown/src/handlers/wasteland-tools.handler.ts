@@ -266,6 +266,7 @@ export async function handleWastelandPost(c: Context<GastownEnv>, params: { town
     description: parsed.data.description,
     priority: parsed.data.priority,
     type: parsed.data.type,
+    publish: true,
   });
 
   if (!result.success) {

@@ -16,6 +16,7 @@
 import { z } from 'zod';
 import { WlClient, WlError, doltRead, type WlClientConfig } from '@kilocode/wl-sdk';
 import { WantedBoardOpError } from './errors';
+import { listMyForkBranchesViaSdk } from '../branch-ops/branch-ops-inner';
 
 export type SdkContext = {
   upstream: string;
@@ -48,11 +49,12 @@ function wrapSdkError(err: unknown, label: string): WantedBoardOpError {
           : err.code === 'internal'
             ? 'INTERNAL_SERVER_ERROR'
             : 'UPSTREAM_ERROR';
-    return new WantedBoardOpError(`${label} failed: ${err.message}`, code);
+    return new WantedBoardOpError(`${label} failed: ${err.message}`, code, err);
   }
   return new WantedBoardOpError(
     `${label} failed: ${err instanceof Error ? err.message : String(err)}`,
-    'UPSTREAM_ERROR'
+    'UPSTREAM_ERROR',
+    err
   );
 }
 
@@ -181,35 +183,73 @@ export async function acceptViaSdk(
   ctx: SdkContext,
   input: {
     itemId: string;
+    submitterRigHandle?: string;
     quality: 'excellent' | 'good' | 'fair' | 'poor';
+    reliability?: 'excellent' | 'good' | 'fair' | 'poor';
+    severity?: 'leaf' | 'branch' | 'root';
+    skillTags?: readonly string[];
     message?: string;
   },
   fetchImpl?: typeof fetch
 ): Promise<{ success: true }> {
-  const completionId = await readLatestCompletionId(ctx, input.itemId, fetchImpl);
+  const submitterRigHandle =
+    input.submitterRigHandle ?? (await resolveSubmitterRig(ctx, input.itemId, fetchImpl));
+  if (!submitterRigHandle) {
+    throw new WantedBoardOpError(
+      'Accept failed: no in-review submitter found',
+      'PRECONDITION_FAILED'
+    );
+  }
+  if (submitterRigHandle === ctx.rigHandle) {
+    throw new WantedBoardOpError(
+      'Accept failed: cannot issue a stamp to yourself; close the item instead',
+      'PRECONDITION_FAILED'
+    );
+  }
+
+  const completionId = await readLatestCompletionId(
+    { ...ctx, rigHandle: submitterRigHandle },
+    input.itemId,
+    fetchImpl
+  );
   if (!completionId) {
     throw new WantedBoardOpError(
-      `Accept failed: no completion found on branch wl/${ctx.rigHandle}/${input.itemId}`,
+      `Accept failed: no completion found on branch wl/${submitterRigHandle}/${input.itemId}`,
       'PRECONDITION_FAILED'
     );
   }
   const wl = makeClient(ctx, fetchImpl);
   try {
-    await wl.accept(input.itemId, {
+    await wl.acceptUpstream(input.itemId, {
+      submitterRigHandle,
       completionId,
       stamp: {
         id: makeStampId(input.itemId),
-        subject: ctx.rigHandle,
+        subject: submitterRigHandle,
         quality: QUALITY_TO_INT[input.quality],
-        reliability: QUALITY_TO_INT[input.quality],
-        severity: 'info',
+        reliability: QUALITY_TO_INT[input.reliability ?? input.quality],
+        severity: input.severity ?? 'leaf',
+        skillTags: input.skillTags,
         message: input.message,
       },
     });
+    await wl.publish(input.itemId);
   } catch (err) {
     throw wrapSdkError(err, 'Accept');
   }
   return { success: true };
+}
+
+async function resolveSubmitterRig(
+  ctx: SdkContext,
+  itemId: string,
+  fetchImpl?: typeof fetch
+): Promise<string | null> {
+  const branches = await listMyForkBranchesViaSdk(ctx, fetchImpl);
+  const branch = branches.find(
+    b => b.wantedId === itemId && b.wantedStatusOnBranch === 'in_review'
+  );
+  return branch?.branchName.split('/')[1] ?? null;
 }
 
 export async function rejectViaSdk(
@@ -247,11 +287,13 @@ export async function postViaSdk(
     description: string;
     priority?: z.infer<typeof PriorityEnum>;
     type?: z.infer<typeof TypeEnum>;
+    publish?: boolean;
   },
   fetchImpl?: typeof fetch
-): Promise<{ success: true; wantedId: string }> {
+): Promise<{ success: true; wantedId: string; pr_url: string | null }> {
   const wl = makeClient(ctx, fetchImpl);
   const wantedId = makeWantedId();
+  let prUrl: string | null = null;
   try {
     await wl.post({
       wantedId,
@@ -263,10 +305,47 @@ export async function postViaSdk(
           ? PRIORITY_TO_NUMBER[input.priority]
           : PRIORITY_TO_NUMBER.medium,
     });
+    if (input.publish === true) {
+      const pub = await wl.publish(wantedId);
+      prUrl = pub.prUrl;
+    }
   } catch (err) {
     throw wrapSdkError(err, 'Post');
   }
-  return { success: true, wantedId };
+  return { success: true, wantedId, pr_url: prUrl };
+}
+
+export async function editViaSdk(
+  ctx: SdkContext,
+  input: {
+    itemId: string;
+    title?: string;
+    description?: string;
+    priority?: z.infer<typeof PriorityEnum>;
+    type?: z.infer<typeof TypeEnum>;
+  },
+  fetchImpl?: typeof fetch
+): Promise<{ success: true; pr_url: string | null }> {
+  const wl = makeClient(ctx, fetchImpl);
+  let prUrl: string | null = null;
+  try {
+    await wl.edit({
+      wantedId: input.itemId,
+      title: input.title,
+      description: input.description,
+      type: input.type,
+      priority: input.priority !== undefined ? PRIORITY_TO_NUMBER[input.priority] : undefined,
+    });
+    try {
+      const pub = await wl.publish(input.itemId);
+      prUrl = pub.prUrl;
+    } catch {
+      console.warn('[wanted-board-ops-sdk] publish after edit failed', { itemId: input.itemId });
+    }
+  } catch (err) {
+    throw wrapSdkError(err, 'Edit');
+  }
+  return { success: true, pr_url: prUrl };
 }
 
 export async function doneViaSdk(

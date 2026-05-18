@@ -22,12 +22,21 @@
  */
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import type { WastelandOutputs } from '@/lib/wasteland/trpc';
 import { useWastelandRepo } from '../_components/WastelandRepoContext';
 import { useDrawerStack } from '@/components/wasteland/drawer/WastelandDrawerStack';
+import {
+  AcceptDialog,
+  CloseItemDialog,
+  MarkDoneDialog,
+  RejectDialog,
+  UnclaimDialog,
+} from '../../../by-id/[wastelandId]/wanted/WantedBoardClient';
+import type { WantedItem } from '@/components/wasteland/drawer/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -80,6 +89,7 @@ export function ForkClient() {
   const trpc = useWastelandTRPC();
   const queryClient = useQueryClient();
   const { open: openDrawer } = useDrawerStack();
+  const searchParams = useSearchParams();
 
   const branchesQuery = useQuery(
     trpc.wasteland.listMyForkBranches.queryOptions({ wastelandId: repo.wastelandId })
@@ -112,17 +122,82 @@ export function ForkClient() {
 
   const discardMutation = useMutation({
     ...trpc.wasteland.discardBranch.mutationOptions(),
-    onSuccess: () => {
-      toast.success('Branch discarded');
+    onSuccess: (_result, variables) => {
+      toast.success('Branch discarded', {
+        description: 'Any open DoltHub PR for the branch was closed.',
+      });
+      setSuppressedWantedIds(current => new Set(current).add(variables.wantedId));
+      queryClient.setQueryData<ForkBranch[]>(
+        branchesQueryKey,
+        current => current?.filter(branch => branch.wantedId !== variables.wantedId) ?? current
+      );
       refetch();
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.listMyPulls.queryKey({ wastelandId: repo.wastelandId }),
+      });
     },
     onError: err => toast.error(`Discard failed: ${err.message}`),
   });
 
   const dolthubOrg = credentialQuery.data?.dolthub_org ?? null;
-  const branches = branchesQuery.data ?? [];
+  const isAdmin = credentialQuery.data?.is_upstream_admin ?? false;
+  const [suppressedWantedIds, setSuppressedWantedIds] = useState<Set<string>>(() => new Set());
+  const branches = useMemo(
+    () => (branchesQuery.data ?? []).filter(branch => !suppressedWantedIds.has(branch.wantedId)),
+    [branchesQuery.data, suppressedWantedIds]
+  );
+
+  useEffect(() => {
+    if (!branchesQuery.data || suppressedWantedIds.size === 0) return;
+    const returnedWantedIds = new Set(branchesQuery.data.map(branch => branch.wantedId));
+    const next = new Set<string>();
+    for (const wantedId of suppressedWantedIds) {
+      if (returnedWantedIds.has(wantedId)) next.add(wantedId);
+    }
+    if (next.size !== suppressedWantedIds.size) setSuppressedWantedIds(next);
+  }, [branchesQuery.data, suppressedWantedIds]);
+
+  const [doneItem, setDoneItem] = useState<WantedItem | null>(null);
+  const [acceptItem, setAcceptItem] = useState<WantedItem | null>(null);
+  const [rejectItem, setRejectItem] = useState<WantedItem | null>(null);
+  const [closeItem, setCloseItem] = useState<WantedItem | null>(null);
+  const [unclaimItem, setUnclaimItem] = useState<WantedItem | null>(null);
 
   const upstreamPath = `/wasteland/${repo.owner}/${repo.repo}`;
+
+  const autoOpenedWantedIdRef = useRef<string | null>(null);
+  const drawerActions = {
+    isAdmin,
+    onDone: setDoneItem,
+    onAccept: setAcceptItem,
+    onReject: setRejectItem,
+    onCloseItem: setCloseItem,
+    onUnclaim: setUnclaimItem,
+  };
+
+  const invalidateWorkshop = () => {
+    void queryClient.invalidateQueries({ queryKey: branchesQueryKey });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId: repo.wastelandId }),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.wasteland.listMyPendingClaims.queryKey({ wastelandId: repo.wastelandId }),
+    });
+  };
+
+  useEffect(() => {
+    const wantedId = searchParams?.get('wantedId');
+    if (!wantedId) return;
+    if (autoOpenedWantedIdRef.current === wantedId) return;
+    autoOpenedWantedIdRef.current = wantedId;
+    openDrawer({
+      type: 'wanted-item-by-id',
+      wastelandId: repo.wastelandId,
+      itemId: wantedId,
+      actions: drawerActions,
+      initialTab: 'branch',
+    });
+  }, [searchParams, openDrawer, repo.wastelandId, isAdmin]);
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -156,6 +231,7 @@ export function ForkClient() {
                       type: 'wanted-item-by-id',
                       wastelandId: repo.wastelandId,
                       itemId: branch.wantedId,
+                      actions: drawerActions,
                       // Fork view → land on the My branch tab, where
                       // the publish/discard affordances live.
                       initialTab: 'branch',
@@ -186,6 +262,36 @@ export function ForkClient() {
             </div>
           )}
         </div>
+        <MarkDoneDialog
+          wastelandId={repo.wastelandId}
+          item={doneItem}
+          onClose={() => setDoneItem(null)}
+          onSuccess={invalidateWorkshop}
+        />
+        <AcceptDialog
+          wastelandId={repo.wastelandId}
+          item={acceptItem}
+          onClose={() => setAcceptItem(null)}
+          onSuccess={invalidateWorkshop}
+        />
+        <RejectDialog
+          wastelandId={repo.wastelandId}
+          item={rejectItem}
+          onClose={() => setRejectItem(null)}
+          onSuccess={invalidateWorkshop}
+        />
+        <CloseItemDialog
+          wastelandId={repo.wastelandId}
+          item={closeItem}
+          onClose={() => setCloseItem(null)}
+          onSuccess={invalidateWorkshop}
+        />
+        <UnclaimDialog
+          wastelandId={repo.wastelandId}
+          item={unclaimItem}
+          onClose={() => setUnclaimItem(null)}
+          onSuccess={invalidateWorkshop}
+        />
       </div>
     </TooltipProvider>
   );
@@ -367,7 +473,7 @@ function BranchRow({
               isLoading={discarding}
               confirmText="Discard"
               cancelText="Cancel"
-              warningText="Deletes this branch from your fork. Cannot be undone."
+              warningText="Closes the open PR for this branch, then deletes the branch from your fork. Cannot be undone."
             />
           ) : (
             <Button

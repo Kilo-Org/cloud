@@ -50,10 +50,12 @@ export type ForkBranchEntry = {
   wantedId: string;
   /** Item title, sourced from upstream `main` when available. */
   wantedTitle: string | null;
+  wantedRowOnBranch: WantedRow | null;
   wantedStatusOnBranch: BranchWantedStatus;
   wantedStatusOnMain: BranchWantedStatus;
   divergence: BranchDivergence;
   hasOpenPR: boolean;
+  pullState: 'open' | 'closed' | 'merged' | null;
   prUrl: string | null;
   /** ISO timestamp string of the branch's latest commit, or null. */
   lastCommitAt: string | null;
@@ -143,11 +145,27 @@ function deriveDivergence(
   return 'diverged';
 }
 
-const WantedStatusRow = z.object({
+const WantedRow = z.object({
   id: z.string(),
-  title: z.string().nullable().default(null),
+  title: z.string(),
+  description: z.string().nullable().default(null),
+  project: z.string().nullable().default(null),
+  type: z.string().nullable().default(null),
+  priority: z.union([z.string(), z.number()]).nullable().default(null),
+  tags: z.string().nullable().default(null),
+  posted_by: z.string().nullable().default(null),
+  claimed_by: z.string().nullable().default(null),
   status: z.string().nullable().default(null),
+  effort_level: z.string().nullable().default(null),
+  evidence_url: z.string().nullable().default(null),
+  sandbox_required: z.union([z.string(), z.number()]).nullable().default(null),
+  sandbox_scope: z.string().nullable().default(null),
+  sandbox_min_tier: z.string().nullable().default(null),
+  created_at: z.string().nullable().default(null),
+  updated_at: z.string().nullable().default(null),
 });
+
+type WantedRow = z.infer<typeof WantedRow>;
 
 /**
  * Read the wanted row off a specific branch tip on the fork. Returns
@@ -159,12 +177,12 @@ async function readWantedFromBranch(
   branchName: string,
   wantedId: string,
   fetchImpl?: typeof fetch
-): Promise<{ status: BranchWantedStatus; title: string | null } | null> {
+): Promise<{ status: BranchWantedStatus; title: string | null; row: WantedRow } | null> {
   const slash = ctx.upstream.indexOf('/');
   if (slash <= 0) return null;
   const upstreamDb = ctx.upstream.slice(slash + 1);
   const escapedId = wantedId.replace(/'/g, "''").replace(/\\/g, '\\\\');
-  const sql = `SELECT id, title, status FROM wanted WHERE id = '${escapedId}' LIMIT 1`;
+  const sql = `SELECT id, title, description, project, type, priority, tags, posted_by, claimed_by, status, effort_level, evidence_url, sandbox_required, sandbox_scope, sandbox_min_tier, created_at, updated_at FROM wanted WHERE id = '${escapedId}' LIMIT 1`;
   try {
     const res = await doltRead({
       auth: { token: ctx.token },
@@ -175,11 +193,12 @@ async function readWantedFromBranch(
       fetch: fetchImpl,
     });
     if (res.rows.length === 0) return null;
-    const parsed = WantedStatusRow.safeParse(res.rows[0]);
+    const parsed = WantedRow.safeParse(res.rows[0]);
     if (!parsed.success) return null;
     return {
       status: normalizeStatus(parsed.data.status),
       title: parsed.data.title,
+      row: parsed.data,
     };
   } catch {
     return null;
@@ -189,7 +208,7 @@ async function readWantedFromBranch(
 // ── Public ops ───────────────────────────────────────────────────────────
 
 /**
- * Enumerate the user's `wl/<rigHandle>/*` branches on the fork and
+ * Enumerate the user's `wl/<any-rig>/<wantedId>` branches on the fork and
  * cross-reference each with upstream `main` and the branch tip.
  *
  * Why two reads per branch (fork tip + upstream main) rather than the
@@ -212,8 +231,12 @@ export async function listMyForkBranchesViaSdk(
     throw wrapSdkError(err, 'List fork branches');
   }
   // `wantedId === ''` happens for non-wanted branches (registration
-  // etc.). Skip them — the workshop view is wanted-only.
-  const wantedBranches = branches.filter(b => b.wantedId.length > 0);
+  // etc.). Skip them — the workshop view is wanted-only. The SDK returns
+  // all wanted branches on this fork so work created through connected
+  // tools under a different rig handle still appears in the workshop.
+  const wantedBranches = branches.filter(
+    b => b.wantedId.length > 0 && (b.pullState === null || b.pullState === 'open')
+  );
   if (wantedBranches.length === 0) return [];
 
   // Upstream main snapshot — one bulk read keyed by id. We only need
@@ -238,7 +261,7 @@ export async function listMyForkBranchesViaSdk(
         fetch: fetchImpl,
       });
       for (const row of res.rows) {
-        const parsed = WantedStatusRow.safeParse(row);
+        const parsed = WantedRow.pick({ id: true, title: true, status: true }).safeParse(row);
         if (parsed.success) {
           mainStatusByItemId.set(parsed.data.id, {
             status: normalizeStatus(parsed.data.status),
@@ -262,10 +285,12 @@ export async function listMyForkBranchesViaSdk(
         branchName: b.branchName,
         wantedId: b.wantedId,
         wantedTitle,
+        wantedRowOnBranch: branchTip?.row ?? null,
         wantedStatusOnBranch: branchStatus,
         wantedStatusOnMain: mainStatus,
         divergence: deriveDivergence(branchStatus, mainStatus),
         hasOpenPR: b.openPullId !== null,
+        pullState: b.pullState,
         prUrl: b.openPullId ? buildPullWebUrl(ctx.upstream, b.openPullId) : null,
         lastCommitAt: b.latestCommitDate,
       };

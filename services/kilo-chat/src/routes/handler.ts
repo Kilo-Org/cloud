@@ -24,6 +24,7 @@ import { notifyMessageDeliveryFailed } from '../webhook/deliver';
 import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
 import { setTypingFor, stopTypingFor } from '../services/typing';
 import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
+import { mintPutUrl } from '../util/presigner';
 import type {
   CreateMessageResponse,
   EditMessageResponse,
@@ -39,6 +40,7 @@ import type {
 import {
   ulidSchema,
   sandboxIdSchema,
+  attachmentInitRequestSchema,
   createMessageRequestSchema,
   createBotConversationRequestSchema,
   editMessageRequestSchema,
@@ -585,6 +587,54 @@ export async function handleCreateBotConversation(c: HonoCtx) {
     } satisfies CreateConversationResponse,
     201
   );
+}
+
+// ─── attachmentInit ─────────────────────────────────────────────────────────
+
+export async function handleAttachmentInit(c: HonoCtx) {
+  const body = await parseBody(c, attachmentInitRequestSchema);
+  if (!body.ok) return body.response;
+
+  const callerId = c.get('callerId');
+  const { conversationId, mimeType, size, filename } = body.data;
+
+  let init: { attachmentId: string; r2Key: string };
+  try {
+    init = await withDORetry(
+      () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId)),
+      stub => stub.initAttachment({ uploaderId: callerId, mimeType, size, filename }),
+      'ConversationDO.initAttachment'
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/member/i.test(msg)) return c.json({ error: 'Forbidden' }, 403);
+    if (/size|mimeType|filename/i.test(msg)) {
+      return c.json({ error: msg }, 400);
+    }
+    throw err;
+  }
+
+  const accessKeyId = await c.env.R2_ACCESS_KEY_ID.get();
+  const secretAccessKey = await c.env.R2_SECRET_ACCESS_KEY.get();
+  if (!accessKeyId || !secretAccessKey) {
+    return c.json({ error: 'R2 credentials unavailable' }, 503);
+  }
+
+  const { url, headers } = await mintPutUrl({
+    accountId: c.env.R2_ACCOUNT_ID,
+    bucket: c.env.R2_BUCKET_NAME,
+    accessKeyId,
+    secretAccessKey,
+    key: init.r2Key,
+    contentType: mimeType,
+    expiresSeconds: 900,
+  });
+
+  return c.json({
+    attachmentId: init.attachmentId,
+    putUrl: url,
+    putHeaders: headers,
+  });
 }
 
 // ─── renameConversation ─────────────────────────────────────────────────────

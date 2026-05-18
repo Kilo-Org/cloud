@@ -373,6 +373,25 @@ export const createBotConversationRequestSchema = z.object({
   additionalMembers: z.array(z.string().min(1)).max(20).optional(),
 });
 
+// ── Attachments ─────────────────────────────────────────────────────
+
+export const attachmentInitRequestSchema = z.object({
+  conversationId: ulidSchema,
+  mimeType: z.string().min(1).max(255),
+  size: z
+    .number()
+    .int()
+    .positive()
+    .max(100 * 1024 * 1024),
+  filename: z.string().min(1).max(512),
+});
+
+export const attachmentInitResponseSchema = z.object({
+  attachmentId: ulidSchema,
+  putUrl: z.string().url(),
+  putHeaders: z.record(z.string(), z.string()),
+});
+
 // ── Plugin client response schemas (controller-proxied bot endpoints) ───────
 
 export const botGetMembersResponseSchema = z.object({

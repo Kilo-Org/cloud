@@ -14,6 +14,7 @@ import { decodeConversationCursor, type ConversationCursor } from '@kilocode/kil
 import { registerConversationRoutes } from './routes/conversations';
 import {
   handleAddReaction,
+  handleAttachmentInit,
   handleCreateMessage,
   handleDeleteMessage,
   handleEditMessage,
@@ -94,6 +95,9 @@ app.delete('/v1/messages/:messageId/reactions', handleRemoveReaction);
 // Typing
 app.post('/v1/conversations/:conversationId/typing', handleSetTyping);
 app.post('/v1/conversations/:conversationId/typing/stop', handleStopTyping);
+
+// Attachments
+app.post('/v1/attachments/init', handleAttachmentInit);
 
 // Bot HTTP routes — gateway-token auth, called directly by Fly controllers.
 app.use('/bot/v1/sandboxes/:sandboxId/*', botAuthMiddleware);

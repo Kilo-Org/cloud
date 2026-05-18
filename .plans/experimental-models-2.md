@@ -6,7 +6,7 @@
 > rules, partner auth model, webhook contract, warehouse coordination, and
 > replay-bundle format are all open questions. Do **not** treat this as an
 > implementation-ready plan. Expect significant rework after design review
-> with humans (security, legal, partner-eng, data).
+> with humans.
 
 > **Scope: preview/experimental models only.** Trace export, redaction, and
 > partner webhooks here apply exclusively to traffic on opt-in preview model

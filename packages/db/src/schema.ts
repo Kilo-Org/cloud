@@ -1522,6 +1522,41 @@ export const microdollar_usage = pgTable(
   ]
 );
 
+// Per-day rollup of microdollar_usage.cost, keyed by (kilo_user_id, organization_id,
+// usage_date). Maintained by the same CTE that inserts into microdollar_usage so it
+// is updated atomically with the source row. Powers the hot 3-month-rolling-sum
+// query in kiloPass.getAverageMonthlyUsageLast3Months without scanning the raw
+// 800M-row microdollar_usage table.
+export const microdollar_usage_daily = pgTable(
+  'microdollar_usage_daily',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    usage_date: date({ mode: 'string' }).notNull(),
+    total_cost_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    // Personal-scope rollup: one row per user per day (no org).
+    uniqueIndex('idx_microdollar_usage_daily_personal')
+      .on(table.kilo_user_id, table.usage_date)
+      .where(isNull(table.organization_id)),
+    // Org-scope rollup: one row per user per org per day.
+    uniqueIndex('idx_microdollar_usage_daily_org')
+      .on(table.kilo_user_id, table.organization_id, table.usage_date)
+      .where(isNotNull(table.organization_id)),
+  ]
+);
+
+export type MicrodollarUsageDaily = typeof microdollar_usage_daily.$inferSelect;
+
 export const microdollar_usage_metadata = pgTable(
   'microdollar_usage_metadata',
   {
@@ -1563,7 +1598,12 @@ export const microdollar_usage_metadata = pgTable(
     market_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
   },
-  table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
+  table => [
+    index('idx_microdollar_usage_metadata_created_at').on(table.created_at),
+    index('idx_microdollar_usage_metadata_session_id_created_at')
+      .on(table.session_id, table.created_at)
+      .where(isNotNull(table.session_id)),
+  ]
 );
 
 export const api_request_log = pgTable(
@@ -1908,7 +1948,6 @@ export const stytch_fingerprints = pgTable(
     http_user_agent: text(),
   },
   table => [
-    index('idx_fingerprint_data').on(table.fingerprint_data),
     index('idx_hardware_fingerprint').on(table.hardware_fingerprint),
     index('idx_kilo_user_id').on(table.kilo_user_id),
     index('idx_stytch_fingerprints_reasons_gin').using('gin', table.reasons),
@@ -2615,7 +2654,6 @@ export const code_indexing_manifest = pgTable(
     index('IDX_code_indexing_manifest_organization_id').on(table.organization_id),
     index('IDX_code_indexing_manifest_kilo_user_id').on(table.kilo_user_id),
     index('IDX_code_indexing_manifest_project_id').on(table.project_id),
-    index('IDX_code_indexing_manifest_file_hash').on(table.file_hash),
     index('IDX_code_indexing_manifest_git_branch').on(table.git_branch),
     index('IDX_code_indexing_manifest_created_at').on(table.created_at),
     // Unique index to prevent race conditions during concurrent indexing
@@ -3523,6 +3561,9 @@ export const app_builder_projects = pgTable(
     index('IDX_app_builder_projects_owned_by_organization_id').on(table.owned_by_organization_id),
     index('IDX_app_builder_projects_created_at').on(table.created_at),
     index('IDX_app_builder_projects_last_message_at').on(table.last_message_at),
+    index('IDX_app_builder_projects_git_repo_integration')
+      .on(table.git_repo_full_name, table.git_platform_integration_id)
+      .where(isNotNull(table.git_repo_full_name)),
     check(
       'app_builder_projects_owner_check',
       sql`(
@@ -4323,10 +4364,6 @@ export const free_model_usage = pgTable(
     index('idx_free_model_usage_ip_created_at').on(table.ip_address, table.created_at),
     // Secondary index for analytics
     index('idx_free_model_usage_created_at').on(table.created_at),
-    // Index for per-user rate limiting (server-side products); partial to exclude anonymous rows
-    index('idx_free_model_usage_user_created_at')
-      .on(table.kilo_user_id, table.created_at)
-      .where(isNotNull(table.kilo_user_id)),
   ]
 );
 

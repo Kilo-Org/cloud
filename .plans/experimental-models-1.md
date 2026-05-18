@@ -34,8 +34,8 @@ Run A/B tests against model checkpoints in partnership with model providers, esp
 
 - Deterministic hash bucketing: `apps/web/src/lib/ai-gateway/getRandomNumber.ts`.
 - Runtime A/B precedent: `apps/web/src/lib/ai-gateway/providers/vercel/index.ts`, cached in Redis for ~10 minutes.
-- Direct-to-upstream routing pattern: the `kilo-internal/...` branch in `getProvider` (`apps/web/src/lib/ai-gateway/providers/index.ts:138-180`) returns a `{ id: 'custom', apiUrl, apiKey, supportedChatApis, transformRequest, bypassAccessCheck: true }` provider built from a `custom_llm2` row. `openRouterRequest` (`providers/index.ts:344-389`) then `fetch`es `${apiUrl}${path}` with `Authorization: Bearer ${apiKey}` — OpenRouter and Vercel are never contacted. Experiments reuse this exact shape, with the upstream config sourced from the variant version instead of `custom_llm2`.
-- Public→internal model rewriting: `applyProviderSpecificLogic` in `apps/web/src/lib/ai-gateway/providers/index.ts` (the kilo-exclusive branch around L296–306), called from `apps/web/src/app/api/openrouter/[...path]/route.ts` after provider resolution. It rewrites `body.model` to `internal_id` and pins `body.provider.only` once, pre-flight. Experiments do not use this path — variant selection happens earlier, inside `getProvider`.
+- Direct-to-upstream routing pattern: the `kilo-internal/...` branch in `getProvider` (`apps/web/src/lib/ai-gateway/providers/get-provider.ts`) returns a `{ provider, userByok: null, bypassAccessCheck: true }` result built from a `custom_llm2` row. The `Provider` itself has `{ id: 'custom', apiUrl, apiKey, supportedChatApis, transformRequest }`; `bypassAccessCheck` lives on the `getProvider` return value, not inside the provider. `upstream-request.ts` then `fetch`es `${provider.apiUrl}${path}${search}` with `Authorization: Bearer ${provider.apiKey}` — OpenRouter and Vercel are never contacted. Experiments reuse this direct-provider shape, with the upstream config sourced from the variant version instead of `custom_llm2`.
+- Public→internal model rewriting: `applyProviderSpecificLogic` in `apps/web/src/lib/ai-gateway/providers/apply-provider-specific-logic.ts`, called from `apps/web/src/app/api/openrouter/[...path]/route.ts` after provider resolution. It rewrites `body.model` to a Kilo-exclusive `internal_id` and may pin `body.provider.only` pre-flight. Variant selection happens earlier, inside `getProvider`; whether direct experiment providers explicitly bypass this logic or defensively remove incompatible provider fields is a follow-up routing decision before implementation.
 - Usage telemetry: `microdollar_usage` and `microdollar_usage_metadata` in `packages/db/src/schema.ts`, populated by `apps/web/src/lib/ai-gateway/processUsage.ts`.
 - API metrics pipeline: `apps/web/src/lib/ai-gateway/o11y/api-metrics.server.ts` → `services/o11y/src/api-metrics-routes.ts`.
 - Admin tRPC pattern: `apps/web/src/routers/admin/gateway-config-router.ts`.
@@ -57,13 +57,13 @@ POST /api/openrouter/.../chat/completions
   │    │    │    ├─ bucket with getRandomNumber(seed, sumOfWeights)
   │    │    │    ├─ select variant by cumulative weight
   │    │    │    └─ return { experimentId, variantId, variantVersionId, upstream, allocationSubject }
-  │    │    ├─ if paused: return PAUSED_ERROR sentinel (route.ts emits 4xx)
-  │    │    └─ return buildDirectProvider(upstream)  // same shape as kilo-internal/... provider
+  │    │    ├─ if paused/unavailable: return a route-visible non-provider result (route.ts emits 4xx/503 before dereferencing provider)
+  │    │    └─ return buildDirectProvider(upstream) + experiment metadata
   │    └─ else: existing branches (BYOK, kilo-internal, kiloExclusiveModels → openrouter|vercel)
-  ├─ org / access checks (bypassed for direct provider, same as kilo-internal)
-  ├─ applyProviderSpecificLogic(...) — unchanged; experiment branch is no longer here
-  ├─ stash variantVersionId + allocationSubject + clientRequestId onto MicrodollarUsageContext
-  ├─ applyTrackingIds (unchanged)
+  ├─ construct MicrodollarUsageContext and stash variantVersionId + allocationSubject + clientRequestId from the getProvider result
+  ├─ balance / org access checks (bypassed for direct provider; preview traffic is free/provider-funded in v1)
+  ├─ applyTrackingIds + applyProviderSpecificLogic / provider.transformRequest
+  ├─ snapshot canonical post-transform request body onto MicrodollarUsageContext for prompt storage
   ├─ upstream fetch (unchanged)
   └─ after():
        ├─ accountForMicrodollarUsage writes usage + experiment request attribution
@@ -189,7 +189,7 @@ Indexes for `model_experiment_request`:
 
 Experiment- and variant-level reports go through join: `request → variant_version → variant → experiment`. The served upstream config is read from `model_experiment_variant_version.upstream` JSONB; reports surface `upstream->>'internal_id'` and (where useful) `upstream->>'base_url'`. **Never select `upstream->>'api_key'` in any reporting view, admin query, or response payload.** If query plans show the join hop is hot, add a covering index or denormalize `variant_id` and/or `experiment_id` onto the request row later — defer until measured.
 
-`model_experiment_request.created_at` and `usage_id` are pre-generated in app code at the start of the after-hook (see Phase 4), then copied into both the microdollar write and the experiment write. This keeps time-window joins exact and avoids the previous "same-CTE" coupling between `processUsage.ts` and the experiment write.
+`model_experiment_request.created_at` and `usage_id` match the linked `microdollar_usage` row exactly. The implementation may either pre-generate those values before the microdollar write or have the microdollar write return them; choose the smaller change in the current `processUsage.ts` flow.
 
 `model_experiment_request` stores **only hashes** for prompts, never prompt content. The bodies live in R2 (see Prompt Storage below), keyed by sha256. Storing only hashes keeps the Postgres row tiny (~80 bytes overhead beyond the existing attribution columns), keeps PG TOAST out of the picture entirely, and lets the experiment data wipe cleanly without coordinating with the primary datastore.
 
@@ -270,7 +270,7 @@ In `apps/web/src/app/api/openrouter/[...path]/route.ts`:
 - Capture `x-kilo-session` as a fallback for `session_id` when `x-kilocode-taskid` is absent.
 - Reuse the existing machine-id extraction; do not introduce a new header.
 - Pass `clientRequestId` through `MicrodollarUsageContext` and persist it in `model_experiment_request` only when an experiment is applied.
-- Note on context mutation: `MicrodollarUsageContext` is constructed once at `route.ts` ~L431 (before `applyProviderSpecificLogic` runs) but is mutable; the existing code already assigns `ttfb_ms`, `status_code`, and `abuse_request_id` onto it after construction, before `accountForMicrodollarUsage` consumes it at ~L619. Experiment fields (`modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`) follow the same pattern: `applyProviderSpecificLogic` returns the experiment selection record, and the caller assigns those fields onto `usageContext` immediately after.
+- Note on context mutation: current `route.ts` calls `getProvider` before constructing `MicrodollarUsageContext`. `getProvider` must therefore return experiment metadata alongside the provider result, and `route.ts` assigns `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, and the prompt-storage body snapshot onto `usageContext` after it is constructed. The existing code already mutates `usageContext` later for fields such as `ttfb_ms`, `status_code`, and `abuse_request_id`; experiment fields follow that route-level mutation pattern rather than mutating context from inside `getProvider`.
 
 ### Phase 3 — Variant Picker + Routing
 
@@ -292,13 +292,13 @@ Add `apps/web/src/lib/ai-gateway/experiments/`:
   - Variant selection: `getRandomNumber(seed, sumOfWeights)`, then cumulative weights walked in `ORDER BY model_experiment_variant.id ASC`. Ordering by the immutable `id` (uuid PK), not by `label`, so live label edits never rebucket users. Reports group by `variant_version_id` and don't depend on slot order.
 
 - `build-direct-provider.ts`
-  - `buildDirectProvider(upstream)`: returns the same `Provider` shape that `getProvider`'s `kilo-internal/...` branch returns today (`apps/web/src/lib/ai-gateway/providers/index.ts:138-180`): `{ id: 'custom', apiUrl: upstream.base_url, apiKey: upstream.api_key, supportedChatApis: inferSupportedChatApis(upstream.opencode_settings?.ai_sdk_provider, upstream.openclaw_settings?.api_adapter), transformRequest, bypassAccessCheck: true }`. The existing `kilo-internal` branch is refactored to call this same builder (passing the relevant fields from the `custom_llm2` row) so both code paths share one implementation.
+  - `buildDirectProvider(upstream)`: returns the same `Provider` shape that `getProvider`'s `kilo-internal/...` branch returns today (`apps/web/src/lib/ai-gateway/providers/get-provider.ts`): `{ id: 'custom', apiUrl: upstream.base_url, apiKey: upstream.api_key, supportedChatApis: inferSupportedChatApis(upstream.opencode_settings?.ai_sdk_provider, upstream.openclaw_settings?.api_adapter), transformRequest }`. The existing `kilo-internal` branch is refactored to call this same builder (passing the relevant fields from the `custom_llm2` row) so both code paths share one implementation. `bypassAccessCheck: true` remains on the `getProvider` result object, not on the `Provider`.
 - `index.ts`
   - Public exports for the gateway and tests.
 
-Integration in `getProvider` (`apps/web/src/lib/ai-gateway/providers/index.ts`):
+Integration in `getProvider` (`apps/web/src/lib/ai-gateway/providers/get-provider.ts`) and `route.ts`:
 
-- A new branch is added near the top of `getProvider`, after the BYOK branches and **before** the `kilo-internal/...` branch and the `kiloExclusiveModels` lookup. Pseudocode:
+- Extend `getProvider`'s return type with optional experiment routing metadata, because `route.ts` constructs `MicrodollarUsageContext` after `getProvider` returns. A new branch is added near the top of `getProvider`, after the BYOK branches and **before** the `kilo-internal/...` branch and the `kiloExclusiveModels` lookup. Pseudocode:
   ```ts
   if (await isPublicIdExperimented(requestedModel)) {
     const selection = await pickModelExperimentVariant({
@@ -308,33 +308,38 @@ Integration in `getProvider` (`apps/web/src/lib/ai-gateway/providers/index.ts`):
       clientIp,
     });
     if (selection?.status === 'paused') {
-      return EXPERIMENT_PAUSED_PROVIDER_SENTINEL; // route.ts maps to 4xx
+      return EXPERIMENT_PAUSED_ROUTING_RESULT; // route.ts maps to 4xx before dereferencing provider
+    }
+    if (selection?.status === 'unavailable') {
+      return EXPERIMENT_UNAVAILABLE_ROUTING_RESULT; // route.ts maps to temporarilyUnavailableResponse()
     }
     if (selection?.status === 'active') {
-      // record selection on usageContext for later persistence
-      usageContext.modelExperimentVariantVersionId = selection.variantVersionId;
-      usageContext.modelExperimentAllocationSubject = selection.allocationSubject;
-      // capture canonical post-transformRequest body for prompt storage; structuredClone defended against
-      // later in-place mutation in the request pipeline. Stored on the context so the after-hook can persist.
-      usageContext.experimentRequestBody = structuredClone(body);
       return {
         provider: buildDirectProvider(selection.upstream),
         userByok: null,
         bypassAccessCheck: true,
+        experiment: {
+          experimentId: selection.experimentId,
+          variantId: selection.variantId,
+          variantVersionId: selection.variantVersionId,
+          allocationSubject: selection.allocationSubject,
+        },
       };
     }
     // selection === null is unreachable for an experimented id under v1 (control fallback always returns active)
   }
   ```
-- Picking inside `getProvider` is required because `bypassAccessCheck` and the upstream `apiUrl/apiKey` must be set before `route.ts:462` runs balance and `checkOrganizationModelRestrictions` checks. This is the same layer where `kilo-internal/...` already integrates.
-- `applyProviderSpecificLogic` is **not** modified for experiments. Its existing kilo-exclusive branch is bypassed because the experiment branch returns a `{ id: 'custom' }` provider, which the family-specific logic in `applyProviderSpecificLogic` already no-ops on (same as current `kilo-internal/...` traffic).
+- `route.ts` handles paused/unavailable routing results before reading `provider.supportedChatApis`. For active selections, it constructs `usageContext` as it does today, then copies `providerResult.experiment.variantVersionId`, `allocationSubject`, and `clientRequestId` onto the context. It captures `usageContext.experimentRequestBody = structuredClone(requestBodyParsed.body)` after provider-specific/direct-provider transforms have produced the canonical upstream request body and before any later mutation.
+- Picking inside `getProvider` is required because `bypassAccessCheck` and the upstream `apiUrl/apiKey` must be set before `route.ts` runs balance and `checkOrganizationModelRestrictions` checks. This is the same layer where `kilo-internal/...` already integrates.
+- `bypassAccessCheck: true` intentionally skips balance and organization policy checks for v1 experiment traffic. Preview experiment traffic is free/provider-funded for v1, and org discovery remains gated by the preview public id's registry entry.
+- `applyProviderSpecificLogic` direct-provider behavior is a required implementation decision before coding: either route-level logic skips Kilo-exclusive rewriting for experiment/custom direct providers, or `buildDirectProvider` defensively removes incompatible provider fields before the upstream fetch.
 
 Routing scope:
 
 - Applies only when the request's resolved public id is in the experimented SET. Under Dedicated mode v1 these are dedicated testing public ids (e.g. `kilo/preview-experiment-foo`) that clients select explicitly.
 - `kilo-auto` resolution does not feed experimented public ids: the auto-router's candidate-set construction excludes any public id where `isPublicIdExperimented(publicId)` is true (one-line guard near `applyResolvedAutoModel`). Dedicated testing ids never get silently selected by auto-routing.
 - Does not apply to BYOK requests or `kilo-internal/...` traffic (those branches are matched first / by id prefix and never reach the experiment branch).
-- Org allow/deny checks against the public model id are bypassed via `bypassAccessCheck: true`, matching `kilo-internal/...` behavior. The experimented public id's `kiloExclusiveModels` registry entry still gates client-side discovery.
+- Balance checks and org allow/deny checks against the public model id are bypassed via `bypassAccessCheck: true`, matching the current direct-provider behavior. This is intentional for v1 because preview experiment traffic is free/provider-funded. The experimented public id's `kiloExclusiveModels` registry entry still gates client-side discovery.
 - Experimented traffic goes **direct to `upstream.base_url`** — OpenRouter and Vercel are never contacted. No gateway pin needed.
 
 ### Phase 4 — Usage, Metrics, and Reporting
@@ -342,7 +347,7 @@ Routing scope:
 Persist experiment attribution everywhere request-level metrics are consumed:
 
 - `MicrodollarUsageContext`: add `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, and `experimentRequestBody`. The picker also returns `variantId` and `experimentId` for in-memory use (debug logs only), but only `variantVersionId` and `allocationSubject` are persisted to `model_experiment_request`. The `upstream` blob is consumed by `buildDirectProvider` and not stored on the context. `experimentRequestBody` holds the structured-cloned canonical body used by the prompt-storage path; never re-read by anything else.
-- **Decoupled experiment write.** `processUsage.ts` is **not modified** by this feature. The microdollar write retains its existing single-CTE shape. Inside the same `after()` hook scheduled by `accountForMicrodollarUsage`, a new step runs `persistExperimentAttribution` (see `apps/web/src/lib/ai-gateway/experiments/persist.ts`) when `usageContext.modelExperimentVariantVersionId` is set. The hook pre-generates `usageId` (`randomUUID()`) and `createdAt` once at the start and passes them into both the microdollar write and the experiment write — no read-back, no timestamp drift. Failure of the experiment write is Sentry-reported but does not roll back the microdollar write (billing must succeed independently of analytics).
+- **Decoupled experiment write.** The microdollar write remains the billing source of truth, and experiment attribution is written as a separate best-effort analytics row. Small `processUsage.ts` changes are allowed if they keep this flow simpler, such as accepting pre-generated `usageId`/`createdAt` or returning the inserted usage identity. Inside the same `after()` hook scheduled by `accountForMicrodollarUsage`, a new step runs `persistExperimentAttribution` (see `apps/web/src/lib/ai-gateway/experiments/persist.ts`) when `usageContext.modelExperimentVariantVersionId` is set. Failure of the experiment write is Sentry-reported but does not roll back the microdollar write (billing must succeed independently of analytics).
 - `persistExperimentAttribution` performs, in order:
   1. Split the canonical body into `system_message_content` (single leading `system` message if present) and `request_body_remainder` (everything else, serialized).
   2. Apply size caps (4 MB each); flag `was_truncated` if either side overflowed.
@@ -456,7 +461,7 @@ These constraints exist because of how the gateway is built today. The spec must
 
 ## Risk Areas
 
-- Routing order: variant selection must happen inside `getProvider`, before `route.ts` runs balance and org-model-restriction checks (which the experiment branch's `bypassAccessCheck: true` skips, matching `kilo-internal/...` behavior).
+- Routing order: variant selection must happen inside `getProvider`, before `route.ts` runs balance and org-model-restriction checks (which the experiment branch's `bypassAccessCheck: true` skips intentionally because v1 preview traffic is free/provider-funded).
 - Historical attribution: reports must group by `model_experiment_request.variant_version_id` (immutable FK to the exact RC served) and resolve `upstream` through the version row. Never compute "current version of variant X" as part of a historical report; that's mutable.
 - Anonymous allocation stability: `machine` and `ip` cohorts are lower-confidence than `user`; reports must expose/filter by `allocation_subject`. Identifier-less traffic is recorded as `allocation_subject = 'control'` and should be filterable separately.
 - Structural edits: weight/add/remove operations are only legal on `draft` experiments. Once activated, structural changes require a brand-new experiment — there is no `paused → draft` transition because data collected under one bucket layout cannot be carried over to a different one. Hot-swap (new RC under existing slot) is not structural and is allowed in any non-terminal state.
@@ -490,10 +495,12 @@ Core experiment implementation:
 - `apps/web/src/lib/ai-gateway/experiments/persist.ts` (new — owns `persistExperimentAttribution`, size caps, sha256 hashing, R2 puts, and the single-row insert into `model_experiment_request`)
 - `apps/web/src/lib/ai-gateway/experiments/index.ts`
 - `apps/web/src/app/api/openrouter/[...path]/route.ts`
-- `apps/web/src/lib/ai-gateway/providers/index.ts` (refactor `kilo-internal/...` branch to share `buildDirectProvider`; add experiment branch; capture `structuredClone(body)` onto `usageContext.experimentRequestBody`)
-- `apps/web/src/lib/ai-gateway/llm-proxy-helpers.ts` (extend the existing `after()` hook around `accountForMicrodollarUsage` to also call `persistExperimentAttribution` after the microdollar write completes; pre-generate `usageId` + `createdAt`)
+- `apps/web/src/lib/ai-gateway/providers/get-provider.ts` (refactor `kilo-internal/...` branch to share `buildDirectProvider`; add experiment branch that returns direct provider plus experiment metadata)
+- `apps/web/src/lib/ai-gateway/providers/types.ts` (add the provider-result/experiment metadata types if they do not fit locally in `get-provider.ts`)
+- `apps/web/src/lib/ai-gateway/providers/apply-provider-specific-logic.ts` (finalize direct-provider handling before implementation)
+- `apps/web/src/lib/ai-gateway/llm-proxy-helpers.ts` (extend the existing `after()` hook around `accountForMicrodollarUsage` to also call `persistExperimentAttribution` after the microdollar write completes)
+- `apps/web/src/lib/ai-gateway/processUsage.ts` (small identity plumbing only if needed to share or return the inserted `usage_id`/`created_at`)
 - `apps/web/src/lib/ai-gateway/processUsage.types.ts` (add `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, `clientRequestId`, `experimentRequestBody` fields to `MicrodollarUsageContext`)
-- **`processUsage.ts` is intentionally not modified** — the experiment write is fully decoupled.
 
 R2 prompt store:
 

@@ -518,8 +518,8 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
 
   try {
     loginComposioCli(env as Record<string, string | undefined>);
-  } catch (err) {
-    console.error('[composio] CLI login failed:', err);
+  } catch {
+    console.error('[composio] CLI login failed');
   } finally {
     clearComposioCliEnv(env as Record<string, string | undefined>);
   }

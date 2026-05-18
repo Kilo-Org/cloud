@@ -32,6 +32,9 @@ function isInteractiveStatusType(statusType: string | undefined): boolean {
   return statusType === 'question' || statusType === 'permission';
 }
 
+export const CODE_REVIEW_PERMISSION_REJECTION_MESSAGE =
+  'Permission rejected for code-review non-interactive mode. Continue using another read-only, non-interactive method if available.';
+
 function rejectCodeReviewQuestion(
   questionId: string | undefined,
   kiloClient: WrapperKiloClient
@@ -49,11 +52,13 @@ function rejectCodeReviewPermission(
   kiloClient: WrapperKiloClient
 ): void {
   if (!permissionId) return;
-  kiloClient.answerPermission(permissionId, 'reject').catch(err => {
-    logToFile(
-      `failed to reject code-review permission ${permissionId}: ${err instanceof Error ? err.message : String(err)}`
-    );
-  });
+  kiloClient
+    .answerPermission(permissionId, 'reject', CODE_REVIEW_PERMISSION_REJECTION_MESSAGE)
+    .catch(err => {
+      logToFile(
+        `failed to reject code-review permission ${permissionId}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    });
 }
 
 export function trimIngestEvent(event: IngestEvent): IngestEvent {

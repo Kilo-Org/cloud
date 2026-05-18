@@ -7,6 +7,7 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
+  CODE_REVIEW_PERMISSION_REJECTION_MESSAGE,
   createConnectionManager,
   type ConnectionCallbacks,
 } from '../../../wrapper/src/connection.js';
@@ -826,7 +827,11 @@ describe('ingest WS reconnection', () => {
       event => event.streamEventType === 'kilocode' && event.data.event === 'permission.asked'
     );
     expect(permissionEvents).toHaveLength(0);
-    expect(answerPermission).toHaveBeenCalledWith('p_456', 'reject');
+    expect(answerPermission).toHaveBeenCalledWith(
+      'p_456',
+      'reject',
+      CODE_REVIEW_PERMISSION_REJECTION_MESSAGE
+    );
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
     expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
     expect(callbacks.onSseEvent).toHaveBeenCalledTimes(1);

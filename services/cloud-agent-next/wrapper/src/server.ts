@@ -91,6 +91,7 @@ type CommandBody = {
 type AnswerPermissionBody = {
   permissionId: string;
   response: 'always' | 'once' | 'reject';
+  message?: string;
 };
 
 type AnswerQuestionBody = {
@@ -382,7 +383,11 @@ function createAnswerPermissionHandler(deps: ServerDependencies) {
     }
 
     try {
-      const success = await kiloClient.answerPermission(body.permissionId, body.response);
+      const success = await kiloClient.answerPermission(
+        body.permissionId,
+        body.response,
+        body.message
+      );
       state.updateActivity();
       logToFile(
         `job/answer-permission: permissionId=${body.permissionId} response=${body.response}`

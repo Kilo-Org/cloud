@@ -49,7 +49,11 @@ export type WrapperKiloClient = {
   }) => Promise<void>;
   abortSession: (opts: { sessionId: string }) => Promise<boolean>;
   sendCommand: (opts: { sessionId: string; command: string; args?: string }) => Promise<unknown>;
-  answerPermission: (permissionId: string, response: PermissionResponse) => Promise<boolean>;
+  answerPermission: (
+    permissionId: string,
+    response: PermissionResponse,
+    message?: string
+  ) => Promise<boolean>;
   answerQuestion: (questionId: string, answers: string[][]) => Promise<boolean>;
   rejectQuestion: (questionId: string) => Promise<boolean>;
   getSessionStatuses: () => Promise<Record<string, { type: string; [key: string]: unknown }>>;
@@ -165,8 +169,8 @@ export function createWrapperKiloClient(
       return result.data;
     },
 
-    answerPermission: async (permissionId, response) => {
-      await v2Client.permission.reply({ requestID: permissionId, reply: response });
+    answerPermission: async (permissionId, response, message) => {
+      await v2Client.permission.reply({ requestID: permissionId, reply: response, message });
       return true;
     },
 

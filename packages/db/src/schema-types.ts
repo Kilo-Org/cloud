@@ -70,6 +70,7 @@ export enum KiloPassAuditLogAction {
   YearlyMonthlyBaseCronStarted = 'yearly_monthly_base_cron_started',
   YearlyMonthlyBaseCronCompleted = 'yearly_monthly_base_cron_completed',
   IssueYearlyRemainingCredits = 'issue_yearly_remaining_credits',
+  DuplicateCardSubscriptionCanceled = 'duplicate_card_subscription_canceled',
 
   /* Not removed because I didn't want to deal with the migration. */
   /**

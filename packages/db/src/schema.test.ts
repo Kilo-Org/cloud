@@ -201,6 +201,7 @@ describe('database schema', () => {
         'yearly_monthly_base_cron_started',
         'yearly_monthly_base_cron_completed',
         'issue_yearly_remaining_credits',
+        'duplicate_card_subscription_canceled',
         'yearly_monthly_bonus_cron_started',
         'yearly_monthly_bonus_cron_completed',
       ],

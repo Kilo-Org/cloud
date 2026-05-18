@@ -54,6 +54,7 @@ export const subjects = {
   accountDeletionRequest: 'Kilo: Account Deletion Request Received',
   creditsTopUp: 'Your Kilo credit top-up',
   kiloClawSubscriptionStarted: 'Your KiloClaw subscription is active',
+  kiloPassDuplicateCardCanceled: 'Kilo Pass: Subscription Cancelled',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
@@ -553,5 +554,17 @@ export async function sendKiloClawSubscriptionStartedEmail(
       next_billing_date: formatDate(props.nextBillingDate),
       manage_url,
     },
+  });
+}
+
+export async function sendKiloPassDuplicateCardCanceledEmail(
+  to: string,
+  props: { supportUrl?: string }
+): Promise<SendResult> {
+  const support_url = props.supportUrl ?? `mailto:hi@kilocode.ai`;
+  return send({
+    to,
+    templateName: 'kiloPassDuplicateCardCanceled',
+    templateVars: { support_url },
   });
 }

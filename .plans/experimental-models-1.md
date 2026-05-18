@@ -62,7 +62,7 @@ POST /api/openrouter/.../chat/completions
   │    │    └─ return buildDirectProvider(upstream) + experiment metadata
   │    └─ else: existing branches (BYOK, kilo-internal, kiloExclusiveModels → openrouter|vercel)
   ├─ construct MicrodollarUsageContext and stash variantVersionId + allocationSubject + clientRequestId from the getProvider result
-  ├─ balance / org access checks (bypassed for direct provider; preview traffic is free/provider-funded in v1)
+  ├─ balance check skipped for preview experiments; org model/data-collection policy still enforced
   ├─ applyTrackingIds + applyProviderSpecificLogic / provider.transformRequest
   ├─ build bounded prompt capture from canonical post-transform body and store it on MicrodollarUsageContext
   ├─ upstream fetch (unchanged)
@@ -327,7 +327,7 @@ Integration in `getProvider` (`apps/web/src/lib/ai-gateway/providers/get-provide
         kind: 'provider',
         provider: buildDirectProvider(selection.upstream),
         userByok: null,
-        bypassAccessCheck: true,
+        skipBalanceCheck: true,
         skipKiloExclusiveModelSettings: true,
         experiment: {
           experimentId: selection.experimentId,
@@ -347,7 +347,7 @@ Integration in `getProvider` (`apps/web/src/lib/ai-gateway/providers/get-provide
         kind: 'provider';
         provider: Provider;
         userByok: BYOKResult[] | null;
-        bypassAccessCheck: boolean;
+        skipBalanceCheck?: boolean;
         skipKiloExclusiveModelSettings?: boolean;
         experiment?: {
           experimentId: string;
@@ -360,8 +360,8 @@ Integration in `getProvider` (`apps/web/src/lib/ai-gateway/providers/get-provide
     | { kind: 'unavailable' };
   ```
 - `route.ts` handles `not-found`/`unavailable` routing results before reading `provider.supportedChatApis`: `not-found` maps to local 404/model unavailable, and `unavailable` maps to 503/temporarily unavailable. For active selections, it constructs `usageContext` as it does today, then copies `providerResult.experiment.variantVersionId`, `allocationSubject`, and `clientRequestId` onto the context. After provider-specific/direct-provider transforms have produced the canonical upstream request body and before any later mutation, it stores `usageContext.experimentPromptCapture = buildExperimentPromptCapture(requestBodyParsed.body)`. The capture is bounded before being retained for the async write.
-- Picking inside `getProvider` is required because `bypassAccessCheck` and the upstream `apiUrl/apiKey` must be set before `route.ts` runs balance and `checkOrganizationModelRestrictions` checks. This is the same layer where `kilo-internal/...` already integrates.
-- `bypassAccessCheck: true` intentionally skips balance and organization policy checks for v1 experiment traffic. Preview experiment traffic is free/provider-funded for v1, and org discovery remains gated by the preview public id's registry entry.
+- Picking inside `getProvider` is required because the upstream `apiUrl/apiKey`, billing metadata, and direct-provider policy flags must be known before `route.ts` runs balance and `checkOrganizationModelRestrictions` checks. This is the same layer where `kilo-internal/...` already integrates.
+- Experiment traffic uses `skipBalanceCheck: true` because preview experiment traffic is free/provider-funded for v1. It does **not** skip server-side organization policy checks: `route.ts` still calls `checkOrganizationModelRestrictions` for experimented public ids, but it must not apply provider pinning (`body.provider`) to direct experiment upstreams. `skipKiloExclusiveModelSettings: true` separately prevents registry `internal_id`/provider rewrites from overriding the selected variant.
 - `applyProviderSpecificLogic` accepts route metadata that skips only Kilo-exclusive model settings when `skipKiloExclusiveModelSettings` is true. Generic provider-specific request fixes still run, and `provider.transformRequest` still performs the direct experiment rewrite before the upstream fetch.
 
 Routing scope:
@@ -369,7 +369,7 @@ Routing scope:
 - Applies only when the request's resolved public id is in the experimented SET. Under Dedicated mode v1 these are dedicated testing public ids (e.g. `kilo/preview-experiment-foo`) that clients select explicitly.
 - `kilo-auto` resolution does not feed experimented public ids: the auto-router's candidate-set construction excludes any public id where `isPublicIdExperimented(publicId)` is true (one-line guard near `applyResolvedAutoModel`). Dedicated testing ids never get silently selected by auto-routing.
 - Does not apply to BYOK requests or `kilo-internal/...` traffic (those branches are matched first / by id prefix and never reach the experiment branch).
-- Balance checks and org allow/deny checks against the public model id are bypassed via `bypassAccessCheck: true`, matching the current direct-provider behavior. This is intentional for v1 because preview experiment traffic is free/provider-funded. The experimented public id's `kiloExclusiveModels` registry entry still gates client-side discovery.
+- Balance checks are skipped for experimented preview ids because v1 traffic is free/provider-funded. Server-side organization allow/deny and data-collection policy checks still run against the public model id; direct experiment routing ignores only the provider-pinning side effect because the upstream is selected by the experiment variant.
 - Experimented traffic goes **direct to `upstream.base_url`** — OpenRouter and Vercel are never contacted. No gateway pin needed.
 
 ### Phase 4 — Usage, Metrics, and Reporting
@@ -489,7 +489,7 @@ These constraints exist because of how the gateway is built today. The spec must
 
 ## Risk Areas
 
-- Routing order: variant selection must happen inside `getProvider`, before `route.ts` runs balance and org-model-restriction checks (which the experiment branch's `bypassAccessCheck: true` skips intentionally because v1 preview traffic is free/provider-funded).
+- Routing order: variant selection must happen inside `getProvider`, before `route.ts` runs balance and org-model-restriction checks. Experiment traffic skips only the balance check because v1 preview traffic is free/provider-funded; server-side organization policy checks still run before upstream fetch.
 - Historical attribution: reports must group by `model_experiment_request.variant_version_id` (immutable FK to the exact RC served) and resolve `upstream` through the version row. Never compute "current version of variant X" as part of a historical report; that's mutable.
 - Anonymous allocation stability: `machine` and `ip` cohorts are lower-confidence than `user`; reports must expose/filter by `allocation_subject`. Identifier-less traffic is not routed or recorded; it fails closed as temporarily unavailable.
 - Structural edits: weight/add/remove operations are only legal on `draft` experiments. Once activated, structural changes require a brand-new experiment — there is no `paused → draft` transition because data collected under one bucket layout cannot be carried over to a different one. Hot-swap (new RC under existing slot) is not structural and is allowed in any non-terminal state.

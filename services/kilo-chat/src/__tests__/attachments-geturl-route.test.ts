@@ -229,6 +229,17 @@ describe('GET /v1/attachments/:id/url (user)', () => {
     const res = await userApp.request(`/v1/attachments/${ulid()}/url`, {}, testEnv);
     expect(res.status).toBe(400);
   });
+
+  it('returns 400 when attachmentId is not a valid ULID', async () => {
+    const { userId, conversationId, testEnv } = await setupConversation('att-get-bad-id');
+    const userApp = makeUserApp(userId);
+    const res = await userApp.request(
+      `/v1/attachments/not-a-ulid/url?conversationId=${conversationId}`,
+      {},
+      testEnv
+    );
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('GET /bot/v1/sandboxes/:sandboxId/attachments/:id/url (bot)', () => {

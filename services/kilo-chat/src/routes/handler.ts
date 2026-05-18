@@ -24,7 +24,7 @@ import { notifyMessageDeliveryFailed } from '../webhook/deliver';
 import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
 import { setTypingFor, stopTypingFor } from '../services/typing';
 import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
-import { mintPutUrl } from '../util/presigner';
+import { mintGetUrl, mintPutUrl } from '../util/presigner';
 import type {
   CreateMessageResponse,
   EditMessageResponse,
@@ -634,6 +634,96 @@ export async function handleAttachmentInit(c: HonoCtx) {
     attachmentId: init.attachmentId,
     putUrl: url,
     putHeaders: headers,
+  });
+}
+
+// ─── attachmentGetUrl ───────────────────────────────────────────────────────
+
+/**
+ * Sanitize a filename for embedding into an RFC 6266 quoted Content-Disposition
+ * value. Strips characters that would break out of the quoted string and
+ * collapses path separators. Falls back to a generic name if the result is
+ * empty.
+ */
+function safeQuotedFilename(filename: string): string {
+  // eslint-disable-next-line no-control-regex
+  const cleaned = filename
+    .replace(/[\\"\r\n\x00-\x1f]/g, '')
+    .replace(/[/\\]/g, '_')
+    .trim();
+  return cleaned.length > 0 ? cleaned : 'download';
+}
+
+const GET_URL_TTL_SECONDS = 3600;
+
+export async function handleAttachmentGetUrl(c: HonoCtx) {
+  const attachmentIdParsed = ulidSchema.safeParse(c.req.param('id'));
+  if (!attachmentIdParsed.success) {
+    return c.json({ error: 'Invalid attachment ID' }, 400);
+  }
+  const attachmentId = attachmentIdParsed.data;
+
+  const conversationIdRaw = c.req.query('conversationId');
+  if (!conversationIdRaw) {
+    return c.json({ error: 'Missing conversationId query parameter' }, 400);
+  }
+  const conversationIdParsed = ulidSchema.safeParse(conversationIdRaw);
+  if (!conversationIdParsed.success) {
+    return c.json({ error: 'Invalid conversationId' }, 400);
+  }
+  const conversationId = conversationIdParsed.data;
+
+  const callerId = c.get('callerId');
+
+  let row: {
+    id: string;
+    r2Key: string;
+    mimeType: string;
+    size: number;
+    filename: string;
+  } | null;
+  try {
+    row = await withDORetry(
+      () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId)),
+      stub => stub.getAttachmentForRead({ requesterId: callerId, attachmentId }),
+      'ConversationDO.getAttachmentForRead'
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/member/i.test(msg)) return c.json({ error: 'Forbidden' }, 403);
+    throw err;
+  }
+
+  if (!row) {
+    return c.json({ error: 'Attachment not found' }, 404);
+  }
+
+  const accessKeyId = await c.env.R2_ACCESS_KEY_ID.get();
+  const secretAccessKey = await c.env.R2_SECRET_ACCESS_KEY.get();
+  if (!accessKeyId || !secretAccessKey) {
+    return c.json({ error: 'R2 credentials unavailable' }, 503);
+  }
+
+  const responseContentDisposition = row.mimeType.startsWith('image/')
+    ? undefined
+    : `attachment; filename="${safeQuotedFilename(row.filename)}"`;
+
+  const { url } = await mintGetUrl({
+    accountId: c.env.R2_ACCOUNT_ID,
+    bucket: c.env.R2_BUCKET_NAME,
+    accessKeyId,
+    secretAccessKey,
+    key: row.r2Key,
+    expiresSeconds: GET_URL_TTL_SECONDS,
+    responseContentDisposition,
+  });
+
+  return c.json({
+    url,
+    mimeType: row.mimeType,
+    size: row.size,
+    filename: row.filename,
+    expiresAt: Date.now() + GET_URL_TTL_SECONDS * 1000,
   });
 }
 

@@ -45,6 +45,20 @@ minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx
   - expo-dev-client
+  - expo-dev-launcher
+  - expo-dev-menu
+  - expo-dev-menu-interface
+  - expo-manifests
+  - expo-updates-interface
+  - '@expo/schema-utils'
+  - '@typescript/native-preview'
+  - '@typescript/native-preview-darwin-arm64'
+  - '@typescript/native-preview-darwin-x64'
+  - '@typescript/native-preview-linux-arm'
+  - '@typescript/native-preview-linux-arm64'
+  - '@typescript/native-preview-linux-x64'
+  - '@typescript/native-preview-win32-arm64'
+  - '@typescript/native-preview-win32-x64'
 overrides:
   '@sentry/cli': 3.4.2
   mdast-util-to-hast: 13.2.1

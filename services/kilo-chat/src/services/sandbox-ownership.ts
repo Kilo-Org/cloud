@@ -1,6 +1,10 @@
 import { getWorkerDb } from '@kilocode/db';
 import { kiloclaw_instances } from '@kilocode/db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
+import {
+  instanceIdFromSandboxId,
+  isInstanceKeyedSandboxId,
+} from '@kilocode/worker-utils/instance-id';
 
 async function queryOwnsSandbox(
   connectionString: string,
@@ -8,14 +12,28 @@ async function queryOwnsSandbox(
   sandboxId: string
 ): Promise<boolean> {
   const db = getWorkerDb(connectionString);
+  // Half-migrated tolerance: a row's `sandbox_id` may still be the legacy
+  // userId-derived value while the kiloclaw DO has already moved to the
+  // ki_<uuid-hex> form (and the browser sends the latter). Accept the ki_
+  // form by matching against `id` so ownership keeps working across the
+  // migration window. Ownership is still strictly scoped to the caller's
+  // own active rows (user_id + destroyed_at filters are unchanged).
+  const candidateInstanceId = isInstanceKeyedSandboxId(sandboxId)
+    ? instanceIdFromSandboxId(sandboxId)
+    : null;
   const rows = await db
     .select({ sandbox_id: kiloclaw_instances.sandbox_id })
     .from(kiloclaw_instances)
     .where(
       and(
-        eq(kiloclaw_instances.sandbox_id, sandboxId),
         eq(kiloclaw_instances.user_id, userId),
-        isNull(kiloclaw_instances.destroyed_at)
+        isNull(kiloclaw_instances.destroyed_at),
+        candidateInstanceId
+          ? or(
+              eq(kiloclaw_instances.sandbox_id, sandboxId),
+              eq(kiloclaw_instances.id, candidateInstanceId)
+            )
+          : eq(kiloclaw_instances.sandbox_id, sandboxId)
       )
     )
     .limit(1);

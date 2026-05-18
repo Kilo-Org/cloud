@@ -149,6 +149,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     for (const delay of ACCEPTED_QUEUE_REFRESH_DELAYS_MS) {
       const timer = window.setTimeout(() => {
         void queryClient.invalidateQueries();
+        acceptedQueueRefreshTimersRef.current = acceptedQueueRefreshTimersRef.current.filter(
+          pendingTimer => pendingTimer !== timer
+        );
       }, delay);
       acceptedQueueRefreshTimersRef.current.push(timer);
     }

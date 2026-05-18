@@ -270,10 +270,6 @@ export async function finalizeFailedAnalysisCallback(params: {
     return { status: disposition };
   }
 
-  if (params.payload.status === 'completed') {
-    return { status: 'process' };
-  }
-
   const failure = mapAnalysisCallbackFailure({
     status: params.payload.status === 'interrupted' ? 'interrupted' : 'failed',
     errorMessage: params.payload.errorMessage,

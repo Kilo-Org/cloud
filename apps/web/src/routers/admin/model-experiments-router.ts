@@ -14,6 +14,15 @@ import { TRPCError } from '@trpc/server';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
+type TrpcErrorCode = ConstructorParameters<typeof TRPCError>[0]['code'];
+
+function trpcThrow(code: TrpcErrorCode, message: string): never {
+  throw new TRPCError({ code, message });
+}
+
+const notFound = (entity: string): never => trpcThrow('NOT_FOUND', `${entity} not found`);
+const badRequest = (message: string): never => trpcThrow('BAD_REQUEST', message);
+
 const RoutingStatuses = ['active', 'paused'] as const;
 const AllStatuses = ['draft', 'active', 'paused', 'completed'] as const;
 type Status = (typeof AllStatuses)[number];
@@ -28,10 +37,7 @@ const apiKeySchema = z.string().min(1);
 
 function ensureEncryptionKey(): string {
   if (!BYOK_ENCRYPTION_KEY) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'BYOK encryption is not configured',
-    });
+    trpcThrow('INTERNAL_SERVER_ERROR', 'BYOK encryption is not configured');
   }
   return BYOK_ENCRYPTION_KEY;
 }
@@ -40,10 +46,14 @@ async function loadExperimentOrThrow(id: string) {
   const row = await db.query.model_experiment.findFirst({
     where: eq(model_experiment.id, id),
   });
-  if (!row) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Experiment not found' });
-  }
-  return row;
+  return row ?? notFound('Experiment');
+}
+
+async function loadVariantOrThrow(variantId: string) {
+  const row = await db.query.model_experiment_variant.findFirst({
+    where: eq(model_experiment_variant.id, variantId),
+  });
+  return row ?? notFound('Variant');
 }
 
 async function recomputeExperimentedPublicIds() {
@@ -121,42 +131,27 @@ async function listVariantsWithCurrentVersion(experimentId: string) {
 
 function assertDraft(status: Status, op: string) {
   if (status !== 'draft') {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: `${op} is only allowed on draft experiments`,
-    });
+    badRequest(`${op} is only allowed on draft experiments`);
   }
 }
 
 function assertNonTerminal(status: Status, op: string) {
   if (status === 'completed') {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: `${op} is not allowed on completed experiments`,
-    });
+    badRequest(`${op} is not allowed on completed experiments`);
   }
 }
 
 async function assertActivatable(experimentId: string, publicModelId: string) {
   const variants = await listVariantsWithCurrentVersion(experimentId);
   if (variants.length < 2) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Active experiments must have at least 2 variants',
-    });
+    badRequest('Active experiments must have at least 2 variants');
   }
   if (variants.some(v => v.weight <= 0)) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Every variant must have a positive weight',
-    });
+    badRequest('Every variant must have a positive weight');
   }
   const now = new Date();
   if (variants.some(v => !v.current_version || new Date(v.current_version.effective_at) > now)) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Every variant must have at least one variant_version with effective_at <= now()',
-    });
+    badRequest('Every variant must have at least one variant_version with effective_at <= now()');
   }
   // Routing-relevant uniqueness per public_model_id (active|paused). The DB
   // partial unique index will also enforce this; we check first to surface a
@@ -173,10 +168,7 @@ async function assertActivatable(experimentId: string, publicModelId: string) {
     )
     .limit(1);
   if (conflict.length > 0) {
-    throw new TRPCError({
-      code: 'CONFLICT',
-      message: `Another active or paused experiment exists for ${publicModelId}`,
-    });
+    trpcThrow('CONFLICT', `Another active or paused experiment exists for ${publicModelId}`);
   }
 }
 
@@ -286,12 +278,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
 
   activate: adminProcedure.input(idSchema).mutation(async ({ input }) => {
     const existing = await loadExperimentOrThrow(input.id);
-    if (existing.status === 'completed') {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'Cannot activate a completed experiment',
-      });
-    }
+    if (existing.status === 'completed') badRequest('Cannot activate a completed experiment');
     if (existing.status === 'active') return existing;
     await assertActivatable(input.id, existing.public_model_id);
     const [updated] = await db
@@ -309,12 +296,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
   pause: adminProcedure.input(idSchema).mutation(async ({ input }) => {
     const existing = await loadExperimentOrThrow(input.id);
     if (existing.status === 'paused') return existing;
-    if (existing.status !== 'active') {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'Only active experiments can be paused',
-      });
-    }
+    if (existing.status !== 'active') badRequest('Only active experiments can be paused');
     const [updated] = await db
       .update(model_experiment)
       .set({ status: 'paused' })
@@ -328,10 +310,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
     const existing = await loadExperimentOrThrow(input.id);
     if (existing.status === 'completed') return existing;
     if (existing.status !== 'active' && existing.status !== 'paused') {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'Only active or paused experiments can be completed',
-      });
+      badRequest('Only active or paused experiments can be completed');
     }
     const [updated] = await db
       .update(model_experiment)
@@ -345,10 +324,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
   setArchived: adminProcedure.input(SetArchivedSchema).mutation(async ({ input }) => {
     const existing = await loadExperimentOrThrow(input.id);
     if (input.archived && existing.status === 'active') {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'Cannot archive an active experiment',
-      });
+      badRequest('Cannot archive an active experiment');
     }
     const [updated] = await db
       .update(model_experiment)
@@ -375,12 +351,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
   }),
 
   removeVariant: adminProcedure.input(variantIdSchema).mutation(async ({ input }) => {
-    const variant = await db.query.model_experiment_variant.findFirst({
-      where: eq(model_experiment_variant.id, input.variantId),
-    });
-    if (!variant) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Variant not found' });
-    }
+    const variant = await loadVariantOrThrow(input.variantId);
     const experiment = await loadExperimentOrThrow(variant.experiment_id);
     assertDraft(experiment.status as Status, 'Removing variants');
     await db.delete(model_experiment_variant).where(eq(model_experiment_variant.id, variant.id));
@@ -388,12 +359,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
   }),
 
   updateVariantLabel: adminProcedure.input(UpdateVariantLabelSchema).mutation(async ({ input }) => {
-    const variant = await db.query.model_experiment_variant.findFirst({
-      where: eq(model_experiment_variant.id, input.variantId),
-    });
-    if (!variant) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Variant not found' });
-    }
+    const variant = await loadVariantOrThrow(input.variantId);
     const experiment = await loadExperimentOrThrow(variant.experiment_id);
     assertNonTerminal(experiment.status as Status, 'Updating variant label');
     const [updated] = await db
@@ -410,12 +376,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
     .input(SwapVariantVersionSchema)
     .mutation(async ({ input, ctx }) => {
       const key = ensureEncryptionKey();
-      const variant = await db.query.model_experiment_variant.findFirst({
-        where: eq(model_experiment_variant.id, input.variantId),
-      });
-      if (!variant) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Variant not found' });
-      }
+      const variant = await loadVariantOrThrow(input.variantId);
       const experiment = await loadExperimentOrThrow(variant.experiment_id);
       assertNonTerminal(experiment.status as Status, 'Swapping variant version');
 
@@ -435,12 +396,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
 
   rotateApiKey: adminProcedure.input(RotateApiKeySchema).mutation(async ({ input, ctx }) => {
     const key = ensureEncryptionKey();
-    const variant = await db.query.model_experiment_variant.findFirst({
-      where: eq(model_experiment_variant.id, input.variantId),
-    });
-    if (!variant) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Variant not found' });
-    }
+    const variant = await loadVariantOrThrow(input.variantId);
     const experiment = await loadExperimentOrThrow(variant.experiment_id);
     assertNonTerminal(experiment.status as Status, 'Rotating api key');
 
@@ -455,19 +411,14 @@ export const adminModelExperimentsRouter = createTRPCRouter({
       .limit(1);
     const previousUpstream = latest[0]?.upstream;
     if (!previousUpstream) {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message:
-          'Cannot rotate api key: variant has no existing version. Use swapVariantVersion to seed.',
-      });
+      badRequest(
+        'Cannot rotate api key: variant has no existing version. Use swapVariantVersion to seed.'
+      );
     }
 
     const validated = ExperimentUpstreamSchema.safeParse(previousUpstream);
     if (!validated.success) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Latest variant version has an invalid upstream blob',
-      });
+      trpcThrow('INTERNAL_SERVER_ERROR', 'Latest variant version has an invalid upstream blob');
     }
 
     const encrypted = encryptApiKey(input.apiKey, key);

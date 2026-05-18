@@ -1529,7 +1529,7 @@ describe('kiloPassRouter', () => {
         google_user_email: 'kilo-pass-avg-usage-personal-only@example.com',
       });
 
-      // last 3 months total: $30 personal + $60 org => should average to $10
+      // personal-only total in last 3 months: $30 (org $60 is excluded) => average $10/month
       const now = new Date().toISOString();
       await insertMicrodollarUsageWithDailyRollup([
         {

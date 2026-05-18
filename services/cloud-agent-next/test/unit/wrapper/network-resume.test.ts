@@ -329,11 +329,13 @@ describe('network resume', () => {
     await openConnection(manager);
     await vi.advanceTimersByTimeAsync(0);
 
+    expect(manager.isConnected()).toBe(false);
     expect(resumeNetworkWait).not.toHaveBeenCalled();
 
     eventStream.emitFirstEvent({ type: 'server.connected' });
     await vi.advanceTimersByTimeAsync(0);
 
+    expect(manager.isConnected()).toBe(true);
     expect(resumeNetworkWait).toHaveBeenCalledTimes(1);
     expect(resumeNetworkWait).toHaveBeenCalledWith('net_req_restored');
     expect(subscribe.mock.invocationCallOrder[0]).toBeLessThan(

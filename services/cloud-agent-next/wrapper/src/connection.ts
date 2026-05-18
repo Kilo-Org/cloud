@@ -146,7 +146,6 @@ export function createConnectionManager(
   callbacks: ConnectionCallbacks
 ): ConnectionManager {
   let ingestWs: WebSocket | null = null;
-  let eventSubscriptionActive = false;
   let eventSubscriptionListening = false;
   let eventSubscriptionGeneration = 0;
   let eventSubscriptionAbort: AbortController | null = null;
@@ -504,7 +503,6 @@ export function createConnectionManager(
     eventSubscriptionAbort?.abort();
 
     const myGeneration = ++eventSubscriptionGeneration;
-    eventSubscriptionActive = true;
     eventSubscriptionListening = false;
     const abortController = new AbortController();
     eventSubscriptionAbort = abortController;
@@ -537,7 +535,6 @@ export function createConnectionManager(
         });
         if (!result.stream) {
           logToFile('No event stream returned from SDK');
-          eventSubscriptionActive = false;
           markStarted(false);
           callbacks.onDisconnect('No event stream from SDK');
           return;
@@ -686,7 +683,6 @@ export function createConnectionManager(
       } finally {
         markStarted(false);
         if (myGeneration === eventSubscriptionGeneration) {
-          eventSubscriptionActive = false;
           eventSubscriptionListening = false;
         }
       }
@@ -825,7 +821,9 @@ export function createConnectionManager(
     },
 
     isConnected: () => {
-      return ingestWs !== null && ingestWs.readyState === WebSocket.OPEN && eventSubscriptionActive;
+      return (
+        ingestWs !== null && ingestWs.readyState === WebSocket.OPEN && eventSubscriptionListening
+      );
     },
 
     isReconnecting: () => reconnecting,

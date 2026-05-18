@@ -514,7 +514,7 @@ export async function handleKiloPassInvoicePaid(params: {
           .set({ status: 'canceled', ended_at: dayjs().utc().toISOString() })
           .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
 
-        blockedGateResult = { kiloUserId, stripeInvoiceId: gateResult.stripeInvoiceId };
+        blockedGateResult = { kiloUserId, stripeInvoiceId: invoice.id };
         kiloUserIdForCache = null;
         return;
       }

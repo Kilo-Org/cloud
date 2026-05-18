@@ -237,11 +237,6 @@ function classifyCloudAgentNextFreshSessionRetry(
     );
   }
 
-  // Sandbox `exec` returned a non-numeric exit code. Observed in production
-  // as `mkdir operation failed with exit code NaN` and pre-flight `df`
-  // returning `exitCode: null`. The sandbox process never delivered a real
-  // exit code, which is a transient sandbox-side condition (typically a
-  // stuck Cloudflare Sandbox DO). A fresh session creates a new sandbox.
   if (body.includes('mkdir operation failed with exit code')) {
     return cloudAgentNextFreshRetryClassification(
       error,
@@ -251,10 +246,6 @@ function classifyCloudAgentNextFreshSessionRetry(
     );
   }
 
-  // Cloudflare Durable Object connection drop mid-prepareSession. The
-  // surrounding context (repo cloned, branch checked out) shows the
-  // sandbox itself was healthy a moment earlier, so retrying with a fresh
-  // session is appropriate.
   if (body.includes('network connection lost')) {
     return cloudAgentNextFreshRetryClassification(
       error,
@@ -264,11 +255,6 @@ function classifyCloudAgentNextFreshSessionRetry(
     );
   }
 
-  // Generic command timeout inside the sandbox during workspace setup
-  // (e.g. `git checkout` exceeding 30s). Distinct from the deterministic
-  // `repo_clone_or_checkout_failure` cases above (LFS errors, missing
-  // objects, hard checkout failures), which are intentionally not
-  // retried. A timeout is transient and may succeed on a fresh sandbox.
   if (body.includes('commanderror') && body.includes('command timeout after')) {
     return cloudAgentNextFreshRetryClassification(
       error,

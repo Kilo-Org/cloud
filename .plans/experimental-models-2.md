@@ -1,5 +1,13 @@
 # Experimental Models — Part 2: Partner Trace Export & Replay Roadmap
 
+> **STATUS: VERY WIP — needs human iteration.** This document is an early
+> sketch of the partner trace export and replay roadmap. It has not been
+> grilled to the same level of detail as Part 1: scope boundaries, redaction
+> rules, partner auth model, webhook contract, warehouse coordination, and
+> replay-bundle format are all open questions. Do **not** treat this as an
+> implementation-ready plan. Expect significant rework after design review
+> with humans (security, legal, partner-eng, data).
+
 > **Scope: preview/experimental models only.** Trace export, redaction, and
 > partner webhooks here apply exclusively to traffic on opt-in preview model
 > ids defined by Part 1. Production traffic and non-experimented model ids are

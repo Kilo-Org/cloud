@@ -30,13 +30,6 @@ const config: ExpoConfig = {
       AdAttributionKit: {
         PostbackCopyURL: 'https://appsflyer-skadnetwork.com/',
       },
-      NSMicrophoneUsageDescription:
-        'Allow $(PRODUCT_NAME) to access your microphone to record audio messages.',
-      NSPhotoLibraryUsageDescription:
-        'Allow $(PRODUCT_NAME) to access your photos to share images in chat.',
-      NSPhotoLibraryAddUsageDescription: 'Allow $(PRODUCT_NAME) to save photos to your library.',
-      NSCameraUsageDescription:
-        'Allow $(PRODUCT_NAME) to access your camera to take photos for chat.',
     },
   },
   splash: {
@@ -98,19 +91,6 @@ const config: ExpoConfig = {
       },
     ],
     [
-      'expo-image-picker',
-      {
-        photosPermission: 'Allow $(PRODUCT_NAME) to access your photos to share images in chat.',
-        cameraPermission: 'Allow $(PRODUCT_NAME) to access your camera to take photos for chat.',
-      },
-    ],
-    [
-      'expo-document-picker',
-      {
-        iCloudContainerEnvironment: 'Production',
-      },
-    ],
-    [
       'expo-location',
       {
         locationWhenInUsePermission:
@@ -121,11 +101,7 @@ const config: ExpoConfig = {
       },
     ],
     'expo-apple-authentication',
-    'expo-audio',
     'expo-iap',
-    'expo-sharing',
-    'expo-video',
-    'expo-asset',
     [
       'expo-tracking-transparency',
       {

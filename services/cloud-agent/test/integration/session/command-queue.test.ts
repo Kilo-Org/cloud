@@ -5,17 +5,12 @@
  * Each test gets isolated storage automatically.
  */
 
-import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { env, runInDurableObject } from 'cloudflare:test';
+import { describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createCommandQueueQueries } from '../../../src/session/queries/command-queue.js';
 
 describe('createCommandQueueQueries', () => {
-  beforeEach(async () => {
-    const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    expect(ids).toHaveLength(0);
-  });
-
   describe('enqueue', () => {
     it('inserts a new command and returns the generated ID', async () => {
       const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_cq_1');

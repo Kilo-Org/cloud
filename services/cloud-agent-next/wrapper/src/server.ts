@@ -32,6 +32,8 @@ export type ServerConfig = {
   agentSessionId: string;
   /** Stable Cloud Agent user ID, passed at wrapper startup */
   userId: string;
+  /** Product surface that created the session, e.g. code-review. */
+  platform?: string;
 };
 
 export type ServerDependencies = {
@@ -177,6 +179,7 @@ async function bindExecutionContext(
     ingestUrl: execution.ingestUrl,
     ingestToken: execution.ingestToken,
     workerAuthToken: execution.workerAuthToken,
+    platform: config.platform,
   };
 
   // Close stale ingest connection from the prior execution. The prior execution's

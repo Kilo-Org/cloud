@@ -57,9 +57,10 @@ import {
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { appendUsageFooter } from '@/lib/code-reviews/summary/usage-footer';
+import { appendReviewSummaryFooter } from '@/lib/code-reviews/summary/usage-footer';
 import { APP_URL } from '@/lib/constants';
 import type { CloudAgentCodeReview, PlatformIntegration } from '@kilocode/db/schema';
+import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import {
   CODE_REVIEW_TERMINAL_REASONS,
   type CodeReviewTerminalReason,
@@ -269,6 +270,14 @@ async function getReviewUsageData(reviewId: string) {
   }
 
   return { model: null, tokensIn: null, tokensOut: null };
+}
+
+function getReviewGuidanceFooterData(review: CloudAgentCodeReview) {
+  return {
+    used: review.repository_review_instructions_used,
+    ref: review.repository_review_instructions_ref,
+    truncated: review.repository_review_instructions_truncated,
+  };
 }
 
 /**
@@ -853,6 +862,7 @@ export async function POST(
 
             if (platform === 'github' && integration.platform_installation_id) {
               const [repoOwner, repoName] = review.repo_full_name.split('/');
+              const appType: GitHubAppType = integration.github_app_type || 'standard';
 
               // Reaction
               const reaction = status === 'completed' ? 'hooray' : 'confused';
@@ -861,7 +871,8 @@ export async function POST(
                 repoOwner,
                 repoName,
                 review.pr_number,
-                reaction
+                reaction,
+                appType
               );
               logExceptInTest(
                 `[code-review-status] Added ${reaction} reaction to ${review.repo_full_name}#${review.pr_number}`
@@ -877,7 +888,8 @@ export async function POST(
                   repoOwner,
                   repoName,
                   review.pr_number,
-                  BILLING_NOTICE_MARKER
+                  BILLING_NOTICE_MARKER,
+                  appType
                 );
                 if (!alreadyPosted) {
                   await createPRComment(
@@ -885,7 +897,8 @@ export async function POST(
                     repoOwner,
                     repoName,
                     review.pr_number,
-                    BILLING_NOTICE_BODY
+                    BILLING_NOTICE_BODY,
+                    appType
                   );
                   logExceptInTest(
                     `[code-review-status] Posted billing notice on ${review.repo_full_name}#${review.pr_number}`
@@ -896,30 +909,35 @@ export async function POST(
               // Usage footer (completed only)
               if (status === 'completed') {
                 const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
+                const usage =
+                  model && tokensIn != null && tokensOut != null
+                    ? { model, tokensIn, tokensOut }
+                    : undefined;
+                const reviewGuidance = getReviewGuidanceFooterData(review);
 
-                if (model && tokensIn != null && tokensOut != null) {
+                if (usage || reviewGuidance.used) {
                   const existing = await findKiloReviewComment(
                     integration.platform_installation_id,
                     repoOwner,
                     repoName,
-                    review.pr_number
+                    review.pr_number,
+                    appType
                   );
                   if (existing) {
-                    const updatedBody = appendUsageFooter(
-                      existing.body,
-                      model,
-                      tokensIn,
-                      tokensOut
-                    );
+                    const updatedBody = appendReviewSummaryFooter(existing.body, {
+                      usage,
+                      reviewGuidance,
+                    });
                     await updateKiloReviewComment(
                       integration.platform_installation_id,
                       repoOwner,
                       repoName,
                       existing.commentId,
-                      updatedBody
+                      updatedBody,
+                      appType
                     );
                     logExceptInTest(
-                      `[code-review-status] Updated summary comment with usage footer on ${review.repo_full_name}#${review.pr_number}`
+                      `[code-review-status] Updated summary comment footer on ${review.repo_full_name}#${review.pr_number}`
                     );
                   }
                 } else {
@@ -982,8 +1000,13 @@ export async function POST(
               // Usage footer (completed only)
               if (status === 'completed') {
                 const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
+                const usage =
+                  model && tokensIn != null && tokensOut != null
+                    ? { model, tokensIn, tokensOut }
+                    : undefined;
+                const reviewGuidance = getReviewGuidanceFooterData(review);
 
-                if (model && tokensIn != null && tokensOut != null) {
+                if (usage || reviewGuidance.used) {
                   const existing = await findKiloReviewNote(
                     accessToken,
                     review.repo_full_name,
@@ -991,12 +1014,10 @@ export async function POST(
                     instanceUrl
                   );
                   if (existing) {
-                    const updatedBody = appendUsageFooter(
-                      existing.body,
-                      model,
-                      tokensIn,
-                      tokensOut
-                    );
+                    const updatedBody = appendReviewSummaryFooter(existing.body, {
+                      usage,
+                      reviewGuidance,
+                    });
                     await updateKiloReviewNote(
                       accessToken,
                       review.repo_full_name,
@@ -1006,7 +1027,7 @@ export async function POST(
                       instanceUrl
                     );
                     logExceptInTest(
-                      `[code-review-status] Updated summary note with usage footer on GitLab MR ${review.repo_full_name}!${review.pr_number}`
+                      `[code-review-status] Updated summary note footer on GitLab MR ${review.repo_full_name}!${review.pr_number}`
                     );
                   }
                 } else {

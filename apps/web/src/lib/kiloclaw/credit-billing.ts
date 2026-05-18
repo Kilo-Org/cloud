@@ -30,19 +30,12 @@ import {
 } from '@/lib/kiloclaw/instance-lifecycle';
 import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
 import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
-import {
-  computeUsageTriggeredMonthlyBonusDecision,
-  maybeIssueKiloPassBonusFromUsageThreshold,
-} from '@/lib/kilo-pass/usage-triggered-bonus';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
-import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
 import {
-  KILO_PASS_TIER_CONFIG,
-  KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
-} from '@/lib/kilo-pass/constants';
-import { computeIssueMonth } from '@/lib/kilo-pass/issuance';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+  computeProjectedKiloPassBonusMicrodollars,
+  getEffectiveKiloPassThreshold,
+} from '@kilocode/worker-utils/kilo-pass-bonus-projection';
 import { sentryLogger } from '@/lib/utils.server';
 import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 import {
@@ -375,31 +368,19 @@ export async function projectPendingKiloPassBonusMicrodollars(params: {
     providedSubscription !== undefined
       ? providedSubscription
       : await getKiloPassStateForUser(db, userId);
-  if (!subscription || subscription.status !== 'active') return 0;
 
-  const tierConfig = KILO_PASS_TIER_CONFIG[subscription.tier];
-  const monthlyBaseAmountUsd = tierConfig.monthlyPriceUsd;
-
-  let bonusPercent: number;
-  if (subscription.cadence !== KiloPassCadence.Monthly) {
-    bonusPercent = KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT;
-  } else {
-    const issueMonth = computeIssueMonth(dayjs().utc());
-    // Conservatively assume returning subscriber to avoid over-projecting
-    // the 50% first-time promo. Under-projection is safe: the user still
-    // succeeds via the post-deduction bonus evaluation (spec rule 6).
-    const assumeReturningSubscriber = false;
-    const decision = computeUsageTriggeredMonthlyBonusDecision({
-      tier: subscription.tier,
-      startedAtIso: subscription.startedAt,
-      currentStreakMonths: subscription.currentStreakMonths,
-      isFirstTimeSubscriberEver: assumeReturningSubscriber,
-      issueMonth,
-    });
-    bonusPercent = decision.bonusPercentApplied;
-  }
-
-  return Math.round(monthlyBaseAmountUsd * bonusPercent * 1_000_000);
+  return computeProjectedKiloPassBonusMicrodollars({
+    microdollarsUsed,
+    kiloPassThreshold,
+    subscription: subscription
+      ? {
+          tier: subscription.tier,
+          cadence: subscription.cadence,
+          status: subscription.status,
+          currentStreakMonths: subscription.currentStreakMonths,
+        }
+      : null,
+  });
 }
 
 export async function getEffectiveCreditBalancePreview(params: {

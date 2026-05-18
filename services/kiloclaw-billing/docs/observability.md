@@ -94,6 +94,43 @@ Display:
 
 - show `billingRunId`, `userId`, `instanceId`, `subscriptionId`, `reason`, `platformStatus`
 
+### Credit renewal fanout discovery
+
+Filter:
+
+- `billingFlow = "kiloclaw_lifecycle"`
+- `billingSweep = "credit_renewal_discovery"`
+- `event = "credit_renewal_discovery"`
+
+Display:
+
+- show `billingRunId`, `billingAttempt`, `cutoffTime`, cursor fields, `pageBudget`, `fetchedCount`, `enqueuedCount`, `discoveryBacklogLikely`, `continuationEnqueued`, next cursor fields
+
+### Credit renewal item outcomes and age
+
+Filter:
+
+- `billingFlow = "kiloclaw_lifecycle"`
+- `billingSweep = "credit_renewal_item"`
+- `event = "credit_renewal_item"`
+
+Display:
+
+- group by `itemOutcome`
+- chart `itemQueueAgeMs` p50 / p95 / max
+- show `billingRunId`, `billingAttempt`, `subscriptionId`, `instanceId`, `renewalBoundary`, `terminalFailureStatus`
+
+### Credit renewal terminal failures
+
+Filter:
+
+- `billingFlow = "kiloclaw_lifecycle"`
+- `event = "credit_renewal_terminal_failure"`
+
+Display:
+
+- show `subscriptionId`, `renewalBoundary`, `attempts`, `terminalFailureStatus`, `terminalFailureCount`, `oldestUnresolvedTerminalFailureAt`, oldest unresolved subscription/boundary fields
+
 ### Entity drilldown
 
 Filter:
@@ -128,6 +165,18 @@ Create these monitors in Axiom:
 
 5. `billing-snowflake-failure-spike`
    Trigger when `billingComponent = "snowflake_sql_api"` and `outcome = "failed"` count is `>= 5` in 15 minutes.
+   Severity: ticket.
+
+6. `credit-renewal-terminal-failures`
+   Trigger when `event = "credit_renewal_terminal_failure"` and `terminalFailureStatus = "unresolved"` count is `>= 1` in 5 minutes.
+   Severity: page.
+
+7. `credit-renewal-item-age-risk`
+   Trigger when `event = "credit_renewal_item"` and `itemQueueAgeMs` p95 approaches the past-due enforcement grace window.
+   Severity: ticket; page if the age risks false suspension or destruction.
+
+8. `credit-renewal-discovery-backlog`
+   Trigger when `event = "credit_renewal_discovery"` and `discoveryBacklogLikely = true` persists across repeated billing runs.
    Severity: ticket.
 
 ## Credit Enrollment Flow

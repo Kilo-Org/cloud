@@ -646,11 +646,18 @@ describe('disk space checking', () => {
 describe('autoCommitChangesStream', () => {
   let fakeSession: ExecutionSession;
   let mockExec: ReturnType<typeof vi.fn>;
-  let mockStreamKilocodeExec: ReturnType<typeof vi.fn>;
+  let mockStreamKilocodeExec: ReturnType<
+    typeof vi.fn<
+      (mode: string, prompt: string, options?: { sessionId?: string }) => AsyncGenerator<any>
+    >
+  >;
 
   beforeEach(() => {
     mockExec = vi.fn();
-    mockStreamKilocodeExec = vi.fn();
+    mockStreamKilocodeExec =
+      vi.fn<
+        (mode: string, prompt: string, options?: { sessionId?: string }) => AsyncGenerator<any>
+      >();
     fakeSession = {
       exec: mockExec,
     } as unknown as ExecutionSession;

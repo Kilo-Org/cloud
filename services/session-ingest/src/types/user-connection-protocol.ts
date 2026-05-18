@@ -51,7 +51,7 @@ export const CLIInboundMessageSchema = z.discriminatedUnion('type', [
     id: z.string(),
     command: z.string(),
     sessionId: z.string().optional(),
-    data: z.unknown(),
+    data: z.unknown().optional(),
   }),
   z.object({
     type: z.literal('system'),
@@ -80,7 +80,7 @@ export const WebOutboundMessageSchema = z.discriminatedUnion('type', [
     sessionId: z.string().optional(),
     connectionId: z.string().optional(),
     command: z.string(),
-    data: z.unknown(),
+    data: z.unknown().optional(),
   }),
 ]);
 

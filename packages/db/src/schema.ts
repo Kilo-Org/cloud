@@ -47,6 +47,9 @@ import {
   KiloClawSubscriptionAccessOrigin,
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionChangeAction,
+  KiloClawTerminalRenewalFailureStatus,
+  KiloClawTerminalRenewalFailureCode,
+  KiloClawTerminalRenewalFailureResolutionActorType,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
@@ -142,6 +145,9 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawSubscriptionAccessOrigin,
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionChangeAction,
+  KiloClawTerminalRenewalFailureStatus,
+  KiloClawTerminalRenewalFailureCode,
+  KiloClawTerminalRenewalFailureResolutionActorType,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
@@ -1516,6 +1522,41 @@ export const microdollar_usage = pgTable(
   ]
 );
 
+// Per-day rollup of microdollar_usage.cost, keyed by (kilo_user_id, organization_id,
+// usage_date). Maintained by the same CTE that inserts into microdollar_usage so it
+// is updated atomically with the source row. Powers the hot 3-month-rolling-sum
+// query in kiloPass.getAverageMonthlyUsageLast3Months without scanning the raw
+// 800M-row microdollar_usage table.
+export const microdollar_usage_daily = pgTable(
+  'microdollar_usage_daily',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    usage_date: date({ mode: 'string' }).notNull(),
+    total_cost_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    // Personal-scope rollup: one row per user per day (no org).
+    uniqueIndex('idx_microdollar_usage_daily_personal')
+      .on(table.kilo_user_id, table.usage_date)
+      .where(isNull(table.organization_id)),
+    // Org-scope rollup: one row per user per org per day.
+    uniqueIndex('idx_microdollar_usage_daily_org')
+      .on(table.kilo_user_id, table.organization_id, table.usage_date)
+      .where(isNotNull(table.organization_id)),
+  ]
+);
+
+export type MicrodollarUsageDaily = typeof microdollar_usage_daily.$inferSelect;
+
 export const microdollar_usage_metadata = pgTable(
   'microdollar_usage_metadata',
   {
@@ -1557,7 +1598,12 @@ export const microdollar_usage_metadata = pgTable(
     market_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
   },
-  table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
+  table => [
+    index('idx_microdollar_usage_metadata_created_at').on(table.created_at),
+    index('idx_microdollar_usage_metadata_session_id_created_at')
+      .on(table.session_id, table.created_at)
+      .where(isNotNull(table.session_id)),
+  ]
 );
 
 export const api_request_log = pgTable(
@@ -3152,6 +3198,11 @@ export const cloud_agent_code_reviews = pgTable(
     // GitHub Check Run ID; null for GitLab or pre-feature reviews
     check_run_id: bigint({ mode: 'number' }),
 
+    // REVIEW.md usage metadata
+    repository_review_instructions_used: boolean().notNull().default(false),
+    repository_review_instructions_ref: text(),
+    repository_review_instructions_truncated: boolean().notNull().default(false),
+
     // Usage tracking (populated on completion by orchestrator)
     model: text(), // LLM model slug used (e.g., 'anthropic/claude-sonnet-4.6')
     total_tokens_in: integer(), // Total input tokens across all LLM calls
@@ -3512,6 +3563,9 @@ export const app_builder_projects = pgTable(
     index('IDX_app_builder_projects_owned_by_organization_id').on(table.owned_by_organization_id),
     index('IDX_app_builder_projects_created_at').on(table.created_at),
     index('IDX_app_builder_projects_last_message_at').on(table.last_message_at),
+    index('IDX_app_builder_projects_git_repo_integration')
+      .on(table.git_repo_full_name, table.git_platform_integration_id)
+      .where(isNotNull(table.git_repo_full_name)),
     check(
       'app_builder_projects_owner_check',
       sql`(
@@ -4710,6 +4764,13 @@ export const kiloclaw_instances = pgTable(
     index('IDX_kiloclaw_instances_active_org_by_user_org')
       .on(table.user_id, table.organization_id)
       .where(sql`${table.organization_id} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
+    // Non-partial index over all rows (including destroyed) so we can answer
+    // "what is this user's earliest instance" without a sequential scan. Used
+    // by `userIsWithinFirstKiloClawInstanceWindow` on the AI gateway hot path;
+    // the existing partial-by-user indexes can't serve it because they exclude
+    // destroyed rows, and destroyed rows must still count for "first instance"
+    // semantics.
+    index('IDX_kiloclaw_instances_user_id_created_at').on(table.user_id, table.created_at),
     // Powers admin "instances on version X" filter; partial since destroyed rows are excluded.
     index('IDX_kiloclaw_instances_tracked_image_tag')
       .on(table.tracked_image_tag)
@@ -5455,6 +5516,86 @@ export const kiloclaw_subscription_change_log = pgTable(
 
 export type KiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferSelect;
 export type NewKiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferInsert;
+
+// KiloClaw credit-renewal terminal failures — durable record of
+// (subscription_id, renewal_boundary) pairs whose automatic retry has been
+// exhausted and that require operator resolution, waiver, retry, or
+// supersession before downstream enforcement may proceed.
+//
+// Only unresolved rows protect a subscription-renewal boundary from
+// downstream enforcement. Resolved, waived, and superseded rows are kept for
+// operator history but do not block enforcement.
+//
+// Uniqueness on (subscription_id, renewal_boundary) makes duplicate
+// terminal-failure recording for the same boundary idempotent: ON CONFLICT
+// updates the existing row's attempt history and last-error fields rather
+// than inserting a duplicate.
+export const kiloclaw_terminal_renewal_failures = pgTable(
+  'kiloclaw_terminal_renewal_failures',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    subscription_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_subscriptions.id),
+    renewal_boundary: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    status: text()
+      .notNull()
+      .$type<KiloClawTerminalRenewalFailureStatus>()
+      .default(KiloClawTerminalRenewalFailureStatus.Unresolved),
+    attempt_count: integer().notNull().default(0),
+    first_failure_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_failure_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_failure_code: text().notNull().$type<KiloClawTerminalRenewalFailureCode>(),
+    last_failure_message: text(),
+    resolution_actor_type: text().$type<KiloClawTerminalRenewalFailureResolutionActorType>(),
+    resolution_actor_id: text(),
+    resolution_at: timestamp({ withTimezone: true, mode: 'string' }),
+    resolution_reason: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_kiloclaw_terminal_renewal_failures_subscription_boundary').on(
+      table.subscription_id,
+      table.renewal_boundary
+    ),
+    // Partial index optimizing the hot enforcement-protection lookup and
+    // operator diagnostics for unresolved failures only. Resolved, waived,
+    // and superseded rows are kept for history but are not in the index.
+    index('IDX_kiloclaw_terminal_renewal_failures_unresolved')
+      .on(table.subscription_id, table.renewal_boundary)
+      .where(sql`${table.status} = 'unresolved'`),
+    index('IDX_kiloclaw_terminal_renewal_failures_status_last_failure_at').on(
+      table.status,
+      table.last_failure_at
+    ),
+    enumCheck(
+      'kiloclaw_terminal_renewal_failures_status_check',
+      table.status,
+      KiloClawTerminalRenewalFailureStatus
+    ),
+    enumCheck(
+      'kiloclaw_terminal_renewal_failures_last_failure_code_check',
+      table.last_failure_code,
+      KiloClawTerminalRenewalFailureCode
+    ),
+    enumCheck(
+      'kiloclaw_terminal_renewal_failures_resolution_actor_type_check',
+      table.resolution_actor_type,
+      KiloClawTerminalRenewalFailureResolutionActorType
+    ),
+  ]
+);
+
+export type KiloClawTerminalRenewalFailure = typeof kiloclaw_terminal_renewal_failures.$inferSelect;
+export type NewKiloClawTerminalRenewalFailure =
+  typeof kiloclaw_terminal_renewal_failures.$inferInsert;
 
 // KiloClaw subscription-started emails are per paid activation, not per
 // instance lifetime. Cancel+resubscribe reuses the same subscription row (we

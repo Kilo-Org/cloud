@@ -40,6 +40,8 @@ const baseStatus: KiloClawDashboardStatus = {
   botNature: null,
   botVibe: null,
   botEmoji: null,
+  userLocation: null,
+  userTimezone: null,
   workerUrl: 'https://claw.kilo.ai',
   controllerCapabilitiesVersion: null,
   instanceId: 'instance-1',

@@ -101,7 +101,12 @@ export type CreateMachineRequest = {
 export type FlyVolume = {
   id: string;
   name: string;
-  state: 'created' | 'attached' | 'detached' | 'destroying' | 'destroyed';
+  /**
+   * Fly volume lifecycle states. `pending_destroy` is observed in production
+   * for volumes Fly is in the process of reaping (e.g. after a successful
+   * `DELETE /volumes/:id` while async cleanup is in flight).
+   */
+  state: 'created' | 'attached' | 'detached' | 'pending_destroy' | 'destroying' | 'destroyed';
   size_gb: number;
   region: string;
   attached_machine_id: string | null;

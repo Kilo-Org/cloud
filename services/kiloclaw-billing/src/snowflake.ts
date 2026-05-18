@@ -80,7 +80,7 @@ function createUsageStatement(batchSize: number): string {
   return `select distinct kilo_user_id
 from microdollar_usage_hourly
 where usage_hour >= dateadd('day', -2, current_date())
-  and feature = 'kiloclaw'
+  and feature = 'kilo_claw'
   and not is_heartbeat
   and kilo_user_id in (${placeholders})`;
 }

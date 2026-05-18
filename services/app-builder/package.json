@@ -17,7 +17,7 @@
   "dependencies": {
     "@ashishkumar472/cf-git": "1.0.5",
     "@kilocode/worker-utils": "workspace:*",
-    "diff": "^8.0.3",
+    "diff": "8.0.4",
     "drizzle-orm": "catalog:",
     "jsonwebtoken": "catalog:",
     "workers-tagged-logger": "catalog:",
@@ -25,15 +25,15 @@
   },
   "devDependencies": {
     "@cloudflare/containers": "0.1.1",
-    "@cloudflare/sandbox": "0.7.13",
+    "@cloudflare/sandbox": "0.7.21",
     "@cloudflare/workers-types": "catalog:",
     "@types/jsonwebtoken": "catalog:",
-    "@types/node": ">=24 <25",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
-    "tsx": "^4.21.0",
+    "tsx": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^4.1.0",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

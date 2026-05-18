@@ -19,39 +19,28 @@ vi.mock('openclaw/plugin-sdk/plugin-entry', () => ({
 import { buildBriefingWebSearchQuery } from './index';
 
 describe('buildBriefingWebSearchQuery', () => {
-  it('returns the hardcoded engineering query when topics are empty', () => {
-    expect(buildBriefingWebSearchQuery([])).toBe(
-      'top engineering updates and breaking software infrastructure news from the last 24 hours'
-    );
-  });
+  // Function now interpolates a single topic per call (per-topic loop
+  // pattern). `collectWebSearch` short-circuits to a nudge when no
+  // topics are selected and runs this builder once per remaining topic.
 
-  it('returns the engineering query when all topics are whitespace-only', () => {
-    expect(buildBriefingWebSearchQuery(['  ', '\t', ''])).toBe(
-      'top engineering updates and breaking software infrastructure news from the last 24 hours'
-    );
-  });
-
-  it('interpolates a single topic', () => {
-    expect(buildBriefingWebSearchQuery(['Tech'])).toBe(
+  it('interpolates a topic into the query string', () => {
+    expect(buildBriefingWebSearchQuery('Tech')).toBe(
       'latest news and updates on Tech from the last 24 hours'
     );
   });
 
-  it('joins multiple topics with commas', () => {
-    expect(buildBriefingWebSearchQuery(['Tech', 'AI', 'Finance'])).toBe(
-      'latest news and updates on Tech, AI, Finance from the last 24 hours'
+  it('interpolates a multi-word topic verbatim', () => {
+    expect(buildBriefingWebSearchQuery('Health Tech')).toBe(
+      'latest news and updates on Health Tech from the last 24 hours'
     );
   });
 
-  it('trims topics before interpolating', () => {
-    expect(buildBriefingWebSearchQuery(['  Tech  ', 'AI '])).toBe(
-      'latest news and updates on Tech, AI from the last 24 hours'
-    );
-  });
-
-  it('skips whitespace-only topics in a mixed list', () => {
-    expect(buildBriefingWebSearchQuery(['Tech', '   ', 'AI'])).toBe(
-      'latest news and updates on Tech, AI from the last 24 hours'
+  it('does not trim — caller is responsible for sanitisation', () => {
+    // The collectWebSearch caller trims + filters empty topics. This
+    // function trusts the input so the same call site can build
+    // arbitrary queries without re-trimming.
+    expect(buildBriefingWebSearchQuery('  Markets ')).toBe(
+      'latest news and updates on   Markets  from the last 24 hours'
     );
   });
 });

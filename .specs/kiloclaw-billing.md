@@ -1086,6 +1086,17 @@ rows renew.
 4. The system MUST send an instance-destroyed notification.
 5. If the destroy operation fails (e.g., no instance exists), the system
    MUST still proceed with the state transition.
+6. Destroy request acceptance and provider cleanup finalization are
+   distinct. The lifecycle sweep MAY proceed with the local instance and
+   subscription state transition once the provider lifecycle owner has
+   accepted the destroy request or the sweep has logged the failed
+   attempt, provided any unfinalized provider cleanup remains durably
+   tracked by the provider lifecycle owner.
+7. When provider cleanup is not finalized immediately, the provider
+   lifecycle owner MUST retain enough durable state to retry cleanup and
+   MUST emit telemetry identifying pending provider resources and the
+   latest provider error, if any. A provider 404 for a resource counts as
+   confirmed deletion of that resource.
 
 ### Past-Due Payment Enforcement
 

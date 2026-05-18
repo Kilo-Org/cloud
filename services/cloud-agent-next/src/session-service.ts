@@ -69,6 +69,30 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
 ];
 
 const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
+  'bash',
+  'sh',
+  'zsh',
+  'fish',
+  'python',
+  'python3',
+  'node',
+  'irb',
+  'php -a',
+  'rails console',
+  'vi',
+  'vim',
+  'nvim',
+  'nano',
+  'emacs',
+  'less',
+  'more',
+  'top',
+  'htop',
+  'watch',
+  'tail -f',
+  'ssh',
+  'tmux',
+  'screen',
   'git add',
   'git commit',
   'git push',
@@ -88,6 +112,9 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'gh pr create',
   'gh pr close',
   'gh pr edit',
+  'gh pr checkout',
+  'gh auth login',
+  'gh auth refresh',
   'gh issue',
   'gh repo create',
   'gh repo fork',
@@ -129,6 +156,19 @@ class SessionSnapshotRestoreError extends Error {
 
 export function determineBranchName(sessionId: string, upstreamBranch?: string): string {
   return upstreamBranch ?? `session/${sessionId}`;
+}
+
+export function backendUrlForSandbox(workerBackendUrl: string): string {
+  try {
+    const url = new URL(workerBackendUrl);
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      url.hostname = 'host.docker.internal';
+      return url.toString().replace(/\/$/, '');
+    }
+  } catch {
+    // Non-URL value: leave untouched.
+  }
+  return workerBackendUrl;
 }
 
 type SandboxRetryConfig = {
@@ -798,10 +838,21 @@ export class SessionService {
       providerOptions.kilocodeOrganizationId = kilocodeOrganizationId;
     }
     if (env.KILO_OPENROUTER_BASE) {
-      providerOptions.baseURL = env.KILO_OPENROUTER_BASE;
+      providerOptions.baseURL = backendUrlForSandbox(env.KILO_OPENROUTER_BASE);
     }
     const isInteractive = createdOnPlatform == 'cloud-agent-web';
     const commandGuardPolicy = getCommandGuardPolicy(createdOnPlatform);
+
+    if (commandGuardPolicy) {
+      Object.assign(envVars, {
+        CI: 'true',
+        GIT_TERMINAL_PROMPT: '0',
+        GH_PROMPT_DISABLED: '1',
+        PAGER: 'cat',
+        GIT_PAGER: 'cat',
+        TERM: 'dumb',
+      });
+    }
 
     const permission: Record<string, unknown> = {
       external_directory: {
@@ -825,6 +876,7 @@ export class SessionService {
       skill: 'allow',
       todowrite: 'allow',
       todoread: 'allow',
+      suggest: 'deny',
     };
 
     if (commandGuardPolicy) {
@@ -834,6 +886,7 @@ export class SessionService {
       // so denied sub-commands correctly override broader allows.
       const bashPermissions: Record<string, string> = {};
       for (const cmd of commandGuardPolicy.denied) {
+        bashPermissions[cmd] = 'deny';
         bashPermissions[`${cmd} *`] = 'deny';
       }
       for (const cmd of commandGuardPolicy.allowed) {
@@ -963,9 +1016,10 @@ export class SessionService {
     }
 
     if (env.KILOCODE_BACKEND_BASE_URL) {
-      envVars.KILOCODE_BACKEND_BASE_URL = env.KILOCODE_BACKEND_BASE_URL;
+      const sandboxUrl = backendUrlForSandbox(env.KILOCODE_BACKEND_BASE_URL);
+      envVars.KILOCODE_BACKEND_BASE_URL = sandboxUrl;
       // Used by kilo server to check user auth to send to ingest
-      envVars.KILO_API_URL = env.KILOCODE_BACKEND_BASE_URL;
+      envVars.KILO_API_URL = sandboxUrl;
     }
 
     if (env.KILO_SESSION_INGEST_URL) {

@@ -24,12 +24,11 @@ export type ActiveKiloPassByFingerprint = {
 
 export async function findActiveKiloPassByCardFingerprint(
   fingerprint: string | null | undefined,
-  excludingUserId: string,
-  dbOrTx: typeof db | DrizzleTransaction = db
+  excludingUserId: string
 ): Promise<ActiveKiloPassByFingerprint | null> {
   if (!fingerprint) return null;
 
-  const otherPaymentMethods = await dbOrTx
+  const otherPaymentMethods = await db
     .select({
       userId: payment_methods.user_id,
     })
@@ -45,7 +44,7 @@ export async function findActiveKiloPassByCardFingerprint(
   const otherUserIds = [...new Set(otherPaymentMethods.map(pm => pm.userId))];
   if (otherUserIds.length === 0) return null;
 
-  const activeSub = await dbOrTx
+  const activeSub = await db
     .select({
       kiloUserId: kilo_pass_subscriptions.kilo_user_id,
       id: kilo_pass_subscriptions.id,
@@ -86,9 +85,8 @@ async function resolveCardFingerprint(params: {
   invoice: InvoiceWithPaymentIntent;
   stripe: Stripe;
   kiloUserId: string;
-  dbOrTx: typeof db | DrizzleTransaction;
 }): Promise<string | null> {
-  const { invoice, stripe, kiloUserId, dbOrTx } = params;
+  const { invoice, stripe, kiloUserId } = params;
 
   const paymentIntentUnion = invoice.payment_intent;
   let paymentMethodId: string | null = null;
@@ -107,7 +105,7 @@ async function resolveCardFingerprint(params: {
   }
 
   if (paymentMethodId) {
-    const localPm = await dbOrTx.query.payment_methods.findFirst({
+    const localPm = await db.query.payment_methods.findFirst({
       columns: { stripe_fingerprint: true },
       where: and(
         eq(payment_methods.stripe_id, paymentMethodId),
@@ -126,7 +124,7 @@ async function resolveCardFingerprint(params: {
     }
   }
 
-  const customerPms = await dbOrTx.query.payment_methods.findMany({
+  const customerPms = await db.query.payment_methods.findMany({
     columns: { stripe_fingerprint: true },
     where: and(
       eq(payment_methods.user_id, kiloUserId),
@@ -176,17 +174,12 @@ export async function checkDuplicateCardFingerprintGate(params: {
     invoice: invoiceWithPi,
     stripe,
     kiloUserId,
-    dbOrTx,
   });
   if (!fingerprint) {
     return { blocked: false };
   }
 
-  const existingActiveKiloPass = await findActiveKiloPassByCardFingerprint(
-    fingerprint,
-    kiloUserId,
-    dbOrTx
-  );
+  const existingActiveKiloPass = await findActiveKiloPassByCardFingerprint(fingerprint, kiloUserId);
   if (!existingActiveKiloPass) {
     return { blocked: false };
   }
@@ -243,7 +236,7 @@ export async function checkDuplicateCardFingerprintGate(params: {
     },
   });
 
-  await maybeSendDuplicateCardCanceledEmail({ kiloUserId, stripeInvoiceId, dbOrTx });
+  await maybeSendDuplicateCardCanceledEmail({ kiloUserId, stripeInvoiceId });
 
   return {
     blocked: true,
@@ -255,12 +248,11 @@ export async function checkDuplicateCardFingerprintGate(params: {
 async function maybeSendDuplicateCardCanceledEmail(params: {
   kiloUserId: string;
   stripeInvoiceId: string;
-  dbOrTx: typeof db | DrizzleTransaction;
 }): Promise<void> {
-  const { kiloUserId, stripeInvoiceId, dbOrTx } = params;
+  const { kiloUserId, stripeInvoiceId } = params;
 
   try {
-    const insertResult = await dbOrTx
+    const insertResult = await db
       .insert(transactional_email_log)
       .values({
         user_id: kiloUserId,
@@ -273,7 +265,7 @@ async function maybeSendDuplicateCardCanceledEmail(params: {
       return;
     }
 
-    const user = await dbOrTx.query.kilocode_users.findFirst({
+    const user = await db.query.kilocode_users.findFirst({
       columns: { google_user_email: true },
       where: eq(kilocode_users.id, kiloUserId),
     });
@@ -283,7 +275,7 @@ async function maybeSendDuplicateCardCanceledEmail(params: {
     const sendResult = await sendKiloPassDuplicateCardCanceledEmail(user.google_user_email, {});
 
     if (!sendResult.sent && sendResult.reason === 'provider_not_configured') {
-      await dbOrTx
+      await db
         .delete(transactional_email_log)
         .where(
           and(
@@ -298,7 +290,7 @@ async function maybeSendDuplicateCardCanceledEmail(params: {
       extra: { kiloUserId, stripeInvoiceId },
     });
     try {
-      await dbOrTx
+      await db
         .delete(transactional_email_log)
         .where(
           and(

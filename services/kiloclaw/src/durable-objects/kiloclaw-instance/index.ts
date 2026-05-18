@@ -3925,11 +3925,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * plugin write-queue stall is worse than silently degrading to "takes
    * effect on next deploy."
    *
-   * When the instance is stopped, persist DO state only and skip gateway
-   * calls — the next boot picks up the new location through the
-   * KILOCLAW_USER_LOCATION env-var path. This mirrors what the old
-   * `updateConfig`/provision path did (it gated `writeUserProfile` on
-   * `status === 'running'` but still updated DO state regardless).
+   * Rejects when the instance is not running. The plugin reads
+   * `config.json.userLocation` first and a non-empty string there wins
+   * over the env var, so silently persisting a clear/update while
+   * stopped (or during a `starting`/`restarting` window after env vars
+   * were already built for the boot) can result in success toasts that
+   * never affect the next briefing. The Settings UI greys out the
+   * editor when the instance is not running.
    *
    * Ordering matters: do not persist the new location to DO state until
    * the required gateway write has succeeded. If we persisted first and
@@ -3939,30 +3941,29 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    */
   async updateUserLocation(input: { userLocation: string | null }) {
     await this.loadState();
+    if (this.s.status !== 'running') {
+      throw new Error('Instance is not running');
+    }
     const previous = this.s.userLocation ?? null;
     if (input.userLocation === previous) {
       return { ok: true, userLocation: previous };
     }
 
-    if (this.s.status === 'running') {
-      await gateway.writeUserProfile(this.s, this.env, {
-        userLocation: input.userLocation,
-      });
-    }
+    await gateway.writeUserProfile(this.s, this.env, {
+      userLocation: input.userLocation,
+    });
 
     this.s.userLocation = input.userLocation;
     await this.ctx.storage.put({ userLocation: input.userLocation });
 
-    if (this.s.status === 'running') {
-      try {
-        await gateway.updateMorningBriefingUserLocation(this.s, this.env, {
-          userLocation: input.userLocation,
-        });
-      } catch (err) {
-        doWarn(this.s, 'updateMorningBriefingUserLocation failed', {
-          error: toLoggable(err),
-        });
-      }
+    try {
+      await gateway.updateMorningBriefingUserLocation(this.s, this.env, {
+        userLocation: input.userLocation,
+      });
+    } catch (err) {
+      doWarn(this.s, 'updateMorningBriefingUserLocation failed', {
+        error: toLoggable(err),
+      });
     }
 
     return { ok: true, userLocation: input.userLocation };

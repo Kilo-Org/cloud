@@ -528,15 +528,24 @@ function MorningBriefingLocationEditor({
   mutations,
   userLocation,
   userTimezone,
+  isRunning,
 }: {
   mutations: ClawMutations;
   userLocation: string | null;
   userTimezone: string | null;
+  /**
+   * Editor is disabled when the instance is not running. The DO method
+   * rejects saves while not running because the plugin reads
+   * `config.json.userLocation` first and silently persisting a change
+   * here would not affect the next briefing on the current boot.
+   */
+  isRunning: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(userLocation ?? '');
   const isSaving = mutations.updateUserLocation.isPending;
   const hasLocation = userLocation !== null && userLocation.trim().length > 0;
+  const controlsDisabled = !isRunning || isSaving;
 
   function handleSave() {
     const value = draft.trim();
@@ -589,17 +598,23 @@ function MorningBriefingLocationEditor({
   const containerClass = hasLocation
     ? 'rounded-lg border p-4'
     : 'rounded-lg border border-amber-500/50 bg-amber-500/5 p-4';
+  const dimmedClass = !isRunning ? ' opacity-60' : '';
 
   return (
-    <div className={containerClass}>
+    <div className={containerClass + dimmedClass}>
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-foreground text-sm font-semibold">Location for Local News</h3>
         {hasLocation && !editing && (
-          <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+          <Button size="sm" variant="ghost" onClick={() => setEditing(true)} disabled={!isRunning}>
             Edit
           </Button>
         )}
       </div>
+      {!isRunning && (
+        <p className="text-muted-foreground mb-2 text-xs">
+          Start your instance to update Location.
+        </p>
+      )}
 
       {hasLocation && !editing && (
         <>
@@ -622,7 +637,7 @@ function MorningBriefingLocationEditor({
               : 'Add a city or address (e.g. "San Francisco, CA") and we\'ll surface local headlines.'}
           </p>
           <div className="mt-3">
-            <Button size="sm" onClick={() => setEditing(true)}>
+            <Button size="sm" onClick={() => setEditing(true)} disabled={!isRunning}>
               Set location
             </Button>
           </div>
@@ -635,12 +650,12 @@ function MorningBriefingLocationEditor({
             placeholder="e.g. San Francisco, CA"
             value={draft}
             onChange={event => setDraft(event.target.value)}
-            disabled={isSaving}
+            disabled={controlsDisabled}
             maxLength={200}
             autoFocus
           />
           <div className="flex items-center gap-2">
-            <Button size="sm" onClick={handleSave} disabled={isSaving}>
+            <Button size="sm" onClick={handleSave} disabled={controlsDisabled}>
               {isSaving ? 'Saving...' : 'Save'}
             </Button>
             <Button size="sm" variant="ghost" onClick={handleCancel} disabled={isSaving}>
@@ -651,7 +666,7 @@ function MorningBriefingLocationEditor({
                 size="sm"
                 variant="ghost"
                 onClick={handleClear}
-                disabled={isSaving}
+                disabled={controlsDisabled}
                 className="text-destructive hover:text-destructive"
               >
                 Clear
@@ -1296,6 +1311,7 @@ function MorningBriefingCard({
                   mutations={mutations}
                   userLocation={userLocation}
                   userTimezone={userTimezone}
+                  isRunning={isRunning}
                 />
               )}
 

@@ -11328,15 +11328,16 @@ describe('non-Fly lifecycle push dispatch', () => {
 });
 
 describe('updateUserLocation', () => {
-  it('persists DO state without gateway calls when the instance is stopped', async () => {
+  it('throws "Instance is not running" when the instance is stopped', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'stopped', userLocation: null });
     vi.mocked(fetch).mockClear();
 
-    const result = await instance.updateUserLocation({ userLocation: 'Paris, France' });
+    await expect(instance.updateUserLocation({ userLocation: 'Paris, France' })).rejects.toThrow(
+      'Instance is not running'
+    );
 
-    expect(result).toEqual({ ok: true, userLocation: 'Paris, France' });
-    expect(storage._store.get('userLocation')).toBe('Paris, France');
+    expect(storage._store.get('userLocation') ?? null).toBeNull();
     const gatewayCalls = vi
       .mocked(fetch)
       .mock.calls.filter(
@@ -11346,6 +11347,30 @@ describe('updateUserLocation', () => {
             call[0].includes('/_kilo/morning-briefing/user-location'))
       );
     expect(gatewayCalls).toHaveLength(0);
+  });
+
+  it('throws "Instance is not running" when the instance is starting', async () => {
+    const { instance, storage } = createInstance();
+    await seedStarting(storage, { userLocation: 'Old, NY' });
+    vi.mocked(fetch).mockClear();
+
+    await expect(instance.updateUserLocation({ userLocation: 'Paris, France' })).rejects.toThrow(
+      'Instance is not running'
+    );
+
+    expect(storage._store.get('userLocation')).toBe('Old, NY');
+  });
+
+  it('throws "Instance is not running" when the instance is restarting', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage, { userLocation: 'Old, NY' });
+    vi.mocked(fetch).mockClear();
+
+    await expect(instance.updateUserLocation({ userLocation: 'Paris, France' })).rejects.toThrow(
+      'Instance is not running'
+    );
+
+    expect(storage._store.get('userLocation')).toBe('Old, NY');
   });
 
   it('does not persist DO state when the required writeUserProfile call fails', async () => {

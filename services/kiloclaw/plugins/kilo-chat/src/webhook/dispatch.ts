@@ -26,12 +26,7 @@ export const __dispatchInternals: {
   fetchImpl: undefined,
 };
 
-type InboundAttachmentMeta = {
-  attachmentId: string;
-  mimeType: string;
-  size: number;
-  filename: string;
-};
+type InboundAttachmentMeta = NonNullable<KiloChatInboundPayload['attachments']>[number];
 
 type SaveMediaBuffer = (
   buffer: Buffer,

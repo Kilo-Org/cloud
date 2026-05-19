@@ -7,8 +7,14 @@ import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types
 
 /**
  * Sentinel values written to `model_experiment_request.system_prompt_sha256` /
- * `request_body_sha256` instead of a real 64-char hex digest. See the schema
- * CHECK constraints and `.plans/experimental-models-1.md` "Prompt Storage".
+ * `request_body_sha256` instead of a real 64-char hex digest. The schema
+ * CHECK constraints accept either a 64-char lowercase hex digest or one
+ * of these sentinels.
+ *
+ * - `__absent__` (system only): the request had no leading system message.
+ * - `__failed__`: R2 storage failed; the attribution row still lands.
+ * - `__deleted__`: prompt content intentionally wiped while retaining
+ *   experiment attribution.
  */
 export const PROMPT_HASH_ABSENT = '__absent__';
 export const PROMPT_HASH_FAILED = '__failed__';

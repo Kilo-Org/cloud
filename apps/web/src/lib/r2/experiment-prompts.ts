@@ -13,10 +13,10 @@ import { r2Client, r2ExperimentPromptsBucketName } from './client';
  *
  * - Bucket: `R2_EXPERIMENT_PROMPTS_BUCKET_NAME` (one per environment).
  * - Trust boundary: same R2 credentials as cli-sessions and
- *   cloud-agent-attachments; prompts collected under explicit experiment
- *   opt-in are not subject to the default microdollar_usage_metadata
- *   soft-delete policy. See `.plans/experimental-models-1.md` "Prompt
- *   Storage > GDPR and consent".
+ *   cloud-agent-attachments. Prompts collected under explicit experiment
+ *   opt-in use a dedicated retention policy and are NOT subject to the
+ *   default `microdollar_usage_metadata` soft-delete; `softDeleteUser`
+ *   does not touch these rows or their R2 objects.
  *
  * Failures here MUST NOT roll back the microdollar usage write or the
  * experiment attribution row. Callers store `__failed__` for the affected

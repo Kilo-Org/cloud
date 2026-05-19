@@ -32,7 +32,12 @@ import { parseDolthubUpstream } from '@/lib/wasteland/upstream';
 function linkForWasteland(wasteland: { wasteland_id: string; dolthub_upstream: string | null }) {
   const upstream = parseDolthubUpstream(wasteland.dolthub_upstream);
   if (upstream) return `/wasteland/${upstream.owner}/${upstream.repo}`;
-  return `/wasteland/${wasteland.wasteland_id}`;
+  // Fall back to the id-based redirect page when the wasteland has no
+  // parseable upstream — that page resolves the upstream server-side and
+  // forwards to /wasteland/{owner}/{repo} when it can. The bare
+  // `/wasteland/{id}` URL would otherwise hit the [owner]/[repo] route
+  // with the id as the owner segment, which 404s.
+  return `/wasteland/by-id/${wasteland.wasteland_id}`;
 }
 
 export function TownListPageClient() {

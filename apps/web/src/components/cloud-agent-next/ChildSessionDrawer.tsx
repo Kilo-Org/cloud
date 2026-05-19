@@ -11,7 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import type { ChildSessionHydrationState, KiloSessionId } from '@/lib/cloud-agent-sdk';
+import type { ChildSessionHydrationState } from '@/lib/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
 import { MessageBubble } from './MessageBubble';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
@@ -27,10 +27,6 @@ type ChildSessionDrawerProps = {
   onCloseAutoFocus?: ComponentProps<typeof SheetContent>['onCloseAutoFocus'];
   portalContainer?: HTMLElement | null;
 };
-
-function toKiloSessionId(sessionId: string): KiloSessionId {
-  return sessionId as KiloSessionId;
-}
 
 export function ChildSessionDrawer({
   stack,
@@ -55,7 +51,7 @@ export function ChildSessionDrawer({
 
   useEffect(() => {
     if (!selectedSessionId) return;
-    void manager.hydrateChildSession(toKiloSessionId(selectedSessionId));
+    void manager.hydrateChildSession(selectedSessionId);
   }, [manager, selectedSessionId]);
 
   useEffect(() => {
@@ -76,7 +72,7 @@ export function ChildSessionDrawer({
 
   const handleRetry = useCallback(() => {
     if (!selectedSessionId) return;
-    void manager.hydrateChildSession(toKiloSessionId(selectedSessionId));
+    void manager.hydrateChildSession(selectedSessionId);
   }, [manager, selectedSessionId]);
 
   const hasMessages = messages.length > 0;

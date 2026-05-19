@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { ChevronRight, ChevronDown, Bot, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import type { KiloSessionId } from '@/lib/cloud-agent-sdk';
 import type { SubtaskPart, StoredMessage, ToolPart, Part } from './types';
 import { isMessageStreaming, isToolPart } from './types';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
@@ -11,7 +12,7 @@ import { MessageErrorBoundary } from './MessageErrorBoundary';
 const MAX_NESTING_DEPTH = 5;
 
 export type ChildSessionDrawerEntry = {
-  sessionId: string;
+  sessionId: KiloSessionId;
   description?: string;
   agent?: string;
 };
@@ -29,7 +30,7 @@ export type RenderPartFn = (props: {
 type ChildSessionSectionProps = {
   subtaskPart?: SubtaskPart;
   taskToolPart?: ToolPart;
-  sessionId?: string;
+  sessionId?: KiloSessionId;
   childMessages?: StoredMessage[];
   depth?: number;
   getChildMessages?: (sessionId: string) => StoredMessage[];
@@ -254,16 +255,21 @@ function getTaskAgent(toolPart?: ToolPart): string | undefined {
   return getStringProperty(input, 'subagent_type');
 }
 
+function isKiloSessionId(sessionId: string | undefined): sessionId is KiloSessionId {
+  return sessionId !== undefined && sessionId.startsWith('ses_') && sessionId.length === 30;
+}
+
 /**
  * Extract the child session ID from a task tool part.
  * The session ID is stored in state.metadata.sessionId.
  */
-export function getTaskToolSessionId(toolPart: ToolPart): string | undefined {
+export function getTaskToolSessionId(toolPart: ToolPart): KiloSessionId | undefined {
   if (toolPart.tool !== 'task') return undefined;
   const state = toolPart.state;
   if (state.status === 'running' || state.status === 'completed') {
     const metadata = state.metadata;
-    return getStringProperty(metadata, 'sessionId');
+    const sessionId = getStringProperty(metadata, 'sessionId');
+    return isKiloSessionId(sessionId) ? sessionId : undefined;
   }
   return undefined;
 }

@@ -129,6 +129,13 @@ export type MicrodollarUsageContext = {
   machine_id: string | null;
   /** True if user/org is using their own API key - cost should be zeroed out */
   user_byok: boolean;
+  /**
+   * True for traffic where Kilo (or a partner) is footing the bill, so the
+   * user's billable cost must be zeroed out (preserving `market_cost` for
+   * reporting). Currently set for model-experiment routing — preview
+   * checkpoints are provider-funded for v1.
+   */
+  provider_funded?: boolean;
   has_tools: boolean;
   botId?: string;
   tokenSource?: string;

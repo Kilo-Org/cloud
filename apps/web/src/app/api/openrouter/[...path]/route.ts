@@ -507,6 +507,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (experiment) {
     usageContext.modelExperimentVariantVersionId = experiment.variantVersionId;
     usageContext.modelExperimentAllocationSubject = experiment.allocationSubject;
+    // Preview experiment traffic is partner/Kilo-funded for v1. Zero the
+    // billable cost in `processTokenData` while preserving `market_cost`
+    // for reporting. Without this flag the microdollar insert CTE still
+    // increments `microdollars_used` by the upstream cost.
+    usageContext.provider_funded = true;
   }
 
   sentryRootSpan()?.setAttribute(

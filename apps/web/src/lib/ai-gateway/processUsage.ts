@@ -984,7 +984,11 @@ export async function processTokenData(
   // Preserve the real cost before zeroing for free/BYOK
   usageStats.market_cost = usageStats.cost_mUsd;
 
-  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
+  if (
+    isFreeModel(usageContext.requested_model) ||
+    usageContext.user_byok ||
+    usageContext.provider_funded
+  ) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }

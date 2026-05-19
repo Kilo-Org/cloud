@@ -211,6 +211,9 @@ export function useAttachmentQueue(
         });
         if (pending.abort.signal.aborted) return;
         dispatch({ type: 'setReady', tempId });
+        // Release the blob once the upload has succeeded — the server-side
+        // copy is now authoritative and the row no longer needs the bytes.
+        pendingRef.current.delete(tempId);
       } catch (err) {
         if (pending.abort.signal.aborted) return;
         const message = err instanceof Error ? err.message : 'Upload failed';

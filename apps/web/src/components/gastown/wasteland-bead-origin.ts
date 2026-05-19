@@ -39,6 +39,14 @@ export function readWastelandBeadOrigin(
  * When `pathname` includes an org-scoped segment, the link is routed
  * through the matching `/organizations/[id]/wasteland/...` tree so the
  * user stays inside the org's app shell.
+ *
+ * The personal-scope link goes through `/wasteland/by-id/{wastelandId}/wanted`,
+ * the redirect page that resolves the wasteland's upstream server-side
+ * and forwards to the canonical `/wasteland/{owner}/{repo}` URL,
+ * preserving the `?itemId=` query. The bare `/wasteland/{wastelandId}/wanted`
+ * URL would otherwise hit the `[owner]/[repo]` route with the id as the
+ * owner segment and 404 — the bead origin metadata only carries the
+ * wasteland UUID, not the upstream slug.
  */
 export function buildWastelandItemHref(
   origin: Pick<WastelandBeadOrigin, 'wasteland_id' | 'item_id'>,
@@ -47,6 +55,6 @@ export function buildWastelandItemHref(
   const orgMatch = pathname?.match(/^\/organizations\/([^/]+)\//);
   const base = orgMatch
     ? `/organizations/${orgMatch[1]}/wasteland/${origin.wasteland_id}/wanted`
-    : `/wasteland/${origin.wasteland_id}/wanted`;
+    : `/wasteland/by-id/${origin.wasteland_id}/wanted`;
   return `${base}?itemId=${encodeURIComponent(origin.item_id)}`;
 }

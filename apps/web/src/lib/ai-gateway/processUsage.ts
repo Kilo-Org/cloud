@@ -245,17 +245,22 @@ export function toInsertableDbUsageRecord(
 export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext
-) {
+): Promise<{ usageId: string; createdAt: string } | null> {
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
   const { core, metadata } = toInsertableDbUsageRecord(usageStats, contextInfo);
 
-  await saveUsageRelatedData(
+  const inserted = await saveUsageRelatedData(
     core,
     metadata,
     usageContext.prior_microdollar_usage,
     usageContext.posthog_distinct_id ?? null
   );
+
+  // `insertUsageRecord` swallows DB errors and returns null; surface that
+  // failure to callers so dependent FK writes don't dangle on a row that
+  // was never persisted.
+  return inserted ? { usageId: core.id, createdAt: core.created_at } : null;
 }
 
 async function saveUsageRelatedData(
@@ -263,7 +268,7 @@ async function saveUsageRelatedData(
   metadataFields: UsageMetaData,
   prior_microdollar_usage: number,
   posthog_distinct_id: string | null
-) {
+): Promise<BalanceUpdateResult> {
   const isFirst = await isFirstUsage(coreUsageFields, prior_microdollar_usage);
   if (isFirst && posthog_distinct_id)
     await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
@@ -277,6 +282,7 @@ async function saveUsageRelatedData(
     );
   }
   await ingestOrganizationTokenUsage(coreUsageFields);
+  return balanceUpdateResult;
 }
 
 async function isFirstUsage(
@@ -909,14 +915,14 @@ export function calculateKiloExclusiveCost_mUsd(
 export async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
-) {
+): Promise<{ usageId: string; createdAt: string } | null> {
   if (!usageStats) {
     captureMessage('SUSPICIOUS: No usage information', {
       level: 'error',
       tags: { source: 'usage_processing' },
       extra: { usageContext },
     });
-    return;
+    return null;
   }
 
   const timer = createTimer();
@@ -987,7 +993,7 @@ export async function processTokenData(
     usageStats.cacheDiscount_mUsd = 0;
   }
 
-  await logMicrodollarUsage(usageStats, usageContext);
+  return logMicrodollarUsage(usageStats, usageContext);
 }
 
 function useAnthropicStyleTokenCounting(requestedModel: string, provider: ProviderId) {

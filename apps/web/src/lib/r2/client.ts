@@ -9,6 +9,13 @@ const R2_CLI_SESSIONS_BUCKET_NAME = getEnvVariable('R2_CLI_SESSIONS_BUCKET_NAME'
 const CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME = getEnvVariable(
   'CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME'
 );
+// Per-environment buckets:
+//   dev:   kilo-experiment-prompts-dev
+//   prod:  kilo-experiment-prompts-prod
+// Optional: when unset, the experiment prompt-storage path is a no-op and
+// `model_experiment_request` rows record the `__failed__` sentinel for the
+// affected side. Experiment attribution still lands.
+const R2_EXPERIMENT_PROMPTS_BUCKET_NAME = getEnvVariable('R2_EXPERIMENT_PROMPTS_BUCKET_NAME');
 
 if (!R2_ACCOUNT_ID) {
   throw new Error('R2_ACCOUNT_ID environment variable is required');
@@ -43,3 +50,4 @@ export const r2Client = new S3Client({
 
 export const r2CliSessionsBucketName = R2_CLI_SESSIONS_BUCKET_NAME;
 export const r2CloudAgentAttachmentsBucketName = CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME;
+export const r2ExperimentPromptsBucketName = R2_EXPERIMENT_PROMPTS_BUCKET_NAME;

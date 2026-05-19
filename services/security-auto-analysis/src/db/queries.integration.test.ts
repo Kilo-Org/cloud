@@ -72,10 +72,69 @@ describe('security analysis durable database invariants', () => {
     ).resolves.toBe(false);
 
     const queueRows = await client.db
-      .select({ queueStatus: security_analysis_queue.queue_status })
+      .select({
+        queueStatus: security_analysis_queue.queue_status,
+        claimToken: security_analysis_queue.claim_token,
+      })
       .from(security_analysis_queue)
       .where(eq(security_analysis_queue.finding_id, findingId));
-    expect(queueRows).toEqual([{ queueStatus: 'pending' }]);
+    expect(queueRows).toEqual([{ queueStatus: 'pending', claimToken: 'claim-token-one' }]);
+  });
+
+  it('revives terminal manual queue rows so users can rerun analysis after completion', async () => {
+    const findingId = await insertFinding('manual-rerun');
+    const finding = await getSecurityFindingById(client.db as never, findingId);
+    expect(finding).not.toBeNull();
+    if (!finding) return;
+
+    await expect(
+      ensureManualAnalysisQueueRow(client.db as never, {
+        finding,
+        claimToken: 'claim-token-first',
+        jobId: 'manual-job-first',
+      })
+    ).resolves.toBe(true);
+    // Simulate the prior manual run reaching a terminal state with retry
+    // metadata that must be cleared on rerun.
+    await client.db
+      .update(security_analysis_queue)
+      .set({
+        queue_status: 'failed',
+        failure_code: 'START_CALL_AMBIGUOUS',
+        last_error_redacted: 'prior failure',
+        attempt_count: 2,
+      })
+      .where(eq(security_analysis_queue.finding_id, findingId));
+
+    await expect(
+      ensureManualAnalysisQueueRow(client.db as never, {
+        finding,
+        claimToken: 'claim-token-rerun',
+        jobId: 'manual-job-rerun',
+      })
+    ).resolves.toBe(true);
+
+    const queueRows = await client.db
+      .select({
+        queueStatus: security_analysis_queue.queue_status,
+        claimToken: security_analysis_queue.claim_token,
+        claimedByJobId: security_analysis_queue.claimed_by_job_id,
+        failureCode: security_analysis_queue.failure_code,
+        lastErrorRedacted: security_analysis_queue.last_error_redacted,
+        attemptCount: security_analysis_queue.attempt_count,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, findingId));
+    expect(queueRows).toEqual([
+      {
+        queueStatus: 'pending',
+        claimToken: 'claim-token-rerun',
+        claimedByJobId: 'manual-job-rerun',
+        failureCode: null,
+        lastErrorRedacted: null,
+        attemptCount: 0,
+      },
+    ]);
   });
 
   it('requeues stale pending rows and terminalizes stale running rows in real SQL', async () => {

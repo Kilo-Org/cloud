@@ -376,6 +376,10 @@ export async function ensureManualAnalysisQueueRow(
         : params.finding.severity === 'medium'
           ? 2
           : 3;
+  // Insert a fresh manual-analysis claim, or revive a prior row that is in a
+  // terminal state (completed/failed) so users can rerun analysis after a
+  // previous attempt finished. Active rows (queued/pending/running) are left
+  // alone and the caller treats this as a duplicate.
   const rows = await db
     .insert(security_analysis_queue)
     .values({
@@ -390,7 +394,26 @@ export async function ensureManualAnalysisQueueRow(
       claim_token: params.claimToken,
       updated_at: sql`now()`.mapWith(String),
     })
-    .onConflictDoNothing()
+    .onConflictDoUpdate({
+      target: security_analysis_queue.finding_id,
+      set: {
+        queue_status: 'pending',
+        severity_rank: severityRank,
+        queued_at: sql`now()`,
+        claimed_at: sql`now()`,
+        claimed_by_job_id: params.jobId,
+        claim_token: params.claimToken,
+        attempt_count: 0,
+        next_retry_at: null,
+        failure_code: null,
+        last_error_redacted: null,
+        updated_at: sql`now()`,
+      },
+      setWhere: or(
+        eq(security_analysis_queue.queue_status, 'completed'),
+        eq(security_analysis_queue.queue_status, 'failed')
+      ),
+    })
     .returning({ id: security_analysis_queue.id });
   return rows.length > 0;
 }

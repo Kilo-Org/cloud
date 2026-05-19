@@ -110,7 +110,7 @@ describe('processManualAnalysisStart', () => {
         if (insertCount === 1) {
           return {
             values: () => ({
-              onConflictDoNothing: () => ({ returning: async () => [{ id: 'queue-row' }] }),
+              onConflictDoUpdate: () => ({ returning: async () => [{ id: 'queue-row' }] }),
             }),
           };
         }
@@ -173,12 +173,14 @@ describe('processManualAnalysisStart', () => {
 describe('ensureManualAnalysisQueueRow', () => {
   it('records claimed pending manual queue state with owner and claim correlation', async () => {
     const inserted: unknown[] = [];
+    const updateConfigs: unknown[] = [];
     const db = {
       insert: () => ({
         values: (values: unknown) => ({
-          onConflictDoNothing: () => ({
+          onConflictDoUpdate: (config: unknown) => ({
             returning: async () => {
               inserted.push(values);
+              updateConfigs.push(config);
               return [{ id: 'queue-row' }];
             },
           }),
@@ -200,13 +202,27 @@ describe('ensureManualAnalysisQueueRow', () => {
       claim_token: 'claim-token',
       claimed_by_job_id: 'manual-job',
     });
+    // Reviving terminal rows requires a setWhere clause that scopes the
+    // ON CONFLICT update to completed/failed rows. Active rows (queued/
+    // pending/running) must remain untouched and surface as duplicates.
+    expect(updateConfigs[0]).toMatchObject({
+      set: expect.objectContaining({
+        queue_status: 'pending',
+        claim_token: 'claim-token',
+        claimed_by_job_id: 'manual-job',
+        attempt_count: 0,
+        failure_code: null,
+        last_error_redacted: null,
+      }),
+      setWhere: expect.anything(),
+    });
   });
 
-  it('reports duplicate manual starts when the finding queue row already exists', async () => {
+  it('reports duplicate manual starts when an active queue row already exists', async () => {
     const db = {
       insert: () => ({
         values: () => ({
-          onConflictDoNothing: () => ({ returning: async () => [] }),
+          onConflictDoUpdate: () => ({ returning: async () => [] }),
         }),
       }),
     };

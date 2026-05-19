@@ -5,6 +5,7 @@ import { atom } from 'jotai';
 import type { Atom, WritableAtom } from 'jotai';
 import { createCloudAgentSession } from './session';
 import type { CloudAgentSession } from './session';
+import { createChatProcessor } from './chat-processor';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
 import type { CloudAgentApi, CloudAgentStreamTicketResult } from './transport';
@@ -66,6 +67,15 @@ type StandaloneSuggestion = {
   /** Tool call ID that emitted this suggestion, when available. */
   callId?: string;
 };
+type ChildSessionHydrationState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready' }
+  | { status: 'error'; message: string };
+
+const IDLE_CHILD_SESSION_HYDRATION_STATE = {
+  status: 'idle',
+} satisfies ChildSessionHydrationState;
 
 type AssociatedPrData = {
   url: string;
@@ -173,10 +183,12 @@ type SessionManagerAtoms = {
   dynamicMessages: Atom<StoredMessage[]>;
   totalCost: Atom<number>;
   childMessages: Atom<(childSessionId: string) => StoredMessage[]>;
+  childSessionHydrationState: Atom<(childSessionId: string) => ChildSessionHydrationState>;
 };
 
 type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
+  hydrateChildSession(childSessionId: KiloSessionId): Promise<void>;
   send(input: { payload: TransportSendPayload; images?: Images }): Promise<boolean>;
   interrupt(): Promise<void>;
   answerQuestion(requestId: string, answers: string[][]): Promise<void>;
@@ -313,6 +325,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * DO) and on every wrapper push. Empty list = wrapper hasn't reported yet.
    */
   const availableCommandsAtom = atom<SlashCommandInfo[]>([]);
+  const childSessionHydrationStatesAtom = atom<Map<string, ChildSessionHydrationState>>(new Map());
 
   // Derived atoms
   const messagesListAtom = atom<StoredMessage[]>(get => {
@@ -359,6 +372,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       return out;
     };
   });
+  const childSessionHydrationStateAtom = atom(get => {
+    const states = get(childSessionHydrationStatesAtom);
+    return (childSessionId: string): ChildSessionHydrationState =>
+      states.get(childSessionId) ?? IDLE_CHILD_SESSION_HYDRATION_STATE;
+  });
 
   // Private mutable state
   let activeSessionId: KiloSessionId | null = null;
@@ -366,6 +384,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   let activeSessionType: ActiveSessionType | null = null;
   let stateUnsub: (() => void) | null = null;
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
+  let childSessionHydrationGeneration = 0;
+  const childSessionHydrationRequests = new Map<string, Promise<void>>();
 
   function setIndicator(ind: SessionStatusIndicator | null): void {
     if (indicatorTimer !== null) {
@@ -404,6 +424,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(activeSuggestionAtom, null);
     store.set(failedPromptAtom, null);
     store.set(fetchedSessionDataAtom, null);
+    store.set(childSessionHydrationStatesAtom, new Map());
     store.set(chatUIAtom, { shouldAutoScroll: true });
     store.set(availableCommandsAtom, []);
   }
@@ -431,6 +452,77 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       text: data.prompt,
       synthetic: true,
     } satisfies TextPart);
+  }
+
+  function setChildSessionHydrationState(
+    childSessionId: KiloSessionId,
+    state: ChildSessionHydrationState
+  ): void {
+    const next = new Map(store.get(childSessionHydrationStatesAtom));
+    next.set(childSessionId, state);
+    store.set(childSessionHydrationStatesAtom, next);
+  }
+
+  function isCurrentChildSessionHydration(
+    generation: number,
+    rootSessionId: KiloSessionId,
+    storage: JotaiSessionStorage
+  ): boolean {
+    return (
+      generation === childSessionHydrationGeneration &&
+      activeSessionId === rootSessionId &&
+      store.get(sessionStorageAtom) === storage
+    );
+  }
+
+  async function hydrateChildSession(childSessionId: KiloSessionId): Promise<void> {
+    const existingState = store.get(childSessionHydrationStatesAtom).get(childSessionId);
+    if (existingState?.status === 'ready') return;
+
+    const inFlightRequest = childSessionHydrationRequests.get(childSessionId);
+    if (inFlightRequest) {
+      await inFlightRequest;
+      return;
+    }
+
+    const storage = store.get(sessionStorageAtom);
+    const rootSessionId = activeSessionId;
+    if (!storage || !rootSessionId) return;
+
+    const generation = childSessionHydrationGeneration;
+    setChildSessionHydrationState(childSessionId, { status: 'loading' });
+
+    const request = (async () => {
+      try {
+        const snapshot = await config.fetchSnapshot(childSessionId);
+        if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
+
+        const chatProcessor = createChatProcessor(storage);
+        for (const message of snapshot.messages) {
+          chatProcessor.process({ type: 'message.updated', info: message.info });
+          for (const part of message.parts) {
+            chatProcessor.process({ type: 'message.part.updated', part });
+          }
+        }
+
+        setChildSessionHydrationState(childSessionId, { status: 'ready' });
+      } catch (err) {
+        if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
+        setChildSessionHydrationState(childSessionId, {
+          status: 'error',
+          message: formatError(err),
+        });
+      }
+    })();
+
+    childSessionHydrationRequests.set(childSessionId, request);
+    try {
+      await request;
+    } finally {
+      if (childSessionHydrationRequests.get(childSessionId) === request) {
+        childSessionHydrationRequests.delete(childSessionId);
+      }
+    }
   }
 
   function subscribeToServiceState(
@@ -520,6 +612,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
+    childSessionHydrationGeneration += 1;
+    childSessionHydrationRequests.clear();
     activeSessionId = kiloSessionId;
     activeSessionType = null;
     stateUnsub?.();
@@ -809,6 +903,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   function destroy(): void {
+    childSessionHydrationGeneration += 1;
+    childSessionHydrationRequests.clear();
     stateUnsub?.();
     stateUnsub = null;
     currentSession?.destroy();
@@ -824,6 +920,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   return {
     switchSession,
+    hydrateChildSession,
     send,
     interrupt,
     answerQuestion,
@@ -866,6 +963,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       dynamicMessages: dynamicMessagesAtom,
       totalCost: totalCostAtom,
       childMessages: childMessagesAtom,
+      childSessionHydrationState: childSessionHydrationStateAtom,
     },
   };
 }
@@ -880,6 +978,7 @@ export type {
   StandalonePermission,
   StandaloneQuestion,
   StandaloneSuggestion,
+  ChildSessionHydrationState,
   StoredMessage,
   FetchedSessionData,
   AssociatedPrData,

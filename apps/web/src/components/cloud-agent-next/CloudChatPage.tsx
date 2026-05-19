@@ -15,6 +15,8 @@ import { ChatInput } from './ChatInput';
 import type { ModeOption } from '@/components/shared/ModeCombobox';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { MessageBubble } from './MessageBubble';
+import { ChildSessionDrawer } from './ChildSessionDrawer';
+import type { ChildSessionDrawerEntry, OpenChildSession } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
 import { WorkingIndicator } from './WorkingIndicator';
 import { QuestionToolCard } from './QuestionToolCard';
@@ -60,14 +62,20 @@ const StaticMessages = memo(
   ({
     messages,
     getChildMessages,
+    onOpenChildSession,
   }: {
     messages: StoredMessage[];
     getChildMessages?: (sessionId: string) => StoredMessage[];
+    onOpenChildSession?: OpenChildSession;
   }) => (
     <>
       {messages.map(msg => (
         <MessageErrorBoundary key={msg.info.id}>
-          <MessageBubble message={msg} getChildMessages={getChildMessages} />
+          <MessageBubble
+            message={msg}
+            getChildMessages={getChildMessages}
+            onOpenChildSession={onOpenChildSession}
+          />
         </MessageErrorBoundary>
       ))}
     </>
@@ -81,9 +89,11 @@ StaticMessages.displayName = 'StaticMessages';
 function DynamicMessages({
   messages,
   getChildMessages,
+  onOpenChildSession,
 }: {
   messages: StoredMessage[];
   getChildMessages?: (sessionId: string) => StoredMessage[];
+  onOpenChildSession?: OpenChildSession;
 }) {
   return (
     <>
@@ -95,6 +105,7 @@ function DynamicMessages({
               message={msg}
               isStreaming={streaming}
               getChildMessages={getChildMessages}
+              onOpenChildSession={onOpenChildSession}
             />
           </MessageErrorBoundary>
         );
@@ -155,10 +166,17 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const { mutateAsync: orgUploadUrl } = useMutation(
     trpc.organizations.cloudAgentNext.getImageUploadUrl.mutationOptions()
   );
+  const [childSessionStack, setChildSessionStack] = useState<ChildSessionDrawerEntry[]>([]);
+  const [childSessionDrawerContainer, setChildSessionDrawerContainer] =
+    useState<HTMLDivElement | null>(null);
+  const childSessionDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
+
   // URL-driven session switching
   const sessionIdFromParams = searchParams?.get('sessionId');
   useEffect(() => {
     if (sessionIdFromParams) {
+      childSessionDrawerFocusTargetRef.current = null;
+      setChildSessionStack([]);
       void manager.switchSession(sessionIdFromParams as KiloSessionId);
     }
   }, [sessionIdFromParams, manager]);
@@ -460,6 +478,33 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     [manager]
   );
 
+  const handleOpenTopLevelChildSession = useCallback((entry: ChildSessionDrawerEntry) => {
+    const activeElement = document.activeElement;
+    childSessionDrawerFocusTargetRef.current =
+      activeElement instanceof HTMLElement ? activeElement : null;
+    setChildSessionStack([entry]);
+  }, []);
+
+  const handleOpenNestedChildSession = useCallback((entry: ChildSessionDrawerEntry) => {
+    setChildSessionStack(currentStack => [...currentStack, entry]);
+  }, []);
+
+  const handleChildSessionDrawerBack = useCallback(() => {
+    setChildSessionStack(currentStack => currentStack.slice(0, -1));
+  }, []);
+
+  const handleChildSessionDrawerOpenChange = useCallback((open: boolean) => {
+    if (!open) setChildSessionStack([]);
+  }, []);
+
+  const handleChildSessionDrawerCloseAutoFocus = useCallback((event: Event) => {
+    const focusTarget = childSessionDrawerFocusTargetRef.current;
+    childSessionDrawerFocusTargetRef.current = null;
+    if (!focusTarget?.isConnected) return;
+    event.preventDefault();
+    focusTarget.focus();
+  }, []);
+
   // Expose the session's custom agents to the chat picker. Slug + name only;
   // the full config stays server-side. `GetSessionOutput.runtimeAgents`
   // already filters to enabled & non-hidden at send time, so we just pass
@@ -622,142 +667,162 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                   <div className="shrink-0">{sessionActions}</div>
                 </div>
 
-                <div className="relative min-h-0 flex-1">
-                  {workspaceTabs.activeTabId === CHAT_TAB_ID && (
-                    <>
-                      <div
-                        ref={scrollContainerRef}
-                        className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
-                        onScroll={handleScroll}
-                      >
-                        <div ref={messagesContentRef}>
-                          <StaticMessages
-                            messages={staticMessages}
-                            getChildMessages={getChildMessages}
-                          />
-                          <DynamicMessages
-                            messages={dynamicMessages}
-                            getChildMessages={getChildMessages}
-                          />
-
-                          <WorkingIndicator messages={dynamicMessages} isStreaming={isStreaming} />
-                          {statusIndicator && (
-                            <SessionStatusIndicator indicator={statusIndicator} />
-                          )}
-
-                          <div ref={messagesEndRef} />
-                        </div>
-                      </div>
-
-                      {showScrollButton && (
-                        <button
-                          type="button"
-                          onClick={scrollToBottom}
-                          className="border-border bg-background absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border p-2 shadow-md"
-                        >
-                          <ArrowDown className="h-4 w-4" />
-                        </button>
-                      )}
-                    </>
-                  )}
-
+                <div
+                  ref={setChildSessionDrawerContainer}
+                  className="relative flex min-h-0 flex-1 flex-col"
+                >
                   <div
-                    className={
-                      workspaceTabs.activeTabId === CHAT_TAB_ID
-                        ? 'hidden'
-                        : 'h-full min-h-0 px-[max(1rem,calc(50%_-_27rem))] py-2'
-                    }
+                    inert={childSessionStack.length > 0}
+                    className="flex min-h-0 flex-1 flex-col"
                   >
-                    {terminalPaneMap}
-                  </div>
-                </div>
+                    <div className="relative min-h-0 flex-1">
+                      {workspaceTabs.activeTabId === CHAT_TAB_ID && (
+                        <>
+                          <div
+                            ref={scrollContainerRef}
+                            className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+                            onScroll={handleScroll}
+                          >
+                            <div ref={messagesContentRef}>
+                              <StaticMessages
+                                messages={staticMessages}
+                                getChildMessages={getChildMessages}
+                                onOpenChildSession={handleOpenTopLevelChildSession}
+                              />
+                              <DynamicMessages
+                                messages={dynamicMessages}
+                                getChildMessages={getChildMessages}
+                                onOpenChildSession={handleOpenTopLevelChildSession}
+                              />
 
-                {workspaceTabs.activeTabId === CHAT_TAB_ID && (
-                  <>
-                    {isReadOnly ? (
-                      !isLoading && sessionIdFromParams && fetchedSessionData ? (
-                        <SessionContinuationPanel sessionId={sessionIdFromParams} />
-                      ) : null
-                    ) : (
+                              <WorkingIndicator
+                                messages={dynamicMessages}
+                                isStreaming={isStreaming}
+                              />
+                              {statusIndicator && (
+                                <SessionStatusIndicator indicator={statusIndicator} />
+                              )}
+
+                              <div ref={messagesEndRef} />
+                            </div>
+                          </div>
+
+                          {showScrollButton && (
+                            <button
+                              type="button"
+                              onClick={scrollToBottom}
+                              className="border-border bg-background absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border p-2 shadow-md"
+                            >
+                              <ArrowDown className="h-4 w-4" />
+                            </button>
+                          )}
+                        </>
+                      )}
+
+                      <div
+                        className={
+                          workspaceTabs.activeTabId === CHAT_TAB_ID
+                            ? 'hidden'
+                            : 'h-full min-h-0 px-[max(1rem,calc(50%_-_27rem))] py-2'
+                        }
+                      >
+                        {terminalPaneMap}
+                      </div>
+                    </div>
+
+                    {workspaceTabs.activeTabId === CHAT_TAB_ID && (
                       <>
-                        {activeQuestion && (
-                          <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
-                            <QuestionToolCard
-                              key={activeQuestion.requestId}
-                              questions={activeQuestion.questions}
-                              requestId={activeQuestion.requestId}
-                              status="running"
-                            />
-                          </div>
-                        )}
-                        {activePermission && (
-                          <div className="flex items-center border-t p-4">
-                            <PermissionCard
-                              key={activePermission.requestId}
-                              requestId={activePermission.requestId}
-                              permission={activePermission.permission}
-                              patterns={activePermission.patterns}
-                              metadata={activePermission.metadata}
-                              always={activePermission.always}
-                            />
-                          </div>
-                        )}
-                        <div className={activeQuestion || activePermission ? 'hidden' : ''}>
-                          <ChatInput
-                            onSend={handleSendMessage}
-                            onSendCommand={handleSendSlashCommand}
-                            onStop={handleStopExecution}
-                            disabled={(isStreaming && !activeSuggestion) || !canSend}
-                            isStreaming={isStreaming && !activeSuggestion}
-                            placeholder={placeholder}
-                            slashCommands={availableCommands}
-                            mode={sessionConfig?.mode as AgentMode | undefined}
-                            model={displayModel}
-                            modelOptions={modelOptions}
-                            isLoadingModels={isLoadingModels}
-                            onModeChange={handleModeChange}
-                            onModelChange={handleModelChange}
-                            variant={displayVariant}
-                            onVariantChange={handleVariantChange}
-                            availableVariants={displayAvailableVariants}
-                            showToolbar={Boolean(sessionIdFromParams)}
-                            initialValue={failedPrompt ?? undefined}
-                            customModeOptions={customModeOptions}
-                            modelPickerDisabled={modelPickerLocked}
-                            modelPickerTooltip={lockTooltip}
-                            variantPickerDisabled={modelPickerLocked}
-                            variantPickerTooltip={lockTooltip}
-                            imageUploadOptions={{
-                              messageUuid: imageMessageUuid,
-                              organizationId,
-                              maxImages: CLOUD_AGENT_IMAGE_MAX_COUNT,
-                              maxOriginalFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
-                              maxFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
-                              allowedTypes: CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
-                              resizeImages: { maxDimensionPx: CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX },
-                              getUploadUrl: {
-                                personal: personalUploadUrl,
-                                organization: orgUploadUrl,
-                              },
-                            }}
-                          />
-                          {sessionConfig?.repository && (
-                            <div className="text-muted-foreground flex items-center gap-1.5 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">
-                              <GitBranch className="h-3 w-3 shrink-0" />
-                              <span className="truncate">{sessionConfig.repository}</span>
-                              {fetchedSessionData?.gitBranch && (
-                                <>
-                                  <span>·</span>
-                                  <span className="truncate">{fetchedSessionData.gitBranch}</span>
-                                </>
+                        {isReadOnly ? (
+                          !isLoading && sessionIdFromParams && fetchedSessionData ? (
+                            <SessionContinuationPanel sessionId={sessionIdFromParams} />
+                          ) : null
+                        ) : (
+                          <>
+                            {activeQuestion && (
+                              <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
+                                <QuestionToolCard
+                                  key={activeQuestion.requestId}
+                                  questions={activeQuestion.questions}
+                                  requestId={activeQuestion.requestId}
+                                  status="running"
+                                />
+                              </div>
+                            )}
+                            {activePermission && (
+                              <div className="flex items-center border-t p-4">
+                                <PermissionCard
+                                  key={activePermission.requestId}
+                                  requestId={activePermission.requestId}
+                                  permission={activePermission.permission}
+                                  patterns={activePermission.patterns}
+                                  metadata={activePermission.metadata}
+                                  always={activePermission.always}
+                                />
+                              </div>
+                            )}
+                            <div className={activeQuestion || activePermission ? 'hidden' : ''}>
+                              <ChatInput
+                                onSend={handleSendMessage}
+                                onSendCommand={handleSendSlashCommand}
+                                onStop={handleStopExecution}
+                                disabled={(isStreaming && !activeSuggestion) || !canSend}
+                                isStreaming={isStreaming && !activeSuggestion}
+                                placeholder={placeholder}
+                                slashCommands={availableCommands}
+                                mode={sessionConfig?.mode as AgentMode | undefined}
+                                model={displayModel}
+                                modelOptions={modelOptions}
+                                isLoadingModels={isLoadingModels}
+                                onModeChange={handleModeChange}
+                                onModelChange={handleModelChange}
+                                variant={displayVariant}
+                                onVariantChange={handleVariantChange}
+                                availableVariants={displayAvailableVariants}
+                                showToolbar={Boolean(sessionIdFromParams)}
+                                initialValue={failedPrompt ?? undefined}
+                                customModeOptions={customModeOptions}
+                                modelPickerDisabled={modelPickerLocked}
+                                modelPickerTooltip={lockTooltip}
+                                variantPickerDisabled={modelPickerLocked}
+                                variantPickerTooltip={lockTooltip}
+                                imageUploadOptions={{
+                                  messageUuid: imageMessageUuid,
+                                  organizationId,
+                                  maxImages: CLOUD_AGENT_IMAGE_MAX_COUNT,
+                                  maxOriginalFileSizeBytes:
+                                    CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
+                                  maxFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
+                                  allowedTypes: CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
+                                  resizeImages: {
+                                    maxDimensionPx: CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX,
+                                  },
+                                  getUploadUrl: {
+                                    personal: personalUploadUrl,
+                                    organization: orgUploadUrl,
+                                  },
+                                }}
+                              />
+                              {sessionConfig?.repository && (
+                                <div className="text-muted-foreground flex items-center gap-1.5 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">
+                                  <GitBranch className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{sessionConfig.repository}</span>
+                                  {fetchedSessionData?.gitBranch && (
+                                    <>
+                                      <span>·</span>
+                                      <span className="truncate">
+                                        {fetchedSessionData.gitBranch}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
                               )}
                             </div>
-                          )}
-                        </div>
+                          </>
+                        )}
                       </>
                     )}
-                  </>
-                )}
+                  </div>
+                </div>
               </>
             ) : (
               <div className="text-muted-foreground relative flex h-full flex-col items-center justify-center gap-2">
@@ -766,6 +831,14 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                 <p className="text-xs">Select a session from the sidebar or create a new one</p>
               </div>
             )}
+            <ChildSessionDrawer
+              stack={childSessionStack}
+              onBack={handleChildSessionDrawerBack}
+              onOpenChange={handleChildSessionDrawerOpenChange}
+              onOpenChildSession={handleOpenNestedChildSession}
+              onCloseAutoFocus={handleChildSessionDrawerCloseAutoFocus}
+              portalContainer={childSessionDrawerContainer}
+            />
           </div>
         </SuggestionContextProvider>
       </PermissionContextProvider>

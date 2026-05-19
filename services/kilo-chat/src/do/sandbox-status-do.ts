@@ -14,22 +14,24 @@ import {
 import { botStatus, conversationStatus } from '../db/sandbox-status-schema';
 import migrations from '../../drizzle/sandbox-status/migrations';
 
-const storedCapabilitiesSchema = z.array(capabilitySchema);
+const storedCapabilitiesSchema = z.array(capabilitySchema).nonempty();
 
 // Defensive parser: the column stores a JSON-encoded Capability[] (or NULL).
 // Malformed JSON, unknown capability strings, or non-array shapes return
 // undefined so a corrupt row never breaks bot status reads.
-function parseCapabilities(raw: string | null): Capability[] | undefined {
+export const storedCapabilitiesColumnSchema = z.preprocess(raw => {
   if (raw === null || raw === '') return undefined;
-  let json: unknown;
+  if (typeof raw !== 'string') return raw;
   try {
-    json = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
+    return parsed;
   } catch {
     return undefined;
   }
-  const result = storedCapabilitiesSchema.safeParse(json);
-  if (!result.success || result.data.length === 0) return undefined;
-  return result.data;
+}, storedCapabilitiesSchema.optional().catch(undefined));
+
+function parseCapabilities(raw: string | null): Capability[] | undefined {
+  return storedCapabilitiesColumnSchema.parse(raw);
 }
 
 // Internal RPC input shapes derived from the shared zod schemas. The

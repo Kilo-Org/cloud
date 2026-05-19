@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  type BotStatusEvent,
   type BotStatusRecord,
   type KiloChatClient,
   type KiloChatEventOf,
@@ -10,6 +11,19 @@ import { botStatusKey, botStatusRequestKey } from './query-keys';
 
 const POLL_INTERVAL_MS = 15_000;
 const STATUS_STALE_MS = 10_000;
+
+export function reduceBotStatusOnEvent(
+  prev: BotStatusRecord | null | undefined,
+  event: BotStatusEvent
+): BotStatusRecord {
+  if (prev && prev.at >= event.at) return prev;
+  return {
+    online: event.online,
+    at: event.at,
+    updatedAt: event.at,
+    capabilities: event.capabilities ?? prev?.capabilities,
+  };
+}
 
 export function useBotStatus(
   client: KiloChatClient,
@@ -26,9 +40,7 @@ export function useBotStatus(
         return;
       }
       queryClient.setQueryData<BotStatusRecord | null>(botStatusKey(sandboxId), prev =>
-        prev && prev.at >= event.at
-          ? prev
-          : { online: event.online, at: event.at, updatedAt: event.at }
+        reduceBotStatusOnEvent(prev, event)
       );
     });
   }, [client, queryClient, sandboxId]);

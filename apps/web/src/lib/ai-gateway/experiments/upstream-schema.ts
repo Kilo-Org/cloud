@@ -10,8 +10,8 @@ import {
  *
  * - **Does not include `api_key`.** The encrypted key lives in the sibling
  *   `model_experiment_variant_version.encrypted_api_key` JSONB column so the
- *   never-read invariant is enforceable at the column level. See
- *   `.plans/experimental-models-1.md` §"API Keys".
+ *   never-read invariant is enforceable at the column level — admin tRPC
+ *   responses simply omit the column from their selects.
  * - **Does not include `extra_headers`.** Partner checkpoint routing should
  *   use `api_key` + `base_url` + `internal_id` + adapter settings. If a
  *   non-secret header is required later, add an explicit allowlisted field

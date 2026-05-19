@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { File as FileIcon, Download, AlertCircle } from 'lucide-react';
 import type { AttachmentBlock } from '@kilocode/kilo-chat';
 import { useAttachmentUrl } from '@kilocode/kilo-chat-hooks';
@@ -73,6 +73,10 @@ export function MessageAttachment({
 
 function ImageAttachment({ url, filename, size }: { url: string; filename: string; size: number }) {
   const [errored, setErrored] = useState(false);
+  // Signed URLs are refreshed periodically by useAttachmentUrl; reset the
+  // error state on each new URL so a transient failure doesn't pin the
+  // FileChip fallback forever.
+  useEffect(() => setErrored(false), [url]);
   if (errored) {
     return <FileChip url={url} filename={filename} size={size} loading={false} error={false} />;
   }

@@ -118,12 +118,16 @@ describe('POST /v1/attachments/init (user)', () => {
       attachmentId: string;
       putUrl: string;
       putHeaders: Record<string, string>;
+      putUrlExpiresAt: number;
     }>();
     expect(body.attachmentId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
     expect(body.putUrl).toContain('.r2.cloudflarestorage.com/');
     expect(body.putUrl).toContain('X-Amz-Expires=900');
     expect(body.putHeaders['Content-Type']).toBe('image/png');
     expect(body.putHeaders['Content-Length']).toBe('1024');
+    const nowSec = Math.floor(Date.now() / 1000);
+    expect(body.putUrlExpiresAt).toBeGreaterThan(nowSec + 800);
+    expect(body.putUrlExpiresAt).toBeLessThanOrEqual(nowSec + 900);
   });
 
   it('rejects size > 100 MB with 400', async () => {
@@ -198,11 +202,13 @@ describe('POST /bot/v1/sandboxes/:sandboxId/attachments/init (bot)', () => {
       attachmentId: string;
       putUrl: string;
       putHeaders: Record<string, string>;
+      putUrlExpiresAt: number;
     }>();
     expect(body.attachmentId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
     expect(body.putUrl).toContain('.r2.cloudflarestorage.com/');
     expect(body.putHeaders['Content-Type']).toBe('image/png');
     expect(body.putHeaders['Content-Length']).toBe('256');
+    expect(typeof body.putUrlExpiresAt).toBe('number');
   });
 
   it('rejects bot from sandbox-B accessing a conversation owned by sandbox-A with 403', async () => {

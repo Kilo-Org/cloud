@@ -165,7 +165,7 @@ export function useAttachmentQueue(
     abort: AbortController;
     putUrl?: string;
     putHeaders?: Record<string, string>;
-    putUrlMintedAt?: number;
+    putUrlExpiresAtMs?: number;
   };
   const pendingRef = useRef<Map<string, Pending>>(new Map());
 
@@ -180,8 +180,9 @@ export function useAttachmentQueue(
       try {
         let putUrl = pending.putUrl;
         let putHeaders = pending.putHeaders;
-        const mintedAt = pending.putUrlMintedAt ?? 0;
-        const putUrlExpired = Date.now() - mintedAt > 14 * 60 * 1000;
+        const expiresAtMs = pending.putUrlExpiresAtMs ?? 0;
+        // Treat the URL as expired a minute early to avoid racing R2 at the boundary.
+        const putUrlExpired = Date.now() > expiresAtMs - 60 * 1000;
 
         if (!putUrl || !putHeaders || putUrlExpired) {
           const res = await client.initAttachment({
@@ -194,7 +195,7 @@ export function useAttachmentQueue(
           if (pending.abort.signal.aborted) return;
           pending.putUrl = res.putUrl;
           pending.putHeaders = res.putHeaders;
-          pending.putUrlMintedAt = Date.now();
+          pending.putUrlExpiresAtMs = res.putUrlExpiresAt * 1000;
           putUrl = res.putUrl;
           putHeaders = res.putHeaders;
           dispatch({ type: 'setInited', tempId, attachmentId: res.attachmentId });
@@ -260,7 +261,7 @@ export function useAttachmentQueue(
         abort: new AbortController(),
         putUrl: existing.putUrl,
         putHeaders: existing.putHeaders,
-        putUrlMintedAt: existing.putUrlMintedAt,
+        putUrlExpiresAtMs: existing.putUrlExpiresAtMs,
       };
       pendingRef.current.set(tempId, fresh);
       dispatch({ type: 'retry', tempId });

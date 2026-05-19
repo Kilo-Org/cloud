@@ -639,6 +639,7 @@ export async function handleAttachmentInit(c: HonoCtx) {
     attachmentId: init.attachmentId,
     putUrl: url,
     putHeaders: headers,
+    putUrlExpiresAt: Math.floor(Date.now() / 1000) + PUT_URL_TTL_SECONDS,
   });
 }
 

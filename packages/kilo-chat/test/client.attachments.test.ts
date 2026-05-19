@@ -66,6 +66,7 @@ describe('KiloChatClient.initAttachment', () => {
           attachmentId: '01HV0000000000000000000001',
           putUrl: 'https://r2.test/put',
           putHeaders: { 'Content-Type': 'image/png', 'Content-Length': '42' },
+          putUrlExpiresAt: 1_700_000_900,
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
@@ -82,6 +83,7 @@ describe('KiloChatClient.initAttachment', () => {
       attachmentId: '01HV0000000000000000000001',
       putUrl: 'https://r2.test/put',
       putHeaders: { 'Content-Type': 'image/png', 'Content-Length': '42' },
+      putUrlExpiresAt: 1_700_000_900,
     });
     expect(fetchFn).toHaveBeenCalledTimes(1);
   });

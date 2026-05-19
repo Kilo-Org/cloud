@@ -36,6 +36,7 @@ describe('kilo-chat outbound.sendMedia', () => {
             attachmentId: ATTACHMENT_ULID,
             putUrl: PUT_URL,
             putHeaders: { 'content-type': 'image/png', 'content-length': '3' },
+            putUrlExpiresAt: 1_700_000_900,
           }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         );
@@ -142,6 +143,7 @@ describe('kilo-chat outbound.sendMedia', () => {
             attachmentId: ATTACHMENT_ULID,
             putUrl: PUT_URL,
             putHeaders: {},
+            putUrlExpiresAt: 1_700_000_900,
           }),
           { status: 200 }
         );
@@ -213,6 +215,7 @@ describe('kilo-chat outbound.sendMedia', () => {
             attachmentId: ATTACHMENT_ULID,
             putUrl: PUT_URL,
             putHeaders: {},
+            putUrlExpiresAt: 1_700_000_900,
           }),
           { status: 200 }
         );
@@ -259,6 +262,7 @@ describe('kilo-chat outbound.sendMedia', () => {
             attachmentId: ATTACHMENT_ULID,
             putUrl: PUT_URL,
             putHeaders: {},
+            putUrlExpiresAt: 1_700_000_900,
           }),
           { status: 200 }
         );

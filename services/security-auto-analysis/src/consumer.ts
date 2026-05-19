@@ -10,6 +10,7 @@ import {
   updateQueueFromPending,
   type ClaimedQueueRow,
 } from './db/queries.js';
+import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { logger } from './logger.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
 import {
@@ -494,42 +495,18 @@ async function processOwnerMessage(params: {
         nextAuthSecret,
         internalApiSecret,
         callbackTokenSecret,
+        lifecycleClaim: {
+          source: 'scheduled',
+          findingId: row.finding_id,
+          queueRowId: row.id,
+          claimToken: row.claim_token,
+        },
       });
 
       if (startResult.started) {
         if (startResult.triageOnly) {
-          await markQueuePendingState({
-            db,
-            rowId: row.id,
-            claimToken: row.claim_token,
-            status: 'completed',
-            incrementAttempt: true,
-            logContext: {
-              jobId,
-              owner: launchOwner,
-              findingId: row.finding_id,
-              attemptCount: row.attempt_count + 1,
-              actorUserId: actorResolution.user.id,
-              actorResolutionMode: actorResolution.mode,
-            },
-          });
           counters.completed += 1;
         } else {
-          await markQueuePendingState({
-            db,
-            rowId: row.id,
-            claimToken: row.claim_token,
-            status: 'running',
-            incrementAttempt: true,
-            logContext: {
-              jobId,
-              owner: launchOwner,
-              findingId: row.finding_id,
-              attemptCount: row.attempt_count + 1,
-              actorUserId: actorResolution.user.id,
-              actorResolutionMode: actorResolution.mode,
-            },
-          });
           counters.launched += 1;
         }
         continue;
@@ -559,8 +536,31 @@ async function processOwnerMessage(params: {
       const nextAttemptCount = row.attempt_count + 1;
       const isRetryable = classification.class === 'retryable';
       const terminal = !isRetryable || nextAttemptCount >= AUTO_ANALYSIS_MAX_ATTEMPTS;
+      const retryAt = terminal ? null : nextRetryAt(nextAttemptCount);
 
-      if (terminal) {
+      if (startResult.failureNeedsLifecycleTransition) {
+        await transitionAnalysisStartLifecycle(db, {
+          claim: {
+            source: 'scheduled',
+            findingId: row.finding_id,
+            queueRowId: row.id,
+            claimToken: row.claim_token,
+          },
+          outcome: {
+            type: 'start-failed',
+            errorMessage: startResult.error ?? 'Security analysis start failed',
+            queueStatus: terminal ? 'failed' : 'queued',
+            failureCode: classification.code,
+            incrementAttempt: true,
+            nextRetryAt: retryAt?.toISOString() ?? null,
+          },
+        });
+        if (terminal) {
+          counters.failed += 1;
+        } else {
+          counters.requeued += 1;
+        }
+      } else if (terminal) {
         await markQueuePendingState({
           db,
           rowId: row.id,
@@ -588,7 +588,7 @@ async function processOwnerMessage(params: {
           failureCode: classification.code,
           errorMessage: startResult.error,
           incrementAttempt: true,
-          nextRetryAt: nextRetryAt(nextAttemptCount),
+          nextRetryAt: retryAt,
           logContext: {
             jobId,
             owner: launchOwner,
@@ -607,19 +607,20 @@ async function processOwnerMessage(params: {
       if (classification.class === 'credit_gated') {
         await markOwnerCreditFailure(db, catchOwner);
 
-        await markQueuePendingState({
-          db,
-          rowId: row.id,
-          claimToken: row.claim_token,
-          status: 'queued',
-          failureCode: classification.code,
-          errorMessage: error instanceof Error ? error.message : String(error),
-          nextRetryAt: new Date(Date.now() + 30 * 60 * 1000),
-          logContext: {
-            jobId,
-            owner: catchOwner,
+        await transitionAnalysisStartLifecycle(db, {
+          claim: {
+            source: 'scheduled',
             findingId: row.finding_id,
-            attemptCount: row.attempt_count,
+            queueRowId: row.id,
+            claimToken: row.claim_token,
+          },
+          outcome: {
+            type: 'start-failed',
+            errorMessage: error instanceof Error ? error.message : String(error),
+            queueStatus: 'queued',
+            failureCode: classification.code,
+            incrementAttempt: false,
+            nextRetryAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
           },
         });
 

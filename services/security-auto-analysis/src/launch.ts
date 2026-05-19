@@ -5,13 +5,14 @@ import { deriveCallbackToken } from '@kilocode/worker-utils';
 import {
   clearAnalysisStatus,
   getSecurityFindingById,
-  setFindingCompleted,
-  setFindingFailed,
   setFindingPending,
-  setFindingRunning,
   tryAcquireAnalysisStartLease,
   type SecurityFindingRecord,
 } from './db/queries.js';
+import {
+  transitionAnalysisStartLifecycle,
+  type AnalysisStartLifecycleClaim,
+} from './analysis-start-lifecycle.js';
 import { logger } from './logger.js';
 import { generateApiToken } from './token.js';
 import { triageSecurityFinding } from './triage.js';
@@ -113,6 +114,7 @@ type StartSecurityAnalysisParams = {
   internalApiSecret: string;
   callbackTokenSecret: string;
   retrySandboxOnly?: boolean;
+  lifecycleClaim: AnalysisStartLifecycleClaim;
 };
 
 export function buildSecurityAnalysisCallbackTarget(
@@ -149,9 +151,16 @@ export function buildSecurityAnalysisCallbackTarget(
   };
 }
 
+export type StartSecurityAnalysisResult = {
+  started: boolean;
+  error?: string;
+  triageOnly?: boolean;
+  failureNeedsLifecycleTransition?: boolean;
+};
+
 export async function startSecurityAnalysis(
   params: StartSecurityAnalysisParams
-): Promise<{ started: boolean; error?: string; triageOnly?: boolean }> {
+): Promise<StartSecurityAnalysisResult> {
   const correlationId = randomUUID();
 
   const finding = await getSecurityFindingById(params.db, params.findingId);
@@ -207,10 +216,11 @@ export async function startSecurityAnalysis(
         triggeredByUserId: params.actorUser.id,
         correlationId,
       };
-      const written = await setFindingCompleted(params.db, params.findingId, triageOnlyAnalysis);
-      if (!written) {
-        // Finding was superseded between lease acquisition and completion.
-        // Clear stale analysis_status so it doesn't count against the concurrency cap.
+      const transition = await transitionAnalysisStartLifecycle(params.db, {
+        claim: params.lifecycleClaim,
+        outcome: { type: 'triage-only-completed', analysis: triageOnlyAnalysis },
+      });
+      if (!transition.transitioned) {
         await clearAnalysisStatus(params.db, params.findingId);
         return { started: false, error: 'Finding was superseded during analysis' };
       }
@@ -265,28 +275,31 @@ export async function startSecurityAnalysis(
 
     if (!prepareResponse.ok) {
       const errorText = await prepareResponse.text();
-      if (!(await setFindingFailed(params.db, params.findingId, errorText))) {
-        await clearAnalysisStatus(params.db, params.findingId);
-      }
-      return { started: false, error: errorText };
+      return {
+        started: false,
+        error: errorText,
+        failureNeedsLifecycleTransition: true,
+      };
     }
 
     const parsedPrepare = PrepareSessionResponseSchema.safeParse(await prepareResponse.json());
     if (!parsedPrepare.success) {
-      if (
-        !(await setFindingFailed(
-          params.db,
-          params.findingId,
-          'Invalid prepareSession response shape'
-        ))
-      ) {
-        await clearAnalysisStatus(params.db, params.findingId);
-      }
-      return { started: false, error: 'Invalid prepareSession response shape' };
+      return {
+        started: false,
+        error: 'Invalid prepareSession response shape',
+        failureNeedsLifecycleTransition: true,
+      };
     }
 
     const { cloudAgentSessionId, kiloSessionId } = parsedPrepare.data.result.data;
-    await setFindingRunning(params.db, params.findingId, cloudAgentSessionId, kiloSessionId);
+    const runningTransition = await transitionAnalysisStartLifecycle(params.db, {
+      claim: params.lifecycleClaim,
+      outcome: { type: 'sandbox-running', cloudAgentSessionId, kiloSessionId },
+    });
+    if (!runningTransition.transitioned) {
+      await clearAnalysisStatus(params.db, params.findingId);
+      return { started: false, error: 'Finding was superseded during analysis' };
+    }
 
     const initiateResponse = await params.env.CLOUD_AGENT_NEXT.fetch(
       new Request('https://cloud-agent-next/trpc/initiateFromKilocodeSessionV2', {
@@ -301,9 +314,6 @@ export async function startSecurityAnalysis(
 
     if (!initiateResponse.ok) {
       const errorText = await initiateResponse.text();
-      if (!(await setFindingFailed(params.db, params.findingId, errorText))) {
-        await clearAnalysisStatus(params.db, params.findingId);
-      }
 
       if (initiateResponse.status === 402) {
         throw new InsufficientCreditsError(errorText || 'Insufficient credits');
@@ -312,30 +322,22 @@ export async function startSecurityAnalysis(
       return {
         started: false,
         error: errorText,
+        failureNeedsLifecycleTransition: true,
       };
     }
 
     const parsedInitiate = InitiateResponseSchema.safeParse(await initiateResponse.json());
     if (!parsedInitiate.success) {
-      if (
-        !(await setFindingFailed(
-          params.db,
-          params.findingId,
-          'Invalid initiateFromKilocodeSessionV2 response shape'
-        ))
-      ) {
-        await clearAnalysisStatus(params.db, params.findingId);
-      }
       return {
         started: false,
         error: 'Invalid initiateFromKilocodeSessionV2 response shape',
+        failureNeedsLifecycleTransition: true,
       };
     }
 
     return { started: true, triageOnly: false };
   } catch (error) {
     if (error instanceof InsufficientCreditsError) {
-      // setFindingFailed already called at the throw site (line 231)
       throw error;
     }
 
@@ -346,9 +348,10 @@ export async function startSecurityAnalysis(
       error: errorMessage,
     });
 
-    if (!(await setFindingFailed(params.db, params.findingId, errorMessage))) {
-      await clearAnalysisStatus(params.db, params.findingId);
-    }
-    return { started: false, error: errorMessage };
+    return {
+      started: false,
+      error: errorMessage,
+      failureNeedsLifecycleTransition: true,
+    };
   }
 }

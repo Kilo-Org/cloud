@@ -9,6 +9,7 @@ import {
   setFindingRunning,
   tryAcquireAnalysisStartLease,
 } from './db/queries.js';
+import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { buildSecurityAnalysisCallbackTarget, startSecurityAnalysis } from './launch.js';
 import { generateApiToken } from './token.js';
 import { triageSecurityFinding } from './triage.js';
@@ -22,6 +23,7 @@ vi.mock('./db/queries.js', () => ({
   setFindingRunning: vi.fn(),
   tryAcquireAnalysisStartLease: vi.fn(),
 }));
+vi.mock('./analysis-start-lifecycle.js', () => ({ transitionAnalysisStartLifecycle: vi.fn() }));
 vi.mock('./token.js', () => ({ generateApiToken: vi.fn() }));
 vi.mock('./triage.js', () => ({ triageSecurityFinding: vi.fn() }));
 
@@ -86,6 +88,11 @@ function createParams(retrySandboxOnly: boolean, cloudAgentFetch: typeof fetch) 
     internalApiSecret: 'internal-api-secret',
     callbackTokenSecret: CALLBACK_SECRET,
     retrySandboxOnly,
+    lifecycleClaim: {
+      source: 'manual' as const,
+      findingId: finding.id,
+      claimToken: 'manual-claim-token',
+    },
   };
 }
 
@@ -149,6 +156,7 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     vi.mocked(setFindingPending).mockResolvedValue(true);
     vi.mocked(setFindingRunning).mockResolvedValue(true);
     vi.mocked(clearAnalysisStatus).mockResolvedValue(undefined);
+    vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValue({ transitioned: true });
   });
 
   it('stores scoped callback token instead of raw internal API secret', async () => {
@@ -226,7 +234,18 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       finding.id,
       expect.objectContaining({ triage: existingTriage })
     );
-    expect(setFindingRunning).toHaveBeenCalledWith({}, finding.id, 'agent-session', 'ses-123');
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        claim: expect.objectContaining({ source: 'manual', claimToken: 'manual-claim-token' }),
+        outcome: {
+          type: 'sandbox-running',
+          cloudAgentSessionId: 'agent-session',
+          kiloSessionId: 'ses-123',
+        },
+      })
+    );
+    expect(setFindingRunning).not.toHaveBeenCalled();
   });
 
   it('falls back to full triage when sandbox-only retry has no prior triage', async () => {
@@ -244,8 +263,65 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
 
     expect(triageSecurityFinding).toHaveBeenCalledTimes(1);
     expect(setFindingPending).toHaveBeenCalledWith({}, finding.id, null);
-    expect(setFindingCompleted).toHaveBeenCalledTimes(1);
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        claim: expect.objectContaining({ source: 'manual', claimToken: 'manual-claim-token' }),
+        outcome: expect.objectContaining({ type: 'triage-only-completed' }),
+      })
+    );
+    expect(setFindingCompleted).not.toHaveBeenCalled();
     expect(setFindingFailed).not.toHaveBeenCalled();
     expect(clearAnalysisStatus).not.toHaveBeenCalled();
+  });
+
+  it('returns failed starts for lifecycle settlement instead of updating findings alone', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue({ ...finding, analysis: null } as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
+    const cloudAgentFetch = vi.fn().mockResolvedValue(
+      new Response('upstream unavailable', {
+        status: 503,
+      })
+    );
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).resolves.toEqual({
+      started: false,
+      error: 'upstream unavailable',
+      failureNeedsLifecycleTransition: true,
+    });
+
+    expect(setFindingFailed).not.toHaveBeenCalled();
+  });
+
+  it('returns initiate failures for lifecycle settlement after the running transition', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue({ ...finding, analysis: null } as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
+    const cloudAgentFetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            result: { data: { cloudAgentSessionId: 'agent-session', kiloSessionId: 'ses-123' } },
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(new Response('initiate unavailable', { status: 503 }));
+
+    await expect(
+      startSecurityAnalysis(createParams(false, cloudAgentFetch as never))
+    ).resolves.toEqual({
+      started: false,
+      error: 'initiate unavailable',
+      failureNeedsLifecycleTransition: true,
+    });
+
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ outcome: expect.objectContaining({ type: 'sandbox-running' }) })
+    );
+    expect(setFindingFailed).not.toHaveBeenCalled();
   });
 });

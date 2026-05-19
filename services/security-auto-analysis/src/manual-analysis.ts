@@ -12,7 +12,8 @@ import {
   transitionManualAnalysisQueueFromStart,
   type SecurityFindingRecord,
 } from './db/queries.js';
-import { startSecurityAnalysis } from './launch.js';
+import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
+import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
 import {
   resolveSecurityAgentModels,
   SECURITY_ANALYSIS_OWNER_CAP,
@@ -121,30 +122,76 @@ export async function processManualAnalysisStart(params: {
     params.env.INTERNAL_API_SECRET.get(),
     params.env.CALLBACK_TOKEN_SECRET.get(),
   ]);
-  const result = await startSecurityAnalysis({
-    db: params.db,
-    env: params.env,
-    findingId: finding.id,
-    actorUser: actor,
-    githubToken: tokenResult.token,
-    triageModel,
-    analysisModel,
-    analysisMode: config.analysis_mode,
-    organizationId: owner.type === 'org' ? owner.id : undefined,
-    nextAuthSecret,
-    internalApiSecret,
-    callbackTokenSecret,
-    retrySandboxOnly: params.command.retrySandboxOnly,
-  });
-  const queueStatus = result.started ? (result.triageOnly ? 'completed' : 'running') : 'failed';
-  await transitionManualAnalysisQueueFromStart(params.db, {
-    findingId: finding.id,
-    claimToken,
-    status: queueStatus,
-    failureCode: result.started ? null : 'START_CALL_AMBIGUOUS',
-    errorMessage: result.error ?? null,
-  });
-  if (!result.started) return { status: 'failed' };
+  let result: Awaited<ReturnType<typeof startSecurityAnalysis>>;
+  try {
+    result = await startSecurityAnalysis({
+      db: params.db,
+      env: params.env,
+      findingId: finding.id,
+      actorUser: actor,
+      githubToken: tokenResult.token,
+      triageModel,
+      analysisModel,
+      analysisMode: config.analysis_mode,
+      organizationId: owner.type === 'org' ? owner.id : undefined,
+      nextAuthSecret,
+      internalApiSecret,
+      callbackTokenSecret,
+      retrySandboxOnly: params.command.retrySandboxOnly,
+      lifecycleClaim: {
+        source: 'manual',
+        findingId: finding.id,
+        claimToken,
+      },
+    });
+  } catch (error) {
+    if (!(error instanceof InsufficientCreditsError)) throw error;
+
+    await transitionAnalysisStartLifecycle(params.db, {
+      claim: {
+        source: 'manual',
+        findingId: finding.id,
+        claimToken,
+      },
+      outcome: {
+        type: 'start-failed',
+        errorMessage: error.message,
+        queueStatus: 'failed',
+        failureCode: 'INSUFFICIENT_CREDITS',
+        incrementAttempt: false,
+        nextRetryAt: null,
+      },
+    });
+    throw error;
+  }
+  if (!result.started) {
+    if (result.failureNeedsLifecycleTransition) {
+      await transitionAnalysisStartLifecycle(params.db, {
+        claim: {
+          source: 'manual',
+          findingId: finding.id,
+          claimToken,
+        },
+        outcome: {
+          type: 'start-failed',
+          errorMessage: result.error ?? 'Security analysis start failed',
+          queueStatus: 'failed',
+          failureCode: 'START_CALL_AMBIGUOUS',
+          incrementAttempt: false,
+          nextRetryAt: null,
+        },
+      });
+    } else {
+      await transitionManualAnalysisQueueFromStart(params.db, {
+        findingId: finding.id,
+        claimToken,
+        status: 'failed',
+        failureCode: 'START_CALL_AMBIGUOUS',
+        errorMessage: result.error ?? null,
+      });
+    }
+    return { status: 'failed' };
+  }
 
   await params.db.insert(security_audit_log).values({
     owned_by_organization_id: finding.owned_by_organization_id,

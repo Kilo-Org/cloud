@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { ensureManualAnalysisQueueRow } from './db/queries.js';
-import { startSecurityAnalysis } from './launch.js';
+import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
 import { processManualAnalysisStart, type ManualAnalysisStartCommand } from './manual-analysis.js';
 
+vi.mock('./analysis-start-lifecycle.js', () => ({
+  transitionAnalysisStartLifecycle: vi.fn(),
+}));
 vi.mock('./launch.js', () => ({
+  InsufficientCreditsError: class InsufficientCreditsError extends Error {},
   startSecurityAnalysis: vi.fn(),
 }));
 
@@ -26,6 +31,8 @@ const finding = {
 
 beforeEach(() => {
   vi.mocked(startSecurityAnalysis).mockReset();
+  vi.mocked(transitionAnalysisStartLifecycle).mockReset();
+  vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValue({ transitioned: true });
 });
 
 describe('processManualAnalysisStart', () => {
@@ -139,6 +146,7 @@ describe('processManualAnalysisStart', () => {
           },
           NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
           INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
+          CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
         } as unknown as CloudflareEnv,
         command: {
           ...command,
@@ -154,7 +162,13 @@ describe('processManualAnalysisStart', () => {
         triageModel: 'request/triage',
         analysisModel: 'request/analysis',
         analysisMode: 'deep',
+        callbackTokenSecret: 'callback-token-secret',
         retrySandboxOnly: true,
+        lifecycleClaim: expect.objectContaining({
+          source: 'manual',
+          findingId: command.findingId,
+          claimToken: expect.any(String),
+        }),
       })
     );
     expect(auditRows[0]).toMatchObject({
@@ -166,7 +180,162 @@ describe('processManualAnalysisStart', () => {
         analysisMode: 'deep',
       },
     });
-    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('settles post-lease manual start failures through the lifecycle transition', async () => {
+    let selectCount = 0;
+    let insertCount = 0;
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const db = {
+      select: () => {
+        selectCount += 1;
+        if (selectCount === 1) {
+          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
+        }
+        if (selectCount === 2) {
+          return { from: () => ({ where: async () => [{ total: 0 }] }) };
+        }
+        if (selectCount === 3) {
+          return {
+            from: () => ({
+              where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => ({
+              limit: async () => [{ config: { analysis_mode: 'auto' } }],
+            }),
+          }),
+        };
+      },
+      insert: () => {
+        insertCount += 1;
+        return {
+          values: () => ({
+            onConflictDoUpdate: () => ({
+              returning: async () => [{ id: `queue-row-${insertCount}` }],
+            }),
+          }),
+        };
+      },
+      execute,
+    };
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({
+      started: false,
+      error: 'prepareSession timed out',
+      failureNeedsLifecycleTransition: true,
+    });
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        env: {
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({
+              success: true,
+              token: 'github-token',
+              installationId: 'installation-123',
+              accountLogin: 'kilo',
+              appType: 'standard',
+            }),
+          },
+          NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+          INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
+          CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+        } as unknown as CloudflareEnv,
+        command,
+      })
+    ).resolves.toEqual({ status: 'failed' });
+
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        claim: expect.objectContaining({ source: 'manual', findingId: command.findingId }),
+        outcome: {
+          type: 'start-failed',
+          errorMessage: 'prepareSession timed out',
+          queueStatus: 'failed',
+          failureCode: 'START_CALL_AMBIGUOUS',
+          incrementAttempt: false,
+          nextRetryAt: null,
+        },
+      })
+    );
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('settles thrown manual credit failures before preserving queue retry behavior', async () => {
+    let selectCount = 0;
+    const db = {
+      select: () => {
+        selectCount += 1;
+        if (selectCount === 1) {
+          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
+        }
+        if (selectCount === 2) {
+          return { from: () => ({ where: async () => [{ total: 0 }] }) };
+        }
+        if (selectCount === 3) {
+          return {
+            from: () => ({
+              where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => ({ limit: async () => [{ config: { analysis_mode: 'auto' } }] }),
+          }),
+        };
+      },
+      insert: () => ({
+        values: () => ({
+          onConflictDoUpdate: () => ({ returning: async () => [{ id: 'queue-row-credit' }] }),
+        }),
+      }),
+    };
+    vi.mocked(startSecurityAnalysis).mockRejectedValue(
+      new InsufficientCreditsError('Insufficient credits')
+    );
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        env: {
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({
+              success: true,
+              token: 'github-token',
+              installationId: 'installation-123',
+              accountLogin: 'kilo',
+              appType: 'standard',
+            }),
+          },
+          NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+          INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
+          CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+        } as unknown as CloudflareEnv,
+        command,
+      })
+    ).rejects.toThrow('Insufficient credits');
+
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        claim: expect.objectContaining({ source: 'manual', findingId: command.findingId }),
+        outcome: {
+          type: 'start-failed',
+          errorMessage: 'Insufficient credits',
+          queueStatus: 'failed',
+          failureCode: 'INSUFFICIENT_CREDITS',
+          incrementAttempt: false,
+          nextRetryAt: null,
+        },
+      })
+    );
   });
 });
 

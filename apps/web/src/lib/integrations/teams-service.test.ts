@@ -57,9 +57,9 @@ describe('teams-service', () => {
     expect(result.platform_installation_id).toBe('tenant-a');
     expect(result.platform_account_login).toBe('Acme Teams');
     expect(result.integration_status).toBe(INTEGRATION_STATUS.ACTIVE);
-    expect(result.metadata).toEqual(
-      expect.objectContaining({ bot_enabled: true, model_slug: expect.any(String) })
-    );
+    expect(result.metadata).toEqual(expect.objectContaining({ model_slug: expect.any(String) }));
+    expect(result.metadata as Record<string, unknown>).not.toHaveProperty('bot_enabled');
+    expect(result.metadata as Record<string, unknown>).not.toHaveProperty('tenant_name');
   });
 
   test('preserves the selected model on reinstall', async () => {
@@ -77,9 +77,26 @@ describe('teams-service', () => {
     });
 
     expect(updated.platform_account_login).toBe('Acme Teams Renamed');
-    expect(updated.metadata).toEqual(
-      expect.objectContaining({ bot_enabled: true, model_slug: 'openai/gpt-test' })
-    );
+    expect(updated.metadata).toEqual(expect.objectContaining({ model_slug: 'openai/gpt-test' }));
+  });
+
+  test('uses the conflicting tenant name in the error message', async () => {
+    await upsertTeamsInstallation({
+      owner: { type: 'user', id: user.id },
+      tenantId: 'tenant-shared',
+      tenantName: 'Existing Tenant Display',
+    });
+
+    await expect(
+      upsertTeamsInstallation({
+        owner: { type: 'user', id: otherUser.id },
+        tenantId: 'tenant-shared',
+        tenantName: 'New Caller Display',
+      })
+    ).rejects.toMatchObject({
+      name: 'TeamsTenantAlreadyConnectedError',
+      message: expect.stringContaining('Existing Tenant Display'),
+    });
   });
 
   test('rejects conflicting tenant ownership', async () => {

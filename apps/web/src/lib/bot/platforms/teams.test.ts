@@ -94,12 +94,12 @@ describe('createTeamsBotPlatform', () => {
     jest.clearAllMocks();
   });
 
-  it('only enables bot processing when metadata.bot_enabled is true', () => {
+  it('always enables bot processing for installed Teams tenants (mirrors Slack)', () => {
     const platform = createTeamsBotPlatform(makeTeamsAdapter() as never);
 
-    expect(platform.isEnabledForBot({ metadata: { bot_enabled: true } } as never)).toBe(true);
-    expect(platform.isEnabledForBot({ metadata: { bot_enabled: false } } as never)).toBe(false);
-    expect(platform.isEnabledForBot({ metadata: null } as never)).toBe(false);
+    expect(platform.isEnabledForBot({ metadata: null } as never)).toBe(true);
+    expect(platform.isEnabledForBot({ metadata: {} } as never)).toBe(true);
+    expect(platform.isEnabledForBot({ metadata: { model_slug: 'x' } } as never)).toBe(true);
   });
 
   it('sends account-link prompts privately with DM fallback', async () => {

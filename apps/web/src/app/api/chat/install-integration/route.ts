@@ -69,11 +69,17 @@ function errorPage(title: string, message: string, status: number): Response {
   );
 }
 
-function successPage(message: string): Response {
-  return htmlPage(
-    'Teams connected',
-    `<h1 style="margin:0 0 8px;font-size:24px">Teams connected</h1><p style="margin:0;color:#a3a3a3;line-height:1.5">${escapeHtml(message)}</p>`
-  );
+// Redirect targets for the integrations page; the React surface
+// (TeamsIntegrationDetails) consumes ?success=installed and
+// ?error=tenant_already_connected and shows the matching toast/alert.
+function teamsIntegrationsPath(owner: Owner, query: string): string {
+  return owner.type === 'org'
+    ? `/organizations/${owner.id}/integrations/teams?${query}`
+    : `/integrations/teams?${query}`;
+}
+
+function redirectToTeamsIntegrations(owner: Owner, query: string): Response {
+  return Response.redirect(new URL(teamsIntegrationsPath(owner, query), APP_URL).toString());
 }
 
 async function authenticateOrRedirect(url: URL): Promise<{ user: User } | Response> {
@@ -142,6 +148,19 @@ async function linkAndReplay(params: {
   }
 }
 
+function ownerForIntegration(integration: {
+  owned_by_user_id: string | null;
+  owned_by_organization_id: string | null;
+}): Owner | null {
+  if (integration.owned_by_organization_id) {
+    return { type: 'org', id: integration.owned_by_organization_id };
+  }
+  if (integration.owned_by_user_id) {
+    return { type: 'user', id: integration.owned_by_user_id };
+  }
+  return null;
+}
+
 async function finishExistingIntegration(params: {
   payload: VerifiedTeamsInstallPayload;
   user: User;
@@ -149,7 +168,12 @@ async function finishExistingIntegration(params: {
   const integration = await getPlatformIntegration(params.payload.identity);
   if (!integration) return null;
 
+  const owner = ownerForIntegration(integration);
+
   if (!(await canKiloUserAccessPlatformIntegration(integration, params.user.id))) {
+    if (owner) {
+      return redirectToTeamsIntegrations(owner, 'error=tenant_already_connected');
+    }
     return errorPage(
       'Teams tenant already connected',
       'This Teams tenant is already connected to another Kilo account or organization.',
@@ -158,8 +182,13 @@ async function finishExistingIntegration(params: {
   }
 
   await linkAndReplay({ ...params.payload, user: params.user });
-  return successPage(
-    'Your Teams user has been linked. You can close this tab and return to Teams.'
+  if (owner) {
+    return redirectToTeamsIntegrations(owner, 'success=installed');
+  }
+  return errorPage(
+    'Teams integration is missing an owner',
+    'This Teams integration is missing an owner. Please contact support.',
+    500
   );
 }
 
@@ -253,11 +282,11 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof TeamsTenantAlreadyConnectedError) {
-      return errorPage('Teams tenant already connected', error.message, 409);
+      return redirectToTeamsIntegrations(owner, 'error=tenant_already_connected');
     }
     throw error;
   }
 
   await linkAndReplay({ ...payload, user: auth.user });
-  return successPage('Teams is connected. You can close this tab and return to Teams.');
+  return redirectToTeamsIntegrations(owner, 'success=installed');
 }

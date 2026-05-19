@@ -155,7 +155,7 @@ describe('/api/chat/install-integration', () => {
     expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
 
-  test('creates integration, links user, and reprocesses original message once', async () => {
+  test('creates integration, links user, redirects to org integrations page, and reprocesses original message once', async () => {
     const { POST } = await import('./route');
     const response = await POST(
       makeRequest('/api/chat/install-integration', {
@@ -164,7 +164,10 @@ describe('/api/chat/install-integration', () => {
       }) as never
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/organizations/org-1/integrations/teams?success=installed'
+    );
     expect(mockedUpsertTeamsInstallation).toHaveBeenCalledWith({
       owner: { type: 'org', id: 'org-1' },
       tenantId: 'tenant-a',
@@ -183,16 +186,62 @@ describe('/api/chat/install-integration', () => {
     );
   });
 
-  test('links only when an existing integration is accessible', async () => {
-    mockedGetPlatformIntegration.mockResolvedValue({ id: 'pi-teams' } as never);
+  test('redirects with tenant_already_connected when upsert reports a conflict', async () => {
+    const { TeamsTenantAlreadyConnectedError } = await import('@/lib/integrations/teams-service');
+    mockedUpsertTeamsInstallation.mockRejectedValueOnce(
+      new TeamsTenantAlreadyConnectedError('Other Teams')
+    );
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest('/api/chat/install-integration', {
+        method: 'POST',
+        body: new URLSearchParams({ token: 'signed', owner: 'org:org-1' }),
+      }) as never
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/organizations/org-1/integrations/teams?error=tenant_already_connected'
+    );
+    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
+  });
+
+  test('links and redirects to integrations page when an existing integration is accessible', async () => {
+    mockedGetPlatformIntegration.mockResolvedValue({
+      id: 'pi-teams',
+      owned_by_organization_id: 'org-1',
+      owned_by_user_id: null,
+    } as never);
     mockedCanKiloUserAccessPlatformIntegration.mockResolvedValue(true);
 
     const { GET } = await import('./route');
     const response = await GET(makeRequest('/api/chat/install-integration?token=signed') as never);
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/organizations/org-1/integrations/teams?success=installed'
+    );
     expect(mockedUpsertTeamsInstallation).not.toHaveBeenCalled();
     expect(mockedLinkKiloUser).toHaveBeenCalled();
+  });
+
+  test('redirects existing-tenant conflict to the owning surface', async () => {
+    mockedGetPlatformIntegration.mockResolvedValue({
+      id: 'pi-teams',
+      owned_by_organization_id: 'other-org',
+      owned_by_user_id: null,
+    } as never);
+    mockedCanKiloUserAccessPlatformIntegration.mockResolvedValue(false);
+
+    const { GET } = await import('./route');
+    const response = await GET(makeRequest('/api/chat/install-integration?token=signed') as never);
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/organizations/other-org/integrations/teams?error=tenant_already_connected'
+    );
+    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
 
   test('rejects unsupported platforms', async () => {

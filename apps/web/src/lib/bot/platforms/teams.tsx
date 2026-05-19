@@ -191,10 +191,7 @@ export function createTeamsBotPlatform(teamsAdapter: TeamsAdapter): BotPlatform 
       };
     },
 
-    isEnabledForBot(integration) {
-      const metadata = integration.metadata as { bot_enabled?: boolean } | null;
-      return metadata?.bot_enabled === true;
-    },
+    isEnabledForBot: () => true,
 
     canHandleMessage: () => true,
 

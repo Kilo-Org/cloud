@@ -26,9 +26,7 @@ import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restric
 const TEAMS_DEFAULT_MODEL = KILO_AUTO_FREE_MODEL.id;
 
 type TeamsMetadata = Record<string, unknown> & {
-  bot_enabled?: boolean;
   model_slug?: string;
-  tenant_name?: string | null;
 };
 
 type TeamsUninstallOptions = {
@@ -76,18 +74,8 @@ function readTeamsMetadata(integration: PlatformIntegration | null): TeamsMetada
 
 function isTeamsTenantUniqueViolation(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
-
-  if (
-    'constraint' in error &&
-    error.constraint === 'UQ_platform_integrations_teams_platform_inst'
-  ) {
-    return true;
-  }
-
   return (
-    'message' in error &&
-    typeof error.message === 'string' &&
-    error.message.includes('UQ_platform_integrations_teams_platform_inst')
+    'constraint' in error && error.constraint === 'UQ_platform_integrations_teams_platform_inst'
   );
 }
 
@@ -160,7 +148,7 @@ export async function upsertTeamsInstallation({
 
   const conflicting = await getConflictingTeamsInstallation(owner, tenantId);
   if (conflicting) {
-    throw new TeamsTenantAlreadyConnectedError(accountName);
+    throw new TeamsTenantAlreadyConnectedError(conflicting.platform_account_login || accountName);
   }
 
   const defaultModel =
@@ -171,10 +159,8 @@ export async function upsertTeamsInstallation({
   const existingMetadata = readTeamsMetadata(existing);
   const metadata: TeamsMetadata = {
     ...existingMetadata,
-    bot_enabled: true,
     model_slug:
       typeof existingMetadata.model_slug === 'string' ? existingMetadata.model_slug : defaultModel,
-    tenant_name: tenantName ?? existingMetadata.tenant_name ?? null,
   };
 
   if (existing) {

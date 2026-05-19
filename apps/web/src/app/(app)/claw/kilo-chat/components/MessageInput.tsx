@@ -313,6 +313,7 @@ export function MessageInput({
           disabled={!inputEnabled}
         />
         <button
+          type="button"
           onClick={handleSubmit}
           disabled={isSubmitting || !canSubmit}
           className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg p-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"

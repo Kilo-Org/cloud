@@ -45,6 +45,7 @@ export function MessageAttachment({
         )}
         {onRemove && (
           <button
+            type="button"
             onClick={onRemove}
             className="bg-background/80 hover:bg-background absolute right-1 top-1 rounded-full p-1 text-xs"
             title="Remove attachment"
@@ -128,6 +129,7 @@ function FileChip({ url, filename, size, loading, error, onRemove }: FileChipPro
       </a>
       {onRemove && (
         <button
+          type="button"
           onClick={onRemove}
           className="bg-background/90 hover:bg-background absolute -right-1 -top-1 rounded-full p-0.5 text-xs leading-none"
           title="Remove attachment"

@@ -47,6 +47,7 @@ export function AttachmentPreviewChip({
 
       {row.status === 'failed' && (
         <button
+          type="button"
           onClick={onRetry}
           className="bg-background/80 hover:bg-background absolute inset-0 flex items-center justify-center"
           title={row.error ? `Retry — ${row.error}` : 'Retry upload'}
@@ -59,6 +60,7 @@ export function AttachmentPreviewChip({
       )}
 
       <button
+        type="button"
         onClick={onRemove}
         className="bg-background/90 hover:bg-background absolute right-0.5 top-0.5 rounded-full p-0.5"
         title="Remove"

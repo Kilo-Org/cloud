@@ -14,9 +14,31 @@ export const PROMPT_HASH_ABSENT = '__absent__';
 export const PROMPT_HASH_FAILED = '__failed__';
 export const PROMPT_HASH_DELETED = '__deleted__';
 
-/** 4 MB. Comfortably above any current 1M-token-context request. */
+/** 4 MB measured as UTF-8 bytes (matching what `putPromptIfAbsent` actually
+ *  uploads). Comfortably above any current 1M-token-context request. */
 export const SYSTEM_PROMPT_CAP_BYTES = 4 * 1024 * 1024;
 export const REQUEST_BODY_CAP_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Tail-truncates a string to at most `maxBytes` UTF-8 bytes, stepping back
+ * to a UTF-8 codepoint boundary so the result is always valid UTF-8.
+ *
+ * `string.length` would have measured UTF-16 code units, which under-counts
+ * non-ASCII content by up to 4× when encoded as UTF-8 — a 4 MB code-unit
+ * cap on CJK content can balloon to ~12 MB on the wire. Slicing UTF-16
+ * code units could also split surrogate pairs and produce U+FFFD on encode,
+ * making the resulting hash non-deterministic across runtimes.
+ */
+export function truncateToUtf8Bytes(s: string, maxBytes: number): string {
+  const buf = Buffer.from(s, 'utf8');
+  if (buf.length <= maxBytes) return s;
+  // UTF-8 continuation bytes have the form 0b10xxxxxx. Walk backward from
+  // `maxBytes` until we land on a non-continuation byte (a codepoint
+  // start), then slice at that boundary.
+  let end = maxBytes;
+  while (end > 0 && (buf[end] & 0xc0) === 0x80) end--;
+  return buf.subarray(0, end).toString('utf8');
+}
 
 /**
  * Build a bounded capture of the canonical post-`transformRequest` upstream
@@ -46,12 +68,15 @@ export function buildExperimentPromptCapture(request: GatewayRequest): Experimen
     }
     const remainder = { ...request.body, messages: nonSystemMessages };
     let bodyContent = serialize(remainder);
-    if (systemContent !== null && systemContent.length > SYSTEM_PROMPT_CAP_BYTES) {
-      systemContent = systemContent.slice(0, SYSTEM_PROMPT_CAP_BYTES);
+    if (
+      systemContent !== null &&
+      Buffer.byteLength(systemContent, 'utf8') > SYSTEM_PROMPT_CAP_BYTES
+    ) {
+      systemContent = truncateToUtf8Bytes(systemContent, SYSTEM_PROMPT_CAP_BYTES);
       wasTruncated = true;
     }
-    if (bodyContent.length > REQUEST_BODY_CAP_BYTES) {
-      bodyContent = bodyContent.slice(0, REQUEST_BODY_CAP_BYTES);
+    if (Buffer.byteLength(bodyContent, 'utf8') > REQUEST_BODY_CAP_BYTES) {
+      bodyContent = truncateToUtf8Bytes(bodyContent, REQUEST_BODY_CAP_BYTES);
       wasTruncated = true;
     }
     if (wasTruncated) {
@@ -68,8 +93,8 @@ export function buildExperimentPromptCapture(request: GatewayRequest): Experimen
   // side; system extraction for those API kinds is left for later if it
   // turns out to dedup meaningfully.
   let bodyContent = serialize(request.body);
-  if (bodyContent.length > REQUEST_BODY_CAP_BYTES) {
-    bodyContent = bodyContent.slice(0, REQUEST_BODY_CAP_BYTES);
+  if (Buffer.byteLength(bodyContent, 'utf8') > REQUEST_BODY_CAP_BYTES) {
+    bodyContent = truncateToUtf8Bytes(bodyContent, REQUEST_BODY_CAP_BYTES);
     wasTruncated = true;
     noteTruncation(request.body.model);
   }

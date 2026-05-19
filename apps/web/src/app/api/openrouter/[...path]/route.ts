@@ -496,6 +496,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
     if (modelRestrictionError) return modelRestrictionError;
 
+    // Experiment traffic captures prompts to R2 for partner evaluation, which
+    // is a form of data collection that the gateway-pinned `data_collection`
+    // setting cannot enforce on a direct partner upstream. If the org has
+    // explicitly disabled data collection, refuse the experimented public id
+    // here rather than routing through and silently capturing prompts.
+    if (experiment && settings?.data_collection === 'deny') {
+      return dataCollectionRequiredResponse();
+    }
+
     // Direct experiment upstreams must not have a Vercel/OpenRouter
     // provider config pinned onto them — the partner endpoint is selected
     // by the variant version.

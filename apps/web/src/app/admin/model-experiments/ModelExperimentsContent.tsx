@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
 import {
   useModelExperiments,
@@ -62,6 +63,49 @@ const STATUS_VARIANT: Record<Status, 'default' | 'secondary' | 'outline' | 'dest
 
 function StatusBadge({ status }: { status: Status }) {
   return <Badge variant={STATUS_VARIANT[status]}>{status}</Badge>;
+}
+
+function getActivationDisabledReason(variants: readonly Variant[]) {
+  if (variants.length < 2) {
+    return 'Active experiments must have at least 2 variants';
+  }
+  if (variants.some(v => v.weight <= 0)) {
+    return 'Every variant must have a positive weight';
+  }
+  const now = new Date();
+  if (variants.some(v => !v.current_version || new Date(v.current_version.effective_at) > now)) {
+    return 'Every variant must have at least one variant_version with effective_at <= now()';
+  }
+  return null;
+}
+
+function ActivationButton({
+  label,
+  disabledReason,
+  isPending,
+  onActivate,
+}: {
+  label: string;
+  disabledReason: string | null;
+  isPending: boolean;
+  onActivate: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex" tabIndex={disabledReason ? 0 : undefined}>
+          <Button onClick={onActivate} disabled={isPending || disabledReason !== null}>
+            {label}
+          </Button>
+        </span>
+      </TooltipTrigger>
+      {disabledReason && (
+        <TooltipContent side="bottom" className="max-w-xs">
+          {disabledReason}
+        </TooltipContent>
+      )}
+    </Tooltip>
+  );
 }
 
 export function ModelExperimentsContent() {
@@ -318,6 +362,7 @@ function ExperimentDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const { experiment, variants } = data;
   const status = experiment.status as Status;
   const totalWeight = variants.reduce((sum, v) => sum + v.weight, 0);
+  const activationDisabledReason = getActivationDisabledReason(variants);
 
   const handleAction = async <T,>(label: string, p: Promise<T>) => {
     try {
@@ -348,12 +393,14 @@ function ExperimentDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
         <div className="flex flex-wrap items-center justify-end gap-2">
           {status === 'draft' && (
-            <Button
-              onClick={() => handleAction('Activated', activate.mutateAsync({ id: experiment.id }))}
-              disabled={activate.isPending}
-            >
-              Activate
-            </Button>
+            <ActivationButton
+              label="Activate"
+              disabledReason={activationDisabledReason}
+              isPending={activate.isPending}
+              onActivate={() =>
+                handleAction('Activated', activate.mutateAsync({ id: experiment.id }))
+              }
+            />
           )}
           {status === 'active' && (
             <Button
@@ -365,12 +412,14 @@ function ExperimentDetail({ id, onBack }: { id: string; onBack: () => void }) {
             </Button>
           )}
           {status === 'paused' && (
-            <Button
-              onClick={() => handleAction('Activated', activate.mutateAsync({ id: experiment.id }))}
-              disabled={activate.isPending}
-            >
-              Resume
-            </Button>
+            <ActivationButton
+              label="Resume"
+              disabledReason={activationDisabledReason}
+              isPending={activate.isPending}
+              onActivate={() =>
+                handleAction('Activated', activate.mutateAsync({ id: experiment.id }))
+              }
+            />
           )}
           {(status === 'active' || status === 'paused') && (
             <Button

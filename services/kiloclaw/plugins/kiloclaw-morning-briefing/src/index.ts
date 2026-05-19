@@ -11,7 +11,12 @@ import { definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
 // signature is actually broader than the SDK's typed `ListWebSearchProvidersParams`,
 // and passing the real api into a narrow-typed function fails.
 type SdkWebSearchRuntime = OpenClawPluginApi['runtime']['webSearch'];
-import { buildBriefingMarkdown, offsetDateKey, resolveBriefingPath } from './briefing-utils';
+import {
+  buildBriefingMarkdown,
+  type BriefingDocumentSection,
+  offsetDateKey,
+  resolveBriefingPath,
+} from './briefing-utils';
 import {
   type BriefingDeliveryResult,
   deliverBriefingToConfiguredChannels,
@@ -75,6 +80,7 @@ import { createKiloChatSummaryClient } from './chat-summary-client';
 import {
   buildChatSummarySectionLines,
   buildChatSummaryStatus,
+  buildTodaySoFarChatWindow,
   buildYesterdayChatWindow,
   summarizeChatActivity,
 } from './chat-summary-utils';
@@ -152,6 +158,7 @@ type SourceCollectionResult = {
   ok: boolean;
   summary: string;
   sectionLines: string[];
+  sections?: BriefingDocumentSection[];
   /**
    * Optional per-source section title override. Most sources use a
    * fixed title (`GitHub`, `Linear`, `Web Search`), but `local-news`
@@ -1354,17 +1361,34 @@ async function collectKiloChatSummary(
     };
   }
 
-  const window = buildYesterdayChatWindow(now, userTimezone);
+  const yesterdayWindow = buildYesterdayChatWindow(now, userTimezone);
+  const todayWindow = buildTodaySoFarChatWindow(now, userTimezone);
   try {
-    const conversations = await client.listYesterdayConversations(window);
-    const stats = summarizeChatActivity(conversations, window);
+    const [yesterdayConversations, todayConversations] = await Promise.all([
+      client.listConversationsForWindow(yesterdayWindow),
+      client.listConversationsForWindow(todayWindow),
+    ]);
+    const yesterdayStats = summarizeChatActivity(yesterdayConversations, yesterdayWindow);
+    const todayStats = summarizeChatActivity(todayConversations, todayWindow);
     return {
       source: 'kilo-chat',
       configured: true,
       ok: true,
-      summary: buildChatSummaryStatus(stats),
-      sectionLines: buildChatSummarySectionLines(stats),
-      sectionTitle: `Yesterday in Chat (${window.dateKey})`,
+      summary: `Yesterday: ${buildChatSummaryStatus(
+        yesterdayStats,
+        'yesterday'
+      )}; today: ${buildChatSummaryStatus(todayStats, 'so far today')}`,
+      sectionLines: [],
+      sections: [
+        {
+          title: `Yesterday in Chat (${yesterdayWindow.dateKey})`,
+          lines: buildChatSummarySectionLines(yesterdayStats, 'No Kilo Chat messages yesterday.'),
+        },
+        {
+          title: 'So Far Today in Chat',
+          lines: buildChatSummarySectionLines(todayStats, 'No Kilo Chat messages so far today.'),
+        },
+      ],
     };
   } catch (error) {
     return {
@@ -1501,10 +1525,15 @@ async function generateBriefing(
       ok: source.ok,
       summary: source.summary,
     })),
-    sections: sources.map(source => ({
-      title: source.sectionTitle ?? DEFAULT_SECTION_TITLE[source.source],
-      lines: source.sectionLines,
-    })),
+    sections: sources.flatMap(
+      source =>
+        source.sections ?? [
+          {
+            title: source.sectionTitle ?? DEFAULT_SECTION_TITLE[source.source],
+            lines: source.sectionLines,
+          },
+        ]
+    ),
     failures,
   });
 

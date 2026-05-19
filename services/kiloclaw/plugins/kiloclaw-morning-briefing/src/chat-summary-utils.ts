@@ -27,7 +27,6 @@ export type ChatSummaryStats = {
   userMessageCount: number;
   botMessageCount: number;
   deletedMessageCount: number;
-  topConversations: Array<{ title: string; messageCount: number }>;
 };
 
 function readDatePart(parts: Intl.DateTimeFormatPart[], type: 'year' | 'month' | 'day'): string {
@@ -86,6 +85,16 @@ export function buildYesterdayChatWindow(now: Date, timezone: string): ChatSumma
   };
 }
 
+export function buildTodaySoFarChatWindow(now: Date, timezone: string): ChatSummaryWindow {
+  const tz = timezone || DEFAULT_TIMEZONE;
+  const todayKey = dateKeyInZone(now, tz);
+  return {
+    startMs: utcMillisForWallTime(todayKey, '00:00:00', tz),
+    endMs: now.getTime(),
+    dateKey: todayKey,
+  };
+}
+
 export function ulidToTimestampMs(ulid: string): number | null {
   if (ulid.length < ULID_TIME_LENGTH) return null;
   let value = 0;
@@ -95,11 +104,6 @@ export function ulidToTimestampMs(ulid: string): number | null {
     value = value * 32 + digit;
   }
   return Number.isSafeInteger(value) ? value : null;
-}
-
-function displayConversationTitle(conversation: ChatSummaryConversation): string {
-  const title = conversation.title?.trim();
-  return title && title.length > 0 ? title : 'New chat';
 }
 
 function isBotSender(senderId: string): boolean {
@@ -114,7 +118,7 @@ export function summarizeChatActivity(
   let userMessageCount = 0;
   let botMessageCount = 0;
   let deletedMessageCount = 0;
-  const perConversation = new Map<string, { title: string; count: number }>();
+  const activeConversationIds = new Set<string>();
 
   for (const conversation of conversations) {
     for (const message of conversation.messages) {
@@ -131,30 +135,16 @@ export function summarizeChatActivity(
         userMessageCount += 1;
       }
 
-      const existing = perConversation.get(conversation.conversationId);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        perConversation.set(conversation.conversationId, {
-          title: displayConversationTitle(conversation),
-          count: 1,
-        });
-      }
+      activeConversationIds.add(conversation.conversationId);
     }
   }
 
-  const topConversations = Array.from(perConversation.values())
-    .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title))
-    .slice(0, 3)
-    .map(item => ({ title: item.title, messageCount: item.count }));
-
   return {
-    activeConversationCount: perConversation.size,
+    activeConversationCount: activeConversationIds.size,
     messageCount,
     userMessageCount,
     botMessageCount,
     deletedMessageCount,
-    topConversations,
   };
 }
 
@@ -162,9 +152,12 @@ function pluralize(count: number, singular: string, plural = `${singular}s`): st
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-export function buildChatSummarySectionLines(stats: ChatSummaryStats): string[] {
+export function buildChatSummarySectionLines(
+  stats: ChatSummaryStats,
+  emptyMessage: string
+): string[] {
   if (stats.messageCount === 0) {
-    return ['No Kilo Chat messages yesterday.'];
+    return [emptyMessage];
   }
 
   const lines = [
@@ -185,17 +178,10 @@ export function buildChatSummarySectionLines(stats: ChatSummaryStats): string[] 
     );
   }
 
-  if (stats.topConversations.length > 0) {
-    lines.push('', 'Most active threads');
-    for (const conversation of stats.topConversations) {
-      lines.push(`- ${conversation.title} (${pluralize(conversation.messageCount, 'message')})`);
-    }
-  }
-
   return lines;
 }
 
-export function buildChatSummaryStatus(stats: ChatSummaryStats): string {
-  if (stats.messageCount === 0) return '0 Kilo Chat messages yesterday';
+export function buildChatSummaryStatus(stats: ChatSummaryStats, periodLabel: string): string {
+  if (stats.messageCount === 0) return `0 Kilo Chat messages ${periodLabel}`;
   return `${stats.messageCount} Kilo Chat message(s) across ${stats.activeConversationCount} conversation(s)`;
 }

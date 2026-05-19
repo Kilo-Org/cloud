@@ -26,7 +26,7 @@ describe('chat summary client', () => {
     expect(client.configured).toBe(false);
     expect(client.reason).toBe('OPENCLAW_GATEWAY_TOKEN is not configured');
     await expect(
-      client.listYesterdayConversations(
+      client.listConversationsForWindow(
         buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
       )
     ).resolves.toEqual([]);
@@ -73,7 +73,7 @@ describe('chat summary client', () => {
       token: 'token',
       fetchImpl,
     });
-    const conversations = await client.listYesterdayConversations(
+    const conversations = await client.listConversationsForWindow(
       buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
     );
 
@@ -98,6 +98,59 @@ describe('chat summary client', () => {
     });
   });
 
+  it('skips current-day conversations while still fetching yesterday conversations', async () => {
+    const requests: string[] = [];
+    const fetchImpl = mockFetch(async input => {
+      const url = fetchInputUrl(input);
+      requests.push(url);
+      if (url === 'http://controller/_kilo/kilo-chat/conversations?limit=100') {
+        return jsonResponse({
+          conversations: [
+            {
+              conversationId: 'conv-today',
+              title: 'Today only',
+              lastActivityAt: Date.parse('2026-05-19T10:00:00.000Z'),
+            },
+            {
+              conversationId: 'conv-yesterday',
+              title: 'Yesterday thread',
+              lastActivityAt: Date.parse('2026-05-18T17:00:00.000Z'),
+            },
+          ],
+          hasMore: false,
+          nextCursor: null,
+        });
+      }
+      if (
+        url === 'http://controller/_kilo/kilo-chat/conversations/conv-yesterday/messages?limit=100'
+      ) {
+        return jsonResponse({
+          messages: [{ id: '01JVPPRVG00000000000000000', senderId: 'user:1', deleted: false }],
+          hasMore: false,
+          nextCursor: null,
+        });
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    });
+
+    const client = createKiloChatSummaryClient({
+      baseUrl: 'http://controller',
+      token: 'token',
+      fetchImpl,
+    });
+    const conversations = await client.listConversationsForWindow(
+      buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
+    );
+
+    expect(conversations.map(conversation => conversation.conversationId)).toEqual([
+      'conv-yesterday',
+    ]);
+    expect(requests).toEqual([
+      'http://controller/_kilo/kilo-chat/conversations?limit=100',
+      'http://controller/_kilo/kilo-chat/conversations/conv-yesterday/messages?limit=100',
+    ]);
+  });
+
   it('throws on non-ok controller responses', async () => {
     const fetchImpl = mockFetch(async () => new Response('no route', { status: 404 }));
     const client = createKiloChatSummaryClient({
@@ -107,7 +160,7 @@ describe('chat summary client', () => {
     });
 
     await expect(
-      client.listYesterdayConversations(
+      client.listConversationsForWindow(
         buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
       )
     ).rejects.toThrow('Kilo Chat controller responded 404: no route');

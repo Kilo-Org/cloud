@@ -43,7 +43,7 @@ export type KiloChatSummaryClientOptions = {
 export type KiloChatSummaryClient = {
   configured: boolean;
   reason: string;
-  listYesterdayConversations: (window: ChatSummaryWindow) => Promise<ChatSummaryConversation[]>;
+  listConversationsForWindow: (window: ChatSummaryWindow) => Promise<ChatSummaryConversation[]>;
 };
 
 function normalizeBaseUrl(input: string | undefined): string {
@@ -130,7 +130,11 @@ function shouldInspectConversation(
   conversation: KiloChatConversationListItem,
   window: ChatSummaryWindow
 ): boolean {
-  return conversation.lastActivityAt !== null && conversation.lastActivityAt >= window.startMs;
+  return (
+    conversation.lastActivityAt !== null &&
+    conversation.lastActivityAt >= window.startMs &&
+    conversation.lastActivityAt < window.endMs
+  );
 }
 
 function shouldStopConversationScan(
@@ -151,7 +155,7 @@ export function createKiloChatSummaryClient(
     return {
       configured: false,
       reason: 'OPENCLAW_GATEWAY_TOKEN is not configured',
-      listYesterdayConversations: async () => [],
+      listConversationsForWindow: async () => [],
     };
   }
 
@@ -194,7 +198,7 @@ export function createKiloChatSummaryClient(
     return messages;
   }
 
-  async function listYesterdayConversations(
+  async function listConversationsForWindow(
     window: ChatSummaryWindow
   ): Promise<ChatSummaryConversation[]> {
     const conversations: ChatSummaryConversation[] = [];
@@ -231,6 +235,6 @@ export function createKiloChatSummaryClient(
   return {
     configured: true,
     reason: 'Kilo Chat controller is configured',
-    listYesterdayConversations,
+    listConversationsForWindow,
   };
 }

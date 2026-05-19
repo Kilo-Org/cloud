@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildChatSummarySectionLines,
   buildChatSummaryStatus,
+  buildTodaySoFarChatWindow,
   buildYesterdayChatWindow,
   summarizeChatActivity,
   ulidToTimestampMs,
@@ -36,6 +37,15 @@ describe('chat summary utils', () => {
     expect(window.dateKey).toBe('2026-05-18');
     expect(new Date(window.startMs).toISOString()).toBe('2026-05-18T07:00:00.000Z');
     expect(new Date(window.endMs).toISOString()).toBe('2026-05-19T07:00:00.000Z');
+  });
+
+  it('builds today-so-far window in the user timezone', () => {
+    const now = new Date('2026-05-19T14:00:00.000Z');
+    const window = buildTodaySoFarChatWindow(now, 'America/Los_Angeles');
+
+    expect(window.dateKey).toBe('2026-05-19');
+    expect(new Date(window.startMs).toISOString()).toBe('2026-05-19T07:00:00.000Z');
+    expect(new Date(window.endMs).toISOString()).toBe(now.toISOString());
   });
 
   it('summarizes yesterday messages and ignores messages outside the window', () => {
@@ -90,20 +100,14 @@ describe('chat summary utils', () => {
       userMessageCount: 3,
       botMessageCount: 1,
       deletedMessageCount: 1,
-      topConversations: [
-        { title: 'Launch plan', messageCount: 3 },
-        { title: 'New chat', messageCount: 1 },
-      ],
     });
-    expect(buildChatSummaryStatus(stats)).toBe('4 Kilo Chat message(s) across 2 conversation(s)');
-    expect(buildChatSummarySectionLines(stats)).toEqual([
+    expect(buildChatSummaryStatus(stats, 'yesterday')).toBe(
+      '4 Kilo Chat message(s) across 2 conversation(s)'
+    );
+    expect(buildChatSummarySectionLines(stats, 'No Kilo Chat messages yesterday.')).toEqual([
       '- 4 messages across 2 conversations.',
       '- 3 messages from you; 1 reply from Kilo.',
       '- 1 deleted message excluded from content summaries.',
-      '',
-      'Most active threads',
-      '- Launch plan (3 messages)',
-      '- New chat (1 message)',
     ]);
   });
 
@@ -113,7 +117,9 @@ describe('chat summary utils', () => {
       buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
     );
 
-    expect(buildChatSummaryStatus(stats)).toBe('0 Kilo Chat messages yesterday');
-    expect(buildChatSummarySectionLines(stats)).toEqual(['No Kilo Chat messages yesterday.']);
+    expect(buildChatSummaryStatus(stats, 'so far today')).toBe('0 Kilo Chat messages so far today');
+    expect(buildChatSummarySectionLines(stats, 'No Kilo Chat messages so far today.')).toEqual([
+      'No Kilo Chat messages so far today.',
+    ]);
   });
 });

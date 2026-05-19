@@ -16,6 +16,11 @@ export type BuildEditContentInput = {
   removedIds: Set<string>;
 };
 
+// Edit normalizes the message body to `(text? + attachments[])`. Any other
+// block type on the original message (e.g. `actions`) is dropped, which is
+// intentional: user-authored messages should never carry those, and rebuilding
+// on save lets us keep the editor surface simple. If user messages ever gain a
+// new block type, this needs to either pass it through or reject the edit.
 export function buildEditContent(input: BuildEditContentInput): ContentBlock[] {
   const blocks: ContentBlock[] = [];
   const trimmed = input.text.trim();

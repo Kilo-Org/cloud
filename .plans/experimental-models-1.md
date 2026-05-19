@@ -59,6 +59,18 @@
 
 The `model_experiment_request_stats` reporting view was implemented and reverted out of PR #3325 because there is no consumer yet. The two real arguments for the view are (a) centralizing the 4-table join + JSON extraction and (b) physically excluding `upstream->>'api_key'` at the column level so any consumer of the view cannot leak the key. (a) is also achievable inline with Drizzle queries, and (b) can be enforced with a code-review rule + grep test until a real consumer materializes. Re-add when `getLiveStats` (Phase 5 deferred) or another report needs it; by then the right column set will be obvious.
 
+**Stale membership cache — follow-up (next step after PR #3325 lands):**
+
+Surfaced in PR #3325 review. Two compounding issues in the current routing pre-check:
+
+- `EXPERIMENTED_PUBLIC_IDS_REDIS_KEY` is written without a TTL by `recomputeExperimentedPublicIds()` (`apps/web/src/routers/admin/model-experiments-router.ts`), so a stale value persists indefinitely.
+- `isPublicIdExperimented(publicId)` (`apps/web/src/lib/ai-gateway/experiments/pick-variant.ts`) trusts a populated cache absolutely on a "not in list" read; it only falls through to Postgres when Redis returns null or throws.
+- Cache invalidation in the admin router catches and swallows errors.
+
+Failure mode: admin activates an experiment, Postgres write succeeds, Redis recompute fails (network blip), the membership key keeps the previous list. Until another admin mutation succeeds against Redis, every request to the experimented public id silently routes through default routing instead of the experiment.
+
+Fix: add a TTL (e.g. 300s) on `redisSet(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, …)` so the next reader after expiry gets `null` from Redis, falls through to the existing DB query path, and writes a fresh list. Self-healing with bounded staleness. A "DB fallback when populated cache says no" was considered and rejected — most requests are non-experiment, so per-miss DB queries would defeat the cache's purpose. Targeted test: simulate Redis being unavailable during activate, then a subsequent request after TTL expiry should pick up the experiment via the DB fallback.
+
 **Phase 5 — concrete output (in PR — see status table for branch/PR):**
 
 - `apps/web/src/lib/ai-gateway/experiments/upstream-schema.ts` — `ExperimentUpstreamSchema` (strict subset of `CustomLlmDefinitionSchema`, no `api_key`, no `extra_headers`).

@@ -6,8 +6,6 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageLayout } from '@/components/PageLayout';
-import { IS_DEVELOPMENT } from '@/lib/constants';
-import { notFound } from 'next/navigation';
 
 export default async function UserDoltHubIntegrationPage({
   searchParams,
@@ -17,10 +15,6 @@ export default async function UserDoltHubIntegrationPage({
     error?: string;
   }>;
 }) {
-  if (!IS_DEVELOPMENT) {
-    notFound();
-  }
-
   await getUserFromAuthOrRedirect('/users/sign_in');
   const search = await searchParams;
 

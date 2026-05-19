@@ -3,10 +3,12 @@ import crypto from 'node:crypto';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 
 export type StreamTicketPayload = {
+  purpose?: 'stream' | 'terminal';
   userId: string;
   kiloSessionId?: string;
   cloudAgentSessionId: string;
   organizationId?: string;
+  ptyId?: string;
 };
 
 export function signStreamTicket(

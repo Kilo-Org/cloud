@@ -11,6 +11,7 @@
 import type { KiloClient as SDKClient } from '@kilocode/sdk';
 import { createKiloClient as createV2Client } from '@kilocode/sdk/v2';
 import { logToFile } from './utils.js';
+import { toSlashCommandInfo, type SlashCommandInfo } from '../../src/shared/slash-commands.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -63,6 +64,21 @@ export type NetworkWait = {
   restored: boolean;
 };
 
+export type WrapperPty = {
+  id: string;
+  title: string;
+  command: string;
+  args: string[];
+  cwd: string;
+  status: 'running' | 'exited';
+  pid: number;
+};
+
+export type WrapperPtySize = {
+  cols: number;
+  rows: number;
+};
+
 /**
  * The wrapper's unified kilo client interface.
  * All wrapper modules depend on this type rather than the raw SDK client.
@@ -85,7 +101,14 @@ export type WrapperKiloClient = {
     tools?: Record<string, boolean>;
   }) => Promise<void>;
   abortSession: (opts: { sessionId: string }) => Promise<boolean>;
-  sendCommand: (opts: { sessionId: string; command: string; args?: string }) => Promise<unknown>;
+  sendCommand: (opts: {
+    sessionId: string;
+    command: string;
+    args?: string;
+    messageId?: string;
+  }) => Promise<unknown>;
+  /** Fetch the full slash command catalog from kilo, trimmed to wire shape. */
+  listCommands: () => Promise<SlashCommandInfo[]>;
   answerPermission: (
     permissionId: string,
     response: PermissionResponse,
@@ -111,6 +134,13 @@ export type WrapperKiloClient = {
   getNetworkWaits: () => Promise<NetworkWait[]>;
   resumeNetworkWait: (requestID: string) => Promise<boolean>;
   generateCommitMessage: (opts: { path: string }) => Promise<{ message: string }>;
+  createPty: (opts: {
+    cwd: string;
+    title: string;
+    env: Record<string, string>;
+  }) => Promise<WrapperPty>;
+  resizePty: (ptyId: string, size: WrapperPtySize) => Promise<WrapperPty>;
+  deletePty: (ptyId: string) => Promise<boolean>;
 
   /** The underlying SDK client — used directly by connection.ts for event subscription */
   readonly sdkClient: SDKClient;
@@ -130,7 +160,8 @@ export type WrapperKiloClient = {
  */
 export function createWrapperKiloClient(
   sdkClient: SDKClient,
-  serverUrl: string
+  serverUrl: string,
+  workspacePath: string
 ): WrapperKiloClient {
   logToFile(`creating wrapper kilo client for ${serverUrl}`);
   const v2Client = createV2Client({ baseUrl: serverUrl });
@@ -203,9 +234,21 @@ export function createWrapperKiloClient(
         body: {
           command: opts.command,
           arguments: opts.args ?? '',
+          ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
         },
       });
       return result.data;
+    },
+
+    listCommands: async () => {
+      const result = await sdkClient.command.list();
+      const raw = (result.data ?? []) as unknown[];
+      const commands: SlashCommandInfo[] = [];
+      for (const item of raw) {
+        const trimmed = toSlashCommandInfo(item);
+        if (trimmed && trimmed.source !== 'skill') commands.push(trimmed);
+      }
+      return commands;
     },
 
     answerPermission: async (permissionId, response, message) => {
@@ -263,6 +306,39 @@ export function createWrapperKiloClient(
     generateCommitMessage: async opts => {
       const result = await v2Client.commitMessage.generate({ path: opts.path });
       return result.data ?? { message: '' };
+    },
+
+    createPty: async opts => {
+      const result = await v2Client.pty.create({
+        directory: opts.cwd,
+        cwd: opts.cwd,
+        title: opts.title,
+        env: opts.env,
+      });
+      if (!result.data) {
+        throw new Error('PTY create returned no data');
+      }
+      return result.data as WrapperPty;
+    },
+
+    resizePty: async (ptyId, size) => {
+      const result = await v2Client.pty.update({
+        ptyID: ptyId,
+        directory: workspacePath,
+        size,
+      });
+      if (!result.data) {
+        throw new Error(`PTY update returned no data for ${ptyId}`);
+      }
+      return result.data as WrapperPty;
+    },
+
+    deletePty: async ptyId => {
+      const result = await v2Client.pty.remove({
+        ptyID: ptyId,
+        directory: workspacePath,
+      });
+      return Boolean(result.data);
     },
   };
 }

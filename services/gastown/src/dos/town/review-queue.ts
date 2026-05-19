@@ -453,10 +453,10 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
     // The agent was unhooked by a recovery path between when the agent
     // finished work and when it called gt_done.
     //
-    // For refineries, this is critical: the refinery successfully merged
-    // but the hook was cleared by zombie detection. We MUST still complete
-    // the review — otherwise the source bead stays open forever. Find the
-    // most recent non-closed MR bead assigned to this agent and complete it.
+    // For refineries, this is critical: the refinery may have actually
+    // completed work (merged a PR, posted a review) but its hook was
+    // cleared by zombie detection. We need to make progress without
+    // landing PRs the refinery did NOT actually approve.
     if (agent.role === 'refinery') {
       const recentMrRows = [
         ...query(
@@ -479,6 +479,8 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
           `[review-queue] agentDone: unhooked refinery ${agentId} — recovering MR bead ${mrBeadId}`
         );
         if (input.pr_url) {
+          // Refinery created/landed a PR. Trust the URL: storing it
+          // moves the MR to in_review where poll_pr decides the merge.
           const stored = setReviewPrUrl(sql, mrBeadId, input.pr_url);
           if (stored) {
             markReviewInReview(sql, mrBeadId);
@@ -490,10 +492,46 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
             });
           }
         } else {
+          // No pr_url and no hook: we can NOT prove the refinery
+          // actually merged. Previously we optimistically marked the
+          // MR as 'merged' — but the same race that cleared the hook
+          // (idle+hooked+live-bead reconciler rule firing on a phantom
+          // dispatch_failed) ALSO fires when the refinery is mid-review
+          // and decided to call gt_request_changes. In that case the
+          // refinery wanted rework, gt_request_changes failed with
+          // "not hooked", and the refinery's fallback gt_done() call
+          // would silently land the PR it was trying to reject.
+          //
+          // Fail the review instead: this returns the source bead to
+          // 'open' and surfaces the problem so the next dispatch can
+          // re-review properly. Also raise an escalation so a human
+          // sees what happened.
+          console.warn(
+            `[review-queue] agentDone: unhooked refinery ${agentId} called gt_done without pr_url ` +
+              `for MR ${mrBeadId} — failing review (cannot confirm merge)`
+          );
           completeReviewWithResult(sql, {
             entry_id: mrBeadId,
-            status: 'merged',
-            message: input.summary ?? 'Merged by refinery agent (recovered from unhook)',
+            status: 'failed',
+            message:
+              input.summary ??
+              'Refinery called gt_done without a pr_url after losing its hook — cannot confirm merge',
+          });
+          createBead(sql, {
+            type: 'escalation',
+            title: 'Refinery gt_done without pr_url after hook loss',
+            body:
+              `Refinery ${agentId} called gt_done with no pr_url while unhooked from MR ${mrBeadId}. ` +
+              `The hook was likely cleared by the reconciler after a phantom dispatch failure ` +
+              `while the SDK session was still alive. The MR has been failed (not merged) so a human ` +
+              `can verify whether the refinery's intended outcome was 'approve and merge' or ` +
+              `'request changes'. Summary from refinery: ${input.summary ?? '(none)'}`,
+            priority: 'high',
+            metadata: {
+              source_bead_id: mrBeadId,
+              source_agent_id: agentId,
+              kind: 'refinery_unhooked_done',
+            },
           });
         }
         return;

@@ -9,7 +9,7 @@ import type { Connection, ConnectionLifecycleHooks, WebSocketHeaders } from './b
 import { normalizeCliEvent, isChatEvent } from './normalizer';
 import { cloudAgentSdkRuntime } from './runtime';
 import { webInboundMessageSchema, heartbeatDataSchema, type WebInboundMessage } from './schemas';
-import type { TransportFactory, TransportSink } from './transport';
+import type { TransportFactory, TransportSendPayload, TransportSink } from './transport';
 import type { KiloSessionId, SessionSnapshot } from './types';
 
 type CliLiveTransportConfig = {
@@ -267,14 +267,25 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         );
       },
 
-      send: (payload: { prompt: string; mode?: string; model?: string; variant?: string }) =>
-        rawSendCommand('send_message', {
+      send: (input: { payload: TransportSendPayload }) => {
+        // CLI live transport does not yet support structured slash command
+        // invocation — kilo CLI's command API needs to be plumbed through
+        // its own raw protocol command. Reject explicitly so callers see
+        // a clear error rather than a silently-dropped command.
+        if (input.payload.type === 'command') {
+          return Promise.reject(
+            new Error('Slash commands are not supported on the CLI live transport yet')
+          );
+        }
+        const p = input.payload;
+        return rawSendCommand('send_message', {
           sessionID: config.kiloSessionId,
-          parts: [{ type: 'text', text: payload.prompt }],
-          ...(payload.mode ? { agent: payload.mode } : {}),
-          ...(payload.model ? { model: payload.model } : {}),
-          ...(payload.variant ? { variant: payload.variant } : {}),
-        }),
+          parts: [{ type: 'text', text: p.prompt }],
+          ...(p.mode ? { agent: p.mode } : {}),
+          ...(p.model ? { model: p.model } : {}),
+          ...(p.variant ? { variant: p.variant } : {}),
+        });
+      },
       interrupt: () => rawSendCommand('interrupt', {}),
       answer: (payload: { requestId: string; answers: unknown }) =>
         rawSendCommand('question_reply', {

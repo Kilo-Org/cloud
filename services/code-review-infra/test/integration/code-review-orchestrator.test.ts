@@ -44,7 +44,12 @@ function trpcSuccess(data: unknown): Response {
   return Response.json({ result: { data } });
 }
 
-function trpcError(status: number, message: string, code = 'INTERNAL_SERVER_ERROR'): Response {
+function trpcError(
+  status: number,
+  message: string,
+  code = 'INTERNAL_SERVER_ERROR',
+  data: Record<string, unknown> = {}
+): Response {
   return Response.json(
     {
       error: {
@@ -54,6 +59,7 @@ function trpcError(status: number, message: string, code = 'INTERNAL_SERVER_ERRO
           code,
           httpStatus: status,
           path: 'prepareSession',
+          ...data,
         },
       },
     },
@@ -531,6 +537,108 @@ describe('CodeReviewOrchestrator recovery', () => {
       }
     );
     expect(failedStatusUpdates).toHaveLength(0);
+  });
+
+  it('retries prepareSession from a structured workspace mkdir retry marker', async () => {
+    const stub = getReviewStub();
+    let prepareCalls = 0;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        prepareCalls += 1;
+        if (prepareCalls === 1) {
+          return trpcError(
+            500,
+            'Failed to create workspace directory: FileSystemError: mkdir operation failed with exit code NaN',
+            'INTERNAL_SERVER_ERROR',
+            { error: 'sandbox_internal_server_error', retryable: true }
+          );
+        }
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-workspace-retry',
+          kiloSessionId: 'ses_workspace_retry',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-workspace-retry', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    const status = await stub.status();
+    expect(status).toMatchObject({
+      status: 'running',
+      sessionId: 'agent-workspace-retry',
+      cliSessionId: 'ses_workspace_retry',
+    });
+
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      sandboxRetryAttempted: true,
+      status: 'running',
+      sessionId: 'agent-workspace-retry',
+      cliSessionId: 'ses_workspace_retry',
+    });
+
+    const failedStatusUpdates = fetchCalls(fetchMock, '/api/internal/code-review-status/').filter(
+      call => {
+        const init = call[1] as RequestInit | undefined;
+        if (typeof init?.body !== 'string') return false;
+        return (JSON.parse(init.body) as { status?: string }).status === 'failed';
+      }
+    );
+    expect(failedStatusUpdates).toHaveLength(0);
+  });
+
+  it('does not retry workspace mkdir prose without a structured retry marker', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(
+          500,
+          'Failed to create workspace directory: FileSystemError: mkdir operation failed with exit code NaN'
+        );
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'failed',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'failed',
+    });
+    const stored = await storedReview(stub);
+    expect(stored?.sandboxRetryAttempted).toBeUndefined();
   });
 
   it('retries prepareSession once after wrapper waitForPort readiness timeout', async () => {

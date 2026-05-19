@@ -249,6 +249,7 @@ export const ManyProfiles: Story = {
       mcpServerCount: Math.floor(Math.random() * 3),
       skillCount: Math.floor(Math.random() * 3),
       agentCount: Math.floor(Math.random() * 2),
+      kiloCommandCount: 0,
     }));
     return <ProfileSelectorWrapper profiles={manyProfiles} />;
   },

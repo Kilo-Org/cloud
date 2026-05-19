@@ -8,6 +8,7 @@ export type {
   McpServerConfigFragment,
   ProfileSkillResponse,
   ProfileAgentResponse,
+  ProfileKiloCommandResponse,
   ProfileResponse,
   ProfileResponseWithOwner,
   ProfileSummary,
@@ -34,6 +35,7 @@ export {
   type MergeProfileConfigurationResult,
   type MergedSkillForSession,
   type MergedAgentForSession,
+  type MergedKiloCommandForSession,
   type ClientMcpServerValue,
   type InlineSkillInput,
   type InlineAgentInput,
@@ -135,6 +137,28 @@ export {
   type AgentUpdateInput,
   type AgentForSession,
 } from './profile-agents-service';
+
+// Kilo command CRUD + session helpers
+export {
+  MAX_PROFILE_KILO_COMMANDS,
+  MAX_KILO_COMMAND_NAME_LENGTH,
+  MAX_KILO_COMMAND_TEMPLATE_LENGTH,
+  MAX_KILO_COMMAND_DESCRIPTION_LENGTH,
+  BUILTIN_COMMAND_NAMES,
+  kiloCommandNameSchema,
+  kiloCommandCreateInputSchema,
+  kiloCommandUpdateInputSchema,
+  listKiloCommandsForProfile,
+  createKiloCommand,
+  updateKiloCommand,
+  deleteKiloCommand,
+  setKiloCommandEnabled,
+  reorderKiloCommands,
+  getKiloCommandsForSession,
+  type KiloCommandCreateInput,
+  type KiloCommandUpdateInput,
+  type KiloCommandForSession,
+} from './profile-kilo-commands-service';
 
 // Repo binding CRUD
 export {

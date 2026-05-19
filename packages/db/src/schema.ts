@@ -4707,6 +4707,43 @@ export const agent_environment_profile_agents = pgTable(
 
 export type AgentEnvironmentProfileAgent = typeof agent_environment_profile_agents.$inferSelect;
 
+// ============ AGENT ENVIRONMENT PROFILE KILO COMMANDS ============
+// Custom slash commands attached to an environment profile. Materialized into
+// KILO_CONFIG_CONTENT.command.<name> at session preparation time.
+
+export const agent_environment_profile_kilo_commands = pgTable(
+  'agent_environment_profile_kilo_commands',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    description: text(),
+    template: text().notNull(),
+    agent: text(),
+    model: text(),
+    subtask: boolean().notNull().default(false),
+    enabled: boolean().notNull().default(true),
+    sort_order: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_agent_env_profile_kilo_cmds_profile_id').on(table.profile_id),
+    unique('UQ_agent_env_profile_kilo_cmds_profile_name').on(table.profile_id, table.name),
+  ]
+);
+
+export type AgentEnvironmentProfileKiloCommand =
+  typeof agent_environment_profile_kilo_commands.$inferSelect;
+
 // ============ APP BUILDER FEEDBACK ============
 
 export const app_builder_feedback = pgTable(
@@ -6114,9 +6151,11 @@ export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // Model experiments (preview/experimental A/B testing)
-// See `.plans/experimental-models-1.md` and (eventually) `.specs/model-experiments.md`.
+//
 // Scope: opt-in dedicated preview public model ids only. Never used for
-// production/general traffic. See plan for full design rationale.
+// production/general traffic. Users only reach this routing path by
+// explicitly selecting a dedicated preview public id (e.g.
+// `kilo/preview-experiment-foo`).
 // ---------------------------------------------------------------------------
 
 export const model_experiment = pgTable(
@@ -6185,11 +6224,10 @@ export type ModelExperimentVariant = typeof model_experiment_variant.$inferSelec
 export type NewModelExperimentVariant = typeof model_experiment_variant.$inferInsert;
 
 // Immutable per-variant version. New RC = new row. Never UPDATEd.
-// `upstream` is validated by ExperimentUpstreamSchema in app code (see
-// experimental-models-1.md Phase 1). The api key is stored separately in
-// `encrypted_api_key` (same shape as byok_api_keys.encrypted_api_key) so the
-// JSONB blob never holds the secret and reporting/admin views can simply omit
-// the column.
+// `upstream` is validated by ExperimentUpstreamSchema in app code. The
+// api key is stored separately in `encrypted_api_key` (same shape as
+// `byok_api_keys.encrypted_api_key`) so the JSONB blob never holds the
+// secret and reporting/admin views can simply omit the column.
 export const model_experiment_variant_version = pgTable(
   'model_experiment_variant_version',
   {
@@ -6215,8 +6253,11 @@ export type ModelExperimentVariantVersion = typeof model_experiment_variant_vers
 export type NewModelExperimentVariantVersion = typeof model_experiment_variant_version.$inferInsert;
 
 // One row per experimented request, keyed on usage_id (1:1 with microdollar_usage).
-// Stores attribution + R2 prompt hashes (or reserved sentinel values).
-// See experimental-models-1.md "Prompt Storage (R2)" for sentinel values.
+// Stores attribution + R2 prompt hashes. The two sha256 columns hold either
+// a 64-char lowercase hex digest pointing at an R2 object, or one of the
+// reserved sentinels: `__absent__` (system only, no leading system message),
+// `__failed__` (R2 storage failed), `__deleted__` (prompt content wiped
+// while retaining attribution).
 export const model_experiment_request = pgTable(
   'model_experiment_request',
   {

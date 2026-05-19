@@ -8,6 +8,7 @@ import { Command, CommandList, CommandItem, CommandEmpty } from '@/components/ui
 import { Send, Square, Paperclip, Upload } from 'lucide-react';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 import { cn } from '@/lib/utils';
+import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
 import { BrowseCommandsDialog } from './BrowseCommandsDialog';
 import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
@@ -28,6 +29,13 @@ import type { AgentMode } from './types';
 
 type ChatInputProps = {
   onSend: (message: string, images?: Images) => Promise<boolean>;
+  /**
+   * Invoked when the user submits a slash command (input starts with `/<name>`
+   * and `<name>` matches a known entry in `slashCommands`). When omitted or
+   * the input doesn't match a known command, the input is forwarded to
+   * `onSend` as plain text instead.
+   */
+  onSendCommand?: (command: string, args: string, images?: Images) => Promise<boolean>;
   onStop?: () => void;
   disabled?: boolean;
   isStreaming?: boolean;
@@ -71,6 +79,7 @@ type ChatInputProps = {
 
 export function ChatInput({
   onSend,
+  onSendCommand,
   onStop,
   disabled = false,
   isStreaming = false,
@@ -95,11 +104,10 @@ export function ChatInput({
   variantPickerTooltip,
 }: ChatInputProps) {
   const [value, setValue] = useState('');
-  const [showAutocomplete, setShowAutocomplete] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const valueRef = useRef('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const commandListRef = useRef<HTMLDivElement>(null);
 
   const setInputValue = useCallback((nextValue: string) => {
     valueRef.current = nextValue;
@@ -132,34 +140,6 @@ export function ChatInput({
     ? formatShortModelDisplayName(lockedModelOption.name)
     : model;
 
-  // Filter commands based on current input
-  const filteredCommands = useMemo(() => {
-    if (!slashCommands || slashCommands.length === 0) return [];
-    if (!value.startsWith('/')) return [];
-
-    const query = value.slice(1).toLowerCase();
-    return slashCommands.filter(cmd => cmd.trigger.toLowerCase().startsWith(query));
-  }, [value, slashCommands]);
-
-  // Determine if autocomplete should be shown
-  const shouldShowAutocomplete = useMemo(() => {
-    return (
-      value.startsWith('/') &&
-      filteredCommands.length > 0 &&
-      slashCommands &&
-      slashCommands.length > 0
-    );
-  }, [value, filteredCommands.length, slashCommands]);
-
-  // Update showAutocomplete state when conditions change
-  useEffect(() => {
-    setShowAutocomplete(shouldShowAutocomplete);
-    // Reset selected index when filtering changes
-    if (shouldShowAutocomplete) {
-      setSelectedIndex(0);
-    }
-  }, [shouldShowAutocomplete]);
-
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -180,13 +160,27 @@ export function ChatInput({
 
       setInputValue('');
       submittedImageIds.forEach(imageUpload.removeImage);
-      setShowAutocomplete(false);
 
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
 
-      const accepted = await onSend(trimmed, imagesData);
+      // Re-match against the trimmed value at submit time
+      let accepted: boolean;
+      const slashMatch = onSendCommand
+        ? /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(trimmed)
+        : null;
+      const slashCommand =
+        slashMatch && slashCommands?.some(c => c.trigger === slashMatch[1])
+          ? { command: slashMatch[1], args: slashMatch[2]?.trim() ?? '' }
+          : null;
+
+      if (slashCommand && onSendCommand) {
+        accepted = await onSendCommand(slashCommand.command, slashCommand.args, imagesData);
+      } else {
+        accepted = await onSend(trimmed, imagesData);
+      }
+
       if (!accepted) {
         if (valueRef.current === '') {
           setInputValue(trimmed);
@@ -197,7 +191,7 @@ export function ChatInput({
 
       return true;
     },
-    [disabled, imageUpload, onSend, setInputValue]
+    [disabled, imageUpload, onSend, onSendCommand, setInputValue, slashCommands]
   );
 
   const handleSend = () => {
@@ -210,63 +204,44 @@ export function ChatInput({
     }
   };
 
-  const handleSelectCommand = (command: SlashCommand, autoSend = false) => {
-    const expansion = command.expansion;
-    setShowAutocomplete(false);
-    setSelectedIndex(0);
-
-    if (autoSend) {
-      void sendMessage(expansion);
-    } else {
-      // Just fill the input for editing
-      setInputValue(expansion);
-      // Force height recalculation for expanded text
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+  const handleSelectCommand = useCallback(
+    (command: SlashCommand, autoSend = false) => {
+      if (autoSend) {
+        void sendMessage(`/${command.trigger}`);
+      } else {
+        const inserted = `/${command.trigger} `;
+        setInputValue(inserted);
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+          const end = inserted.length;
+          textareaRef.current.setSelectionRange(end, end);
+        }
       }
-    }
 
-    // Keep focus on textarea
-    textareaRef.current?.focus();
-  };
+      textareaRef.current?.focus();
+    },
+    [sendMessage, setInputValue]
+  );
+
+  const {
+    showAutocomplete,
+    selectedIndex,
+    setSelectedIndex,
+    filteredCommands,
+    handleKeyDown: handleAutocompleteKeyDown,
+    setShowAutocomplete,
+  } = useSlashCommandAutocomplete({
+    value,
+    slashCommands,
+    onSelect: handleSelectCommand,
+    listRef: commandListRef,
+  });
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Ignore keyboard events during IME composition (Chinese, Japanese, Korean input)
     if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
 
-    if (showAutocomplete && filteredCommands.length > 0) {
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault();
-          setSelectedIndex(prev => (prev + 1) % filteredCommands.length);
-          return;
-        case 'ArrowUp':
-          e.preventDefault();
-          setSelectedIndex(prev => (prev - 1 + filteredCommands.length) % filteredCommands.length);
-          return;
-        case 'Enter':
-          e.preventDefault();
-          // Bounds check to prevent race condition
-          if (selectedIndex >= 0 && selectedIndex < filteredCommands.length) {
-            // Enter = select and send; Shift+Enter = select and expand only
-            handleSelectCommand(filteredCommands[selectedIndex], !e.shiftKey);
-          }
-          return;
-        case 'Tab':
-          e.preventDefault();
-          // Bounds check to prevent race condition
-          if (selectedIndex >= 0 && selectedIndex < filteredCommands.length) {
-            // Tab = select and expand only (don't send)
-            handleSelectCommand(filteredCommands[selectedIndex], false);
-          }
-          return;
-        case 'Escape':
-          e.preventDefault();
-          setShowAutocomplete(false);
-          return;
-      }
-    }
+    if (handleAutocompleteKeyDown(e)) return;
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -368,8 +343,9 @@ export function ChatInput({
             sideOffset={4}
             onOpenAutoFocus={e => e.preventDefault()}
           >
-            <Command>
+            <Command shouldFilter={false} value={filteredCommands[selectedIndex]?.trigger ?? ''}>
               <CommandList
+                ref={commandListRef}
                 id="slash-command-list"
                 role="listbox"
                 className="max-h-64 overflow-auto"
@@ -380,13 +356,8 @@ export function ChatInput({
                     key={cmd.trigger}
                     value={cmd.trigger}
                     onSelect={() => handleSelectCommand(cmd)}
-                    className={cn(
-                      'flex cursor-pointer flex-col items-start gap-1 px-3 py-2',
-                      index === selectedIndex && 'bg-accent'
-                    )}
+                    className="flex cursor-pointer flex-col items-start gap-1 px-3 py-2"
                     onMouseEnter={() => setSelectedIndex(index)}
-                    role="option"
-                    aria-selected={index === selectedIndex}
                   >
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm font-medium text-blue-400">

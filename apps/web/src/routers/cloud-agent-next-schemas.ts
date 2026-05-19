@@ -201,6 +201,7 @@ export const basePrepareSessionNextSchema = z
     autoInitiate: z.boolean().optional(),
     initialMessageId: z.string().startsWith('msg_').length(30).optional(),
     images: cloudAgentImagesSchema,
+    devcontainer: z.boolean().optional(),
   })
   .refine(
     data => (data.githubRepo || data.gitlabProject) && !(data.githubRepo && data.gitlabProject),
@@ -235,17 +236,34 @@ export const agentModeSendMessageSchema = z
     message: 'Custom mode requires prepareSession/updateSession, not sendMessage',
   });
 
+/**
+ * Discriminated payload for sendMessage — free-text prompt or structured slash
+ * command. Mirrors the worker's SendMessageV2Payload schema; both variants
+ * ride the same execution pipeline on the cloud-agent-next side.
+ */
+export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('prompt'),
+    prompt: z.string().min(1),
+    mode: agentModeSendMessageSchema,
+    model: z.string().min(1),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
+  }),
+  z.object({
+    type: z.literal('command'),
+    command: z.string().min(1),
+    arguments: z.string().default(''),
+  }),
+]);
+
 // Schema for sending a message (V2 - uses cloudAgentSessionId)
 export const baseSendMessageNextSchema = z.object({
   cloudAgentSessionId: z.string(),
-  prompt: z.string().min(1),
-  mode: agentModeSendMessageSchema,
-  model: z.string().min(1),
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
+  payload: sendMessageNextPayloadSchema,
   autoCommit: z.boolean().optional(),
   messageId: z.string().startsWith('msg_').length(30).optional(),
   images: cloudAgentImagesSchema,
@@ -259,6 +277,75 @@ export const baseInterruptSessionNextSchema = z.object({
 // Schema for getting session state
 export const baseGetSessionNextSchema = z.object({
   cloudAgentSessionId: z.string(),
+});
+
+export const cloudAgentTerminalSizeSchema = z.object({
+  cols: z.number().int().min(2).max(500),
+  rows: z.number().int().min(2).max(200),
+});
+
+export const cloudAgentTerminalPtyIdSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[a-zA-Z0-9_-]+$/);
+
+export const cloudAgentTerminalPtySchema = z.object({
+  id: cloudAgentTerminalPtyIdSchema,
+  title: z.string(),
+  command: z.string(),
+  args: z.array(z.string()),
+  cwd: z.string(),
+  status: z.enum(['running', 'exited']),
+  pid: z.number().int(),
+});
+
+export const baseCreateTerminalNextSchema = z
+  .object({
+    cloudAgentSessionId: z.string(),
+  })
+  .extend(cloudAgentTerminalSizeSchema.partial().shape)
+  .refine(data => (data.cols === undefined) === (data.rows === undefined), {
+    message: 'cols and rows must be provided together',
+  });
+
+export const baseResizeTerminalNextSchema = z
+  .object({
+    cloudAgentSessionId: z.string(),
+    ptyId: cloudAgentTerminalPtyIdSchema,
+  })
+  .extend(cloudAgentTerminalSizeSchema.shape);
+
+export const baseCloseTerminalNextSchema = z.object({
+  cloudAgentSessionId: z.string(),
+  ptyId: cloudAgentTerminalPtyIdSchema,
+});
+
+export const baseCreateTerminalNextOutputSchema = z.object({
+  pty: cloudAgentTerminalPtySchema,
+  ptyId: cloudAgentTerminalPtyIdSchema,
+  wsUrl: z.string().min(1),
+  ticket: z.string().min(1),
+  expiresAt: z.number().int().positive(),
+});
+
+export const baseRefreshTerminalTicketNextSchema = z.object({
+  cloudAgentSessionId: z.string(),
+  ptyId: cloudAgentTerminalPtyIdSchema,
+});
+
+export const baseRefreshTerminalTicketNextOutputSchema = z.object({
+  wsUrl: z.string().min(1),
+  ticket: z.string().min(1),
+  expiresAt: z.number().int().positive(),
+});
+
+export const baseResizeTerminalNextOutputSchema = z.object({
+  pty: cloudAgentTerminalPtySchema,
+});
+
+export const baseCloseTerminalNextOutputSchema = z.object({
+  success: z.boolean(),
 });
 
 // Execution status schema for getSession response

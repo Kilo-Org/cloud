@@ -1,10 +1,25 @@
 /**
- * Copy the root pnpm-workspace.yaml (catalog only) and pnpm-lock.yaml
- * into the container build context so pnpm can resolve catalog: references.
+ * Copy the root pnpm-workspace.yaml (with `packages:` and
+ * `patchedDependencies:` stripped) and pnpm-lock.yaml into the container
+ * build context so pnpm can resolve catalog: references and honour the
+ * same overrides / allowBuilds policy as the monorepo root.
  *
- * The packages: section and other non-catalog sections are stripped because
- * those workspace paths don't exist inside the container and would cause
- * pnpm to error on workspace: references.
+ * Stripped sections:
+ *   - `packages:` — workspace paths don't exist inside the container and
+ *     would cause pnpm to error on workspace: references.
+ *   - `patchedDependencies:` — patch files live under repoRoot/patches/
+ *     and aren't copied into the container; pnpm would fail to find them.
+ *
+ * Sections kept (notably):
+ *   - `catalog:` — required to resolve `catalog:` deps in package.prod.json.
+ *   - `overrides:` — the lockfile bakes resolved versions in, but pnpm
+ *     validates that workspace overrides match what's pinned. Dropping
+ *     this triggers ERR_PNPM_LOCKFILE_CONFIG_MISMATCH.
+ *   - `allowBuilds:` — required for transitive native-build deps such as
+ *     msgpackr-extract; without it, pnpm 11 exits with
+ *     ERR_PNPM_IGNORED_BUILDS in non-interactive mode.
+ *   - `publicHoistPattern`, `autoInstallPeers`, `minimumReleaseAge*` —
+ *     keep pnpm behaviour aligned with the root install.
  */
 
 import { readFileSync, writeFileSync, copyFileSync } from 'node:fs';
@@ -16,30 +31,32 @@ const gastownRoot = resolve(__dirname, '..');
 const repoRoot = resolve(gastownRoot, '..', '..');
 const containerDir = resolve(gastownRoot, 'container');
 
-// Read root workspace yaml and extract only the catalog: section.
-// Parse line-by-line: keep lines from `catalog:` until the next
-// top-level key (a line starting with a non-space, non-comment char).
+// Read root workspace yaml and drop the top-level sections that don't
+// make sense (or actively break) inside the container build context.
+// Parse line-by-line: a top-level key is a line whose first character is
+// non-whitespace and not `#`. Once we see a key in DROP_TOP_KEYS, skip
+// all of its (indented/blank/comment) child lines until the next
+// top-level key or EOF.
+const DROP_TOP_KEYS = new Set(['packages', 'patchedDependencies']);
+
 const lines = readFileSync(resolve(repoRoot, 'pnpm-workspace.yaml'), 'utf8').split('\n');
-const catalogLines = [];
-let inCatalog = false;
+const kept = [];
+let dropping = false;
+
+const isTopLevelKey = line =>
+  line.length > 0 && !line.startsWith(' ') && !line.startsWith('\t') && !line.startsWith('#');
 
 for (const line of lines) {
-  if (line.startsWith('catalog:')) {
-    inCatalog = true;
-    catalogLines.push(line);
+  if (isTopLevelKey(line)) {
+    const key = line.split(':', 1)[0];
+    dropping = DROP_TOP_KEYS.has(key);
+    if (!dropping) kept.push(line);
     continue;
   }
-  if (inCatalog) {
-    // Still in catalog if line is indented, empty, or a comment
-    if (line === '' || line.startsWith(' ') || line.startsWith('\t') || line.startsWith('#')) {
-      catalogLines.push(line);
-    } else {
-      break;
-    }
-  }
+  if (!dropping) kept.push(line);
 }
 
-writeFileSync(resolve(containerDir, 'pnpm-workspace.yaml'), catalogLines.join('\n') + '\n');
+writeFileSync(resolve(containerDir, 'pnpm-workspace.yaml'), kept.join('\n'));
 
 // Create a production-only package.json that strips workspace: references
 // (they can't be resolved outside the monorepo).
@@ -59,5 +76,5 @@ writeFileSync(resolve(containerDir, 'package.prod.json'), JSON.stringify(pkg, nu
 copyFileSync(resolve(repoRoot, 'pnpm-lock.yaml'), resolve(containerDir, 'pnpm-lock.yaml'));
 
 console.log(
-  'Prepared container build context with pnpm-workspace.yaml (catalog only) and pnpm-lock.yaml'
+  'Prepared container build context with pnpm-workspace.yaml (packages/patchedDependencies stripped) and pnpm-lock.yaml'
 );

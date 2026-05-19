@@ -128,7 +128,7 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <KiloCrabIcon className="size-4" />,
   },
   {
-    title: () => 'Community PRs',
+    title: () => 'Community Contributions',
     url: '/admin/community-prs',
     icon: () => <GitPullRequest />,
   },

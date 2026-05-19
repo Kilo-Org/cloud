@@ -114,7 +114,13 @@ export function ProfilePickerPopover({
     const vars = Math.max(baseProfile?.varCount ?? 0, topProfile?.varCount ?? 0);
     const mcps = (baseProfile?.mcpServerCount ?? 0) + (topProfile?.mcpServerCount ?? 0);
     const skills = (baseProfile?.skillCount ?? 0) + (topProfile?.skillCount ?? 0);
-    return [vars > 0 && `${vars} vars`, mcps > 0 && `${mcps} MCP`, skills > 0 && `${skills} skills`]
+    const cmds = (baseProfile?.kiloCommandCount ?? 0) + (topProfile?.kiloCommandCount ?? 0);
+    return [
+      vars > 0 && `${vars} vars`,
+      mcps > 0 && `${mcps} MCP`,
+      skills > 0 && `${skills} skills`,
+      cmds > 0 && `${cmds} cmds`,
+    ]
       .filter(Boolean)
       .join(' · ');
   }, [baseProfile, topProfile]);
@@ -124,6 +130,7 @@ export function ProfilePickerPopover({
       profile.varCount > 0 && `${profile.varCount} vars`,
       profile.mcpServerCount > 0 && `${profile.mcpServerCount} MCP`,
       profile.skillCount > 0 && `${profile.skillCount} skills`,
+      profile.kiloCommandCount > 0 && `${profile.kiloCommandCount} cmds`,
     ]
       .filter(Boolean)
       .join(' · ');

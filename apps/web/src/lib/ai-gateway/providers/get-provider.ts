@@ -11,41 +11,14 @@ import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
-import type { BYOKResult, GatewayChatApiKind, Provider } from '@/lib/ai-gateway/providers/types';
+import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
+import { CustomLlmDefinitionSchema } from '@kilocode/db';
 import {
-  CustomLlmDefinitionSchema,
-  type OpenClawApiAdapter,
-  type CustomLlmProvider,
-} from '@kilocode/db';
-import {
-  addCacheBreakpoints,
-  injectReasoningIntoContent,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-
-function inferSupportedChatApis(
-  aiSdkProvider: CustomLlmProvider | undefined,
-  openClawApiAdapter: OpenClawApiAdapter | undefined
-): ReadonlyArray<GatewayChatApiKind> {
-  const result = new Array<GatewayChatApiKind>();
-  if (aiSdkProvider === 'openai' || openClawApiAdapter === 'openai-responses') {
-    result.push('responses');
-  }
-  if (aiSdkProvider === 'anthropic' || openClawApiAdapter === 'anthropic-messages') {
-    result.push('messages');
-  }
-  if (
-    aiSdkProvider === 'openai-compatible' ||
-    aiSdkProvider === 'alibaba' ||
-    aiSdkProvider === 'openrouter' ||
-    openClawApiAdapter === 'openai-completions' ||
-    result.length === 0
-  ) {
-    result.push('chat_completions');
-  }
-  return result;
-}
+  buildDirectProvider,
+  inferSupportedChatApis,
+} from '@/lib/ai-gateway/experiments/build-direct-provider';
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
@@ -95,32 +68,22 @@ async function checkCustomLlm(
     return null;
   }
   return {
-    provider: {
-      id: 'custom',
-      apiUrl: customLlm.base_url,
-      apiKey: customLlm.api_key,
-      supportedChatApis: inferSupportedChatApis(
-        customLlm.opencode_settings?.ai_sdk_provider,
-        customLlm.openclaw_settings?.api_adapter
-      ),
-      transformRequest(context) {
-        if (customLlm.remove_from_body) {
-          const body = context.request.body as Record<string, unknown>;
-          for (const key of customLlm.remove_from_body ?? []) {
-            delete body[key];
-          }
-        }
-        Object.assign(context.request.body, customLlm.extra_body ?? {});
-        Object.assign(context.extraHeaders, customLlm.extra_headers ?? {});
-        context.request.body.model = customLlm.internal_id;
-        if (customLlm.add_cache_breakpoints) {
-          addCacheBreakpoints(context.request);
-        }
-        if (customLlm.inject_reasoning_into_content) {
-          injectReasoningIntoContent(context.request);
-        }
-      },
-    },
+    provider: buildDirectProvider({
+      internal_id: customLlm.internal_id,
+      base_url: customLlm.base_url,
+      api_key: customLlm.api_key,
+      opencode_settings: customLlm.opencode_settings
+        ? { ai_sdk_provider: customLlm.opencode_settings.ai_sdk_provider }
+        : undefined,
+      openclaw_settings: customLlm.openclaw_settings
+        ? { api_adapter: customLlm.openclaw_settings.api_adapter }
+        : undefined,
+      extra_body: customLlm.extra_body,
+      extra_headers: customLlm.extra_headers,
+      remove_from_body: customLlm.remove_from_body,
+      add_cache_breakpoints: customLlm.add_cache_breakpoints,
+      inject_reasoning_into_content: customLlm.inject_reasoning_into_content,
+    }),
     userByok: null,
     bypassAccessCheck: true,
   };

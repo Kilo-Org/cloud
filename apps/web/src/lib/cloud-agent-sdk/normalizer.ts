@@ -4,7 +4,7 @@
  * boundary `as` casts so downstream code receives properly typed NormalizedEvents.
  */
 import type { Part, SessionStatus, QuestionInfo, Message } from '@/types/opencode.gen';
-import type { SessionInfo, CloudStatus, SuggestionAction } from './types';
+import type { SessionInfo, CloudStatus, SuggestionAction, SlashCommandInfo } from './types';
 import {
   cloudAgentEventSchema,
   kilocodePayloadSchema,
@@ -33,6 +33,7 @@ import {
   autocommitCompletedDataSchema,
   cloudStatusDataSchema,
   connectedDataSchema,
+  commandsAvailableDataSchema,
   type CloudAgentEvent,
 } from './schemas';
 
@@ -111,7 +112,8 @@ export type ServiceEvent =
       type: 'connected';
       sessionStatus?: SessionStatus;
       cloudStatus?: CloudStatus;
-    };
+    }
+  | { type: 'commands.available'; commands: SlashCommandInfo[] };
 
 export type NormalizedEvent = ChatEvent | ServiceEvent;
 
@@ -376,6 +378,12 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         ...(r.data.sessionStatus !== undefined && { sessionStatus: r.data.sessionStatus }),
         ...(r.data.cloudStatus !== undefined && { cloudStatus: r.data.cloudStatus }),
       };
+    }
+
+    case 'commands.available': {
+      const r = commandsAvailableDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return { type: 'commands.available', commands: r.data.commands };
     }
 
     default:

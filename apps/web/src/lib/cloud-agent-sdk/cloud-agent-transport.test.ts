@@ -369,13 +369,13 @@ describe('CloudAgentTransport command delegation', () => {
     const api = createMockApi();
     const { transport } = createTransportWithSinks(undefined, undefined, api);
 
-    void transport.send!({ prompt: 'hello', mode: 'code', model: 'gpt-4' });
+    void transport.send!({
+      payload: { type: 'prompt', prompt: 'hello', mode: 'code', model: 'gpt-4' },
+    });
 
     expect(api.send).toHaveBeenCalledWith({
       sessionId: 'ses-1',
-      prompt: 'hello',
-      mode: 'code',
-      model: 'gpt-4',
+      payload: { type: 'prompt', prompt: 'hello', mode: 'code', model: 'gpt-4' },
     });
 
     transport.destroy();

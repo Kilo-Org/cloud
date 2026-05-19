@@ -142,9 +142,9 @@ export const LINEAR_CLIENT_ID = getEnvVariable('LINEAR_CLIENT_ID');
 export const LINEAR_CLIENT_SECRET = getEnvVariable('LINEAR_CLIENT_SECRET');
 export const LINEAR_WEBHOOK_SECRET = getEnvVariable('LINEAR_WEBHOOK_SECRET');
 
-// DoltHub (dev-only OAuth integration — app pending admin approval)
-export const DOLTHUB_APP_DEV_CLIENT_ID = getEnvVariable('DOLTHUB_APP_DEV_CLIENT_ID');
-export const DOLTHUB_APP_DEV_CLIENT_SECRET = getEnvVariable('DOLTHUB_APP_DEV_CLIENT_SECRET');
+// DoltHub OAuth integration
+export const DOLTHUB_APP_CLIENT_ID = getEnvVariable('DOLTHUB_APP_CLIENT_ID');
+export const DOLTHUB_APP_CLIENT_SECRET = getEnvVariable('DOLTHUB_APP_CLIENT_SECRET');
 
 // Discord (bot integration — existing)
 export const DISCORD_CLIENT_ID = getEnvVariable('DISCORD_CLIENT_ID');

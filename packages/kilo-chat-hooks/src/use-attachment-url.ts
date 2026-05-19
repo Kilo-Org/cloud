@@ -17,7 +17,7 @@ export function useAttachmentUrl(
   attachmentId: string | null
 ): UseQueryResult<AttachmentGetUrlResponse> {
   return useQuery({
-    queryKey: attachmentUrlKey(attachmentId),
+    queryKey: attachmentUrlKey(conversationId, attachmentId),
     queryFn: async () => {
       if (!conversationId || !attachmentId) {
         throw new Error('useAttachmentUrl called without ids');

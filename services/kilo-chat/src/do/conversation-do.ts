@@ -1543,6 +1543,14 @@ export class ConversationDO extends DurableObject<Env> {
     // This covers attachments whose DB rows we'll wipe below as well as any
     // orphaned objects (e.g. uploads that completed after the row was
     // expired by the orphan sweeper).
+    //
+    // Known gap (accepted): a client that obtained a presigned PUT URL before
+    // destroy can still upload bytes *after* this list() — up to the URL's
+    // remaining TTL (PUT_URL_TTL_SECONDS in handler.ts). Those bytes will
+    // remain in R2 with no DB row and no future sweeper, since this DO is
+    // gone. The window is short and worst-case cost is a few KB per destroyed
+    // conversation; revisit by shortening the PUT TTL if it ever shows up in
+    // R2 usage.
     const prefix = `${this.keyPrefix}attachments/${info.id}/`;
     let cursor: string | undefined;
     do {

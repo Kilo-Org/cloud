@@ -23,7 +23,14 @@ describe('ConversationDO.initAttachment', () => {
     if (!result.ok) return;
     expect(result.attachmentId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
     expect(result.r2Key).toContain(`attachments/${conversationId}/user-A/`);
-    expect(result.row.status).toBe('pending');
+    const stored = await stub.getAttachmentForRead({
+      requesterId: 'user-A',
+      attachmentId: result.attachmentId,
+    });
+    expect(stored.ok).toBe(true);
+    // The row remains pending until createMessage links it, so the read
+    // helper (which only returns linked rows) reports null.
+    if (stored.ok) expect(stored.row).toBeNull();
   });
 
   it('accepts size 0 (empty file)', async () => {
@@ -38,8 +45,7 @@ describe('ConversationDO.initAttachment', () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.row.size).toBe(0);
-    expect(result.row.status).toBe('pending');
+    expect(result.attachmentId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
   });
 
   it('rejects non-integer size with invalid code', async () => {

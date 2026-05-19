@@ -249,7 +249,6 @@ export type InitAttachmentOk = {
   ok: true;
   attachmentId: string;
   r2Key: string;
-  row: StoredAttachmentRow;
 };
 export type InitAttachmentErr = {
   ok: false;
@@ -1374,7 +1373,6 @@ export class ConversationDO extends DurableObject<Env> {
         ok: true,
         attachmentId: existing.id,
         r2Key: existing.r2_key,
-        row: existing,
       };
     }
 
@@ -1402,14 +1400,9 @@ export class ConversationDO extends DurableObject<Env> {
       })
       .run();
 
-    const row = this.db.select().from(attachments).where(eq(attachments.id, attachmentId)).get();
-    if (!row) {
-      throw new Error(`initAttachment: row ${attachmentId} not found after insert`);
-    }
-
     this.scheduleOrphanSweepIfNeeded();
 
-    return { ok: true, attachmentId, r2Key, row };
+    return { ok: true, attachmentId, r2Key };
   }
 
   getAttachmentForRead(params: GetAttachmentForReadParams): GetAttachmentForReadResult {

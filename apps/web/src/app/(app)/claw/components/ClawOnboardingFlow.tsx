@@ -150,17 +150,26 @@ function writeComposioPopupLoadingPage(popup: Window) {
   popup.document.close();
 }
 
-function isComposioPopupMessage(
-  value: unknown
-): value is { type: 'kiloclaw:composio-connect'; result: 'success' | 'failed' | 'unknown' } {
+function isComposioPopupMessage(value: unknown): value is {
+  type: 'kiloclaw:composio-connect';
+  result: 'success' | 'failed' | 'unknown';
+  attemptId: string;
+} {
   if (typeof value !== 'object' || value === null) return false;
   const candidate = value as Record<string, unknown>;
   return (
     candidate.type === 'kiloclaw:composio-connect' &&
     (candidate.result === 'success' ||
       candidate.result === 'failed' ||
-      candidate.result === 'unknown')
+      candidate.result === 'unknown') &&
+    typeof candidate.attemptId === 'string' &&
+    candidate.attemptId.length > 0
   );
+}
+
+function createComposioConnectAttemptId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 export type { ClawOnboardingMode };
@@ -299,6 +308,7 @@ function ClawOnboardingFlowInner({
   const composioPopupRef = useRef<Window | null>(null);
   const composioPopupPendingRef = useRef(false);
   const composioPopupResultHandledRef = useRef(false);
+  const composioPopupAttemptIdRef = useRef<string | null>(null);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
 
   const stateInput = {
@@ -364,16 +374,18 @@ function ClawOnboardingFlowInner({
   }, []);
 
   const handleComposioPopupResult = useCallback(
-    (result: 'success' | 'failed' | 'unknown') => {
+    (message: { result: 'success' | 'failed' | 'unknown'; attemptId: string }) => {
       if (!composioPopupPendingRef.current || composioPopupResultHandledRef.current) return;
+      if (message.attemptId !== composioPopupAttemptIdRef.current) return;
       composioPopupResultHandledRef.current = true;
       composioPopupRef.current?.close();
       composioPopupRef.current = null;
+      composioPopupAttemptIdRef.current = null;
       setComposioPopupPendingState(false);
       setOnboardingStep('tools');
       void composioStatus.refetch();
 
-      if (result === 'success') {
+      if (message.result === 'success') {
         posthog?.capture('claw_setup_tools_composio_completed');
         toast.success('Google Calendar connected');
         return;
@@ -391,7 +403,7 @@ function ClawOnboardingFlowInner({
     function handleMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) return;
       if (!isComposioPopupMessage(event.data)) return;
-      handleComposioPopupResult(event.data.result);
+      handleComposioPopupResult(event.data);
     }
 
     window.addEventListener('message', handleMessage);
@@ -404,7 +416,7 @@ function ClawOnboardingFlowInner({
       try {
         const parsed: unknown = JSON.parse(event.newValue);
         if (!isComposioPopupMessage(parsed)) return;
-        handleComposioPopupResult(parsed.result);
+        handleComposioPopupResult(parsed);
       } catch {
         return;
       }
@@ -419,7 +431,7 @@ function ClawOnboardingFlowInner({
     const channel = new BroadcastChannel('kiloclaw:composio-connect');
     channel.onmessage = event => {
       if (!isComposioPopupMessage(event.data)) return;
-      handleComposioPopupResult(event.data.result);
+      handleComposioPopupResult(event.data);
     };
     return () => channel.close();
   }, [handleComposioPopupResult]);
@@ -432,6 +444,7 @@ function ClawOnboardingFlowInner({
       if (!popup || !popup.closed) return;
 
       composioPopupRef.current = null;
+      composioPopupAttemptIdRef.current = null;
       setComposioPopupPendingState(false);
       void composioStatus.refetch();
       posthog?.capture('claw_setup_tools_connect_failed', {
@@ -449,6 +462,7 @@ function ClawOnboardingFlowInner({
 
     composioPopupRef.current?.close();
     composioPopupRef.current = null;
+    composioPopupAttemptIdRef.current = null;
     setComposioPopupPendingState(false);
     posthog?.capture('claw_setup_tools_composio_completed', { source: 'status_refetch' });
     toast.success('Google Calendar connected');
@@ -822,12 +836,14 @@ function ClawOnboardingFlowInner({
             'popup,width=520,height=720'
           );
           composioPopupRef.current = popup;
+          const attemptId = popup ? createComposioConnectAttemptId() : undefined;
+          composioPopupAttemptIdRef.current = attemptId ?? null;
           if (popup) {
             setComposioPopupPendingState(true);
             writeComposioPopupLoadingPage(popup);
           }
           mutations.createComposioGoogleCalendarLink.mutate(
-            { returnTo, popup: popup !== null },
+            { returnTo, popup: popup !== null, attemptId },
             {
               onSuccess: result => {
                 if (popup) {
@@ -839,6 +855,7 @@ function ClawOnboardingFlowInner({
               onError: err => {
                 popup?.close();
                 composioPopupRef.current = null;
+                composioPopupAttemptIdRef.current = null;
                 setComposioPopupPendingState(false);
                 posthog?.capture('claw_setup_tools_connect_failed', {
                   toolkit: 'googlecalendar',

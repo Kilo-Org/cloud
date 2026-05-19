@@ -2450,6 +2450,19 @@ export function SettingsTab({
                 <SecretEntrySection
                   key={entry.id}
                   entry={entry}
+                  configured={configuredSecrets[entry.id] ?? false}
+                  mutations={mutations}
+                  onSecretsChanged={onSecretsChanged}
+                  isDirty={dirtySecrets.has(entry.id)}
+                  onRedeploy={onRedeploy}
+                />
+              ))}
+            {toolEntries
+              .filter(e => e.id === 'composio')
+              .map(entry => (
+                <SecretEntrySection
+                  key={entry.id}
+                  entry={entry}
                   configured={composioConfigured}
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
@@ -2476,19 +2489,6 @@ export function SettingsTab({
                       </p>
                     ) : undefined
                   }
-                />
-              ))}
-            {toolEntries
-              .filter(e => e.id === 'composio')
-              .map(entry => (
-                <SecretEntrySection
-                  key={entry.id}
-                  entry={entry}
-                  configured={configuredSecrets[entry.id] ?? false}
-                  mutations={mutations}
-                  onSecretsChanged={onSecretsChanged}
-                  isDirty={dirtySecrets.has(entry.id)}
-                  onRedeploy={onRedeploy}
                 />
               ))}
           </div>

@@ -16,6 +16,10 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
   KiloClawInternalClient: jest.fn(),
 }));
 
+jest.mock('@/lib/kiloclaw/encryption', () => ({
+  encryptKiloClawSecret: jest.fn((value: string) => `encrypted:${value}`),
+}));
+
 const selectedRows: unknown[][] = [];
 
 jest.mock('@/lib/drizzle', () => ({
@@ -29,7 +33,11 @@ jest.mock('@/lib/drizzle', () => ({
         })),
       })),
     })),
-    insert: jest.fn(),
+    insert: jest.fn(() => ({
+      values: jest.fn(() => ({
+        onConflictDoUpdate: jest.fn(async () => undefined),
+      })),
+    })),
     delete: jest.fn(),
   },
 }));
@@ -143,6 +151,28 @@ describe('completeManagedComposioGoogleCalendarConnection', () => {
 
     expect(result).toBe(false);
     expect(mockedKiloClawInternalClient).not.toHaveBeenCalled();
+  });
+
+  it('patches managed credentials through workerInstanceId routing', async () => {
+    selectedRows.push([{ source: 'managed' }]);
+    const patchSecrets = jest.fn(async () => ({}));
+    mockedKiloClawInternalClient.mockImplementation(
+      () => ({ patchSecrets }) as unknown as KiloClawInternalClient
+    );
+
+    const result = await completeManagedComposioGoogleCalendarConnection({
+      userId: 'user-1',
+      instance,
+      scope,
+      connectedAccountId: 'ca_123',
+    });
+
+    expect(result).toBe(true);
+    expect(patchSecrets).toHaveBeenCalledWith(
+      'user-1',
+      { secrets: expect.objectContaining({ composioUserApiKey: expect.any(String) }) },
+      undefined
+    );
   });
 });
 

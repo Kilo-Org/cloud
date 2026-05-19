@@ -21,7 +21,7 @@ import {
   type DecryptedComposioIdentity,
   type ComposioOwnerScope,
 } from '@/lib/kiloclaw/composio-identities';
-import type { ActiveKiloClawInstance } from '@/lib/kiloclaw/instance-registry';
+import { workerInstanceId, type ActiveKiloClawInstance } from '@/lib/kiloclaw/instance-registry';
 
 export type ComposioConnectionStatus = 'not_configured' | 'disconnected' | 'connected' | 'error';
 
@@ -47,11 +47,13 @@ export function getComposioConnectCallbackUrl(params: {
   organizationId?: string;
   returnTo: string;
   popup?: boolean;
+  attemptId?: string;
 }): string {
   const url = new URL('/api/integrations/composio/callback', APP_URL);
   url.searchParams.set('returnTo', params.returnTo);
   if (params.organizationId) url.searchParams.set('organizationId', params.organizationId);
   if (params.popup) url.searchParams.set('popup', '1');
+  if (params.attemptId) url.searchParams.set('attemptId', params.attemptId);
   return url.toString();
 }
 
@@ -70,7 +72,7 @@ export async function applyManagedComposioCredentials(params: {
         composioOrg: encryptKiloClawSecret(identity.org),
       },
     },
-    params.instance.id
+    workerInstanceId(params.instance)
   );
   await markComposioInstanceConfig({
     instanceId: params.instance.id,
@@ -221,7 +223,7 @@ export async function completeManagedComposioGoogleCalendarConnection(params: {
         composioOrg: encryptKiloClawSecret(identity.org),
       },
     },
-    params.instance.id
+    workerInstanceId(params.instance)
   );
   await markComposioInstanceConfig({
     instanceId: params.instance.id,
@@ -238,6 +240,7 @@ export async function createManagedComposioGoogleCalendarLink(params: {
   organizationId?: string;
   returnTo: string;
   popup?: boolean;
+  attemptId?: string;
 }): Promise<{ redirectUrl: string; connectedAccountId: string }> {
   const identity = await ensureManagedComposioIdentity(params.scope);
   const auth = composioUserContextAuth(identity);
@@ -252,6 +255,7 @@ export async function createManagedComposioGoogleCalendarLink(params: {
       organizationId: params.organizationId,
       returnTo: params.returnTo,
       popup: params.popup,
+      attemptId: params.attemptId,
     }),
   });
 }

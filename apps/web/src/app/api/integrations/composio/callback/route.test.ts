@@ -81,13 +81,16 @@ describe('GET /api/integrations/composio/callback', () => {
 
     const { GET } = await import('./route');
     const response = await GET(
-      makeRequest('/api/integrations/composio/callback?popup=1&status=success') as never
+      makeRequest(
+        '/api/integrations/composio/callback?popup=1&attemptId=attempt-1&status=success'
+      ) as never
     );
 
     expect(response.status).toBe(200);
     expect(response.headers.get('location')).toBeNull();
     const body = await responseBody(response);
     expect(body).toContain('kiloclaw:composio-connect');
+    expect(body).toContain('attempt-1');
     expect(body).toContain('unauthorized');
     expect(body).toContain('BroadcastChannel');
   });
@@ -173,5 +176,17 @@ describe('GET /api/integrations/composio/callback', () => {
       scope: { ownerType: 'organization_user', userId: USER_ID, organizationId: ORG_ID },
       connectedAccountId: 'ca_123',
     });
+  });
+
+  test('includes popup attempt id in success document payload', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/composio/callback?popup=1&attemptId=attempt-2&organizationId=${ORG_ID}&returnTo=%2Forganizations%2F${ORG_ID}%2Fclaw%2Fnew%3Fstep%3Dtools&status=success&connected_account_id=ca_123`
+      ) as never
+    );
+
+    const body = await responseBody(response);
+    expect(body).toContain('attempt-2');
   });
 });

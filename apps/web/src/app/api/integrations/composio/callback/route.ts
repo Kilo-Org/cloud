@@ -46,7 +46,8 @@ function appendError(path: string, error: string): string {
 
 function popupResultResponse(
   result: 'success' | 'failed' | 'unknown',
-  error?: string
+  error?: string,
+  attemptId?: string | null
 ): NextResponse {
   const title = result === 'success' ? 'Google Calendar connected' : 'Connection incomplete';
   const description =
@@ -56,6 +57,7 @@ function popupResultResponse(
   const payload = JSON.stringify({
     type: 'kiloclaw:composio-connect',
     result,
+    attemptId: attemptId ?? null,
     ...(error ? { error } : {}),
   });
   const targetOrigin = JSON.stringify(new URL(APP_URL).origin);
@@ -141,17 +143,18 @@ export async function GET(request: NextRequest) {
   const organizationId = parsedOrgId?.success ? parsedOrgId.data : undefined;
   const returnTo = safeReturnTo(request.nextUrl.searchParams.get('returnTo'), organizationId);
   const popup = request.nextUrl.searchParams.get('popup') === '1';
+  const attemptId = request.nextUrl.searchParams.get('attemptId');
 
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
-      if (popup) return popupResultResponse('failed', 'unauthorized');
+      if (popup) return popupResultResponse('failed', 'unauthorized', attemptId);
       return NextResponse.redirect(new URL('/users/sign_in', APP_URL));
     }
 
     if (organizationIdParam) {
       if (!parsedOrgId?.success) {
-        if (popup) return popupResultResponse('failed', 'invalid_state');
+        if (popup) return popupResultResponse('failed', 'invalid_state', attemptId);
         return NextResponse.redirect(new URL(appendError(returnTo, 'invalid_state'), APP_URL));
       }
       await ensureOrganizationAccess({ user }, parsedOrgId.data);
@@ -159,13 +162,13 @@ export async function GET(request: NextRequest) {
 
     const providerStatus = request.nextUrl.searchParams.get('status');
     if (providerStatus === 'failed') {
-      if (popup) return popupResultResponse('failed', 'connection_failed');
+      if (popup) return popupResultResponse('failed', 'connection_failed', attemptId);
       return NextResponse.redirect(new URL(appendResult(returnTo, 'failed'), APP_URL));
     }
 
     const connectedAccountId = request.nextUrl.searchParams.get('connected_account_id');
     if (providerStatus !== 'success' || !connectedAccountId) {
-      if (popup) return popupResultResponse('unknown');
+      if (popup) return popupResultResponse('unknown', undefined, attemptId);
       return NextResponse.redirect(new URL(appendResult(returnTo, 'unknown'), APP_URL));
     }
 
@@ -173,7 +176,7 @@ export async function GET(request: NextRequest) {
       ? await getActiveOrgInstance(user.id, organizationId)
       : await getActiveInstance(user.id);
     if (!instance) {
-      if (popup) return popupResultResponse('failed', 'missing_instance');
+      if (popup) return popupResultResponse('failed', 'missing_instance', attemptId);
       return NextResponse.redirect(new URL(appendError(returnTo, 'missing_instance'), APP_URL));
     }
 
@@ -186,12 +189,12 @@ export async function GET(request: NextRequest) {
       connectedAccountId,
     });
 
-    if (popup) return popupResultResponse(verified ? 'success' : 'failed');
+    if (popup) return popupResultResponse(verified ? 'success' : 'failed', undefined, attemptId);
     return NextResponse.redirect(
       new URL(appendResult(returnTo, verified ? 'success' : 'failed'), APP_URL)
     );
   } catch {
-    if (popup) return popupResultResponse('failed', 'unauthorized');
+    if (popup) return popupResultResponse('failed', 'unauthorized', attemptId);
     return NextResponse.redirect(new URL(appendError(returnTo, 'unauthorized'), APP_URL));
   }
 }

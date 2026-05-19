@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { KiloCardLayout } from '@/components/KiloCardLayout';
+import { getUserFromAuthOrRedirect } from '@/lib/user.server';
 import { type PlatformId } from '../_components/platforms';
 import { AuthorizeFlow } from './_components/AuthorizeFlow';
 
@@ -33,7 +35,10 @@ function parseServices(raw: string | string[] | undefined): PlatformId[] {
   return Array.from(seen);
 }
 
-export default async function BotAuthorizePage({ searchParams }: AppPageProps) {
+export default async function CollabAuthorizePage({ searchParams }: AppPageProps) {
+  const user = await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/collab');
+  if (user.is_admin !== true) notFound();
+
   const params = await searchParams;
   const services = parseServices(params?.services);
 

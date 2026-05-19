@@ -53,7 +53,7 @@ export function BotWizard() {
   const proceedToAuthorize = () => {
     setMissingPlatformWarning(null);
     const services = Array.from(selected).join(',');
-    router.push(`/bot/authorize?services=${encodeURIComponent(services)}`);
+    router.push(`/collab/authorize?services=${encodeURIComponent(services)}`);
   };
 
   const handleContinueWithoutRecommendedPlatform = () => {

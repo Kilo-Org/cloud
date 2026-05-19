@@ -194,6 +194,228 @@ describe('security analysis durable database invariants', () => {
     );
   });
 
+  it('heals stale running queue state without downgrading a completed finding', async () => {
+    const completedFindingId = await insertFinding('stale-running-completed', 'completed');
+    await client.db.insert(security_analysis_queue).values({
+      finding_id: completedFindingId,
+      owned_by_user_id: testUserId,
+      queue_status: 'running',
+      severity_rank: 1,
+      queued_at: '2026-05-18T06:00:00.000Z',
+      claimed_at: '2026-05-18T06:00:00.000Z',
+      claimed_by_job_id: 'completed-running-job',
+      claim_token: 'completed-running-claim',
+      updated_at: '2026-05-18T06:00:00.000Z',
+    });
+
+    await expect(reconcileStaleAnalysisQueueRows(client.db as never)).resolves.toEqual({
+      requeuedPendingCount: 0,
+      failedRunningCount: 0,
+    });
+
+    const findingRows = await client.db
+      .select({
+        analysisStatus: security_findings.analysis_status,
+        analysisError: security_findings.analysis_error,
+      })
+      .from(security_findings)
+      .where(eq(security_findings.id, completedFindingId));
+    expect(findingRows).toEqual([{ analysisStatus: 'completed', analysisError: null }]);
+
+    const queueRows = await client.db
+      .select({
+        status: security_analysis_queue.queue_status,
+        failureCode: security_analysis_queue.failure_code,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, completedFindingId));
+    expect(queueRows).toEqual([{ status: 'completed', failureCode: null }]);
+  });
+
+  it('preserves a failed terminal finding while settling stale running queue state', async () => {
+    const failedFindingId = await insertFinding('stale-running-failed', 'failed');
+    await client.db
+      .update(security_findings)
+      .set({ analysis_error: 'Callback failure already committed' })
+      .where(eq(security_findings.id, failedFindingId));
+    await client.db.insert(security_analysis_queue).values({
+      finding_id: failedFindingId,
+      owned_by_user_id: testUserId,
+      queue_status: 'running',
+      severity_rank: 1,
+      queued_at: '2026-05-18T06:00:00.000Z',
+      claimed_at: '2026-05-18T06:00:00.000Z',
+      claimed_by_job_id: 'failed-running-job',
+      claim_token: 'failed-running-claim',
+      updated_at: '2026-05-18T06:00:00.000Z',
+    });
+
+    await expect(reconcileStaleAnalysisQueueRows(client.db as never)).resolves.toEqual({
+      requeuedPendingCount: 0,
+      failedRunningCount: 0,
+    });
+
+    const findingRows = await client.db
+      .select({
+        analysisStatus: security_findings.analysis_status,
+        analysisError: security_findings.analysis_error,
+      })
+      .from(security_findings)
+      .where(eq(security_findings.id, failedFindingId));
+    expect(findingRows).toEqual([
+      { analysisStatus: 'failed', analysisError: 'Callback failure already committed' },
+    ]);
+
+    const queueRows = await client.db
+      .select({ status: security_analysis_queue.queue_status })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, failedFindingId));
+    expect(queueRows).toEqual([{ status: 'failed' }]);
+  });
+
+  it('preserves a failed terminal finding while settling stale pending queue state', async () => {
+    const failedFindingId = await insertFinding('stale-pending-failed', 'failed');
+    await client.db
+      .update(security_findings)
+      .set({ analysis_error: 'Start failure already committed' })
+      .where(eq(security_findings.id, failedFindingId));
+    await client.db.insert(security_analysis_queue).values({
+      finding_id: failedFindingId,
+      owned_by_user_id: testUserId,
+      queue_status: 'pending',
+      severity_rank: 1,
+      queued_at: '2026-05-18T08:00:00.000Z',
+      claimed_at: '2026-05-18T08:00:00.000Z',
+      claimed_by_job_id: 'failed-pending-job',
+      claim_token: 'failed-pending-claim',
+      updated_at: '2026-05-18T08:00:00.000Z',
+    });
+
+    await expect(reconcileStaleAnalysisQueueRows(client.db as never)).resolves.toEqual({
+      requeuedPendingCount: 0,
+      failedRunningCount: 0,
+    });
+
+    const findingRows = await client.db
+      .select({
+        analysisStatus: security_findings.analysis_status,
+        analysisError: security_findings.analysis_error,
+      })
+      .from(security_findings)
+      .where(eq(security_findings.id, failedFindingId));
+    expect(findingRows).toEqual([
+      { analysisStatus: 'failed', analysisError: 'Start failure already committed' },
+    ]);
+
+    const queueRows = await client.db
+      .select({ status: security_analysis_queue.queue_status })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, failedFindingId));
+    expect(queueRows).toEqual([{ status: 'failed' }]);
+  });
+
+  it('promotes a stale pending queue row when launch already advanced the finding to running', async () => {
+    const runningFindingId = await insertFinding('stale-pending-running', 'running');
+    await client.db.insert(security_analysis_queue).values({
+      finding_id: runningFindingId,
+      owned_by_user_id: testUserId,
+      queue_status: 'pending',
+      severity_rank: 1,
+      queued_at: '2026-05-18T08:00:00.000Z',
+      claimed_at: '2026-05-18T08:00:00.000Z',
+      claimed_by_job_id: 'pending-running-job',
+      claim_token: 'pending-running-claim',
+      updated_at: '2026-05-18T08:00:00.000Z',
+    });
+
+    await expect(reconcileStaleAnalysisQueueRows(client.db as never)).resolves.toEqual({
+      requeuedPendingCount: 0,
+      failedRunningCount: 0,
+    });
+
+    const findingRows = await client.db
+      .select({ analysisStatus: security_findings.analysis_status })
+      .from(security_findings)
+      .where(eq(security_findings.id, runningFindingId));
+    expect(findingRows).toEqual([{ analysisStatus: 'running' }]);
+
+    const queueRows = await client.db
+      .select({
+        status: security_analysis_queue.queue_status,
+        claimToken: security_analysis_queue.claim_token,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, runningFindingId));
+    expect(queueRows).toEqual([{ status: 'running', claimToken: 'pending-running-claim' }]);
+  });
+
+  it('heals a stale pending queue row when triage completion reached durable finding state', async () => {
+    const completedFindingId = await insertFinding('stale-pending-completed', 'completed');
+    await client.db.insert(security_analysis_queue).values({
+      finding_id: completedFindingId,
+      owned_by_user_id: testUserId,
+      queue_status: 'pending',
+      severity_rank: 1,
+      queued_at: '2026-05-18T08:00:00.000Z',
+      claimed_at: '2026-05-18T08:00:00.000Z',
+      claimed_by_job_id: 'pending-completed-job',
+      claim_token: 'pending-completed-claim',
+      updated_at: '2026-05-18T08:00:00.000Z',
+    });
+
+    await expect(reconcileStaleAnalysisQueueRows(client.db as never)).resolves.toEqual({
+      requeuedPendingCount: 0,
+      failedRunningCount: 0,
+    });
+
+    const findingRows = await client.db
+      .select({ analysisStatus: security_findings.analysis_status })
+      .from(security_findings)
+      .where(eq(security_findings.id, completedFindingId));
+    expect(findingRows).toEqual([{ analysisStatus: 'completed' }]);
+
+    const queueRows = await client.db
+      .select({
+        status: security_analysis_queue.queue_status,
+        failureCode: security_analysis_queue.failure_code,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, completedFindingId));
+    expect(queueRows).toEqual([{ status: 'completed', failureCode: null }]);
+  });
+
+  it('does not mark a stale running queue row lost when finding state has not reached running', async () => {
+    const pendingFindingId = await insertFinding('stale-running-pending', 'pending');
+    await client.db.insert(security_analysis_queue).values({
+      finding_id: pendingFindingId,
+      owned_by_user_id: testUserId,
+      queue_status: 'running',
+      severity_rank: 1,
+      queued_at: '2026-05-18T06:00:00.000Z',
+      claimed_at: '2026-05-18T06:00:00.000Z',
+      claimed_by_job_id: 'running-pending-job',
+      claim_token: 'running-pending-claim',
+      updated_at: '2026-05-18T06:00:00.000Z',
+    });
+
+    await expect(reconcileStaleAnalysisQueueRows(client.db as never)).resolves.toEqual({
+      requeuedPendingCount: 0,
+      failedRunningCount: 0,
+    });
+
+    const findingRows = await client.db
+      .select({ analysisStatus: security_findings.analysis_status })
+      .from(security_findings)
+      .where(eq(security_findings.id, pendingFindingId));
+    expect(findingRows).toEqual([{ analysisStatus: 'pending' }]);
+
+    const queueRows = await client.db
+      .select({ status: security_analysis_queue.queue_status })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, pendingFindingId));
+    expect(queueRows).toEqual([{ status: 'running' }]);
+  });
+
   it('leaves fresh pending and running rows untouched in real SQL', async () => {
     const currentTimestamp = new Date(Date.now() - 60_000).toISOString();
     const pendingFindingId = await insertFinding('fresh-pending');

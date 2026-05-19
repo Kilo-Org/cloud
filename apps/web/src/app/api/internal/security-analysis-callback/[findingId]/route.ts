@@ -32,6 +32,8 @@ import {
   DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
 } from '@/lib/security-agent/core/constants';
 
+// Compatibility-only callback ingress retained for explicit rollback routing.
+// Durable default ingress lives in the security-auto-analysis Worker.
 const log = sentryLogger('security-agent:callback', 'info');
 const warn = sentryLogger('security-agent:callback', 'warning');
 const logError = sentryLogger('security-agent:callback', 'error');

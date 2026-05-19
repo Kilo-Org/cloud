@@ -3,7 +3,10 @@ import { randomUUID } from 'crypto';
 import { createDrizzleClient } from '@kilocode/db/client';
 import { kilocode_users, security_analysis_queue, security_findings } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
+import {
+  transitionAnalysisCallbackLifecycle,
+  transitionAnalysisStartLifecycle,
+} from './analysis-start-lifecycle.js';
 import type { SecurityFindingAnalysis } from './types.js';
 
 const connectionString =
@@ -80,6 +83,208 @@ describe('analysis start lifecycle durable transitions', () => {
       .from(security_analysis_queue)
       .where(eq(security_analysis_queue.finding_id, findingId));
     expect(queueRows).toEqual([{ status: 'completed' }]);
+  });
+
+  it('terminalizes completed callbacks with queue and finding state settled together', async () => {
+    const findingId = await insertFinding('callback-completed', 'running');
+    await insertQueueClaim({
+      findingId,
+      claimToken: 'callback-completed-claim',
+      jobId: 'callback-completed-job',
+      queueStatus: 'running',
+    });
+    const analysis = createAnalysis('callback-completed');
+
+    await expect(
+      transitionAnalysisCallbackLifecycle(client.db as never, {
+        findingId,
+        outcome: {
+          type: 'completed',
+          analysis,
+        },
+      })
+    ).resolves.toEqual({ status: 'completed' });
+
+    const findingRows = await client.db
+      .select({
+        analysisStatus: security_findings.analysis_status,
+        analysis: security_findings.analysis,
+      })
+      .from(security_findings)
+      .where(eq(security_findings.id, findingId));
+    expect(findingRows).toEqual([
+      expect.objectContaining({
+        analysisStatus: 'completed',
+        analysis: expect.objectContaining({ correlationId: analysis.correlationId }),
+      }),
+    ]);
+
+    const queueRows = await client.db
+      .select({
+        status: security_analysis_queue.queue_status,
+        failureCode: security_analysis_queue.failure_code,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, findingId));
+    expect(queueRows).toEqual([{ status: 'completed', failureCode: null }]);
+  });
+
+  it('terminalizes failed callbacks with queue and finding failure state settled together', async () => {
+    const findingId = await insertFinding('callback-failed', 'running');
+    await insertQueueClaim({
+      findingId,
+      claimToken: 'callback-failed-claim',
+      jobId: 'callback-failed-job',
+      queueStatus: 'running',
+    });
+
+    await expect(
+      transitionAnalysisCallbackLifecycle(client.db as never, {
+        findingId,
+        outcome: {
+          type: 'failed',
+          errorMessage: 'upstream 503',
+          failureCode: 'UPSTREAM_5XX',
+        },
+      })
+    ).resolves.toEqual({ status: 'failed' });
+
+    const findingRows = await client.db
+      .select({
+        analysisStatus: security_findings.analysis_status,
+        analysisError: security_findings.analysis_error,
+      })
+      .from(security_findings)
+      .where(eq(security_findings.id, findingId));
+    expect(findingRows).toEqual([{ analysisStatus: 'failed', analysisError: 'upstream 503' }]);
+
+    const queueRows = await client.db
+      .select({
+        status: security_analysis_queue.queue_status,
+        failureCode: security_analysis_queue.failure_code,
+        lastError: security_analysis_queue.last_error_redacted,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, findingId));
+    expect(queueRows).toEqual([
+      { status: 'failed', failureCode: 'UPSTREAM_5XX', lastError: 'upstream 503' },
+    ]);
+  });
+
+  it('clears superseded callback capacity while settling its queue row', async () => {
+    const findingId = await insertFinding('callback-superseded', 'running');
+    await client.db
+      .update(security_findings)
+      .set({ ignored_reason: 'superseded:canonical-finding' })
+      .where(eq(security_findings.id, findingId));
+    await insertQueueClaim({
+      findingId,
+      claimToken: 'callback-superseded-claim',
+      jobId: 'callback-superseded-job',
+      queueStatus: 'running',
+    });
+
+    await expect(
+      transitionAnalysisCallbackLifecycle(client.db as never, {
+        findingId,
+        outcome: { type: 'superseded' },
+      })
+    ).resolves.toEqual({ status: 'superseded' });
+
+    const findingRows = await client.db
+      .select({ analysisStatus: security_findings.analysis_status })
+      .from(security_findings)
+      .where(eq(security_findings.id, findingId));
+    expect(findingRows).toEqual([{ analysisStatus: null }]);
+
+    const queueRows = await client.db
+      .select({
+        status: security_analysis_queue.queue_status,
+        failureCode: security_analysis_queue.failure_code,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, findingId));
+    expect(queueRows).toEqual([{ status: 'completed', failureCode: 'SKIPPED_NO_LONGER_ELIGIBLE' }]);
+  });
+
+  it('settles completion races that find the callback superseded at terminal write time', async () => {
+    const findingId = await insertFinding('callback-superseded-completion-race', 'running');
+    await client.db
+      .update(security_findings)
+      .set({ ignored_reason: 'superseded:replacement-finding' })
+      .where(eq(security_findings.id, findingId));
+    await insertQueueClaim({
+      findingId,
+      claimToken: 'callback-superseded-completion-race-claim',
+      jobId: 'callback-superseded-completion-race-job',
+      queueStatus: 'running',
+    });
+
+    await expect(
+      transitionAnalysisCallbackLifecycle(client.db as never, {
+        findingId,
+        outcome: {
+          type: 'completed',
+          analysis: createAnalysis('callback-superseded-completion-race'),
+        },
+      })
+    ).resolves.toEqual({ status: 'superseded' });
+
+    const findingRows = await client.db
+      .select({ analysisStatus: security_findings.analysis_status })
+      .from(security_findings)
+      .where(eq(security_findings.id, findingId));
+    expect(findingRows).toEqual([{ analysisStatus: null }]);
+
+    const queueRows = await client.db
+      .select({
+        status: security_analysis_queue.queue_status,
+        failureCode: security_analysis_queue.failure_code,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, findingId));
+    expect(queueRows).toEqual([{ status: 'completed', failureCode: 'SKIPPED_NO_LONGER_ELIGIBLE' }]);
+  });
+
+  it('heals stale running queue state on retried already-terminal completed callbacks', async () => {
+    const findingId = await insertFinding('callback-partial-completion', 'running');
+    await client.db
+      .update(security_findings)
+      .set({ analysis_status: 'completed' })
+      .where(eq(security_findings.id, findingId));
+    await insertQueueClaim({
+      findingId,
+      claimToken: 'callback-partial-completion-claim',
+      jobId: 'callback-partial-completion-job',
+      queueStatus: 'running',
+    });
+
+    await expect(
+      transitionAnalysisCallbackLifecycle(client.db as never, {
+        findingId,
+        outcome: {
+          type: 'already-terminal',
+          findingStatus: 'completed',
+          failureCode: null,
+          errorMessage: null,
+        },
+      })
+    ).resolves.toEqual({ status: 'already-terminal' });
+
+    const findingRows = await client.db
+      .select({ analysisStatus: security_findings.analysis_status })
+      .from(security_findings)
+      .where(eq(security_findings.id, findingId));
+    expect(findingRows).toEqual([{ analysisStatus: 'completed' }]);
+
+    const queueRows = await client.db
+      .select({
+        status: security_analysis_queue.queue_status,
+        failureCode: security_analysis_queue.failure_code,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, findingId));
+    expect(queueRows).toEqual([{ status: 'completed', failureCode: null }]);
   });
 
   it('promotes scheduled sandbox starts to running without leaving the queue pending', async () => {

@@ -788,6 +788,26 @@ export async function reconcileStaleAnalysisQueueRows(db: WorkerDb): Promise<{
   requeuedPendingCount: number;
   failedRunningCount: number;
 }> {
+  await db.execute(sql`
+    UPDATE security_analysis_queue
+    SET
+      queue_status = security_findings.analysis_status,
+      failure_code = CASE
+        WHEN security_findings.analysis_status = 'completed' THEN NULL
+        ELSE security_analysis_queue.failure_code
+      END,
+      last_error_redacted = CASE
+        WHEN security_findings.analysis_status = 'completed' THEN NULL
+        ELSE security_analysis_queue.last_error_redacted
+      END,
+      updated_at = now()
+    FROM security_findings
+    WHERE security_analysis_queue.finding_id = security_findings.id
+      AND security_analysis_queue.queue_status = 'pending'
+      AND security_analysis_queue.claimed_at <= now() - interval '15 minutes'
+      AND security_findings.analysis_status IN ('completed', 'failed', 'running')
+  `);
+
   const requeuedPending = await db.execute<{ id: string }>(sql`
     WITH requeued_rows AS (
       UPDATE security_analysis_queue
@@ -812,6 +832,26 @@ export async function reconcileStaleAnalysisQueueRows(db: WorkerDb): Promise<{
     RETURNING id
   `);
 
+  await db.execute(sql`
+    UPDATE security_analysis_queue
+    SET
+      queue_status = security_findings.analysis_status,
+      failure_code = CASE
+        WHEN security_findings.analysis_status = 'completed' THEN NULL
+        ELSE security_analysis_queue.failure_code
+      END,
+      last_error_redacted = CASE
+        WHEN security_findings.analysis_status = 'completed' THEN NULL
+        ELSE security_analysis_queue.last_error_redacted
+      END,
+      updated_at = now()
+    FROM security_findings
+    WHERE security_analysis_queue.finding_id = security_findings.id
+      AND security_analysis_queue.queue_status = 'running'
+      AND security_analysis_queue.updated_at <= now() - interval '2 hours'
+      AND security_findings.analysis_status IN ('completed', 'failed')
+  `);
+
   const failedRunning = await db.execute<{ id: string }>(sql`
     WITH failed_rows AS (
       UPDATE security_analysis_queue
@@ -820,9 +860,12 @@ export async function reconcileStaleAnalysisQueueRows(db: WorkerDb): Promise<{
         failure_code = 'RUN_LOST',
         last_error_redacted = 'Automated stale running reconciliation',
         updated_at = now()
-      WHERE queue_status = 'running'
-        AND updated_at <= now() - interval '2 hours'
-      RETURNING finding_id
+      FROM security_findings
+      WHERE security_analysis_queue.finding_id = security_findings.id
+        AND security_analysis_queue.queue_status = 'running'
+        AND security_analysis_queue.updated_at <= now() - interval '2 hours'
+        AND security_findings.analysis_status = 'running'
+      RETURNING security_analysis_queue.finding_id
     )
     UPDATE security_findings
     SET

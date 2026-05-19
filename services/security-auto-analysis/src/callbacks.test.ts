@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { transitionAnalysisCallbackLifecycle } from './analysis-start-lifecycle.js';
 import {
   classifyAnalysisCallback,
   consumeAnalysisCallbackBatch,
@@ -16,6 +17,15 @@ const failedPayload = {
   status: 'failed',
   errorMessage: 'upstream 503',
 } satisfies SecurityAnalysisCallbackPayload;
+
+vi.mock('./analysis-start-lifecycle.js', () => ({
+  transitionAnalysisCallbackLifecycle: vi.fn(),
+}));
+
+beforeEach(() => {
+  vi.mocked(transitionAnalysisCallbackLifecycle).mockReset();
+  vi.mocked(transitionAnalysisCallbackLifecycle).mockResolvedValue({ status: 'completed' });
+});
 
 describe('classifyAnalysisCallback', () => {
   it('rejects stale session callbacks before terminalization', () => {
@@ -168,11 +178,111 @@ describe('finalizeCompletedAnalysisCallback', () => {
       })
     ).resolves.toEqual({ status: 'completed-finalized' });
 
-    expect(updates).toHaveLength(1);
-    expect(executes).toHaveLength(1);
+    expect(updates).toHaveLength(0);
+    expect(executes).toHaveLength(0);
+    expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
+      findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      outcome: expect.objectContaining({
+        type: 'completed',
+        analysis: expect.objectContaining({
+          rawMarkdown: '# Completed analysis',
+        }),
+      }),
+    });
     expect(auditRows).toHaveLength(1);
     expect(autoDismissCalls).toHaveLength(1);
     expect(analyticsCalls).toHaveLength(1);
+  });
+
+  it('delegates already-terminal completed callback retries for queue healing', async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [
+              {
+                session_id: 'agent-123',
+                cli_session_id: 'ses-123',
+                ignored_reason: null,
+                analysis_status: 'completed',
+              },
+            ],
+          }),
+        }),
+      }),
+    };
+    const extractSandboxAnalysis = vi.fn();
+
+    await expect(
+      finalizeCompletedAnalysisCallback({
+        db: db as never,
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        payload: {
+          sessionId: 'session-123',
+          cloudAgentSessionId: 'agent-123',
+          executionId: 'exec-123',
+          kiloSessionId: 'ses-123',
+          status: 'completed',
+          lastAssistantMessageText: '# Duplicate completion',
+        },
+        extractSandboxAnalysis,
+      })
+    ).resolves.toEqual({ status: 'already-terminal' });
+
+    expect(extractSandboxAnalysis).not.toHaveBeenCalled();
+    expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
+      findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      outcome: {
+        type: 'already-terminal',
+        findingStatus: 'completed',
+        failureCode: null,
+        errorMessage: null,
+      },
+    });
+  });
+
+  it('delegates superseded completed callbacks to lifecycle settlement', async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [
+              {
+                session_id: 'agent-123',
+                cli_session_id: 'ses-123',
+                ignored_reason: 'superseded:canonical-finding',
+                analysis_status: 'running',
+              },
+            ],
+          }),
+        }),
+      }),
+      update: () => ({ set: () => ({ where: async () => undefined }) }),
+      execute: async () => ({ rows: [] }),
+    };
+    const extractSandboxAnalysis = vi.fn();
+
+    await expect(
+      finalizeCompletedAnalysisCallback({
+        db: db as never,
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        payload: {
+          sessionId: 'session-123',
+          cloudAgentSessionId: 'agent-123',
+          executionId: 'exec-123',
+          kiloSessionId: 'ses-123',
+          status: 'completed',
+          lastAssistantMessageText: '# Superseded completion',
+        },
+        extractSandboxAnalysis,
+      })
+    ).resolves.toEqual({ status: 'superseded' });
+
+    expect(extractSandboxAnalysis).not.toHaveBeenCalled();
+    expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
+      findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      outcome: { type: 'superseded' },
+    });
   });
 
   it('terminalizes completed callbacks when result markdown never becomes available', async () => {
@@ -229,8 +339,16 @@ describe('finalizeCompletedAnalysisCallback', () => {
       })
     ).resolves.toEqual({ status: 'result-missing' });
 
-    expect(findingUpdates[0]).toMatchObject({ analysis_status: 'failed' });
-    expect(queueTransitions).toHaveLength(1);
+    expect(findingUpdates).toHaveLength(0);
+    expect(queueTransitions).toHaveLength(0);
+    expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
+      findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      outcome: {
+        type: 'failed',
+        errorMessage: 'Analysis completed but callback result text was missing',
+        failureCode: 'START_CALL_AMBIGUOUS',
+      },
+    });
   });
 });
 
@@ -279,6 +397,78 @@ describe('consumeAnalysisCallbackBatch', () => {
 });
 
 describe('finalizeFailedAnalysisCallback', () => {
+  it('delegates already-terminal failed callback retries for queue healing', async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [
+              {
+                session_id: 'agent-123',
+                cli_session_id: null,
+                ignored_reason: null,
+                analysis_status: 'failed',
+                analysis_error: 'upstream 503',
+              },
+            ],
+          }),
+        }),
+      }),
+    };
+
+    await expect(
+      finalizeFailedAnalysisCallback({
+        db: db as never,
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        payload: failedPayload,
+      })
+    ).resolves.toEqual({ status: 'already-terminal' });
+
+    expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
+      findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      outcome: {
+        type: 'already-terminal',
+        findingStatus: 'failed',
+        failureCode: 'UPSTREAM_5XX',
+        errorMessage: 'upstream 503',
+      },
+    });
+  });
+
+  it('delegates superseded failed callbacks to lifecycle settlement', async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [
+              {
+                session_id: 'agent-123',
+                cli_session_id: null,
+                ignored_reason: 'superseded:canonical-finding',
+                analysis_status: 'running',
+              },
+            ],
+          }),
+        }),
+      }),
+      update: () => ({ set: () => ({ where: async () => undefined }) }),
+      execute: async () => ({ rows: [] }),
+    };
+
+    await expect(
+      finalizeFailedAnalysisCallback({
+        db: db as never,
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        payload: failedPayload,
+      })
+    ).resolves.toEqual({ status: 'superseded' });
+
+    expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
+      findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      outcome: { type: 'superseded' },
+    });
+  });
+
   it('writes terminal failed finding and queue state for retry-classified callbacks', async () => {
     const findingUpdates: unknown[] = [];
     const queueTransitions: unknown[] = [];
@@ -320,11 +510,16 @@ describe('finalizeFailedAnalysisCallback', () => {
         payload: failedPayload,
       })
     ).resolves.toEqual({ status: 'failed-finalized' });
-    expect(findingUpdates[0]).toMatchObject({
-      analysis_status: 'failed',
-      analysis_error: 'upstream 503',
+    expect(findingUpdates).toHaveLength(0);
+    expect(queueTransitions).toHaveLength(0);
+    expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
+      findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      outcome: {
+        type: 'failed',
+        errorMessage: 'upstream 503',
+        failureCode: 'UPSTREAM_5XX',
+      },
     });
-    expect(queueTransitions).toHaveLength(1);
   });
 });
 

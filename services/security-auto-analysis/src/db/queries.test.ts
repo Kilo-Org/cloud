@@ -17,18 +17,25 @@ describe('reconcileStaleAnalysisQueueRows', () => {
   it('reports requeued stale pending rows and failed stale running rows', async () => {
     const execute = vi
       .fn()
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: 'pending-row' }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: 'running-row' }, { id: 'running-row-2' }] });
 
     await expect(reconcileStaleAnalysisQueueRows({ execute } as never)).resolves.toEqual({
       requeuedPendingCount: 1,
       failedRunningCount: 2,
     });
-    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute).toHaveBeenCalledTimes(4);
   });
 
   it('leaves fresh rows untouched when reconciliation queries return no stale rows', async () => {
-    const execute = vi.fn().mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
 
     await expect(reconcileStaleAnalysisQueueRows({ execute } as never)).resolves.toEqual({
       requeuedPendingCount: 0,

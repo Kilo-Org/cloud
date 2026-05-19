@@ -16,6 +16,7 @@ import {
 import { logger } from './logger.js';
 import { generateApiToken } from './token.js';
 import { triageSecurityFinding } from './triage.js';
+import { maybeAutoDismissCompletedAnalysis } from './auto-dismiss.js';
 import type { AnalysisMode, SecurityFindingAnalysis } from './types.js';
 
 export class InsufficientCreditsError extends Error {
@@ -224,6 +225,13 @@ export async function startSecurityAnalysis(
         await clearAnalysisStatus(params.db, params.findingId);
         return { started: false, error: 'Finding was superseded during analysis' };
       }
+      await maybeAutoDismissCompletedAnalysis({
+        db: params.db,
+        env: params.env,
+        findingId: params.findingId,
+        finding,
+        analysis: triageOnlyAnalysis,
+      });
       return { started: true, triageOnly: true };
     }
 

@@ -1,6 +1,7 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import { platform_integrations, security_audit_log, security_findings } from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import { parseDependabotDismissalTarget } from '@kilocode/worker-utils/dependabot-dismissal-target';
 import { eq, sql } from 'drizzle-orm';
 import { getSecurityAgentConfigForOwner, type SecurityFindingRecord } from './db/queries.js';
 import { logger } from './logger.js';
@@ -36,9 +37,11 @@ async function writeBackDependabotDismissal(params: {
   if (params.finding.source !== 'dependabot' || !params.finding.platform_integration_id) {
     return;
   }
-  const alertNumber = Number.parseInt(params.finding.source_id, 10);
-  const [repoOwner, repoName] = params.finding.repo_full_name.split('/');
-  if (!Number.isFinite(alertNumber) || !repoOwner || !repoName) return;
+  const target = parseDependabotDismissalTarget({
+    sourceId: params.finding.source_id,
+    repoFullName: params.finding.repo_full_name,
+  });
+  if (!target) return;
 
   const rows = await params.db
     .select({ installationId: platform_integrations.platform_installation_id })
@@ -51,7 +54,7 @@ async function writeBackDependabotDismissal(params: {
   try {
     const token = await params.env.GIT_TOKEN_SERVICE.getToken(installationId);
     const response = await fetch(
-      `https://api.github.com/repos/${repoOwner}/${repoName}/dependabot/alerts/${alertNumber}`,
+      `https://api.github.com/repos/${target.repoOwner}/${target.repoName}/dependabot/alerts/${target.alertNumber}`,
       {
         method: 'PATCH',
         headers: {
@@ -89,6 +92,8 @@ export async function maybeAutoDismissCompletedAnalysis(params: {
   finding: SecurityFindingRecord;
   analysis: SecurityFindingAnalysis;
 }): Promise<void> {
+  if (params.finding.status === 'ignored') return;
+
   const owner = findingOwner(params.finding);
   if (!owner) return;
   const config = await getSecurityAgentConfigForOwner(params.db, owner);

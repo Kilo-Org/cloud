@@ -2,14 +2,8 @@ import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { security_audit_log } from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
 import { z } from 'zod';
-import {
-  clearAnalysisStatus,
-  getAnalysisActorById,
-  getSecurityFindingById,
-  setFindingCompleted,
-  setFindingFailed,
-  transitionAnalysisQueueFromCallback,
-} from './db/queries.js';
+import { getAnalysisActorById, getSecurityFindingById } from './db/queries.js';
+import { transitionAnalysisCallbackLifecycle } from './analysis-start-lifecycle.js';
 import { generateApiToken } from './token.js';
 import { extractSandboxAnalysis as runSandboxExtraction } from './extraction.js';
 import { fetchLatestAssistantText as fetchSessionAssistantText } from './session-result.js';
@@ -158,17 +152,28 @@ export async function finalizeCompletedAnalysisCallback(params: {
   if (!finding) return { status: 'missing' };
 
   const disposition = classifyAnalysisCallback(finding, params.payload);
-  if (disposition === 'stale-session' || disposition === 'already-terminal') {
+  if (disposition === 'stale-session') return { status: disposition };
+  if (disposition === 'already-terminal') {
+    const findingStatus = finding.analysis_status === 'failed' ? 'failed' : 'completed';
+    await transitionAnalysisCallbackLifecycle(params.db, {
+      findingId: params.findingId,
+      outcome: {
+        type: 'already-terminal',
+        findingStatus,
+        failureCode: findingStatus === 'failed' ? 'START_CALL_AMBIGUOUS' : null,
+        errorMessage:
+          findingStatus === 'failed'
+            ? 'Analysis completed but callback result text was missing'
+            : null,
+      },
+    });
     return { status: disposition };
   }
   if (disposition === 'superseded') {
-    await transitionAnalysisQueueFromCallback(params.db, {
+    await transitionAnalysisCallbackLifecycle(params.db, {
       findingId: params.findingId,
-      toStatus: 'completed',
-      failureCode: 'SKIPPED_NO_LONGER_ELIGIBLE',
-      errorMessage: null,
+      outcome: { type: 'superseded' },
     });
-    await clearAnalysisStatus(params.db, params.findingId);
     return { status: disposition };
   }
 
@@ -179,14 +184,13 @@ export async function finalizeCompletedAnalysisCallback(params: {
   });
   if (!rawMarkdown) {
     const errorMessage = 'Analysis completed but callback result text was missing';
-    if (!(await setFindingFailed(params.db, params.findingId, errorMessage))) {
-      await clearAnalysisStatus(params.db, params.findingId);
-    }
-    await transitionAnalysisQueueFromCallback(params.db, {
+    await transitionAnalysisCallbackLifecycle(params.db, {
       findingId: params.findingId,
-      toStatus: 'failed',
-      failureCode: 'START_CALL_AMBIGUOUS',
-      errorMessage,
+      outcome: {
+        type: 'failed',
+        errorMessage,
+        failureCode: 'START_CALL_AMBIGUOUS',
+      },
     });
     return { status: 'result-missing' };
   }
@@ -206,16 +210,14 @@ export async function finalizeCompletedAnalysisCallback(params: {
     correlationId: priorAnalysis?.correlationId,
   };
 
-  if (!(await setFindingCompleted(params.db, params.findingId, completedAnalysis))) {
-    await clearAnalysisStatus(params.db, params.findingId);
-    return { status: 'superseded' };
-  }
-  await transitionAnalysisQueueFromCallback(params.db, {
+  const lifecycleTransition = await transitionAnalysisCallbackLifecycle(params.db, {
     findingId: params.findingId,
-    toStatus: 'completed',
-    failureCode: null,
-    errorMessage: null,
+    outcome: {
+      type: 'completed',
+      analysis: completedAnalysis,
+    },
   });
+  if (lifecycleTransition.status === 'superseded') return { status: 'superseded' };
   await params.db.insert(security_audit_log).values({
     owned_by_organization_id: finding.owned_by_organization_id,
     owned_by_user_id: finding.owned_by_user_id,
@@ -256,17 +258,32 @@ export async function finalizeFailedAnalysisCallback(params: {
   if (!finding) return { status: 'missing' };
 
   const disposition = classifyAnalysisCallback(finding, params.payload);
-  if (disposition === 'stale-session' || disposition === 'already-terminal') {
+  if (disposition === 'stale-session') return { status: disposition };
+  if (disposition === 'already-terminal') {
+    const findingStatus = finding.analysis_status === 'completed' ? 'completed' : 'failed';
+    const failure =
+      findingStatus === 'failed'
+        ? mapAnalysisCallbackFailure({
+            status: params.payload.status === 'interrupted' ? 'interrupted' : 'failed',
+            errorMessage: params.payload.errorMessage,
+          })
+        : null;
+    await transitionAnalysisCallbackLifecycle(params.db, {
+      findingId: params.findingId,
+      outcome: {
+        type: 'already-terminal',
+        findingStatus,
+        failureCode: failure?.failureCode ?? null,
+        errorMessage: failure?.errorMessage ?? null,
+      },
+    });
     return { status: disposition };
   }
   if (disposition === 'superseded') {
-    await transitionAnalysisQueueFromCallback(params.db, {
+    await transitionAnalysisCallbackLifecycle(params.db, {
       findingId: params.findingId,
-      toStatus: 'completed',
-      failureCode: 'SKIPPED_NO_LONGER_ELIGIBLE',
-      errorMessage: null,
+      outcome: { type: 'superseded' },
     });
-    await clearAnalysisStatus(params.db, params.findingId);
     return { status: disposition };
   }
 
@@ -274,15 +291,15 @@ export async function finalizeFailedAnalysisCallback(params: {
     status: params.payload.status === 'interrupted' ? 'interrupted' : 'failed',
     errorMessage: params.payload.errorMessage,
   });
-  if (!(await setFindingFailed(params.db, params.findingId, failure.errorMessage))) {
-    await clearAnalysisStatus(params.db, params.findingId);
-  }
-  await transitionAnalysisQueueFromCallback(params.db, {
+  const lifecycleTransition = await transitionAnalysisCallbackLifecycle(params.db, {
     findingId: params.findingId,
-    toStatus: 'failed',
-    failureCode: failure.failureCode,
-    errorMessage: failure.errorMessage,
+    outcome: {
+      type: 'failed',
+      errorMessage: failure.errorMessage,
+      failureCode: failure.failureCode,
+    },
   });
+  if (lifecycleTransition.status === 'superseded') return { status: 'superseded' };
   return { status: 'failed-finalized' };
 }
 

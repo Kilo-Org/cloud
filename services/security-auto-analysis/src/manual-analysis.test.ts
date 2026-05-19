@@ -75,6 +75,102 @@ describe('processManualAnalysisStart', () => {
     ).resolves.toEqual({ status: 'owner-cap' });
   });
 
+  it('rejects manual starts when the analysis actor is missing', async () => {
+    let selectCount = 0;
+    const db = {
+      select: () => {
+        selectCount += 1;
+        if (selectCount === 1) {
+          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
+        }
+        if (selectCount === 2) {
+          return { from: () => ({ where: async () => [{ total: 0 }] }) };
+        }
+        return { from: () => ({ where: () => ({ limit: async () => [] }) }) };
+      },
+    };
+
+    await expect(
+      processManualAnalysisStart({ db: db as never, env: {} as CloudflareEnv, command })
+    ).resolves.toEqual({ status: 'actor-missing' });
+    expect(startSecurityAnalysis).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate manual starts after an active queue row wins admission', async () => {
+    let selectCount = 0;
+    const db = {
+      select: () => {
+        selectCount += 1;
+        if (selectCount === 1) {
+          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
+        }
+        if (selectCount === 2) {
+          return { from: () => ({ where: async () => [{ total: 0 }] }) };
+        }
+        return {
+          from: () => ({
+            where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
+          }),
+        };
+      },
+      insert: () => ({
+        values: () => ({
+          onConflictDoUpdate: () => ({ returning: async () => [] }),
+        }),
+      }),
+    };
+
+    await expect(
+      processManualAnalysisStart({ db: db as never, env: {} as CloudflareEnv, command })
+    ).resolves.toEqual({ status: 'duplicate' });
+    expect(startSecurityAnalysis).not.toHaveBeenCalled();
+  });
+
+  it('settles queued manual starts when the GitHub token is unavailable', async () => {
+    let selectCount = 0;
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const db = {
+      select: () => {
+        selectCount += 1;
+        if (selectCount === 1) {
+          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
+        }
+        if (selectCount === 2) {
+          return { from: () => ({ where: async () => [{ total: 0 }] }) };
+        }
+        return {
+          from: () => ({
+            where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
+          }),
+        };
+      },
+      insert: () => ({
+        values: () => ({
+          onConflictDoUpdate: () => ({ returning: async () => [{ id: 'queue-row-token' }] }),
+        }),
+      }),
+      execute,
+    };
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        env: {
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({
+              success: false,
+              reason: 'token missing',
+            }),
+          },
+        } as unknown as CloudflareEnv,
+        command,
+      })
+    ).resolves.toEqual({ status: 'token-missing' });
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(startSecurityAnalysis).not.toHaveBeenCalled();
+  });
+
   it('persists actor-selected model context in Worker launch and audit metadata', async () => {
     let selectCount = 0;
     let insertCount = 0;

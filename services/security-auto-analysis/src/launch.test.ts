@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
 import {
   clearAnalysisStatus,
+  getSecurityAgentConfigForOwner,
   getSecurityFindingById,
   setFindingCompleted,
   setFindingFailed,
@@ -16,6 +18,7 @@ import { triageSecurityFinding } from './triage.js';
 
 vi.mock('./db/queries.js', () => ({
   clearAnalysisStatus: vi.fn(),
+  getSecurityAgentConfigForOwner: vi.fn(),
   getSecurityFindingById: vi.fn(),
   setFindingCompleted: vi.fn(),
   setFindingFailed: vi.fn(),
@@ -28,6 +31,11 @@ vi.mock('./token.js', () => ({ generateApiToken: vi.fn() }));
 vi.mock('./triage.js', () => ({ triageSecurityFinding: vi.fn() }));
 
 const CALLBACK_SECRET = 'test-callback-token-secret';
+const workerConfig = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 const finding = {
   id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -66,9 +74,36 @@ const existingTriage = {
   triageAt: '2026-05-18T08:00:00.000Z',
 };
 
-function createParams(retrySandboxOnly: boolean, cloudAgentFetch: typeof fetch) {
+function createAutoDismissDb() {
+  const updates: unknown[] = [];
+  const auditRows: unknown[] = [];
+  const db = {
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => [{ installationId: 'installation-123' }],
+        }),
+      }),
+    }),
+    update: () => ({
+      set: (values: unknown) => ({
+        where: async () => {
+          updates.push(values);
+        },
+      }),
+    }),
+    insert: () => ({
+      values: async (values: unknown) => {
+        auditRows.push(values);
+      },
+    }),
+  };
+  return { db, updates, auditRows };
+}
+
+function createParams(retrySandboxOnly: boolean, cloudAgentFetch: typeof fetch, db: unknown = {}) {
   return {
-    db: {} as never,
+    db: db as never,
     env: {
       ENVIRONMENT: 'development',
       KILOCODE_BACKEND_BASE_URL: 'https://backend.test',
@@ -76,6 +111,7 @@ function createParams(retrySandboxOnly: boolean, cloudAgentFetch: typeof fetch) 
       SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL: 'https://app.kilo.ai',
       SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL: 'https://security-analysis.test',
       CLOUD_AGENT_NEXT: { fetch: cloudAgentFetch },
+      GIT_TOKEN_SERVICE: { getToken: async () => 'github-token' },
     } as unknown as CloudflareEnv,
     findingId: finding.id,
     actorUser: { id: 'user-123', api_token_pepper: null },
@@ -97,6 +133,20 @@ function createParams(retrySandboxOnly: boolean, cloudAgentFetch: typeof fetch) 
 }
 
 describe('buildSecurityAnalysisCallbackTarget', () => {
+  it('keeps deployment callback routing defaults on durable Worker ingress', () => {
+    expect(workerConfig.match(/"SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE": "worker"/g)).toHaveLength(
+      2
+    );
+    expect(workerConfig).toContain('"pattern": "security-auto-analysis.kilosessions.ai"');
+    expect(workerConfig).toContain('"custom_domain": true');
+    expect(workerConfig).toContain(
+      '"SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL": "https://security-auto-analysis.kilosessions.ai"'
+    );
+    expect(workerConfig).toContain(
+      '"SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL": "http://localhost:8797"'
+    );
+  });
+
   it('routes callback delivery to configured Worker HTTP ingress', () => {
     expect(
       buildSecurityAnalysisCallbackTarget(
@@ -151,6 +201,10 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     vi.clearAllMocks();
     vi.mocked(tryAcquireAnalysisStartLease).mockResolvedValue(true);
     vi.mocked(generateApiToken).mockResolvedValue('auth-token');
+    vi.mocked(getSecurityAgentConfigForOwner).mockResolvedValue({
+      auto_dismiss_enabled: true,
+      auto_dismiss_confidence_threshold: 'high',
+    } as never);
     vi.mocked(setFindingCompleted).mockResolvedValue(true);
     vi.mocked(setFindingFailed).mockResolvedValue(true);
     vi.mocked(setFindingPending).mockResolvedValue(true);
@@ -273,6 +327,96 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     expect(setFindingCompleted).not.toHaveBeenCalled();
     expect(setFindingFailed).not.toHaveBeenCalled();
     expect(clearAnalysisStatus).not.toHaveBeenCalled();
+  });
+
+  it('auto-dismisses triage-only dismiss recommendations after durable Worker completion', async () => {
+    const { db, updates, auditRows } = createAutoDismissDb();
+    const fetchSpy = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.mocked(getSecurityFindingById).mockResolvedValue({ ...finding, analysis: null } as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue({
+      ...existingTriage,
+      needsSandboxAnalysis: false,
+      needsSandboxReasoning: 'No relevant runtime path.',
+      suggestedAction: 'dismiss',
+    });
+
+    await expect(startSecurityAnalysis(createParams(false, vi.fn() as never, db))).resolves.toEqual(
+      {
+        started: true,
+        triageOnly: true,
+      }
+    );
+
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        outcome: expect.objectContaining({ type: 'triage-only-completed' }),
+      })
+    );
+    expect(updates[0]).toMatchObject({
+      status: 'ignored',
+      ignored_reason: 'not_used',
+      ignored_by: 'auto-triage',
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(auditRows[0]).toMatchObject({
+      action: 'security.finding.auto_dismissed',
+      resource_id: finding.id,
+      metadata: { dismissSource: 'triage', confidence: 'high' },
+    });
+  });
+
+  it('leaves triage-only dismiss recommendations open when auto-dismiss is disabled', async () => {
+    const { db, updates, auditRows } = createAutoDismissDb();
+    const fetchSpy = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.mocked(getSecurityAgentConfigForOwner).mockResolvedValue({
+      auto_dismiss_enabled: false,
+      auto_dismiss_confidence_threshold: 'high',
+    } as never);
+    vi.mocked(getSecurityFindingById).mockResolvedValue({ ...finding, analysis: null } as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue({
+      ...existingTriage,
+      needsSandboxAnalysis: false,
+      needsSandboxReasoning: 'No relevant runtime path.',
+      suggestedAction: 'dismiss',
+    });
+
+    await expect(startSecurityAnalysis(createParams(false, vi.fn() as never, db))).resolves.toEqual(
+      {
+        started: true,
+        triageOnly: true,
+      }
+    );
+
+    expect(updates).toHaveLength(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it('leaves triage-only non-dismiss recommendations open after Worker completion', async () => {
+    const { db, updates, auditRows } = createAutoDismissDb();
+    const fetchSpy = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.mocked(getSecurityFindingById).mockResolvedValue({ ...finding, analysis: null } as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue({
+      ...existingTriage,
+      needsSandboxAnalysis: false,
+      needsSandboxReasoning: 'Maintain manual review.',
+      suggestedAction: 'manual_review',
+    });
+
+    await expect(startSecurityAnalysis(createParams(false, vi.fn() as never, db))).resolves.toEqual(
+      {
+        started: true,
+        triageOnly: true,
+      }
+    );
+
+    expect(updates).toHaveLength(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(auditRows).toHaveLength(0);
   });
 
   it('returns failed starts for lifecycle settlement instead of updating findings alone', async () => {

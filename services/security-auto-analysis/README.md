@@ -65,7 +65,7 @@ pnpm --filter cloudflare-security-auto-analysis exec wrangler queues list
 - `pending` is stale after 15 minutes
 - `running` is stale after 2 hours
 
-> **Note:** The dispatcher reconciles stale rows before enqueueing due owners: stale `pending` rows return to `queued`, and stale `running` rows become terminal `failed` rows with `RUN_LOST`. Diagnostic queries below remain useful for verification and incident review.
+> **Note:** The dispatcher reconciles stale rows before enqueueing due owners: queue rows first heal to already-advanced finding states, remaining stale `pending` rows return to `queued`, and stale `running` rows become terminal `failed` rows with `RUN_LOST` only while the finding still reports `running`. Diagnostic queries below remain useful for verification and incident review.
 
 ### Failure codes
 
@@ -205,8 +205,8 @@ Do not clear the block until credits are restored. After top-up, clear the block
 
 **Callback routing:**
 
-- `SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE=worker` targets `${SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL}/internal/security-analysis-callback/:findingId`; base URL must be reachable from `cloud-agent-next`.
-- `SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE=web` targets `${SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL}/api/internal/security-analysis-callback/:findingId`; this is default callback path and keeps `cloud-agent-next` domain-blind.
+- `SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE=worker` is the default and targets `${SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL}/internal/security-analysis-callback/:findingId`; base URL must be reachable from `cloud-agent-next`. Worker ingress validates, enqueues callback finalization, then returns `202`.
+- `SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE=web` targets `${SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL}/api/internal/security-analysis-callback/:findingId`; this is compatibility-only rollback routing while legacy callback traffic drains, not the durable default.
 
 **Owner-scoped stop** (surgical):
 

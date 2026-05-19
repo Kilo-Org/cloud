@@ -35,11 +35,158 @@ export type AnalysisStartLifecycleOutcome =
       nextRetryAt: string | null;
     };
 
+export type AnalysisCallbackLifecycleOutcome =
+  | {
+      type: 'completed';
+      analysis: SecurityFindingAnalysis;
+    }
+  | {
+      type: 'failed';
+      errorMessage: string;
+      failureCode: AutoAnalysisFailureCode;
+    }
+  | {
+      type: 'superseded';
+    }
+  | {
+      type: 'already-terminal';
+      findingStatus: 'completed' | 'failed';
+      failureCode: AutoAnalysisFailureCode | null;
+      errorMessage: string | null;
+    };
+
 class AnalysisStartQueueTransitionRejected extends Error {
   constructor() {
     super('Analysis start queue transition rejected');
     this.name = 'AnalysisStartQueueTransitionRejected';
   }
+}
+
+export async function transitionAnalysisCallbackLifecycle(
+  db: WorkerDb,
+  params: {
+    findingId: string;
+    outcome: AnalysisCallbackLifecycleOutcome;
+  }
+): Promise<{ status: 'completed' | 'failed' | 'superseded' | 'already-terminal' }> {
+  return db.transaction(async tx => {
+    if (params.outcome.type === 'already-terminal') {
+      await tx
+        .update(security_analysis_queue)
+        .set({
+          queue_status: params.outcome.findingStatus,
+          failure_code:
+            params.outcome.findingStatus === 'completed' ? null : params.outcome.failureCode,
+          last_error_redacted:
+            params.outcome.findingStatus === 'completed' ? null : params.outcome.errorMessage,
+          updated_at: sql`now()`.mapWith(String),
+        })
+        .where(
+          and(
+            eq(security_analysis_queue.finding_id, params.findingId),
+            inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+          )
+        );
+      return { status: 'already-terminal' };
+    }
+
+    if (params.outcome.type === 'superseded') {
+      await tx
+        .update(security_findings)
+        .set({
+          analysis_status: null,
+          updated_at: sql`now()`.mapWith(String),
+        })
+        .where(eq(security_findings.id, params.findingId));
+      await tx
+        .update(security_analysis_queue)
+        .set({
+          queue_status: 'completed',
+          failure_code: 'SKIPPED_NO_LONGER_ELIGIBLE',
+          last_error_redacted: null,
+          updated_at: sql`now()`.mapWith(String),
+        })
+        .where(
+          and(
+            eq(security_analysis_queue.finding_id, params.findingId),
+            inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+          )
+        );
+      return { status: 'superseded' };
+    }
+
+    const findingRows = await tx
+      .update(security_findings)
+      .set(
+        params.outcome.type === 'completed'
+          ? {
+              analysis_status: 'completed',
+              analysis: sql`${JSON.stringify(params.outcome.analysis)}::jsonb`,
+              analysis_error: null,
+              analysis_completed_at: sql`now()`.mapWith(String),
+              updated_at: sql`now()`.mapWith(String),
+            }
+          : {
+              analysis_status: 'failed',
+              analysis_error: params.outcome.errorMessage,
+              analysis_completed_at: sql`now()`.mapWith(String),
+              updated_at: sql`now()`.mapWith(String),
+            }
+      )
+      .where(
+        and(
+          eq(security_findings.id, params.findingId),
+          or(
+            isNull(security_findings.ignored_reason),
+            not(like(security_findings.ignored_reason, 'superseded:%'))
+          )
+        )
+      )
+      .returning({ id: security_findings.id });
+
+    if (findingRows.length === 0) {
+      await tx
+        .update(security_findings)
+        .set({
+          analysis_status: null,
+          updated_at: sql`now()`.mapWith(String),
+        })
+        .where(eq(security_findings.id, params.findingId));
+      await tx
+        .update(security_analysis_queue)
+        .set({
+          queue_status: 'completed',
+          failure_code: 'SKIPPED_NO_LONGER_ELIGIBLE',
+          last_error_redacted: null,
+          updated_at: sql`now()`.mapWith(String),
+        })
+        .where(
+          and(
+            eq(security_analysis_queue.finding_id, params.findingId),
+            inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+          )
+        );
+      return { status: 'superseded' };
+    }
+
+    await tx
+      .update(security_analysis_queue)
+      .set({
+        queue_status: params.outcome.type === 'completed' ? 'completed' : 'failed',
+        failure_code: params.outcome.type === 'completed' ? null : params.outcome.failureCode,
+        last_error_redacted:
+          params.outcome.type === 'completed' ? null : params.outcome.errorMessage,
+        updated_at: sql`now()`.mapWith(String),
+      })
+      .where(
+        and(
+          eq(security_analysis_queue.finding_id, params.findingId),
+          inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+        )
+      );
+
+    return { status: params.outcome.type };
+  });
 }
 
 export async function transitionAnalysisStartLifecycle(

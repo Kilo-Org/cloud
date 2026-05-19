@@ -48,6 +48,7 @@ import type {
   attachmentGetUrlResponseSchema,
   attachmentMetadataSchema,
   attachmentBlockSchema,
+  inputContentBlockSchema,
 } from './schemas';
 import type {
   messageCreatedEventSchema,
@@ -151,6 +152,7 @@ export type GetBotStatusResponse = z.infer<typeof getBotStatusResponseSchema>;
 export type GetConversationStatusResponse = z.infer<typeof getConversationStatusResponseSchema>;
 
 // ── Attachments ─────────────────────────────────────────────────────
+export type InputContentBlock = z.infer<typeof inputContentBlockSchema>;
 export type AttachmentInitRequest = z.infer<typeof attachmentInitRequestSchema>;
 export type AttachmentInitResponse = z.infer<typeof attachmentInitResponseSchema>;
 export type AttachmentGetUrlRequest = z.infer<typeof attachmentGetUrlRequestSchema>;

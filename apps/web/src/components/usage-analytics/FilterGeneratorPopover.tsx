@@ -94,16 +94,23 @@ export function FilterGeneratorPopover({
     () => (breakdown?.breakdown ?? []).filter(i => i.key).map(i => i.key),
     [breakdown]
   );
-  const userSuggestionIds = dimension === 'user' ? suggestionKeys : [];
+  const userSuggestionIds = useMemo(
+    () => (dimension === 'user' ? suggestionKeys : []),
+    [dimension, suggestionKeys]
+  );
   const { data: userSuggestionResolution, isLoading: userSuggestionResolutionLoading } =
     useResolveOrgUsers(organizationId, userSuggestionIds);
   const isResolvingUserSuggestions =
     dimension === 'user' && userSuggestionIds.length > 0 && userSuggestionResolutionLoading;
+  const resolvedUsersById = useMemo(
+    () => new Map(userSuggestionResolution?.users.map(user => [user.id, user]) ?? []),
+    [userSuggestionResolution]
+  );
 
   const suggestions = useMemo(
     () =>
       suggestionKeys.map(key => {
-        const resolvedUser = userSuggestionResolution?.users.find(u => u.id === key);
+        const resolvedUser = resolvedUsersById.get(key);
         return {
           key,
           label:
@@ -112,7 +119,7 @@ export function FilterGeneratorPopover({
             (labelForDimensionValue ? labelForDimensionValue(dimension, key) : key),
         };
       }),
-    [dimension, labelForDimensionValue, suggestionKeys, userSuggestionResolution]
+    [dimension, labelForDimensionValue, resolvedUsersById, suggestionKeys]
   );
 
   const activeSet = useMemo(() => {

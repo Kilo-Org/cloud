@@ -92,8 +92,6 @@ export function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const latestStateRef = useRef<MessageInputSubmissionState>({ text: '', replyingTo: null });
 
-  const [blobByTempId, setBlobByTempId] = useState<Map<string, Blob>>(new Map());
-
   const queue = useAttachmentQueue(kiloChatClient, conversationId, {
     performUpload: webPerformUpload,
     maxBytes: ATTACHMENT_MAX_BYTES,
@@ -117,16 +115,6 @@ export function MessageInput({
     textarea.style.height = 'auto';
     textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
   }, [text]);
-
-  // Reconcile blobByTempId with queue.rows: drop blobs for removed rows.
-  useEffect(() => {
-    setBlobByTempId(prev => {
-      const next = new Map<string, Blob>();
-      const tempIds = new Set(queue.rows.map(r => r.tempId));
-      for (const [id, blob] of prev.entries()) if (tempIds.has(id)) next.set(id, blob);
-      return next;
-    });
-  }, [queue.rows]);
 
   const overLimit = text.length > MESSAGE_TEXT_MAX_CHARS;
   const showCounter = text.length >= COUNTER_SHOW_AT;
@@ -193,7 +181,6 @@ export function MessageInput({
       setText(nextState.text);
       if (sendSucceeded) {
         queue.clear();
-        setBlobByTempId(new Map());
       }
       if (currentState.replyingTo !== null && nextState.replyingTo === null) onCancelReply();
     } finally {
@@ -277,7 +264,7 @@ export function MessageInput({
       )}
       <AttachmentPreviewStrip
         rows={queue.rows}
-        blobByTempId={blobByTempId}
+        getBlob={queue.getBlob}
         onRemove={tempId => queue.removeFile(tempId)}
         onRetry={tempId => queue.retryFile(tempId)}
       />

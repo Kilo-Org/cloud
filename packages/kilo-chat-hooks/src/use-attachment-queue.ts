@@ -138,10 +138,11 @@ export type UseAttachmentQueueOptions = {
 
 export type UseAttachmentQueueResult = {
   rows: QueuedAttachment[];
-  addFile: (input: AddFileInput) => void;
+  addFile: (input: AddFileInput) => string | null;
   removeFile: (tempId: string) => void;
   retryFile: (tempId: string) => void;
   clear: () => void;
+  getBlob: (tempId: string) => Blob | null;
   readyBlocks: AttachmentBlock[];
   isUploading: boolean;
   hasFailed: boolean;
@@ -161,13 +162,17 @@ export function useAttachmentQueue(
   const generate = generateTempId ?? defaultTempId;
 
   type Pending = {
-    blob: Blob;
     abort: AbortController;
     putUrl?: string;
     putHeaders?: Record<string, string>;
     putUrlExpiresAtMs?: number;
   };
   const pendingRef = useRef<Map<string, Pending>>(new Map());
+  // Blobs are tracked separately so previews keep working after the upload
+  // completes — pendingRef releases its entry on setReady to free upload
+  // bookkeeping, but the local bytes are still useful for the preview chip
+  // until the user sends or removes the attachment.
+  const blobsRef = useRef<Map<string, Blob>>(new Map());
 
   type UploadArgs = { tempId: string; filename: string; mimeType: string; size: number };
 
@@ -175,7 +180,8 @@ export function useAttachmentQueue(
     async (args: UploadArgs) => {
       const { tempId, filename, mimeType, size } = args;
       const pending = pendingRef.current.get(tempId);
-      if (!pending) return;
+      const blob = blobsRef.current.get(tempId);
+      if (!pending || !blob) return;
       if (!conversationId) {
         dispatch({ type: 'setFailed', tempId, error: 'No active conversation' });
         return;
@@ -205,14 +211,14 @@ export function useAttachmentQueue(
           dispatch({ type: 'setInited', tempId, attachmentId: res.attachmentId });
         }
 
-        await performUpload(pending.blob, putUrl, putHeaders, {
+        await performUpload(blob, putUrl, putHeaders, {
           signal: pending.abort.signal,
           onProgress: fraction => dispatch({ type: 'setProgress', tempId, progress: fraction }),
         });
         if (pending.abort.signal.aborted) return;
         dispatch({ type: 'setReady', tempId });
-        // Release the blob once the upload has succeeded — the server-side
-        // copy is now authoritative and the row no longer needs the bytes.
+        // Release upload bookkeeping; blobsRef keeps the bytes alive for the
+        // preview chip until send or remove.
         pendingRef.current.delete(tempId);
       } catch (err) {
         if (pending.abort.signal.aborted) return;
@@ -224,15 +230,16 @@ export function useAttachmentQueue(
   );
 
   const addFile = useCallback(
-    (input: AddFileInput) => {
+    (input: AddFileInput): string | null => {
       if (input.blob.size > maxBytes) {
         onSizeRejected?.(input);
-        return;
+        return null;
       }
-      if (!conversationId) return;
+      if (!conversationId) return null;
       const tempId = generate();
       const size = input.blob.size;
-      pendingRef.current.set(tempId, { blob: input.blob, abort: new AbortController() });
+      blobsRef.current.set(tempId, input.blob);
+      pendingRef.current.set(tempId, { abort: new AbortController() });
       dispatch({
         type: 'add',
         row: {
@@ -245,6 +252,7 @@ export function useAttachmentQueue(
         },
       });
       void startUpload({ tempId, filename: input.filename, mimeType: input.mimeType, size });
+      return tempId;
     },
     [conversationId, generate, maxBytes, onSizeRejected, startUpload]
   );
@@ -253,6 +261,7 @@ export function useAttachmentQueue(
     const pending = pendingRef.current.get(tempId);
     pending?.abort.abort();
     pendingRef.current.delete(tempId);
+    blobsRef.current.delete(tempId);
     dispatch({ type: 'remove', tempId });
   }, []);
 
@@ -260,11 +269,11 @@ export function useAttachmentQueue(
     (tempId: string) => {
       const existing = pendingRef.current.get(tempId);
       if (!existing) return;
+      if (!blobsRef.current.has(tempId)) return;
       const row = state.rows.find(r => r.tempId === tempId);
       if (!row) return;
       existing.abort.abort();
       const fresh: Pending = {
-        blob: existing.blob,
         abort: new AbortController(),
         putUrl: existing.putUrl,
         putHeaders: existing.putHeaders,
@@ -285,13 +294,17 @@ export function useAttachmentQueue(
   const clear = useCallback(() => {
     for (const pending of pendingRef.current.values()) pending.abort.abort();
     pendingRef.current.clear();
+    blobsRef.current.clear();
     dispatch({ type: 'clear' });
   }, []);
+
+  const getBlob = useCallback((tempId: string) => blobsRef.current.get(tempId) ?? null, []);
 
   useEffect(() => {
     return () => {
       for (const pending of pendingRef.current.values()) pending.abort.abort();
       pendingRef.current.clear();
+      blobsRef.current.clear();
     };
   }, []);
 
@@ -305,6 +318,7 @@ export function useAttachmentQueue(
     removeFile,
     retryFile,
     clear,
+    getBlob,
     readyBlocks,
     isUploading,
     hasFailed,

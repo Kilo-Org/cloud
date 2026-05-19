@@ -6,14 +6,14 @@ import { AttachmentPreviewChip } from './AttachmentPreviewChip';
 
 type AttachmentPreviewStripProps = {
   rows: QueuedAttachment[];
-  blobByTempId: Map<string, Blob>;
+  getBlob: (tempId: string) => Blob | null;
   onRemove: (tempId: string) => void;
   onRetry: (tempId: string) => void;
 };
 
 export function AttachmentPreviewStrip({
   rows,
-  blobByTempId,
+  getBlob,
   onRemove,
   onRetry,
 }: AttachmentPreviewStripProps) {
@@ -24,7 +24,7 @@ export function AttachmentPreviewStrip({
         <AttachmentPreviewChip
           key={row.tempId}
           row={row}
-          blob={blobByTempId.get(row.tempId) ?? null}
+          blob={getBlob(row.tempId)}
           onRemove={() => onRemove(row.tempId)}
           onRetry={() => onRetry(row.tempId)}
         />

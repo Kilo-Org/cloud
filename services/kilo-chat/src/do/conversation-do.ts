@@ -341,6 +341,21 @@ export class ConversationDO extends DurableObject<Env> {
     );
   }
 
+  private async validateUploadedAttachmentObjects(
+    rows: readonly StoredAttachmentRow[]
+  ): Promise<string | null> {
+    for (const row of rows) {
+      const object = await this.env.MEDIA_BUCKET.head(row.r2_key);
+      if (!object) {
+        return `Attachment ${row.id} upload is missing`;
+      }
+      if (object.size !== row.size) {
+        return `Attachment ${row.id} upload size ${object.size} does not match declared size ${row.size}`;
+      }
+    }
+    return null;
+  }
+
   async enqueueMessageWebhook(msg: WebhookMessage, convContext: MemberContext): Promise<void> {
     this.webhookChain = this.webhookChain
       .catch(() => {})
@@ -610,7 +625,7 @@ export class ConversationDO extends DurableObject<Env> {
     return true;
   }
 
-  createMessage(params: CreateMessageParams): CreateMessageResult {
+  async createMessage(params: CreateMessageParams): Promise<CreateMessageResult> {
     const info = this.getInfo();
     if (!info) return { ok: false, code: 'internal', error: 'Conversation not initialized' };
 
@@ -653,6 +668,10 @@ export class ConversationDO extends DurableObject<Env> {
         );
       }
       attachmentRows.push(row);
+    }
+    const uploadError = await this.validateUploadedAttachmentObjects(attachmentRows);
+    if (uploadError) {
+      return { ok: false, code: 'internal', error: uploadError };
     }
 
     const messageId = this.nextUlid();

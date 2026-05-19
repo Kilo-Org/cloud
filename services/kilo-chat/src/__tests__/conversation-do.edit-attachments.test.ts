@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
-import { bootstrapConversationForTest, unwrap } from './helpers';
+import { bootstrapConversationForTest, putUploadedAttachmentObject, unwrap } from './helpers';
 
 function getDO(name: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(name));
@@ -30,6 +30,8 @@ describe('ConversationDO.editMessage with attachments', () => {
         filename: 'a2',
       })
     );
+    await putUploadedAttachmentObject({ r2Key: a1.r2Key, size: 1, mimeType: 'image/png' });
+    await putUploadedAttachmentObject({ r2Key: a2.r2Key, size: 2, mimeType: 'image/png' });
 
     const create = await stub.createMessage({
       senderId: 'user-A',
@@ -106,6 +108,7 @@ describe('ConversationDO.editMessage with attachments', () => {
         filename: 'a1',
       })
     );
+    await putUploadedAttachmentObject({ r2Key: a1.r2Key, size: 1, mimeType: 'image/png' });
     const create = await stub.createMessage({
       senderId: 'user-A',
       content: [

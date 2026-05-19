@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
-import { bootstrapConversationForTest, unwrap } from './helpers';
+import { bootstrapConversationForTest, putUploadedAttachmentObject, unwrap } from './helpers';
 
 function getDO(name: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(name));
@@ -23,6 +23,7 @@ describe('ConversationDO.destroyAndReturnMembers with attachments', () => {
         filename: 'linked',
       })
     );
+    await putUploadedAttachmentObject({ r2Key: linked.r2Key, size: 1, mimeType: 'image/png' });
     const create = await stub.createMessage({
       senderId: 'user-A',
       content: [
@@ -47,8 +48,7 @@ describe('ConversationDO.destroyAndReturnMembers with attachments', () => {
       })
     );
 
-    // Pre-populate R2 so list() returns them (otherwise list will be empty).
-    await env.MEDIA_BUCKET.put(linked.r2Key, new Uint8Array([0x01]));
+    // Pre-populate R2 so list() returns pending uploads too.
     await env.MEDIA_BUCKET.put(pending.r2Key, new Uint8Array([0x02]));
 
     const deletedKeys: string[] = [];

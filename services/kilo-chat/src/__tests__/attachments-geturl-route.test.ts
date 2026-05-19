@@ -9,7 +9,7 @@ import { registerConversationRoutes } from '../routes/conversations';
 import { handleAttachmentGetUrl } from '../routes/handler';
 import { deriveGatewayToken } from '../lib/gateway-token';
 import type { ConversationDO } from '../do/conversation-do';
-import { makeApp, unwrap, withTestExecutionCtx } from './helpers';
+import { makeApp, putUploadedAttachmentObject, unwrap, withTestExecutionCtx } from './helpers';
 
 const ownershipMap = new Map<string, Set<string>>();
 const sandboxOwnerMap = new Map<string, string>();
@@ -112,6 +112,11 @@ async function seedLinkedAttachment(
       filename: opts.filename,
     })
   );
+  await putUploadedAttachmentObject({
+    r2Key: init.r2Key,
+    size: opts.size,
+    mimeType: opts.mimeType,
+  });
   const result = await stub.createMessage({
     senderId: uploaderId,
     content: [

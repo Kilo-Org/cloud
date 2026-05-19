@@ -1,4 +1,4 @@
-import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
+import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test';
 import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import type { AuthContext } from '../auth';
@@ -90,6 +90,16 @@ export async function unwrap<T extends { ok: true }>(
     throw new Error(`unwrap: expected ok, got ${r.code}: ${r.error}`);
   }
   return r;
+}
+
+export async function putUploadedAttachmentObject(params: {
+  r2Key: string;
+  size: number;
+  mimeType?: string;
+}): Promise<void> {
+  await env.MEDIA_BUCKET.put(params.r2Key, new Uint8Array(params.size), {
+    httpMetadata: { contentType: params.mimeType },
+  });
 }
 
 /**

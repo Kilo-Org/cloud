@@ -2,14 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
-import { bootstrapConversationForTest, unwrap } from './helpers';
+import { bootstrapConversationForTest, putUploadedAttachmentObject, unwrap } from './helpers';
 
 function getDO(name: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(name));
 }
 
 describe('ConversationDO.createMessage with attachment blocks', () => {
-  it('flips referenced attachment rows to linked', async () => {
+  it('rejects when the uploaded R2 object is missing', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
     await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
@@ -21,6 +21,39 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
         filename: 'a.png',
       })
     );
+
+    const result = await stub.createMessage({
+      senderId: 'user-A',
+      content: [
+        {
+          type: 'attachment',
+          attachmentId,
+          mimeType: 'image/png',
+          size: 100,
+          filename: 'a.png',
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/upload/i);
+    }
+  });
+
+  it('flips referenced attachment rows to linked', async () => {
+    const conversationId = ulid();
+    const stub = getDO(conversationId);
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
+    const { attachmentId, r2Key } = await unwrap(
+      stub.initAttachment({
+        uploaderId: 'user-A',
+        mimeType: 'image/png',
+        size: 100,
+        filename: 'a.png',
+      })
+    );
+    await putUploadedAttachmentObject({ r2Key, size: 100, mimeType: 'image/png' });
     const result = await stub.createMessage({
       senderId: 'user-A',
       content: [
@@ -58,7 +91,7 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
       })
     );
     await runInDurableObject(stub, async (instance: ConversationDO) => {
-      expect(() =>
+      await expect(
         instance.createMessage({
           senderId: 'user-B',
           content: [
@@ -71,7 +104,7 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
             },
           ],
         })
-      ).toThrow(/uploader/i);
+      ).rejects.toThrow(/uploader/i);
     });
   });
 
@@ -79,7 +112,7 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
     await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
-    const { attachmentId } = await unwrap(
+    const { attachmentId, r2Key } = await unwrap(
       stub.initAttachment({
         uploaderId: 'user-A',
         mimeType: 'image/png',
@@ -87,6 +120,7 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
         filename: 'a.png',
       })
     );
+    await putUploadedAttachmentObject({ r2Key, size: 100, mimeType: 'image/png' });
     await stub.createMessage({
       senderId: 'user-A',
       content: [
@@ -100,7 +134,7 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
       ],
     });
     await runInDurableObject(stub, async (instance: ConversationDO) => {
-      expect(() =>
+      await expect(
         instance.createMessage({
           senderId: 'user-A',
           content: [
@@ -113,7 +147,7 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
             },
           ],
         })
-      ).toThrow(/pending/i);
+      ).rejects.toThrow(/pending/i);
     });
   });
 
@@ -129,7 +163,7 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
       filename: string;
     }> = [];
     for (let i = 0; i < 11; i++) {
-      const { attachmentId } = await unwrap(
+      const { attachmentId, r2Key } = await unwrap(
         stub.initAttachment({
           uploaderId: 'user-A',
           mimeType: 'image/png',
@@ -137,6 +171,7 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
           filename: `a${i}.png`,
         })
       );
+      await putUploadedAttachmentObject({ r2Key, size: i + 1, mimeType: 'image/png' });
       blocks.push({
         type: 'attachment',
         attachmentId,
@@ -146,7 +181,9 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
       });
     }
     await runInDurableObject(stub, async (instance: ConversationDO) => {
-      expect(() => instance.createMessage({ senderId: 'user-A', content: blocks })).toThrow(/10/);
+      await expect(instance.createMessage({ senderId: 'user-A', content: blocks })).rejects.toThrow(
+        /10/
+      );
     });
   });
 });

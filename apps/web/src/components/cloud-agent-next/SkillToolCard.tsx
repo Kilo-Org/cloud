@@ -1,5 +1,3 @@
-import { BookOpen } from 'lucide-react';
-import { ToolCardShell } from './ToolCardShell';
 import type { ToolPart } from './types';
 
 type SkillToolCardProps = {
@@ -14,29 +12,24 @@ export function SkillToolCard({ toolPart }: SkillToolCardProps) {
   const state = toolPart.state;
   const input = state.input as SkillInput;
   const skillName = input.name ?? 'skill';
-  const error = state.status === 'error' ? state.error : undefined;
+  const skillLabel = `Skill "${skillName}"`;
+  const isLoading = state.status === 'pending' || state.status === 'running';
+
+  if (state.status === 'error') {
+    return (
+      <div className="text-destructive flex min-w-0 items-baseline gap-2 px-1 py-0.5 font-mono text-sm">
+        <span className="shrink-0">→</span>
+        <span className="shrink-0">{skillLabel}</span>
+        <span className="truncate">{state.error ?? 'Failed to load skill'}</span>
+      </div>
+    );
+  }
 
   return (
-    <ToolCardShell icon={BookOpen} title="Loading skill" subtitle={skillName} status={state.status}>
-      {/* Error */}
-      {error && (
-        <div>
-          <div className="text-muted-foreground mb-1 text-xs">Error:</div>
-          <pre className="bg-background overflow-auto rounded-md p-2 text-xs text-red-500">
-            <code>{error}</code>
-          </pre>
-        </div>
-      )}
-
-      {/* Running state */}
-      {state.status === 'running' && (
-        <div className="text-muted-foreground text-xs italic">Loading {skillName}...</div>
-      )}
-
-      {/* Pending state */}
-      {state.status === 'pending' && (
-        <div className="text-muted-foreground text-xs italic">Waiting to load {skillName}...</div>
-      )}
-    </ToolCardShell>
+    <div className="text-muted-foreground flex min-w-0 items-center gap-2 px-1 py-0.5 font-mono text-sm">
+      <span className="shrink-0">→</span>
+      <span className="truncate">{skillLabel}</span>
+      {isLoading && <span className="animate-pulse">...</span>}
+    </div>
   );
 }

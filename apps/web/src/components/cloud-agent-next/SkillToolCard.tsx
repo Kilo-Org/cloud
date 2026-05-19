@@ -17,12 +17,7 @@ export function SkillToolCard({ toolPart }: SkillToolCardProps) {
   const error = state.status === 'error' ? state.error : undefined;
 
   return (
-    <ToolCardShell
-      icon={BookOpen}
-      title="Loading skill"
-      subtitle={skillName}
-      status={state.status}
-    >
+    <ToolCardShell icon={BookOpen} title="Loading skill" subtitle={skillName} status={state.status}>
       {/* Error */}
       {error && (
         <div>

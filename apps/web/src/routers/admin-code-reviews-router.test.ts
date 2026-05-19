@@ -2,6 +2,7 @@ import { db } from '@/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
+  cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   kilocode_users,
   organizations,
@@ -18,7 +19,7 @@ type FilterInput = {
   startDate: string;
   endDate: string;
   ownershipType?: 'all' | 'personal' | 'organization';
-  agentVersion?: 'all' | 'v1' | 'v2';
+  retryAccountingMode?: 'final_outcome' | 'all_attempts';
 };
 type CodeReviewInsert = typeof cloud_agent_code_reviews.$inferInsert;
 
@@ -27,7 +28,7 @@ function filterInput(overrides: Partial<FilterInput> = {}): FilterInput {
     startDate: START_DATE,
     endDate: END_DATE,
     ownershipType: 'all',
-    agentVersion: 'all',
+    retryAccountingMode: 'final_outcome',
     ...overrides,
   };
 }
@@ -161,6 +162,124 @@ describe('adminCodeReviewsRouter', () => {
     expect(result.p99WaitSeconds).toBeCloseTo(592.8);
     expect(result.maxWaitSeconds).toBeCloseTo(600);
     expect(result.waitWithinFiveMinuteRate).toBeCloseTo(66.67, 1);
+  });
+
+  it('counts recovered retries as final outcomes by default and separate attempts in all-attempts mode', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner: { type: 'user', id: adminUser.id },
+          status: 'completed',
+          createdAt: timestamp(600),
+          startedAt: timestamp(602),
+          completedAt: timestamp(640),
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(cloud_agent_code_review_attempts).values([
+      {
+        code_review_id: review.id,
+        attempt_number: 1,
+        status: 'failed',
+        session_id: 'agent-failed-attempt',
+        error_message: 'Container shutdown: SIGTERM',
+        terminal_reason: 'sandbox_error',
+        started_at: timestamp(602),
+        completed_at: timestamp(610),
+        created_at: timestamp(601),
+      },
+      {
+        code_review_id: review.id,
+        attempt_number: 2,
+        retry_reason: 'infra_failure',
+        status: 'completed',
+        session_id: 'agent-completed-attempt',
+        started_at: timestamp(612),
+        completed_at: timestamp(640),
+        created_at: timestamp(611),
+      },
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const finalOutcome = await caller.admin.codeReviews.getOverviewStats(filterInput());
+    const allAttempts = await caller.admin.codeReviews.getOverviewStats(
+      filterInput({ retryAccountingMode: 'all_attempts' })
+    );
+
+    expect(finalOutcome.totalReviews).toBe(1);
+    expect(finalOutcome.completedCount).toBe(1);
+    expect(finalOutcome.failedCount).toBe(0);
+    expect(allAttempts.totalReviews).toBe(2);
+    expect(allAttempts.completedCount).toBe(1);
+    expect(allAttempts.failedCount).toBe(1);
+  });
+
+  it('includes recovered failed attempts in all-attempts error analysis and export', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner: { type: 'user', id: adminUser.id },
+          status: 'completed',
+          createdAt: timestamp(650),
+          startedAt: timestamp(652),
+          completedAt: timestamp(690),
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(cloud_agent_code_review_attempts).values([
+      {
+        code_review_id: review.id,
+        attempt_number: 1,
+        status: 'failed',
+        session_id: 'agent-recovered-failure',
+        error_message: 'Container shutdown: SIGTERM',
+        terminal_reason: 'sandbox_error',
+        created_at: timestamp(651),
+        started_at: timestamp(652),
+        completed_at: timestamp(660),
+      },
+      {
+        code_review_id: review.id,
+        attempt_number: 2,
+        retry_reason: 'infra_failure',
+        status: 'completed',
+        session_id: 'agent-recovered-success',
+        created_at: timestamp(661),
+        started_at: timestamp(662),
+        completed_at: timestamp(690),
+      },
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const finalErrors = await caller.admin.codeReviews.getErrorAnalysis(filterInput());
+    const attemptErrors = await caller.admin.codeReviews.getErrorAnalysis(
+      filterInput({ retryAccountingMode: 'all_attempts' })
+    );
+    const sessions = await caller.admin.codeReviews.getErrorSessions({
+      ...filterInput({ retryAccountingMode: 'all_attempts' }),
+      errorMessage: 'Container shutdown: SIGTERM',
+    });
+    const exportRows = await caller.admin.codeReviews.getExportData(
+      filterInput({ retryAccountingMode: 'all_attempts' })
+    );
+
+    expect(finalErrors.details).toHaveLength(0);
+    expect(attemptErrors.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ errorType: 'Container shutdown: SIGTERM', count: 1 }),
+      ])
+    );
+    expect(sessions[0]).toMatchObject({
+      reviewId: review.id,
+      attemptNumber: 1,
+      sessionId: 'agent-recovered-failure',
+    });
+    expect(exportRows[0]).toHaveProperty('attempt_id');
+    expect(exportRows[0]).toHaveProperty('attempt_status');
   });
 
   it('returns ownership wait breakdown and daily trend series', async () => {

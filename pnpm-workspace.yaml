@@ -4,50 +4,124 @@ packages:
   - services/cloud-agent/wrapper
   - services/cloud-agent-next/wrapper
   - services/gastown/container
-  - services/wasteland/container/control-server
+  - services/kiloclaw/controller
+  - services/kiloclaw/plugins/*
   - services/deploy-infra/builder
   - services/deploy-infra/dispatcher
   - packages/*
 
 catalog:
-  '@cloudflare/workers-types': ^4.20260430.1
-  '@octokit/auth-app': ^8.2.0
-  '@sentry/cli': ^3.3.4
-  '@tanstack/react-query': ^5.90.21
-  '@trpc/client': ^11.13.0
-  '@trpc/server': ^11.13.0
-  '@trpc/tanstack-react-query': ^11.13.0
-  '@types/jsonwebtoken': ^9.0.10
-  '@typescript/native-preview': 7.0.0-dev.20260319.1
-  '@workos-inc/node': ^8.9.0
-  aws4fetch: ^1.0.20
-  drizzle-kit: ^0.31.9
-  drizzle-orm: ^0.45.2
-  hono: ^4.12.18
-  jose: ^6.2.1
-  jsonwebtoken: ^9.0.3
-  p-limit: ^7.3.0
-  stream-chat: ^9.38.0
-  stripe: ^19.3.0
-  typescript: ^5.9.3
-  workers-tagged-logger: ^1.0.0
-  wrangler: ^4.87.0
-  zod: ^4.3.6
-
-ignoredBuiltDependencies:
-  - '@sentry/cli'
-  - core-js
-  - oxc-resolver
-  - sharp
-  - unrs-resolver
+  '@cloudflare/vitest-pool-workers': 0.16.4
+  '@cloudflare/workers-types': 4.20260511.1
+  '@octokit/auth-app': 8.2.0
+  '@sentry/cli': 3.4.2
+  '@tanstack/react-query': 5.100.10
+  '@trpc/client': 11.17.0
+  '@trpc/server': 11.17.0
+  '@trpc/tanstack-react-query': 11.17.0
+  '@types/jsonwebtoken': 9.0.10
+  '@types/node': 24.12.4
+  '@typescript/native-preview': 7.0.0-dev.20260514.1
+  '@vitest/coverage-v8': 4.1.6
+  '@vitest/ui': 4.1.6
+  '@workos-inc/node': 8.13.0
+  aws4fetch: 1.0.20
+  drizzle-kit: 0.31.10
+  drizzle-orm: 0.45.2
+  hono: 4.12.18
+  jose: 6.2.3
+  jsonwebtoken: 9.0.3
+  p-limit: 7.3.0
+  stripe: 19.3.1
+  tsx: 4.21.0
+  typescript: 5.9.3
+  ulid: 3.0.2
+  vitest: 4.1.6
+  workers-tagged-logger: 1.0.0
+  wrangler: 4.90.1
+  zod: 4.4.3
 
 minimumReleaseAge: 6842
-
-onlyBuiltDependencies:
-  - '@swc/core'
-  - '@tailwindcss/oxide'
-  - core-js-pure
-  - es5-ext
-  - esbuild
-  - libpq
-  - workerd
+minimumReleaseAgeExclude:
+  - tsx
+  - expo-dev-client
+  - expo-dev-launcher
+  - expo-dev-menu
+  - expo-dev-menu-interface
+  - expo-manifests
+  - expo-updates-interface
+  - '@expo/schema-utils'
+  - '@typescript/native-preview'
+  - '@typescript/native-preview-darwin-arm64'
+  - '@typescript/native-preview-darwin-x64'
+  - '@typescript/native-preview-linux-arm'
+  - '@typescript/native-preview-linux-arm64'
+  - '@typescript/native-preview-linux-x64'
+  - '@typescript/native-preview-win32-arm64'
+  - '@typescript/native-preview-win32-x64'
+overrides:
+  '@sentry/cli': 3.4.2
+  mdast-util-to-hast: 13.2.1
+  storybook: 9.1.17
+  next: 16.2.6
+  preact: 10.28.4
+  glob: '>=13.0.1'
+  esbuild: '>=0.25.0'
+  lodash: '>=4.18.1'
+  diff: '>=8.0.3'
+  fast-xml-parser: '>=5.7.3'
+  vite: '>=8.0.5 <8.0.11'
+  dompurify: 3.4.3
+  handlebars: 4.7.9
+  brace-expansion: 5.0.6
+  node-forge: 1.4.0
+  postcss: '>=8.5.10 <8.5.14'
+  picomatch@^2: 2.3.2
+  picomatch@^4: 4.0.4
+  yaml: 2.8.4
+  undici@^7: 7.25.0
+  path-to-regexp: 8.4.2
+  ip-address: 10.2.0
+  drizzle-orm: 0.45.2
+  lodash-es: '>=4.18.1'
+  '@xmldom/xmldom': 0.8.13
+  qs: '>=6.14.1'
+  serialize-javascript: '>=7.0.3'
+  hono: 4.12.18
+  '@hono/node-server': 1.19.14
+  undici@^6: 6.24.1
+  # 1.30.2+ regresses var() round-trip through JS visitors, breaking
+  # react-native-css's metro transformer. Upstream issue:
+  # https://github.com/parcel-bundler/lightningcss/issues/1081
+  lightningcss: 1.30.1
+  axios: 1.16.1
+  protobufjs: 8.0.3
+patchedDependencies:
+  '@storybook/nextjs@9.1.20': patches/@storybook__nextjs@9.1.20.patch
+  expo-server-sdk: patches/expo-server-sdk.patch
+publicHoistPattern:
+  - '@types/*'
+  - '*import-in-the-middle*'
+  - '*require-in-the-middle*'
+  - metro
+autoInstallPeers: false
+allowBuilds:
+  '@swc/core': true
+  '@tailwindcss/oxide': true
+  esbuild: true
+  libpq: true
+  workerd: true
+  '@sentry/cli': false
+  bufferutil: false
+  core-js: false
+  core-js-pure: false
+  es5-ext: false
+  msgpackr-extract: false
+  oxc-resolver: false
+  protobufjs: false
+  sharp: false
+  unrs-resolver: false
+  utf-8-validate: false
+  '@google/genai': false
+  koffi: false
+  openclaw: false

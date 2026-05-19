@@ -7,20 +7,85 @@
 
 import { db } from '@/lib/drizzle';
 import {
+  cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   microdollar_usage,
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
-import { eq, and, desc, count, ne, inArray, sql, sum, gte, isNull } from 'drizzle-orm';
+import { eq, and, asc, desc, count, ne, inArray, sql, sum, gte, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
-import type { CloudAgentCodeReview } from '@kilocode/db/schema';
+import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
 
+type CodeReviewAttemptStatus = CodeReviewStatus;
+
+type InfraRetryAttemptResult =
+  | {
+      outcome: 'created';
+      attempt: CloudAgentCodeReviewAttempt;
+    }
+  | {
+      outcome: 'existing-for-attempt';
+      attempt: CloudAgentCodeReviewAttempt;
+    }
+  | {
+      outcome: 'existing-for-review';
+      attempt: CloudAgentCodeReviewAttempt;
+    }
+  | {
+      outcome: 'skipped-inactive';
+      reviewStatus: string;
+      terminalReason: string | null;
+    };
+
+type AttemptCallbackFields = {
+  codeReviewId: string;
+  attemptId?: string;
+  status: CodeReviewAttemptStatus;
+  sessionId?: string;
+  cliSessionId?: string;
+  executionId?: string;
+  errorMessage?: string;
+  terminalReason?: CodeReviewTerminalReason;
+  startedAt?: Date;
+  completedAt?: Date;
+};
+
+function isTerminalCodeReviewStatus(status: string): boolean {
+  return status === 'completed' || status === 'failed' || status === 'cancelled';
+}
+
+function buildAttemptUpdateData(
+  fields: Omit<AttemptCallbackFields, 'codeReviewId'>
+): Partial<typeof cloud_agent_code_review_attempts.$inferInsert> {
+  const updateData: Partial<typeof cloud_agent_code_review_attempts.$inferInsert> = {
+    status: fields.status,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (fields.sessionId !== undefined) updateData.session_id = fields.sessionId;
+  if (fields.cliSessionId !== undefined) updateData.cli_session_id = fields.cliSessionId;
+  if (fields.executionId !== undefined) updateData.execution_id = fields.executionId;
+  if (fields.errorMessage !== undefined) updateData.error_message = fields.errorMessage;
+  if (fields.terminalReason !== undefined) updateData.terminal_reason = fields.terminalReason;
+  if (fields.startedAt !== undefined) updateData.started_at = fields.startedAt.toISOString();
+  if (fields.completedAt !== undefined) updateData.completed_at = fields.completedAt.toISOString();
+
+  if (fields.status === 'running' && !fields.startedAt) {
+    updateData.started_at = new Date().toISOString();
+  }
+  if (isTerminalCodeReviewStatus(fields.status) && !fields.completedAt) {
+    updateData.completed_at = new Date().toISOString();
+  }
+
+  return updateData;
+}
 export type CancelledReviewRow = {
   id: string;
   prevStatus: 'pending' | 'queued' | 'running';
   sessionId: string | null;
+  latestActiveAttemptId: string | null;
   checkRunId: number | null;
   headSha: string;
   platform: 'github' | 'gitlab';
@@ -28,6 +93,14 @@ export type CancelledReviewRow = {
   platformIntegrationId: string | null;
 };
 
+const RETRYABLE_PARENT_REVIEW_STATUSES = ['queued', 'running'];
+
+function canCreateInfraRetryAttempt(review: { status: string; terminal_reason: string | null }) {
+  return (
+    review.terminal_reason !== 'superseded' &&
+    RETRYABLE_PARENT_REVIEW_STATUSES.includes(review.status)
+  );
+}
 /**
  * Creates a new code review record
  * Returns the created review ID
@@ -86,6 +159,491 @@ export async function getCodeReviewById(reviewId: string): Promise<CloudAgentCod
     });
     throw error;
   }
+}
+
+export async function listCodeReviewAttempts(
+  codeReviewId: string
+): Promise<CloudAgentCodeReviewAttempt[]> {
+  try {
+    return await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, codeReviewId))
+      .orderBy(asc(cloud_agent_code_review_attempts.attempt_number));
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'listCodeReviewAttempts' },
+      extra: { codeReviewId },
+    });
+    throw error;
+  }
+}
+
+export async function getLatestCodeReviewAttempt(
+  codeReviewId: string
+): Promise<CloudAgentCodeReviewAttempt | null> {
+  try {
+    const [attempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, codeReviewId))
+      .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+      .limit(1);
+
+    return attempt ?? null;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'getLatestCodeReviewAttempt' },
+      extra: { codeReviewId },
+    });
+    throw error;
+  }
+}
+
+export async function getCodeReviewAttemptForReview(
+  codeReviewId: string,
+  attemptId: string
+): Promise<CloudAgentCodeReviewAttempt | null> {
+  try {
+    const [attempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(
+        and(
+          eq(cloud_agent_code_review_attempts.code_review_id, codeReviewId),
+          eq(cloud_agent_code_review_attempts.id, attemptId)
+        )
+      )
+      .limit(1);
+
+    return attempt ?? null;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'getCodeReviewAttemptForReview' },
+      extra: { codeReviewId, attemptId },
+    });
+    throw error;
+  }
+}
+
+export async function createCodeReviewAttempt(params: {
+  codeReviewId: string;
+  retryOfAttemptId?: string;
+  retryReason?: string;
+  status?: CodeReviewAttemptStatus;
+  sessionId?: string;
+  cliSessionId?: string;
+  executionId?: string;
+  errorMessage?: string;
+  terminalReason?: CodeReviewTerminalReason;
+  startedAt?: Date;
+  completedAt?: Date;
+}): Promise<CloudAgentCodeReviewAttempt> {
+  try {
+    return await db.transaction(async tx => {
+      await tx
+        .select({ id: cloud_agent_code_reviews.id })
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, params.codeReviewId))
+        .for('update')
+        .limit(1);
+
+      const [latest] = await tx
+        .select({ attempt_number: cloud_agent_code_review_attempts.attempt_number })
+        .from(cloud_agent_code_review_attempts)
+        .where(eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId))
+        .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+        .limit(1);
+
+      const attemptNumber = (latest?.attempt_number ?? 0) + 1;
+      const status = params.status ?? 'pending';
+      const now = new Date();
+
+      const [attempt] = await tx
+        .insert(cloud_agent_code_review_attempts)
+        .values({
+          code_review_id: params.codeReviewId,
+          attempt_number: attemptNumber,
+          retry_of_attempt_id: params.retryOfAttemptId ?? null,
+          retry_reason: params.retryReason ?? null,
+          session_id: params.sessionId ?? null,
+          cli_session_id: params.cliSessionId ?? null,
+          execution_id: params.executionId ?? null,
+          status,
+          error_message: params.errorMessage ?? null,
+          terminal_reason: params.terminalReason ?? null,
+          started_at:
+            params.startedAt?.toISOString() ?? (status === 'running' ? now.toISOString() : null),
+          completed_at:
+            params.completedAt?.toISOString() ??
+            (isTerminalCodeReviewStatus(status) ? now.toISOString() : null),
+        })
+        .returning();
+
+      if (!attempt) {
+        throw new Error('Failed to create code review attempt');
+      }
+
+      return attempt;
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'createCodeReviewAttempt' },
+      extra: { params },
+    });
+    throw error;
+  }
+}
+
+export async function createInfraRetryAttemptIfMissing(params: {
+  codeReviewId: string;
+  retryOfAttemptId: string;
+}): Promise<InfraRetryAttemptResult> {
+  try {
+    return await db.transaction(async tx => {
+      const [review] = await tx
+        .select({
+          id: cloud_agent_code_reviews.id,
+          status: cloud_agent_code_reviews.status,
+          terminalReason: cloud_agent_code_reviews.terminal_reason,
+        })
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, params.codeReviewId))
+        .for('update')
+        .limit(1);
+
+      if (!review) {
+        throw new Error(`Code review ${params.codeReviewId} not found`);
+      }
+
+      if (
+        !canCreateInfraRetryAttempt({
+          status: review.status,
+          terminal_reason: review.terminalReason,
+        })
+      ) {
+        return {
+          outcome: 'skipped-inactive',
+          reviewStatus: review.status,
+          terminalReason: review.terminalReason,
+        };
+      }
+
+      const [existingForAttempt] = await tx
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(
+          and(
+            eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId),
+            eq(cloud_agent_code_review_attempts.retry_reason, 'infra_failure'),
+            eq(cloud_agent_code_review_attempts.retry_of_attempt_id, params.retryOfAttemptId)
+          )
+        )
+        .limit(1);
+
+      if (existingForAttempt) {
+        return { outcome: 'existing-for-attempt', attempt: existingForAttempt };
+      }
+
+      const [existingForReview] = await tx
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(
+          and(
+            eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId),
+            eq(cloud_agent_code_review_attempts.retry_reason, 'infra_failure')
+          )
+        )
+        .limit(1);
+
+      if (existingForReview) {
+        return { outcome: 'existing-for-review', attempt: existingForReview };
+      }
+
+      const [latest] = await tx
+        .select({ attempt_number: cloud_agent_code_review_attempts.attempt_number })
+        .from(cloud_agent_code_review_attempts)
+        .where(eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId))
+        .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+        .limit(1);
+
+      const [attempt] = await tx
+        .insert(cloud_agent_code_review_attempts)
+        .values({
+          code_review_id: params.codeReviewId,
+          attempt_number: (latest?.attempt_number ?? 0) + 1,
+          retry_of_attempt_id: params.retryOfAttemptId,
+          retry_reason: 'infra_failure',
+          status: 'pending',
+        })
+        .returning();
+
+      if (!attempt) {
+        throw new Error('Failed to create infra retry attempt');
+      }
+
+      return { outcome: 'created', attempt };
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'createInfraRetryAttemptIfMissing' },
+      extra: { params },
+    });
+    throw error;
+  }
+}
+
+export async function ensureCodeReviewAttemptForRunningCallback(params: {
+  codeReviewId: string;
+  sessionId?: string;
+  cliSessionId?: string;
+  executionId?: string;
+}): Promise<CloudAgentCodeReviewAttempt> {
+  try {
+    const latestAttempt = await getLatestCodeReviewAttempt(params.codeReviewId);
+
+    if (!latestAttempt) {
+      return await createCodeReviewAttempt({
+        codeReviewId: params.codeReviewId,
+        status: 'running',
+        sessionId: params.sessionId,
+        cliSessionId: params.cliSessionId,
+        executionId: params.executionId,
+      });
+    }
+
+    const sessionMatches =
+      (params.sessionId !== undefined && latestAttempt.session_id === params.sessionId) ||
+      (params.cliSessionId !== undefined && latestAttempt.cli_session_id === params.cliSessionId);
+    const latestAttemptIsRetry = latestAttempt.retry_of_attempt_id !== null;
+    const shouldUpdateLatestPending =
+      sessionMatches ||
+      (!latestAttemptIsRetry &&
+        (latestAttempt.status === 'pending' ||
+          (!latestAttempt.session_id &&
+            !latestAttempt.cli_session_id &&
+            !isTerminalCodeReviewStatus(latestAttempt.status))));
+
+    if (shouldUpdateLatestPending) {
+      const [updated] = await db
+        .update(cloud_agent_code_review_attempts)
+        .set(
+          buildAttemptUpdateData({
+            status: 'running',
+            sessionId: params.sessionId,
+            cliSessionId: params.cliSessionId,
+            executionId: params.executionId,
+          })
+        )
+        .where(eq(cloud_agent_code_review_attempts.id, latestAttempt.id))
+        .returning();
+
+      if (updated) return updated;
+    }
+
+    return latestAttempt;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'ensureCodeReviewAttemptForRunningCallback' },
+      extra: { params },
+    });
+    throw error;
+  }
+}
+
+export async function updateCodeReviewAttemptForCallback(
+  params: AttemptCallbackFields
+): Promise<CloudAgentCodeReviewAttempt> {
+  try {
+    if (params.attemptId) {
+      const explicitAttempt = await getCodeReviewAttemptForReview(
+        params.codeReviewId,
+        params.attemptId
+      );
+      if (!explicitAttempt) {
+        throw new Error(
+          `Code review attempt ${params.attemptId} not found for review ${params.codeReviewId}`
+        );
+      }
+
+      const [updated] = await db
+        .update(cloud_agent_code_review_attempts)
+        .set(
+          buildAttemptUpdateData({
+            status: params.status,
+            sessionId: params.sessionId,
+            cliSessionId: params.cliSessionId,
+            executionId: params.executionId,
+            errorMessage: params.errorMessage,
+            terminalReason: params.terminalReason,
+            startedAt: params.startedAt,
+            completedAt: params.completedAt,
+          })
+        )
+        .where(eq(cloud_agent_code_review_attempts.id, explicitAttempt.id))
+        .returning();
+
+      if (!updated) {
+        throw new Error('Failed to update code review attempt');
+      }
+
+      return updated;
+    }
+
+    if (params.status === 'running') {
+      return await ensureCodeReviewAttemptForRunningCallback(params);
+    }
+
+    let matchingAttempt: CloudAgentCodeReviewAttempt | undefined;
+    if (params.sessionId) {
+      [matchingAttempt] = await db
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(
+          and(
+            eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId),
+            eq(cloud_agent_code_review_attempts.session_id, params.sessionId)
+          )
+        )
+        .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+        .limit(1);
+    }
+
+    if (!matchingAttempt && params.cliSessionId) {
+      [matchingAttempt] = await db
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(
+          and(
+            eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId),
+            eq(cloud_agent_code_review_attempts.cli_session_id, params.cliSessionId)
+          )
+        )
+        .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+        .limit(1);
+    }
+
+    const latestAttempt = await getLatestCodeReviewAttempt(params.codeReviewId);
+    if (
+      !matchingAttempt &&
+      params.sessionId &&
+      latestAttempt?.session_id &&
+      latestAttempt.session_id !== params.sessionId
+    ) {
+      return latestAttempt;
+    }
+
+    const targetAttempt = matchingAttempt ?? latestAttempt;
+
+    if (!targetAttempt) {
+      return await createCodeReviewAttempt({
+        codeReviewId: params.codeReviewId,
+        status: params.status,
+        sessionId: params.sessionId,
+        cliSessionId: params.cliSessionId,
+        executionId: params.executionId,
+        errorMessage: params.errorMessage,
+        terminalReason: params.terminalReason,
+        startedAt: params.startedAt,
+        completedAt: params.completedAt,
+      });
+    }
+
+    const [updated] = await db
+      .update(cloud_agent_code_review_attempts)
+      .set(
+        buildAttemptUpdateData({
+          status: params.status,
+          sessionId: params.sessionId,
+          cliSessionId: params.cliSessionId,
+          executionId: params.executionId,
+          errorMessage: params.errorMessage,
+          terminalReason: params.terminalReason,
+          startedAt: params.startedAt,
+          completedAt: params.completedAt,
+        })
+      )
+      .where(eq(cloud_agent_code_review_attempts.id, targetAttempt.id))
+      .returning();
+
+    if (!updated) {
+      throw new Error('Failed to update code review attempt');
+    }
+
+    return updated;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'updateCodeReviewAttemptForCallback' },
+      extra: { params },
+    });
+    throw error;
+  }
+}
+
+export async function hasInfraRetryAttempt(codeReviewId: string): Promise<boolean> {
+  try {
+    const [attempt] = await db
+      .select({ id: cloud_agent_code_review_attempts.id })
+      .from(cloud_agent_code_review_attempts)
+      .where(
+        and(
+          eq(cloud_agent_code_review_attempts.code_review_id, codeReviewId),
+          eq(cloud_agent_code_review_attempts.retry_reason, 'infra_failure')
+        )
+      )
+      .limit(1);
+
+    return !!attempt;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'hasInfraRetryAttempt' },
+      extra: { codeReviewId },
+    });
+    throw error;
+  }
+}
+
+export async function ensureCurrentCodeReviewAttemptFromReview(
+  review: CloudAgentCodeReview
+): Promise<CloudAgentCodeReviewAttempt> {
+  const latestAttempt = await getLatestCodeReviewAttempt(review.id);
+  if (latestAttempt) {
+    if (
+      latestAttempt.status === 'pending' &&
+      (review.session_id || review.cli_session_id || review.status !== 'pending')
+    ) {
+      const [updated] = await db
+        .update(cloud_agent_code_review_attempts)
+        .set(
+          buildAttemptUpdateData({
+            status: review.status as CodeReviewAttemptStatus,
+            sessionId: review.session_id ?? undefined,
+            cliSessionId: review.cli_session_id ?? undefined,
+            errorMessage: review.error_message ?? undefined,
+            terminalReason: review.terminal_reason as CodeReviewTerminalReason | undefined,
+            startedAt: review.started_at ? new Date(review.started_at) : undefined,
+            completedAt: review.completed_at ? new Date(review.completed_at) : undefined,
+          })
+        )
+        .where(eq(cloud_agent_code_review_attempts.id, latestAttempt.id))
+        .returning();
+
+      return updated ?? latestAttempt;
+    }
+
+    return latestAttempt;
+  }
+
+  return await createCodeReviewAttempt({
+    codeReviewId: review.id,
+    status: review.status as CodeReviewAttemptStatus,
+    sessionId: review.session_id ?? undefined,
+    cliSessionId: review.cli_session_id ?? undefined,
+    errorMessage: review.error_message ?? undefined,
+    terminalReason: review.terminal_reason as CodeReviewTerminalReason | undefined,
+    startedAt: review.started_at ? new Date(review.started_at) : undefined,
+    completedAt: review.completed_at ? new Date(review.completed_at) : undefined,
+  });
 }
 
 /**
@@ -269,6 +827,47 @@ export async function releaseQueuedReviewClaim(reviewId: string): Promise<boolea
   }
 }
 
+export async function reviewIsStillQueued(reviewId: string): Promise<boolean> {
+  try {
+    const [review] = await db
+      .select({ id: cloud_agent_code_reviews.id })
+      .from(cloud_agent_code_reviews)
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.id, reviewId),
+          eq(cloud_agent_code_reviews.status, 'queued')
+        )
+      )
+      .limit(1);
+
+    return !!review;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'reviewIsStillQueued' },
+      extra: { reviewId },
+    });
+    throw error;
+  }
+}
+
+export async function reviewIsSuperseded(reviewId: string): Promise<boolean> {
+  try {
+    const [review] = await db
+      .select({ terminalReason: cloud_agent_code_reviews.terminal_reason })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId))
+      .limit(1);
+
+    return review?.terminalReason === 'superseded';
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'reviewIsSuperseded' },
+      extra: { reviewId },
+    });
+    throw error;
+  }
+}
+
 /**
  * Updates only usage-related columns on a code review, without touching status or timestamps.
  */
@@ -307,6 +906,36 @@ export async function updateCodeReviewUsage(
     captureException(error, {
       tags: { operation: 'updateCodeReviewUsage' },
       extra: { reviewId, usage },
+    });
+    throw error;
+  }
+}
+
+/**
+ * Updates REVIEW.md usage metadata for a code review.
+ */
+export async function updateRepositoryReviewInstructionsMetadata(
+  reviewId: string,
+  metadata: {
+    used: boolean;
+    ref: string | null;
+    truncated: boolean;
+  }
+): Promise<void> {
+  try {
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        repository_review_instructions_used: metadata.used,
+        repository_review_instructions_ref: metadata.ref,
+        repository_review_instructions_truncated: metadata.truncated,
+        updated_at: new Date().toISOString(),
+      })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'updateRepositoryReviewInstructionsMetadata' },
+      extra: { reviewId, metadata },
     });
     throw error;
   }
@@ -485,6 +1114,7 @@ export async function resetCodeReviewForRetry(reviewId: string): Promise<void> {
         session_id: null,
         cli_session_id: null,
         error_message: null,
+        terminal_reason: null,
         check_run_id: null,
         started_at: null,
         completed_at: null,
@@ -546,6 +1176,7 @@ export async function cancelSupersededReviewsForPR(
       id: string;
       prev_status: 'pending' | 'queued' | 'running';
       session_id: string | null;
+      latest_active_attempt_id: string | null;
       check_run_id: number | null;
       head_sha: string;
       platform: 'github' | 'gitlab';
@@ -557,6 +1188,14 @@ export async function cancelSupersededReviewsForPR(
           id,
           status AS prev_status,
           session_id,
+          (
+            SELECT attempts.id
+            FROM ${cloud_agent_code_review_attempts} AS attempts
+            WHERE attempts.code_review_id = ${cloud_agent_code_reviews}.id
+              AND attempts.status IN ('pending', 'queued', 'running')
+            ORDER BY attempts.attempt_number DESC
+            LIMIT 1
+          ) AS latest_active_attempt_id,
           check_run_id,
           head_sha,
           platform,
@@ -567,6 +1206,17 @@ export async function cancelSupersededReviewsForPR(
           AND ${cloud_agent_code_reviews.pr_number} = ${prNumber}
           AND ${cloud_agent_code_reviews.head_sha} != ${excludeSha}
           AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
+      ), cancelled_attempts AS (
+        UPDATE ${cloud_agent_code_review_attempts} AS attempts
+        SET
+          status = 'cancelled',
+          terminal_reason = 'superseded',
+          error_message = 'Superseded by new push',
+          completed_at = now(),
+          updated_at = now()
+        FROM targets
+        WHERE attempts.code_review_id = targets.id
+          AND attempts.status IN ('pending', 'queued', 'running')
       )
       UPDATE ${cloud_agent_code_reviews} AS reviews
       SET
@@ -581,6 +1231,7 @@ export async function cancelSupersededReviewsForPR(
         reviews.id,
         targets.prev_status,
         targets.session_id,
+        targets.latest_active_attempt_id,
         targets.check_run_id,
         targets.head_sha,
         targets.platform,
@@ -592,6 +1243,7 @@ export async function cancelSupersededReviewsForPR(
       id: row.id,
       prevStatus: row.prev_status,
       sessionId: row.session_id,
+      latestActiveAttemptId: row.latest_active_attempt_id,
       checkRunId: row.check_run_id,
       headSha: row.head_sha,
       platform: row.platform,

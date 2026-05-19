@@ -396,6 +396,19 @@ describe('WrapperClient', () => {
       const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       expect(execCall).toContain('reject');
     });
+
+    it('sends optional permission message', async () => {
+      const session = createMockSession(
+        createSuccessResponse({ status: 'answered', success: true })
+      );
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await client.answerPermission('perm_789', 'reject', 'continue read-only');
+
+      const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(execCall).toContain('/job/answer-permission');
+      expect(execCall).toContain('continue read-only');
+    });
   });
 
   // -------------------------------------------------------------------------

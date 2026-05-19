@@ -13,6 +13,13 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: '2026-05-13',
     description:
+      'Baked bundled OpenClaw plugin runtime dependencies into the KiloClaw image so doctor and gateway startup no longer need to install them one plugin at a time. This reduces cold-start delays on shared-CPU instances and only affects bundled OpenClaw plugins; custom user-installed plugins keep their normal install behavior.',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
+    date: '2026-05-13',
+    description:
       'Optimized the KiloClaw image and startup path by cleaning npm and Bun package caches. Build-time cleanup reduces deployed image size, and runtime npm cache cleanup now runs after bootstrap finishes so it reduces persistent storage growth without delaying readiness.',
     category: 'feature',
     deployHint: 'redeploy_suggested',

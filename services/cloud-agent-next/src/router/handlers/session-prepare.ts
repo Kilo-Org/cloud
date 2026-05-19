@@ -1,3 +1,4 @@
+import { dirname } from 'node:path';
 import { TRPCError } from '@trpc/server';
 import type * as z from 'zod';
 import { getSandbox } from '@cloudflare/sandbox';
@@ -189,6 +190,71 @@ function setCollectionUpdate<T>(
   updates[key] = isEmpty(value) ? null : value;
 }
 
+type PrepareSessionWorkspaceFailureCategory =
+  | 'sandbox_api_or_storage_failure'
+  | 'wrapper_wait_for_port_timeout'
+  | 'wrapper_kilo_server_start_timeout'
+  | 'configured_session_lookup_failure'
+  | 'repo_clone_or_checkout_failure'
+  | 'other_workspace_preparation_failure';
+
+function prepareSessionErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function classifyPrepareSessionWorkspaceFailure(
+  error: unknown,
+  sandboxInternalServerError: boolean
+): PrepareSessionWorkspaceFailureCategory {
+  const message = prepareSessionErrorMessage(error).toLowerCase();
+
+  if (
+    message.includes('configured session') &&
+    message.includes('not found: session get returned no data')
+  ) {
+    return 'configured_session_lookup_failure';
+  }
+
+  if (message.includes('failed to start kilo server: timeout waiting for server to start')) {
+    return 'wrapper_kilo_server_start_timeout';
+  }
+
+  if (
+    message.includes('wrapper did not become ready on port') &&
+    message.includes('waitforport timed out')
+  ) {
+    return 'wrapper_wait_for_port_timeout';
+  }
+
+  if (
+    message.includes('git clone timed out') ||
+    message.includes('failed to checkout pull ref') ||
+    message.includes('git-lfs filter-process') ||
+    message.includes('object does not exist on the server')
+  ) {
+    return 'repo_clone_or_checkout_failure';
+  }
+
+  if (
+    sandboxInternalServerError ||
+    message.includes('internal error in durable object storage') ||
+    message.includes('durable object storage operation exceeded timeout')
+  ) {
+    return 'sandbox_api_or_storage_failure';
+  }
+
+  return 'other_workspace_preparation_failure';
+}
+
+function isRetryableWrapperReadinessFailure(
+  failureCategory: PrepareSessionWorkspaceFailureCategory
+): boolean {
+  return (
+    failureCategory === 'wrapper_wait_for_port_timeout' ||
+    failureCategory === 'wrapper_kilo_server_start_timeout'
+  );
+}
+
 /**
  * Creates session preparation handlers.
  * These handlers are protected by internal API authentication (backend-to-backend).
@@ -248,6 +314,8 @@ const prepareSessionHandler = internalApiProtectedProcedure
         userId: ctx.userId,
         orgId: input.kilocodeOrganizationId ?? '(personal)',
         sandboxId,
+        botId: ctx.botId,
+        sandboxKind: ctx.botId ? 'bot' : 'user',
       });
       logger.info('Preparing new session with workspace setup');
 
@@ -562,17 +630,56 @@ const prepareSessionHandler = internalApiProtectedProcedure
         await writeAuthFile(sandbox, sessionHome, ctx.authToken);
         await writeGlobalRules(sandbox, sessionHome, cloudAgentSessionId);
 
-        // 11. Start wrapper (which starts kilo server in-process and creates session)
-        logger.info('Starting wrapper');
-        const { client: _wrapperClient, sessionId: kiloSessionId } =
-          await WrapperClient.ensureWrapper(sandbox, session, {
-            agentSessionId: cloudAgentSessionId,
-            userId: ctx.userId,
-            workspacePath,
-          });
-
+        // 11. Pre-import a minimal session so the wrapper starts with --session-id.
+        // This avoids the race condition where Session.Event.Created fires before
+        // KiloSessions.init() has registered its Bus.subscribe handler.
+        const kiloSessionId = generateKiloSessionId();
         logger.setTags({ kiloSessionId });
-        logger.info('Wrapper started, kilo session created');
+        logger.info('Pre-importing kilo session');
+        const now = Date.now();
+        const minimalSessionJson = JSON.stringify({
+          info: {
+            id: kiloSessionId,
+            slug: '',
+            projectID: '',
+            directory: '',
+            title: 'New session - ' + new Date(now).toISOString(),
+            version: '2',
+            time: { created: now, updated: now },
+          },
+          messages: [],
+        });
+        const importFilePath = `/tmp/kilo-empty-session-${kiloSessionId}.json`;
+        await sandbox.writeFile(importFilePath, minimalSessionJson);
+        const escapedFile = importFilePath.replaceAll("'", "'\\''");
+        const escapedId = kiloSessionId.replaceAll("'", "'\\''");
+        const escapedWorkspace = workspacePath.replaceAll("'", "'\\''");
+        const restoreResult = await session.exec(
+          `bun /usr/local/bin/kilo-restore-session.js --file '${escapedFile}' '${escapedId}' '${escapedWorkspace}'`,
+          { cwd: dirname(workspacePath) }
+        );
+        if (restoreResult.exitCode !== 0) {
+          const stdout = restoreResult.stdout?.trim() ?? '';
+          logger
+            .withFields({ exitCode: restoreResult.exitCode, stdout })
+            .error('Pre-import of kilo session failed');
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Failed to pre-import kilo session (exit ${restoreResult.exitCode})`,
+          });
+        }
+        logger.info('Kilo session pre-imported');
+
+        // 12. Start wrapper with --session-id so no new session is created (no race)
+        logger.info('Starting wrapper');
+        const { client: _wrapperClient } = await WrapperClient.ensureWrapper(sandbox, session, {
+          agentSessionId: cloudAgentSessionId,
+          userId: ctx.userId,
+          workspacePath,
+          sessionId: kiloSessionId,
+        });
+
+        logger.info('Wrapper started');
 
         return { workspacePath, sessionHome, branchName, kiloSessionId };
       };
@@ -582,6 +689,20 @@ const prepareSessionHandler = internalApiProtectedProcedure
         preparedWorkspace = await prepareWorkspace();
       } catch (error) {
         const sandboxInternalServerError = isSandboxInternalServerError(error);
+        const failureCategory = classifyPrepareSessionWorkspaceFailure(
+          error,
+          sandboxInternalServerError
+        );
+        logger
+          .withFields({
+            error: prepareSessionErrorMessage(error),
+            failureCategory,
+            retryableSandboxInternalServerError: sandboxInternalServerError,
+            retryableWrapperReadinessFailure: isRetryableWrapperReadinessFailure(failureCategory),
+            sandboxKind: ctx.botId ? 'bot' : 'user',
+            logTag: 'prepare_session_workspace_preparation_failed',
+          })
+          .error('prepareSession workspace preparation failed');
         await destroySandboxAfterInternalServerError(
           {
             sandbox,
@@ -643,7 +764,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
       const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${cloudAgentSessionId}`);
       const stub = ctx.env.CLOUD_AGENT_SESSION.get(doId);
 
-      let prepareResult;
+      let prepareResult: Awaited<ReturnType<typeof stub.prepare>>;
       try {
         prepareResult = await stub.prepare({
           sessionId: cloudAgentSessionId,

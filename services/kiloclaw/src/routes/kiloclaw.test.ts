@@ -20,6 +20,7 @@ describe('buildConfiguredSecrets', () => {
       agentcard: false,
       onepassword: false,
       'brave-search': false,
+      composio: false,
     });
   });
 
@@ -116,7 +117,8 @@ describe('buildConfiguredSecrets', () => {
     expect(keys).toContain('linear');
     expect(keys).toContain('onepassword');
     expect(keys).toContain('brave-search');
-    expect(keys).toHaveLength(8);
+    expect(keys).toContain('composio');
+    expect(keys).toHaveLength(9);
   });
 
   it('treats null values as not configured', () => {

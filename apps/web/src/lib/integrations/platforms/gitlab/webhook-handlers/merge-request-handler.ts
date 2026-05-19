@@ -224,7 +224,8 @@ export async function handleMergeRequestCodeReview(
             try {
               const response = await codeReviewWorkerClient.cancelReview(
                 review.id,
-                'Superseded by new push'
+                'Superseded by new push',
+                review.latestActiveAttemptId ?? undefined
               );
 
               if (!response.success) {
@@ -257,35 +258,46 @@ export async function handleMergeRequestCodeReview(
     const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
 
     if (cancelledReviews.length > 0 && fullIntegration) {
+      const gitlabCancelledReviews = cancelledReviews.flatMap(review => {
+        if (
+          review.platform === 'gitlab' &&
+          review.platformProjectId != null &&
+          review.headSha.length > 0
+        ) {
+          return [{ headSha: review.headSha, platformProjectId: review.platformProjectId }];
+        }
+
+        return [];
+      });
+      const projectAccessTokens = new Map<number, Promise<string>>();
+      const getProjectAccessToken = (platformProjectId: number) => {
+        let token = projectAccessTokens.get(platformProjectId);
+        if (!token) {
+          token = getOrCreateProjectAccessToken(fullIntegration, platformProjectId);
+          projectAccessTokens.set(platformProjectId, token);
+        }
+        return token;
+      };
+
       await Promise.allSettled(
-        cancelledReviews
-          .filter(
-            review =>
-              review.platform === 'gitlab' &&
-              review.platformProjectId != null &&
-              review.headSha.length > 0
-          )
-          .map(async review => {
-            try {
-              const pratToken = await getOrCreateProjectAccessToken(
-                fullIntegration,
-                review.platformProjectId as number
-              );
-              await setCommitStatus(
-                pratToken,
-                review.platformProjectId as number,
-                review.headSha,
-                'canceled',
-                { description: 'Superseded by new push' },
-                instanceUrl
-              );
-            } catch (error) {
-              logExceptInTest(
-                `Failed to cancel old commit status for ${review.headSha} on project ${review.platformProjectId}:`,
-                error
-              );
-            }
-          })
+        gitlabCancelledReviews.map(async review => {
+          try {
+            const pratToken = await getProjectAccessToken(review.platformProjectId);
+            await setCommitStatus(
+              pratToken,
+              review.platformProjectId,
+              review.headSha,
+              'canceled',
+              { description: 'Superseded by new push' },
+              instanceUrl
+            );
+          } catch (error) {
+            logExceptInTest(
+              `Failed to cancel old commit status for ${review.headSha} on project ${review.platformProjectId}:`,
+              error
+            );
+          }
+        })
       );
     }
 

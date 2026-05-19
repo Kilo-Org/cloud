@@ -193,6 +193,41 @@ export const KiloClawSubscriptionChangeActorType = {
 export type KiloClawSubscriptionChangeActorType =
   (typeof KiloClawSubscriptionChangeActorType)[keyof typeof KiloClawSubscriptionChangeActorType];
 
+export const KiloClawTerminalRenewalFailureStatus = {
+  Unresolved: 'unresolved',
+  Resolved: 'resolved',
+  Waived: 'waived',
+  Superseded: 'superseded',
+} as const;
+
+export type KiloClawTerminalRenewalFailureStatus =
+  (typeof KiloClawTerminalRenewalFailureStatus)[keyof typeof KiloClawTerminalRenewalFailureStatus];
+
+// System failure codes for credit-renewal terminal failures. These are
+// recorded only after automatic retry is exhausted for a particular
+// (subscription, renewal_boundary). Expected business outcomes
+// (e.g. insufficient credits past-due, cancel-at-period-end, stale skip)
+// MUST NOT be recorded as terminal failures and so are not part of this set.
+export const KiloClawTerminalRenewalFailureCode = {
+  CreditBalanceReadFailed: 'credit_balance_read_failed',
+  RenewalTransactionFailed: 'renewal_transaction_failed',
+  AutoTopUpMarkerWriteFailed: 'auto_top_up_marker_write_failed',
+  WorkerTimeout: 'worker_timeout',
+  PoisonPayload: 'poison_payload',
+  QueueDeliveryExhausted: 'queue_delivery_exhausted',
+} as const;
+
+export type KiloClawTerminalRenewalFailureCode =
+  (typeof KiloClawTerminalRenewalFailureCode)[keyof typeof KiloClawTerminalRenewalFailureCode];
+
+export const KiloClawTerminalRenewalFailureResolutionActorType = {
+  Operator: 'operator',
+  System: 'system',
+} as const;
+
+export type KiloClawTerminalRenewalFailureResolutionActorType =
+  (typeof KiloClawTerminalRenewalFailureResolutionActorType)[keyof typeof KiloClawTerminalRenewalFailureResolutionActorType];
+
 export const KiloClawSubscriptionChangeAction = {
   Created: 'created',
   StatusChanged: 'status_changed',
@@ -694,6 +729,7 @@ export const GatewayApiKindSchema = z.enum([
   'fim_completions',
   'messages',
   'responses',
+  'audio_transcriptions',
 ]);
 
 export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
@@ -755,6 +791,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   selected_repository_ids: z.array(z.number()).optional(),
   // Manually added repositories (for GitLab where pagination limits results)
   manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
+  disable_review_md: z.boolean().optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.
   //   'off'      — gate only fails on system errors (timeout, crash)

@@ -157,7 +157,7 @@ pnpm start            # wrangler dev
 ## Controller Smoke Scripts
 
 When working on machine-side controller behavior, use the Docker smoke scripts in
-`scripts/` (build image first: `docker build -t kiloclaw:controller .`):
+`scripts/` (build image first: `docker buildx build --build-context workspace=../.. --load -t kiloclaw:controller .`):
 
 - `scripts/controller-smoke-test.sh`
   - Fresh container (onboard path). Tests auth, env patch, version endpoints.

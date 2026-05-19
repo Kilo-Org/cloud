@@ -14,6 +14,7 @@ import { CodeReviewWaitTimeSummary } from '@/app/admin/components/CodeReviewWait
 import { CodeReviewUserSegmentation } from '@/app/admin/components/CodeReviewUserSegmentation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { RefreshCw, Download, X, Search, User, Building2 } from 'lucide-react';
 import {
   useCodeReviewOverviewStats,
@@ -38,7 +39,7 @@ const breadcrumbs = (
 
 type RangeType = '7d' | '30d' | '90d';
 type OwnershipType = 'all' | 'personal' | 'organization';
-type AgentVersionType = 'all' | 'v1' | 'v2';
+type RetryAccountingModeType = 'final_outcome' | 'all_attempts';
 
 type SelectedUser = {
   id: string;
@@ -62,7 +63,8 @@ export default function CodeReviewsPage() {
 
   // Filter state
   const [ownershipType, setOwnershipType] = useState<OwnershipType>('all');
-  const [agentVersion, setAgentVersion] = useState<AgentVersionType>('all');
+  const [retryAccountingMode, setRetryAccountingMode] =
+    useState<RetryAccountingModeType>('final_outcome');
   const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null);
   const [selectedOrg, setSelectedOrg] = useState<SelectedOrg | null>(null);
 
@@ -101,9 +103,9 @@ export default function CodeReviewsPage() {
       userId: selectedUser?.id,
       organizationId: selectedOrg?.id,
       ownershipType: selectedUser || selectedOrg ? undefined : ownershipType,
-      agentVersion,
+      retryAccountingMode,
     }),
-    [startDate, endDate, selectedUser, selectedOrg, ownershipType, agentVersion]
+    [startDate, endDate, selectedUser, selectedOrg, ownershipType, retryAccountingMode]
   );
 
   // Queries
@@ -166,13 +168,16 @@ export default function CodeReviewsPage() {
     setSelectedUser(null);
     setSelectedOrg(null);
     setOwnershipType('all');
-    setAgentVersion('all');
+    setRetryAccountingMode('final_outcome');
     setUserSearchQuery('');
     setOrgSearchQuery('');
   };
 
   const hasActiveFilter =
-    selectedUser || selectedOrg || ownershipType !== 'all' || agentVersion !== 'all';
+    selectedUser ||
+    selectedOrg ||
+    ownershipType !== 'all' ||
+    retryAccountingMode !== 'final_outcome';
 
   const splitWaitTimeByOwnership = !selectedUser && !selectedOrg && ownershipType === 'all';
   const waitTimeSeriesLabel = selectedUser
@@ -294,22 +299,25 @@ export default function CodeReviewsPage() {
             ))}
           </div>
 
-          {/* Agent Version Filter */}
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="text-sm font-medium">Agent Version:</span>
-            {(['all', 'v1', 'v2'] as AgentVersionType[]).map(version => (
-              <label key={version} className="flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="agentVersion"
-                  value={version}
-                  checked={agentVersion === version}
-                  onChange={() => setAgentVersion(version)}
-                  className="h-4 w-4"
-                />
-                {version === 'all' ? 'All Versions' : version.toUpperCase()}
+          {/* Retry Accounting Mode */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="retry-aware-metrics"
+                checked={retryAccountingMode === 'final_outcome'}
+                onCheckedChange={checked =>
+                  setRetryAccountingMode(checked ? 'final_outcome' : 'all_attempts')
+                }
+              />
+              <label htmlFor="retry-aware-metrics" className="cursor-pointer text-sm font-medium">
+                Retry-aware metrics
               </label>
-            ))}
+            </div>
+            <span className="text-muted-foreground text-xs">
+              {retryAccountingMode === 'final_outcome'
+                ? 'Recovered infra retries count as the final review outcome.'
+                : 'Every session attempt is counted separately.'}
+            </span>
           </div>
 
           {/* User/Org Search Filters */}
@@ -481,7 +489,7 @@ export default function CodeReviewsPage() {
             {performanceQuery.data && (
               <CodeReviewPerformanceChart
                 data={performanceQuery.data}
-                agentVersion={agentVersion}
+                retryAccountingMode={retryAccountingMode}
               />
             )}
 

@@ -224,7 +224,8 @@ export async function handlePullRequestCodeReview(
             try {
               const response = await codeReviewWorkerClient.cancelReview(
                 review.id,
-                'Superseded by new push'
+                'Superseded by new push',
+                review.latestActiveAttemptId ?? undefined
               );
 
               if (!response.success) {

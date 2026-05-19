@@ -50,7 +50,10 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   updateCheckRun: (...args: unknown[]) => mockUpdateCheckRun(...args),
 }));
 
-import { resolvePullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
+import {
+  getGitHubPullRequestCheckoutRef,
+  resolvePullRequestCheckoutRef,
+} from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
 import {
   handlePullRequest,
   shouldSkipSynchronizeForMergeCommit,
@@ -113,7 +116,11 @@ beforeEach(() => {
 });
 
 describe('resolvePullRequestCheckoutRef', () => {
-  it('uses head.ref for same-repo PRs', () => {
+  it('builds GitHub synthetic pull refs', () => {
+    expect(getGitHubPullRequestCheckoutRef(123)).toBe('refs/pull/123/head');
+  });
+
+  it('uses refs/pull/<number>/head for same-repo PRs', () => {
     const result = resolvePullRequestCheckoutRef({
       pull_request: {
         number: 123,
@@ -128,7 +135,7 @@ describe('resolvePullRequestCheckoutRef', () => {
     });
 
     expect(result).toEqual({
-      checkoutRef: 'feature/same-repo',
+      checkoutRef: 'refs/pull/123/head',
       isForkPr: false,
       headRepoFullName: 'acme/widgets',
     });
@@ -155,7 +162,7 @@ describe('resolvePullRequestCheckoutRef', () => {
     });
   });
 
-  it('falls back to head.ref when head.repo is missing', () => {
+  it('uses refs/pull/<number>/head when head.repo is missing', () => {
     const result = resolvePullRequestCheckoutRef({
       pull_request: {
         number: 789,
@@ -169,7 +176,7 @@ describe('resolvePullRequestCheckoutRef', () => {
     });
 
     expect(result).toEqual({
-      checkoutRef: 'feature/missing-head-repo',
+      checkoutRef: 'refs/pull/789/head',
       isForkPr: false,
       headRepoFullName: null,
     });
@@ -285,6 +292,7 @@ describe('handlePullRequest', () => {
         id: 'pending-review',
         prevStatus: 'pending',
         sessionId: null,
+        latestActiveAttemptId: 'pending-attempt',
         checkRunId: 101,
         headSha: 'old-pending-sha',
         platform: 'github',
@@ -295,6 +303,7 @@ describe('handlePullRequest', () => {
         id: 'queued-review',
         prevStatus: 'queued',
         sessionId: 'session-queued',
+        latestActiveAttemptId: 'queued-attempt',
         checkRunId: 102,
         headSha: 'old-queued-sha',
         platform: 'github',
@@ -305,6 +314,7 @@ describe('handlePullRequest', () => {
         id: 'running-review',
         prevStatus: 'running',
         sessionId: 'session-running',
+        latestActiveAttemptId: 'running-attempt',
         checkRunId: null,
         headSha: 'old-running-sha',
         platform: 'github',
@@ -318,8 +328,18 @@ describe('handlePullRequest', () => {
     expect(response.status).toBe(202);
     expect(mockCancelSupersededReviewsForPR).toHaveBeenCalledWith('acme/widgets', 42, 'abc123');
     expect(mockCancelReview).toHaveBeenCalledTimes(2);
-    expect(mockCancelReview).toHaveBeenNthCalledWith(1, 'queued-review', 'Superseded by new push');
-    expect(mockCancelReview).toHaveBeenNthCalledWith(2, 'running-review', 'Superseded by new push');
+    expect(mockCancelReview).toHaveBeenNthCalledWith(
+      1,
+      'queued-review',
+      'Superseded by new push',
+      'queued-attempt'
+    );
+    expect(mockCancelReview).toHaveBeenNthCalledWith(
+      2,
+      'running-review',
+      'Superseded by new push',
+      'running-attempt'
+    );
     expect(mockUpdateCheckRun).toHaveBeenCalledWith(
       '98765',
       'acme',

@@ -164,7 +164,8 @@ describe('GET /api/code-reviews/up', () => {
       .insert(cloud_agent_code_reviews)
       .values([
         reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
-        ...Array.from({ length: 19 }, () => reviewValues()),
+        reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
+        ...Array.from({ length: 18 }, () => reviewValues()),
       ]);
 
     const response = await GET(makeRequest('kilo-code-reviews-health-check'));
@@ -178,12 +179,12 @@ describe('GET /api/code-reviews/up', () => {
           kind: 'error_spike',
           label: 'Error Spike',
           severity: 'ticket',
-          rate: 0.05,
+          rate: 0.1,
           startedCount: 20,
-          errorCount: 1,
+          errorCount: 2,
           windowMinutes: 30,
           topReason: 'timeout',
-          topReasonCount: 1,
+          topReasonCount: 2,
           adminUrl: expect.stringContaining('/admin/code-reviews'),
           runbookUrl: CODE_REVIEW_RUNBOOK_URL,
         },
@@ -221,7 +222,9 @@ describe('GET /api/code-reviews/up', () => {
         })
       ),
       reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
-      ...Array.from({ length: 19 }, () => reviewValues()),
+      reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
+      reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
+      ...Array.from({ length: 17 }, () => reviewValues()),
     ]);
 
     const response = await GET(makeRequest('kilo-code-reviews-health-check'));

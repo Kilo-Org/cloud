@@ -25,6 +25,7 @@ jest.mock('@sentry/nextjs', () => ({
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
+  cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   kilocode_users,
   organizations,
@@ -420,6 +421,55 @@ describe('tryDispatchPendingReviews', () => {
     expect(review?.terminalReason).toBe('superseded');
   });
 
+  it('does not dispatch a review that is superseded after claim', async () => {
+    const recentTimestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        ...reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentTimestamp,
+          updatedAt: recentTimestamp,
+        }),
+        pr_number: 100,
+        head_sha: 'sha-race-old',
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected review to be inserted');
+    }
+
+    mockPrepareReviewPayload.mockImplementationOnce(async (params: { reviewId: string }) => {
+      queueMicrotask(() => {
+        void cancelSupersededReviewsForPR(REPO, 100, 'sha-race-new');
+      });
+      return { reviewId: params.reviewId };
+    });
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({
+      dispatched: 0,
+      pending: 1,
+      activeCount: 0,
+    });
+    expect(mockDispatchReview).not.toHaveBeenCalled();
+    expect(storedReview?.status).toBe('cancelled');
+    expect(storedReview?.terminal_reason).toBe('superseded');
+  });
   it('does not count stale queued reviews against owner capacity', async () => {
     const recentTimestamp = minutesAgo(1);
     const staleQueuedTimestamp = minutesAgo(6);
@@ -549,7 +599,12 @@ describe('tryDispatchPendingReviews', () => {
       pending: 0,
       activeCount: 1,
     });
-    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id);
+    const [attempt] = await db
+      .select({ id: cloud_agent_code_review_attempts.id })
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id))
+      .limit(1);
+    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id, attempt?.id);
     expect(storedReview?.status).toBe('queued');
   });
 
@@ -591,7 +646,12 @@ describe('tryDispatchPendingReviews', () => {
       pending: 1,
       activeCount: 0,
     });
-    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id);
+    const [attempt] = await db
+      .select({ id: cloud_agent_code_review_attempts.id })
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id))
+      .limit(1);
+    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id, attempt?.id);
     expect(storedReview?.status).toBe('pending');
   });
 
@@ -633,7 +693,89 @@ describe('tryDispatchPendingReviews', () => {
       pending: 1,
       activeCount: 0,
     });
-    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id);
+    const [attempt] = await db
+      .select({ id: cloud_agent_code_review_attempts.id })
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id))
+      .limit(1);
+    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id, attempt?.id);
     expect(storedReview?.status).toBe('queued');
+  });
+
+  it('sends the current attempt id to the worker dispatch payload', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const [attempt] = await db
+      .select({ id: cloud_agent_code_review_attempts.id })
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id))
+      .limit(1);
+
+    expect(mockDispatchReview).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewId: review.id, attemptId: attempt?.id })
+    );
+  });
+
+  it('mirrors terminal worker dispatch responses', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+    mockDispatchReview.mockRejectedValue(
+      new Error("Dispatch returned terminal status 'failed' for review terminal-review")
+    );
+    mockGetReviewStatus.mockResolvedValue({ reviewId: 'unused', status: 'failed' });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+    const storedAttempt = await db.query.cloud_agent_code_review_attempts.findFirst({
+      where: eq(cloud_agent_code_review_attempts.code_review_id, review.id),
+    });
+
+    expect(result).toEqual({
+      dispatched: 1,
+      pending: 0,
+      activeCount: 1,
+    });
+    expect(storedReview?.status).toBe('failed');
+    expect(storedAttempt?.status).toBe('failed');
   });
 });

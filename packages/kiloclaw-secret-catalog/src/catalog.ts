@@ -225,6 +225,36 @@ const SECRET_CATALOG_RAW = [
     helpText: 'Generate an API key from your Linear account security settings.',
     helpUrl: 'https://linear.app/settings/account/security',
   },
+  {
+    id: 'composio',
+    label: 'Composio',
+    category: 'tool',
+    icon: 'plug',
+    order: 6,
+    allFieldsRequired: true,
+    fields: [
+      {
+        key: 'composioUserApiKey',
+        label: 'User API Key',
+        placeholder: 'uak_...',
+        placeholderConfigured: 'Enter new user API key to replace',
+        envVar: 'COMPOSIO_USER_API_KEY',
+        validationPattern: '^uak_[A-Za-z0-9_-]{16,}$',
+        validationMessage: 'Composio user API keys start with uak_.',
+        maxLength: 300,
+      },
+      {
+        key: 'composioOrg',
+        label: 'Organization ID or Name',
+        placeholder: 'username_workspace',
+        placeholderConfigured: 'Enter new organization ID, name, or slug to replace',
+        envVar: 'COMPOSIO_ORG',
+        maxLength: 300,
+      },
+    ],
+    helpText: 'Used to sign the Composio CLI into this sandbox.',
+    helpUrl: 'https://docs.composio.dev/docs/cli',
+  },
 ] as const satisfies readonly SecretCatalogEntry[];
 
 // Runtime validation — fails fast at module load if catalog data is malformed

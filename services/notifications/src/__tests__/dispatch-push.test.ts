@@ -70,7 +70,7 @@ function getDO(name = 'user-1') {
 
 describe('NotificationChannelDO.dispatchPush', () => {
   beforeEach(() => {
-    vi.mocked(sendPushNotifications).mockClear();
+    vi.clearAllMocks();
     vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue('test-token');
   });
 

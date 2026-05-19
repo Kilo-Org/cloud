@@ -24,6 +24,7 @@ import {
   KILO_CLI_SECTION_CONFIG,
   OP_SECTION_CONFIG,
   LINEAR_SECTION_CONFIG,
+  COMPOSIO_SECTION_CONFIG,
   KILOCLAW_MITIGATIONS_SECTION_CONFIG,
   PLUGIN_INSTALL_SECTION_CONFIG,
   PROCESS_MODEL_SECTION_CONFIG,
@@ -297,6 +298,18 @@ describe('setupDirectories', () => {
     expect(env.NODE_COMPILE_CACHE).toBe('/var/tmp/openclaw-compile-cache');
     expect(env.INVOCATION_ID).toBe('1');
     expect(env.GOG_KEYRING_PASSWORD).toBe('kiloclaw');
+    expect(env.OPENCLAW_PLUGIN_STAGE_DIR).toBe('/usr/local/share/openclaw-plugin-runtime-deps');
+  });
+
+  it('preserves an explicit OpenClaw plugin stage dir', () => {
+    const { deps } = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      OPENCLAW_PLUGIN_STAGE_DIR: '/custom/plugin-runtime-deps',
+    };
+
+    setupDirectories(env, deps);
+
+    expect(env.OPENCLAW_PLUGIN_STAGE_DIR).toBe('/custom/plugin-runtime-deps');
   });
 
   it('derives KILO_API_URL from KILOCODE_API_BASE_URL origin', () => {
@@ -1657,6 +1670,7 @@ describe('TOOLS.md section configs', () => {
     KILO_CLI_SECTION_CONFIG,
     OP_SECTION_CONFIG,
     LINEAR_SECTION_CONFIG,
+    COMPOSIO_SECTION_CONFIG,
     KILOCLAW_MITIGATIONS_SECTION_CONFIG,
     PLUGIN_INSTALL_SECTION_CONFIG,
     PROCESS_MODEL_SECTION_CONFIG,
@@ -1744,6 +1758,14 @@ describe('TOOLS.md section configs', () => {
     );
     expect(GOG_SECTION_CONFIG.section).toContain('gog drive ls --account <email> --json');
     expect(GOG_SECTION_CONFIG.section).not.toContain('gog drive files list');
+  });
+
+  it('Composio section references core CLI commands', () => {
+    const section = COMPOSIO_SECTION_CONFIG.section;
+    expect(section).toContain('composio whoami');
+    expect(section).toContain('composio search');
+    expect(section).toContain('composio connections list');
+    expect(section).toContain('composio link <toolkit>');
   });
 });
 

@@ -198,6 +198,7 @@ describe('handleMergeRequestCodeReview', () => {
         id: 'pending-review',
         prevStatus: 'pending',
         sessionId: null,
+        latestActiveAttemptId: 'pending-attempt',
         checkRunId: null,
         headSha: 'old-pending-sha',
         platform: 'gitlab',
@@ -208,6 +209,7 @@ describe('handleMergeRequestCodeReview', () => {
         id: 'queued-review',
         prevStatus: 'queued',
         sessionId: 'session-queued',
+        latestActiveAttemptId: 'queued-attempt',
         checkRunId: null,
         headSha: 'old-queued-sha',
         platform: 'gitlab',
@@ -218,6 +220,7 @@ describe('handleMergeRequestCodeReview', () => {
         id: 'running-review',
         prevStatus: 'running',
         sessionId: 'session-running',
+        latestActiveAttemptId: 'running-attempt',
         checkRunId: null,
         headSha: 'old-running-sha',
         platform: 'gitlab',
@@ -234,8 +237,18 @@ describe('handleMergeRequestCodeReview', () => {
     expect(response.status).toBe(202);
     expect(mockCancelSupersededReviewsForPR).toHaveBeenCalledWith('acme/widgets', 42, 'abc123');
     expect(mockCancelReview).toHaveBeenCalledTimes(2);
-    expect(mockCancelReview).toHaveBeenNthCalledWith(1, 'queued-review', 'Superseded by new push');
-    expect(mockCancelReview).toHaveBeenNthCalledWith(2, 'running-review', 'Superseded by new push');
+    expect(mockCancelReview).toHaveBeenNthCalledWith(
+      1,
+      'queued-review',
+      'Superseded by new push',
+      'queued-attempt'
+    );
+    expect(mockCancelReview).toHaveBeenNthCalledWith(
+      2,
+      'running-review',
+      'Superseded by new push',
+      'running-attempt'
+    );
     expect(mockSetCommitStatus).toHaveBeenCalledWith(
       'prat-token',
       123,

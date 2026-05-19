@@ -1,8 +1,13 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { cloud_agent_code_reviews, kilocode_users, organizations } from '@kilocode/db/schema';
+import {
+  cloud_agent_code_review_attempts,
+  cloud_agent_code_reviews,
+  kilocode_users,
+  organizations,
+} from '@kilocode/db/schema';
 import * as z from 'zod';
-import { sql, and, gte, lt, eq, isNotNull, isNull, desc, ilike, or, type SQL } from 'drizzle-orm';
+import { sql, and, gte, lt, eq, isNotNull, desc, ilike, or, inArray, type SQL } from 'drizzle-orm';
 
 /**
  * SQL condition that identifies billing/credits errors (402 Payment Required).
@@ -18,6 +23,14 @@ const isBillingError = sql`(
   OR ${cloud_agent_code_reviews.error_message} ILIKE '%Credits Required%'
 )`;
 
+const isBillingAttemptError = sql`(
+  ${cloud_agent_code_review_attempts.terminal_reason} = 'billing'
+  OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%Insufficient credits%'
+  OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%paid model%'
+  OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%add credits%'
+  OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%Credits Required%'
+)`;
+
 /**
  * SQL condition to exclude billing errors from failure metrics.
  * Uses COALESCE to handle NULL error_message (NULL NOT LIKE returns NULL, not TRUE).
@@ -27,6 +40,12 @@ const excludeBillingErrors = sql`COALESCE(${cloud_agent_code_reviews.terminal_re
   AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%paid model%'
   AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%add credits%'
   AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%Credits Required%'`;
+
+const excludeBillingAttemptErrors = sql`COALESCE(${cloud_agent_code_review_attempts.terminal_reason}, '') <> 'billing'
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%Insufficient credits%'
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%paid model%'
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%add credits%'
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%Credits Required%'`;
 
 /**
  * Categorize error messages into high-level buckets via SQL CASE WHEN.
@@ -45,14 +64,32 @@ const errorCategoryExpr = sql<string>`CASE
   ELSE 'Other'
 END`;
 
+const attemptErrorCategoryExpr = sql<string>`CASE
+  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%rate limit%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Rate limit%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%429%' THEN 'Rate Limited'
+  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%timeout%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Timeout%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%ETIMEDOUT%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%timed out%' THEN 'Timeout'
+  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%context window%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%token limit%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%too large%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%maximum context length%' THEN 'Context Window Exceeded'
+  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%authentication%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%401%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%403%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%permission%' THEN 'Auth / Permission Error'
+  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%not found%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%404%' THEN 'Not Found'
+  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%500%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%502%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%503%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%internal server%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Internal Server%' THEN 'Upstream Server Error'
+  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%ECONNREFUSED%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%ECONNRESET%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%socket hang up%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%network%' THEN 'Network Error'
+  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%parse%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%JSON%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%unexpected token%' THEN 'Parse Error'
+  WHEN ${cloud_agent_code_review_attempts.error_message} IS NULL THEN 'Unknown Error'
+  ELSE 'Other'
+END`;
+
 const FilterSchema = z.object({
   startDate: z.string().date(), // ISO date string YYYY-MM-DD
   endDate: z.string().date(), // ISO date string YYYY-MM-DD
   userId: z.string().min(1).optional(), // Filter by specific user
   organizationId: z.string().uuid().optional(), // Filter by specific organization
   ownershipType: z.enum(['all', 'personal', 'organization']).optional().default('all'),
-  agentVersion: z.enum(['all', 'v1', 'v2']).optional().default('all'),
+  retryAccountingMode: z
+    .enum(['final_outcome', 'all_attempts'])
+    .optional()
+    .default('final_outcome'),
 });
+
+type FilterInput = z.infer<typeof FilterSchema>;
 
 /**
  * Helper to build ownership filter conditions.
@@ -87,58 +124,104 @@ function buildOwnershipFilter(
   return conditions.length > 0 ? and(...conditions) : undefined;
 }
 
-/** Returns a SQL condition filtering by agent_version, or undefined for 'all'. */
-function buildAgentVersionFilter(agentVersion?: 'all' | 'v1' | 'v2'): SQL | undefined {
-  if (!agentVersion || agentVersion === 'all') return undefined;
-  // NULL agent_version is treated as 'v1' (schema default + existing normalization)
-  if (agentVersion === 'v1') {
-    return or(
-      eq(cloud_agent_code_reviews.agent_version, 'v1'),
-      isNull(cloud_agent_code_reviews.agent_version)
-    );
-  }
-  return eq(cloud_agent_code_reviews.agent_version, agentVersion);
-}
-
 const ownershipTypeExpr = sql<string>`CASE WHEN ${cloud_agent_code_reviews.owned_by_organization_id} IS NOT NULL THEN 'organization' ELSE 'personal' END`;
 const waitSecondsExpr = sql<number>`EXTRACT(EPOCH FROM (${cloud_agent_code_reviews.started_at} - ${cloud_agent_code_reviews.created_at}))`;
 const validStartedWaitCondition = sql`${cloud_agent_code_reviews.started_at} IS NOT NULL AND ${cloud_agent_code_reviews.started_at} >= ${cloud_agent_code_reviews.created_at}`;
+const attemptWaitSecondsExpr = sql<number>`EXTRACT(EPOCH FROM (${cloud_agent_code_review_attempts.started_at} - ${cloud_agent_code_review_attempts.created_at}))`;
+const validAttemptStartedWaitCondition = sql`${cloud_agent_code_review_attempts.started_at} IS NOT NULL AND ${cloud_agent_code_review_attempts.started_at} >= ${cloud_agent_code_review_attempts.created_at}`;
+
+function accountingCreatedAt(input: FilterInput) {
+  return input.retryAccountingMode === 'all_attempts'
+    ? cloud_agent_code_review_attempts.created_at
+    : cloud_agent_code_reviews.created_at;
+}
+
+function accountingDayExpr(input: FilterInput): SQL {
+  return sql`DATE_TRUNC('day', ${accountingCreatedAt(input)})`;
+}
+
+function buildBaseConditions(input: FilterInput): SQL[] {
+  const createdAt = accountingCreatedAt(input);
+  const conditions = [gte(createdAt, input.startDate), lt(createdAt, input.endDate)];
+  const ownershipFilter = buildOwnershipFilter(
+    input.userId,
+    input.organizationId,
+    input.ownershipType
+  );
+  if (ownershipFilter) {
+    conditions.push(ownershipFilter);
+  }
+
+  return conditions;
+}
 
 export const adminCodeReviewsRouter = createTRPCRouter({
   // Get overview KPIs
   getOverviewStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
-    const { startDate, endDate, userId, organizationId, ownershipType, agentVersion } = input;
-    const ownershipFilter = buildOwnershipFilter(userId, organizationId, ownershipType);
-    const agentVersionFilter = buildAgentVersionFilter(agentVersion);
+    const conditions = buildBaseConditions(input);
+    const statusTable =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts
+        : cloud_agent_code_reviews;
+    const billingError =
+      input.retryAccountingMode === 'all_attempts' ? isBillingAttemptError : isBillingError;
+    const excludeBilling =
+      input.retryAccountingMode === 'all_attempts'
+        ? excludeBillingAttemptErrors
+        : excludeBillingErrors;
+    const durationStartedAt =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts.started_at
+        : cloud_agent_code_reviews.started_at;
+    const durationCompletedAt =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts.completed_at
+        : cloud_agent_code_reviews.completed_at;
+    const waitCondition =
+      input.retryAccountingMode === 'all_attempts'
+        ? validAttemptStartedWaitCondition
+        : validStartedWaitCondition;
+    const waitSeconds =
+      input.retryAccountingMode === 'all_attempts' ? attemptWaitSecondsExpr : waitSecondsExpr;
+    const waitCreatedAt =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts.created_at
+        : cloud_agent_code_reviews.created_at;
+    const waitStartedAt =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts.started_at
+        : cloud_agent_code_reviews.started_at;
 
-    const conditions = [
-      gte(cloud_agent_code_reviews.created_at, startDate),
-      lt(cloud_agent_code_reviews.created_at, endDate),
-      ownershipFilter,
-      agentVersionFilter,
-    ].filter(Boolean) as SQL[];
-
-    const result = await db
+    const query = db
       .select({
         total_reviews: sql<number>`COUNT(*)`,
-        completed_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'completed')`,
+        completed_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'completed')`,
         // Exclude billing errors from system failure count — they get their own KPI
-        failed_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'failed' AND ${excludeBillingErrors})`,
-        cancelled_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'cancelled')`,
-        interrupted_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'interrupted')`,
-        in_progress_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running'))`,
-        avg_duration_seconds: sql<number>`AVG(EXTRACT(EPOCH FROM (${cloud_agent_code_reviews.completed_at}::timestamp - ${cloud_agent_code_reviews.started_at}::timestamp))) FILTER (WHERE ${cloud_agent_code_reviews.completed_at} IS NOT NULL AND ${cloud_agent_code_reviews.started_at} IS NOT NULL)`,
-        wait_started_count: sql<number>`COUNT(*) FILTER (WHERE ${validStartedWaitCondition})`,
-        avg_wait_seconds: sql<number>`AVG(${waitSecondsExpr}) FILTER (WHERE ${validStartedWaitCondition})`,
-        p95_wait_seconds: sql<number>`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${waitSecondsExpr}) FILTER (WHERE ${validStartedWaitCondition})`,
-        p99_wait_seconds: sql<number>`percentile_cont(0.99) WITHIN GROUP (ORDER BY ${waitSecondsExpr}) FILTER (WHERE ${validStartedWaitCondition})`,
-        max_wait_seconds: sql<number>`MAX(${waitSecondsExpr}) FILTER (WHERE ${validStartedWaitCondition})`,
-        within_5m_wait_count: sql<number>`COUNT(*) FILTER (WHERE ${validStartedWaitCondition} AND ${cloud_agent_code_reviews.started_at} <= ${cloud_agent_code_reviews.created_at} + INTERVAL '5 minutes')`,
+        failed_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling})`,
+        cancelled_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'cancelled')`,
+        interrupted_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'interrupted')`,
+        in_progress_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} IN ('pending', 'queued', 'running'))`,
+        avg_duration_seconds: sql<number>`AVG(EXTRACT(EPOCH FROM (${durationCompletedAt}::timestamp - ${durationStartedAt}::timestamp))) FILTER (WHERE ${durationCompletedAt} IS NOT NULL AND ${durationStartedAt} IS NOT NULL)`,
+        wait_started_count: sql<number>`COUNT(*) FILTER (WHERE ${waitCondition})`,
+        avg_wait_seconds: sql<number>`AVG(${waitSeconds}) FILTER (WHERE ${waitCondition})`,
+        p95_wait_seconds: sql<number>`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${waitSeconds}) FILTER (WHERE ${waitCondition})`,
+        p99_wait_seconds: sql<number>`percentile_cont(0.99) WITHIN GROUP (ORDER BY ${waitSeconds}) FILTER (WHERE ${waitCondition})`,
+        max_wait_seconds: sql<number>`MAX(${waitSeconds}) FILTER (WHERE ${waitCondition})`,
+        within_5m_wait_count: sql<number>`COUNT(*) FILTER (WHERE ${waitCondition} AND ${waitStartedAt} <= ${waitCreatedAt} + INTERVAL '5 minutes')`,
         // Billing errors (402): not system failures, not cancellations — separate bucket
-        billing_error_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'failed' AND ${isBillingError})`,
+        billing_error_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${billingError})`,
       })
-      .from(cloud_agent_code_reviews)
-      .where(and(...conditions));
+      .from(cloud_agent_code_reviews);
+
+    const result =
+      input.retryAccountingMode === 'all_attempts'
+        ? await query
+            .innerJoin(
+              cloud_agent_code_review_attempts,
+              eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+            )
+            .where(and(...conditions))
+        : await query.where(and(...conditions));
 
     const stats = result[0];
     const total = Number(stats.total_reviews) || 0;
@@ -157,30 +240,9 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     const terminalCount =
       completedCount + failedCount + interruptedCount + cancelledCount + billingErrorCount;
 
-    // Per-version breakdown (only when viewing all versions)
-    const baseConditions = [
-      gte(cloud_agent_code_reviews.created_at, startDate),
-      lt(cloud_agent_code_reviews.created_at, endDate),
-      ownershipFilter,
-    ].filter(Boolean) as SQL[];
-
-    const versionBreakdown =
-      !agentVersion || agentVersion === 'all'
-        ? await db
-            .select({
-              agent_version: sql<string>`COALESCE(${cloud_agent_code_reviews.agent_version}, 'v1')`,
-              total: sql<number>`COUNT(*)`,
-              completed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'completed')`,
-              failed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'failed' AND ${excludeBillingErrors})`,
-              avg_duration_seconds: sql<number>`AVG(EXTRACT(EPOCH FROM (${cloud_agent_code_reviews.completed_at}::timestamp - ${cloud_agent_code_reviews.started_at}::timestamp))) FILTER (WHERE ${cloud_agent_code_reviews.completed_at} IS NOT NULL AND ${cloud_agent_code_reviews.started_at} IS NOT NULL)`,
-            })
-            .from(cloud_agent_code_reviews)
-            .where(and(...baseConditions))
-            .groupBy(sql`COALESCE(${cloud_agent_code_reviews.agent_version}, 'v1')`)
-        : undefined;
-
     return {
       totalReviews: total,
+      retryAccountingMode: input.retryAccountingMode,
       completedCount,
       failedCount,
       cancelledCount,
@@ -202,45 +264,52 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       maxWaitSeconds: Number(stats.max_wait_seconds) || 0,
       waitWithinFiveMinuteRate:
         waitStartedCount > 0 ? (withinFiveMinuteWaitCount / waitStartedCount) * 100 : 0,
-      versionBreakdown: versionBreakdown?.map(row => ({
-        agentVersion: row.agent_version,
-        total: Number(row.total) || 0,
-        completed: Number(row.completed) || 0,
-        failed: Number(row.failed) || 0,
-        avgDurationSeconds: Number(row.avg_duration_seconds) || 0,
-      })),
     };
   }),
 
   // Get daily time series data
   getDailyStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
-    const { startDate, endDate, userId, organizationId, ownershipType, agentVersion } = input;
-    const ownershipFilter = buildOwnershipFilter(userId, organizationId, ownershipType);
-    const agentVersionFilter = buildAgentVersionFilter(agentVersion);
+    const conditions = buildBaseConditions(input);
+    const dayExpr = accountingDayExpr(input);
+    const statusTable =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts
+        : cloud_agent_code_reviews;
+    const billingError =
+      input.retryAccountingMode === 'all_attempts' ? isBillingAttemptError : isBillingError;
+    const excludeBilling =
+      input.retryAccountingMode === 'all_attempts'
+        ? excludeBillingAttemptErrors
+        : excludeBillingErrors;
 
-    const conditions = [
-      gte(cloud_agent_code_reviews.created_at, startDate),
-      lt(cloud_agent_code_reviews.created_at, endDate),
-      ownershipFilter,
-      agentVersionFilter,
-    ].filter(Boolean) as SQL[];
-
-    const result = await db
+    const query = db
       .select({
-        day: sql<string>`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})::date::text`,
+        day: sql<string>`${dayExpr}::date::text`,
         total: sql<number>`COUNT(*)`,
-        completed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'completed')`,
+        completed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'completed')`,
         // Exclude billing errors from system failure count
-        failed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'failed' AND ${excludeBillingErrors})`,
-        cancelled: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'cancelled')`,
-        interrupted: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'interrupted')`,
-        in_progress: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running'))`,
-        billing_errors: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'failed' AND ${isBillingError})`,
+        failed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling})`,
+        cancelled: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'cancelled')`,
+        interrupted: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'interrupted')`,
+        in_progress: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} IN ('pending', 'queued', 'running'))`,
+        billing_errors: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${billingError})`,
       })
-      .from(cloud_agent_code_reviews)
-      .where(and(...conditions))
-      .groupBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`)
-      .orderBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`);
+      .from(cloud_agent_code_reviews);
+
+    const result =
+      input.retryAccountingMode === 'all_attempts'
+        ? await query
+            .innerJoin(
+              cloud_agent_code_review_attempts,
+              eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+            )
+            .where(and(...conditions))
+            .groupBy(dayExpr)
+            .orderBy(dayExpr)
+        : await query
+            .where(and(...conditions))
+            .groupBy(dayExpr)
+            .orderBy(dayExpr);
 
     return result.map(row => ({
       day: row.day,
@@ -256,39 +325,50 @@ export const adminCodeReviewsRouter = createTRPCRouter({
 
   // Get cancellation reasons analysis
   getCancellationAnalysis: adminProcedure.input(FilterSchema).query(async ({ input }) => {
-    const { startDate, endDate, userId, organizationId, ownershipType, agentVersion } = input;
-    const ownershipFilter = buildOwnershipFilter(userId, organizationId, ownershipType);
-    const agentVersionFilter = buildAgentVersionFilter(agentVersion);
+    const createdAt = accountingCreatedAt(input);
+    const statusTable =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts
+        : cloud_agent_code_reviews;
 
     const conditions = [
-      eq(cloud_agent_code_reviews.status, 'cancelled'),
-      gte(cloud_agent_code_reviews.created_at, startDate),
-      lt(cloud_agent_code_reviews.created_at, endDate),
-      ownershipFilter,
-      agentVersionFilter,
-    ].filter(Boolean) as SQL[];
+      eq(statusTable.status, 'cancelled'),
+      ...buildBaseConditions(input),
+    ] as SQL[];
 
     const cancellationReasonExpr = sql<string>`CASE
-      WHEN ${cloud_agent_code_reviews.terminal_reason} = 'superseded' OR ${cloud_agent_code_reviews.error_message} ILIKE '%superseded%' THEN 'Superseded by new commit'
-      WHEN ${cloud_agent_code_reviews.error_message} ILIKE '%stream timeout%' THEN 'Stream timeout'
-      WHEN ${cloud_agent_code_reviews.terminal_reason} = 'user_cancelled' OR ${cloud_agent_code_reviews.error_message} ILIKE '%cancelled%' OR ${cloud_agent_code_reviews.error_message} ILIKE '%canceled%' THEN 'Explicitly cancelled'
-      WHEN ${cloud_agent_code_reviews.error_message} ILIKE '%killed%' OR ${cloud_agent_code_reviews.error_message} ILIKE '%sigkill%' OR ${cloud_agent_code_reviews.error_message} ILIKE '%sigterm%' THEN 'Process killed'
-      WHEN ${cloud_agent_code_reviews.terminal_reason} = 'interrupted' OR ${cloud_agent_code_reviews.error_message} ILIKE '%interrupted%' THEN 'User interrupted'
-      WHEN ${cloud_agent_code_reviews.error_message} IS NULL THEN 'No reason provided'
+      WHEN ${statusTable.terminal_reason} = 'superseded' OR ${statusTable.error_message} ILIKE '%superseded%' THEN 'Superseded by new commit'
+      WHEN ${statusTable.error_message} ILIKE '%stream timeout%' THEN 'Stream timeout'
+      WHEN ${statusTable.terminal_reason} = 'user_cancelled' OR ${statusTable.error_message} ILIKE '%cancelled%' OR ${statusTable.error_message} ILIKE '%canceled%' THEN 'Explicitly cancelled'
+      WHEN ${statusTable.error_message} ILIKE '%killed%' OR ${statusTable.error_message} ILIKE '%sigkill%' OR ${statusTable.error_message} ILIKE '%sigterm%' THEN 'Process killed'
+      WHEN ${statusTable.terminal_reason} = 'interrupted' OR ${statusTable.error_message} ILIKE '%interrupted%' THEN 'User interrupted'
+      WHEN ${statusTable.error_message} IS NULL THEN 'No reason provided'
       ELSE 'Other'
     END`;
 
-    const reasons = await db
+    const query = db
       .select({
         reason: cancellationReasonExpr,
         count: sql<number>`COUNT(*)`,
-        first_occurrence: sql<string>`MIN(${cloud_agent_code_reviews.created_at})::text`,
-        last_occurrence: sql<string>`MAX(${cloud_agent_code_reviews.created_at})::text`,
+        first_occurrence: sql<string>`MIN(${createdAt})::text`,
+        last_occurrence: sql<string>`MAX(${createdAt})::text`,
       })
-      .from(cloud_agent_code_reviews)
-      .where(and(...conditions))
-      .groupBy(cancellationReasonExpr)
-      .orderBy(desc(sql`COUNT(*)`));
+      .from(cloud_agent_code_reviews);
+
+    const reasons =
+      input.retryAccountingMode === 'all_attempts'
+        ? await query
+            .innerJoin(
+              cloud_agent_code_review_attempts,
+              eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+            )
+            .where(and(...conditions))
+            .groupBy(cancellationReasonExpr)
+            .orderBy(desc(sql`COUNT(*)`))
+        : await query
+            .where(and(...conditions))
+            .groupBy(cancellationReasonExpr)
+            .orderBy(desc(sql`COUNT(*)`));
 
     return reasons.map(row => ({
       reason: row.reason,
@@ -300,49 +380,80 @@ export const adminCodeReviewsRouter = createTRPCRouter({
 
   // Get error analysis (excludes billing errors — those have their own KPI bucket)
   getErrorAnalysis: adminProcedure.input(FilterSchema).query(async ({ input }) => {
-    const { startDate, endDate, userId, organizationId, ownershipType, agentVersion } = input;
-    const ownershipFilter = buildOwnershipFilter(userId, organizationId, ownershipType);
-    const agentVersionFilter = buildAgentVersionFilter(agentVersion);
+    const createdAt = accountingCreatedAt(input);
+    const statusTable =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts
+        : cloud_agent_code_reviews;
+    const errorCategory =
+      input.retryAccountingMode === 'all_attempts' ? attemptErrorCategoryExpr : errorCategoryExpr;
+    const errorMessageColumn =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts.error_message
+        : cloud_agent_code_reviews.error_message;
+    const excludeBilling =
+      input.retryAccountingMode === 'all_attempts'
+        ? excludeBillingAttemptErrors
+        : excludeBillingErrors;
 
     const conditions = [
-      eq(cloud_agent_code_reviews.status, 'failed'),
-      excludeBillingErrors,
-      gte(cloud_agent_code_reviews.created_at, startDate),
-      lt(cloud_agent_code_reviews.created_at, endDate),
-      ownershipFilter,
-      agentVersionFilter,
-    ].filter(Boolean) as SQL[];
+      eq(statusTable.status, 'failed'),
+      excludeBilling,
+      ...buildBaseConditions(input),
+    ] as SQL[];
 
     // Categorized error summary
-    const categorized = await db
+    const categorizedQuery = db
       .select({
-        category: errorCategoryExpr,
+        category: errorCategory,
         count: sql<number>`COUNT(*)`,
-        first_occurrence: sql<string>`MIN(${cloud_agent_code_reviews.created_at})::text`,
-        last_occurrence: sql<string>`MAX(${cloud_agent_code_reviews.created_at})::text`,
+        first_occurrence: sql<string>`MIN(${createdAt})::text`,
+        last_occurrence: sql<string>`MAX(${createdAt})::text`,
       })
-      .from(cloud_agent_code_reviews)
-      .where(and(...conditions))
-      .groupBy(errorCategoryExpr)
-      .orderBy(desc(sql`COUNT(*)`));
+      .from(cloud_agent_code_reviews);
+
+    const categorized =
+      input.retryAccountingMode === 'all_attempts'
+        ? await categorizedQuery
+            .innerJoin(
+              cloud_agent_code_review_attempts,
+              eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+            )
+            .where(and(...conditions))
+            .groupBy(errorCategory)
+            .orderBy(desc(sql`COUNT(*)`))
+        : await categorizedQuery
+            .where(and(...conditions))
+            .groupBy(errorCategory)
+            .orderBy(desc(sql`COUNT(*)`));
 
     // Raw error messages (top 50, for drill-down table)
-    const raw = await db
+    const rawQuery = db
       .select({
-        error_type: sql<string>`COALESCE(SUBSTRING(${cloud_agent_code_reviews.error_message} FROM 1 FOR 200), 'Unknown Error')`,
-        category: errorCategoryExpr,
+        error_type: sql<string>`COALESCE(SUBSTRING(${errorMessageColumn} FROM 1 FOR 200), 'Unknown Error')`,
+        category: errorCategory,
         count: sql<number>`COUNT(*)`,
-        first_occurrence: sql<string>`MIN(${cloud_agent_code_reviews.created_at})::text`,
-        last_occurrence: sql<string>`MAX(${cloud_agent_code_reviews.created_at})::text`,
+        first_occurrence: sql<string>`MIN(${createdAt})::text`,
+        last_occurrence: sql<string>`MAX(${createdAt})::text`,
       })
-      .from(cloud_agent_code_reviews)
-      .where(and(...conditions))
-      .groupBy(
-        sql`SUBSTRING(${cloud_agent_code_reviews.error_message} FROM 1 FOR 200)`,
-        errorCategoryExpr
-      )
-      .orderBy(desc(sql`COUNT(*)`))
-      .limit(50);
+      .from(cloud_agent_code_reviews);
+
+    const raw =
+      input.retryAccountingMode === 'all_attempts'
+        ? await rawQuery
+            .innerJoin(
+              cloud_agent_code_review_attempts,
+              eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+            )
+            .where(and(...conditions))
+            .groupBy(sql`SUBSTRING(${errorMessageColumn} FROM 1 FOR 200)`, errorCategory)
+            .orderBy(desc(sql`COUNT(*)`))
+            .limit(50)
+        : await rawQuery
+            .where(and(...conditions))
+            .groupBy(sql`SUBSTRING(${errorMessageColumn} FROM 1 FOR 200)`, errorCategory)
+            .orderBy(desc(sql`COUNT(*)`))
+            .limit(50);
 
     return {
       categories: categorized.map(row => ({
@@ -365,141 +476,240 @@ export const adminCodeReviewsRouter = createTRPCRouter({
   getErrorSessions: adminProcedure
     .input(FilterSchema.extend({ errorMessage: z.string().min(1) }))
     .query(async ({ input }) => {
-      const {
-        startDate,
-        endDate,
-        userId,
-        organizationId,
-        ownershipType,
-        agentVersion,
-        errorMessage,
-      } = input;
-      const ownershipFilter = buildOwnershipFilter(userId, organizationId, ownershipType);
-      const agentVersionFilter = buildAgentVersionFilter(agentVersion);
+      const { errorMessage } = input;
+      const statusTable =
+        input.retryAccountingMode === 'all_attempts'
+          ? cloud_agent_code_review_attempts
+          : cloud_agent_code_reviews;
+      const errorMessageColumn =
+        input.retryAccountingMode === 'all_attempts'
+          ? cloud_agent_code_review_attempts.error_message
+          : cloud_agent_code_reviews.error_message;
+      const excludeBilling =
+        input.retryAccountingMode === 'all_attempts'
+          ? excludeBillingAttemptErrors
+          : excludeBillingErrors;
 
       const conditions = [
-        eq(cloud_agent_code_reviews.status, 'failed'),
-        excludeBillingErrors,
-        gte(cloud_agent_code_reviews.created_at, startDate),
-        lt(cloud_agent_code_reviews.created_at, endDate),
+        eq(statusTable.status, 'failed'),
+        excludeBilling,
         eq(
-          sql`COALESCE(SUBSTRING(${cloud_agent_code_reviews.error_message} FROM 1 FOR 200), 'Unknown Error')`,
+          sql`COALESCE(SUBSTRING(${errorMessageColumn} FROM 1 FOR 200), 'Unknown Error')`,
           errorMessage
         ),
-        ownershipFilter,
-        agentVersionFilter,
-      ].filter(Boolean) as SQL[];
+        ...buildBaseConditions(input),
+      ] as SQL[];
 
-      const rows = await db
+      const query = db
         .select({
-          session_id: cloud_agent_code_reviews.session_id,
-          cli_session_id: cloud_agent_code_reviews.cli_session_id,
+          review_id: cloud_agent_code_reviews.id,
+          session_id:
+            input.retryAccountingMode === 'all_attempts'
+              ? cloud_agent_code_review_attempts.session_id
+              : cloud_agent_code_reviews.session_id,
+          cli_session_id:
+            input.retryAccountingMode === 'all_attempts'
+              ? cloud_agent_code_review_attempts.cli_session_id
+              : cloud_agent_code_reviews.cli_session_id,
+          attempt_id:
+            input.retryAccountingMode === 'all_attempts'
+              ? cloud_agent_code_review_attempts.id
+              : sql<string | null>`NULL`,
+          attempt_number:
+            input.retryAccountingMode === 'all_attempts'
+              ? cloud_agent_code_review_attempts.attempt_number
+              : sql<number | null>`NULL`,
           user_id: cloud_agent_code_reviews.owned_by_user_id,
           org_id: cloud_agent_code_reviews.owned_by_organization_id,
-          error_message: cloud_agent_code_reviews.error_message,
-          created_at: cloud_agent_code_reviews.created_at,
+          error_message: errorMessageColumn,
+          created_at:
+            input.retryAccountingMode === 'all_attempts'
+              ? cloud_agent_code_review_attempts.created_at
+              : cloud_agent_code_reviews.created_at,
           repo_full_name: cloud_agent_code_reviews.repo_full_name,
           pr_number: cloud_agent_code_reviews.pr_number,
-          agent_version: cloud_agent_code_reviews.agent_version,
         })
-        .from(cloud_agent_code_reviews)
-        .where(and(...conditions))
-        .orderBy(desc(cloud_agent_code_reviews.created_at))
-        .limit(20);
+        .from(cloud_agent_code_reviews);
+
+      const rows =
+        input.retryAccountingMode === 'all_attempts'
+          ? await query
+              .innerJoin(
+                cloud_agent_code_review_attempts,
+                eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+              )
+              .where(and(...conditions))
+              .orderBy(desc(cloud_agent_code_review_attempts.created_at))
+              .limit(20)
+          : await query
+              .where(and(...conditions))
+              .orderBy(desc(cloud_agent_code_reviews.created_at))
+              .limit(20);
 
       return rows.map(row => ({
+        reviewId: row.review_id,
         sessionId: row.session_id,
         cliSessionId: row.cli_session_id,
+        attemptId: input.retryAccountingMode === 'all_attempts' ? row.attempt_id : null,
+        attemptNumber: input.retryAccountingMode === 'all_attempts' ? row.attempt_number : null,
         userId: row.user_id,
         orgId: row.org_id,
         errorMessage: row.error_message,
         createdAt: row.created_at,
         repoFullName: row.repo_full_name,
         prNumber: row.pr_number,
-        agentVersion: row.agent_version,
       }));
     }),
 
   // Get user segmentation (note: this doesn't use filters since it shows top users/orgs for selection)
   getUserSegmentation: adminProcedure.input(FilterSchema).query(async ({ input }) => {
-    const { startDate, endDate, userId, organizationId, ownershipType, agentVersion } = input;
-    const ownershipFilter = buildOwnershipFilter(userId, organizationId, ownershipType);
-    const agentVersionFilter = buildAgentVersionFilter(agentVersion);
-
-    const baseConditions = [
-      gte(cloud_agent_code_reviews.created_at, startDate),
-      lt(cloud_agent_code_reviews.created_at, endDate),
-      ownershipFilter,
-      agentVersionFilter,
-    ].filter(Boolean) as SQL[];
+    const { userId, organizationId } = input;
+    const baseConditions = buildBaseConditions(input);
+    const statusTable =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts
+        : cloud_agent_code_reviews;
+    const excludeBilling =
+      input.retryAccountingMode === 'all_attempts'
+        ? excludeBillingAttemptErrors
+        : excludeBillingErrors;
+    const waitCondition =
+      input.retryAccountingMode === 'all_attempts'
+        ? validAttemptStartedWaitCondition
+        : validStartedWaitCondition;
+    const waitSeconds =
+      input.retryAccountingMode === 'all_attempts' ? attemptWaitSecondsExpr : waitSecondsExpr;
 
     // Personal vs Org breakdown
-    const ownershipBreakdown = await db
+    const ownershipBreakdownQuery = db
       .select({
         ownership_type: ownershipTypeExpr,
         count: sql<number>`COUNT(*)`,
-        completed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'completed')`,
+        completed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'completed')`,
         // Exclude billing errors from failed count
-        failed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'failed' AND ${excludeBillingErrors})`,
-        wait_started_count: sql<number>`COUNT(*) FILTER (WHERE ${validStartedWaitCondition})`,
-        avg_wait_seconds: sql<number>`AVG(${waitSecondsExpr}) FILTER (WHERE ${validStartedWaitCondition})`,
-        p95_wait_seconds: sql<number>`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${waitSecondsExpr}) FILTER (WHERE ${validStartedWaitCondition})`,
+        failed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling})`,
+        wait_started_count: sql<number>`COUNT(*) FILTER (WHERE ${waitCondition})`,
+        avg_wait_seconds: sql<number>`AVG(${waitSeconds}) FILTER (WHERE ${waitCondition})`,
+        p95_wait_seconds: sql<number>`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${waitSeconds}) FILTER (WHERE ${waitCondition})`,
       })
-      .from(cloud_agent_code_reviews)
-      .where(and(...baseConditions))
-      .groupBy(ownershipTypeExpr);
+      .from(cloud_agent_code_reviews);
+
+    const ownershipBreakdown =
+      input.retryAccountingMode === 'all_attempts'
+        ? await ownershipBreakdownQuery
+            .innerJoin(
+              cloud_agent_code_review_attempts,
+              eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+            )
+            .where(and(...baseConditions))
+            .groupBy(ownershipTypeExpr)
+        : await ownershipBreakdownQuery.where(and(...baseConditions)).groupBy(ownershipTypeExpr);
 
     // Top users (only show if not filtering by specific user)
     const topUsers = userId
       ? []
-      : await db
-          .select({
-            user_id: cloud_agent_code_reviews.owned_by_user_id,
-            email: kilocode_users.google_user_email,
-            name: kilocode_users.google_user_name,
-            review_count: sql<number>`COUNT(*)`,
-            completed_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'completed')`,
-          })
-          .from(cloud_agent_code_reviews)
-          .leftJoin(
-            kilocode_users,
-            eq(cloud_agent_code_reviews.owned_by_user_id, kilocode_users.id)
-          )
-          .where(and(isNotNull(cloud_agent_code_reviews.owned_by_user_id), ...baseConditions))
-          .groupBy(
-            cloud_agent_code_reviews.owned_by_user_id,
-            kilocode_users.google_user_email,
-            kilocode_users.google_user_name
-          )
-          .orderBy(desc(sql`COUNT(*)`))
-          .limit(10);
+      : input.retryAccountingMode === 'all_attempts'
+        ? await db
+            .select({
+              user_id: cloud_agent_code_reviews.owned_by_user_id,
+              email: kilocode_users.google_user_email,
+              name: kilocode_users.google_user_name,
+              review_count: sql<number>`COUNT(*)`,
+              completed_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_review_attempts.status} = 'completed')`,
+            })
+            .from(cloud_agent_code_reviews)
+            .innerJoin(
+              cloud_agent_code_review_attempts,
+              eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+            )
+            .leftJoin(
+              kilocode_users,
+              eq(cloud_agent_code_reviews.owned_by_user_id, kilocode_users.id)
+            )
+            .where(and(isNotNull(cloud_agent_code_reviews.owned_by_user_id), ...baseConditions))
+            .groupBy(
+              cloud_agent_code_reviews.owned_by_user_id,
+              kilocode_users.google_user_email,
+              kilocode_users.google_user_name
+            )
+            .orderBy(desc(sql`COUNT(*)`))
+            .limit(10)
+        : await db
+            .select({
+              user_id: cloud_agent_code_reviews.owned_by_user_id,
+              email: kilocode_users.google_user_email,
+              name: kilocode_users.google_user_name,
+              review_count: sql<number>`COUNT(*)`,
+              completed_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'completed')`,
+            })
+            .from(cloud_agent_code_reviews)
+            .leftJoin(
+              kilocode_users,
+              eq(cloud_agent_code_reviews.owned_by_user_id, kilocode_users.id)
+            )
+            .where(and(isNotNull(cloud_agent_code_reviews.owned_by_user_id), ...baseConditions))
+            .groupBy(
+              cloud_agent_code_reviews.owned_by_user_id,
+              kilocode_users.google_user_email,
+              kilocode_users.google_user_name
+            )
+            .orderBy(desc(sql`COUNT(*)`))
+            .limit(10);
 
     // Top organizations (only show if not filtering by specific org)
     const topOrgs = organizationId
       ? []
-      : await db
-          .select({
-            org_id: cloud_agent_code_reviews.owned_by_organization_id,
-            org_name: organizations.name,
-            org_plan: organizations.plan,
-            review_count: sql<number>`COUNT(*)`,
-            completed_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'completed')`,
-          })
-          .from(cloud_agent_code_reviews)
-          .leftJoin(
-            organizations,
-            eq(cloud_agent_code_reviews.owned_by_organization_id, organizations.id)
-          )
-          .where(
-            and(isNotNull(cloud_agent_code_reviews.owned_by_organization_id), ...baseConditions)
-          )
-          .groupBy(
-            cloud_agent_code_reviews.owned_by_organization_id,
-            organizations.name,
-            organizations.plan
-          )
-          .orderBy(desc(sql`COUNT(*)`))
-          .limit(10);
+      : input.retryAccountingMode === 'all_attempts'
+        ? await db
+            .select({
+              org_id: cloud_agent_code_reviews.owned_by_organization_id,
+              org_name: organizations.name,
+              org_plan: organizations.plan,
+              review_count: sql<number>`COUNT(*)`,
+              completed_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_review_attempts.status} = 'completed')`,
+            })
+            .from(cloud_agent_code_reviews)
+            .innerJoin(
+              cloud_agent_code_review_attempts,
+              eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+            )
+            .leftJoin(
+              organizations,
+              eq(cloud_agent_code_reviews.owned_by_organization_id, organizations.id)
+            )
+            .where(
+              and(isNotNull(cloud_agent_code_reviews.owned_by_organization_id), ...baseConditions)
+            )
+            .groupBy(
+              cloud_agent_code_reviews.owned_by_organization_id,
+              organizations.name,
+              organizations.plan
+            )
+            .orderBy(desc(sql`COUNT(*)`))
+            .limit(10)
+        : await db
+            .select({
+              org_id: cloud_agent_code_reviews.owned_by_organization_id,
+              org_name: organizations.name,
+              org_plan: organizations.plan,
+              review_count: sql<number>`COUNT(*)`,
+              completed_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'completed')`,
+            })
+            .from(cloud_agent_code_reviews)
+            .leftJoin(
+              organizations,
+              eq(cloud_agent_code_reviews.owned_by_organization_id, organizations.id)
+            )
+            .where(
+              and(isNotNull(cloud_agent_code_reviews.owned_by_organization_id), ...baseConditions)
+            )
+            .groupBy(
+              cloud_agent_code_reviews.owned_by_organization_id,
+              organizations.name,
+              organizations.plan
+            )
+            .orderBy(desc(sql`COUNT(*)`))
+            .limit(10);
 
     return {
       ownershipBreakdown: ownershipBreakdown.map(row => ({
@@ -530,33 +740,41 @@ export const adminCodeReviewsRouter = createTRPCRouter({
 
   // Get daily queue wait percentiles (wait time = started_at - created_at)
   getWaitTimeStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
-    const { startDate, endDate, userId, organizationId, ownershipType, agentVersion } = input;
-    const ownershipFilter = buildOwnershipFilter(userId, organizationId, ownershipType);
-    const agentVersionFilter = buildAgentVersionFilter(agentVersion);
+    const waitCondition =
+      input.retryAccountingMode === 'all_attempts'
+        ? validAttemptStartedWaitCondition
+        : validStartedWaitCondition;
+    const waitSeconds =
+      input.retryAccountingMode === 'all_attempts' ? attemptWaitSecondsExpr : waitSecondsExpr;
+    const conditions = [...buildBaseConditions(input), waitCondition] as SQL[];
 
-    const conditions = [
-      gte(cloud_agent_code_reviews.created_at, startDate),
-      lt(cloud_agent_code_reviews.created_at, endDate),
-      validStartedWaitCondition,
-      ownershipFilter,
-      agentVersionFilter,
-    ].filter(Boolean) as SQL[];
+    const dayExpr = accountingDayExpr(input);
 
-    const dayExpr = sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`;
-
-    const result = await db
+    const query = db
       .select({
         day: sql<string>`${dayExpr}::date::text`,
         ownership_type: ownershipTypeExpr,
-        avg_seconds: sql<number>`AVG(${waitSecondsExpr})`,
-        p50_seconds: sql<number>`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${waitSecondsExpr})`,
-        p95_seconds: sql<number>`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${waitSecondsExpr})`,
+        avg_seconds: sql<number>`AVG(${waitSeconds})`,
+        p50_seconds: sql<number>`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${waitSeconds})`,
+        p95_seconds: sql<number>`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${waitSeconds})`,
         count: sql<number>`COUNT(*)`,
       })
-      .from(cloud_agent_code_reviews)
-      .where(and(...conditions))
-      .groupBy(dayExpr, ownershipTypeExpr)
-      .orderBy(dayExpr, ownershipTypeExpr);
+      .from(cloud_agent_code_reviews);
+
+    const result =
+      input.retryAccountingMode === 'all_attempts'
+        ? await query
+            .innerJoin(
+              cloud_agent_code_review_attempts,
+              eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+            )
+            .where(and(...conditions))
+            .groupBy(dayExpr, ownershipTypeExpr)
+            .orderBy(dayExpr, ownershipTypeExpr)
+        : await query
+            .where(and(...conditions))
+            .groupBy(dayExpr, ownershipTypeExpr)
+            .orderBy(dayExpr, ownershipTypeExpr);
 
     return result.map(row => ({
       day: row.day,
@@ -570,42 +788,56 @@ export const adminCodeReviewsRouter = createTRPCRouter({
 
   // Get daily performance percentiles (execution time = completed_at - started_at)
   getPerformanceStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
-    const { startDate, endDate, userId, organizationId, ownershipType, agentVersion } = input;
-    const ownershipFilter = buildOwnershipFilter(userId, organizationId, ownershipType);
-    const agentVersionFilter = buildAgentVersionFilter(agentVersion);
+    const statusTable =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts
+        : cloud_agent_code_reviews;
+    const startedAt =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts.started_at
+        : cloud_agent_code_reviews.started_at;
+    const completedAt =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts.completed_at
+        : cloud_agent_code_reviews.completed_at;
 
     const conditions = [
-      eq(cloud_agent_code_reviews.status, 'completed'),
-      gte(cloud_agent_code_reviews.created_at, startDate),
-      lt(cloud_agent_code_reviews.created_at, endDate),
-      isNotNull(cloud_agent_code_reviews.completed_at),
-      isNotNull(cloud_agent_code_reviews.started_at),
-      ownershipFilter,
-      agentVersionFilter,
-    ].filter(Boolean) as SQL[];
+      eq(statusTable.status, 'completed'),
+      ...buildBaseConditions(input),
+      isNotNull(completedAt),
+      isNotNull(startedAt),
+    ] as SQL[];
 
-    const durationExpr = sql`EXTRACT(EPOCH FROM (${cloud_agent_code_reviews.completed_at}::timestamp - ${cloud_agent_code_reviews.started_at}::timestamp))`;
+    const durationExpr = sql`EXTRACT(EPOCH FROM (${completedAt}::timestamp - ${startedAt}::timestamp))`;
+    const dayExpr = accountingDayExpr(input);
 
-    const result = await db
+    const query = db
       .select({
-        day: sql<string>`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})::date::text`,
-        agent_version: sql<string>`COALESCE(${cloud_agent_code_reviews.agent_version}, 'v1')`,
+        day: sql<string>`${dayExpr}::date::text`,
         avg_seconds: sql<number>`AVG(${durationExpr})`,
         p50_seconds: sql<number>`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${durationExpr})`,
         p90_seconds: sql<number>`percentile_cont(0.9) WITHIN GROUP (ORDER BY ${durationExpr})`,
         count: sql<number>`COUNT(*)`,
       })
-      .from(cloud_agent_code_reviews)
-      .where(and(...conditions))
-      .groupBy(
-        sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`,
-        sql`COALESCE(${cloud_agent_code_reviews.agent_version}, 'v1')`
-      )
-      .orderBy(sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`);
+      .from(cloud_agent_code_reviews);
+
+    const result =
+      input.retryAccountingMode === 'all_attempts'
+        ? await query
+            .innerJoin(
+              cloud_agent_code_review_attempts,
+              eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+            )
+            .where(and(...conditions))
+            .groupBy(dayExpr)
+            .orderBy(dayExpr)
+        : await query
+            .where(and(...conditions))
+            .groupBy(dayExpr)
+            .orderBy(dayExpr);
 
     return result.map(row => ({
       day: row.day,
-      agentVersion: row.agent_version,
       avgSeconds: Number(row.avg_seconds) || 0,
       p50Seconds: Number(row.p50_seconds) || 0,
       p90Seconds: Number(row.p90_seconds) || 0,
@@ -615,18 +847,76 @@ export const adminCodeReviewsRouter = createTRPCRouter({
 
   // Get CSV export data
   getExportData: adminProcedure.input(FilterSchema).query(async ({ input }) => {
-    const { startDate, endDate, userId, organizationId, ownershipType, agentVersion } = input;
-    const ownershipFilter = buildOwnershipFilter(userId, organizationId, ownershipType);
-    const agentVersionFilter = buildAgentVersionFilter(agentVersion);
+    const conditions = buildBaseConditions(input);
 
-    const conditions = [
-      gte(cloud_agent_code_reviews.created_at, startDate),
-      lt(cloud_agent_code_reviews.created_at, endDate),
-      ownershipFilter,
-      agentVersionFilter,
-    ].filter(Boolean) as SQL[];
+    if (input.retryAccountingMode === 'all_attempts') {
+      const cappedReviewIds = await db
+        .selectDistinct({
+          id: cloud_agent_code_reviews.id,
+          created_at: cloud_agent_code_reviews.created_at,
+        })
+        .from(cloud_agent_code_reviews)
+        .innerJoin(
+          cloud_agent_code_review_attempts,
+          eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+        )
+        .where(and(...conditions))
+        .orderBy(desc(cloud_agent_code_reviews.created_at))
+        .limit(10000);
 
-    const result = await db
+      if (cappedReviewIds.length === 0) {
+        return [];
+      }
+
+      return await db
+        .select({
+          id: cloud_agent_code_reviews.id,
+          owned_by_organization_id: cloud_agent_code_reviews.owned_by_organization_id,
+          owned_by_user_id: cloud_agent_code_reviews.owned_by_user_id,
+          repo_full_name: cloud_agent_code_reviews.repo_full_name,
+          pr_number: cloud_agent_code_reviews.pr_number,
+          pr_title: cloud_agent_code_reviews.pr_title,
+          pr_author: cloud_agent_code_reviews.pr_author,
+          status: cloud_agent_code_reviews.status,
+          error_message: cloud_agent_code_reviews.error_message,
+          terminal_reason: cloud_agent_code_reviews.terminal_reason,
+          started_at: cloud_agent_code_reviews.started_at,
+          completed_at: cloud_agent_code_reviews.completed_at,
+          created_at: cloud_agent_code_reviews.created_at,
+          session_id: cloud_agent_code_reviews.session_id,
+          attempt_id: cloud_agent_code_review_attempts.id,
+          attempt_number: cloud_agent_code_review_attempts.attempt_number,
+          retry_of_attempt_id: cloud_agent_code_review_attempts.retry_of_attempt_id,
+          retry_reason: cloud_agent_code_review_attempts.retry_reason,
+          attempt_status: cloud_agent_code_review_attempts.status,
+          attempt_error_message: cloud_agent_code_review_attempts.error_message,
+          attempt_terminal_reason: cloud_agent_code_review_attempts.terminal_reason,
+          attempt_session_id: cloud_agent_code_review_attempts.session_id,
+          attempt_cli_session_id: cloud_agent_code_review_attempts.cli_session_id,
+          attempt_started_at: cloud_agent_code_review_attempts.started_at,
+          attempt_completed_at: cloud_agent_code_review_attempts.completed_at,
+        })
+        .from(cloud_agent_code_reviews)
+        .innerJoin(
+          cloud_agent_code_review_attempts,
+          eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+        )
+        .where(
+          and(
+            inArray(
+              cloud_agent_code_reviews.id,
+              cappedReviewIds.map(row => row.id)
+            ),
+            ...conditions
+          )
+        )
+        .orderBy(
+          desc(cloud_agent_code_reviews.created_at),
+          desc(cloud_agent_code_review_attempts.attempt_number)
+        );
+    }
+
+    return await db
       .select({
         id: cloud_agent_code_reviews.id,
         owned_by_organization_id: cloud_agent_code_reviews.owned_by_organization_id,
@@ -647,8 +937,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       .where(and(...conditions))
       .orderBy(desc(cloud_agent_code_reviews.created_at))
       .limit(10000);
-
-    return result;
   }),
 
   // Search users for filter dropdown

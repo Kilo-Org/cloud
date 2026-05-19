@@ -1,11 +1,20 @@
 import { db } from '@/lib/drizzle';
-import { cloud_agent_code_reviews, kilocode_users } from '@kilocode/db/schema';
+import {
+  cloud_agent_code_review_attempts,
+  cloud_agent_code_reviews,
+  kilocode_users,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import {
   cancelSupersededReviewsForPR,
   createCodeReview,
+  createCodeReviewAttempt,
+  createInfraRetryAttemptIfMissing,
+  getCodeReviewAttemptForReview,
+  listCodeReviewAttempts,
+  updateCodeReviewAttemptForCallback,
   findPreviousCompletedReview,
   updateCodeReviewStatus,
 } from './code-reviews';
@@ -62,6 +71,15 @@ describe('cancelSupersededReviewsForPR', () => {
     const pendingId = await createReview({ headSha: 'sha-pending' });
     const queuedId = await createReview({ headSha: 'sha-queued' });
     const runningId = await createReview({ headSha: 'sha-running' });
+    const pendingAttempt = await createCodeReviewAttempt({
+      codeReviewId: pendingId,
+      status: 'pending',
+    });
+    const runningAttempt = await createCodeReviewAttempt({
+      codeReviewId: runningId,
+      status: 'running',
+      sessionId: 'session-running',
+    });
 
     await updateCodeReviewStatus(queuedId, 'queued');
     await updateCodeReviewStatus(runningId, 'running', { sessionId: 'session-running' });
@@ -77,6 +95,7 @@ describe('cancelSupersededReviewsForPR', () => {
           prevStatus: 'running',
           headSha: 'sha-running',
           sessionId: 'session-running',
+          latestActiveAttemptId: runningAttempt.id,
         }),
       ])
     );
@@ -104,6 +123,32 @@ describe('cancelSupersededReviewsForPR', () => {
     expect(rows.find(row => row.id === pendingId)?.startedAt).toBeNull();
     expect(rows.find(row => row.id === pendingId)?.sessionId).toBeNull();
     expect(rows.find(row => row.id === runningId)?.sessionId).toBe('session-running');
+
+    const attempts = await db
+      .select({
+        id: cloud_agent_code_review_attempts.id,
+        status: cloud_agent_code_review_attempts.status,
+        terminalReason: cloud_agent_code_review_attempts.terminal_reason,
+        errorMessage: cloud_agent_code_review_attempts.error_message,
+        completedAt: cloud_agent_code_review_attempts.completed_at,
+      })
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, pendingId));
+
+    expect(cancelled).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: pendingId, latestActiveAttemptId: pendingAttempt.id }),
+      ])
+    );
+    expect(attempts).toEqual([
+      expect.objectContaining({
+        id: pendingAttempt.id,
+        status: 'cancelled',
+        terminalReason: 'superseded',
+        errorMessage: 'Superseded by new push',
+        completedAt: expect.any(String),
+      }),
+    ]);
   });
 
   it('ignores same-sha, different repo or pr, and already-terminal rows; second call is idempotent', async () => {
@@ -295,5 +340,185 @@ describe('findPreviousCompletedReview', () => {
       .limit(1);
 
     expect(review?.agentVersion).toBe('v2');
+  });
+
+  it('creates, links, lists, and updates code review attempts', async () => {
+    const reviewId = await createReview('sha-attempts');
+    const firstAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_attempt_1',
+      cliSessionId: 'ses_attempt_1',
+    });
+    const secondAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      retryOfAttemptId: firstAttempt.id,
+      retryReason: 'infra_failure',
+      status: 'pending',
+    });
+
+    expect(firstAttempt.attempt_number).toBe(1);
+    expect(secondAttempt.attempt_number).toBe(2);
+    expect(secondAttempt.retry_of_attempt_id).toBe(firstAttempt.id);
+
+    const attempts = await listCodeReviewAttempts(reviewId);
+    expect(attempts.map(attempt => attempt.attempt_number)).toEqual([1, 2]);
+
+    await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent_attempt_1',
+      errorMessage: 'Container shutdown: SIGTERM',
+      terminalReason: 'sandbox_error',
+    });
+
+    const [updatedFirstAttempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, firstAttempt.id))
+      .limit(1);
+
+    expect(updatedFirstAttempt?.status).toBe('failed');
+    expect(updatedFirstAttempt?.error_message).toBe('Container shutdown: SIGTERM');
+  });
+
+  it('does not reopen a terminal attempt without session ids', async () => {
+    const reviewId = await createReview('sha-terminal-attempt');
+    const failedAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'failed',
+      errorMessage: 'startup failed',
+      terminalReason: 'sandbox_error',
+    });
+
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_late',
+      cliSessionId: 'ses_late',
+      executionId: 'exec_late',
+    });
+
+    expect(result.id).toBe(failedAttempt.id);
+    expect(result.status).toBe('failed');
+    expect(result.session_id).toBeNull();
+    expect(result.cli_session_id).toBeNull();
+    expect(result.execution_id).toBeNull();
+
+    const [storedAttempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, failedAttempt.id))
+      .limit(1);
+
+    expect(storedAttempt?.status).toBe('failed');
+    expect(storedAttempt?.session_id).toBeNull();
+    expect(storedAttempt?.cli_session_id).toBeNull();
+    expect(storedAttempt?.execution_id).toBeNull();
+  });
+
+  it('creates only one infra retry attempt for the same failed attempt', async () => {
+    const reviewId = await createReview('sha-infra-retry');
+    await updateCodeReviewStatus(reviewId, 'running', { sessionId: 'agent_failed' });
+    const failedAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent_failed',
+      terminalReason: 'sandbox_error',
+    });
+
+    const first = await createInfraRetryAttemptIfMissing({
+      codeReviewId: reviewId,
+      retryOfAttemptId: failedAttempt.id,
+    });
+    const second = await createInfraRetryAttemptIfMissing({
+      codeReviewId: reviewId,
+      retryOfAttemptId: failedAttempt.id,
+    });
+
+    expect(first.outcome).toBe('created');
+    expect(second.outcome).toBe('existing-for-attempt');
+    if (first.outcome !== 'created' || second.outcome !== 'existing-for-attempt') {
+      throw new Error('Expected created retry followed by existing retry');
+    }
+    expect(second.attempt.id).toBe(first.attempt.id);
+
+    const attempts = await listCodeReviewAttempts(reviewId);
+    expect(attempts.filter(attempt => attempt.retry_reason === 'infra_failure')).toHaveLength(1);
+  });
+
+  it('does not create an infra retry attempt for a superseded review', async () => {
+    const reviewId = await createReview('sha-superseded-retry');
+    const failedAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'failed',
+      terminalReason: 'sandbox_error',
+    });
+    await updateCodeReviewStatus(reviewId, 'cancelled', {
+      terminalReason: 'superseded',
+      errorMessage: 'Superseded by new push',
+    });
+
+    const result = await createInfraRetryAttemptIfMissing({
+      codeReviewId: reviewId,
+      retryOfAttemptId: failedAttempt.id,
+    });
+
+    expect(result).toEqual({
+      outcome: 'skipped-inactive',
+      reviewStatus: 'cancelled',
+      terminalReason: 'superseded',
+    });
+
+    const attempts = await listCodeReviewAttempts(reviewId);
+    expect(attempts.filter(attempt => attempt.retry_reason === 'infra_failure')).toHaveLength(0);
+  });
+
+  it('updates an explicit attempt id even when a newer attempt exists', async () => {
+    const reviewId = await createReview('sha-explicit-attempt');
+    const firstAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent-first',
+    });
+    const newerAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      retryOfAttemptId: firstAttempt.id,
+      retryReason: 'manual_retrigger',
+      status: 'running',
+      sessionId: 'agent-second',
+    });
+
+    await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      attemptId: firstAttempt.id,
+      status: 'cancelled',
+      errorMessage: 'superseded callback',
+    });
+
+    const updatedFirst = await getCodeReviewAttemptForReview(reviewId, firstAttempt.id);
+    const unchangedLatest = await getCodeReviewAttemptForReview(reviewId, newerAttempt.id);
+
+    expect(updatedFirst?.status).toBe('cancelled');
+    expect(updatedFirst?.error_message).toBe('superseded callback');
+    expect(unchangedLatest?.status).toBe('running');
+  });
+
+  it('throws for an explicit missing attempt id', async () => {
+    const reviewId = await createReview('sha-missing-explicit-attempt');
+    await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent-existing',
+    });
+
+    await expect(
+      updateCodeReviewAttemptForCallback({
+        codeReviewId: reviewId,
+        attemptId: '00000000-0000-0000-0000-000000000999',
+        status: 'failed',
+        errorMessage: 'bad callback',
+      })
+    ).rejects.toThrow('not found');
   });
 });

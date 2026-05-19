@@ -3,9 +3,17 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { AlertCircle, Loader2, Terminal, CheckCircle2, XCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   createWebSocketManager,
   type ConnectionState,
@@ -17,6 +25,18 @@ import { CLOUD_AGENT_NEXT_WS_URL } from '@/lib/constants';
 type CodeReviewStreamViewProps = {
   reviewId: string;
   onComplete?: () => void;
+  attempts?: CodeReviewAttemptSummary[];
+};
+
+type CodeReviewAttemptSummary = {
+  id: string;
+  attempt_number: number;
+  retry_reason: string | null;
+  session_id: string | null;
+  cli_session_id: string | null;
+  status: string;
+  error_message: string | null;
+  terminal_reason: string | null;
 };
 
 /** Simplified event for display in the code review log */
@@ -148,12 +168,36 @@ const formatTimestamp = (timestamp: string): string => {
   });
 };
 
+function formatStatusLabel(status: string): string {
+  return status.slice(0, 1).toUpperCase() + status.slice(1);
+}
+
+function formatAttemptLabel(attempt: CodeReviewAttemptSummary): string {
+  const parts = [`Attempt ${attempt.attempt_number}`, formatStatusLabel(attempt.status)];
+  const sessionId = attempt.session_id ?? attempt.cli_session_id;
+  if (sessionId) {
+    parts.push(sessionId.length > 12 ? `${sessionId.slice(0, 12)}...` : sessionId);
+  } else if (attempt.terminal_reason) {
+    parts.push(attempt.terminal_reason);
+  } else if (attempt.retry_reason) {
+    parts.push(attempt.retry_reason.replace(/_/g, ' '));
+  }
+  return parts.join(' · ');
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function CodeReviewStreamView({ reviewId, onComplete }: CodeReviewStreamViewProps) {
+export function CodeReviewStreamView({
+  reviewId,
+  onComplete,
+  attempts = [],
+}: CodeReviewStreamViewProps) {
   const trpc = useTRPC();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [events, setEvents] = useState<DisplayEvent[]>([]);
   const [isComplete, setIsComplete] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>({
@@ -164,12 +208,61 @@ export function CodeReviewStreamView({ reviewId, onComplete }: CodeReviewStreamV
   const [autoScroll, setAutoScroll] = useState(true);
   const wsManagerRef = useRef<ReturnType<typeof createWebSocketManager> | null>(null);
 
+  const orderedAttempts = [...attempts].sort((a, b) => a.attempt_number - b.attempt_number);
+  const attemptIds = orderedAttempts.map(attempt => attempt.id).join('|');
+  const latestAttempt = orderedAttempts.at(-1);
+  const latestCompletedAttempt = [...orderedAttempts]
+    .reverse()
+    .find(attempt => attempt.status === 'completed');
+  const defaultAttemptId = latestCompletedAttempt?.id ?? latestAttempt?.id;
+  const queryAttemptId = searchParams.get('attemptId');
+  const queryAttemptExists = orderedAttempts.some(attempt => attempt.id === queryAttemptId);
+  const effectiveAttemptId = queryAttemptExists ? (queryAttemptId ?? undefined) : defaultAttemptId;
+  const selectedAttempt = orderedAttempts.find(attempt => attempt.id === effectiveAttemptId);
+  const isSelectedLatestAttempt = !selectedAttempt || selectedAttempt.id === latestAttempt?.id;
+
+  const updateAttemptParam = useCallback(
+    (attemptId: string | undefined) => {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      if (attemptId) {
+        nextParams.set('attemptId', attemptId);
+      } else {
+        nextParams.delete('attemptId');
+      }
+      const queryString = nextParams.toString();
+      router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
+  useEffect(() => {
+    if (orderedAttempts.length > 1 && effectiveAttemptId && queryAttemptId !== effectiveAttemptId) {
+      updateAttemptParam(effectiveAttemptId);
+    }
+    if (orderedAttempts.length <= 1 && queryAttemptId) {
+      updateAttemptParam(undefined);
+    }
+  }, [attemptIds, effectiveAttemptId, orderedAttempts.length, queryAttemptId, updateAttemptParam]);
+
+  useEffect(() => {
+    setEvents([]);
+    setIsComplete(false);
+    setConnectionState({ status: 'disconnected' });
+    setWsError(null);
+    setAutoScroll(true);
+    wsManagerRef.current?.disconnect();
+    wsManagerRef.current = null;
+  }, [reviewId, effectiveAttemptId]);
+
   // ---------------------------------------------------------------------------
   // Step 1: Get stream info to determine which mode to use
   // ---------------------------------------------------------------------------
 
   const { data: streamInfo } = useQuery({
-    ...trpc.codeReviews.getReviewStreamInfo.queryOptions({ reviewId }),
+    ...trpc.codeReviews.getReviewStreamInfo.queryOptions({
+      reviewId,
+      attemptId: effectiveAttemptId,
+    }),
     refetchInterval: query => {
       const data = query.state.data;
       if (!data?.success) return 2000;
@@ -189,7 +282,9 @@ export function CodeReviewStreamView({ reviewId, onComplete }: CodeReviewStreamV
   const reviewStatus = streamInfo?.success ? streamInfo.status : undefined;
 
   // Determine mode from the agent version recorded at dispatch time
-  const useWebSocket = streamInfo?.success ? streamInfo.agentVersion === 'v2' : false;
+  const useWebSocket = streamInfo?.success
+    ? streamInfo.agentVersion === 'v2' && isSelectedLatestAttempt
+    : false;
 
   // Mark as complete if the review is already in a terminal state
   useEffect(() => {
@@ -309,7 +404,7 @@ export function CodeReviewStreamView({ reviewId, onComplete }: CodeReviewStreamV
     ...trpc.codeReviews.getReviewEvents.queryOptions({ reviewId }),
     refetchInterval: isComplete ? false : 2000,
     // Only poll when NOT using WebSocket mode and the review exists
-    enabled: !!reviewId && !useWebSocket && !!streamInfo?.success,
+    enabled: !!reviewId && !useWebSocket && isSelectedLatestAttempt && !!streamInfo?.success,
   });
 
   // Sync polled events into display events
@@ -337,7 +432,10 @@ export function CodeReviewStreamView({ reviewId, onComplete }: CodeReviewStreamV
   );
 
   const { data: sessionMessages, isLoading: isLoadingHistory } = useQuery({
-    ...trpc.codeReviews.getSessionMessages.queryOptions({ reviewId }),
+    ...trpc.codeReviews.getSessionMessages.queryOptions({
+      reviewId,
+      attemptId: effectiveAttemptId,
+    }),
     // Only fetch historical data when the review is done and we have no live events
     enabled: !!reviewId && isTerminal && events.length === 0,
   });
@@ -401,7 +499,7 @@ export function CodeReviewStreamView({ reviewId, onComplete }: CodeReviewStreamV
   return (
     <Card className="border-l-4 border-l-blue-500">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Terminal className="h-4 w-4" />
             <CardTitle className="shrink-0 text-sm font-medium">
@@ -416,39 +514,58 @@ export function CodeReviewStreamView({ reviewId, onComplete }: CodeReviewStreamV
               </span>
             )}
           </div>
-          {isComplete ? (
-            reviewStatus === 'failed' ? (
-              <Badge variant="destructive" className="gap-1.5">
-                <XCircle className="h-3 w-3" />
-                Failed
-              </Badge>
-            ) : reviewStatus === 'cancelled' ? (
-              <Badge variant="secondary" className="gap-1.5">
-                <XCircle className="h-3 w-3" />
-                Cancelled
-              </Badge>
-            ) : reviewStatus === 'interrupted' ? (
-              <Badge variant="secondary" className="gap-1.5">
-                <AlertCircle className="h-3 w-3" />
-                Interrupted
-              </Badge>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            {orderedAttempts.length > 1 && effectiveAttemptId && (
+              <div className="flex items-center gap-2">
+                <span className="sr-only">Select session attempt</span>
+                <Select value={effectiveAttemptId} onValueChange={updateAttemptParam}>
+                  <SelectTrigger size="sm" className="h-8 w-full min-w-56 sm:w-64">
+                    <SelectValue placeholder="Select attempt" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {orderedAttempts.map(attempt => (
+                      <SelectItem key={attempt.id} value={attempt.id}>
+                        {formatAttemptLabel(attempt)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {isComplete ? (
+              reviewStatus === 'failed' ? (
+                <Badge variant="destructive" className="gap-1.5">
+                  <XCircle className="h-3 w-3" />
+                  Failed
+                </Badge>
+              ) : reviewStatus === 'cancelled' ? (
+                <Badge variant="secondary" className="gap-1.5">
+                  <XCircle className="h-3 w-3" />
+                  Cancelled
+                </Badge>
+              ) : reviewStatus === 'interrupted' ? (
+                <Badge variant="secondary" className="gap-1.5">
+                  <AlertCircle className="h-3 w-3" />
+                  Interrupted
+                </Badge>
+              ) : (
+                <Badge variant="default" className="gap-1.5 bg-emerald-500 hover:bg-emerald-600">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Complete
+                </Badge>
+              )
             ) : (
-              <Badge variant="default" className="gap-1.5 bg-emerald-500 hover:bg-emerald-600">
-                <CheckCircle2 className="h-3 w-3" />
-                Complete
+              <Badge variant="secondary" className="gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {useWebSocket
+                  ? connectionState.status === 'connecting' ||
+                    connectionState.status === 'reconnecting'
+                    ? 'Connecting...'
+                    : 'Running'
+                  : 'Running'}
               </Badge>
-            )
-          ) : (
-            <Badge variant="secondary" className="gap-1.5">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              {useWebSocket
-                ? connectionState.status === 'connecting' ||
-                  connectionState.status === 'reconnecting'
-                  ? 'Connecting...'
-                  : 'Running'
-                : 'Running'}
-            </Badge>
-          )}
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0">

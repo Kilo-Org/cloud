@@ -1,7 +1,10 @@
 import type { SandboxInstance, ExecutionSession, SystemSandboxUsageEvent } from './types.js';
 import type { ExecResult, ExecOptions } from '@cloudflare/sandbox';
 import { logger } from './logger.js';
-import { findWrapperForSessionInProcesses } from './kilo/wrapper-manager.js';
+import {
+  isWrapperLiveInProcessesOrContainers,
+  listWrapperContainers,
+} from './kilo/wrapper-manager.js';
 import {
   DISK_CHECK_TIMEOUT_MS,
   FAST_SANDBOX_COMMAND_TIMEOUT_MS,
@@ -347,6 +350,10 @@ export async function cleanupStaleWorkspaces(
     return;
   }
 
+  // Also fetch wrapper containers (devcontainer flow). Best-effort — on the
+  // non-DIND outer image `docker ps` simply returns empty, which is fine.
+  const wrapperContainers = await listWrapperContainers(sandbox);
+
   // Get current epoch once so we can age-check directories without re-shelling per candidate
   const nowSeconds = Math.floor(Date.now() / 1000);
 
@@ -395,8 +402,7 @@ export async function cleanupStaleWorkspaces(
         continue;
       }
 
-      const wrapperInfo = findWrapperForSessionInProcesses(processes, candidateSessionId);
-      if (wrapperInfo !== null) {
+      if (isWrapperLiveInProcessesOrContainers(processes, wrapperContainers, candidateSessionId)) {
         logger.withFields({ candidateSessionId }).info('Skipping session: wrapper is running');
         skipped++;
         continue;

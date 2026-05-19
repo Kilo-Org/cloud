@@ -1,9 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { buildRestoreCommand } from '../kilo/devcontainer.js';
 import type { Env } from '../types.js';
 import type { PreparationInput } from './schemas.js';
 
-const { ensureWrapperMock } = vi.hoisted(() => ({
+type RestoreCommandOptions = Parameters<typeof buildRestoreCommand>[0];
+
+const {
+  ensureWrapperMock,
+  buildRestoreCommandMock,
+  bringUpDevContainerMock,
+  detectDevContainerMock,
+} = vi.hoisted(() => ({
   ensureWrapperMock: vi.fn(),
+  buildRestoreCommandMock: vi.fn().mockReturnValue('mocked-restore-cmd'),
+  bringUpDevContainerMock: vi.fn(),
+  detectDevContainerMock: vi.fn().mockResolvedValue(null),
 }));
 
 const fakeSession = {
@@ -45,6 +56,10 @@ vi.mock('../session-service.js', () => ({
     }));
 
     getOrCreateSession = vi.fn().mockResolvedValue(fakeSession);
+    buildRuntimeEnv = vi.fn().mockReturnValue({
+      SESSION_HOME: '/home/agent_test',
+      KILO_SESSION_INGEST_URL: 'https://ingest.example',
+    });
   },
 }));
 
@@ -54,6 +69,18 @@ vi.mock('../kilo/wrapper-client.js', () => ({
   },
 }));
 
+vi.mock('../kilo/devcontainer.js', () => ({
+  buildRestoreCommand: buildRestoreCommandMock,
+  bringUpDevContainer: bringUpDevContainerMock,
+  detectDevContainer: detectDevContainerMock,
+  KILO_CLI_VERSION: '1.0.0',
+}));
+
+vi.mock('../kilo/wrapper-manager.js', () => ({
+  findWrapperContainerForSession: vi.fn().mockResolvedValue(null),
+}));
+
+import { runSetupCommands } from '../session-service.js';
 import { cloneGitHubRepo, cloneGitRepo } from '../workspace.js';
 import { executePreparationSteps } from './async-preparation.js';
 
@@ -65,6 +92,7 @@ const wrapperResult = {
 describe('executePreparationSteps', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fakeSession.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
     fakeSandbox.destroy.mockResolvedValue(undefined);
     ensureWrapperMock.mockResolvedValue(wrapperResult);
   });
@@ -74,6 +102,7 @@ describe('executePreparationSteps', () => {
     const env = {
       Sandbox: {} as Env['Sandbox'],
       SandboxSmall: {} as Env['SandboxSmall'],
+      SandboxDIND: {} as Env['SandboxDIND'],
       GIT_TOKEN_SERVICE: {
         getTokenForRepo: vi.fn(),
         getGitLabToken,
@@ -121,6 +150,7 @@ describe('executePreparationSteps', () => {
     const env = {
       Sandbox: {} as Env['Sandbox'],
       SandboxSmall: {} as Env['SandboxSmall'],
+      SandboxDIND: {} as Env['SandboxDIND'],
       GIT_TOKEN_SERVICE: {
         getTokenForRepo: vi.fn(),
         getGitLabToken,
@@ -150,10 +180,48 @@ describe('executePreparationSteps', () => {
     expect(result?.gitlabTokenManaged).toBe(true);
   });
 
+  it('does not auto-detect a devcontainer unless the caller opts in', async () => {
+    fakeSession.exec.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('.devcontainer')) {
+        throw new Error('devcontainer detection should not run');
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const env = {
+      Sandbox: {} as Env['Sandbox'],
+      SandboxSmall: {} as Env['SandboxSmall'],
+      SandboxDIND: {} as Env['SandboxDIND'],
+      GIT_TOKEN_SERVICE: {
+        getTokenForRepo: vi.fn(),
+      },
+      PER_SESSION_SANDBOX_ORG_IDS: '',
+      GITHUB_APP_SLUG: 'kilo-connect',
+      GITHUB_APP_BOT_USER_ID: '12345',
+    } as unknown as Env;
+    const emitProgress = vi.fn();
+    const input = {
+      sessionId: 'agent_test',
+      userId: 'test-user',
+      orgId: 'test-org',
+      authToken: 'kilo-token',
+      githubRepo: 'acme/repo',
+      githubToken: 'github-token',
+      prompt: 'Fix bug',
+      mode: 'code',
+      model: 'kilo/test-model',
+      autoInitiate: true,
+    } satisfies PreparationInput;
+
+    const result = await executePreparationSteps(input, env, emitProgress);
+
+    expect(result?.devcontainer).toBeUndefined();
+  });
+
   it('returns the resolved GitHub App token used for preparation', async () => {
     const env = {
       Sandbox: {} as Env['Sandbox'],
       SandboxSmall: {} as Env['SandboxSmall'],
+      SandboxDIND: {} as Env['SandboxDIND'],
       GIT_TOKEN_SERVICE: {
         getTokenForRepo: vi.fn().mockResolvedValue({
           success: true,
@@ -193,6 +261,163 @@ describe('executePreparationSteps', () => {
       { GITHUB_APP_SLUG: 'kilo-connect', GITHUB_APP_BOT_USER_ID: '12345' },
       undefined
     );
+  });
+
+  it('forwards runtimeEnv to buildRestoreCommand when importing a kilo session', async () => {
+    const env = {
+      Sandbox: {} as Env['Sandbox'],
+      SandboxSmall: {} as Env['SandboxSmall'],
+      SandboxDIND: {} as Env['SandboxDIND'],
+      GIT_TOKEN_SERVICE: {
+        getTokenForRepo: vi.fn(),
+      },
+      PER_SESSION_SANDBOX_ORG_IDS: '',
+      GITHUB_APP_SLUG: 'kilo-connect',
+      GITHUB_APP_BOT_USER_ID: '12345',
+    } as unknown as Env;
+    const emitProgress = vi.fn();
+    const input = {
+      sessionId: 'agent_test',
+      userId: 'test-user',
+      orgId: 'test-org',
+      authToken: 'kilo-token',
+      githubRepo: 'acme/repo',
+      githubToken: 'github-token',
+      kiloSessionId: 'kilo-123',
+      prompt: 'Fix bug',
+      mode: 'code',
+      model: 'kilo/test-model',
+      autoInitiate: false,
+    } satisfies PreparationInput;
+
+    await executePreparationSteps(input, env, emitProgress);
+
+    const restoreCommandCall = buildRestoreCommandMock.mock.calls[0] as
+      | [RestoreCommandOptions]
+      | undefined;
+    expect(restoreCommandCall).toBeDefined();
+    if (!restoreCommandCall) return;
+
+    const [restoreOptions] = restoreCommandCall;
+    expect(restoreOptions.kiloSessionId).toBe('kilo-123');
+    expect(restoreOptions.runtimeEnv).toMatchObject({
+      SESSION_HOME: '/home/agent_test',
+      KILO_SESSION_INGEST_URL: 'https://ingest.example',
+    });
+  });
+
+  it('runs profile setup commands through the devcontainer handle', async () => {
+    const env = {
+      Sandbox: {} as Env['Sandbox'],
+      SandboxSmall: {} as Env['SandboxSmall'],
+      SandboxDIND: {} as Env['SandboxDIND'],
+      GIT_TOKEN_SERVICE: {
+        getTokenForRepo: vi.fn(),
+      },
+      PER_SESSION_SANDBOX_ORG_IDS: '',
+      GITHUB_APP_SLUG: 'kilo-connect',
+      GITHUB_APP_BOT_USER_ID: '12345',
+    } as unknown as Env;
+    const emitProgress = vi.fn();
+    const devcontainer = {
+      containerId: 'container-id',
+      innerWorkspaceFolder: '/workspaces/test',
+      workspacePath: '/workspace/test-org/test-user/sessions/agent_test',
+      agentSessionId: 'agent_test',
+      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
+      teardown: vi.fn(),
+    };
+    detectDevContainerMock.mockResolvedValueOnce({
+      configPath: '.devcontainer/devcontainer.json',
+    });
+    bringUpDevContainerMock.mockResolvedValueOnce(devcontainer);
+    const input = {
+      sessionId: 'agent_test',
+      userId: 'test-user',
+      orgId: 'test-org',
+      authToken: 'kilo-token',
+      githubRepo: 'acme/repo',
+      githubToken: 'github-token',
+      setupCommands: ['pnpm install'],
+      prompt: 'Fix bug',
+      mode: 'code',
+      model: 'kilo/test-model',
+      autoInitiate: true,
+      devcontainer: true,
+    } satisfies PreparationInput;
+
+    await executePreparationSteps(input, env, emitProgress);
+
+    expect(runSetupCommands).toHaveBeenCalledWith(
+      fakeSession,
+      expect.objectContaining({
+        workspacePath: '/workspace/test-org/test-user/sessions/agent_test',
+      }),
+      ['pnpm install'],
+      true,
+      {
+        devcontainer,
+        dockerEnv: { DOCKER_HOST: 'unix:///var/run/docker.sock' },
+        runtimeEnv: {
+          SESSION_HOME: '/home/agent_test',
+          KILO_SESSION_INGEST_URL: 'https://ingest.example',
+        },
+      }
+    );
+    expect(emitProgress).toHaveBeenCalledWith('setup_commands', 'Running setup commands…');
+  });
+
+  it('tears down the devcontainer when session import fails after bring-up', async () => {
+    const env = {
+      Sandbox: {} as Env['Sandbox'],
+      SandboxSmall: {} as Env['SandboxSmall'],
+      SandboxDIND: {} as Env['SandboxDIND'],
+      GIT_TOKEN_SERVICE: {
+        getTokenForRepo: vi.fn(),
+      },
+      PER_SESSION_SANDBOX_ORG_IDS: '',
+      GITHUB_APP_SLUG: 'kilo-connect',
+      GITHUB_APP_BOT_USER_ID: '12345',
+    } as unknown as Env;
+    const emitProgress = vi.fn();
+    const teardown = vi.fn().mockResolvedValue(undefined);
+    detectDevContainerMock.mockResolvedValueOnce({
+      configPath: '.devcontainer/devcontainer.json',
+    });
+    bringUpDevContainerMock.mockResolvedValueOnce({
+      containerId: 'container-id',
+      innerWorkspaceFolder: '/workspaces/test',
+      workspacePath: '/workspace/test-org/test-user/sessions/agent_test',
+      agentSessionId: 'agent_test',
+      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
+      teardown,
+    });
+    fakeSession.exec.mockImplementation(async (command: string) => {
+      if (command === 'mocked-restore-cmd') {
+        return { exitCode: 7, stdout: 'restore failed', stderr: '' };
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const input = {
+      sessionId: 'agent_test',
+      userId: 'test-user',
+      orgId: 'test-org',
+      authToken: 'kilo-token',
+      githubRepo: 'acme/repo',
+      githubToken: 'github-token',
+      kiloSessionId: 'kilo-123',
+      prompt: 'Fix bug',
+      mode: 'code',
+      model: 'kilo/test-model',
+      autoInitiate: true,
+      devcontainer: true,
+    } satisfies PreparationInput;
+
+    const result = await executePreparationSteps(input, env, emitProgress);
+
+    expect(result).toBeUndefined();
+    expect(emitProgress).toHaveBeenCalledWith('failed', 'Session import failed (exit 7)');
+    expect(teardown).toHaveBeenCalledOnce();
   });
 
   it('destroys the sandbox when preparation hits a sandbox 500', async () => {

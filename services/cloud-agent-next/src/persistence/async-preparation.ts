@@ -22,6 +22,17 @@ import {
   writeGlobalRules,
 } from '../session-service.js';
 import { WrapperClient } from '../kilo/wrapper-client.js';
+import {
+  buildRestoreCommand,
+  bringUpDevContainer,
+  detectDevContainer,
+  KILO_CLI_VERSION,
+  type DevContainerHandle,
+} from '../kilo/devcontainer.js';
+import { findWrapperContainerForSession } from '../kilo/wrapper-manager.js';
+import { randomPort } from '../kilo/ports.js';
+import { dockerSocketEnv, resolveDockerSocketPath } from '../kilo/sandbox-runtime.js';
+import { shellQuote } from '../kilo/utils.js';
 import type { PreparingStep } from '../shared/protocol.js';
 import type { PreparationInput } from './schemas.js';
 import { readProfileBundle } from '../session-profile.js';
@@ -36,6 +47,12 @@ export type PreparationStepsResult = {
   workspacePath: string;
   sessionHome: string;
   branchName: string;
+  devcontainer?: {
+    workspacePath: string;
+    innerWorkspaceFolder: string;
+    wrapperPort: number;
+    configPath: string;
+  };
   kiloSessionId: string;
   resolvedInstallationId: string | undefined;
   resolvedGithubAppType: 'standard' | 'lite' | undefined;
@@ -114,7 +131,8 @@ export async function executePreparationSteps(
     input.orgId,
     input.userId,
     input.sessionId,
-    input.botId
+    input.botId,
+    input.devcontainer
   );
   const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId, {
     sleepAfter: SANDBOX_SLEEP_AFTER_SECONDS,
@@ -158,7 +176,7 @@ export async function executePreparationSteps(
         botId: input.botId,
       });
 
-      const session = await sessionService.getOrCreateSession({
+      const sessionOptions = {
         sandbox,
         context,
         env,
@@ -168,6 +186,11 @@ export async function executePreparationSteps(
         createdOnPlatform: input.createdOnPlatform,
         appendSystemPrompt: input.appendSystemPrompt,
         profile: readProfileBundle(input),
+      };
+      const runtimeEnv = sessionService.buildRuntimeEnv(sessionOptions);
+      const session = await sessionService.getOrCreateSession({
+        ...sessionOptions,
+        sandbox,
       });
 
       const cloneOptions = input.shallow ? { shallow: true } : undefined;
@@ -198,74 +221,165 @@ export async function executePreparationSteps(
       emitProgress('branch', 'Setting up branch…');
       await manageBranch(session, workspacePath, branchName, !!input.upstreamBranch);
 
-      // 6. Setup commands
-      const inputSetupCommands = readProfileBundle(input).setupCommands;
-      if (inputSetupCommands && inputSetupCommands.length > 0) {
-        emitProgress('setup_commands', 'Running setup commands…');
-        await runSetupCommands(session, context, inputSetupCommands, true);
-      }
+      // 5b. Dev container detection + bring-up.
+      let devContainerHandle: DevContainerHandle | undefined;
+      let wrapperPort: number | undefined;
+      let detected: Awaited<ReturnType<typeof detectDevContainer>> = null;
+      let dockerEnv: Record<string, string> | undefined;
+      let preparationSucceeded = false;
 
-      // 7. Write auth file and global rules (runtime skills are written by getOrCreateSession above)
-      await writeAuthFile(sandbox, sessionHome, input.authToken);
-      await writeGlobalRules(sandbox, sessionHome, input.sessionId);
+      try {
+        if (input.devcontainer === true) {
+          // Pre-resolve docker socket env — devcontainer/docker CLIs need
+          // DOCKER_HOST pointing at the sandbox dockerd socket. Resolving once
+          // here avoids redundant execs in restore/import paths.
+          dockerEnv = dockerSocketEnv(await resolveDockerSocketPath(session));
 
-      // 8. Import pre-generated session into CLI's SQLite so the wrapper picks it up
-      if (input.kiloSessionId) {
-        emitProgress('kilo_session', 'Importing session…');
-        const now = Date.now();
-        const defaultTitle = 'New session - ' + new Date(now).toISOString();
-        const minimalSessionJson = JSON.stringify({
-          info: {
-            id: input.kiloSessionId,
-            slug: '',
-            projectID: '',
-            directory: '',
-            title: defaultTitle,
-            version: '2',
-            time: { created: now, updated: now },
-          },
-          messages: [],
-        });
-        const importFilePath = `/tmp/kilo-empty-session-${input.kiloSessionId}.json`;
-        await sandbox.writeFile(importFilePath, minimalSessionJson);
-        const escapedFile = importFilePath.replaceAll("'", "'\\''");
-        const escapedId = input.kiloSessionId.replaceAll("'", "'\\''");
-        const escapedWorkspace = workspacePath.replaceAll("'", "'\\''");
-        const restoreResult = await session.exec(
-          `bun /usr/local/bin/kilo-restore-session.js --file '${escapedFile}' '${escapedId}' '${escapedWorkspace}'`,
-          { cwd: dirname(workspacePath) }
+          detected = await detectDevContainer(session, workspacePath);
+          if (detected) {
+            emitProgress('devcontainer_setup', `Building dev container (${detected.configPath})…`);
+            const existingContainer = await findWrapperContainerForSession(
+              sandbox,
+              input.sessionId
+            );
+            wrapperPort = existingContainer?.port ?? randomPort();
+            try {
+              devContainerHandle = await bringUpDevContainer(session, {
+                workspacePath,
+                sessionHome,
+                agentSessionId: input.sessionId,
+                wrapperPort,
+                kiloCliVersion: KILO_CLI_VERSION,
+                configPath: detected.configPath,
+              });
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              logger
+                .withFields({ sessionId: input.sessionId, configPath: detected.configPath })
+                .error(`devcontainer up failed: ${message}`);
+              emitProgress('failed', `Dev container build failed: ${message}`);
+              return undefined;
+            }
+          }
+        }
+
+        // 6. Setup commands
+        const inputSetupCommands = readProfileBundle(input).setupCommands;
+        if (inputSetupCommands && inputSetupCommands.length > 0) {
+          emitProgress('setup_commands', 'Running setup commands…');
+          await runSetupCommands(session, context, inputSetupCommands, true, {
+            devcontainer: devContainerHandle,
+            dockerEnv,
+            runtimeEnv,
+          });
+        }
+
+        // 7. Write auth file and global rules (runtime skills are written by getOrCreateSession above)
+        await writeAuthFile(sandbox, sessionHome, input.authToken);
+        await writeGlobalRules(sandbox, sessionHome, input.sessionId);
+
+        // 8. Import pre-generated session into CLI's SQLite so the wrapper picks it up.
+        //
+        // When a dev container is in play the import must run *inside* it: the
+        // restore script does `Bun.spawn(['kilo', 'import', ...], { cwd })`, and the
+        // cwd has to exist where the script runs. We also want the session record's
+        // path to match what the runtime kilo (also inside) will see.
+        if (input.kiloSessionId) {
+          emitProgress('kilo_session', 'Importing session…');
+          const now = Date.now();
+          const defaultTitle = 'New session - ' + new Date(now).toISOString();
+          const minimalSessionJson = JSON.stringify({
+            info: {
+              id: input.kiloSessionId,
+              slug: '',
+              projectID: '',
+              directory: '',
+              title: defaultTitle,
+              version: '2',
+              time: { created: now, updated: now },
+            },
+            messages: [],
+          });
+          const importFilePath = devContainerHandle
+            ? `${sessionHome}/tmp/kilo-empty-session-${input.kiloSessionId}.json`
+            : `/tmp/kilo-empty-session-${input.kiloSessionId}.json`;
+          if (devContainerHandle) {
+            await session.exec(`mkdir -p ${shellQuote(`${sessionHome}/tmp`)}`);
+          }
+          await sandbox.writeFile(importFilePath, minimalSessionJson);
+
+          const restoreCommand = buildRestoreCommand({
+            kiloSessionId: input.kiloSessionId,
+            importFilePath,
+            runtimeWorkspacePath: devContainerHandle?.innerWorkspaceFolder ?? workspacePath,
+            devContainer: devContainerHandle,
+            runtimeEnv,
+          });
+          const restoreResult = await session.exec(restoreCommand, {
+            cwd: dirname(workspacePath),
+            env: devContainerHandle ? dockerEnv : undefined,
+          });
+          if (restoreResult.exitCode !== 0) {
+            const stdout = restoreResult.stdout?.trim() ?? '';
+            logger
+              .withFields({ exitCode: restoreResult.exitCode, stdout })
+              .error('Session import failed');
+            emitProgress('failed', `Session import failed (exit ${restoreResult.exitCode})`);
+            return undefined;
+          }
+        }
+
+        // 9. Start wrapper (with --session-id if pre-imported)
+        emitProgress('kilo_server', 'Starting Kilo…');
+        const { sessionId: wrapperSessionId } = await WrapperClient.ensureWrapper(
+          sandbox,
+          session,
+          {
+            agentSessionId: input.sessionId,
+            userId: input.userId,
+            workspacePath,
+            sessionId: input.kiloSessionId,
+            runtimeEnv,
+            devcontainer: devContainerHandle,
+            fixedPort: wrapperPort,
+          }
         );
-        if (restoreResult.exitCode !== 0) {
-          const stdout = restoreResult.stdout?.trim() ?? '';
-          logger
-            .withFields({ exitCode: restoreResult.exitCode, stdout })
-            .error('Session import failed');
-          emitProgress('failed', `Session import failed (exit ${restoreResult.exitCode})`);
-          return undefined;
+
+        preparationSucceeded = true;
+        return {
+          sandboxId,
+          workspacePath,
+          sessionHome,
+          branchName,
+          devcontainer:
+            devContainerHandle && wrapperPort !== undefined
+              ? {
+                  workspacePath: devContainerHandle.workspacePath,
+                  innerWorkspaceFolder: devContainerHandle.innerWorkspaceFolder,
+                  wrapperPort,
+                  configPath: detected?.configPath ?? '',
+                }
+              : undefined,
+          kiloSessionId: input.kiloSessionId ?? wrapperSessionId,
+          resolvedInstallationId,
+          resolvedGithubAppType,
+          resolvedGithubToken: input.githubRepo ? resolvedGithubToken : undefined,
+          resolvedGitToken,
+          gitlabTokenManaged,
+        };
+      } finally {
+        if (!preparationSucceeded && devContainerHandle) {
+          await devContainerHandle.teardown().catch(teardownError => {
+            logger
+              .withFields({
+                sessionId: input.sessionId,
+                error:
+                  teardownError instanceof Error ? teardownError.message : String(teardownError),
+              })
+              .warn('Failed to tear down devcontainer after async preparation failure');
+          });
         }
       }
-
-      // 9. Start wrapper (with --session-id if pre-imported)
-      emitProgress('kilo_server', 'Starting Kilo…');
-      const { sessionId: wrapperSessionId } = await WrapperClient.ensureWrapper(sandbox, session, {
-        agentSessionId: input.sessionId,
-        userId: input.userId,
-        workspacePath,
-        sessionId: input.kiloSessionId,
-      });
-
-      return {
-        sandboxId,
-        workspacePath,
-        sessionHome,
-        branchName,
-        kiloSessionId: input.kiloSessionId ?? wrapperSessionId,
-        resolvedInstallationId,
-        resolvedGithubAppType,
-        resolvedGithubToken: input.githubRepo ? resolvedGithubToken : undefined,
-        resolvedGitToken,
-        gitlabTokenManaged,
-      };
     }
   );
 }

@@ -165,7 +165,6 @@ function ExperimentList({ onSelect }: { onSelect: (id: string) => void }) {
           public_model_id
         </code>{' '}
         and swaps the upstream checkpoint behind it. Clients keep sending the same public model id.
-        See <code>.plans/experimental-models-1.md</code> for the full design.
       </p>
 
       {isLoading ? (

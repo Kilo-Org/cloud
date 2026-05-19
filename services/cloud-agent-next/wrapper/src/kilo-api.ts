@@ -64,6 +64,21 @@ export type NetworkWait = {
   restored: boolean;
 };
 
+export type WrapperPty = {
+  id: string;
+  title: string;
+  command: string;
+  args: string[];
+  cwd: string;
+  status: 'running' | 'exited';
+  pid: number;
+};
+
+export type WrapperPtySize = {
+  cols: number;
+  rows: number;
+};
+
 /**
  * The wrapper's unified kilo client interface.
  * All wrapper modules depend on this type rather than the raw SDK client.
@@ -119,6 +134,13 @@ export type WrapperKiloClient = {
   getNetworkWaits: () => Promise<NetworkWait[]>;
   resumeNetworkWait: (requestID: string) => Promise<boolean>;
   generateCommitMessage: (opts: { path: string }) => Promise<{ message: string }>;
+  createPty: (opts: {
+    cwd: string;
+    title: string;
+    env: Record<string, string>;
+  }) => Promise<WrapperPty>;
+  resizePty: (ptyId: string, size: WrapperPtySize) => Promise<WrapperPty>;
+  deletePty: (ptyId: string) => Promise<boolean>;
 
   /** The underlying SDK client — used directly by connection.ts for event subscription */
   readonly sdkClient: SDKClient;
@@ -138,7 +160,8 @@ export type WrapperKiloClient = {
  */
 export function createWrapperKiloClient(
   sdkClient: SDKClient,
-  serverUrl: string
+  serverUrl: string,
+  workspacePath: string
 ): WrapperKiloClient {
   logToFile(`creating wrapper kilo client for ${serverUrl}`);
   const v2Client = createV2Client({ baseUrl: serverUrl });
@@ -283,6 +306,39 @@ export function createWrapperKiloClient(
     generateCommitMessage: async opts => {
       const result = await v2Client.commitMessage.generate({ path: opts.path });
       return result.data ?? { message: '' };
+    },
+
+    createPty: async opts => {
+      const result = await v2Client.pty.create({
+        directory: opts.cwd,
+        cwd: opts.cwd,
+        title: opts.title,
+        env: opts.env,
+      });
+      if (!result.data) {
+        throw new Error('PTY create returned no data');
+      }
+      return result.data as WrapperPty;
+    },
+
+    resizePty: async (ptyId, size) => {
+      const result = await v2Client.pty.update({
+        ptyID: ptyId,
+        directory: workspacePath,
+        size,
+      });
+      if (!result.data) {
+        throw new Error(`PTY update returned no data for ${ptyId}`);
+      }
+      return result.data as WrapperPty;
+    },
+
+    deletePty: async ptyId => {
+      const result = await v2Client.pty.remove({
+        ptyID: ptyId,
+        directory: workspacePath,
+      });
+      return Boolean(result.data);
     },
   };
 }

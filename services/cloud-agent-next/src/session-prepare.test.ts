@@ -106,6 +106,10 @@ vi.mock('./session-service.js', async importOriginal => {
       createCliSessionViaSessionIngest = createCliSessionViaSessionIngestMock;
       deleteCliSessionViaSessionIngest = deleteCliSessionViaSessionIngestMock;
       getOrCreateSession = vi.fn().mockResolvedValue(createMockExecutionSession());
+      buildRuntimeEnv = vi.fn().mockReturnValue({
+        SESSION_HOME: '/home/test',
+        KILO_SESSION_INGEST_URL: 'https://ingest.example',
+      });
       buildContext = vi.fn().mockReturnValue({
         sandboxId: 'test-sandbox',
         orgId: 'test-org',
@@ -468,6 +472,21 @@ describe('prepareSession endpoint', () => {
           githubRepo: 'acme/repo',
         })
       ).rejects.toThrow();
+    });
+
+    it('should reject devcontainer without autoInitiate', async () => {
+      const ctx = createInternalApiContext({});
+      const caller = appRouter.createCaller(ctx);
+
+      await expect(
+        caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          devcontainer: true,
+        })
+      ).rejects.toThrow('devcontainer sessions must use autoInitiate');
     });
   });
 

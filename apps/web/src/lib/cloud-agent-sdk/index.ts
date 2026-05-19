@@ -8,6 +8,7 @@ export type {
   StandalonePermission,
   StandaloneQuestion,
   StandaloneSuggestion,
+  ChildSessionHydrationState,
   StoredMessage,
   FetchedSessionData,
   AssociatedPrData,

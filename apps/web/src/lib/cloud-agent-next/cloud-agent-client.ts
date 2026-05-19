@@ -135,6 +135,8 @@ export type PrepareSessionInput = {
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
   /** When true, return immediately and run preparation asynchronously */
   autoInitiate?: boolean;
+  /** When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes */
+  devcontainer?: boolean;
 };
 
 /** Output from prepareSession procedure */
@@ -164,6 +166,46 @@ export type SendMessageInput = {
   appendSystemPrompt?: string;
   /** Message ID for correlating the request */
   messageId?: string;
+};
+
+export type TerminalPty = {
+  id: string;
+  title: string;
+  command: string;
+  args: string[];
+  cwd: string;
+  status: 'running' | 'exited';
+  pid: number;
+};
+
+export type CreateTerminalInput = {
+  cloudAgentSessionId: string;
+  cols?: number;
+  rows?: number;
+};
+
+export type CreateTerminalOutput = {
+  pty: TerminalPty;
+};
+
+export type ResizeTerminalInput = {
+  cloudAgentSessionId: string;
+  ptyId: string;
+  cols: number;
+  rows: number;
+};
+
+export type ResizeTerminalOutput = {
+  pty: TerminalPty;
+};
+
+export type CloseTerminalInput = {
+  cloudAgentSessionId: string;
+  ptyId: string;
+};
+
+export type CloseTerminalOutput = {
+  success: boolean;
 };
 
 /** Output from V2 mutation procedures (WebSocket-based) */
@@ -392,6 +434,15 @@ type CloudAgentNextTRPCClient = {
   };
   sendMessageV2: {
     mutate: (input: SendMessageInput) => Promise<InitiateSessionOutput>;
+  };
+  createTerminal: {
+    mutate: (input: CreateTerminalInput) => Promise<CreateTerminalOutput>;
+  };
+  resizeTerminal: {
+    mutate: (input: ResizeTerminalInput) => Promise<ResizeTerminalOutput>;
+  };
+  closeTerminal: {
+    mutate: (input: CloseTerminalInput) => Promise<CloseTerminalOutput>;
   };
   answerQuestion: {
     mutate: (input: AnswerQuestionInput) => Promise<{ success: boolean }>;
@@ -632,6 +683,42 @@ export class CloudAgentNextClient {
         extra: { input },
       });
       throw normalizedError;
+    }
+  }
+
+  async createTerminal(input: CreateTerminalInput): Promise<CreateTerminalOutput> {
+    try {
+      return await this.client.createTerminal.mutate(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'createTerminal' },
+        extra: { cloudAgentSessionId: input.cloudAgentSessionId },
+      });
+      throw error;
+    }
+  }
+
+  async resizeTerminal(input: ResizeTerminalInput): Promise<ResizeTerminalOutput> {
+    try {
+      return await this.client.resizeTerminal.mutate(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'resizeTerminal' },
+        extra: { cloudAgentSessionId: input.cloudAgentSessionId, ptyId: input.ptyId },
+      });
+      throw error;
+    }
+  }
+
+  async closeTerminal(input: CloseTerminalInput): Promise<CloseTerminalOutput> {
+    try {
+      return await this.client.closeTerminal.mutate(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'closeTerminal' },
+        extra: { cloudAgentSessionId: input.cloudAgentSessionId, ptyId: input.ptyId },
+      });
+      throw error;
     }
   }
 

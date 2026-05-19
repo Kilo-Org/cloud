@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useAtom, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import {
@@ -48,6 +49,7 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { ProfilePickerPopover } from '@/components/cloud-agent/ProfilePickerPopover';
+import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from '@/components/ui/popover';
 import {
   Command as UICommand,
@@ -106,6 +108,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
+  const { data: session } = useSession();
+  const isAdmin = session?.isAdmin === true;
+  const [devcontainer, setDevcontainer] = useState(false);
   const { mutateAsync: personalUploadUrl } = useMutation(
     trpc.cloudAgentNext.getImageUploadUrl.mutationOptions()
   );
@@ -683,6 +688,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               },
             }
           : {}),
+        ...(devcontainer ? { devcontainer: true } : {}),
       };
       let result: { kiloSessionId: string; cloudAgentSessionId: string };
 
@@ -742,6 +748,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       setIsPreparing(false);
     }
   }, [
+    devcontainer,
     imageUpload,
     displayModel,
     // `displayVariant` is what we actually submit; raw `variant` is only read
@@ -1108,20 +1115,22 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         </div>
 
         {/* Repo + Settings row (outside prompt box) */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           {/* Repo — bottom left */}
           <Popover open={repoPopoverOpen} onOpenChange={setRepoPopoverOpen}>
             <PopoverTrigger asChild>
               <button
                 type="button"
                 className={cn(
-                  'text-muted-foreground hover:text-foreground inline-flex cursor-pointer items-center gap-1 text-sm',
+                  'text-muted-foreground hover:text-foreground inline-flex min-w-0 flex-1 cursor-pointer items-center gap-1 text-sm',
                   selectedRepo && 'text-foreground'
                 )}
                 disabled={isPreparing}
               >
                 <FolderGit2 className="h-3.5 w-3.5" />
-                <span className="max-w-[16rem] truncate">{selectedRepo || 'Repository'}</span>
+                <span className="max-w-[min(16rem,50vw)] truncate">
+                  {selectedRepo || 'Repository'}
+                </span>
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] p-0" align="start">
@@ -1233,6 +1242,30 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             platform={selectedPlatform}
           />
         </div>
+        {isAdmin && (
+          <div className="flex justify-end">
+            <div className={cn('flex items-center gap-2', isPreparing && 'opacity-70')}>
+              <div className="min-w-0 text-right">
+                <label
+                  htmlFor="devcontainer"
+                  className="block cursor-pointer text-xs leading-none font-medium"
+                >
+                  Dev container support
+                </label>
+                <p id="devcontainer-description" className="text-muted-foreground mt-1 text-xs">
+                  Experimental. Turn on for this session.
+                </p>
+              </div>
+              <Switch
+                id="devcontainer"
+                checked={devcontainer}
+                onCheckedChange={setDevcontainer}
+                disabled={isPreparing}
+                aria-describedby="devcontainer-description"
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

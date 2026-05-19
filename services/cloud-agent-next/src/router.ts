@@ -9,12 +9,14 @@ import { createSessionManagementHandlers } from './router/handlers/session-manag
 import { createSessionPrepareHandlers } from './router/handlers/session-prepare.js';
 import { createSessionExecutionV2Handlers } from './router/handlers/session-execution.js';
 import { createSessionQuestionHandlers } from './router/handlers/session-questions.js';
+import { createSessionTerminalHandlers } from './router/handlers/session-terminal.js';
 
 export const appRouter = router({
   ...createSessionManagementHandlers(),
   ...createSessionPrepareHandlers(),
   ...createSessionExecutionV2Handlers(),
   ...createSessionQuestionHandlers(),
+  ...createSessionTerminalHandlers(),
 });
 
 export type AppRouter = typeof appRouter;

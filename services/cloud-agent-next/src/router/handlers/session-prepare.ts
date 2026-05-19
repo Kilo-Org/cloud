@@ -308,6 +308,13 @@ const prepareSessionHandler = internalApiProtectedProcedure
     return withLogTags({ source: 'prepareSession' }, async () => {
       const sessionService = new SessionService();
 
+      if (input.devcontainer && !input.autoInitiate) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'devcontainer sessions must use autoInitiate',
+        });
+      }
+
       // 1. Generate new cloudAgentSessionId and sandboxId
       const cloudAgentSessionId = generateSessionId();
       const sandboxId = await generateSandboxId(
@@ -315,7 +322,8 @@ const prepareSessionHandler = internalApiProtectedProcedure
         input.kilocodeOrganizationId,
         ctx.userId,
         cloudAgentSessionId,
-        ctx.botId
+        ctx.botId,
+        input.devcontainer
       );
 
       logger.setTags({
@@ -489,6 +497,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
             gateThreshold: input.gateThreshold,
             kilocodeOrganizationId: input.kilocodeOrganizationId,
             autoInitiate: true,
+            devcontainer: input.devcontainer,
             initialMessageId: input.initialMessageId,
             initialPayload: input.initialPayload,
           });
@@ -544,7 +553,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
         });
 
         logger.info('Creating execution session');
-        const session = await sessionService.getOrCreateSession({
+        const sessionOptions = {
           sandbox,
           context,
           env: ctx.env,
@@ -554,7 +563,9 @@ const prepareSessionHandler = internalApiProtectedProcedure
           createdOnPlatform: input.createdOnPlatform,
           appendSystemPrompt: input.appendSystemPrompt,
           profile: effective,
-        });
+        };
+        const runtimeEnv = sessionService.buildRuntimeEnv(sessionOptions);
+        const session = await sessionService.getOrCreateSession(sessionOptions);
 
         // 7. Clone repository
         const cloneOptions = input.shallow ? { shallow: true } : undefined;
@@ -688,6 +699,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           userId: ctx.userId,
           workspacePath,
           sessionId: kiloSessionId,
+          runtimeEnv,
         });
 
         logger.info('Wrapper started');

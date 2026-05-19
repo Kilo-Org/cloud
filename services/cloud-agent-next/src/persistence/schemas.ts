@@ -424,10 +424,18 @@ export const MetadataSchema = z.object({
   sandboxId: z
     .string()
     .refine(
-      s => /^(ses|org|usr|bot|ubt)-[0-9a-f]+$/.test(s) || s.includes('__'),
+      s => /^(ses|dind|org|usr|bot|ubt)-[0-9a-f]+$/.test(s) || s.includes('__'),
       'Invalid sandboxId format'
     )
     .transform(s => s as SandboxId)
+    .optional(),
+  devcontainer: z
+    .object({
+      workspacePath: z.string(),
+      innerWorkspaceFolder: z.string(),
+      wrapperPort: z.number().int().min(1).max(65535),
+      configPath: z.string(),
+    })
     .optional(),
 
   // Initial message ID for correlation
@@ -489,6 +497,7 @@ export const PreparationInputSchema = z.object({
   kilocodeOrganizationId: z.string().optional(),
   // Auto-initiate after preparation
   autoInitiate: z.boolean(),
+  devcontainer: z.boolean().optional(),
 
   initialMessageId: z.string().optional(),
 

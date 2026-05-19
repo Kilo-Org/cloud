@@ -155,6 +155,16 @@
       "max_instances": 400,
       "rollout_active_grace_period": 1800,
     },
+    {
+      "class_name": "SandboxDIND",
+      "image": "./Dockerfile.dind",
+      "instance_type": "standard-3",
+      "image_vars": {
+        "KILOCODE_CLI_VERSION": "7.2.52",
+      },
+      "max_instances": 20,
+      "rollout_active_grace_period": 1800,
+    },
   ],
   "durable_objects": {
     "bindings": [
@@ -165,6 +175,10 @@
       {
         "class_name": "SandboxSmall",
         "name": "SandboxSmall",
+      },
+      {
+        "class_name": "SandboxDIND",
+        "name": "SandboxDIND",
       },
       {
         "class_name": "CloudAgentSession",
@@ -184,6 +198,10 @@
     {
       "new_sqlite_classes": ["SandboxSmall"],
       "tag": "v3",
+    },
+    {
+      "new_sqlite_classes": ["SandboxDIND"],
+      "tag": "v4",
     },
   ],
   /**
@@ -294,6 +312,16 @@
           "max_instances": 2,
           "rollout_active_grace_period": 60,
         },
+        {
+          "class_name": "SandboxDIND",
+          "image": "./Dockerfile.dind",
+          "instance_type": "standard-3",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.2.52",
+          },
+          "max_instances": 2,
+          "rollout_active_grace_period": 60,
+        },
       ],
       "durable_objects": {
         "bindings": [
@@ -304,6 +332,10 @@
           {
             "class_name": "SandboxSmall",
             "name": "SandboxSmall",
+          },
+          {
+            "class_name": "SandboxDIND",
+            "name": "SandboxDIND",
           },
           {
             "class_name": "CloudAgentSession",

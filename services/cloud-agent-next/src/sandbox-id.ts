@@ -17,9 +17,12 @@ function parseOrgIdList(raw: string | undefined): Set<string> {
 
 /**
  * Returns the correct DurableObjectNamespace for the given sandbox ID.
- * Per-session sandboxes (ses-* prefix) use SandboxSmall; all others use Sandbox.
+ * - Docker-in-Docker sandboxes (dind-* prefix) use SandboxDIND
+ * - Per-session sandboxes (ses-* prefix) use SandboxSmall
+ * - All others use Sandbox
  */
 export function getSandboxNamespace(env: Env, sandboxId: string): DurableObjectNamespace<Sandbox> {
+  if (sandboxId.startsWith('dind-')) return env.SandboxDIND;
   return sandboxId.startsWith('ses-') ? env.SandboxSmall : env.Sandbox;
 }
 
@@ -36,7 +39,8 @@ async function hashToSandboxId(input: string, prefix: string): Promise<SandboxId
  * Generate a deterministic, Cloudflare-compatible sandboxId (≤63 chars).
  *
  * When the org is in PER_SESSION_SANDBOX_ORG_IDS the sandbox is isolated
- * per session (ses-{hash}, using SandboxSmall). Otherwise it is shared
+ * per session (ses-{hash}, using SandboxSmall) or when devcontainer mode
+ * is requested (dind-{hash}, using SandboxDIND). Otherwise it is shared
  * per org/user/bot (org-|usr-|bot-|ubt-{hash}, using Sandbox).
  *
  * @param perSessionOrgIds - Comma-separated org IDs that get per-session sandboxes (env var value)
@@ -51,9 +55,13 @@ export async function generateSandboxId(
   orgId: string | undefined,
   userId: string,
   sessionId: string,
-  botId?: string
+  botId?: string,
+  devcontainer?: boolean
 ): Promise<SandboxId> {
   const perSessionOrgs = parseOrgIdList(perSessionOrgIds);
+  if (devcontainer) {
+    return hashToSandboxId(sessionId, 'dind');
+  }
   if (perSessionOrgs.has('*') || (orgId !== undefined && perSessionOrgs.has(orgId))) {
     return hashToSandboxId(sessionId, 'ses');
   }

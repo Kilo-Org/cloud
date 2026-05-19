@@ -50,6 +50,17 @@ import {
 } from './local-news-utils';
 import { resolveNextReconcileAction } from './reconcile-queue-utils';
 import { normalizeWebResults } from './web-utils';
+import {
+  buildCalendarNoConnectionLines,
+  buildCalendarSectionLines,
+  buildCalendarSectionTitle,
+  buildCalendarTimeWindow,
+} from './calendar-utils';
+import {
+  fetchCalendarAccessToken,
+  fetchCalendarEvents,
+  resolveCalendarReady,
+} from './calendar-client';
 
 const PLUGIN_ID = 'kiloclaw-morning-briefing';
 const CRON_JOB_NAME = 'KiloClaw Morning Briefing';
@@ -119,7 +130,7 @@ type StoredStatus = {
 };
 
 type SourceCollectionResult = {
-  source: 'github' | 'linear' | 'local-news' | 'web';
+  source: 'calendar' | 'github' | 'linear' | 'local-news' | 'web';
   configured: boolean;
   ok: boolean;
   summary: string;
@@ -127,9 +138,10 @@ type SourceCollectionResult = {
   /**
    * Optional per-source section title override. Most sources use a
    * fixed title (`GitHub`, `Linear`, `Web Search`), but `local-news`
-   * adds the resolved user location in parens when one is set. Bare
-   * `Local News` heading when no location is configured. Set by
-   * `collectLocalNews`; unset for sources with a static title.
+   * adds the resolved user location in parens when one is set, and
+   * `calendar` uses the connected Google account's email (e.g.
+   * `astorms@kilocode.ai daily calendar`). Set by the collector;
+   * unset for sources with a static title.
    */
   sectionTitle?: string;
 };
@@ -1225,6 +1237,70 @@ async function collectLinear(api: {
   };
 }
 
+/**
+ * Pulls today + tomorrow-morning events from the user's primary Google
+ * calendar via the controller's OAuth broker. Both Settings UI cards
+ * (simple "Calendar Connect" and the full Google Account flow) write
+ * to the same per-instance connection row, so this collector is path-
+ * agnostic: ask the broker for status, then for a token, then hit
+ * Google.
+ *
+ * Returns:
+ *   - `ok:true, configured:false` + nudge body when no Google
+ *     connection or no calendar capability is present
+ *   - `ok:true, configured:true` + rendered section when calendar
+ *     fetch succeeds (including the empty-calendar case)
+ *   - `ok:false, configured:true` when the broker has a connection
+ *     but the token fetch or Google API call fails — the source
+ *     surfaces in the `## Failures` list and the source-status footer
+ */
+async function collectCalendar(now: Date, userTimezone: string): Promise<SourceCollectionResult> {
+  const readiness = await resolveCalendarReady();
+  if (!readiness.connected || !readiness.hasCalendarCapability) {
+    return {
+      source: 'calendar',
+      configured: false,
+      ok: true,
+      summary: readiness.reason,
+      sectionLines: buildCalendarNoConnectionLines(),
+    };
+  }
+
+  let token: Awaited<ReturnType<typeof fetchCalendarAccessToken>>;
+  try {
+    token = await fetchCalendarAccessToken();
+  } catch (error) {
+    return {
+      source: 'calendar',
+      configured: true,
+      ok: false,
+      summary: `Could not retrieve Google access token: ${error instanceof Error ? error.message : String(error)}`,
+      sectionLines: [],
+    };
+  }
+
+  const { timeMin, timeMax } = buildCalendarTimeWindow(now, userTimezone);
+  try {
+    const events = await fetchCalendarEvents(token.accessToken, timeMin, timeMax);
+    return {
+      source: 'calendar',
+      configured: true,
+      ok: true,
+      summary: `Fetched ${events.length} events for ${token.accountEmail}`,
+      sectionLines: buildCalendarSectionLines(events, now, userTimezone),
+      sectionTitle: buildCalendarSectionTitle(token.accountEmail),
+    };
+  } catch (error) {
+    return {
+      source: 'calendar',
+      configured: true,
+      ok: false,
+      summary: `Google Calendar fetch failed: ${error instanceof Error ? error.message : String(error)}`,
+      sectionLines: [],
+    };
+  }
+}
+
 async function generateBriefing(
   api: {
     runtime: {
@@ -1243,7 +1319,9 @@ async function generateBriefing(
         }>;
       };
     };
-    config: unknown;
+    config: {
+      agents?: { defaults?: { userTimezone?: string } };
+    };
     logger: { info?: (message: string) => void; warn?: (message: string) => void };
   },
   dateKey: string
@@ -1258,12 +1336,11 @@ async function generateBriefing(
   const paths = getStatePaths(api);
   await ensureStorage(paths);
 
-  // Read interest topics + userLocation directly from config.json — we
-  // only need these two narrow fields here, and the surrounding `api`
-  // shape doesn't have the `pluginConfig` / `agents.defaults.userTimezone`
-  // context that `readStoredConfig` uses to default cron/timezone.
-  // Missing or malformed file => empty topics + null location (env-var
-  // fallback path in resolveLocationContextWithOverride).
+  // Read interest topics + userLocation directly from config.json. The
+  // `api.config.agents.defaults.userTimezone` field above gives us the
+  // brief's effective timezone for the Calendar source's time window.
+  // Missing or malformed config.json => empty topics + null location
+  // (env-var fallback path in resolveLocationContextWithOverride).
   const storedConfig = await readJsonFile<StoredConfig>(paths.configPath);
   const interestTopics = Array.isArray(storedConfig?.interestTopics)
     ? storedConfig.interestTopics.filter((value): value is string => typeof value === 'string')
@@ -1286,12 +1363,22 @@ async function generateBriefing(
   const webSearchTopics = interestTopics.filter(
     topic => topic.trim().toLowerCase() !== localNewsLabelLower
   );
+  // Calendar uses the user's IANA timezone for time window + formatting.
+  // Falls back to UTC when not configured (the brief plugin already
+  // accepts that fallback elsewhere via `resolveEffectiveTimezone`).
+  const briefingTimezone =
+    api.config.agents?.defaults?.userTimezone &&
+    isValidTimezone(api.config.agents.defaults.userTimezone)
+      ? api.config.agents.defaults.userTimezone
+      : DEFAULT_TIMEZONE;
+
   const corePromises = [
+    collectCalendar(new Date(), briefingTimezone),
     collectGithub(api),
     collectLinear(api),
     collectWebSearch(api, webSearchTopics),
   ];
-  const [github, linear, web] = await Promise.all(corePromises);
+  const [calendar, github, linear, web] = await Promise.all(corePromises);
   // Local News slots between Linear and Web Search — interest-gated so
   // users who haven't opted in pay no search cost and see no
   // local-news entry in the source-status footer.
@@ -1300,6 +1387,7 @@ async function generateBriefing(
     : null;
 
   const sources: SourceCollectionResult[] = [
+    calendar,
     github,
     linear,
     ...(localNews ? [localNews] : []),
@@ -1309,7 +1397,7 @@ async function generateBriefing(
 
   if (successes.length === 0) {
     throw new Error(
-      'No usable briefing sources are available. Configure at least one of GitHub, Linear, Local News, or web search.'
+      'No usable briefing sources are available. Configure at least one of Calendar, GitHub, Linear, Local News, or web search.'
     );
   }
 
@@ -1320,6 +1408,7 @@ async function generateBriefing(
   // `SourceCollectionResult.sectionTitle` (used by Local News to surface
   // the resolved location in the parens).
   const DEFAULT_SECTION_TITLE: Record<SourceCollectionResult['source'], string> = {
+    calendar: 'Calendar',
     github: 'GitHub',
     linear: 'Linear',
     'local-news': 'Local News',

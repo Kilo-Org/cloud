@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import KiloLogo from '@/components/KiloLogo';
 import { getPlatform, type PlatformId, type PlatformOption } from '../../_components/platforms';
+import type { WorkspaceContext } from '../page';
 
 type ProgressListProps = {
   count: number;
@@ -16,16 +17,18 @@ type ProgressListProps = {
 
 type AuthorizeFlowProps = {
   serviceIds: PlatformId[];
+  workspace: WorkspaceContext;
 };
 
-export function AuthorizeFlow({ serviceIds }: AuthorizeFlowProps) {
+export function AuthorizeFlow(props: AuthorizeFlowProps) {
+  const { serviceIds } = props;
   const router = useRouter();
   const [index, setIndex] = useState(0);
   const [done, setDone] = useState(false);
 
   const services = serviceIds.map(id => getPlatform(id)).filter(p => p !== undefined);
-  const isLast = index === services.length - 1;
   const current = services[index];
+  const isLast = index === services.length - 1;
 
   const handleAuthorize = () => {
     // Design-only: simulate a successful OAuth round trip.
@@ -44,10 +47,10 @@ export function AuthorizeFlow({ serviceIds }: AuthorizeFlowProps) {
     }
   };
 
-  if (done) {
+  if (done || !current) {
     return (
       <div className="flex w-full flex-col items-center gap-12">
-        <Completed onContinue={() => router.push('/')} />
+        <Completed hasSelectedServices={services.length > 0} onContinue={() => router.push('/')} />
       </div>
     );
   }
@@ -146,7 +149,13 @@ function ProgressList({ count, activeIndex }: ProgressListProps) {
   );
 }
 
-function Completed({ onContinue }: { onContinue: () => void }) {
+function Completed({
+  hasSelectedServices,
+  onContinue,
+}: {
+  hasSelectedServices: boolean;
+  onContinue: () => void;
+}) {
   return (
     <motion.section
       initial={{ opacity: 0, y: 8 }}
@@ -160,7 +169,9 @@ function Completed({ onContinue }: { onContinue: () => void }) {
       <div className="flex w-full flex-col gap-4 text-center">
         <h1 className="text-2xl font-bold tracking-tight">Kilo is ready</h1>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Every service is connected. You can fine-tune access from settings later.
+          {hasSelectedServices
+            ? 'Setup is complete. You can connect more services or fine-tune access from settings later.'
+            : 'No services were connected. You can connect chat, code, and issue tools from settings later.'}
         </p>
       </div>
       <Button onClick={onContinue} size="lg" className="w-full">

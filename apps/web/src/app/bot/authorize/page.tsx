@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 import { KiloCardLayout } from '@/components/KiloCardLayout';
 import { type PlatformId } from '../_components/platforms';
 import { AuthorizeFlow } from './_components/AuthorizeFlow';
@@ -9,7 +8,7 @@ export const metadata: Metadata = {
   description: 'Connect Kilo to the services your team uses.',
 };
 
-const KNOWN_IDS = new Set<PlatformId>([
+const KNOWN_IDS = new Set<string>([
   'slack',
   'discord',
   'microsoft-teams',
@@ -19,28 +18,40 @@ const KNOWN_IDS = new Set<PlatformId>([
   'linear',
 ]);
 
+function isPlatformId(value: string): value is PlatformId {
+  return KNOWN_IDS.has(value);
+}
+
 function parseServices(raw: string | string[] | undefined): PlatformId[] {
   if (!raw) return [];
   const value = Array.isArray(raw) ? raw.join(',') : raw;
   const seen = new Set<PlatformId>();
   for (const part of value.split(',')) {
-    const id = part.trim() as PlatformId;
-    if (KNOWN_IDS.has(id)) seen.add(id);
+    const id = part.trim();
+    if (isPlatformId(id)) seen.add(id);
   }
   return Array.from(seen);
+}
+
+export type WorkspaceContext = { type: 'org'; id: string } | { type: 'personal' };
+
+function parseWorkspace(raw: string | string[] | undefined): WorkspaceContext {
+  if (!raw) return { type: 'personal' };
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (value.startsWith('org:')) {
+    return { type: 'org', id: value.slice(4) };
+  }
+  return { type: 'personal' };
 }
 
 export default async function BotAuthorizePage({ searchParams }: AppPageProps) {
   const params = await searchParams;
   const services = parseServices(params?.services);
-
-  if (services.length === 0) {
-    redirect('/bot');
-  }
+  const workspace = parseWorkspace(params?.workspace);
 
   return (
     <KiloCardLayout bare className="max-w-xl" contentClassName="">
-      <AuthorizeFlow serviceIds={services} />
+      <AuthorizeFlow serviceIds={services} workspace={workspace} />
     </KiloCardLayout>
   );
 }

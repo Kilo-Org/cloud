@@ -20,70 +20,71 @@ export type PlatformOption = {
   id: PlatformId;
   name: string;
   icon: ComponentType<{ className?: string }>;
+  connectionType: string;
+  description: string;
 };
 
-export type CategoryId = 'chat' | 'code' | 'issues';
+export const CHAT_PLATFORM_IDS = new Set<PlatformId>([
+  'slack',
+  'discord',
+  'microsoft-teams',
+  'google-chat',
+]);
 
-export type Category = {
-  id: CategoryId;
-  step: number;
-  eyebrow: string;
-  title: string;
-  hint: string;
-  options: PlatformOption[];
-};
+export const CODE_PLATFORM_IDS = new Set<PlatformId>(['github', 'gitlab']);
 
-const ALL_PLATFORMS: PlatformOption[] = [
-  { id: 'slack', name: 'Slack', icon: SlackIcon },
-  { id: 'discord', name: 'Discord', icon: DiscordIcon },
-  { id: 'microsoft-teams', name: 'Microsoft Teams', icon: MicrosoftTeamsIcon },
-  { id: 'google-chat', name: 'Google Chat', icon: GoogleChatIcon },
-  { id: 'github', name: 'GitHub', icon: GitHubIcon },
-  { id: 'gitlab', name: 'GitLab', icon: GitLabIcon },
-  { id: 'linear', name: 'Linear', icon: LinearIcon },
+export const ALL_PLATFORMS: PlatformOption[] = [
+  {
+    id: 'slack',
+    name: 'Slack',
+    icon: SlackIcon,
+    connectionType: 'Chat',
+    description: 'Mention Kilo from Slack channels and threads.',
+  },
+  {
+    id: 'discord',
+    name: 'Discord',
+    icon: DiscordIcon,
+    connectionType: 'Chat',
+    description: 'Start Kilo work from Discord servers and channels.',
+  },
+  {
+    id: 'microsoft-teams',
+    name: 'Microsoft Teams',
+    icon: MicrosoftTeamsIcon,
+    connectionType: 'Chat',
+    description: 'Bring Kilo into the Teams spaces your organization uses.',
+  },
+  {
+    id: 'google-chat',
+    name: 'Google Chat',
+    icon: GoogleChatIcon,
+    connectionType: 'Chat',
+    description: 'Use Kilo from Google Chat spaces and direct messages.',
+  },
+  {
+    id: 'github',
+    name: 'GitHub',
+    icon: GitHubIcon,
+    connectionType: 'Code and issues',
+    description: 'Read repositories, open pull requests, and link GitHub issues.',
+  },
+  {
+    id: 'gitlab',
+    name: 'GitLab',
+    icon: GitLabIcon,
+    connectionType: 'Code and issues',
+    description: 'Connect repositories and merge requests from GitLab.',
+  },
+  {
+    id: 'linear',
+    name: 'Linear',
+    icon: LinearIcon,
+    connectionType: 'Issues',
+    description: 'Attach Kilo sessions to Linear issues and product context.',
+  },
 ];
 
 export function getPlatform(id: PlatformId): PlatformOption | undefined {
   return ALL_PLATFORMS.find(p => p.id === id);
 }
-
-export const CATEGORIES: Category[] = [
-  {
-    id: 'chat',
-    step: 1,
-    eyebrow: 'Step 1 of 3',
-    title: 'Where will you talk to Kilo?',
-    hint: 'Pick the workspace you live in. Kilo will listen for mentions there.',
-    options: [
-      { id: 'slack', name: 'Slack', icon: SlackIcon },
-      { id: 'discord', name: 'Discord', icon: DiscordIcon },
-      { id: 'microsoft-teams', name: 'Microsoft Teams', icon: MicrosoftTeamsIcon },
-      { id: 'google-chat', name: 'Google Chat', icon: GoogleChatIcon },
-      { id: 'github', name: 'GitHub', icon: GitHubIcon },
-      { id: 'linear', name: 'Linear', icon: LinearIcon },
-    ],
-  },
-  {
-    id: 'code',
-    step: 2,
-    eyebrow: 'Step 2 of 3',
-    title: 'Where does your code live?',
-    hint: 'Connect the host that owns the repos Kilo will read and open PRs against.',
-    options: [
-      { id: 'github', name: 'GitHub', icon: GitHubIcon },
-      { id: 'gitlab', name: 'GitLab', icon: GitLabIcon },
-    ],
-  },
-  {
-    id: 'issues',
-    step: 3,
-    eyebrow: 'Step 3 of 3',
-    title: 'Where do you track work?',
-    hint: 'Kilo links sessions to issues so the trail back to product context stays clean.',
-    options: [
-      { id: 'linear', name: 'Linear', icon: LinearIcon },
-      { id: 'github', name: 'GitHub', icon: GitHubIcon },
-      { id: 'gitlab', name: 'GitLab', icon: GitLabIcon },
-    ],
-  },
-];

@@ -190,4 +190,22 @@ describe('GET /api/integrations/composio/callback', () => {
     const body = await responseBody(response);
     expect(body).toContain('attempt-2');
   });
+
+  test('escapes popup attempt id before embedding it in inline scripts', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+    } as never);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/composio/callback?popup=1&attemptId=${encodeURIComponent('</script><script>alert(1)</script>')}&status=success`
+      ) as never
+    );
+
+    const body = await responseBody(response);
+    expect(body).not.toContain('</script><script>alert(1)</script>');
+    expect(body).toContain('\\u003c/script>\\u003cscript>alert(1)\\u003c/script>');
+  });
 });

@@ -164,6 +164,7 @@ export function getClawOnboardingStepProgress(
   // Same treatment for `'interests'` → `'provisioning'`.
   let lookupStep: OnboardingStep = step;
   if (lookupStep === 'tools' && !hasToolsStep) lookupStep = hasCalendarStep ? 'calendar' : 'email';
+  if (lookupStep === 'calendar' && hasToolsStep) lookupStep = 'tools';
   if (lookupStep === 'calendar' && !hasCalendarStep) lookupStep = 'email';
   if (lookupStep === 'interests' && !hasInterestsStep) lookupStep = 'provisioning';
   const index = wizardSteps.indexOf(lookupStep);

@@ -214,7 +214,7 @@ describe('ClawOnboardingFlow state machine', () => {
       totalSteps: 5,
     });
     expect(getClawOnboardingStepProgress('calendar', true, true, true)).toEqual({
-      currentStep: 0,
+      currentStep: 2,
       totalSteps: 5,
     });
   });

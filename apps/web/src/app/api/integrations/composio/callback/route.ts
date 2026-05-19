@@ -44,6 +44,10 @@ function appendError(path: string, error: string): string {
   return `${parsedPath.pathname}?${next.toString()}`;
 }
 
+function serializeInlineJson(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+
 function popupResultResponse(
   result: 'success' | 'failed' | 'unknown',
   error?: string,
@@ -54,13 +58,13 @@ function popupResultResponse(
     result === 'success'
       ? 'Close this popup and return to KiloClaw onboarding to continue.'
       : 'Close this popup and return to KiloClaw onboarding to try again or skip for now.';
-  const payload = JSON.stringify({
+  const payload = serializeInlineJson({
     type: 'kiloclaw:composio-connect',
     result,
     attemptId: attemptId ?? null,
     ...(error ? { error } : {}),
   });
-  const targetOrigin = JSON.stringify(new URL(APP_URL).origin);
+  const targetOrigin = serializeInlineJson(new URL(APP_URL).origin);
   return new NextResponse(
     `<!doctype html>
 <html>

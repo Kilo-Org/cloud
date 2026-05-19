@@ -160,20 +160,32 @@ describe('bringUpDevContainer', () => {
       'Installing runtime tools in dev container…',
       'Checking dev container runtime…',
     ]);
-    const commands = (
-      session.exec as unknown as { mock: { calls: Array<[string]> } }
-    ).mock.calls.map(([cmd]) => cmd);
+    const execCalls = (
+      session.exec as unknown as {
+        mock: {
+          calls: Array<[string, { env?: Record<string, string>; timeout?: number } | undefined]>;
+        };
+      }
+    ).mock.calls;
+    const commands = execCalls.map(([cmd]) => cmd);
+    const bootstrapCall = execCalls.find(([cmd]) => cmd.includes('nvm install --lts'));
     expect(preflightCount).toBe(2);
     expect(commands.some(cmd => cmd.includes('bun --version'))).toBe(true);
     expect(commands.some(cmd => cmd.includes('nvm install --lts'))).toBe(true);
     expect(commands.some(cmd => cmd.includes('nvm use --lts'))).toBe(false);
-    expect(commands.some(cmd => cmd.includes('curl -fsSL https://bun.sh/install | bash'))).toBe(
-      true
-    );
+    expect(
+      commands.some(cmd =>
+        cmd.includes('curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.14"')
+      )
+    ).toBe(true);
     expect(commands.some(cmd => cmd.includes('@kilocode/cli@7.2.52'))).toBe(true);
     expect(commands.some(cmd => cmd.includes('set -euo pipefail'))).toBe(true);
     expect(commands.some(cmd => cmd.includes('/usr/local/bin/bun'))).toBe(true);
     expect(commands.some(cmd => cmd.includes('/usr/local/bin/kilo'))).toBe(true);
+    expect(bootstrapCall?.[1]).toEqual({
+      env: { DOCKER_HOST: 'unix:///var/run/docker.sock' },
+      timeout: 10 * 60 * 1000,
+    });
     expect(commands.some(cmd => cmd.startsWith('devcontainer down '))).toBe(false);
   });
 

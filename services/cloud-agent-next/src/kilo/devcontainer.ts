@@ -123,6 +123,9 @@ export const KILO_WRAPPER_PORT_LABEL = 'kilo.wrapperPort';
  */
 export const KILO_CLI_VERSION = '7.2.52';
 
+const DEVCONTAINER_RUNTIME_BUN_VERSION = '1.3.14';
+const DEVCONTAINER_RUNTIME_BOOTSTRAP_TIMEOUT_MS = 10 * 60 * 1000;
+
 /** `devcontainer up` prints multiple JSON lines on stdout — we look for this final line. */
 const UP_OUTCOME_SUCCESS = 'success';
 
@@ -274,13 +277,16 @@ async function bootstrapDevContainerRuntimeTools(
     'ln -sf "$(command -v node)" /usr/local/bin/node',
     'ln -sf "$(command -v npm)" /usr/local/bin/npm',
     'ln -sf "$(command -v npx)" /usr/local/bin/npx',
-    'curl -fsSL https://bun.sh/install | bash',
+    `curl -fsSL https://bun.sh/install | bash -s "bun-v${DEVCONTAINER_RUNTIME_BUN_VERSION}"`,
     'ln -sf "$HOME/.bun/bin/bun" /usr/local/bin/bun',
     `npm install -g ${shellQuote(`@kilocode/cli@${opts.kiloCliVersion}`)}`,
     'ln -sf "$(command -v kilo)" /usr/local/bin/kilo',
   ].join(' && ');
   const command = buildDevContainerRuntimeExecCommand(opts, installCommand, 'bash -lc');
-  const result = await session.exec(command, { env: dockerEnv });
+  const result = await session.exec(command, {
+    env: dockerEnv,
+    timeout: DEVCONTAINER_RUNTIME_BOOTSTRAP_TIMEOUT_MS,
+  } satisfies ExecOptions);
   if (result.exitCode !== 0) {
     throw new DevContainerUpError(
       `Failed to bootstrap dev container runtime tools (exit ${result.exitCode})`,

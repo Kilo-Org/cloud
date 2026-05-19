@@ -1,21 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as DevContainerModule from '../kilo/devcontainer.js';
 import type { Env, SandboxInstance } from '../types.js';
 import type { ExecutionPlan } from './types.js';
 
-const { ensureWrapperMock, promptMock, resumeMock, initiateMock, getOrCreateSessionMock } =
-  vi.hoisted(() => ({
-    ensureWrapperMock: vi.fn(),
-    promptMock: vi.fn(),
-    resumeMock: vi.fn(),
-    initiateMock: vi.fn(),
-    getOrCreateSessionMock: vi.fn(),
-  }));
+const {
+  ensureWrapperMock,
+  promptMock,
+  resumeMock,
+  initiateMock,
+  getOrCreateSessionMock,
+  buildRuntimeEnvMock,
+  bringUpDevContainerMock,
+  findWrapperContainerForSessionMock,
+} = vi.hoisted(() => ({
+  ensureWrapperMock: vi.fn(),
+  promptMock: vi.fn(),
+  resumeMock: vi.fn(),
+  initiateMock: vi.fn(),
+  getOrCreateSessionMock: vi.fn(),
+  buildRuntimeEnvMock: vi.fn(),
+  bringUpDevContainerMock: vi.fn(),
+  findWrapperContainerForSessionMock: vi.fn(),
+}));
 
 vi.mock('../session-service.js', () => ({
   SessionService: class SessionService {
     resume = resumeMock;
     initiateWithRetry = initiateMock;
     getOrCreateSession = getOrCreateSessionMock;
+    buildRuntimeEnv = buildRuntimeEnvMock;
   },
 }));
 
@@ -23,6 +36,18 @@ vi.mock('../kilo/wrapper-client.js', () => ({
   WrapperClient: {
     ensureWrapper: ensureWrapperMock,
   },
+}));
+
+vi.mock('../kilo/devcontainer.js', async importActual => {
+  const actual = await importActual<typeof DevContainerModule>();
+  return {
+    ...actual,
+    bringUpDevContainer: bringUpDevContainerMock,
+  };
+});
+
+vi.mock('../kilo/wrapper-manager.js', () => ({
+  findWrapperContainerForSession: findWrapperContainerForSessionMock,
 }));
 
 vi.mock('./image-prompt-parts.js', () => ({
@@ -90,6 +115,9 @@ describe('ExecutionOrchestrator tool overrides', () => {
     resumeMock.mockResolvedValue(preparedSession);
     initiateMock.mockResolvedValue(preparedSession);
     getOrCreateSessionMock.mockResolvedValue(preparedSession.session);
+    buildRuntimeEnvMock.mockReturnValue({ SESSION_HOME: '/home/agent_test' });
+    bringUpDevContainerMock.mockReset();
+    findWrapperContainerForSessionMock.mockResolvedValue(null);
   });
 
   it('disables interactive tools for code-review resume executions', async () => {
@@ -126,6 +154,53 @@ describe('ExecutionOrchestrator tool overrides', () => {
     expect(promptMock).toHaveBeenCalledWith(
       expect.objectContaining({
         tools: undefined,
+      })
+    );
+  });
+
+  it('reuses a live devcontainer handle on warm resume without rerunning bring-up', async () => {
+    const orchestrator = createOrchestrator();
+    findWrapperContainerForSessionMock.mockResolvedValueOnce({
+      port: 43001,
+      process: {
+        id: 'container-id',
+        command: '[devcontainer] --agent-session agent_test WRAPPER_PORT=43001',
+        status: 'running',
+      },
+      kind: 'container',
+    });
+    const plan = {
+      ...basePlan,
+      workspace: {
+        ...basePlan.workspace,
+        existingMetadata: {
+          workspacePath: '/workspace/test',
+          kiloSessionId: 'kilo_existing',
+          branchName: 'session/agent_test',
+          devcontainer: {
+            workspacePath: '/workspace/test',
+            innerWorkspaceFolder: '/workspaces/test',
+            wrapperPort: 43001,
+            configPath: '.devcontainer/devcontainer.json',
+          },
+        },
+      },
+    } satisfies ExecutionPlan;
+
+    await orchestrator.execute(plan);
+
+    expect(bringUpDevContainerMock).not.toHaveBeenCalled();
+    expect(ensureWrapperMock).toHaveBeenCalledWith(
+      expect.anything(),
+      preparedSession.session,
+      expect.objectContaining({
+        fixedPort: 43001,
+        devcontainer: expect.objectContaining({
+          containerId: 'container-id',
+          innerWorkspaceFolder: '/workspaces/test',
+          workspacePath: '/workspace/test',
+          overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
+        }),
       })
     );
   });

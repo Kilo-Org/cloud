@@ -32,6 +32,7 @@ import {
 import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { TRPCError } from '@trpc/server';
 
 // Extend base schemas with organizationId for organization context
 const PrepareSessionInput = basePrepareSessionNextSchema.and(
@@ -105,6 +106,13 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(PrepareSessionInput)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      if (input.devcontainer && !ctx.user.is_admin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admin access required for devcontainer sessions',
+        });
+      }
+
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 

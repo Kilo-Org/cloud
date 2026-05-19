@@ -15,6 +15,7 @@ import type {
 } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { ExecutionPlan, ExecutionResult } from './types.js';
+import type { DevContainerHandle } from '../kilo/devcontainer.js';
 import { ExecutionError } from './errors.js';
 import { SessionService, type PreparedSession } from '../session-service.js';
 import type { SessionProfileBundle } from '../session-profile.js';
@@ -22,6 +23,12 @@ import { logger } from '../logger.js';
 import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
 import { updateGitRemoteToken } from '../workspace.js';
 import { WrapperClient } from '../kilo/wrapper-client.js';
+import {
+  bringUpDevContainer,
+  getDevContainerOverridePath,
+  KILO_CLI_VERSION,
+} from '../kilo/devcontainer.js';
+import { findWrapperContainerForSession } from '../kilo/wrapper-manager.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { normalizeAgentMode } from '../schema.js';
 import { downloadImagePromptParts } from './image-prompt-parts.js';
@@ -161,11 +168,16 @@ export class ExecutionOrchestrator {
       let wrapperClient: WrapperClient;
       let kiloSessionId: string;
       try {
+        const devcontainer = await this.ensureDevContainerHandleIfNeeded(prepared, plan);
+        const fixedPort = plan.workspace.existingMetadata?.devcontainer?.wrapperPort;
         const result = await WrapperClient.ensureWrapper(sandbox, prepared.session, {
           agentSessionId: sessionId,
           userId,
           workspacePath: prepared.context.workspacePath,
           sessionId: wrapper.kiloSessionId,
+          runtimeEnv: prepared.runtimeEnv,
+          devcontainer,
+          fixedPort: devcontainer ? fixedPort : undefined,
         });
         wrapperClient = result.client;
         kiloSessionId = result.sessionId;
@@ -262,6 +274,44 @@ export class ExecutionOrchestrator {
   // Private Helpers
   // ---------------------------------------------------------------------------
 
+  private async ensureDevContainerHandleIfNeeded(
+    prepared: PreparedSession,
+    plan: ExecutionPlan
+  ): Promise<DevContainerHandle | undefined> {
+    if (prepared.devcontainer) return prepared.devcontainer;
+
+    const devcontainer = plan.workspace.existingMetadata?.devcontainer;
+    if (!devcontainer) return undefined;
+
+    const existingContainer = await findWrapperContainerForSession(
+      prepared.session,
+      plan.sessionId
+    );
+    if (existingContainer) {
+      return {
+        containerId: existingContainer.process.id,
+        innerWorkspaceFolder: devcontainer.innerWorkspaceFolder,
+        workspacePath: devcontainer.workspacePath,
+        agentSessionId: plan.sessionId,
+        overrideConfigPath: getDevContainerOverridePath(
+          plan.sessionId,
+          devcontainer.workspacePath,
+          devcontainer.configPath
+        ),
+        teardown: async () => undefined,
+      };
+    }
+
+    return bringUpDevContainer(prepared.session, {
+      workspacePath: devcontainer.workspacePath,
+      sessionHome: prepared.context.sessionHome,
+      agentSessionId: plan.sessionId,
+      wrapperPort: devcontainer.wrapperPort,
+      kiloCliVersion: KILO_CLI_VERSION,
+      configPath: devcontainer.configPath,
+    });
+  }
+
   /**
    * Prepare workspace based on the workspace plan.
    * Handles three paths: resume, fast path (fully prepared), and full init.
@@ -336,17 +386,22 @@ export class ExecutionOrchestrator {
           envVars: initContext.profile?.envVars,
         };
 
+        const sessionOptions = {
+          sandbox,
+          context,
+          env: this.deps.env,
+          originalToken: initContext.kilocodeToken,
+          kilocodeModel: initContext.kilocodeModel ?? 'default',
+          originalOrgId: orgId,
+          createdOnPlatform: this.getCreatedOnPlatform(plan),
+          appendSystemPrompt: existingMetadata.appendSystemPrompt,
+          profile: mergeFastPathProfile(initContext.profile, existingMetadata.profile),
+        };
+        const runtimeEnv = this.sessionService.buildRuntimeEnv(sessionOptions);
         const session = await withWorkspacePreparationTimeout(
           this.sessionService.getOrCreateSession({
+            ...sessionOptions,
             sandbox,
-            context,
-            env: this.deps.env,
-            originalToken: initContext.kilocodeToken,
-            kilocodeModel: initContext.kilocodeModel ?? 'default',
-            originalOrgId: orgId,
-            createdOnPlatform: this.getCreatedOnPlatform(plan),
-            appendSystemPrompt: existingMetadata.appendSystemPrompt,
-            profile: mergeFastPathProfile(initContext.profile, existingMetadata.profile),
           }),
           'prepared session creation'
         );
@@ -354,6 +409,7 @@ export class ExecutionOrchestrator {
         return {
           context,
           session,
+          runtimeEnv,
         };
       }
 

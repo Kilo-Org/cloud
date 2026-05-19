@@ -201,6 +201,7 @@ export const basePrepareSessionNextSchema = z
     autoInitiate: z.boolean().optional(),
     initialMessageId: z.string().startsWith('msg_').length(30).optional(),
     images: cloudAgentImagesSchema,
+    devcontainer: z.boolean().optional(),
   })
   .refine(
     data => (data.githubRepo || data.gitlabProject) && !(data.githubRepo && data.gitlabProject),

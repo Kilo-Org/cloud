@@ -135,6 +135,8 @@ export type PrepareSessionInput = {
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
   /** When true, return immediately and run preparation asynchronously */
   autoInitiate?: boolean;
+  /** When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes */
+  devcontainer?: boolean;
 };
 
 /** Output from prepareSession procedure */

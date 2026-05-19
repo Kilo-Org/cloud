@@ -28,6 +28,7 @@ import {
 import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { TRPCError } from '@trpc/server';
 
 /**
  * Cloud Agent Next Router (Personal Context)
@@ -52,6 +53,13 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(basePrepareSessionNextSchema)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      if (input.devcontainer && !ctx.user.is_admin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admin access required for devcontainer sessions',
+        });
+      }
+
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 

@@ -296,6 +296,12 @@ export type ExistingSessionMetadata = {
   branchName: string;
   sandboxId?: string;
   sessionHome?: string;
+  devcontainer?: {
+    workspacePath: string;
+    innerWorkspaceFolder: string;
+    wrapperPort: number;
+    configPath: string;
+  };
   upstreamBranch?: string;
   appendSystemPrompt?: string;
   /**

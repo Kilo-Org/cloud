@@ -934,6 +934,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     sessionHome?: string;
     branchName?: string;
     sandboxId?: SandboxId;
+    devcontainer?: CloudAgentSessionState['devcontainer'];
   }): Promise<OperationResult> {
     await this.requireSessionId(input.sessionId as SessionId);
     const existing = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
@@ -1186,6 +1187,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         workspacePath: result.workspacePath,
         sessionHome: result.sessionHome,
         branchName: result.branchName,
+        devcontainer: result.devcontainer,
         sandboxId: result.sandboxId,
         initialMessageId: input.initialMessageId,
         initialPayload: input.initialPayload,
@@ -1815,7 +1817,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         .withFields({ sessionId: this.sessionId, sandboxId })
         .debug('Starting stopKiloServer RPC');
 
-      await stopWrapper(sandbox, metadata.sessionId);
+      await stopWrapper(sandbox, metadata.sessionId, {
+        devcontainer: metadata.devcontainer
+          ? {
+              workspacePath: metadata.devcontainer.workspacePath,
+              configPath: metadata.devcontainer.configPath,
+            }
+          : undefined,
+      });
 
       logger
         .withFields({ sessionId: this.sessionId, sandboxId, rpcElapsedMs: Date.now() - rpcStart })
@@ -2301,6 +2310,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           branchName: params.existingMetadata.branchName ?? '',
           sandboxId: params.existingMetadata.sandboxId,
           sessionHome: params.existingMetadata.sessionHome,
+          devcontainer: params.existingMetadata.devcontainer,
           upstreamBranch: params.existingMetadata.upstreamBranch,
           appendSystemPrompt: params.existingMetadata.appendSystemPrompt,
           profile: existingMetadataProfile,

@@ -318,6 +318,13 @@ export const PrepareSessionInput = z
       .describe(
         'When true, return immediately after creating IDs and run preparation asynchronously. Progress events are streamed via WebSocket.'
       ),
+    devcontainer: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe(
+        'When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes'
+      ),
     initialMessageId: z
       .string()
       .startsWith('msg_')

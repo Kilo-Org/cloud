@@ -29,6 +29,14 @@ export function useAttachmentUrl(
       const data = query.state.data;
       return data ? computeAttachmentUrlStaleMs(data.expiresAt, Date.now()) : 0;
     },
+    // Long-lived tabs would otherwise serve images with signed URLs that
+    // expired hours ago. Schedule a refetch just before staleness.
+    refetchInterval: query => {
+      const data = query.state.data;
+      if (!data) return false;
+      const ms = computeAttachmentUrlStaleMs(data.expiresAt, Date.now());
+      return ms > 0 ? ms : false;
+    },
     refetchOnWindowFocus: false,
   });
 }

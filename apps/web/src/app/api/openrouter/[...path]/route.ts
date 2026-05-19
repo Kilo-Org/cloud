@@ -379,13 +379,33 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
-  const { provider, userByok, bypassAccessCheck } = await getProvider(
-    originalModelIdLowerCased,
-    requestBodyParsed,
+  const machineIdHeader = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
+  const providerResult = await getProvider({
+    requestedModel: originalModelIdLowerCased,
+    request: requestBodyParsed,
     user,
     organizationId,
-    taskId
-  );
+    taskId,
+    clientIp: ipAddress ?? null,
+    machineId: machineIdHeader,
+  });
+  if (providerResult.kind === 'not-found') {
+    // Paused experiment for this public id — return a local model-unavailable
+    // response instead of silently falling through to default routing.
+    return modelDoesNotExistResponse();
+  }
+  if (providerResult.kind === 'unavailable') {
+    return temporarilyUnavailableResponse();
+  }
+  const {
+    provider,
+    userByok,
+    bypassAccessCheck,
+    skipBalanceCheck,
+    skipProviderPin,
+    skipKiloExclusiveModelSettings,
+    experiment,
+  } = providerResult;
   if (!provider.supportedChatApis.includes(requestBodyParsed.kind)) {
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,
@@ -443,7 +463,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     project_id: projectId,
     status_code: null,
     editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
+    machine_id: machineIdHeader,
     user_byok: !!userByok,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
     botId,
@@ -462,7 +482,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user) && !bypassAccessCheck) {
     const { balance, settings, plan } = await balanceAndSettingsPromise;
 
-    if (balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok) {
+    if (!skipBalanceCheck && balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok) {
       return await usageLimitExceededResponse(user, balance);
     }
 
@@ -475,9 +495,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
     if (modelRestrictionError) return modelRestrictionError;
 
-    if (providerConfig) {
+    // Direct experiment upstreams must not have a Vercel/OpenRouter
+    // provider config pinned onto them — the partner endpoint is selected
+    // by the variant version.
+    if (providerConfig && !skipProviderPin) {
       requestBodyParsed.body.provider = providerConfig;
     }
+  }
+
+  if (experiment) {
+    usageContext.modelExperimentVariantVersionId = experiment.variantVersionId;
+    usageContext.modelExperimentAllocationSubject = experiment.allocationSubject;
   }
 
   sentryRootSpan()?.setAttribute(
@@ -527,7 +555,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed,
     extraHeaders,
     userByok,
-    fraudHeaders
+    fraudHeaders,
+    { skipKiloExclusiveModelSettings: skipKiloExclusiveModelSettings === true }
   );
 
   const response = await upstreamRequest({

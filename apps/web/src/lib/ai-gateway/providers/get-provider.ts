@@ -19,12 +19,62 @@ import {
   buildDirectProvider,
   inferSupportedChatApis,
 } from '@/lib/ai-gateway/experiments/build-direct-provider';
+import {
+  isPublicIdExperimented,
+  pickModelExperimentVariant,
+  type AllocationSubject,
+} from '@/lib/ai-gateway/experiments/pick-variant';
+
+/**
+ * Metadata about the experiment that resolved this provider, attached when
+ * routing chose a model_experiment_variant_version. Persisted in the
+ * `model_experiment_request` row by Phase 4 attribution.
+ */
+export type ExperimentRouting = {
+  experimentId: string;
+  variantId: string;
+  variantVersionId: string;
+  allocationSubject: AllocationSubject;
+};
+
+export type GetProviderProviderResult = {
+  kind: 'provider';
+  provider: Provider;
+  userByok: BYOKResult[] | null;
+  /** Skip balance, paid-auth, and organization policy checks entirely. Used
+   *  by direct-byok and custom_llm2 because both already require explicit
+   *  admin opt-in. */
+  bypassAccessCheck: boolean;
+  /** Skip only the balance check while still enforcing organization model/
+   *  provider policy. Set for experiment traffic (preview/provider-funded). */
+  skipBalanceCheck?: boolean;
+  /** Skip pinning `body.provider` from the organization-determined config.
+   *  Set for direct experiment upstreams where the partner endpoint is
+   *  selected by the variant, not by gateway routing. */
+  skipProviderPin?: boolean;
+  /** Skip the kilo-exclusive `internal_id` rewrite + provider pin in
+   *  `applyProviderSpecificLogic`. Generic provider-specific request fixes
+   *  and `provider.transformRequest` still run. */
+  skipKiloExclusiveModelSettings?: boolean;
+  /** Present when this provider was resolved through a model experiment. */
+  experiment?: ExperimentRouting;
+};
+
+/**
+ * Discriminated routing result. `not-found` maps to the local
+ * model-unavailable response (used by paused experiments); `unavailable`
+ * maps to a 503 temporarily-unavailable response (cache/DB/config failure).
+ */
+export type GetProviderResult =
+  | GetProviderProviderResult
+  | { kind: 'not-found' }
+  | { kind: 'unavailable' };
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
   requestedModel: string,
   organizationId: string | undefined
-) {
+): Promise<GetProviderProviderResult | null> {
   const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
   if (!directByok || !directByokModel) {
     return null;
@@ -36,6 +86,7 @@ async function checkDirectBYOK(
     return null;
   }
   return {
+    kind: 'provider',
     provider: {
       id: 'direct-byok',
       apiUrl: directByok.base_url,
@@ -54,7 +105,7 @@ async function checkDirectBYOK(
 async function checkCustomLlm(
   requestedModel: string,
   organizationId: string
-): Promise<{ provider: Provider; userByok: null; bypassAccessCheck: true } | null> {
+): Promise<GetProviderProviderResult | null> {
   const [row] = await db
     .select()
     .from(custom_llm2)
@@ -68,6 +119,7 @@ async function checkCustomLlm(
     return null;
   }
   return {
+    kind: 'provider',
     provider: buildDirectProvider({
       internal_id: customLlm.internal_id,
       base_url: customLlm.base_url,
@@ -109,13 +161,24 @@ async function checkVercelBYOK(
     : getBYOKforUser(db, user.id, modelProviders);
 }
 
-export async function getProvider(
-  requestedModel: string,
-  request: GatewayRequest,
-  user: User | AnonymousUserContext,
-  organizationId: string | undefined,
-  taskId: string | undefined
-): Promise<{ provider: Provider; userByok: BYOKResult[] | null; bypassAccessCheck: boolean }> {
+export type GetProviderInput = {
+  requestedModel: string;
+  request: GatewayRequest;
+  user: User | AnonymousUserContext;
+  organizationId: string | undefined;
+  taskId: string | undefined;
+  /** Resolved client IP from the route handler. Used as the IP-cohort
+   *  allocation subject for experiment routing when no userId/machineId
+   *  is available. */
+  clientIp: string | null;
+  /** Machine identifier from `x-kilocode-machineid`. Used as the machine-
+   *  cohort allocation subject for experiment routing. */
+  machineId: string | null;
+};
+
+export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
+  const { requestedModel, request, user, organizationId, taskId, clientIp, machineId } = input;
+
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {
     return directByokByok;
@@ -124,10 +187,53 @@ export async function getProvider(
   const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
   if (vercelByok) {
     return {
+      kind: 'provider',
       provider: PROVIDERS.VERCEL_AI_GATEWAY,
       userByok: vercelByok,
       bypassAccessCheck: false,
     };
+  }
+
+  // Model experiment routing for dedicated preview public ids. Runs before
+  // `kilo-internal/...` and the `kiloExclusiveModels` lookup so an
+  // experimented public id never falls through to OpenRouter/Vercel.
+  const experimented = await isPublicIdExperimented(requestedModel);
+  if (experimented === 'unavailable') {
+    return { kind: 'unavailable' };
+  }
+  if (experimented === true) {
+    const userId = isAnonymousContext(user) ? null : user.id;
+    const selection = await pickModelExperimentVariant({
+      publicModelId: requestedModel,
+      userId,
+      machineId,
+      clientIp,
+    });
+    if (selection?.status === 'not-found') {
+      return { kind: 'not-found' };
+    }
+    if (selection?.status === 'unavailable') {
+      return { kind: 'unavailable' };
+    }
+    if (selection?.status === 'active') {
+      return {
+        kind: 'provider',
+        provider: buildDirectProvider(selection.upstream),
+        userByok: null,
+        bypassAccessCheck: false,
+        skipBalanceCheck: true,
+        skipProviderPin: true,
+        skipKiloExclusiveModelSettings: true,
+        experiment: {
+          experimentId: selection.experimentId,
+          variantId: selection.variantId,
+          variantVersionId: selection.variantVersionId,
+          allocationSubject: selection.allocationSubject,
+        },
+      };
+    }
+    // selection === null: cache+DB say no routing-relevant experiment for
+    // this id. Fall through to non-experiment routing.
   }
 
   if (requestedModel.startsWith('kilo-internal/') && organizationId) {
@@ -145,10 +251,16 @@ export async function getProvider(
     eligibleForVercelRouting &&
     (await shouldRouteToVercel(requestedModel, request, taskId || user.id))
   ) {
-    return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, bypassAccessCheck: false };
+    return {
+      kind: 'provider',
+      provider: PROVIDERS.VERCEL_AI_GATEWAY,
+      userByok: null,
+      bypassAccessCheck: false,
+    };
   }
 
   return {
+    kind: 'provider',
     provider:
       Object.values(PROVIDERS).find(p => p.id === kiloExclusiveModel?.gateway) ??
       PROVIDERS.OPENROUTER,

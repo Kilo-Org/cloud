@@ -33,6 +33,7 @@ import {
 import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/pick-variant';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -76,6 +77,20 @@ export function getAutoFreeCandidates(
   return [...candidates].toSorted();
 }
 
+/**
+ * Removes any public ids that are currently routed by an active or paused
+ * model experiment. Dedicated preview public ids must never be selected by
+ * `kilo-auto` — users only ever opt in to them explicitly.
+ */
+async function filterOutExperimentedPublicIds(
+  candidates: ReadonlyArray<string>
+): Promise<ReadonlyArray<string>> {
+  const checks = await Promise.all(
+    candidates.map(async id => ({ id, experimented: await isPublicIdExperimented(id) }))
+  );
+  return checks.filter(c => c.experimented !== true).map(c => c.id);
+}
+
 function gatewaySupportsApiKind(
   gateway: ProviderId,
   apiKind: GatewayRequest['kind'] | null
@@ -97,7 +112,9 @@ export async function resolveAutoModel(
   const { model, modeHeader, featureHeader, sessionId, apiKind, clientIp } = params;
   if (model === KILO_AUTO_FREE_MODEL.id) {
     const openRouterModels = await getOpenRouterModels();
-    const candidates = getAutoFreeCandidates(openRouterModels, apiKind);
+    const candidates = await filterOutExperimentedPublicIds(
+      getAutoFreeCandidates(openRouterModels, apiKind)
+    );
     if (candidates.length === 0) {
       return { kind: 'no_free_models_available' };
     }

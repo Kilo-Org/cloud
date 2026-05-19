@@ -5,6 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   AlertTriangle,
   CheckCircle2,
   ExternalLink,
@@ -61,6 +71,8 @@ export function TeamsIntegrationDetails({
   }, [openRouterModels]);
 
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
+  const [devRemoveDialogOpen, setDevRemoveDialogOpen] = useState(false);
 
   useEffect(() => {
     if (installationData?.installation?.modelSlug) {
@@ -109,36 +121,33 @@ export function TeamsIntegrationDetails({
   };
 
   const handleUninstall = () => {
-    if (confirm('Are you sure you want to disconnect Teams?')) {
-      uninstallApp.mutate(input, {
-        onSuccess: async () => {
-          toast.success('Teams disconnected');
-          await refetch();
-        },
-        onError: err => {
-          toast.error('Failed to disconnect Teams', { description: err.message });
-        },
-      });
-    }
+    uninstallApp.mutate(input, {
+      onSuccess: async () => {
+        setDisconnectDialogOpen(false);
+        toast.success('Teams disconnected');
+        await refetch();
+      },
+      onError: err => {
+        toast.error('Failed to disconnect Teams', { description: err.message });
+      },
+    });
   };
 
   const handleDevRemoveDbRowOnly = () => {
-    if (
-      confirm('This will remove the database row but keep the Teams app installed. Are you sure?')
-    ) {
-      devRemoveDbRowOnly.mutate(input, {
-        onSuccess: async () => {
-          toast.success('Database row removed (Teams app still installed)');
-          await refetch();
-        },
-        onError: err => {
-          toast.error('Failed to remove database row', { description: err.message });
-        },
-      });
-    }
+    devRemoveDbRowOnly.mutate(input, {
+      onSuccess: async () => {
+        setDevRemoveDialogOpen(false);
+        toast.success('Database row removed (Teams app still installed)');
+        await refetch();
+      },
+      onError: err => {
+        toast.error('Failed to remove database row', { description: err.message });
+      },
+    });
   };
 
   const handleModelChange = (modelSlug: string) => {
+    const previousModel = selectedModel;
     setSelectedModel(modelSlug);
     updateModel.mutate(
       { modelSlug, organizationId },
@@ -147,10 +156,12 @@ export function TeamsIntegrationDetails({
           if (result.success) {
             toast.success('Model updated successfully');
           } else {
+            setSelectedModel(previousModel);
             toast.error('Failed to update model', { description: result.error });
           }
         },
         onError: err => {
+          setSelectedModel(previousModel);
           toast.error('Failed to update model', { description: err.message });
         },
       }
@@ -212,7 +223,7 @@ export function TeamsIntegrationDetails({
             <div>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquareText className="h-5 w-5" />
-                Microsoft Teams Integration
+                Microsoft Teams integration
               </CardTitle>
               <CardDescription>
                 Mention Kilo in Teams to start coding work from chats, channels, and threads
@@ -231,7 +242,7 @@ export function TeamsIntegrationDetails({
             ) : (
               <Badge variant="secondary" className="flex w-fit items-center gap-1">
                 <XCircle className="h-3 w-3" />
-                Not Connected
+                Not connected
               </Badge>
             )}
           </div>
@@ -240,19 +251,21 @@ export function TeamsIntegrationDetails({
           {installation ? (
             <>
               <div className="space-y-3 rounded-lg border p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm font-medium">Tenant:</span>
-                  <span className="text-right text-sm">{installation.tenantName}</span>
+                <div className="grid gap-1 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:gap-4">
+                  <span className="text-sm font-medium">Tenant</span>
+                  <span className="min-w-0 break-words text-sm sm:text-right">
+                    {installation.tenantName}
+                  </span>
                 </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm font-medium">Tenant ID:</span>
-                  <span className="font-mono text-right text-xs text-muted-foreground">
+                <div className="grid gap-1 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:gap-4">
+                  <span className="text-sm font-medium">Tenant ID</span>
+                  <span className="text-muted-foreground min-w-0 break-all font-mono text-xs sm:text-right">
                     {installation.tenantId}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm font-medium">Connected:</span>
-                  <span className="text-sm">
+                <div className="grid gap-1 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:gap-4">
+                  <span className="text-sm font-medium">Connected</span>
+                  <span className="text-sm sm:text-right">
                     {installation.installedAt
                       ? new Date(installation.installedAt).toLocaleDateString()
                       : 'Unknown'}
@@ -262,13 +275,14 @@ export function TeamsIntegrationDetails({
 
               <div className="space-y-3 rounded-lg border p-4">
                 <ModelCombobox
-                  label="AI Model"
+                  label="AI model"
                   helperText="Select the AI model to use when responding to Teams messages"
                   models={modelOptions}
                   value={selectedModel}
                   onValueChange={handleModelChange}
                   isLoading={isLoadingModels}
                   placeholder="Select a model"
+                  disabled={updateModel.isPending}
                 />
               </div>
 
@@ -276,12 +290,12 @@ export function TeamsIntegrationDetails({
                 {setupInfo?.installUrl && (
                   <Button variant="outline" onClick={handleOpenInstallUrl}>
                     <ExternalLink className="mr-2 h-4 w-4" />
-                    Open Teams Install
+                    Open Teams install
                   </Button>
                 )}
                 <Button
                   variant="destructive"
-                  onClick={handleUninstall}
+                  onClick={() => setDisconnectDialogOpen(true)}
                   disabled={uninstallApp.isPending}
                 >
                   {uninstallApp.isPending ? 'Disconnecting...' : 'Disconnect'}
@@ -289,13 +303,12 @@ export function TeamsIntegrationDetails({
                 {IS_DEVELOPMENT && (
                   <Button
                     variant="outline"
-                    onClick={handleDevRemoveDbRowOnly}
+                    onClick={() => setDevRemoveDialogOpen(true)}
                     disabled={devRemoveDbRowOnly.isPending}
-                    className="border-yellow-500 text-yellow-500 hover:bg-yellow-500/10"
-                    title="Dev only: Remove DB row without removing the Teams app"
+                    title="Dev only: remove DB row without removing the Teams app"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    {devRemoveDbRowOnly.isPending ? 'Removing...' : 'Dev: Remove DB Only'}
+                    {devRemoveDbRowOnly.isPending ? 'Removing...' : 'Dev: remove DB only'}
                   </Button>
                 )}
               </div>
@@ -354,7 +367,7 @@ export function TeamsIntegrationDetails({
               ) : setupInfo?.installUrl ? (
                 <Button onClick={handleOpenInstallUrl} size="lg" className="w-full">
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  Open Teams Install
+                  Open Teams install
                 </Button>
               ) : (
                 <div className="space-y-3 rounded-lg border p-4">
@@ -372,6 +385,50 @@ export function TeamsIntegrationDetails({
           )}
         </CardContent>
       </Card>
+      <AlertDialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect Teams?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Kilo will stop responding to Teams messages for this tenant and remove linked Teams
+              users from the bot cache.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={uninstallApp.isPending}>
+              Keep Teams connected
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleUninstall}
+              disabled={uninstallApp.isPending}
+            >
+              {uninstallApp.isPending ? 'Disconnecting...' : 'Disconnect Teams'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={devRemoveDialogOpen} onOpenChange={setDevRemoveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove the Teams database row?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This development-only action removes the Kilo database row but keeps the Teams app
+              installed in Microsoft Teams.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={devRemoveDbRowOnly.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleDevRemoveDbRowOnly}
+              disabled={devRemoveDbRowOnly.isPending}
+            >
+              {devRemoveDbRowOnly.isPending ? 'Removing...' : 'Remove DB row'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

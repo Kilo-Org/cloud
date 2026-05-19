@@ -25,10 +25,10 @@ export default async function OrgTeamsIntegrationPage({
             <Link href={`/organizations/${organization.id}/integrations`}>
               <Button variant="ghost" size="sm" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
-                Back to Integrations
+                Back to integrations
               </Button>
             </Link>
-            <SetPageTitle title="Microsoft Teams Integration" />
+            <SetPageTitle title="Microsoft Teams integration" />
             <p className="text-muted-foreground">
               Manage Microsoft Teams integration for {organization.name}
             </p>

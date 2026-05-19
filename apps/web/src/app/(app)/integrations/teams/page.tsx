@@ -17,13 +17,13 @@ export default async function UserTeamsIntegrationPage({
 
   return (
     <PageLayout
-      title="Microsoft Teams Integration"
+      title="Microsoft Teams integration"
       subtitle="Connect Teams so Kilo can respond to mentions in chats, channels, and threads"
       headerActions={
         <Link href="/integrations">
           <Button variant="ghost" size="sm" className="gap-2">
             <ArrowLeft className="h-4 w-4" />
-            Back to Integrations
+            Back to integrations
           </Button>
         </Link>
       }

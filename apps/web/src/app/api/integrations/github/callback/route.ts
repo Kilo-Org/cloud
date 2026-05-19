@@ -335,11 +335,12 @@ export async function GET(request: NextRequest) {
 
       // If installation not found, it might have been deleted or belongs to a different app
       if (err.status === 404) {
+        const encodedInstallationId = encodeURIComponent(installationId);
         const redirectPath = returnTo
-          ? appendQueryParam(returnTo, `error=installation_not_found&id=${installationId}`)
+          ? appendQueryParam(returnTo, `error=installation_not_found&id=${encodedInstallationId}`)
           : owner.type === 'org'
-            ? `/organizations/${owner.id}/integrations/github?error=installation_not_found&id=${installationId}`
-            : `/integrations/github?error=installation_not_found&id=${installationId}`;
+            ? `/organizations/${owner.id}/integrations/github?error=installation_not_found&id=${encodedInstallationId}`
+            : `/integrations/github?error=installation_not_found&id=${encodedInstallationId}`;
 
         return NextResponse.redirect(new URL(redirectPath, APP_URL));
       }

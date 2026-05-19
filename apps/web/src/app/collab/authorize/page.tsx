@@ -41,7 +41,14 @@ function hasSuccessfulCallback(params: NextAppSearchParams | undefined): boolean
     ? params.github_pending_approval[0]
     : params?.github_pending_approval;
 
-  return success !== undefined || githubInstall === 'success' || githubPendingApproval === 'true';
+  return (
+    success === 'slack_installed' ||
+    success === 'discord_installed' ||
+    success === 'linear_installed' ||
+    success === 'gitlab_connected' ||
+    githubInstall === 'success' ||
+    githubPendingApproval === 'true'
+  );
 }
 
 export default async function CollabAuthorizePage({ searchParams }: AppPageProps) {

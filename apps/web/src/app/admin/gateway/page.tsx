@@ -29,7 +29,11 @@ export default function AdminGatewayPage() {
   const pathname = usePathname();
 
   const tabParam = searchParams.get('tab');
-  const activeTab: Tab = isValidTab(tabParam) ? tabParam : 'sync-providers';
+  const activeTab: Tab = isValidTab(tabParam)
+    ? tabParam
+    : searchParams.has('experimentId')
+      ? 'model-experiments'
+      : 'sync-providers';
 
   const onTabChange = useCallback(
     (value: string) => {
@@ -38,6 +42,9 @@ export default function AdminGatewayPage() {
         params.delete('tab');
       } else {
         params.set('tab', value);
+      }
+      if (value !== 'model-experiments') {
+        params.delete('experimentId');
       }
       const qs = params.toString();
       router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false });

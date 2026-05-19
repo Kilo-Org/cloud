@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -64,12 +65,30 @@ function StatusBadge({ status }: { status: Status }) {
 }
 
 export function ModelExperimentsContent() {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const selectedId = searchParams.get('experimentId');
+
+  const updateSelectedId = useCallback(
+    (id: string | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', 'model-experiments');
+      if (id === null) {
+        params.delete('experimentId');
+      } else {
+        params.set('experimentId', id);
+      }
+      const qs = params.toString();
+      router.push(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
   return selectedId ? (
-    <ExperimentDetail id={selectedId} onBack={() => setSelectedId(null)} />
+    <ExperimentDetail id={selectedId} onBack={() => updateSelectedId(null)} />
   ) : (
-    <ExperimentList onSelect={setSelectedId} />
+    <ExperimentList onSelect={id => updateSelectedId(id)} />
   );
 }
 

@@ -162,6 +162,10 @@ async function createHarness(options?: {
   // same reason — the host env must not leak in.
   vi.stubEnv('KILOCLAW_USER_LOCATION', options?.userLocationEnv?.KILOCLAW_USER_LOCATION ?? '');
   vi.stubEnv('KILOCLAW_USER_TIMEZONE', options?.userLocationEnv?.KILOCLAW_USER_TIMEZONE ?? '');
+  // Kilo Chat summary reads through the local controller only when the
+  // gateway token exists. Keep host env from making lifecycle tests hit a
+  // real controller unless a test explicitly opts in later.
+  vi.stubEnv('OPENCLAW_GATEWAY_TOKEN', '');
 
   const { default: morningBriefingPlugin } = await import('./index');
   const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'morning-briefing-'));

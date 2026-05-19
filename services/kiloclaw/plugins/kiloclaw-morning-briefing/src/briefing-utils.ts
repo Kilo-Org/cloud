@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 export type BriefingSourceStatus = {
-  source: 'calendar' | 'github' | 'linear' | 'local-news' | 'web';
+  source: 'calendar' | 'github' | 'kilo-chat' | 'linear' | 'local-news' | 'web';
   configured: boolean;
   ok: boolean;
   summary: string;

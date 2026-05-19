@@ -164,6 +164,7 @@ export function buildContentSecurityPolicy({
     'https://api.churnkey.co',
     'https://*.churnkey.co',
     'https://*.d.kiloapps.io',
+    'https://e115e769bcdd4c3d66af59d3332cb394.r2.cloudflarestorage.com',
     isDevelopment ? 'http://localhost:*' : null,
     isDevelopment ? 'ws://localhost:*' : null,
     ...configuredConnectSrcUrls.map(originFromUrl),

@@ -33,7 +33,10 @@ export const webPerformUpload: PerformUpload = (blob, putUrl, putHeaders, opts) 
     opts.signal.addEventListener('abort', onAbort, { once: true });
 
     xhr.open('PUT', putUrl, true);
-    for (const [k, v] of Object.entries(putHeaders)) xhr.setRequestHeader(k, v);
+    for (const [k, v] of Object.entries(putHeaders)) {
+      if (k.toLowerCase() === 'content-length') continue;
+      xhr.setRequestHeader(k, v);
+    }
 
     xhr.upload.addEventListener('progress', e => {
       if (!e.lengthComputable || e.total === 0) return;

@@ -25,7 +25,6 @@ import type { Owner } from '@/lib/integrations/core/types';
 import { getProfileOrganizations } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user.server';
 import type { User } from '@kilocode/db';
-import { TEAMS_APP_ID, TEAMS_APP_PASSWORD } from '@/lib/config.server';
 
 type VerifiedTeamsInstallPayload = {
   contextKey: string;
@@ -39,117 +38,6 @@ type OwnerOption = {
   label: string;
   owner: Owner;
 };
-
-type UnknownRecord = Record<string, unknown>;
-
-type TeamsAdminCheck =
-  | { ok: true }
-  | {
-      ok: false;
-      message: string;
-    };
-
-const TEAMS_INSTALLER_ADMIN_ROLES = new Set([
-  'Global Administrator',
-  'Teams Administrator',
-  'Application Administrator',
-  'Cloud Application Administrator',
-]);
-
-function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === 'object' && value !== null;
-}
-
-function getRecord(value: unknown, key: string): UnknownRecord | null {
-  if (!isRecord(value)) return null;
-  const nested = value[key];
-  return isRecord(nested) ? nested : null;
-}
-
-function getString(value: unknown, key: string): string | null {
-  if (!isRecord(value)) return null;
-  const nested = value[key];
-  return typeof nested === 'string' && nested.trim().length > 0 ? nested : null;
-}
-
-function getTeamsUserAadObjectId(message: SerializedMessage): string | null {
-  const raw = isRecord(message.raw) ? message.raw : null;
-  const from = getRecord(raw, 'from');
-  return getString(from, 'aadObjectId');
-}
-
-async function fetchTeamsGraphAppToken(tenantId: string): Promise<string | null> {
-  if (!TEAMS_APP_ID || !TEAMS_APP_PASSWORD) return null;
-
-  const body = new URLSearchParams({
-    client_id: TEAMS_APP_ID,
-    client_secret: TEAMS_APP_PASSWORD,
-    grant_type: 'client_credentials',
-    scope: 'https://graph.microsoft.com/.default',
-  });
-  const response = await fetch(
-    `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body,
-    }
-  );
-
-  if (!response.ok) return null;
-  const data = await response.json();
-  return getString(data, 'access_token');
-}
-
-async function hasTeamsInstallerAdminRole(params: {
-  tenantId: string;
-  userAadObjectId: string;
-}): Promise<boolean> {
-  const accessToken = await fetchTeamsGraphAppToken(params.tenantId);
-  if (!accessToken) return false;
-
-  const response = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(params.userAadObjectId)}/memberOf/microsoft.graph.directoryRole?$select=displayName`,
-    { headers: { authorization: `Bearer ${accessToken}` } }
-  );
-  if (!response.ok) return false;
-
-  const data = await response.json();
-  const roleValues = isRecord(data) && Array.isArray(data.value) ? data.value : [];
-
-  return roleValues.some(role => {
-    const displayName = getString(role, 'displayName');
-    return displayName ? TEAMS_INSTALLER_ADMIN_ROLES.has(displayName) : false;
-  });
-}
-
-async function verifyTeamsInstallerCanBindTenant(
-  payload: VerifiedTeamsInstallPayload
-): Promise<TeamsAdminCheck> {
-  const userAadObjectId = getTeamsUserAadObjectId(payload.message);
-  if (!userAadObjectId) {
-    return {
-      ok: false,
-      message:
-        'Kilo could not verify your Microsoft Entra user ID from Teams. Ask a Teams tenant administrator to run setup from Teams again.',
-    };
-  }
-
-  if (
-    await hasTeamsInstallerAdminRole({
-      tenantId: payload.identity.teamId,
-      userAadObjectId,
-    })
-  ) {
-    return { ok: true };
-  }
-
-  return {
-    ok: false,
-    message:
-      'Only a Teams tenant administrator can connect a Microsoft Teams tenant to Kilo. Ask a Teams admin to mention Kilo and complete setup.',
-  };
-}
 
 function escapeHtml(value: string): string {
   return value
@@ -383,11 +271,6 @@ export async function POST(request: Request) {
   const owner = findSelectedOwner(options, selectedOwner);
   if (!owner) {
     return errorPage('Access Denied', 'You cannot connect Teams to the selected owner.', 403);
-  }
-
-  const adminCheck = await verifyTeamsInstallerCanBindTenant(payload);
-  if (!adminCheck.ok) {
-    return errorPage('Teams admin required', adminCheck.message, 403);
   }
 
   const names = getTeamsConversationNames(Message.fromJSON(payload.message));

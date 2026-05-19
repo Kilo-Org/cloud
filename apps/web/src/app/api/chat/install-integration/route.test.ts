@@ -13,7 +13,6 @@ import { reprocessLinkedMessage } from '@/lib/bot/reprocess-linked-message';
 
 const mockedAfter = jest.fn();
 const mockState = { kind: 'state' };
-const mockedFetch = jest.fn();
 
 jest.mock('next/server', () => {
   const actual = jest.requireActual('next/server');
@@ -61,12 +60,6 @@ jest.mock('@/lib/bot/platforms/teams', () => ({
 jest.mock('@/lib/integrations/teams-service', () => ({
   TeamsTenantAlreadyConnectedError: class TeamsTenantAlreadyConnectedError extends Error {},
   upsertTeamsInstallation: jest.fn(async () => ({ id: 'pi-teams' })),
-}));
-
-jest.mock('@/lib/config.server', () => ({
-  NEXTAUTH_SECRET: 'test-secret',
-  TEAMS_APP_ID: 'teams-app-id',
-  TEAMS_APP_PASSWORD: 'teams-app-password',
 }));
 
 jest.mock(
@@ -122,7 +115,7 @@ function makePayload() {
       formatted: { type: 'root', children: [] },
       id: 'message-1',
       metadata: { dateSent: '2026-05-19T09:00:00.000Z', edited: false },
-      raw: { conversation: { tenantId: 'tenant-a' }, from: { aadObjectId: 'aad-user-id' } },
+      raw: { conversation: { tenantId: 'tenant-a' } },
       text: '@Kilo fix this',
       threadId: 'teams-thread',
     },
@@ -132,7 +125,6 @@ function makePayload() {
 describe('/api/chat/install-integration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedFetch.mockReset();
     mockedVerifyLinkToken.mockResolvedValue(makePayload() as never);
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
@@ -148,18 +140,6 @@ describe('/api/chat/install-integration', () => {
       { id: 'org-2', name: 'Member Org', role: 'member' },
     ] as never);
     mockedConsumeLinkAccountContext.mockResolvedValue(true);
-    global.fetch = mockedFetch as never;
-    mockedFetch
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ access_token: 'graph-token' }), {
-          headers: { 'content-type': 'application/json' },
-        })
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ value: [{ displayName: 'Teams Administrator' }] }), {
-          headers: { 'content-type': 'application/json' },
-        })
-      );
   });
 
   test('renders owner-selection form when no Teams integration exists', async () => {
@@ -224,34 +204,6 @@ describe('/api/chat/install-integration', () => {
     expect(response.headers.get('location')).toBe(
       'http://localhost:3000/organizations/org-1/integrations/teams?error=tenant_already_connected'
     );
-    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
-  });
-
-  test('rejects install when the Teams user is not a tenant admin', async () => {
-    mockedFetch
-      .mockReset()
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ access_token: 'graph-token' }), {
-          headers: { 'content-type': 'application/json' },
-        })
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ value: [{ displayName: 'Member' }] }), {
-          headers: { 'content-type': 'application/json' },
-        })
-      );
-
-    const { POST } = await import('./route');
-    const response = await POST(
-      makeRequest('/api/chat/install-integration', {
-        method: 'POST',
-        body: new URLSearchParams({ token: 'signed', owner: 'org:org-1' }),
-      }) as never
-    );
-
-    expect(response.status).toBe(403);
-    expect(await response.text()).toContain('Only a Teams tenant administrator can connect');
-    expect(mockedUpsertTeamsInstallation).not.toHaveBeenCalled();
     expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
 

@@ -450,8 +450,13 @@ function ExperimentDetail({ id, onBack }: { id: string; onBack: () => void }) {
           {status === 'draft' && (
             <InlineDeleteConfirmation
               onDelete={async () => {
-                await handleAction('Deleted', remove.mutateAsync({ id: experiment.id }));
-                onBack();
+                try {
+                  await remove.mutateAsync({ id: experiment.id });
+                  toast.success('Deleted');
+                  onBack();
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Failed to delete');
+                }
               }}
               isLoading={remove.isPending}
             />

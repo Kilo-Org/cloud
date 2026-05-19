@@ -115,6 +115,7 @@ async function applyExperimentTransition(opts: {
       .set(decision.values)
       .where(eq(model_experiment.id, opts.id))
       .returning();
+    if (!updated) notFound('Experiment');
     await invalidateExperimentCaches(updated.public_model_id);
     return updated;
   } catch (err) {

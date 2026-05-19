@@ -37,12 +37,34 @@ export type WantedPanelLinks = {
   workshopHref?: string;
 };
 
+/**
+ * Inputs the inline AcceptForm collects from the admin and forwards to
+ * the page-level `acceptWantedItem` mutation. Mirrors the canonical
+ * `wl accept-upstream` flags (quality / reliability / severity /
+ * skill_tags / message).
+ */
+export type AcceptFormInput = {
+  quality: 'excellent' | 'good' | 'fair' | 'poor';
+  reliability: 'excellent' | 'good' | 'fair' | 'poor';
+  severity: 'leaf' | 'branch' | 'root';
+  skillTags?: string[];
+  message?: string;
+};
+
 export type ReviewPanelActions = {
   upstream: string | null;
   busy: boolean;
   onMerge: (item: InboxItem) => void;
   onCloseAction: (item: InboxItem) => void;
   onComment: (item: InboxItem) => void;
+  /**
+   * Accept a work-submission. Only invoked from the inline AcceptForm
+   * inside the review drawer. The page wires this to the
+   * `acceptWantedItem` mutation, threading through the inbox card's
+   * `pull_id`, `submitter`, `fork_owner`, `completion_id`, and
+   * `evidence_url` so the server skips redundant cross-fork reads.
+   */
+  onAccept: (item: InboxItem, input: AcceptFormInput) => void;
 };
 
 export type WastelandDrawerRef =

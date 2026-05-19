@@ -253,9 +253,11 @@ const InboxBase = {
   state: z.string(),
   from_branch: z.string().nullable(),
   submitter: z.string().nullable(),
+  fork_owner: z.string().nullable(),
   creator_name: z.string().nullable(),
   created_at: z.string().nullable(),
   updated_at: z.string().nullable(),
+  dolthub_url: z.string(),
 };
 
 export const InboxItemOutput = z.discriminatedUnion('kind', [

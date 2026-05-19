@@ -18,7 +18,9 @@ import { wrappedWastelandRouter } from './trpc/router';
 import { getWastelandRegistryStub } from './dos/WastelandRegistry.do';
 import { getWastelandDOStub } from './dos/Wasteland.do';
 import * as wantedBoard from './wanted-board/wanted-board-ops-sdk';
+import { loadSdkContext } from './wanted-board/wanted-board-ops-sdk';
 import { WantedBoardOpError } from './wanted-board/errors';
+import { readBranchHead } from '@kilocode/wl-sdk';
 
 // ── DO Exports ──────────────────────────────────────────────────────────
 // Wrangler requires these exports to match the class_name bindings in wrangler.jsonc.
@@ -172,6 +174,35 @@ app.post('/debug/registry/backfill-upstreams', async c => {
 // The userId is passed as a query param (?userId=...) or body field.
 // Used by E2E tests to exercise the real production code path.
 
+function describeCauseChain(err: unknown): unknown[] {
+  const chain: unknown[] = [];
+  let current: unknown = err;
+  // Hard cap to avoid pathological circular causes blowing the response.
+  for (let depth = 0; depth < 10 && current; depth += 1) {
+    if (current instanceof Error) {
+      const entry: Record<string, unknown> = {
+        name: current.name,
+        message: current.message,
+      };
+      // Capture WlDoltHubError-style `status`/`url`/`body` fields when present
+      // so the client can see the failing DoltHub call directly.
+      const c = current as unknown as Record<string, unknown>;
+      if (typeof c.status === 'number') entry.status = c.status;
+      if (typeof c.url === 'string') entry.url = c.url;
+      if (c.body !== undefined) entry.body = c.body;
+      if (typeof c.code === 'string') entry.code = c.code;
+      chain.push(entry);
+      current = current.cause;
+    } else if (current !== undefined) {
+      // Non-Error cause: stringify rather than reach into shape — JSON
+      // is the safe escape hatch for arbitrary thrown values.
+      chain.push(typeof current === 'string' ? current : JSON.stringify(current));
+      current = undefined;
+    }
+  }
+  return chain;
+}
+
 function debugErrorResponse(c: Context<WastelandEnv>, err: unknown) {
   if (err instanceof WantedBoardOpError) {
     const status =
@@ -182,7 +213,14 @@ function debugErrorResponse(c: Context<WastelandEnv>, err: unknown) {
           : err.code === 'UPSTREAM_ERROR'
             ? 502
             : 500;
-    return c.json({ error: err.message, code: err.code }, status as 400);
+    return c.json(
+      {
+        error: err.message,
+        code: err.code,
+        cause: describeCauseChain(err.cause),
+      },
+      status as 400
+    );
   }
   throw err;
 }
@@ -458,6 +496,470 @@ app.post('/debug/wastelands/:wastelandId/claim', async c => {
   }
 });
 
+// Compare fork main HEAD to upstream main HEAD using the worker's
+// stored credentials. Mirrors the staleness gate in `applyMutation`
+// (`packages/wl-sdk/src/ops/mutate.ts`) without performing any writes,
+// so callers can probe whether a fork would currently fail the
+// `assertForkMainCurrent` check.
+//
+// Usage: GET /debug/wastelands/:wastelandId/fork-currency?userId=<userId>
+//
+// Response shape:
+//   {
+//     upstream: "owner/db",
+//     fork: "forkOwner/forkDb",
+//     upstreamHead: "<hash>" | null,   // null if HEAD couldn't be read
+//     forkHead: "<hash>" | null,
+//     isCurrent: boolean,              // true when both heads match (or
+//                                      //   either was null — best-effort
+//                                      //   parity with the SDK's gate)
+//     deepLinkUrl?: string,            // present iff !isCurrent
+//   }
+app.get('/debug/wastelands/:wastelandId/fork-currency', async c => {
+  const wastelandId = c.req.param('wastelandId');
+  const userId = c.req.query('userId');
+  if (!userId) return c.json({ error: 'Missing userId query param' }, 400);
+
+  try {
+    // Delegate to the same adapter the tRPC `getForkCurrency` query
+    // calls so the debug surface and the production UI surface stay
+    // in lockstep — including the prefilled DoltHub deep-link URL.
+    const result = await wantedBoard.getForkCurrency(c.env, wastelandId, userId);
+    return c.json(result);
+  } catch (err) {
+    return debugErrorResponse(c, err);
+  }
+});
+
+// Probe a battery of candidate DoltHub API paths for syncing a fork's
+// main branch with its upstream. We've already shown that `CALL
+// DOLT_FETCH/MERGE/REMOTE` is rejected by the SQL endpoint and that
+// `POST /{forkOwner}/{forkDb}/pulls` with from=upstream:main is
+// rejected with "must have write permissions on from repository".
+// This endpoint blasts through every other plausible path so we can
+// pick a winner — or conclude there is none and route users to the
+// DoltHub web UI for the sync.
+//
+// Usage: POST /debug/wastelands/:wastelandId/fork-sync-experiment?userId=<id>
+//
+// Response: { ctx, probes: Probe[], verification?: { winnerLabel, forkHeadAfter, advanced } }
+// Probe: { label, url, method, requestBody?, status, body, ok }
+//
+// Each probe captures status + body separately so a 200 "Bad Request"
+// envelope (DoltHub's pattern for SQL errors) is still inspectable.
+const ProbeResultShape = z.object({
+  label: z.string(),
+  url: z.string(),
+  method: z.string(),
+  requestBody: z.unknown().optional(),
+  status: z.number(),
+  body: z.unknown(),
+  ok: z.boolean(),
+});
+type ProbeResult = z.infer<typeof ProbeResultShape>;
+
+app.post('/debug/wastelands/:wastelandId/fork-sync-experiment', async c => {
+  const wastelandId = c.req.param('wastelandId');
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'Missing userId query param or body field' }, 400);
+
+  let ctx: Awaited<ReturnType<typeof loadSdkContext>>;
+  try {
+    ctx = await loadSdkContext(c.env, wastelandId, userId);
+  } catch (err) {
+    return debugErrorResponse(c, err);
+  }
+
+  const upstreamParts = ctx.upstream.split('/');
+  if (upstreamParts.length !== 2 || !upstreamParts[0] || !upstreamParts[1]) {
+    return c.json({ error: `Malformed upstream "${ctx.upstream}"` }, 500);
+  }
+  const upstreamOwner = upstreamParts[0];
+  const upstreamDb = upstreamParts[1];
+  const forkOwner = ctx.forkOrg;
+  const forkDb = upstreamDb;
+  const token = ctx.token;
+
+  // Read upstream HEAD up front for the branch-creation probe and to
+  // give the response something concrete to compare against.
+  const auth = { token };
+  const [upstreamHead, forkHeadBefore] = await Promise.all([
+    readBranchHead({ auth, owner: upstreamOwner, db: upstreamDb, branch: 'main' }),
+    readBranchHead({ auth, owner: forkOwner, db: forkDb, branch: 'main' }),
+  ]);
+
+  async function probe(args: {
+    label: string;
+    url: string;
+    method: 'GET' | 'POST';
+    body?: unknown;
+  }): Promise<ProbeResult> {
+    const headers: Record<string, string> = {
+      authorization: `token ${token}`,
+      'cache-control': 'no-cache',
+    };
+    let bodyText: string | undefined;
+    if (args.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      bodyText = JSON.stringify(args.body);
+    }
+    let status = 0;
+    let parsedBody: unknown = null;
+    try {
+      const res = await fetch(args.url, {
+        method: args.method,
+        headers,
+        body: bodyText,
+      });
+      status = res.status;
+      const text = await res.text().catch(() => '');
+      try {
+        parsedBody = JSON.parse(text);
+      } catch {
+        parsedBody = text;
+      }
+    } catch (err) {
+      parsedBody = `transport error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+    // DoltHub's SQL endpoint frequently returns HTTP 200 with a
+    // `query_execution_status: "Error"` envelope. Treat the probe as
+    // successful only when the HTTP status is 2xx AND the SQL envelope
+    // (if present) reports success.
+    let ok = status >= 200 && status < 300;
+    const envelope = z
+      .object({ query_execution_status: z.string() })
+      .passthrough()
+      .safeParse(parsedBody);
+    if (
+      ok &&
+      envelope.success &&
+      envelope.data.query_execution_status.toLowerCase() !== 'success'
+    ) {
+      ok = false;
+    }
+    return {
+      label: args.label,
+      url: args.url,
+      method: args.method,
+      requestBody: args.body,
+      status,
+      body: parsedBody,
+      ok,
+    };
+  }
+
+  const remoteUrl = `https://doltremoteapi.dolthub.com/${upstreamOwner}/${upstreamDb}`;
+  const writeBase = `${DOLTHUB_API_BASE}/${forkOwner}/${forkDb}/write/main/main`;
+  const sqlEnc = (sql: string) => `?q=${encodeURIComponent(sql)}`;
+
+  const probes: ProbeResult[] = [];
+
+  // 1a. write/main/main with no q param.
+  probes.push(
+    await probe({
+      label: '1a-write-main-main-no-q',
+      url: writeBase,
+      method: 'POST',
+    })
+  );
+
+  // 1b. write/<from>/<to> with from = "jrf0110/wl-commons:main".
+  probes.push(
+    await probe({
+      label: '1b-write-cross-repo-from',
+      url: `${DOLTHUB_API_BASE}/${forkOwner}/${forkDb}/write/${encodeURIComponent(`${upstreamOwner}/${upstreamDb}:main`)}/main`,
+      method: 'POST',
+    })
+  );
+
+  // 1c. write with extra path components (cross-repo-from spelled out).
+  probes.push(
+    await probe({
+      label: '1c-write-cross-repo-path',
+      url: `${DOLTHUB_API_BASE}/${forkOwner}/${forkDb}/write/${upstreamOwner}/${upstreamDb}/main/main`,
+      method: 'POST',
+    })
+  );
+
+  // 2. Backwards PR: open a PR on UPSTREAM that pushes upstream main
+  //    into the fork. Almost certainly won't work but worth confirming.
+  probes.push(
+    await probe({
+      label: '2-pr-on-upstream-targeting-fork',
+      url: `${DOLTHUB_API_BASE}/${upstreamOwner}/${upstreamDb}/pulls`,
+      method: 'POST',
+      body: {
+        title: 'Sync fork main with upstream main',
+        description: 'fork-sync-experiment probe',
+        fromBranchOwnerName: upstreamOwner,
+        fromBranchRepoName: upstreamDb,
+        fromBranchName: 'main',
+        toBranchOwnerName: forkOwner,
+        toBranchRepoName: forkDb,
+        toBranchName: 'main',
+      },
+    })
+  );
+
+  // 3. CALL DOLT_PULL with the remote URL inline.
+  probes.push(
+    await probe({
+      label: '3-dolt-pull-with-remote-url',
+      url: `${writeBase}${sqlEnc(`CALL DOLT_PULL('${remoteUrl}','main')`)}`,
+      method: 'POST',
+    })
+  );
+
+  // 4. CALL DOLT_FETCH with remote URL inline.
+  probes.push(
+    await probe({
+      label: '4-dolt-fetch-with-remote-url',
+      url: `${writeBase}${sqlEnc(`CALL DOLT_FETCH('${remoteUrl}','main')`)}`,
+      method: 'POST',
+    })
+  );
+
+  // 5. CALL DOLT_MERGE on a cross-repo ref.
+  probes.push(
+    await probe({
+      label: '5-dolt-merge-cross-repo-ref',
+      url: `${writeBase}${sqlEnc(`CALL DOLT_MERGE('${upstreamOwner}/${upstreamDb}/main','--ff')`)}`,
+      method: 'POST',
+    })
+  );
+
+  // 6. Branch creation pointing at upstream commit hash. If DoltHub
+  //    accepts an unknown hash here, the fork must already share
+  //    history with upstream — which it does for a fork.
+  if (upstreamHead) {
+    // 6a — original guess at the body shape.
+    probes.push(
+      await probe({
+        label: '6a-create-branch-name+startPoint',
+        url: `${DOLTHUB_API_BASE}/${forkOwner}/${forkDb}/branches`,
+        method: 'POST',
+        body: { name: 'sync-from-upstream-experiment', startPoint: upstreamHead },
+      })
+    );
+    // 6b — match the keys the server complained were missing
+    //      (newBranchName, revisionName, revisionType).
+    probes.push(
+      await probe({
+        label: '6b-create-branch-revisionType-commit',
+        url: `${DOLTHUB_API_BASE}/${forkOwner}/${forkDb}/branches`,
+        method: 'POST',
+        body: {
+          newBranchName: 'sync-from-upstream-experiment-2',
+          revisionName: upstreamHead,
+          revisionType: 'commit',
+        },
+      })
+    );
+    // 6c — same shape but cross-repo branch reference.
+    probes.push(
+      await probe({
+        label: '6c-create-branch-revisionType-branch-cross-repo',
+        url: `${DOLTHUB_API_BASE}/${forkOwner}/${forkDb}/branches`,
+        method: 'POST',
+        body: {
+          newBranchName: 'sync-from-upstream-experiment-3',
+          revisionName: `${upstreamOwner}/${upstreamDb}/main`,
+          revisionType: 'branch',
+        },
+      })
+    );
+  } else {
+    probes.push({
+      label: '6-create-branch-skipped',
+      url: '(skipped — could not read upstream HEAD)',
+      method: 'POST',
+      requestBody: undefined,
+      status: 0,
+      body: 'skipped',
+      ok: false,
+    });
+  }
+
+  // 7. Ad-hoc — a few additional shapes the DoltHub web UI plausibly
+  //    uses. None are documented but the failure mode (404 vs 405 vs
+  //    422) is informative.
+  probes.push(
+    await probe({
+      label: '7a-fork-sync-from-upstream',
+      url: `${DOLTHUB_API_BASE}/${forkOwner}/${forkDb}/sync-from-upstream`,
+      method: 'POST',
+      body: { branch: 'main' },
+    })
+  );
+  probes.push(
+    await probe({
+      label: '7b-fork-sync',
+      url: `${DOLTHUB_API_BASE}/${forkOwner}/${forkDb}/sync`,
+      method: 'POST',
+      body: { branch: 'main' },
+    })
+  );
+  probes.push(
+    await probe({
+      label: '7c-fork-update-from-upstream',
+      url: `${DOLTHUB_API_BASE}/${forkOwner}/${forkDb}/update-from-upstream`,
+      method: 'POST',
+      body: { branch: 'main' },
+    })
+  );
+  probes.push(
+    await probe({
+      label: '7d-pulls-merge-upstream',
+      url: `${DOLTHUB_API_BASE}/${forkOwner}/${forkDb}/pulls/merge-upstream`,
+      method: 'POST',
+      body: { branch: 'main' },
+    })
+  );
+  probes.push(
+    await probe({
+      label: '7e-fast-forward-write',
+      url: `${writeBase}${sqlEnc(`CALL DOLT_BRANCH('-f','main','${upstreamOwner}/${upstreamDb}/main')`)}`,
+      method: 'POST',
+    })
+  );
+  probes.push(
+    await probe({
+      label: '7f-dolt-reset-hard-cross-repo',
+      url: `${writeBase}${sqlEnc(`CALL DOLT_RESET('--hard','${upstreamOwner}/${upstreamDb}/main')`)}`,
+      method: 'POST',
+    })
+  );
+
+  // The DoltHub write endpoint is asynchronous — a 200 response with
+  // `query_execution_status: "Success"` only confirms that the
+  // operation was *queued* (it returns an `operation_name`). We have
+  // to poll the operation endpoint to see whether the SQL actually
+  // landed. Returning HTTP 200 here without polling would be a
+  // false-positive trap, so for every probe that produced an
+  // `operation_name` we poll until it terminates (or we time out).
+  // Matches `PollResponse` in packages/wl-sdk/src/dolthub/operation.ts.
+  const OperationShape = z
+    .object({
+      done: z.boolean().optional(),
+      res_details: z
+        .object({
+          query_execution_status: z.string().optional(),
+          query_execution_message: z.string().optional(),
+          from_commit_id: z.string().nullable().optional(),
+          to_commit_id: z.string().nullable().optional(),
+        })
+        .passthrough()
+        .optional(),
+      query_execution_status: z.string().optional(),
+      query_execution_message: z.string().optional(),
+    })
+    .passthrough();
+
+  async function pollOperation(operationName: string): Promise<{
+    done: boolean;
+    final: unknown;
+    pollCount: number;
+  }> {
+    // The poll URL is `/{owner}/{db}/write?operationName=…` (verified
+    // against `packages/wl-sdk/src/dolthub/operation.ts`'s buildPollPath),
+    // not `/{operation_name}`. The `operation_name` field returned by
+    // the write endpoint is just an identifier passed back as a query
+    // parameter; the path is fixed.
+    const url = `${DOLTHUB_API_BASE}/${forkOwner}/${forkDb}/write?operationName=${encodeURIComponent(operationName)}`;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await new Promise(r => setTimeout(r, 1000));
+      let parsedBody: unknown = null;
+      try {
+        const res = await fetch(url, { headers: { authorization: `token ${token}` } });
+        const text = await res.text().catch(() => '');
+        try {
+          parsedBody = JSON.parse(text);
+        } catch {
+          parsedBody = text;
+        }
+      } catch (err) {
+        return {
+          done: true,
+          final: `transport error: ${err instanceof Error ? err.message : String(err)}`,
+          pollCount: attempt + 1,
+        };
+      }
+      const parsed = OperationShape.safeParse(parsedBody);
+      // Treat as terminal when `done: true`, OR when the
+      // `query_execution_status` is anything other than `RowsFlow` /
+      // pending. Some DoltHub responses surface a final
+      // success/error envelope without a `done` flag.
+      const status = parsed.success
+        ? (parsed.data.res_details?.query_execution_status ??
+          parsed.data.query_execution_status ??
+          '')
+        : '';
+      const lower = status.toLowerCase();
+      if (parsed.success && parsed.data.done) {
+        return { done: true, final: parsedBody, pollCount: attempt + 1 };
+      }
+      if (lower === 'success' || lower === 'successwithwarning' || lower === 'error') {
+        return { done: true, final: parsedBody, pollCount: attempt + 1 };
+      }
+    }
+    return { done: false, final: 'timed out after 30s of polling', pollCount: 30 };
+  }
+
+  type OperationOutcome = {
+    label: string;
+    operationName: string;
+    pollCount: number;
+    done: boolean;
+    final: unknown;
+  };
+  const operationOutcomes: OperationOutcome[] = [];
+  for (const p of probes) {
+    if (!p.ok) continue;
+    const opShape = z
+      .object({ operation_name: z.string().min(1) })
+      .passthrough()
+      .safeParse(p.body);
+    if (!opShape.success) continue;
+    const outcome = await pollOperation(opShape.data.operation_name);
+    operationOutcomes.push({
+      label: p.label,
+      operationName: opShape.data.operation_name,
+      pollCount: outcome.pollCount,
+      done: outcome.done,
+      final: outcome.final,
+    });
+  }
+
+  // Re-read fork HEAD once at the end so we can see net effect across
+  // the whole battery (some probes may have cumulatively advanced it).
+  const forkHeadAfter = await readBranchHead({
+    auth,
+    owner: forkOwner,
+    db: forkDb,
+    branch: 'main',
+  });
+  const verification = {
+    forkHeadBefore,
+    forkHeadAfter,
+    upstreamHead,
+    advanced: forkHeadAfter !== forkHeadBefore,
+    matchesUpstream: forkHeadAfter === upstreamHead,
+  };
+
+  return c.json({
+    ctx: {
+      upstream: `${upstreamOwner}/${upstreamDb}`,
+      fork: `${forkOwner}/${forkDb}`,
+      upstreamHead,
+      forkHeadBefore,
+      tokenPrefix: token.slice(0, 6),
+    },
+    probes,
+    operationOutcomes,
+    verification,
+  });
+});
+
 const DoneBody = z.object({
   userId: z.string().optional(),
   itemId: z.string().min(1),
@@ -507,8 +1009,17 @@ app.post('/debug/wastelands/:wastelandId/unclaim', async c => {
 const AcceptBody = z.object({
   userId: z.string().optional(),
   itemId: z.string().min(1),
+  submitterPullId: z.string().min(1).optional(),
+  submitterRigHandle: z.string().min(1).optional(),
+  submitterForkOwner: z.string().min(1).optional(),
+  completionId: z.string().min(1).optional(),
+  evidence: z.string().optional(),
   quality: z.enum(['excellent', 'good', 'fair', 'poor']),
+  reliability: z.enum(['excellent', 'good', 'fair', 'poor']).optional(),
+  severity: z.enum(['leaf', 'branch', 'root']).optional(),
+  skillTags: z.array(z.string().min(1).max(64)).max(16).optional(),
   message: z.string().optional(),
+  direct: z.boolean().optional(),
 });
 
 app.post('/debug/wastelands/:wastelandId/accept', async c => {
@@ -520,8 +1031,17 @@ app.post('/debug/wastelands/:wastelandId/accept', async c => {
   try {
     const result = await wantedBoard.acceptWantedItem(c.env, wastelandId, userId, {
       itemId: parsed.data.itemId,
+      submitterPullId: parsed.data.submitterPullId,
+      submitterRigHandle: parsed.data.submitterRigHandle,
+      submitterForkOwner: parsed.data.submitterForkOwner,
+      completionId: parsed.data.completionId,
+      evidence: parsed.data.evidence,
       quality: parsed.data.quality,
+      reliability: parsed.data.reliability,
+      severity: parsed.data.severity,
+      skillTags: parsed.data.skillTags,
       message: parsed.data.message,
+      direct: parsed.data.direct,
     });
     return c.json(result);
   } catch (err) {

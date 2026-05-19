@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import { WastelandBetaBadge } from '@/components/wasteland/WastelandBetaBadge';
+import { SyncForkButton } from '@/components/wasteland/SyncForkButton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Skull } from 'lucide-react';
@@ -44,7 +45,8 @@ export function WastelandDashboardHeader() {
           </div>
         )}
 
-        {/* Page-specific section — title + count + CTAs, right-aligned via flex-1. */}
+        {/* Page-specific section — title + count + CTAs. Takes available
+            width so its inline actions stay left-of the persistent CTAs. */}
         {pageHeader && (
           <div className="flex flex-1 items-center justify-between gap-2 pl-3">
             <div className="flex items-center gap-2">
@@ -61,6 +63,12 @@ export function WastelandDashboardHeader() {
             )}
           </div>
         )}
+
+        {/* Persistent CTAs that apply to every wasteland sub-page.
+            When no page header is mounted, push these to the right. */}
+        <div className={pageHeader ? 'flex items-center gap-2' : 'ml-auto flex items-center gap-2'}>
+          <SyncForkButton wastelandId={wastelandId} />
+        </div>
       </div>
     </div>
   );

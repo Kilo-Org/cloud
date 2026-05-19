@@ -15,6 +15,7 @@
 
 import { z } from 'zod';
 import {
+  buildPullWebUrl,
   getPull,
   listPulls,
   mapWithLimit,
@@ -47,9 +48,17 @@ type ParsedCommit =
   | { kind: 'unknown'; subject: string };
 
 /**
- * Parse a commit subject against the closed grammar produced by the `wl` CLI:
- *   - `wl {verb}: {wanted-id}[ — {reason}]`  (reason only on `reject`)
- *   - `Register rig: {handle}`               (no leading `wl`, capital R)
+ * Parse a commit subject against the closed grammar produced by the `wl` CLI
+ * AND by our cloud SDK (which sends DML statements through DoltHub's write
+ * API; DoltHub auto-prefixes them with "Run SQL query: " and our SDK appends
+ * a `-- wl <verb>: <id>` trailer for traceability).
+ *
+ * Recognized shapes, in priority order:
+ *   - `wl {verb}: {wanted-id}[ — {reason}]`  — bare CLI commit subject
+ *   - `Register rig: {handle}`               — `wl join` via federation.go
+ *   - `Run SQL query: ... -- wl {verb}: {wanted-id}`
+ *                                            — cloud-SDK write via DoltHub
+ *
  * Anything else returns `{ kind: 'unknown' }` so the card renders as foreign.
  */
 export function parseCommitSubject(subject: string): ParsedCommit {
@@ -61,7 +70,7 @@ export function parseCommitSubject(subject: string): ParsedCommit {
     return { kind: 'register', handle: regMatch[1] };
   }
 
-  // wl <verb>: <item-id>[ — <reason>]
+  // Bare `wl <verb>: <item-id>[ — <reason>]` — what the local CLI emits.
   const wlMatch = trimmed.match(/^wl\s+([a-z-]+):\s+([a-zA-Z0-9_-]+)(?:\s+—\s+(.*))?$/);
   if (wlMatch) {
     const verb = wlMatch[1];
@@ -71,6 +80,28 @@ export function parseCommitSubject(subject: string): ParsedCommit {
         verb: verb as WlVerb,
         itemId: wlMatch[2],
         reason: wlMatch[3]?.trim(),
+      };
+    }
+  }
+
+  // SQL-trailer form — what the cloud SDK produces. DoltHub wraps each
+  // statement we send with "Run SQL query: <sql>" and our SDK appends
+  // ` -- wl <verb>: <id>[ — <reason>]` (see applyMutation in mutate.ts).
+  // The trailer can land on any line of the wrapped commit message
+  // (single-statement UPDATEs put it on line 1; multi-line INSERTs push
+  // it to a later line), so we scan with the `m` flag and a non-anchored
+  // pattern that ends at end-of-line or end-of-string.
+  const trailerMatch = trimmed.match(
+    /--\s+wl\s+([a-z-]+):\s+([a-zA-Z0-9_-]+)(?:\s+—\s+([^\n]*?))?\s*(?:\n|$)/m
+  );
+  if (trailerMatch) {
+    const verb = trailerMatch[1];
+    if ((WL_VERBS as readonly string[]).includes(verb)) {
+      return {
+        kind: 'wl',
+        verb: verb as WlVerb,
+        itemId: trailerMatch[2],
+        reason: trailerMatch[3]?.trim(),
       };
     }
   }
@@ -247,9 +278,20 @@ type InboxCardBase = {
   state: string;
   from_branch: string | null;
   submitter: string | null;
+  /**
+   * DoltHub owner of the fork that hosts `from_branch`. For same-owner
+   * PRs (admin pushing on the upstream itself) this matches
+   * `ctx.upstream`'s owner; for cross-fork PRs (the common case for
+   * worker submissions) this is the contributor's fork. Used by admin
+   * accept flows to read the submitter's `wl/<rig>/<id>` branch from
+   * the correct fork.
+   */
+  fork_owner: string | null;
   creator_name: string | null;
   created_at: string | null;
   updated_at: string | null;
+  /** Web URL of the upstream PR on DoltHub. Always set. */
+  dolthub_url: string;
 };
 
 export type InboxItem = InboxCardBase &
@@ -343,9 +385,17 @@ async function classifyOne(ctx: ClassifyContext, pull: PullSummary): Promise<Inb
   // A commit's `message` field includes subject + body separated by blank
   // lines. We keep both the subject (first line, used for verb parsing)
   // and the full message (used to extract reject reasons from the body).
+  //
+  // The cloud SDK's `applyMutation` appends a `-- wl <verb>: <id>` trailer
+  // to every DML it sends via DoltHub's write API. DoltHub wraps the SQL
+  // with "Run SQL query: " and the trailer ends up on the same line as the
+  // closing semicolon — usually the subject for single-statement UPDATEs,
+  // but `wl post` produces a multi-line INSERT so the trailer lands on a
+  // later line. Pass the full message into `parseCommitSubject` so its
+  // trailer regex can find the marker regardless of which line it's on.
   const commitFull = commits.length > 0 ? commits.map(c => c.message) : [pull.title];
   const commitSubjects = commitFull.map(m => m.split('\n')[0]);
-  const parsedCommits = commitSubjects.map(parseCommitSubject);
+  const parsedCommits = commitFull.map(parseCommitSubject);
 
   const base: InboxCardBase = {
     pull_id: pull.pull_id,
@@ -353,9 +403,11 @@ async function classifyOne(ctx: ClassifyContext, pull: PullSummary): Promise<Inb
     state: pull.state,
     from_branch: fromBranch,
     submitter: parseWlBranch(fromBranch)?.rigHandle ?? null,
+    fork_owner: detail?.from_branch_owner_name ?? null,
     creator_name: pull.creator_name,
     created_at: pull.created_at,
     updated_at: pull.updated_at,
+    dolthub_url: buildPullWebUrl(ctx.upstream, pull.pull_id),
   };
 
   // Rig registration — branch `wl/register/<handle>` OR first commit matches

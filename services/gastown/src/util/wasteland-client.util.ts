@@ -254,7 +254,12 @@ export function createWastelandClient(deps: WastelandClientDeps) {
     },
 
     markWantedItemDone(input: { wastelandId: string; itemId: string; evidence: string }) {
-      return trpcMutation(deps, 'markWantedItemDone', input, z.object({ success: z.boolean() }));
+      return trpcMutation(
+        deps,
+        'markWantedItemDone',
+        input,
+        z.object({ success: z.boolean(), pr_url: z.string().nullable() })
+      );
     },
 
     // ── Wasteland CRUD ────────────────────────────────────────────

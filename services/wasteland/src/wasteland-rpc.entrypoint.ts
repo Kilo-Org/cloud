@@ -104,7 +104,15 @@ export class WastelandRPCEntrypoint extends WorkerEntrypoint<Env> {
     wastelandId: string;
     userId: string;
     itemId: string;
+    submitterPullId?: string;
+    submitterRigHandle?: string;
+    submitterForkOwner?: string;
+    completionId?: string;
+    evidence?: string;
     quality: 'excellent' | 'good' | 'fair' | 'poor';
+    reliability?: 'excellent' | 'good' | 'fair' | 'poor';
+    severity?: 'leaf' | 'branch' | 'root';
+    skillTags?: readonly string[];
     /** Free-form message attached to the reputation stamp. */
     message?: string;
     direct?: boolean;
@@ -112,7 +120,15 @@ export class WastelandRPCEntrypoint extends WorkerEntrypoint<Env> {
     return wrap(() =>
       wantedBoard.acceptWantedItem(this.env, params.wastelandId, params.userId, {
         itemId: params.itemId,
+        submitterPullId: params.submitterPullId,
+        submitterRigHandle: params.submitterRigHandle,
+        submitterForkOwner: params.submitterForkOwner,
+        completionId: params.completionId,
+        evidence: params.evidence,
         quality: params.quality,
+        reliability: params.reliability,
+        severity: params.severity,
+        skillTags: params.skillTags,
         message: params.message,
         direct: params.direct,
       })

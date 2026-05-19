@@ -32,12 +32,21 @@ describe('browse', () => {
           ],
         },
       },
-      // 8. read wanted on wl/alice/w-1 (the only mine branch)
+      // 8. read wanted on wl/alice/w-1 (the only mine branch). The
+      //    claim's `updated_at` is later than the upstream main row's,
+      //    which is what flips `source` to `'fork'`.
       {
         status: 200,
         body: {
           query_execution_status: 'Success',
-          rows: [fixtureWantedRow({ id: 'w-1', status: 'claimed', claimed_by: 'alice' })],
+          rows: [
+            fixtureWantedRow({
+              id: 'w-1',
+              status: 'claimed',
+              claimed_by: 'alice',
+              updated_at: '2024-01-02 00:00:00',
+            }),
+          ],
         },
       },
     ];
@@ -171,6 +180,81 @@ describe('browse', () => {
     if (!result.ok) return;
     expect(result.data[0].upstream?.priority).toBe(2);
     expect(result.data[0].upstream?.sandbox_required).toBe(0);
+  });
+
+  it('keeps source=main when fork branch is stale (upstream advanced past the branch)', async () => {
+    // Reproduces: jfawcett did `wl done` on w-1, the admin merged it
+    // upstream to `completed`, but jfawcett's local `wl/alice/w-1`
+    // branch still shows `in_review`. The browse API should display
+    // the upstream `completed` state, not the stale fork view.
+    const responses: MockResponse[] = [
+      // 6 status reads on upstream main: w-1 only appears in 'completed'.
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [],
+        },
+      },
+      { status: 200, body: { query_execution_status: 'Success', rows: [] } },
+      { status: 200, body: { query_execution_status: 'Success', rows: [] } },
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [
+            fixtureWantedRow({
+              id: 'w-1',
+              status: 'completed',
+              claimed_by: 'alice',
+              updated_at: '2024-02-10 00:00:00',
+            }),
+          ],
+        },
+      },
+      { status: 200, body: { query_execution_status: 'Success', rows: [] } },
+      { status: 200, body: { query_execution_status: 'Success', rows: [] } },
+      // listBranches: the stale `wl/alice/w-1` is still around
+      {
+        status: 200,
+        body: { branches: [{ branch_name: 'wl/alice/w-1' }] },
+      },
+      // branch read: the stale `in_review` snapshot
+      {
+        status: 200,
+        body: {
+          query_execution_status: 'Success',
+          rows: [
+            fixtureWantedRow({
+              id: 'w-1',
+              status: 'in_review',
+              claimed_by: 'alice',
+              updated_at: '2024-02-09 00:00:00',
+            }),
+          ],
+        },
+      },
+    ];
+    const { fetch: f } = makeFetch(responses);
+    const result = await browse({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      fork: { forkOwner: 'alice', forkDb: 'wl' },
+      rigHandle: 'alice',
+      fetch: f,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const entry = result.data.find(e => e.wantedId === 'w-1');
+    expect(entry).toBeDefined();
+    if (!entry) return;
+    // Upstream wins because its updated_at is strictly newer than
+    // the branch's. The fork row is still attached so drawer/branch-tab
+    // consumers can show "you have a stale branch".
+    expect(entry.source).toBe('main');
+    expect(entry.upstream?.status).toBe('completed');
+    expect(entry.fork?.row.status).toBe('in_review');
+    expect(entry.fork?.branchName).toBe('wl/alice/w-1');
   });
 
   it('preserves upstream read details when browse fails', async () => {

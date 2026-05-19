@@ -128,11 +128,16 @@ describe('listMyForkBranchesViaSdk', () => {
 describe('publishBranchViaSdk', () => {
   it('opens a PR and returns { prUrl, prId }', async () => {
     // WlClient.publish sequence (publish.ts):
-    //   1. listPulls on upstream (open) — empty → fall through to create
-    //   2. doltRead branch tip for title — returns the row
-    //   3. createPull — returns pull_id
+    //   1. listPulls(open) on upstream — empty so no idempotent reuse
+    //   2. branch HEAD + main HEAD — distinct so we fall through to
+    //      create instead of triggering the "branch already at main"
+    //      no-op path
+    //   3. doltRead branch tip for title — returns the row
+    //   4. createPull — returns pull_id
     const { fetch, calls } = makeFetch([
       { status: 200, body: { pulls: [] } },
+      readRows([{ h: 'branch-head' }]),
+      readRows([{ h: 'main-head' }]),
       readRows([{ id: 'w-1', title: 'Fix the leaky tap', status: 'claimed' }]),
       { status: 200, body: { pull_id: 'pr-42' } },
     ]);
@@ -151,16 +156,28 @@ describe('publishBranchViaSdk', () => {
 
 describe('discardBranchViaSdk', () => {
   it('issues a DELETE on the branch and returns success', async () => {
-    const { fetch, calls } = makeFetch([{ status: 200, body: {} }]);
+    // SDK discardBranch sequence:
+    //   1. listPulls(state=open) on upstream — empty: nothing to close
+    //   2. DELETE branch on the fork
+    //   3. branchExists post-check via listBranches on the fork — gone
+    const { fetch, calls } = makeFetch([
+      { status: 200, body: { pulls: [] } },
+      { status: 200, body: {} },
+      { status: 200, body: { branches: [] } },
+    ]);
     const result = await discardBranchViaSdk(baseCtx, 'w-1', fetch);
     expect(result).toEqual({ success: true });
-    expect(calls).toHaveLength(1);
-    expect(calls[0].method).toBe('DELETE');
-    expect(calls[0].url).toContain('/alice/wl/branches/wl%2Falice%2Fw-1');
+    const deleteCall = calls.find(c => c.method === 'DELETE');
+    expect(deleteCall).toBeDefined();
+    expect(deleteCall?.url).toContain('/alice/wl/branches/wl%2Falice%2Fw-1');
   });
 
   it('is idempotent on 404 (branch already gone)', async () => {
-    const { fetch } = makeFetch([{ status: 404, body: { error: 'not found' } }]);
+    // listPulls returns empty so nothing to close, then DELETE 404s.
+    const { fetch } = makeFetch([
+      { status: 200, body: { pulls: [] } },
+      { status: 404, body: { error: 'not found' } },
+    ]);
     const result = await discardBranchViaSdk(baseCtx, 'w-missing', fetch);
     expect(result).toEqual({ success: true });
   });

@@ -187,7 +187,33 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
     onError: err => toast.error(`Close failed: ${err.message}`),
   });
 
-  const busy = mergeMutation.isPending || closeMutation.isPending;
+  const acceptMutation = useMutation({
+    ...trpc.wasteland.acceptWantedItem.mutationOptions(),
+    onSuccess: result => {
+      const description = result.merged
+        ? result.closed_submitter_pr
+          ? "Stamp issued, adoption PR merged, worker's PR closed."
+          : 'Stamp issued and adoption PR merged. Close the original PR manually.'
+        : 'Stamp issued. The adoption PR is open on DoltHub — merge it to land the work.';
+      toast.success(result.merged ? 'Submission accepted' : 'Adoption PR opened', {
+        description,
+        action: result.pr_url
+          ? {
+              label: 'Open',
+              onClick: () => window.open(result.pr_url ?? '', '_blank', 'noopener,noreferrer'),
+            }
+          : undefined,
+      });
+      closeDrawer();
+      const refetchAt = [2_000, 5_000, 15_000, 30_000];
+      for (const ms of refetchAt) {
+        pendingTimers.current.push(setTimeout(refetch, ms));
+      }
+    },
+    onError: err => toast.error(err.message || 'Accept failed'),
+  });
+
+  const busy = mergeMutation.isPending || closeMutation.isPending || acceptMutation.isPending;
 
   // ── Page header contribution ──────────────────────────────────────
   useSetWastelandPageHeader({
@@ -242,6 +268,23 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
         onMerge: pr => mergeMutation.mutate({ wastelandId, pullId: pr.pull_id }),
         onCloseAction: pr => closeMutation.mutate({ wastelandId, pullId: pr.pull_id }),
         onComment: pr => setCommentOnItem(pr),
+        onAccept: (pr, input) => {
+          if (pr.kind !== 'work-submission') return;
+          acceptMutation.mutate({
+            wastelandId,
+            itemId: pr.item_id,
+            submitterPullId: pr.pull_id,
+            submitterRigHandle: pr.submitter ?? undefined,
+            submitterForkOwner: pr.fork_owner ?? undefined,
+            completionId: pr.completion_id ?? undefined,
+            evidence: pr.evidence_url ?? undefined,
+            quality: input.quality,
+            reliability: input.reliability,
+            severity: input.severity,
+            skillTags: input.skillTags,
+            message: input.message,
+          });
+        },
       },
     });
   };

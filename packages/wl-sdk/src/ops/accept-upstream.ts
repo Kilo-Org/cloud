@@ -19,6 +19,15 @@ export type AcceptUpstreamOptions = {
   ctx: MutationContext;
   wantedId: string;
   submitterRigHandle: string;
+  /**
+   * The DoltHub owner of the fork that hosts the submitter's
+   * `wl/<submitterRigHandle>/<wantedId>` branch. Required when the
+   * submitter's fork is different from `ctx.fork.forkOwner` (i.e. the
+   * common cross-fork worker → admin case). Defaults to
+   * `ctx.fork.forkOwner` when omitted, which is correct only for the
+   * single-fork case.
+   */
+  submitterForkOwner?: string;
   completionId?: string;
   evidence?: string;
   hopUri?: string;
@@ -75,11 +84,16 @@ async function resolveSubmitterCompletion(opts: AcceptUpstreamOptions) {
     };
   }
 
+  // The submitter's `wl/<rig>/<id>` branch lives on the submitter's
+  // fork, NOT the admin's fork. Default to `ctx.fork.forkOwner` only
+  // for the legacy single-fork case (e.g. admin and submitter share a
+  // sandbox fork in tests).
+  const submitterForkOwner = opts.submitterForkOwner ?? opts.ctx.fork.forkOwner;
   const branchName = makeWlBranch(opts.submitterRigHandle, opts.wantedId);
   const sql = `SELECT id, wanted_id, completed_by, evidence, validated_by, stamp_id, parent_completion_id, block_hash, hop_uri, completed_at, validated_at FROM completions WHERE wanted_id = '${opts.wantedId.replace(/'/g, "''").replace(/\\/g, '\\\\')}' ORDER BY completed_at DESC LIMIT 1`;
   const res = await doltRead({
     auth: opts.ctx.auth,
-    owner: opts.ctx.fork.forkOwner,
+    owner: submitterForkOwner,
     db: opts.ctx.fork.forkDb,
     ref: branchName,
     query: sql,
@@ -87,7 +101,10 @@ async function resolveSubmitterCompletion(opts: AcceptUpstreamOptions) {
     hooks: opts.ctx.hooks,
   });
   if (res.rows.length === 0) {
-    throw new WlError(`no completion found on ${branchName}`, 'precondition');
+    throw new WlError(
+      `no completion found on ${submitterForkOwner}/${opts.ctx.fork.forkDb}@${branchName}`,
+      'precondition'
+    );
   }
   const parsed = CompletionsRowSchema.safeParse(res.rows[0]);
   if (!parsed.success) {

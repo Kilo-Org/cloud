@@ -27,7 +27,12 @@
 import { doltWrite } from '../dolthub/write';
 import { deleteBranch } from '../dolthub/branches';
 import { makeWlBranch } from './branch';
-import { readWantedRowAt, readWantedStatusAt, wantedRowsEquivalent } from './state';
+import {
+  assertForkMainCurrent,
+  readWantedRowAt,
+  readWantedStatusAt,
+  wantedRowsEquivalent,
+} from './state';
 import { WlError, type MutationContext, type MutationOutcome } from './types';
 import { WlDoltHubError } from '../dolthub/api';
 
@@ -91,6 +96,30 @@ export async function applyMutation(opts: ApplyMutationOptions): Promise<Mutatio
   if (branchStatus === targetStatus) {
     return { branchName, alreadyApplied: true, cleanedUp: false };
   }
+
+  // ── 1.5. Stale-fork guard ──────────────────────────────────────
+  // The DoltHub hosted SQL API doesn't expose any synchronous fork-sync
+  // primitive (verified by probing the live API: `CALL DOLT_FETCH`,
+  // `DOLT_PULL`, `DOLT_MERGE('upstream/main', ...)`, and `DOLT_REMOTE`
+  // all return `Unsupported SQL statement`; the cross-repo PR-from-
+  // upstream-to-fork mechanic requires write permission on upstream
+  // which the fork owner doesn't have). So when fork main has fallen
+  // behind upstream main, we have to bail out and direct the user to
+  // sync manually — otherwise the WHERE clauses in our DML
+  // (`WHERE status='open'`, `WHERE claimed_by='<rig>' AND status='claimed'`,
+  // etc.) will silently match zero rows and the mutation will appear
+  // to succeed at the API layer while landing nothing.
+  //
+  // Skipping the check when the branch already exists at the target
+  // state is the previous block's job; here we only run for "we're
+  // about to write something that depends on the branch's base".
+  await assertForkMainCurrent({
+    auth: ctx.auth,
+    upstream: ctx.upstream,
+    fork: ctx.fork,
+    fetch: ctx.fetch,
+    hooks: ctx.hooks,
+  });
 
   // ── 2. Apply each DML statement ────────────────────────────────
   // DoltHub's write API accepts only one statement per request, so

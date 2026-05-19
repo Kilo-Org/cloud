@@ -262,8 +262,19 @@ function MarkDoneInlineForm({ wastelandId, item }: { wastelandId: string; item: 
 
   const doneMutation = useMutation({
     ...trpc.wasteland.markWantedItemDone.mutationOptions(),
-    onSuccess: () => {
-      toast.success('Item marked as done');
+    onSuccess: result => {
+      toast.success(
+        result.pr_url ? 'Item marked as done — PR opened' : 'Item marked as done',
+        result.pr_url
+          ? {
+              description: result.pr_url,
+              action: {
+                label: 'Open',
+                onClick: () => window.open(result.pr_url ?? '', '_blank', 'noopener,noreferrer'),
+              },
+            }
+          : undefined
+      );
       setEvidence('');
       void queryClient.invalidateQueries({
         queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId }),
@@ -276,6 +287,9 @@ function MarkDoneInlineForm({ wastelandId, item }: { wastelandId: string; item: 
       });
       void queryClient.invalidateQueries({
         queryKey: trpc.wasteland.listMyPendingClaims.queryKey({ wastelandId }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.listMyPulls.queryKey({ wastelandId }),
       });
     },
     onError: err => toast.error(err.message || 'Failed to mark item as done'),

@@ -26,7 +26,6 @@ import {
   Wrench,
   Webhook,
   Factory,
-  Skull,
   Settings,
   CreditCard,
   MessageSquare,
@@ -182,11 +181,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
           },
         ]
       : []),
-    {
-      title: 'Wastelands',
-      icon: Skull,
-      url: '/wasteland',
-    },
     ...(user && isEnabledForUser(user)
       ? [
           {

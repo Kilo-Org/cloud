@@ -17,6 +17,7 @@ import { WlError } from './ops/types';
 import { claim } from './ops/claim';
 import {
   fixtureWantedRow,
+  forkCurrentResponses,
   makeFetch,
   readWantedRow,
   syncWriteOk,
@@ -72,6 +73,7 @@ describe('WlClient.claim', () => {
     // by the class, one by the free function.
     const responses = (): MockResponse[] => [
       readWantedRow(null),
+      ...forkCurrentResponses(),
       syncWriteOk(),
       readWantedRow(fixtureWantedRow({ id: 'w-1', status: 'open' })),
       readWantedRow(fixtureWantedRow({ id: 'w-1', status: 'claimed', claimed_by: 'alice' })),
@@ -111,6 +113,7 @@ describe('WlClient hooks', () => {
     const seen: { method: string; url: string }[] = [];
     const { fetch: f } = makeFetch([
       readWantedRow(null),
+      ...forkCurrentResponses(),
       syncWriteOk(),
       readWantedRow(fixtureWantedRow({ id: 'w-1', status: 'open' })),
       readWantedRow(fixtureWantedRow({ id: 'w-1', status: 'claimed', claimed_by: 'alice' })),
@@ -122,13 +125,17 @@ describe('WlClient hooks', () => {
       })
     );
     await c.claim('w-1');
-    expect(seen.length).toBe(4);
+    // 1 idempotency read + 2 stale-fork reads + 1 write + 2 cleanup reads = 6.
+    expect(seen.length).toBe(6);
     // First call is the idempotency read against the fork branch.
     expect(seen[0].method).toBe('GET');
     expect(seen[0].url).toContain('/alice/wl/');
-    // Second call is the write.
-    expect(seen[1].method).toBe('POST');
-    expect(seen[1].url).toContain('/alice/wl/write/main/');
+    // Calls 1-2 are the stale-fork guard's HASHOF reads.
+    expect(seen[1].url).toContain('HASHOF');
+    expect(seen[2].url).toContain('HASHOF');
+    // Third call is the write.
+    expect(seen[3].method).toBe('POST');
+    expect(seen[3].url).toContain('/alice/wl/write/main/');
   });
 
   it('onError fires when DoltHub returns a non-2xx response', async () => {
@@ -187,8 +194,13 @@ describe('WlClient.publish error path', () => {
 describe('WlClient.publish happy path', () => {
   it('returns { prUrl, prId } using the plan-named result shape', async () => {
     const { fetch: f } = makeFetch([
-      // listPulls → empty
+      // listPulls(open) → empty
       { status: 200, body: { pulls: [] } },
+      // branch HEAD + main HEAD — distinct so we fall through to
+      // createPull (the matching-heads case is the no-op idempotency
+      // path, not the create-new-PR path).
+      { status: 200, body: { query_execution_status: 'Success', rows: [{ h: 'branch-head' }] } },
+      { status: 200, body: { query_execution_status: 'Success', rows: [{ h: 'main-head' }] } },
       // read wanted row on branch for the title
       readWantedRow(fixtureWantedRow({ id: 'w-1', title: 'Fix flaky tests' })),
       // createPull
@@ -219,6 +231,8 @@ describe('WlClient.done', () => {
     const { fetch: f, calls } = makeFetch([
       // branch idempotency read: claimed
       readWantedRow(fixtureWantedRow({ status: 'claimed', claimed_by: 'alice' })),
+      // fork-currency preamble: not stale
+      ...forkCurrentResponses(),
       // statement 1: UPDATE wanted
       syncWriteOk(),
       // statement 2: INSERT IGNORE INTO completions
@@ -240,6 +254,7 @@ describe('WlClient.done', () => {
   it('accepts (wantedId, input) form with explicit completionId', async () => {
     const { fetch: f } = makeFetch([
       readWantedRow(fixtureWantedRow({ status: 'claimed', claimed_by: 'alice' })),
+      ...forkCurrentResponses(),
       syncWriteOk(),
       syncWriteOk(),
       readWantedRow(fixtureWantedRow({ status: 'claimed', claimed_by: 'alice' })),
@@ -259,6 +274,8 @@ describe('WlClient.accept', () => {
     const { fetch: f, calls } = makeFetch([
       // branch status read: in_review
       readWantedRow(fixtureWantedRow({ status: 'in_review', claimed_by: 'bob' })),
+      // fork-currency preamble: not stale
+      ...forkCurrentResponses(),
       // 3 writes: INSERT stamp, UPDATE completion, UPDATE wanted
       syncWriteOk(),
       syncWriteOk(),

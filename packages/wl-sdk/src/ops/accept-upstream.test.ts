@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { acceptUpstream } from './accept-upstream';
-import { fixtureWantedRow, makeFetch, readWantedRow, syncWriteOk } from './test-helpers';
+import {
+  fixtureWantedRow,
+  forkCurrentResponses,
+  makeFetch,
+  readWantedRow,
+  syncWriteOk,
+} from './test-helpers';
 
 describe('acceptUpstream', () => {
   it('adopts a submitter completion and stamps it on an admin branch', async () => {
     const { fetch: f, calls } = makeFetch([
       readWantedRow(null),
+      ...forkCurrentResponses(),
       syncWriteOk(),
       syncWriteOk(),
       syncWriteOk(),

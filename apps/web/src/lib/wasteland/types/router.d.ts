@@ -482,6 +482,21 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       output: {
         success: boolean;
+        pr_url: string | null;
+      };
+      meta: object;
+    }>;
+    getForkCurrency: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        wastelandId: string;
+      };
+      output: {
+        upstream: string;
+        fork: string;
+        upstreamHead: string | null;
+        forkHead: string | null;
+        isCurrent: boolean;
+        syncUrl: string;
       };
       meta: object;
     }>;
@@ -489,6 +504,11 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       input: {
         wastelandId: string;
         itemId: string;
+        submitterPullId?: string | undefined;
+        submitterRigHandle?: string | undefined;
+        submitterForkOwner?: string | undefined;
+        completionId?: string | undefined;
+        evidence?: string | undefined;
         quality: 'excellent' | 'fair' | 'good' | 'poor';
         reliability?: 'excellent' | 'fair' | 'good' | 'poor' | undefined;
         severity?: 'branch' | 'leaf' | 'root' | undefined;
@@ -498,6 +518,10 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       output: {
         success: boolean;
+        pr_url: string | null;
+        pr_id: string | null;
+        merged: boolean;
+        closed_submitter_pr: boolean;
       };
       meta: object;
     }>;
@@ -570,7 +594,9 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
               submitter: string | null;
               creator_name: string | null;
               created_at: string | null;
+              fork_owner: string | null;
               updated_at: string | null;
+              dolthub_url: string;
               kind: 'rig-registration';
               handle: string;
               display_name: string | null;
@@ -587,7 +613,9 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
               submitter: string | null;
               creator_name: string | null;
               created_at: string | null;
+              fork_owner: string | null;
               updated_at: string | null;
+              dolthub_url: string;
               kind: 'wanted-post';
               item_id: string;
               item_title: string;
@@ -606,7 +634,9 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
               submitter: string | null;
               creator_name: string | null;
               created_at: string | null;
+              fork_owner: string | null;
               updated_at: string | null;
+              dolthub_url: string;
               kind: 'wanted-edit';
               subkind: 'delete' | 'unclaim' | 'update';
               item_id: string;
@@ -623,7 +653,9 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
               submitter: string | null;
               creator_name: string | null;
               created_at: string | null;
+              fork_owner: string | null;
               updated_at: string | null;
+              dolthub_url: string;
               kind: 'work-submission';
               item_id: string;
               item_title: string;
@@ -640,7 +672,9 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
               submitter: string | null;
               creator_name: string | null;
               created_at: string | null;
+              fork_owner: string | null;
               updated_at: string | null;
+              dolthub_url: string;
               kind: 'admin-action';
               subkind: 'accept' | 'accept-upstream' | 'close' | 'close-upstream' | 'reject';
               item_id: string;
@@ -663,7 +697,9 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
               submitter: string | null;
               creator_name: string | null;
               created_at: string | null;
+              fork_owner: string | null;
               updated_at: string | null;
+              dolthub_url: string;
               kind: 'unknown';
               commit_subjects: string[];
             }
@@ -1338,6 +1374,21 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
           };
           output: {
             success: boolean;
+            pr_url: string | null;
+          };
+          meta: object;
+        }>;
+        getForkCurrency: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            wastelandId: string;
+          };
+          output: {
+            upstream: string;
+            fork: string;
+            upstreamHead: string | null;
+            forkHead: string | null;
+            isCurrent: boolean;
+            syncUrl: string;
           };
           meta: object;
         }>;
@@ -1345,6 +1396,11 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
           input: {
             wastelandId: string;
             itemId: string;
+            submitterPullId?: string | undefined;
+            submitterRigHandle?: string | undefined;
+            submitterForkOwner?: string | undefined;
+            completionId?: string | undefined;
+            evidence?: string | undefined;
             quality: 'excellent' | 'fair' | 'good' | 'poor';
             reliability?: 'excellent' | 'fair' | 'good' | 'poor' | undefined;
             severity?: 'branch' | 'leaf' | 'root' | undefined;
@@ -1354,6 +1410,10 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
           };
           output: {
             success: boolean;
+            pr_url: string | null;
+            pr_id: string | null;
+            merged: boolean;
+            closed_submitter_pr: boolean;
           };
           meta: object;
         }>;
@@ -1426,7 +1486,9 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
                   submitter: string | null;
                   creator_name: string | null;
                   created_at: string | null;
+                  fork_owner: string | null;
                   updated_at: string | null;
+                  dolthub_url: string;
                   kind: 'rig-registration';
                   handle: string;
                   display_name: string | null;
@@ -1443,7 +1505,9 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
                   submitter: string | null;
                   creator_name: string | null;
                   created_at: string | null;
+                  fork_owner: string | null;
                   updated_at: string | null;
+                  dolthub_url: string;
                   kind: 'wanted-post';
                   item_id: string;
                   item_title: string;
@@ -1462,7 +1526,9 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
                   submitter: string | null;
                   creator_name: string | null;
                   created_at: string | null;
+                  fork_owner: string | null;
                   updated_at: string | null;
+                  dolthub_url: string;
                   kind: 'wanted-edit';
                   subkind: 'delete' | 'unclaim' | 'update';
                   item_id: string;
@@ -1479,7 +1545,9 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
                   submitter: string | null;
                   creator_name: string | null;
                   created_at: string | null;
+                  fork_owner: string | null;
                   updated_at: string | null;
+                  dolthub_url: string;
                   kind: 'work-submission';
                   item_id: string;
                   item_title: string;
@@ -1496,7 +1564,9 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
                   submitter: string | null;
                   creator_name: string | null;
                   created_at: string | null;
+                  fork_owner: string | null;
                   updated_at: string | null;
+                  dolthub_url: string;
                   kind: 'admin-action';
                   subkind: 'accept' | 'accept-upstream' | 'close' | 'close-upstream' | 'reject';
                   item_id: string;
@@ -1519,7 +1589,9 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
                   submitter: string | null;
                   creator_name: string | null;
                   created_at: string | null;
+                  fork_owner: string | null;
                   updated_at: string | null;
+                  dolthub_url: string;
                   kind: 'unknown';
                   commit_subjects: string[];
                 }

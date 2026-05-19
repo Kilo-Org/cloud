@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { reject } from './reject';
 import {
   fixtureWantedRow,
+  forkCurrentResponses,
   makeFetch,
   readWantedRow,
   syncWriteOk,
@@ -21,6 +22,7 @@ describe('reject', () => {
   it('fans DELETE + UPDATE onto the branch', async () => {
     const responses: MockResponse[] = [
       readWantedRow(fixtureWantedRow({ status: 'in_review', claimed_by: 'bob' })),
+      ...forkCurrentResponses(),
       syncWriteOk(),
       syncWriteOk(),
       // cleanup reads — diverges from main, no cleanup

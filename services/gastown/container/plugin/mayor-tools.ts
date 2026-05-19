@@ -622,21 +622,32 @@ export function createMayorTools(client: MayorGastownClient) {
     gt_wasteland_done: tool({
       description:
         'Mark a claimed wanted item as done with evidence. ' +
-        'Provide proof of completion (e.g. commit SHA, PR URL, or description of what was done).',
+        'A DoltHub pull request is opened automatically against the upstream wasteland.',
       args: {
         item_id: tool.schema.string().describe('The ID of the wanted item to mark done'),
         evidence: tool.schema
           .string()
-          .describe('Evidence of completion (commit SHA, PR URL, description of work done)'),
+          .describe(
+            'A single URL pointing at the proof of completion (typically a GitHub PR ' +
+              'URL like https://github.com/owner/repo/pull/123, but a commit URL or ' +
+              'artifact URL is also fine). Pass ONLY the URL — no surrounding prose, ' +
+              'no "PR submitted:" prefix, no description. The URL is rendered as a ' +
+              'clickable link in the wasteland review UI, so any extra text breaks ' +
+              "reviewers' ability to navigate to the evidence."
+          ),
       },
       async execute(args) {
         const result = await client.wastelandDone({
           item_id: args.item_id,
           evidence: args.evidence,
         });
-        return result.success
-          ? `Marked item ${args.item_id} as done.`
-          : `Failed to mark item ${args.item_id} as done.`;
+        if (!result.success) return `Failed to mark item ${args.item_id} as done.`;
+        return [
+          `Marked item ${args.item_id} as done.`,
+          result.pr_url
+            ? `Pull request: ${result.pr_url}`
+            : 'Pull request: pending — open later from the wasteland UI.',
+        ].join('\n');
       },
     }),
 

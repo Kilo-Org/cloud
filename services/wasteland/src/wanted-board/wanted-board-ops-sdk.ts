@@ -20,11 +20,13 @@
  */
 
 import { z } from 'zod';
+import { readBranchHead } from '@kilocode/wl-sdk';
 import { getWastelandDOStub } from '../dos/Wasteland.do';
 import { deriveEncryptionKey, decryptToken } from '../util/crypto.util';
 import { resolveSecret } from '../util/secret.util';
 import { meterEvent } from '../util/billing.util';
 import { fetchFreshDoltHubToken } from '../util/dolthub-token.util';
+import * as doltApi from '../util/dolthub-api.util';
 import { WantedBoardOpError } from './errors';
 import {
   acceptViaSdk,
@@ -42,7 +44,7 @@ import {
 const PriorityEnum = z.enum(['low', 'medium', 'high', 'critical']);
 const TypeEnum = z.enum(['feature', 'bug', 'docs', 'other']);
 
-async function loadSdkContext(
+export async function loadSdkContext(
   env: Env,
   wastelandId: string,
   userId: string
@@ -154,12 +156,47 @@ export async function unclaimWantedItem(
   return result;
 }
 
+/**
+ * All-in-one admin accept for a worker's in-review submission.
+ *
+ * The canonical `wl` CLI splits this into `wl accept-upstream` (writes
+ * adoption + opens admin's PR) and a separate `wl merge` (lands the
+ * admin's PR into main) with optional `wl reject-upstream` housekeeping
+ * to close the worker's stale PR. In the cloud UI we collapse all of
+ * this into a single Accept click — the admin fills in stamp metadata
+ * once and the server runs the full chain:
+ *
+ *  1. `acceptViaSdk` writes the 5-statement `AcceptUpstreamDML` stack
+ *     on `wl/<admin>/<itemId>` (the admin's adoption branch) and
+ *     auto-publishes a fresh upstream PR.
+ *  2. We merge the admin's adoption PR into upstream `main` so
+ *     `wanted.status` flips to `completed` and the stamp lands
+ *     on-chain. Synchronous merge surface today; async polling can
+ *     come later if DoltHub's merge endpoint switches to operation
+ *     name semantics for this call shape.
+ *  3. We close the worker's original `wl done` PR (best-effort) so it
+ *     doesn't linger in the inbox as a stale duplicate. A close
+ *     failure does NOT fail the accept response: by this point the
+ *     adoption has already merged.
+ *
+ * `submitterPullId`, `submitterRigHandle`, `submitterForkOwner`,
+ * `completionId`, and `evidence` are the five pieces of context the
+ * inbox classifier already has on each `work-submission` row;
+ * threading them through avoids re-deriving them with another
+ * cross-fork read.
+ */
 export async function acceptWantedItem(
   env: Env,
   wastelandId: string,
   userId: string,
   input: {
     itemId: string;
+    /** PR id of the worker's original `wl done` submission. */
+    submitterPullId?: string;
+    submitterRigHandle?: string;
+    submitterForkOwner?: string;
+    completionId?: string;
+    evidence?: string;
     quality: 'excellent' | 'good' | 'fair' | 'poor';
     reliability?: 'excellent' | 'good' | 'fair' | 'poor';
     severity?: 'leaf' | 'branch' | 'root';
@@ -167,11 +204,66 @@ export async function acceptWantedItem(
     message?: string;
     direct?: boolean;
   }
-): Promise<{ success: true }> {
+): Promise<{
+  success: true;
+  pr_url: string | null;
+  pr_id: string | null;
+  merged: boolean;
+  closed_submitter_pr: boolean;
+}> {
   const ctx = await loadSdkContext(env, wastelandId, userId);
-  const result = await acceptViaSdk(ctx, input);
+  const accept = await acceptViaSdk(ctx, input);
+
+  let merged = false;
+  let closedSubmitterPR = false;
+
+  // The merge + close housekeeping only runs for upstream admins.
+  // Non-admin "Accept" callers can still write the adoption commit on
+  // their fork (the SDK call above succeeds), but their token can't
+  // merge the upstream PR — leave it open for an admin to land.
+  if (ctx.isUpstreamAdmin && accept.pr_id) {
+    try {
+      const mergeResult = await doltApi.mergePull(ctx.upstream, ctx.token, accept.pr_id);
+      // DoltHub returns `merged` for synchronous merges and `merging`
+      // for async-with-operation_name flows; the unified merge endpoint
+      // already kicks off the operation either way.
+      merged = mergeResult.state === 'merged' || mergeResult.state === 'merging';
+    } catch (err) {
+      console.warn('[wanted-board-ops-sdk] merge of admin adoption PR failed', {
+        wastelandId,
+        itemId: input.itemId,
+        adminPullId: accept.pr_id,
+        err,
+      });
+    }
+  }
+
+  // Close the worker's original PR best-effort, only after we've at
+  // least kicked off the adoption merge — otherwise the worker's
+  // evidence disappears from the inbox while the upstream is still
+  // in_review.
+  if (ctx.isUpstreamAdmin && merged && input.submitterPullId) {
+    try {
+      await doltApi.closePull(ctx.upstream, ctx.token, input.submitterPullId);
+      closedSubmitterPR = true;
+    } catch (err) {
+      console.warn('[wanted-board-ops-sdk] close of submitter PR failed', {
+        wastelandId,
+        itemId: input.itemId,
+        submitterPullId: input.submitterPullId,
+        err,
+      });
+    }
+  }
+
   meterEvent(env, { event: 'billing.api_operation', userId, wastelandId, label: 'accept' });
-  return result;
+  return {
+    success: true,
+    pr_url: accept.pr_url,
+    pr_id: accept.pr_id,
+    merged,
+    closed_submitter_pr: closedSubmitterPR,
+  };
 }
 
 export async function rejectWantedItem(
@@ -241,9 +333,84 @@ export async function markWantedItemDone(
   wastelandId: string,
   userId: string,
   input: { itemId: string; evidence: string; direct?: boolean }
-): Promise<{ success: true }> {
+): Promise<{ success: true; pr_url: string | null }> {
   const ctx = await loadSdkContext(env, wastelandId, userId);
   const result = await doneViaSdk(ctx, input);
   meterEvent(env, { event: 'billing.api_operation', userId, wastelandId, label: 'done' });
   return result;
+}
+
+/**
+ * Read upstream main HEAD vs fork main HEAD without writing. UI uses
+ * this to render the persistent "Sync fork" status indicator and
+ * to compose the deep-link the button opens on click.
+ *
+ * DoltHub's hosted SQL API does not expose a programmatic fork-sync
+ * (cross-repo `CALL DOLT_FETCH/MERGE` is blocked, and a fork owner
+ * lacks write on the parent repo so they can't open a PR with
+ * `from = upstream:main`). The supported path is the DoltHub web UI's
+ * "Sync from upstream" button on the fork's `pulls/new` page, hence
+ * the deep link.
+ *
+ * Best-effort: a null read on either side is treated as
+ * "unknown, don't block" — the same decision rule as
+ * `assertForkMainCurrent` (the SDK's mutation guard).
+ */
+export async function getForkCurrency(
+  env: Env,
+  wastelandId: string,
+  userId: string
+): Promise<{
+  upstream: string;
+  fork: string;
+  upstreamHead: string | null;
+  forkHead: string | null;
+  isCurrent: boolean;
+  syncUrl: string;
+}> {
+  const ctx = await loadSdkContext(env, wastelandId, userId);
+  const upstreamParts = ctx.upstream.split('/');
+  if (upstreamParts.length !== 2 || !upstreamParts[0] || !upstreamParts[1]) {
+    throw new WantedBoardOpError(
+      `Malformed upstream "${ctx.upstream}" on wasteland ${wastelandId}`,
+      'INTERNAL_SERVER_ERROR'
+    );
+  }
+  const upstreamOwner = upstreamParts[0];
+  const upstreamDb = upstreamParts[1];
+  // DoltHub doesn't allow renaming forks, so fork.db mirrors upstream.db.
+  const forkOwner = ctx.forkOrg;
+  const forkDb = upstreamDb;
+
+  const auth = { token: ctx.token };
+  const [upstreamHead, forkHead] = await Promise.all([
+    readBranchHead({ auth, owner: upstreamOwner, db: upstreamDb, branch: 'main' }),
+    readBranchHead({ auth, owner: forkOwner, db: forkDb, branch: 'main' }),
+  ]);
+
+  const isCurrent = upstreamHead === null || forkHead === null || upstreamHead === forkHead;
+
+  // The DoltHub `pulls/new` page reads `fromBranchOwner`, `fromBranchRepo`,
+  // `fromBranch`, and `toBranch` query params on the server (visible in
+  // its `__NEXT_DATA__.pageProps.params`) and uses them to prefill the
+  // PR form. Linking with these set drops the user on the form already
+  // configured for an upstream→fork sync — they still have to manually
+  // click "Create pull request" and merge it (DoltHub doesn't expose a
+  // one-click "Sync from upstream" button), but they don't have to
+  // reconfigure the from-repo or branches.
+  const syncQs = new URLSearchParams({
+    fromBranchOwner: upstreamOwner,
+    fromBranchRepo: upstreamDb,
+    fromBranch: 'main',
+    toBranch: 'main',
+  }).toString();
+
+  return {
+    upstream: `${upstreamOwner}/${upstreamDb}`,
+    fork: `${forkOwner}/${forkDb}`,
+    upstreamHead,
+    forkHead,
+    isCurrent,
+    syncUrl: `https://www.dolthub.com/repositories/${encodeURIComponent(forkOwner)}/${encodeURIComponent(forkDb)}/pulls/new?${syncQs}`,
+  };
 }

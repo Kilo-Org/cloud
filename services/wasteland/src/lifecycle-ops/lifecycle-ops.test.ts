@@ -55,13 +55,15 @@ describe('joinViaSdk', () => {
     //   1. POST /fork → sync success body (no operation_name → no polling)
     //                   The SDK treats `status: 'Success'` as
     //                   `created: true` (forkResult.created).
-    //   2. POST /write registration on wl/register/alice
-    //   3. GET listPulls (open) — empty so we fall through to create
-    //   4. POST /pulls → returns pull_id
+    //   2. GET upstream rigs read (rigAlreadyRegistered) — empty rows
+    //   3. GET listPulls (open) — empty so we fall through to write+create
+    //   4. POST /write registration on wl/register/alice
+    //   5. POST /pulls → returns pull_id
     const { fetch, calls } = makeFetch([
       { status: 200, body: { status: 'Success' } },
-      { status: 200, body: { query_execution_status: 'Success' } },
+      { status: 200, body: { query_execution_status: 'Success', rows: [] } },
       { status: 200, body: { pulls: [] } },
+      { status: 200, body: { query_execution_status: 'Success' } },
       { status: 200, body: { pull_id: '42' } },
     ]);
 
@@ -89,13 +91,14 @@ describe('joinViaSdk', () => {
     //   1. POST /fork → DoltHub returns a 2xx body with an "already
     //      exists" message, which `forkDatabase` resolves as
     //      `created: false` (see dolthub/database.ts).
-    //   2. POST /write registration succeeds (idempotent ON DUPLICATE).
+    //   2. GET upstream rigs read (rigAlreadyRegistered) — empty rows so
+    //      we keep going down the PR-detection path.
     //   3. GET listPulls → returns the prior PR with matching title
     //                      "Register rig: alice"; we return it instead
-    //                      of opening another.
+    //                      of writing/opening another.
     const { fetch, calls } = makeFetch([
       { status: 200, body: { message: 'database already exists' } },
-      { status: 200, body: { query_execution_status: 'Success' } },
+      { status: 200, body: { query_execution_status: 'Success', rows: [] } },
       {
         status: 200,
         body: {

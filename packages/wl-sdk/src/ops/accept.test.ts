@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { accept } from './accept';
 import {
   fixtureWantedRow,
+  forkCurrentResponses,
   makeFetch,
   readWantedRow,
   syncWriteOk,
@@ -22,6 +23,8 @@ describe('accept', () => {
     const responses: MockResponse[] = [
       // branch status read: in_review
       readWantedRow(fixtureWantedRow({ status: 'in_review', claimed_by: 'bob' })),
+      // fork-currency preamble: not stale
+      ...forkCurrentResponses(),
       // 3 writes: INSERT stamp, UPDATE completion, UPDATE wanted
       syncWriteOk(),
       syncWriteOk(),

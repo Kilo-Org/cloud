@@ -71,6 +71,32 @@ const BoardStatuses = [
   'withdrawn',
 ] as const;
 
+/**
+ * Returns `true` when the fork-branch row represents work the user is
+ * actively doing on top of the upstream main row — i.e. the fork's
+ * `updated_at` is strictly later than upstream's. In that case the
+ * fork wins as the displayed source.
+ *
+ * Returns `false` when the fork branch is stale relative to upstream
+ * (most often: an admin merged the user's `wl done` upstream, the
+ * upstream row advanced to `completed`, but the fork branch still
+ * shows the older `in_review` snapshot until the branch is discarded).
+ *
+ * Comparing `updated_at` strings is safe here because DoltHub returns
+ * them in `'YYYY-MM-DD HH:MM:SS'` UTC format, which is lexicographically
+ * sortable. When either side lacks a timestamp, we fall back to a
+ * conservative "fork wins" rule — the same as the legacy behavior —
+ * to avoid hiding genuine fork progress on rows that happen to be
+ * missing the field.
+ */
+function forkRowIsAheadOfUpstream(forkRow: WantedRow, upstreamRow: WantedRow | null): boolean {
+  if (upstreamRow === null) return true;
+  const forkAt = forkRow.updated_at;
+  const upstreamAt = upstreamRow.updated_at;
+  if (forkAt === null || upstreamAt === null) return true;
+  return forkAt > upstreamAt;
+}
+
 function formatBrowseError(err: unknown): string {
   if (err instanceof WlDoltHubError) {
     const body = typeof err.body === 'string' ? err.body : JSON.stringify(err.body);
@@ -188,8 +214,19 @@ export async function browse(opts: BrowseOptions): Promise<WlResult<BrowseEntry[
           const existing = byId.get(parsed.wantedId);
           const forkInfo = { row, branchName: branch.branch_name };
           if (existing) {
+            // Always attach the fork row — drawer/branch-tab consumers
+            // surface it independently. But only flip `source` to
+            // `'fork'` when the fork branch is *ahead of* upstream
+            // (its `updated_at` is strictly newer). Otherwise the fork
+            // is stale — for example the user `wl done`'d locally,
+            // an admin merged it upstream, and the original `wl/<rig>/<id>`
+            // branch still lives on the fork showing `in_review` even
+            // though main now reflects `completed`. In that case
+            // upstream wins.
             existing.fork = forkInfo;
-            existing.source = 'fork';
+            if (forkRowIsAheadOfUpstream(row, existing.upstream)) {
+              existing.source = 'fork';
+            }
           } else {
             // Branch-only item — appears in result but has no
             // upstream counterpart yet (e.g. a freshly `post`ed

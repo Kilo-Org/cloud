@@ -58,6 +58,7 @@ export { unpublish } from './ops/unpublish';
 export type { UnpublishOptions, UnpublishResult } from './ops/unpublish';
 export { listMyBranches, discardBranch } from './ops/workshop';
 export type { ListMyBranchesOptions, DiscardBranchOptions, MyBranchEntry } from './ops/workshop';
+export { readBranchHead, assertForkMainCurrent } from './ops/state';
 
 // region ops — types and errors
 export { WlError } from './ops/types';

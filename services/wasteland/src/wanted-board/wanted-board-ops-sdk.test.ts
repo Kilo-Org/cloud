@@ -57,6 +57,37 @@ function readRows(rows: Array<Record<string, unknown>>): MockResponse {
   return { status: 200, body: { query_execution_status: 'Success', rows } };
 }
 
+/**
+ * The two `HASHOF('main')` reads `applyMutation`'s stale-fork guard
+ * issues — upstream main HEAD followed by fork main HEAD. Default:
+ * both equal (fork is current).
+ */
+function forkCurrentResponses(): MockResponse[] {
+  return [readRows([{ h: 'upstream-head' }]), readRows([{ h: 'upstream-head' }])];
+}
+
+/**
+ * `publish` first checks for an open PR on the branch, then compares
+ * branch HEAD vs upstream main HEAD to short-circuit when there is
+ * nothing new to publish. For the create-new-PR happy path:
+ *  - the open-PR list comes back empty, AND
+ *  - branch HEAD differs from main HEAD (so we fall through to
+ *    createPull instead of returning the no-op idempotency case).
+ *
+ * Two distinct hash values keep the path explicit; a `null` from
+ * either read would also fall through, but masks the intent.
+ */
+function publishNoExistingPull(): MockResponse[] {
+  return [
+    // listPulls(open) → empty
+    { status: 200, body: { pulls: [] } },
+    // branch HEAD
+    readRows([{ h: 'branch-head' }]),
+    // upstream main HEAD — different so branch is "ahead"
+    readRows([{ h: 'main-head' }]),
+  ];
+}
+
 function fixtureWantedRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 'w-1',
@@ -92,8 +123,16 @@ const baseCtx: SdkContext = {
 
 describe('browseViaSdk', () => {
   it('reads upstream main, lists fork branches, returns flat rows', async () => {
+    // browse() with no filter fans out one read per BoardStatuses entry
+    // (open, claimed, in_review, completed, validated, withdrawn).
+    // Only the first response carries a row; the rest are empty.
     const { fetch, calls } = makeFetch([
       readRows([fixtureWantedRow({ id: 'w-1', status: 'open' })]),
+      readRows([]),
+      readRows([]),
+      readRows([]),
+      readRows([]),
+      readRows([]),
       // listBranches on fork
       { status: 200, body: { branches: [] } },
     ]);
@@ -102,27 +141,87 @@ describe('browseViaSdk', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ id: 'w-1', status: 'open' });
 
-    // First fetch hits upstream owner/db read endpoint (SQL query
-    // is encoded into the URL → GET).
+    // The first six fetches hit the upstream owner/db read endpoint
+    // (SQL query is encoded into the URL → GET).
     expect(calls[0].url).toContain('/hop/wl?');
-    // Second fetch lists branches on the fork.
-    expect(calls[1].url).toContain('/alice/wl/branches');
+    // Subsequent fetch lists branches on the fork.
+    const branchListCall = calls.find(c => c.url.includes('/alice/wl/branches'));
+    expect(branchListCall).toBeDefined();
   });
 
-  it('prefers fork row when a wl/<rig>/* branch exists', async () => {
+  it('prefers fork row when a wl/<rig>/* branch is ahead of upstream main', async () => {
+    // Fork wins only when its `updated_at` is strictly newer than the
+    // upstream main row's — that's the SDK's "fork has fresh in-progress
+    // work" signal.
     const { fetch } = makeFetch([
-      readRows([fixtureWantedRow({ id: 'w-1', status: 'open' })]),
+      // 6 status reads on upstream main
+      readRows([
+        fixtureWantedRow({ id: 'w-1', status: 'open', updated_at: '2024-01-01 00:00:00' }),
+      ]),
+      readRows([]),
+      readRows([]),
+      readRows([]),
+      readRows([]),
+      readRows([]),
+      // listBranches on fork
       {
         status: 200,
         body: { branches: [{ branch_name: 'wl/alice/w-1' }] },
       },
-      readRows([fixtureWantedRow({ id: 'w-1', status: 'claimed', claimed_by: 'alice' })]),
+      // per-branch read on fork — claim updated_at is strictly newer
+      readRows([
+        fixtureWantedRow({
+          id: 'w-1',
+          status: 'claimed',
+          claimed_by: 'alice',
+          updated_at: '2024-01-02 00:00:00',
+        }),
+      ]),
     ]);
 
     const result = await browseViaSdk(baseCtx, fetch);
     expect(result).toHaveLength(1);
     expect(result[0].status).toBe('claimed');
     expect(result[0].claimed_by).toBe('alice');
+  });
+
+  it('shows upstream when a stale wl/<rig>/* branch lags behind main', async () => {
+    // Reproduces the post-accept stale-branch case: the user's `wl done`
+    // got merged upstream by an admin (main now shows `completed`), but
+    // their fork branch still holds the older `in_review` snapshot.
+    // Browse should surface the freshly-completed upstream row, not
+    // the stale branch view.
+    const { fetch } = makeFetch([
+      // 6 upstream main reads — the row appears in the 'completed' fanout
+      readRows([]),
+      readRows([]),
+      readRows([]),
+      readRows([
+        fixtureWantedRow({
+          id: 'w-1',
+          status: 'completed',
+          claimed_by: 'alice',
+          updated_at: '2024-02-10 00:00:00',
+        }),
+      ]),
+      readRows([]),
+      readRows([]),
+      // listBranches: stale wl/alice/w-1 still around
+      { status: 200, body: { branches: [{ branch_name: 'wl/alice/w-1' }] } },
+      // branch read: older `in_review` snapshot
+      readRows([
+        fixtureWantedRow({
+          id: 'w-1',
+          status: 'in_review',
+          claimed_by: 'alice',
+          updated_at: '2024-02-09 00:00:00',
+        }),
+      ]),
+    ]);
+
+    const result = await browseViaSdk(baseCtx, fetch);
+    expect(result).toHaveLength(1);
+    expect(result[0].status).toBe('completed');
   });
 });
 
@@ -136,15 +235,17 @@ describe('claimViaSdk', () => {
     //   3. read main wanted row       → open
     //   4. read branch wanted row     → claimed (no cleanup)
     // Then publish:
-    //   5. listPulls (open)           → []
+    //   5. listPulls fanout (open, merged, closed) → all []
     //   6. read branch wanted row     → claimed (for title)
     //   7. createPull                  → returns pull_id
     const { fetch, calls } = makeFetch([
       readRows([]),
+      // fork-currency preamble: not stale
+      ...forkCurrentResponses(),
       syncWriteOk(),
       readRows([fixtureWantedRow({ id: 'w-1', status: 'open' })]),
       readRows([fixtureWantedRow({ id: 'w-1', status: 'claimed', claimed_by: 'alice' })]),
-      { status: 200, body: { pulls: [] } },
+      ...publishNoExistingPull(),
       readRows([fixtureWantedRow({ id: 'w-1', status: 'claimed' })]),
       { status: 200, body: { pull_id: 'pr-42' } },
     ]);
@@ -167,8 +268,8 @@ describe('claimViaSdk', () => {
     const { fetch } = makeFetch([
       // 1. claim's idempotency read → already claimed, no write
       readRows([fixtureWantedRow({ id: 'w-1', status: 'claimed', claimed_by: 'alice' })]),
-      // 2. publish: listPulls → empty (no existing PR found)
-      { status: 200, body: { pulls: [] } },
+      // 2. publish: listPulls fanout (open/merged/closed) → all empty
+      ...publishNoExistingPull(),
       // 3. publish: read branch row for title
       readRows([fixtureWantedRow({ id: 'w-1', status: 'claimed' })]),
       // 4. publish: createPull
@@ -186,6 +287,7 @@ describe('unclaimViaSdk', () => {
   it('writes unclaim DML and returns success', async () => {
     const { fetch } = makeFetch([
       readRows([fixtureWantedRow({ id: 'w-1', status: 'claimed', claimed_by: 'alice' })]),
+      ...forkCurrentResponses(),
       syncWriteOk(),
       // auto-cleanup compare reads
       readRows([fixtureWantedRow({ id: 'w-1', status: 'open' })]),
@@ -205,6 +307,8 @@ describe('postViaSdk', () => {
     const { fetch, calls } = makeFetch([
       // Idempotency read on freshly-named branch (no row).
       readRows([]),
+      // fork-currency preamble: not stale
+      ...forkCurrentResponses(),
       // Write the INSERT.
       syncWriteOk(),
     ]);
@@ -228,16 +332,24 @@ describe('postViaSdk', () => {
 // ── doneViaSdk ──────────────────────────────────────────────────────────
 
 describe('doneViaSdk', () => {
-  it('writes done DMLs (UPDATE wanted + INSERT completion) on the branch', async () => {
+  it('writes done DMLs and auto-publishes a PR; returns pr_url', async () => {
     const { fetch, calls } = makeFetch([
       // idempotency read
       readRows([fixtureWantedRow({ id: 'w-1', status: 'claimed', claimed_by: 'alice' })]),
+      // fork-currency preamble: not stale
+      ...forkCurrentResponses(),
       // two write statements
       syncWriteOk(),
       syncWriteOk(),
       // auto-cleanup compare reads
       readRows([fixtureWantedRow({ id: 'w-1', status: 'open' })]),
       readRows([fixtureWantedRow({ id: 'w-1', status: 'in_review' })]),
+      // publish: listPulls fanout (open/merged/closed) → all empty
+      ...publishNoExistingPull(),
+      // publish: read branch row for title
+      readRows([fixtureWantedRow({ id: 'w-1', status: 'in_review' })]),
+      // publish: createPull
+      { status: 200, body: { pull_id: 'pr-77' } },
     ]);
 
     const result = await doneViaSdk(
@@ -245,10 +357,45 @@ describe('doneViaSdk', () => {
       { itemId: 'w-1', evidence: 'https://github.com/x/y/pull/1' },
       fetch
     );
-    expect(result).toEqual({ success: true });
+    expect(result.success).toBe(true);
+    expect(result.pr_url).toContain('pr-77');
 
     const writes = calls.filter(c => c.method === 'POST' && c.url.includes('/write/'));
-    // Two statements → two writes.
+    // Two statements → two writes (publish itself is a separate API).
+    expect(writes).toHaveLength(2);
+  });
+
+  it('returns pr_url=null when publish fails but done write succeeds', async () => {
+    const { fetch, calls } = makeFetch([
+      // idempotency read
+      readRows([fixtureWantedRow({ id: 'w-1', status: 'claimed', claimed_by: 'alice' })]),
+      // fork-currency preamble: not stale
+      ...forkCurrentResponses(),
+      // two write statements
+      syncWriteOk(),
+      syncWriteOk(),
+      // auto-cleanup compare reads
+      readRows([fixtureWantedRow({ id: 'w-1', status: 'open' })]),
+      readRows([fixtureWantedRow({ id: 'w-1', status: 'in_review' })]),
+      // publish: listPulls fans out 3x (open/merged/closed); each
+      // 5xx is swallowed by `findPullForBranchInState` → returns null.
+      { status: 500, body: { error: 'upstream down' } },
+      { status: 500, body: { error: 'upstream down' } },
+      { status: 500, body: { error: 'upstream down' } },
+      // publish: read branch row for title (still attempted)
+      { status: 500, body: { error: 'upstream down' } },
+      // publish: createPull also fails
+      { status: 500, body: { error: 'upstream down' } },
+    ]);
+
+    const result = await doneViaSdk(
+      baseCtx,
+      { itemId: 'w-1', evidence: 'https://github.com/x/y/pull/1' },
+      fetch
+    );
+    expect(result).toEqual({ success: true, pr_url: null });
+
+    const writes = calls.filter(c => c.method === 'POST' && c.url.includes('/write/'));
     expect(writes).toHaveLength(2);
   });
 });
@@ -256,37 +403,153 @@ describe('doneViaSdk', () => {
 // ── acceptViaSdk ────────────────────────────────────────────────────────
 
 describe('acceptViaSdk', () => {
-  it('reads completion id then runs accept DMLs', async () => {
+  it('writes the 5-statement accept-upstream DML stack and auto-publishes the admin PR', async () => {
     const { fetch, calls } = makeFetch([
-      // readLatestCompletionId
-      readRows([{ id: 'c-w-1-alice-abc123' }]),
-      // accept idempotency read
+      // applyMutation: idempotency read on admin's branch wl/alice/w-1
       readRows([fixtureWantedRow({ id: 'w-1', status: 'in_review' })]),
-      // three statements: insert stamp, update completion, update wanted
+      // fork-currency preamble: not stale
+      ...forkCurrentResponses(),
+      // five accept-upstream statements (DELETE, INSERT, UPDATE wanted, INSERT stamp, UPDATE completion)
+      syncWriteOk(),
+      syncWriteOk(),
+      syncWriteOk(),
+      syncWriteOk(),
+      syncWriteOk(),
+      // auto-cleanup compare reads (main vs admin's branch tip)
+      readRows([fixtureWantedRow({ id: 'w-1', status: 'in_review' })]),
+      readRows([fixtureWantedRow({ id: 'w-1', status: 'completed' })]),
+      // publish: listPulls fanout (open/merged/closed) → all empty
+      ...publishNoExistingPull(),
+      // publish: read branch row for title
+      readRows([fixtureWantedRow({ id: 'w-1', status: 'completed' })]),
+      // publish: createPull
+      { status: 200, body: { pull_id: 'pr-200' } },
+    ]);
+
+    const adminCtx: SdkContext = {
+      upstream: 'hop/wl',
+      forkOrg: 'alice',
+      rigHandle: 'alice',
+      token: 'tok',
+      isUpstreamAdmin: true,
+    };
+    const result = await acceptViaSdk(
+      adminCtx,
+      {
+        itemId: 'w-1',
+        submitterRigHandle: 'charlie',
+        submitterForkOwner: 'charlie',
+        completionId: 'c-w-1-charlie-abc123',
+        evidence: 'https://github.com/x/y/pull/77',
+        quality: 'good',
+        reliability: 'good',
+        severity: 'leaf',
+        message: 'nice work',
+      },
+      fetch
+    );
+    expect(result.success).toBe(true);
+    expect(result.pr_url).toContain('pr-200');
+    expect(result.pr_id).toBe('pr-200');
+
+    const writes = calls.filter(c => c.method === 'POST' && c.url.includes('/write/'));
+    // Five accept-upstream statements → five writes.
+    expect(writes).toHaveLength(5);
+    // Adoption commits must land on the admin's branch, not the submitter's.
+    expect(writes.every(w => w.url.includes('/alice/wl/write/'))).toBe(true);
+    expect(writes.every(w => w.url.includes('wl%2Falice%2Fw-1'))).toBe(true);
+  });
+
+  it('refuses to stamp yourself when admin == submitter', async () => {
+    const { fetch } = makeFetch([]);
+    await expect(
+      acceptViaSdk(
+        baseCtx,
+        {
+          itemId: 'w-1',
+          submitterRigHandle: 'alice',
+          submitterForkOwner: 'alice',
+          completionId: 'c-w-1-alice-abc',
+          evidence: 'https://x/y',
+          quality: 'good',
+        },
+        fetch
+      )
+    ).rejects.toThrow(/cannot issue a stamp to yourself/);
+  });
+
+  it('reads completion id and evidence from the submitter fork when not pre-resolved', async () => {
+    const { fetch, calls } = makeFetch([
+      // adapter's readLatestCompletion on charlie's fork — single row read
+      // returns both id + evidence so the SDK can skip its own re-read.
+      readRows([{ id: 'c-w-1-charlie-abc123', evidence: 'https://github.com/x/y/pull/77' }]),
+      // applyMutation: idempotency read on admin's branch
+      readRows([fixtureWantedRow({ id: 'w-1', status: 'in_review' })]),
+      // fork-currency preamble: not stale
+      ...forkCurrentResponses(),
+      syncWriteOk(),
+      syncWriteOk(),
       syncWriteOk(),
       syncWriteOk(),
       syncWriteOk(),
       // cleanup compare
-      readRows([fixtureWantedRow({ id: 'w-1', status: 'open' })]),
+      readRows([fixtureWantedRow({ id: 'w-1', status: 'in_review' })]),
       readRows([fixtureWantedRow({ id: 'w-1', status: 'completed' })]),
+      // publish: listPulls fanout (open/merged/closed) → all empty,
+      // then read branch row for title, then createPull.
+      ...publishNoExistingPull(),
+      readRows([fixtureWantedRow({ id: 'w-1', status: 'completed' })]),
+      { status: 200, body: { pull_id: 'pr-201' } },
     ]);
 
+    const adminCtx: SdkContext = {
+      upstream: 'hop/wl',
+      forkOrg: 'alice',
+      rigHandle: 'alice',
+      token: 'tok',
+      isUpstreamAdmin: true,
+    };
     const result = await acceptViaSdk(
-      baseCtx,
-      { itemId: 'w-1', quality: 'good', message: 'nice' },
+      adminCtx,
+      {
+        itemId: 'w-1',
+        submitterRigHandle: 'charlie',
+        submitterForkOwner: 'charlie',
+        // completionId NOT pre-resolved
+        quality: 'good',
+      },
       fetch
     );
-    expect(result).toEqual({ success: true });
+    expect(result.pr_id).toBe('pr-201');
 
-    const writes = calls.filter(c => c.method === 'POST' && c.url.includes('/write/'));
-    // Three accept statements → three writes.
-    expect(writes).toHaveLength(3);
+    // The first read must hit charlie's fork, not alice's, because
+    // the worker's branch lives on the worker's fork. URL shape:
+    //   /api/v1alpha1/<forkOwner>/<forkDb>/<branch>?q=…
+    expect(calls[0].url).toContain('/charlie/wl/');
+    // And the ref segment targets the worker's branch.
+    expect(calls[0].url).toContain('wl%2Fcharlie%2Fw-1');
   });
 
-  it('throws PRECONDITION_FAILED when no completion exists on the branch', async () => {
+  it('throws PRECONDITION_FAILED when no completion exists on the submitter branch', async () => {
     const { fetch } = makeFetch([readRows([])]);
+    const adminCtx: SdkContext = {
+      upstream: 'hop/wl',
+      forkOrg: 'alice',
+      rigHandle: 'alice',
+      token: 'tok',
+      isUpstreamAdmin: true,
+    };
     await expect(
-      acceptViaSdk(baseCtx, { itemId: 'w-missing', quality: 'good' }, fetch)
+      acceptViaSdk(
+        adminCtx,
+        {
+          itemId: 'w-missing',
+          submitterRigHandle: 'charlie',
+          submitterForkOwner: 'charlie',
+          quality: 'good',
+        },
+        fetch
+      )
     ).rejects.toThrow(/no completion found/);
   });
 });
@@ -297,6 +560,7 @@ describe('rejectViaSdk', () => {
   it('runs reject DMLs and returns success', async () => {
     const { fetch, calls } = makeFetch([
       readRows([fixtureWantedRow({ id: 'w-1', status: 'in_review' })]),
+      ...forkCurrentResponses(),
       syncWriteOk(),
       syncWriteOk(),
       readRows([fixtureWantedRow({ id: 'w-1', status: 'open' })]),
@@ -319,6 +583,7 @@ describe('closeViaSdk', () => {
   it('runs close DML and returns success', async () => {
     const { fetch, calls } = makeFetch([
       readRows([fixtureWantedRow({ id: 'w-1', status: 'open' })]),
+      ...forkCurrentResponses(),
       syncWriteOk(),
       readRows([fixtureWantedRow({ id: 'w-1', status: 'open' })]),
       readRows([fixtureWantedRow({ id: 'w-1', status: 'closed' })]),

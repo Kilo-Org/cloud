@@ -50,7 +50,7 @@ type WastelandService = {
 		userId: string;
 		itemId: string;
 		evidence: string;
-	}): Promise<WastelandRpcResult<{ success: true }>>;
+	}): Promise<WastelandRpcResult<{ success: true; pr_url: string | null }>>;
 };
 declare namespace Cloudflare {
 	interface GlobalProps {

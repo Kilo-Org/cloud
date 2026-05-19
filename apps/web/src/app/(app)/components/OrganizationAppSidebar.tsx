@@ -23,7 +23,6 @@ import {
   ListChecks,
   Wrench,
   Webhook,
-  Skull,
   Settings,
   MessageSquare,
   ChevronLeft,
@@ -192,16 +191,6 @@ export default function OrganizationAppSidebar({
             title: 'Gas Town',
             icon: Bot,
             url: `/organizations/${organizationId}/gastown`,
-          },
-        ]
-      : []),
-    // Wasteland requires a non-billing_manager role.
-    ...(currentRole !== 'billing_manager'
-      ? [
-          {
-            title: 'Wastelands',
-            icon: Skull,
-            url: `/organizations/${organizationId}/wasteland`,
           },
         ]
       : []),

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { post } from './post';
-import { makeFetch, readWantedRow, syncWriteOk, type MockResponse } from './test-helpers';
+import {
+  forkCurrentResponses,
+  makeFetch,
+  readWantedRow,
+  syncWriteOk,
+  type MockResponse,
+} from './test-helpers';
 import type { MutationContext } from './types';
 
 const ctx = (f: typeof fetch, now?: () => Date): MutationContext => ({
@@ -17,6 +23,8 @@ describe('post', () => {
     const responses: MockResponse[] = [
       // branch status read: empty (branch absent)
       readWantedRow(null),
+      // fork-currency preamble: not stale
+      ...forkCurrentResponses(),
       // write
       syncWriteOk(),
     ];
@@ -36,8 +44,9 @@ describe('post', () => {
     const writes = calls.filter(c => c.method === 'POST' && c.url.includes('/write/'));
     expect(writes).toHaveLength(1);
     expect(decodeURIComponent(writes[0].url)).toContain("'2024-05-01 12:00:00'");
-    // No reads after the write — cleanup is disabled.
-    expect(calls).toHaveLength(2);
+    // 1 idempotency read + 2 stale-fork reads + 1 write = 4 calls; no
+    // post-write reads since cleanup is disabled.
+    expect(calls).toHaveLength(4);
   });
 
   it('idempotency: branch already at status=open → no write', async () => {

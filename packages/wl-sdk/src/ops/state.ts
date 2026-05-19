@@ -119,3 +119,113 @@ export function wantedRowsEquivalent(a: WantedRow | null, b: WantedRow | null): 
     a.created_at === b.created_at
   );
 }
+
+const HeadRow = z.object({ h: z.string() }).passthrough();
+
+/**
+ * Read the HEAD commit hash of a branch on a DoltHub repo.
+ *
+ * Used by {@link assertForkMainCurrent} to detect stale forks. Returns
+ * `null` when the branch doesn't exist (404) or DoltHub returns no rows
+ * — callers treat that as "couldn't determine, don't block."
+ */
+export async function readBranchHead(opts: {
+  auth: DoltHubAuth;
+  owner: string;
+  db: string;
+  branch: string;
+  fetch?: typeof fetch;
+  hooks?: DoltFetchHooks;
+}): Promise<string | null> {
+  // `HASHOF('<ref>')` is the standard dolt SQL function for the
+  // commit-hash of a ref. We pass the branch name as the ref so the
+  // result is the HEAD of that branch.
+  const sql = `SELECT HASHOF('${escapeSqlString(opts.branch)}') AS h`;
+  try {
+    const res = await doltRead({
+      auth: opts.auth,
+      owner: opts.owner,
+      db: opts.db,
+      // Read from main — the HASHOF function works regardless of the
+      // queried branch, and main is guaranteed to exist on every repo.
+      ref: 'main',
+      query: sql,
+      fetch: opts.fetch,
+      hooks: opts.hooks,
+    });
+    if (res.rows.length === 0) return null;
+    const parsed = HeadRow.safeParse(res.rows[0]);
+    if (!parsed.success) return null;
+    return parsed.data.h;
+  } catch (err) {
+    if (err instanceof WlDoltHubError && err.status === 404) return null;
+    return null;
+  }
+}
+
+/**
+ * Refuse the mutation if the caller's fork is behind upstream.
+ *
+ * **Why this exists:** the DoltHub hosted SQL API does not support
+ * `CALL DOLT_FETCH` / `DOLT_PULL` / `DOLT_MERGE('upstream/main')`
+ * (verified against jrf0110/wl-commons; all return
+ * `Unsupported SQL statement`), and a cross-repo PR from
+ * `upstream:main` → `fork:main` requires write permission on the
+ * upstream repo (which the fork owner doesn't have).
+ *
+ * So we cannot programmatically sync a fork from upstream. The only
+ * working sync paths are:
+ *  - The DoltHub web UI's "Update from upstream" affordance on the
+ *    fork's pulls page.
+ *  - The local `dolt` CLI: `dolt fetch upstream && dolt merge upstream/main`.
+ *
+ * When we detect drift, this throws a {@link WlError} with `code:
+ * 'precondition'` and a message containing the deep-link URL — the
+ * server adapter surfaces it to the UI so the user can sync and
+ * retry.
+ *
+ * The check is best-effort: if either HEAD read fails we let the
+ * mutation proceed (better to allow a write that might silently
+ * no-op than to block a healthy mutation on a transient read error).
+ */
+export async function assertForkMainCurrent(opts: {
+  auth: DoltHubAuth;
+  upstream: { owner: string; db: string };
+  fork: { forkOwner: string; forkDb: string };
+  fetch?: typeof fetch;
+  hooks?: DoltFetchHooks;
+}): Promise<void> {
+  const [upstreamHead, forkHead] = await Promise.all([
+    readBranchHead({
+      auth: opts.auth,
+      owner: opts.upstream.owner,
+      db: opts.upstream.db,
+      branch: 'main',
+      fetch: opts.fetch,
+      hooks: opts.hooks,
+    }),
+    readBranchHead({
+      auth: opts.auth,
+      owner: opts.fork.forkOwner,
+      db: opts.fork.forkDb,
+      branch: 'main',
+      fetch: opts.fetch,
+      hooks: opts.hooks,
+    }),
+  ]);
+
+  // If either read returned null, we can't decide. Don't block.
+  if (upstreamHead === null || forkHead === null) return;
+  if (upstreamHead === forkHead) return;
+
+  // Drift detected. Compose the deep-link to the fork's pulls/new page,
+  // which is where DoltHub surfaces the "Sync from upstream" UI.
+  const syncUrl = `https://www.dolthub.com/repositories/${encodeURIComponent(opts.fork.forkOwner)}/${encodeURIComponent(opts.fork.forkDb)}/pulls/new`;
+  throw new WlError(
+    `Your DoltHub fork ${opts.fork.forkOwner}/${opts.fork.forkDb} is behind upstream ${opts.upstream.owner}/${opts.upstream.db}. ` +
+      `DoltHub's API doesn't support a programmatic fork-sync, so you'll need to sync manually before this mutation can proceed. ` +
+      `Visit ${syncUrl} and open a pull request from ${opts.upstream.owner}/${opts.upstream.db}:main into your fork's main, then merge it. ` +
+      `After the sync lands, retry this action.`,
+    'precondition'
+  );
+}

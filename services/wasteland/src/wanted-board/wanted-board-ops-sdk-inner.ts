@@ -90,33 +90,46 @@ function makeStampId(wantedId: string): string {
 }
 
 /**
- * Read the latest completion id for a wanted item off the caller's
- * `wl/<rigHandle>/<itemId>` fork branch. Used by `acceptViaSdk`
- * because the SDK requires an explicit `completionId`.
+ * Read the latest completion `(id, evidence)` for a wanted item off
+ * the `wl/<submitterRigHandle>/<itemId>` branch on the submitter's
+ * fork.
+ *
+ * Used by `acceptViaSdk` because the underlying SDK requires both
+ * fields to skip its own cross-fork read. The branch lives on the
+ * submitter's fork (NOT the admin's), so `submitterForkOwner` is
+ * required for cross-fork accept; falls back to `ctx.forkOrg` only
+ * for legacy single-fork tests where admin and submitter share an
+ * org.
  */
-async function readLatestCompletionId(
+async function readLatestCompletion(
   ctx: SdkContext,
   wantedId: string,
+  submitterRigHandle: string,
+  submitterForkOwner: string | null,
   fetchImpl?: typeof fetch
-): Promise<string | null> {
+): Promise<{ id: string; evidence: string | null } | null> {
   const escapedId = wantedId.replace(/'/g, "''").replace(/\\/g, '\\\\');
-  const sql = `SELECT id FROM completions WHERE wanted_id = '${escapedId}' ORDER BY submitted_at DESC LIMIT 1`;
+  const sql = `SELECT id, evidence FROM completions WHERE wanted_id = '${escapedId}' ORDER BY submitted_at DESC LIMIT 1`;
   const slash = ctx.upstream.indexOf('/');
   if (slash <= 0) return null;
   const upstreamDb = ctx.upstream.slice(slash + 1);
-  const branchName = `wl/${ctx.rigHandle}/${wantedId}`;
+  const branchName = `wl/${submitterRigHandle}/${wantedId}`;
   try {
     const res = await doltRead({
       auth: { token: ctx.token },
-      owner: ctx.forkOrg,
+      owner: submitterForkOwner ?? ctx.forkOrg,
       db: upstreamDb,
       ref: branchName,
       query: sql,
       fetch: fetchImpl,
     });
     if (res.rows.length === 0) return null;
-    const parsed = z.object({ id: z.string() }).passthrough().safeParse(res.rows[0]);
-    return parsed.success ? parsed.data.id : null;
+    const parsed = z
+      .object({ id: z.string(), evidence: z.string().nullable().optional() })
+      .passthrough()
+      .safeParse(res.rows[0]);
+    if (!parsed.success) return null;
+    return { id: parsed.data.id, evidence: parsed.data.evidence ?? null };
   } catch {
     return null;
   }
@@ -136,8 +149,13 @@ export async function browseViaSdk(
     throw wrapSdkError(err, 'Browse');
   }
   return entries.map(entry => {
-    const row = entry.fork?.row ?? entry.upstream;
-    if (row === null) return { id: entry.wantedId };
+    // Prefer the row the SDK marked as authoritative (`entry.source`).
+    // The SDK reconciles fork-vs-upstream by comparing `updated_at` so
+    // a stale fork branch (e.g. an admin merged the user's `wl done`
+    // upstream and the local `wl/<rig>/<id>` branch still shows
+    // `in_review`) doesn't shadow the freshly-completed upstream row.
+    const row = entry.source === 'fork' ? (entry.fork?.row ?? entry.upstream) : entry.upstream;
+    if (row === null || row === undefined) return { id: entry.wantedId };
     return { ...row };
   });
 }
@@ -179,11 +197,48 @@ export async function unclaimViaSdk(
   return { success: true };
 }
 
+/**
+ * Adopt a worker's in-review upstream PR and issue a reputation stamp.
+ *
+ * Mirrors the canonical `wl accept-upstream` flow:
+ *  1. Load the worker's completion id off `wl/<submitter>/<itemId>` on
+ *     the submitter's fork (the wanted-board adapter passes this in
+ *     directly when known, since the inbox classifier has already
+ *     fetched it).
+ *  2. Run the 5-statement `AcceptUpstreamDML` stack on the admin's
+ *     `wl/<admin>/<itemId>` branch (DELETE/INSERT completion, UPDATE
+ *     wanted to completed, INSERT stamp, UPDATE completion with
+ *     stamp_id).
+ *  3. Auto-publish the admin's adoption PR for upstream merge. The
+ *     wrapper in `wanted-board-ops-sdk.ts` then merges that PR and
+ *     closes the worker's original PR — the all-in-one accept UX.
+ *
+ * Returns the `pr_url` of the admin's adoption PR so callers can
+ * follow up with merge / housekeeping.
+ */
 export async function acceptViaSdk(
   ctx: SdkContext,
   input: {
     itemId: string;
     submitterRigHandle?: string;
+    /**
+     * DoltHub owner of the submitter's fork. Required when admin and
+     * submitter are in different DoltHub orgs (the common cross-fork
+     * case). Falls back to `ctx.forkOrg` for the legacy single-fork
+     * case.
+     */
+    submitterForkOwner?: string;
+    /**
+     * The completion id from the worker's branch. The inbox classifier
+     * already has this (`work-submission.completion_id`); pass it
+     * through to skip the extra cross-fork read.
+     */
+    completionId?: string;
+    /**
+     * Evidence URL the worker submitted with `wl done`. Skips the
+     * cross-fork read of `completions.evidence` when known.
+     */
+    evidence?: string;
     quality: 'excellent' | 'good' | 'fair' | 'poor';
     reliability?: 'excellent' | 'good' | 'fair' | 'poor';
     severity?: 'leaf' | 'branch' | 'root';
@@ -191,7 +246,7 @@ export async function acceptViaSdk(
     message?: string;
   },
   fetchImpl?: typeof fetch
-): Promise<{ success: true }> {
+): Promise<{ success: true; pr_url: string | null; pr_id: string | null }> {
   const submitterRigHandle =
     input.submitterRigHandle ?? (await resolveSubmitterRig(ctx, input.itemId, fetchImpl));
   if (!submitterRigHandle) {
@@ -207,22 +262,40 @@ export async function acceptViaSdk(
     );
   }
 
-  const completionId = await readLatestCompletionId(
-    { ...ctx, rigHandle: submitterRigHandle },
-    input.itemId,
-    fetchImpl
-  );
-  if (!completionId) {
+  let completionId = input.completionId;
+  let evidence = input.evidence;
+  if (!completionId || !evidence) {
+    const found = await readLatestCompletion(
+      ctx,
+      input.itemId,
+      submitterRigHandle,
+      input.submitterForkOwner ?? null,
+      fetchImpl
+    );
+    if (!found) {
+      throw new WantedBoardOpError(
+        `Accept failed: no completion found on branch wl/${submitterRigHandle}/${input.itemId}`,
+        'PRECONDITION_FAILED'
+      );
+    }
+    completionId = completionId ?? found.id;
+    evidence = evidence ?? found.evidence ?? undefined;
+  }
+  if (!evidence) {
     throw new WantedBoardOpError(
-      `Accept failed: no completion found on branch wl/${submitterRigHandle}/${input.itemId}`,
+      `Accept failed: no evidence recorded on branch wl/${submitterRigHandle}/${input.itemId}`,
       'PRECONDITION_FAILED'
     );
   }
   const wl = makeClient(ctx, fetchImpl);
+  let prUrl: string | null = null;
+  let prId: string | null = null;
   try {
     await wl.acceptUpstream(input.itemId, {
       submitterRigHandle,
+      submitterForkOwner: input.submitterForkOwner,
       completionId,
+      evidence,
       stamp: {
         id: makeStampId(input.itemId),
         subject: submitterRigHandle,
@@ -233,11 +306,13 @@ export async function acceptViaSdk(
         message: input.message,
       },
     });
-    await wl.publish(input.itemId);
+    const pub = await wl.publish(input.itemId);
+    prUrl = pub.prUrl;
+    prId = pub.prId;
   } catch (err) {
     throw wrapSdkError(err, 'Accept');
   }
-  return { success: true };
+  return { success: true, pr_url: prUrl, pr_id: prId };
 }
 
 async function resolveSubmitterRig(
@@ -348,16 +423,42 @@ export async function editViaSdk(
   return { success: true, pr_url: prUrl };
 }
 
+/**
+ * Mark a wanted item as done with evidence, then auto-publish the
+ * fork branch as an upstream PR so the maintainer can review without
+ * the caller having to take a second action.
+ *
+ * Mirrors the canonical `wl` CLI: `Client.mutatePR` in
+ * `wasteland/internal/sdk/mutate.go` auto-creates a PR after the
+ * mutation when the branch survives auto-cleanup and no PR exists
+ * yet. The cloud SDK splits write/publish into two ops, so the
+ * adapter chains them here — same pattern as `claimViaSdk` and
+ * `editViaSdk`.
+ *
+ * Publish failures are demoted to warnings so the upstream branch
+ * write (the source of truth) is not lost when only the PR-creation
+ * call fails. Callers can retry publish from the workshop UI.
+ */
 export async function doneViaSdk(
   ctx: SdkContext,
   input: { itemId: string; evidence: string },
   fetchImpl?: typeof fetch
-): Promise<{ success: true }> {
+): Promise<{ success: true; pr_url: string | null }> {
   const wl = makeClient(ctx, fetchImpl);
+  let prUrl: string | null = null;
   try {
     await wl.done(input.itemId, { evidence: input.evidence });
+    try {
+      const pub = await wl.publish(input.itemId);
+      prUrl = pub.prUrl;
+    } catch (err) {
+      console.warn('[wanted-board-ops-sdk] publish after done failed', {
+        itemId: input.itemId,
+        err,
+      });
+    }
   } catch (err) {
     throw wrapSdkError(err, 'Mark done');
   }
-  return { success: true };
+  return { success: true, pr_url: prUrl };
 }

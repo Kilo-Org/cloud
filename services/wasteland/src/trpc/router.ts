@@ -116,7 +116,7 @@ function wantedBoardErrorToTRPC(err: unknown): never {
           ? { name: err.cause.name, message: err.cause.message }
           : err.cause === undefined
             ? undefined
-            : String(err.cause),
+            : JSON.stringify(err.cause),
     });
     const code =
       err.code === 'PRECONDITION_FAILED'
@@ -1286,7 +1286,7 @@ export const wastelandRouter = router({
         direct: z.boolean().optional(),
       })
     )
-    .output(z.object({ success: z.boolean() }))
+    .output(z.object({ success: z.boolean(), pr_url: z.string().nullable() }))
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
@@ -1300,11 +1300,71 @@ export const wastelandRouter = router({
       }
     }),
 
+  /**
+   * Fork-currency probe: compares the user's fork main HEAD to upstream
+   * main HEAD without writing. UI uses this to drive the persistent
+   * "Sync fork" button — green/disabled when current, prominent when
+   * stale — and to read the `syncUrl` deep-link the button opens on
+   * click.
+   *
+   * DoltHub's API does not expose a programmatic fork-sync. Cross-repo
+   * `CALL DOLT_FETCH/MERGE` is blocked, and a fork owner lacks write on
+   * the parent repo, so `POST /{forkOwner}/{forkDb}/pulls` with
+   * `from=upstream:main` returns "must have write permissions on from
+   * repository". The supported path is DoltHub's web UI "Sync from
+   * upstream" button on `<fork>/pulls/new`.
+   *
+   * Best-effort — a null read on either side is treated as
+   * "unknown, do not block."
+   */
+  getForkCurrency: procedure
+    .input(z.object({ wastelandId: z.string().uuid() }))
+    .output(
+      z.object({
+        upstream: z.string(),
+        fork: z.string(),
+        upstreamHead: z.string().nullable(),
+        forkHead: z.string().nullable(),
+        isCurrent: z.boolean(),
+        syncUrl: z.string().url(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      try {
+        return await wantedBoard.getForkCurrency(ctx.env, input.wastelandId, ctx.userId);
+      } catch (err) {
+        return wantedBoardErrorToTRPC(err);
+      }
+    }),
+
   acceptWantedItem: procedure
     .input(
       z.object({
         wastelandId: z.string().uuid(),
         itemId: z.string().min(1),
+        /**
+         * Pull id of the worker's original `wl done` PR. Threaded
+         * through from the inbox card so the server can close the
+         * stale PR after merging the admin's adoption.
+         */
+        submitterPullId: z.string().min(1).optional(),
+        /**
+         * Worker's rig handle (the `<rig>` in `wl/<rig>/<id>`).
+         * Inbox classifier already exposes this as
+         * `work-submission.submitter`.
+         */
+        submitterRigHandle: z.string().min(1).optional(),
+        /**
+         * DoltHub owner of the worker's fork. Required for cross-fork
+         * accept reads; inbox classifier exposes this as
+         * `work-submission.fork_owner`.
+         */
+        submitterForkOwner: z.string().min(1).optional(),
+        /** Completion id from the worker's branch (inbox `completion_id`). */
+        completionId: z.string().min(1).optional(),
+        /** Evidence URL from the worker's submission (inbox `evidence_url`). */
+        evidence: z.string().optional(),
         quality: z.enum(['excellent', 'good', 'fair', 'poor']),
         reliability: z.enum(['excellent', 'good', 'fair', 'poor']).optional(),
         severity: z.enum(['leaf', 'branch', 'root']).optional(),
@@ -1317,12 +1377,25 @@ export const wastelandRouter = router({
         direct: z.boolean().optional(),
       })
     )
-    .output(z.object({ success: z.boolean() }))
+    .output(
+      z.object({
+        success: z.boolean(),
+        pr_url: z.string().nullable(),
+        pr_id: z.string().nullable(),
+        merged: z.boolean(),
+        closed_submitter_pr: z.boolean(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
         return await wantedBoard.acceptWantedItem(ctx.env, input.wastelandId, ctx.userId, {
           itemId: input.itemId,
+          submitterPullId: input.submitterPullId,
+          submitterRigHandle: input.submitterRigHandle,
+          submitterForkOwner: input.submitterForkOwner,
+          completionId: input.completionId,
+          evidence: input.evidence,
           quality: input.quality,
           reliability: input.reliability,
           severity: input.severity,

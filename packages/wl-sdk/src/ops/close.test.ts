@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { close } from './close';
 import {
   fixtureWantedRow,
+  forkCurrentResponses,
   makeFetch,
   readWantedRow,
   syncWriteOk,
@@ -21,6 +22,7 @@ describe('close', () => {
   it('writes UPDATE wanted to completed', async () => {
     const responses: MockResponse[] = [
       readWantedRow(fixtureWantedRow({ status: 'in_review', claimed_by: 'bob' })),
+      ...forkCurrentResponses(),
       syncWriteOk(),
       readWantedRow(fixtureWantedRow({ status: 'in_review', claimed_by: 'bob' })),
       readWantedRow(fixtureWantedRow({ status: 'completed', claimed_by: 'bob' })),

@@ -73,6 +73,35 @@ export function readWantedRow(row: Record<string, unknown> | null): MockResponse
   };
 }
 
+/**
+ * Build a HASHOF row (`{ rows: [{ h: '<hash>' }] }`) — the shape
+ * `readBranchHead` reads. Used by the matched-pair fork-currency
+ * preamble below; tests can also stamp a custom hash for drift cases.
+ */
+export function readBranchHead(hash: string): MockResponse {
+  return {
+    status: 200,
+    body: {
+      query_execution_status: 'Success',
+      rows: [{ h: hash }],
+    },
+  };
+}
+
+/**
+ * Helper that produces the two `readBranchHead` responses
+ * `applyMutation`'s `assertForkMainCurrent` consumes — upstream main
+ * HEAD followed by fork main HEAD. Default: both equal (fork is
+ * current). Pass `{ drift: true }` to make them differ so the
+ * stale-fork guard fires.
+ */
+export function forkCurrentResponses(opts: { drift?: boolean } = {}): MockResponse[] {
+  return [
+    readBranchHead('upstream-head'),
+    readBranchHead(opts.drift ? 'fork-head' : 'upstream-head'),
+  ];
+}
+
 /** A populated wanted row fixture. */
 export function fixtureWantedRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {

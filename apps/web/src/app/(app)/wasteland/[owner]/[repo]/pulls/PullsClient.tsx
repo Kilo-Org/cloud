@@ -25,6 +25,8 @@ import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import type { WastelandOutputs } from '@/lib/wasteland/trpc';
 import { useUser } from '@/hooks/useUser';
 import { useWastelandRepo } from '../_components/WastelandRepoContext';
+import { useDrawerStack } from '@/components/wasteland/drawer/WastelandDrawerStack';
+import type { AcceptFormInput, ReviewPanelActions } from '@/components/wasteland/drawer/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -38,12 +40,11 @@ import {
 } from '@/components/ui/dialog';
 import {
   CheckCircle2,
+  ChevronRight,
   ExternalLink,
   GitPullRequest,
   Inbox,
   Loader2,
-  MessageSquare,
-  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -231,6 +232,8 @@ function MinePullRow({ pull }: { pull: MyPull }) {
 function IncomingTab({ wastelandId }: { wastelandId: string }) {
   const trpc = useWastelandTRPC();
   const queryClient = useQueryClient();
+  const repo = useWastelandRepo();
+  const { open: openDrawer, closeAll: closeDrawer } = useDrawerStack();
 
   const inboxQueryKey = trpc.wasteland.listInboxItems.queryKey({ wastelandId });
   const inboxQuery = useQuery({
@@ -253,13 +256,25 @@ function IncomingTab({ wastelandId }: { wastelandId: string }) {
     []
   );
 
+  const scheduleSettleRefetch = () => {
+    for (const ms of [2_000, 5_000, 15_000, 30_000]) {
+      pendingTimers.current.push(setTimeout(refetch, ms));
+    }
+  };
+
+  // Merge stays available for non-work-submission inbox kinds
+  // (rig-registration, wanted-post, wanted-edit, admin-action). For
+  // work-submission rows the admin opens the row drawer and submits
+  // the inline AcceptForm, which writes the stamp + adoption commit +
+  // merges + closes the worker's PR in one shot. Plain Merge on a
+  // work-submission would land the worker's branch as-is
+  // (status=in_review, no stamp) — exactly the bug we're fixing.
   const mergeMutation = useMutation({
     ...trpc.wasteland.mergeUpstreamPR.mutationOptions(),
     onSuccess: () => {
       toast.success('Merge initiated');
-      for (const ms of [2_000, 5_000, 15_000, 30_000]) {
-        pendingTimers.current.push(setTimeout(refetch, ms));
-      }
+      scheduleSettleRefetch();
+      closeDrawer();
     },
     onError: err => toast.error(`Merge failed: ${err.message}`),
   });
@@ -269,11 +284,71 @@ function IncomingTab({ wastelandId }: { wastelandId: string }) {
     onSuccess: () => {
       toast.success('PR closed');
       refetch();
+      closeDrawer();
     },
     onError: err => toast.error(`Close failed: ${err.message}`),
   });
 
+  const acceptMutation = useMutation({
+    ...trpc.wasteland.acceptWantedItem.mutationOptions(),
+    onSuccess: result => {
+      const description = result.merged
+        ? result.closed_submitter_pr
+          ? "Stamp issued, adoption PR merged, worker's PR closed."
+          : 'Stamp issued and adoption PR merged. Close the original PR manually.'
+        : 'Stamp issued. The adoption PR is open on DoltHub — merge it to land the work.';
+      toast.success(result.merged ? 'Submission accepted' : 'Adoption PR opened', {
+        description,
+        action: result.pr_url
+          ? {
+              label: 'Open',
+              onClick: () => window.open(result.pr_url ?? '', '_blank', 'noopener,noreferrer'),
+            }
+          : undefined,
+      });
+      scheduleSettleRefetch();
+      closeDrawer();
+    },
+    onError: err => toast.error(err.message || 'Accept failed'),
+  });
+
   const [commentItem, setCommentItem] = useState<InboxItem | null>(null);
+
+  // Build the actions object the drawer's ReviewItemPanel consumes. The
+  // drawer captures the actions on push, so we build the same object
+  // both for openDrawer below and for any inline quick-actions on the
+  // row buttons. Re-opening the drawer with a fresh actions object is
+  // cheap; it just pushes a new entry.
+  const upstream = `${repo.owner}/${repo.repo}`;
+  const busy = mergeMutation.isPending || closeMutation.isPending || acceptMutation.isPending;
+  const buildActions = (): ReviewPanelActions => ({
+    upstream,
+    busy,
+    onMerge: pr => mergeMutation.mutate({ wastelandId, pullId: pr.pull_id }),
+    onCloseAction: pr => closeMutation.mutate({ wastelandId, pullId: pr.pull_id }),
+    onComment: pr => setCommentItem(pr),
+    onAccept: (pr, input: AcceptFormInput) => {
+      if (pr.kind !== 'work-submission') return;
+      acceptMutation.mutate({
+        wastelandId,
+        itemId: pr.item_id,
+        submitterPullId: pr.pull_id,
+        submitterRigHandle: pr.submitter ?? undefined,
+        submitterForkOwner: pr.fork_owner ?? undefined,
+        completionId: pr.completion_id ?? undefined,
+        evidence: pr.evidence_url ?? undefined,
+        quality: input.quality,
+        reliability: input.reliability,
+        severity: input.severity,
+        skillTags: input.skillTags,
+        message: input.message,
+      });
+    },
+  });
+
+  const handleOpenDrawer = (item: InboxItem) => {
+    openDrawer({ type: 'review-item', wastelandId, item, actions: buildActions() });
+  };
 
   if (inboxQuery.isLoading) return <ListSkeleton />;
 
@@ -310,15 +385,7 @@ function IncomingTab({ wastelandId }: { wastelandId: string }) {
     <>
       <div className="flex flex-col gap-2">
         {items.map(item => (
-          <IncomingPullRow
-            key={item.pull_id}
-            item={item}
-            wastelandId={wastelandId}
-            busy={mergeMutation.isPending || closeMutation.isPending}
-            onMerge={() => mergeMutation.mutate({ wastelandId, pullId: item.pull_id })}
-            onClose={() => closeMutation.mutate({ wastelandId, pullId: item.pull_id })}
-            onComment={() => setCommentItem(item)}
-          />
+          <IncomingPullRow key={item.pull_id} item={item} onOpen={() => handleOpenDrawer(item)} />
         ))}
       </div>
       <CommentDialog
@@ -330,22 +397,20 @@ function IncomingTab({ wastelandId }: { wastelandId: string }) {
   );
 }
 
-function IncomingPullRow({
-  item,
-  busy,
-  onMerge,
-  onClose,
-  onComment,
-}: {
-  item: InboxItem;
-  wastelandId: string;
-  busy: boolean;
-  onMerge: () => void;
-  onClose: () => void;
-  onComment: () => void;
-}) {
+/**
+ * Inbox row. Clicking anywhere on the row opens a `review-item`
+ * drawer; the drawer holds the per-kind detail view, the inline
+ * AcceptForm (for work-submissions), and the secondary action
+ * buttons. The DoltHub external-link affordance still opens in a new
+ * tab without triggering the drawer.
+ */
+function IncomingPullRow({ item, onOpen }: { item: InboxItem; onOpen: () => void }) {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-left transition-colors hover:border-white/10 hover:bg-white/[0.035] focus:border-white/15 focus:outline-none"
+    >
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-white/85">{item.title}</p>
@@ -371,37 +436,24 @@ function IncomingPullRow({
             )}
           </div>
         </div>
-        <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-white/55">
-          {item.kind}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-white/55">
+            {item.kind}
+          </Badge>
+          <a
+            href={item.dolthub_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            className="rounded p-1 text-white/35 transition-colors hover:bg-white/[0.06] hover:text-white/70"
+            aria-label="Open on DoltHub"
+          >
+            <ExternalLink className="size-3.5" />
+          </a>
+          <ChevronRight className="size-4 shrink-0 text-white/25" aria-hidden />
+        </div>
       </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button size="sm" onClick={onMerge} disabled={busy} className="h-8 gap-1.5">
-          Merge
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onComment}
-          disabled={busy}
-          className="h-8 gap-1.5"
-        >
-          <MessageSquare className="size-3.5" />
-          Comment
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={onClose}
-          disabled={busy}
-          className="h-8 gap-1.5 text-white/55 hover:bg-red-500/10 hover:text-red-300"
-        >
-          <X className="size-3.5" />
-          Close
-        </Button>
-      </div>
-    </div>
+    </button>
   );
 }
 

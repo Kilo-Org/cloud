@@ -2,8 +2,10 @@
 
 import { usePathname } from 'next/navigation';
 import { WastelandBetaBadge } from '@/components/wasteland/WastelandBetaBadge';
+import { SyncForkButton } from '@/components/wasteland/SyncForkButton';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useWastelandPageHeader } from '@/app/(app)/wasteland/by-id/[wastelandId]/WastelandPageHeaderContext';
+import { useWastelandRepo } from './WastelandRepoContext';
 import { RepoNavTabs } from './RepoNavTabs';
 
 type RepoDashboardHeaderProps = {
@@ -14,7 +16,8 @@ type RepoDashboardHeaderProps = {
 /**
  * Top of the per-wasteland shell. Renders the `<owner>/<repo>` mono
  * title, the per-page header section (via the existing
- * `WastelandPageHeader` context), and the section nav tabs.
+ * `WastelandPageHeader` context), the persistent fork-sync CTA, and
+ * the section nav tabs.
  *
  * Pages contribute their own title/count/actions via
  * `useSetWastelandPageHeader` — same hook the legacy `[wastelandId]/`
@@ -23,6 +26,7 @@ type RepoDashboardHeaderProps = {
 export function RepoDashboardHeader({ owner, repo }: RepoDashboardHeaderProps) {
   const pathname = usePathname();
   const pageHeader = useWastelandPageHeader();
+  const repoIdentity = useWastelandRepo();
   const subtitle = subtitleForPath(pathname, owner, repo);
 
   return (
@@ -44,14 +48,24 @@ export function RepoDashboardHeader({ owner, repo }: RepoDashboardHeaderProps) {
           {subtitle && <p className="text-xs text-white/35">{subtitle}</p>}
         </div>
 
-        {/* Page-specific section — title + count + CTAs, right-aligned via flex-1. */}
-        {pageHeader && (
+        {/* Page-specific section — title + count + CTAs. Takes the
+            available width so its inline actions sit left-of the
+            persistent CTAs. */}
+        {pageHeader?.actions && (
           <div className="flex flex-1 items-center justify-end gap-2 pl-3">
-            {pageHeader.actions && (
-              <div className="flex items-center gap-2">{pageHeader.actions}</div>
-            )}
+            <div className="flex items-center gap-2">{pageHeader.actions}</div>
           </div>
         )}
+
+        {/* Persistent CTAs that apply to every owner/repo sub-page.
+            When no page header is mounted, push these to the right. */}
+        <div
+          className={
+            pageHeader?.actions ? 'flex items-center gap-2' : 'ml-auto flex items-center gap-2'
+          }
+        >
+          <SyncForkButton wastelandId={repoIdentity.wastelandId} />
+        </div>
       </div>
 
       <RepoNavTabs owner={owner} repo={repo} />

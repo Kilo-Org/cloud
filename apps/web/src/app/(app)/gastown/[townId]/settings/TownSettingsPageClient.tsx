@@ -74,7 +74,9 @@ type Props = { townId: string; readOnly?: boolean; organizationId?: string };
 
 type EnvVarEntry = { key: string; value: string; isNew?: boolean };
 
-// Section definitions for the scrollspy nav
+// Section definitions for the scrollspy nav. The `wasteland` entry is
+// filtered out for org-context settings via `buildSections(organizationId)`
+// below — wastelands are personal-scoped only.
 const SECTIONS = [
   { id: 'git-auth', label: 'Git Authentication', icon: GitBranch },
   { id: 'github-cli', label: 'GitHub CLI', icon: Key },
@@ -90,6 +92,11 @@ const SECTIONS = [
   { id: 'debug', label: 'Debug', icon: Bug },
   { id: 'danger-zone', label: 'Danger Zone', icon: Trash2 },
 ] as const;
+
+function buildSections(organizationId: string | undefined) {
+  if (organizationId) return SECTIONS.filter(s => s.id !== 'wasteland');
+  return SECTIONS;
+}
 
 export function TownSettingsPageClient({ townId, readOnly = false, organizationId }: Props) {
   const trpc = useGastownTRPC();
@@ -298,8 +305,9 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     setInitialized(true);
   }
 
+  const sections = useMemo(() => buildSections(organizationId), [organizationId]);
   const { activeId: activeSection, scrollTo: scrollToSection } = useScrollSpy(
-    SECTIONS.map(s => s.id),
+    sections.map(s => s.id),
     { stickyHeaderId: 'settings-sticky-header' }
   );
 
@@ -1170,16 +1178,26 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                 </div>
               </SettingsSection>
 
-              {/* ── Wasteland ──────────────────────────────────────── */}
-              <SettingsSection
-                id="wasteland"
-                title="Wasteland"
-                description="Connect this town to a Wasteland for shared bounties and community contributions."
-                icon={Globe}
-                index={9}
-              >
-                <WastelandSettingsSection townId={townId} readOnly={effectiveReadOnly} />
-              </SettingsSection>
+              {/* ── Wasteland ────────────────────────────────────────
+                  Wastelands are personal-scoped only — the standalone
+                  /wasteland routes filter to user-owned wastelands and
+                  the org sidebar no longer surfaces wastelands at all.
+                  Hiding the connect-to-wasteland affordance for
+                  org-context towns keeps the surface consistent: an
+                  org member can't connect their org's town to a
+                  personal wasteland, and there's no org-wasteland
+                  surface to connect to either. */}
+              {!organizationId && (
+                <SettingsSection
+                  id="wasteland"
+                  title="Wasteland"
+                  description="Connect this town to a Wasteland for shared bounties and community contributions."
+                  icon={Globe}
+                  index={9}
+                >
+                  <WastelandSettingsSection townId={townId} readOnly={effectiveReadOnly} />
+                </SettingsSection>
+              )}
 
               {/* ── Custom Instructions ────────────────────────────────── */}
               <SettingsSection
@@ -1303,7 +1321,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
           </div>
 
           <SettingsScrollspyNav
-            items={SECTIONS as readonly SettingsNavItem[]}
+            items={sections as readonly SettingsNavItem[]}
             activeId={activeSection}
             onNavigate={scrollToSection}
             stickyTopPx={53}

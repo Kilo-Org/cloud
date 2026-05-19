@@ -24,7 +24,13 @@ const WastelandPostBody = z.object({
 
 const WastelandDoneBody = z.object({
   item_id: z.string().min(1),
-  evidence: z.string().min(1),
+  // Evidence MUST be a single URL (PR / commit / artifact). The wasteland
+  // review UI renders this as a clickable link, so passing a sentence with
+  // a URL embedded in it (e.g. "PR submitted: https://…") breaks the link
+  // affordance for admins. Mirrors the strict `z.string().url()` validation
+  // on the tRPC `markWantedItemDone` procedure used by the web UI; the
+  // mayor path was previously the only entry that allowed free-form text.
+  evidence: z.string().url(),
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────

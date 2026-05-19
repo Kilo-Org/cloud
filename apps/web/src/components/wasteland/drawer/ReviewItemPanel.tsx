@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -9,6 +10,7 @@ import {
   GitMerge,
   Hand,
   HelpCircle,
+  Loader2,
   MessageSquare,
   Pencil,
   ScrollText,
@@ -19,7 +21,7 @@ import {
 } from 'lucide-react';
 import type { DrawerStackHelpers } from '@/components/drawer';
 import { MarkdownProse } from '@/components/security-agent/MarkdownProse';
-import type { InboxItem, ReviewPanelActions, WastelandDrawerRef } from './types';
+import type { AcceptFormInput, InboxItem, ReviewPanelActions, WastelandDrawerRef } from './types';
 import { RigLink, WantedItemLink } from './CrossRefs';
 
 type InboxKind = InboxItem['kind'];
@@ -68,44 +70,260 @@ export function ReviewItemPanel({ wastelandId, item, actions, push }: PanelProps
         <DetailRow label="Updated" value={formatTimestamp(item.updated_at)} />
       </div>
 
-      {actions && <ActionButtons item={item} actions={actions} />}
+      {actions && <ActionRegion item={item} actions={actions} />}
     </div>
   );
 }
 
-function ActionButtons({ item, actions }: { item: InboxItem; actions: ReviewPanelActions }) {
-  const { upstream, busy, onMerge, onCloseAction, onComment } = actions;
+/**
+ * Renders the right action surface for the inbox row's `kind`. For
+ * work-submissions we surface the inline AcceptForm (the canonical
+ * `wl accept-upstream` workflow — stamp + adoption commit + merge +
+ * close worker's PR) as the primary action. For everything else we
+ * surface the legacy Merge/Close/Comment trio.
+ */
+function ActionRegion({ item, actions }: { item: InboxItem; actions: ReviewPanelActions }) {
+  if (item.kind === 'work-submission') {
+    return (
+      <div className="space-y-3 border-t border-white/[0.06] pt-3">
+        <AcceptForm item={item} actions={actions} />
+        <SecondaryActions item={item} actions={actions} variant="work-submission" />
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-2 border-t border-white/[0.06] pt-3">
       <button
         type="button"
-        onClick={() => onMerge(item)}
-        disabled={busy}
+        onClick={() => actions.onMerge(item)}
+        disabled={actions.busy}
         className="inline-flex items-center justify-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
       >
         <GitMerge className="size-3.5" />
         Merge PR
       </button>
+      <SecondaryActions item={item} actions={actions} variant="default" />
+    </div>
+  );
+}
+
+/**
+ * Inline accept form for a work-submission inbox row. Mirrors the
+ * canonical `wl accept-upstream` flag set 1:1: quality, reliability,
+ * severity, skill tags, message. Calls `actions.onAccept` which the
+ * hosting page wires to the `acceptWantedItem` mutation.
+ */
+function AcceptForm({
+  item,
+  actions,
+}: {
+  item: Extract<InboxItem, { kind: 'work-submission' }>;
+  actions: ReviewPanelActions;
+}) {
+  const [quality, setQuality] = useState<AcceptFormInput['quality']>('good');
+  const [reliability, setReliability] = useState<AcceptFormInput['reliability']>('good');
+  const [severity, setSeverity] = useState<AcceptFormInput['severity']>('leaf');
+  const [skillTags, setSkillTags] = useState('');
+  const [message, setMessage] = useState('');
+
+  // The accept flow needs the worker's evidence to be present — without
+  // it the server's `acceptUpstream` will fail with PRECONDITION_FAILED
+  // (no completion / no evidence). Surface this in the form so the
+  // admin sees why Accept is disabled before they fill in the form.
+  const canAccept = Boolean(item.has_done && item.evidence_url);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canAccept) return;
+    const tags = skillTags
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+    actions.onAccept(item, {
+      quality,
+      reliability,
+      severity,
+      skillTags: tags.length > 0 ? tags : undefined,
+      message: message.trim() || undefined,
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="flex items-center gap-1.5">
+        <ShieldCheck className="size-3.5 text-emerald-400/80" />
+        <p className="text-[10px] font-semibold tracking-[0.08em] text-emerald-300/80 uppercase">
+          Accept &amp; stamp
+        </p>
+      </div>
+      <p className="text-[11px] leading-relaxed text-white/45">
+        Issue a reputation stamp, write the adoption commit on your branch, merge it to{' '}
+        <span className="font-mono text-white/65">main</span>, and close the worker&apos;s PR — in
+        one step.
+      </p>
+
+      <div>
+        <label
+          htmlFor={`accept-quality-${item.pull_id}`}
+          className="mb-1.5 block text-xs font-medium text-white/60"
+        >
+          Quality
+        </label>
+        <select
+          id={`accept-quality-${item.pull_id}`}
+          value={quality}
+          onChange={e => setQuality(e.target.value as typeof quality)}
+          disabled={!canAccept || actions.busy}
+          className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none focus:border-white/20 disabled:opacity-50"
+        >
+          <option value="excellent">Excellent</option>
+          <option value="good">Good</option>
+          <option value="fair">Fair</option>
+          <option value="poor">Poor</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label
+            htmlFor={`accept-reliability-${item.pull_id}`}
+            className="mb-1.5 block text-xs font-medium text-white/60"
+          >
+            Reliability
+          </label>
+          <select
+            id={`accept-reliability-${item.pull_id}`}
+            value={reliability}
+            onChange={e => setReliability(e.target.value as typeof reliability)}
+            disabled={!canAccept || actions.busy}
+            className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none focus:border-white/20 disabled:opacity-50"
+          >
+            <option value="excellent">Excellent</option>
+            <option value="good">Good</option>
+            <option value="fair">Fair</option>
+            <option value="poor">Poor</option>
+          </select>
+        </div>
+        <div>
+          <label
+            htmlFor={`accept-severity-${item.pull_id}`}
+            className="mb-1.5 block text-xs font-medium text-white/60"
+          >
+            Severity
+          </label>
+          <select
+            id={`accept-severity-${item.pull_id}`}
+            value={severity}
+            onChange={e => setSeverity(e.target.value as typeof severity)}
+            disabled={!canAccept || actions.busy}
+            className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none focus:border-white/20 disabled:opacity-50"
+          >
+            <option value="leaf">Leaf</option>
+            <option value="branch">Branch</option>
+            <option value="root">Root</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label
+          htmlFor={`accept-skills-${item.pull_id}`}
+          className="mb-1.5 block text-xs font-medium text-white/60"
+        >
+          Skill tags <span className="font-normal text-white/30">(optional, comma-separated)</span>
+        </label>
+        <input
+          id={`accept-skills-${item.pull_id}`}
+          value={skillTags}
+          onChange={e => setSkillTags(e.target.value)}
+          placeholder="go, federation"
+          disabled={!canAccept || actions.busy}
+          className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none placeholder:text-white/25 focus:border-white/20 disabled:opacity-50"
+        />
+      </div>
+
+      <div>
+        <label
+          htmlFor={`accept-message-${item.pull_id}`}
+          className="mb-1.5 block text-xs font-medium text-white/60"
+        >
+          Stamp message <span className="font-normal text-white/30">(optional)</span>
+        </label>
+        <textarea
+          id={`accept-message-${item.pull_id}`}
+          rows={3}
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          placeholder="Leave a note on the stamp…"
+          disabled={!canAccept || actions.busy}
+          className="w-full resize-none rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none placeholder:text-white/25 focus:border-white/20 disabled:opacity-50"
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={!canAccept || actions.busy}
+        className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+      >
+        {actions.busy ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <CheckCircle2 className="size-3.5" />
+        )}
+        Accept &amp; merge
+      </button>
+
+      {!canAccept && (
+        <ScrutinyHint
+          tone="amber"
+          text={
+            item.has_done
+              ? "This PR doesn't have an evidence URL — the worker's `wl done` either didn't land cleanly or this isn't a completed submission. Use Comment to ask the contributor to retry, or Close to dismiss."
+              : "This is a claim-only PR — the worker hasn't submitted evidence yet. Wait for the `wl done` PR before accepting."
+          }
+        />
+      )}
+    </form>
+  );
+}
+
+/**
+ * The non-primary actions (Close / Comment / Open on DoltHub). Shared
+ * between the work-submission and default action regions; rendered as
+ * a quieter row below whichever primary action the kind expects.
+ */
+function SecondaryActions({
+  item,
+  actions,
+  variant,
+}: {
+  item: InboxItem;
+  actions: ReviewPanelActions;
+  variant: 'work-submission' | 'default';
+}) {
+  const closeLabel = variant === 'work-submission' ? 'Reject (close PR)' : 'Close (no merge)';
+  return (
+    <div className="flex flex-col gap-2">
       <button
         type="button"
-        onClick={() => onCloseAction(item)}
-        disabled={busy}
+        onClick={() => actions.onCloseAction(item)}
+        disabled={actions.busy}
         className="inline-flex items-center justify-center gap-1.5 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50"
       >
         <XCircle className="size-3.5" />
-        Close (no merge)
+        {closeLabel}
       </button>
       <button
         type="button"
-        onClick={() => onComment(item)}
+        onClick={() => actions.onComment(item)}
         className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.06]"
       >
         <MessageSquare className="size-3.5" />
         Comment on PR
       </button>
-      {upstream && (
+      {actions.upstream && (
         <a
-          href={`https://www.dolthub.com/repositories/${upstream}/pulls/${item.pull_id}`}
+          href={`https://www.dolthub.com/repositories/${actions.upstream}/pulls/${item.pull_id}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.06]"
@@ -310,20 +528,15 @@ function WorkSubmissionBody({
           <RigLink handle={item.claimer} wastelandId={wastelandId} push={push} />
         </span>
       </div>
-      {item.evidence_url && (
-        <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2">
-          <p className="mb-1 text-[10px] font-medium tracking-wide text-white/40 uppercase">
-            Evidence
-          </p>
-          <a
-            href={item.evidence_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono text-[11px] break-all text-sky-400 hover:text-sky-300"
-          >
-            {item.evidence_url}
-          </a>
-        </div>
+      {item.evidence_url ? (
+        <EvidenceCard evidence={item.evidence_url} />
+      ) : (
+        item.has_done && (
+          <ScrutinyHint
+            tone="amber"
+            text="No evidence URL recorded on the worker's branch. The DML may have silently no-op'd (stale fork, mismatched rig handle, missing claim, etc.). Inspect on DoltHub before accepting."
+          />
+        )
       )}
       {item.completion_id && (
         <p className="font-mono text-[10px] text-white/25">completion {item.completion_id}</p>
@@ -465,6 +678,89 @@ function UnknownBody({ item }: { item: Extract<InboxItem, { kind: 'unknown' }> }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Render a worker's submitted evidence. The wasteland protocol stores
+ * `completions.evidence` as a free-form string — the canonical CLI
+ * encourages a URL but doesn't enforce one, and historically our
+ * mayor tool also accepted prose. Two render paths:
+ *
+ *  - Cleanly parseable as a single URL → click-to-open card with an
+ *    external-link icon (the happy path).
+ *  - Anything else (prose, "PR submitted: <url>", commit SHA, etc.) →
+ *    pass it through as plain text inside the same card so the admin
+ *    can still read it. If we can recover an embedded URL via
+ *    `extractFirstUrl`, we surface a separate "Open URL" affordance
+ *    at the bottom of the card so the admin doesn't have to copy-paste.
+ *
+ * Either way the card renders — we never silently drop the value.
+ */
+function EvidenceCard({ evidence }: { evidence: string }) {
+  const trimmed = evidence.trim();
+  const url = parseAsUrl(trimmed);
+
+  // Cleanly parseable URL → the original click-target card.
+  if (url) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group/evidence flex items-start gap-2 rounded-md border border-sky-500/20 bg-sky-500/5 p-2.5 transition-colors hover:border-sky-500/40 hover:bg-sky-500/10"
+      >
+        <ExternalLink className="mt-0.5 size-3.5 shrink-0 text-sky-400 transition-colors group-hover/evidence:text-sky-300" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-medium tracking-wide text-sky-400/80 uppercase">
+            Evidence
+          </p>
+          <p className="mt-0.5 truncate font-mono text-[11px] text-sky-300 group-hover/evidence:text-sky-200">
+            {url}
+          </p>
+        </div>
+      </a>
+    );
+  }
+
+  // Otherwise pass the value through as plain text. If we can dig a URL
+  // out of the surrounding prose (e.g. "PR submitted: https://…"),
+  // surface it as a recovery action so reviewers don't get stuck.
+  const embedded = extractFirstUrl(trimmed);
+  return (
+    <div className="rounded-md border border-white/[0.08] bg-white/[0.03] p-2.5">
+      <p className="text-[10px] font-medium tracking-wide text-white/40 uppercase">Evidence</p>
+      <p className="mt-0.5 font-mono text-[11px] break-words text-white/70">{trimmed}</p>
+      {embedded && (
+        <a
+          href={embedded}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300"
+        >
+          <ExternalLink className="size-3" />
+          Open URL
+        </a>
+      )}
+    </div>
+  );
+}
+
+/** Strict URL check: returns the URL string if it parses cleanly with an http(s) scheme. */
+function parseAsUrl(value: string): string | null {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** Pull the first http(s) URL out of a free-form string, or null. */
+function extractFirstUrl(value: string): string | null {
+  const match = value.match(/https?:\/\/\S+/);
+  if (!match) return null;
+  return parseAsUrl(match[0]);
+}
 
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { unclaim } from './unclaim';
 import {
   fixtureWantedRow,
+  forkCurrentResponses,
   makeFetch,
   readWantedRow,
   syncWriteOk,
@@ -22,11 +23,13 @@ describe('unclaim', () => {
     const responses: MockResponse[] = [
       // 1. branch status read: claimed (so unclaim is needed)
       readWantedRow(fixtureWantedRow({ status: 'claimed', claimed_by: 'alice' })),
-      // 2. write
+      // 2. fork-currency preamble: not stale
+      ...forkCurrentResponses(),
+      // 3. write
       syncWriteOk(),
-      // 3. upstream main: still has the original 'open' row
+      // 4. upstream main: still has the original 'open' row
       readWantedRow(fixtureWantedRow({ status: 'open' })),
-      // 4. fork branch row after write: open with claimed_by NULL —
+      // 5. fork branch row after write: open with claimed_by NULL —
       //    differs from main on `updated_at` (NOW vs original) but
       //    wantedRowsEquivalent ignores updated_at; here we mark the
       //    description differently to force cleanup=false.
@@ -51,6 +54,7 @@ describe('unclaim', () => {
     const sameRow = fixtureWantedRow({ status: 'open' });
     const responses: MockResponse[] = [
       readWantedRow(fixtureWantedRow({ status: 'claimed', claimed_by: 'alice' })),
+      ...forkCurrentResponses(),
       syncWriteOk(),
       readWantedRow(sameRow),
       readWantedRow(sameRow),

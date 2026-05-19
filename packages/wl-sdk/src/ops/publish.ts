@@ -15,7 +15,7 @@
  */
 
 import { createPull, getPull, listPulls } from '../dolthub/pulls';
-import { readWantedRowAt } from './state';
+import { readBranchHead, readWantedRowAt } from './state';
 import { makeWlBranch } from './branch';
 import type { DoltHubAuth, DoltFetchHooks } from '../dolthub/api';
 import type { RigHandle, WastelandRef, WlResult } from './types';
@@ -47,14 +47,58 @@ export async function publish(opts: PublishOptions): Promise<WlResult<PublishRes
   const branchName = makeWlBranch(opts.rigHandle, opts.wantedId);
 
   try {
-    // Idempotency: existing open PR from this branch?
-    const existing = await findOpenPullForBranch(opts, branchName);
-    if (existing !== null) {
+    // Idempotency #1: an existing OPEN PR from this branch is reused.
+    const existingOpen = await findOpenPullForBranch(opts, branchName);
+    if (existingOpen !== null) {
       return {
         ok: true,
         data: {
-          prUrl: buildPullWebUrl(opts.upstream, existing),
-          pullId: existing,
+          prUrl: buildPullWebUrl(opts.upstream, existingOpen),
+          pullId: existingOpen,
+          created: false,
+        },
+      };
+    }
+
+    // Idempotency #2: when the branch tip already equals upstream main
+    // — i.e. there is nothing new to publish — return a no-op success
+    // with empty `pullId`/`prUrl`. This avoids DoltHub's 400 on
+    // "fromBranch has already been merged into the toBranch" for
+    // retries after a successful merge, and short-circuits cleanly so
+    // callers can detect the no-op via `pullId === ''`.
+    //
+    // We deliberately do NOT reuse a previously-merged PR id here:
+    //  - A `wl/<rig>/<wantedId>` branch is reused across
+    //    claim → done → accept, so prior merged PRs are unrelated to
+    //    the current branch state and surfacing one as "the publish
+    //    result" would mislead the caller (e.g. acceptWantedItem
+    //    would try to re-merge an already-merged PR).
+    //  - When the branch has fresh commits past main, we fall through
+    //    to createPull and open a fresh PR.
+    const [branchHead, mainHead] = await Promise.all([
+      readBranchHead({
+        auth: opts.auth,
+        owner: opts.fork.forkOwner,
+        db: opts.fork.forkDb,
+        branch: branchName,
+        fetch: opts.fetch,
+        hooks: opts.hooks,
+      }),
+      readBranchHead({
+        auth: opts.auth,
+        owner: opts.upstream.owner,
+        db: opts.upstream.db,
+        branch: 'main',
+        fetch: opts.fetch,
+        hooks: opts.hooks,
+      }),
+    ]);
+    if (branchHead !== null && mainHead !== null && branchHead === mainHead) {
+      return {
+        ok: true,
+        data: {
+          prUrl: '',
+          pullId: '',
           created: false,
         },
       };
@@ -105,14 +149,25 @@ export async function publish(opts: PublishOptions): Promise<WlResult<PublishRes
 }
 
 /**
- * Find an open PR matching `<fork.owner>/<fork.db>:<branch>` →
- * `<upstream.owner>/<upstream.db>:main` by listing open pulls and
- * checking each one's detail (the list summary does not include
- * from-branch). Returns the pull id on a match, else `null`.
+ * Find an OPEN PR matching
+ * `<fork.owner>/<fork.db>:<branch>` → `<upstream.owner>/<upstream.db>:main`.
+ *
+ * The list summary does not include from-branch, so we fan out to
+ * `getPull` for each candidate. Returns the matching pull id or
+ * `null`. Errors are swallowed; the caller proceeds to create a fresh
+ * PR if no match is found.
  */
 async function findOpenPullForBranch(
   opts: PublishOptions,
   branchName: string
+): Promise<string | null> {
+  return findPullForBranchInState(opts, branchName, 'open');
+}
+
+async function findPullForBranchInState(
+  opts: PublishOptions,
+  branchName: string,
+  state: 'open' | 'closed' | 'merged'
 ): Promise<string | null> {
   let pulls;
   try {
@@ -120,7 +175,7 @@ async function findOpenPullForBranch(
       auth: opts.auth,
       owner: opts.upstream.owner,
       db: opts.upstream.db,
-      state: 'open',
+      state,
       fetch: opts.fetch,
       hooks: opts.hooks,
     });

@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
     }
 
     const customCredentials = customCredentialsRef
-      ? await getGitLabOAuthCredentials(customCredentialsRef)
+      ? ((await getGitLabOAuthCredentials(customCredentialsRef)) ?? undefined)
       : undefined;
 
     if (customCredentialsRef && !customCredentials) {

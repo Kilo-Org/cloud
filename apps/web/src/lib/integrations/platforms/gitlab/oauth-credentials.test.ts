@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { OAUTH_STATE_TTL_SECONDS } from '@/lib/integrations/oauth-state';
 import { redisGet, redisSet } from '@/lib/redis';
+import { gitLabOAuthCredentialsRedisKey } from '@/lib/redis-keys';
 import { getGitLabOAuthCredentials, storeGitLabOAuthCredentials } from './oauth-credentials';
 
 jest.mock('@/lib/redis', () => ({
@@ -27,8 +28,9 @@ describe('GitLab OAuth credential cache', () => {
     const credentialRef = await storeGitLabOAuthCredentials(customCredentials);
 
     expect(credentialRef).toEqual(expect.any(String));
+    if (!credentialRef) throw new Error('Expected cached credential reference');
     expect(mockedRedisSet).toHaveBeenCalledWith(
-      `gitlab-oauth-credentials:${credentialRef}`,
+      gitLabOAuthCredentialsRedisKey(credentialRef),
       JSON.stringify(customCredentials),
       OAUTH_STATE_TTL_SECONDS + 5
     );
@@ -46,7 +48,9 @@ describe('GitLab OAuth credential cache', () => {
     await expect(getGitLabOAuthCredentials('cached-credentials-ref')).resolves.toEqual(
       customCredentials
     );
-    expect(mockedRedisGet).toHaveBeenCalledWith('gitlab-oauth-credentials:cached-credentials-ref');
+    expect(mockedRedisGet).toHaveBeenCalledWith(
+      gitLabOAuthCredentialsRedisKey('cached-credentials-ref')
+    );
   });
 
   test('rejects malformed cached credentials', async () => {

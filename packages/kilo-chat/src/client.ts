@@ -14,6 +14,7 @@ import {
   executeActionResponseSchema,
   getBotStatusResponseSchema,
   getConversationStatusResponseSchema,
+  attachmentInitResponseSchema,
   type listConversationsQuerySchema,
   type listMessagesQuerySchema,
   type deleteMessageQuerySchema,
@@ -60,6 +61,8 @@ import type {
   ConversationStatusEvent,
   GetBotStatusResponse,
   GetConversationStatusResponse,
+  AttachmentInitRequest,
+  AttachmentInitResponse,
 } from './types';
 
 // Accept any response body for fire-and-forget endpoints. The server may
@@ -237,6 +240,15 @@ export class KiloChatClient {
       `/v1/conversations/${conversationId}/messages/${messageId}/execute-action`,
       { method: 'POST', body, schema: executeActionResponseSchema }
     );
+  }
+
+  async initAttachment(req: AttachmentInitRequest): Promise<AttachmentInitResponse> {
+    const body = req satisfies AttachmentInitRequest;
+    return this.httpRequest('/v1/attachments/init', {
+      method: 'POST',
+      body,
+      schema: attachmentInitResponseSchema,
+    });
   }
 
   // ── Queries via HTTP ──────────────────────────────────────────────────────

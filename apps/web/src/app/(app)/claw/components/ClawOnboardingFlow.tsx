@@ -79,6 +79,90 @@ function getBrowserTimeZone(): string | undefined {
   }
 }
 
+function writeComposioPopupLoadingPage(popup: Window) {
+  popup.document.write(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Preparing Google Calendar connection</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: oklch(0.145 0 0);
+        color: oklch(0.985 0 0);
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      main {
+        width: min(360px, calc(100vw - 48px));
+        border: 1px solid oklch(1 0 0 / 0.1);
+        border-radius: 14px;
+        background: oklch(0.205 0 0);
+        padding: 24px;
+      }
+      .eyebrow {
+        color: oklch(0.95 0.15 108);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 10px 0 8px;
+        font-size: 20px;
+        line-height: 1.25;
+      }
+      p {
+        margin: 0;
+        color: oklch(0.708 0 0);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        margin-top: 18px;
+        border-radius: 999px;
+        background: oklch(0.95 0.15 108);
+        animation: pulse 1s ease-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.35; transform: scale(0.85); }
+        50% { opacity: 1; transform: scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .dot { animation: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">KiloClaw</div>
+      <h1>Preparing Google Calendar connection</h1>
+      <p>Keep this window open. Google approval will load here, then Kilo will return you to onboarding.</p>
+      <div class="dot" aria-hidden="true"></div>
+    </main>
+  </body>
+</html>`);
+  popup.document.close();
+}
+
+function isComposioPopupMessage(
+  value: unknown
+): value is { type: 'kiloclaw:composio-connect'; result: 'success' | 'failed' | 'unknown' } {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.type === 'kiloclaw:composio-connect' &&
+    (candidate.result === 'success' ||
+      candidate.result === 'failed' ||
+      candidate.result === 'unknown')
+  );
+}
+
 export type { ClawOnboardingMode };
 
 export function ClawOnboardingFlow({
@@ -204,6 +288,7 @@ function ClawOnboardingFlowInner({
   // only runs after the instance is fully ready.
   const [pendingInterests, setPendingInterests] = useState<string[] | null>(null);
   const [localCreateSetupStarted, setLocalCreateSetupStarted] = useState(false);
+  const [composioPopupPending, setComposioPopupPending] = useState(false);
   const [onboardingSaveSession, setOnboardingSaveSession] = useState(0);
   const hasCapturedIdentityView = useRef(false);
   const hasCapturedToolsView = useRef(false);
@@ -211,6 +296,7 @@ function ClawOnboardingFlowInner({
   const hasCapturedEmailView = useRef(false);
   const hasCapturedInterestsView = useRef(false);
   const hasCapturedDoneView = useRef(false);
+  const composioPopupRef = useRef<Window | null>(null);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
 
   const stateInput = {
@@ -268,6 +354,110 @@ function ClawOnboardingFlowInner({
     }`,
     mutations,
   });
+
+  const handleComposioPopupResult = useCallback(
+    (result: 'success' | 'failed' | 'unknown') => {
+      composioPopupRef.current?.close();
+      composioPopupRef.current = null;
+      setComposioPopupPending(false);
+      setOnboardingStep('tools');
+      void composioStatus.refetch();
+
+      if (result === 'success') {
+        posthog?.capture('claw_setup_tools_composio_completed');
+        toast.success('Google Calendar connected');
+        return;
+      }
+
+      posthog?.capture('claw_setup_tools_connect_failed', {
+        toolkit: 'googlecalendar',
+      });
+      toast.error('Could not connect Google Calendar. Try again or skip for now.');
+    },
+    [composioStatus, posthog]
+  );
+
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (!isComposioPopupMessage(event.data)) return;
+      handleComposioPopupResult(event.data.result);
+    }
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [handleComposioPopupResult]);
+
+  useEffect(() => {
+    function handleStorage(event: StorageEvent) {
+      if (event.key !== 'kiloclaw:composio-connect-result' || !event.newValue) return;
+      try {
+        const parsed: unknown = JSON.parse(event.newValue);
+        if (!isComposioPopupMessage(parsed)) return;
+        handleComposioPopupResult(parsed.result);
+      } catch {
+        return;
+      }
+    }
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [handleComposioPopupResult]);
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const channel = new BroadcastChannel('kiloclaw:composio-connect');
+    channel.onmessage = event => {
+      if (!isComposioPopupMessage(event.data)) return;
+      handleComposioPopupResult(event.data.result);
+    };
+    return () => channel.close();
+  }, [handleComposioPopupResult]);
+
+  useEffect(() => {
+    if (!composioPopupPending) return;
+
+    const intervalId = window.setInterval(() => {
+      const popup = composioPopupRef.current;
+      if (!popup || !popup.closed) return;
+
+      composioPopupRef.current = null;
+      setComposioPopupPending(false);
+      void composioStatus.refetch();
+      posthog?.capture('claw_setup_tools_connect_failed', {
+        toolkit: 'googlecalendar',
+        reason: 'popup_closed',
+      });
+      toast.message('Connection window closed. Checking Google Calendar status.');
+    }, 700);
+
+    return () => window.clearInterval(intervalId);
+  }, [composioPopupPending, composioStatus, posthog]);
+
+  useEffect(() => {
+    if (!composioPopupPending || composioStatus.data?.status !== 'connected') return;
+
+    composioPopupRef.current?.close();
+    composioPopupRef.current = null;
+    setComposioPopupPending(false);
+    posthog?.capture('claw_setup_tools_composio_completed', { source: 'status_refetch' });
+    toast.success('Google Calendar connected');
+  }, [composioPopupPending, composioStatus.data?.status, posthog]);
+
+  useEffect(() => {
+    if (!composioPopupPending) return;
+
+    function refetchComposioStatus() {
+      void composioStatus.refetch();
+    }
+
+    window.addEventListener('focus', refetchComposioStatus);
+    document.addEventListener('visibilitychange', refetchComposioStatus);
+    return () => {
+      window.removeEventListener('focus', refetchComposioStatus);
+      document.removeEventListener('visibilitychange', refetchComposioStatus);
+    };
+  }, [composioPopupPending, composioStatus]);
 
   useEffect(() => {
     if (flowState.renderStep !== 'identity' || hasCapturedIdentityView.current) return;
@@ -429,10 +619,15 @@ function ClawOnboardingFlowInner({
           ? 'claw_setup_tools_composio_completed'
           : 'claw_setup_calendar_oauth_completed'
       );
-      toast.success(stepParam === 'tools' ? 'Tool connected' : 'Calendar connected');
+      toast.success(stepParam === 'tools' ? 'Google Calendar connected' : 'Calendar connected');
     } else if (errorParamRaw) {
-      posthog?.capture('claw_setup_calendar_oauth_failed', { reason: errorReason });
-      toast.error('Could not connect calendar — please try again or skip for now.');
+      posthog?.capture(
+        stepParam === 'tools'
+          ? 'claw_setup_tools_connect_failed'
+          : 'claw_setup_calendar_oauth_failed',
+        { reason: errorReason }
+      );
+      toast.error('Could not connect calendar. Try again or skip for now.');
     }
     cleanupResumeQueryParams();
   }, [
@@ -602,7 +797,7 @@ function ClawOnboardingFlowInner({
         totalSteps={flowState.totalSteps}
         status={composioStatus.data?.status ?? 'disconnected'}
         loading={composioStatus.isPending || composioConfigPending}
-        connecting={mutations.createComposioGoogleCalendarLink.isPending}
+        connecting={mutations.createComposioGoogleCalendarLink.isPending || composioPopupPending}
         savingManual={mutations.patchSecrets.isPending}
         readyToConnect={
           flowState.instanceStatus !== null && onboardingSaves.ready && !composioConfigPending
@@ -610,16 +805,33 @@ function ClawOnboardingFlowInner({
         manualConfigured={composioManualConfigured}
         onConnect={() => {
           const returnTo = `${basePath}/new?step=tools`;
-          posthog?.capture('claw_setup_tools_connect_clicked', { toolkit: 'google_calendar' });
+          posthog?.capture('claw_setup_tools_connect_clicked', { toolkit: 'googlecalendar' });
+          const popup = window.open(
+            'about:blank',
+            'kiloclaw-composio-connect',
+            'popup,width=520,height=720'
+          );
+          composioPopupRef.current = popup;
+          if (popup) {
+            setComposioPopupPending(true);
+            writeComposioPopupLoadingPage(popup);
+          }
           mutations.createComposioGoogleCalendarLink.mutate(
-            { returnTo },
+            { returnTo, popup: popup !== null },
             {
               onSuccess: result => {
-                window.location.href = result.redirectUrl;
+                if (popup) {
+                  popup.location.href = result.redirectUrl;
+                } else {
+                  window.location.href = result.redirectUrl;
+                }
               },
               onError: err => {
+                popup?.close();
+                composioPopupRef.current = null;
+                setComposioPopupPending(false);
                 posthog?.capture('claw_setup_tools_connect_failed', {
-                  toolkit: 'google_calendar',
+                  toolkit: 'googlecalendar',
                 });
                 toast.error(err.message);
               },

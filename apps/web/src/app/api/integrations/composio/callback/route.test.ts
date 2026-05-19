@@ -43,6 +43,10 @@ function redirectPath(response: Response): string {
   return `${url.pathname}${url.search}`;
 }
 
+async function responseBody(response: Response): Promise<string> {
+  return await response.text();
+}
+
 describe('GET /api/integrations/composio/callback', () => {
   beforeEach(() => {
     jest.resetAllMocks();
@@ -67,6 +71,25 @@ describe('GET /api/integrations/composio/callback', () => {
 
     expect(response.status).toBe(307);
     expect(redirectPath(response)).toBe('/users/sign_in');
+  });
+
+  test('returns popup failure instead of sign-in redirect when popup auth fails', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+    } as never);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/composio/callback?popup=1&status=success') as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('location')).toBeNull();
+    const body = await responseBody(response);
+    expect(body).toContain('kiloclaw:composio-connect');
+    expect(body).toContain('unauthorized');
+    expect(body).toContain('BroadcastChannel');
   });
 
   test('rejects backslash-prefixed returnTo values instead of redirecting externally', async () => {
@@ -117,6 +140,33 @@ describe('GET /api/integrations/composio/callback', () => {
       ORG_ID
     );
     expect(mockedGetActiveOrgInstance).toHaveBeenCalledWith(USER_ID, ORG_ID);
+    expect(mockedCompleteManagedComposioGoogleCalendarConnection).toHaveBeenCalledWith({
+      userId: USER_ID,
+      instance: fakeInstance,
+      scope: { ownerType: 'organization_user', userId: USER_ID, organizationId: ORG_ID },
+      connectedAccountId: 'ca_123',
+    });
+  });
+
+  test('returns popup success document after verifying managed credentials', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/composio/callback?popup=1&organizationId=${ORG_ID}&returnTo=%2Forganizations%2F${ORG_ID}%2Fclaw%2Fnew%3Fstep%3Dtools&status=success&connected_account_id=ca_123`
+      ) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/html');
+    const body = await responseBody(response);
+    expect(body).toContain('Google Calendar connected');
+    expect(body).toContain('Close popup');
+    expect(body).toContain('localStorage.setItem');
+    expect(body).toContain('window.opener.postMessage');
+    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
+      { user: { id: USER_ID, is_admin: false } },
+      ORG_ID
+    );
     expect(mockedCompleteManagedComposioGoogleCalendarConnection).toHaveBeenCalledWith({
       userId: USER_ID,
       instance: fakeInstance,

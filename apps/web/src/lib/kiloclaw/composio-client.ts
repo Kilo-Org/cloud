@@ -64,7 +64,7 @@ export type ComposioUserContextAuth = {
   projectId: string;
 };
 
-const GOOGLE_CALENDAR_TOOLKIT_SLUG = 'google_calendar';
+const GOOGLE_CALENDAR_TOOLKIT_SLUG = 'googlecalendar';
 
 const SENSITIVE_RESPONSE_KEYS = new Set([
   'redirect_url',

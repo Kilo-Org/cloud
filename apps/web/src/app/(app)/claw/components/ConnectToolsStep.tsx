@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Calendar, Check, Plug, TriangleAlert } from 'lucide-react';
+import { useId, useState } from 'react';
+import { Calendar, Check, ChevronDown, Plug, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -48,6 +48,7 @@ export function ConnectToolsStepView({
   onContinue,
   onSaveManualCredentials,
 }: ConnectToolsStepViewProps) {
+  const manualPanelId = useId();
   const [showManual, setShowManual] = useState(false);
   const [userApiKey, setUserApiKey] = useState('');
   const [org, setOrg] = useState('');
@@ -57,7 +58,7 @@ export function ConnectToolsStepView({
   const primaryLabel = (() => {
     if (status === 'connected') return 'Continue';
     if (manualConfigured) return 'Continue with manual setup';
-    if (connecting) return 'Opening Composio…';
+    if (connecting) return 'Waiting for approval…';
     if (loading) return 'Checking connection…';
     if (!readyToConnect) return 'Waiting for instance setup';
     return 'Connect Google Calendar';
@@ -77,9 +78,9 @@ export function ConnectToolsStepView({
       totalSteps={totalSteps}
       stepLabel={`Step ${currentStep} of ${totalSteps} · Tools`}
       title="Connect Google Calendar"
-      description="Kilo uses Composio to connect read-only calendar context to this sandbox."
+      description="Connect calendar access for time-aware agent work. You review Google’s permission screen before approving."
     >
-      <div className="border-border bg-card flex flex-col gap-5 rounded-lg border p-5 sm:p-6">
+      <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
             <div className="border-border flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-muted/30">
@@ -91,19 +92,19 @@ export function ConnectToolsStepView({
                 <span className="text-muted-foreground text-xs">Powered by Composio</span>
               </div>
               <p className="text-muted-foreground max-w-xl text-sm">
-                Give your agent calendar context for briefings and time-aware tasks. Kilo requests
-                read access only.
+                Kilo uses Composio to connect Google Calendar to this instance. The connection opens
+                in a popup so you can return here when approval is complete.
               </p>
             </div>
           </div>
           <span
             className={cn(
-              'w-fit rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase ring-1',
+              'w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wider uppercase ring-1',
               status === 'connected'
                 ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
                 : status === 'error'
                   ? 'bg-destructive/10 text-destructive ring-destructive/30'
-                  : 'bg-yellow-500/10 text-yellow-400 ring-yellow-500/20'
+                  : 'bg-zinc-500/10 text-zinc-400 ring-zinc-500/20'
             )}
           >
             {loading ? 'Checking' : statusLabel(status)}
@@ -116,8 +117,10 @@ export function ConnectToolsStepView({
               <Check className="h-3 w-3" />
             </span>
             <div className="space-y-0.5">
-              <p className="text-foreground font-medium">Read-only calendar context</p>
-              <p className="text-muted-foreground text-xs">No event creation, edits, or deletes.</p>
+              <p className="text-foreground font-medium">Review permissions with Google</p>
+              <p className="text-muted-foreground text-xs">
+                Google shows exactly what access Composio requests before you continue.
+              </p>
             </div>
           </div>
           <div className="flex items-start gap-3">
@@ -125,9 +128,9 @@ export function ConnectToolsStepView({
               <Check className="h-3 w-3" />
             </span>
             <div className="space-y-0.5">
-              <p className="text-foreground font-medium">Scoped to this sandbox</p>
+              <p className="text-foreground font-medium">For this OpenClaw instance</p>
               <p className="text-muted-foreground text-xs">
-                Use Kilo-managed setup or your own Composio account.
+                Kilo-managed setup connects this OpenClaw instance to its Composio workspace.
               </p>
             </div>
           </div>
@@ -140,12 +143,29 @@ export function ConnectToolsStepView({
           </div>
         ) : null}
 
+        {status === 'connected' ? (
+          <div className="flex items-start gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-300">
+            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>Google Calendar is connected. Continue to inbound email setup.</span>
+          </div>
+        ) : null}
+
+        {connecting && status !== 'connected' ? (
+          <div className="border-border bg-muted/30 text-muted-foreground flex items-start gap-2 rounded-md border p-3 text-xs">
+            <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              Finish approving Google Calendar in the popup. This page will update when it closes.
+            </span>
+          </div>
+        ) : null}
+
         {manualConfigured ? (
           <div className="text-muted-foreground border-border bg-muted/30 flex items-start gap-2 rounded-md border p-3 text-xs">
             <Plug className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              Your own Composio credentials are saved for this sandbox. Connect Google Calendar from
-              the sandbox with <code className="font-mono">composio link google_calendar</code>.
+              Your own Composio credentials are saved for this OpenClaw instance. Connect Google
+              Calendar from the instance with{' '}
+              <code className="font-mono">composio link googlecalendar</code>.
             </span>
           </div>
         ) : null}
@@ -156,26 +176,30 @@ export function ConnectToolsStepView({
           </p>
         ) : null}
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
             onClick={() => setShowManual(value => !value)}
+            disabled={connecting}
             aria-expanded={showManual}
-            className="text-muted-foreground hover:text-foreground flex items-start gap-2 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            aria-controls={manualPanelId}
+            className="border-border bg-secondary/40 text-muted-foreground hover:bg-muted hover:text-foreground inline-flex h-9 w-fit items-center gap-2 rounded-md border px-3 text-left text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
           >
-            <Plug className="mt-0.5 h-4 w-4 shrink-0" />
-            <span className="flex flex-col gap-0.5">
-              <span>Use your own Composio credentials</span>
-              <span className="text-muted-foreground/80 text-xs font-normal">
-                Advanced: signs the sandbox CLI into your Composio account.
-              </span>
-            </span>
+            <Plug className="h-3.5 w-3.5 shrink-0" />
+            <span>Advanced setup: use your own Composio account</span>
+            <ChevronDown
+              className={cn(
+                'h-3.5 w-3.5 shrink-0 transition-transform',
+                showManual && 'rotate-180'
+              )}
+            />
           </button>
-          <div className="flex items-center justify-end gap-3">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="button"
               onClick={() => onSkip()}
-              className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              disabled={connecting}
+              className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
             >
               Skip for now
             </button>
@@ -193,15 +217,16 @@ export function ConnectToolsStepView({
         </div>
 
         {showManual ? (
-          <div className="border-border flex flex-col gap-4 border-t pt-5">
+          <div id={manualPanelId} className="border-border flex flex-col gap-4 border-t pt-5">
             <div className="space-y-1">
               <h3 className="text-foreground text-sm font-semibold">
                 Use your own Composio account
               </h3>
               <p className="text-muted-foreground text-sm">
-                These credentials override Kilo-managed Composio for this sandbox. The CLI signs
-                into your account; connect tools later with{' '}
-                <code className="font-mono">composio link google_calendar</code>.
+                These credentials override Kilo-managed Composio for this OpenClaw instance. Once
+                the instance is online, ask the agent to run{' '}
+                <code className="font-mono">composio link googlecalendar</code> if Google Calendar
+                is not already linked in your Composio account.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">

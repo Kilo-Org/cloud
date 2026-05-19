@@ -46,10 +46,12 @@ function composioUserContextAuth(
 export function getComposioConnectCallbackUrl(params: {
   organizationId?: string;
   returnTo: string;
+  popup?: boolean;
 }): string {
   const url = new URL('/api/integrations/composio/callback', APP_URL);
   url.searchParams.set('returnTo', params.returnTo);
   if (params.organizationId) url.searchParams.set('organizationId', params.organizationId);
+  if (params.popup) url.searchParams.set('popup', '1');
   return url.toString();
 }
 
@@ -235,6 +237,7 @@ export async function createManagedComposioGoogleCalendarLink(params: {
   scope: ComposioOwnerScope;
   organizationId?: string;
   returnTo: string;
+  popup?: boolean;
 }): Promise<{ redirectUrl: string; connectedAccountId: string }> {
   const identity = await ensureManagedComposioIdentity(params.scope);
   const auth = composioUserContextAuth(identity);
@@ -248,6 +251,7 @@ export async function createManagedComposioGoogleCalendarLink(params: {
     callbackUrl: getComposioConnectCallbackUrl({
       organizationId: params.organizationId,
       returnTo: params.returnTo,
+      popup: params.popup,
     }),
   });
 }

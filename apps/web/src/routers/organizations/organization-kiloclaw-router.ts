@@ -231,6 +231,7 @@ const composioConnectLinkSchema = z.object({
     .refine(value => value.startsWith('/'), {
       message: 'returnTo must be a relative path',
     }),
+  popup: z.boolean().optional(),
 });
 
 function composioSecretsPatchSource(
@@ -897,6 +898,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
         },
         organizationId: input.organizationId,
         returnTo: input.returnTo,
+        popup: input.popup,
       });
     }),
 

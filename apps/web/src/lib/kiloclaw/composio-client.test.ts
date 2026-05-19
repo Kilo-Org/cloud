@@ -88,14 +88,14 @@ describe('Composio client', () => {
     });
     expect(JSON.parse(String(requests[0].init?.body))).toEqual({
       user_id: 'kiloclaw:user:user-1',
-      toolkits: { enable: ['google_calendar'] },
+      toolkits: { enable: ['googlecalendar'] },
       manage_connections: { enable: true },
     });
     expect(requests[1].url).toBe(
       'https://api.example.com/api/v3/tool_router/session/session_123/link'
     );
     expect(JSON.parse(String(requests[1].init?.body))).toEqual({
-      toolkit: 'google_calendar',
+      toolkit: 'googlecalendar',
       callback_url: 'https://app.example.com/api/integrations/composio/callback',
     });
     expect(requests[1].init?.headers).toEqual({
@@ -151,7 +151,7 @@ describe('Composio client', () => {
           {
             id: 'ca_123',
             status: 'ACTIVE',
-            toolkit: { slug: 'google_calendar' },
+            toolkit: { slug: 'googlecalendar' },
           },
         ],
       });
@@ -172,7 +172,7 @@ describe('Composio client', () => {
     expect(url.origin + url.pathname).toBe('https://api.example.com/api/v3/connected_accounts');
     expect(url.searchParams.get('user_ids')).toBe('kiloclaw:user:user-1');
     expect(url.searchParams.get('auth_config_ids')).toBeNull();
-    expect(url.searchParams.get('toolkit_slugs')).toBe('google_calendar');
+    expect(url.searchParams.get('toolkit_slugs')).toBe('googlecalendar');
     expect(requests[0].init?.headers).toEqual({
       'x-user-api-key': 'uak_123',
       'x-org-id': 'org-1',

@@ -45,4 +45,38 @@ describe('buildAttachmentR2Key', () => {
       })
     ).toThrow();
   });
+
+  it('sanitizes slashes in an id segment so it cannot escape its slot', () => {
+    const key = buildAttachmentR2Key({
+      keyPrefix: '',
+      conversationId: 'CONV',
+      uploaderId: '../other-user',
+      attachmentId: 'A',
+    });
+    // `/` is percent-encoded; the key still has exactly three segments after
+    // `attachments/`.
+    expect(key).toBe('attachments/CONV/..%2Fother-user/A');
+    expect(key.split('/').length).toBe(4);
+  });
+
+  it('percent-encodes backslashes, control characters, and whitespace', () => {
+    const key = buildAttachmentR2Key({
+      keyPrefix: '',
+      conversationId: 'CONV',
+      uploaderId: 'a\\b\nc d',
+      attachmentId: 'A',
+    });
+    expect(key).toBe('attachments/CONV/a%5Cb%0Ac%20d/A');
+  });
+
+  it('leaves ULID-shaped ids unchanged', () => {
+    const ulid = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+    const key = buildAttachmentR2Key({
+      keyPrefix: '',
+      conversationId: ulid,
+      uploaderId: ulid,
+      attachmentId: ulid,
+    });
+    expect(key).toBe(`attachments/${ulid}/${ulid}/${ulid}`);
+  });
 });

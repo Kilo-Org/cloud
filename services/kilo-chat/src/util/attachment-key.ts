@@ -8,5 +8,9 @@ export function buildAttachmentR2Key(params: {
   if (!conversationId || !uploaderId || !attachmentId) {
     throw new Error('buildAttachmentR2Key: all id segments are required');
   }
-  return `${keyPrefix}attachments/${conversationId}/${uploaderId}/${attachmentId}`;
+  // encodeURIComponent leaves [A-Za-z0-9-_.!~*'()] alone and percent-encodes
+  // everything else, including `/`, `\`, control chars, whitespace, and
+  // non-ASCII. That guarantees each segment occupies exactly one path slot in
+  // the R2 key regardless of what shape future auth flows give callerId.
+  return `${keyPrefix}attachments/${encodeURIComponent(conversationId)}/${encodeURIComponent(uploaderId)}/${encodeURIComponent(attachmentId)}`;
 }

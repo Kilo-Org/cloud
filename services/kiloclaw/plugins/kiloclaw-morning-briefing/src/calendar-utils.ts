@@ -81,11 +81,14 @@ export function buildCalendarTimeWindow(now: Date, userTimezone: string): Calend
   const tz = userTimezone || DEFAULT_TIMEZONE;
   const todayKey = dateKeyInZone(now, tz);
   const tomorrowKey = addDays(todayKey, 1);
-  const offset = getTimezoneOffset(now, tz);
   return {
-    timeMin: `${todayKey}T00:00:00${offset}`,
-    timeMax: `${tomorrowKey}T12:00:00${offset}`,
+    timeMin: `${todayKey}T00:00:00${getTimezoneOffsetForWallTime(todayKey, '00:00:00', tz)}`,
+    timeMax: `${tomorrowKey}T12:00:00${getTimezoneOffsetForWallTime(tomorrowKey, '12:00:00', tz)}`,
   };
+}
+
+function getTimezoneOffsetForWallTime(dateKey: string, time: string, timezone: string): string {
+  return getTimezoneOffset(new Date(`${dateKey}T${time}Z`), timezone);
 }
 
 function formatTime(isoDateTime: string, timezone: string): string {
@@ -109,6 +112,13 @@ function eventDayKey(event: CalendarEvent, timezone: string): string {
 
 export function isAllDayEvent(event: CalendarEvent): boolean {
   return Boolean(event.start.date && !event.start.dateTime);
+}
+
+function allDayEventOverlapsDate(event: CalendarEvent, dateKey: string): boolean {
+  const startKey = event.start.date;
+  if (!startKey) return false;
+  const endKey = event.end.date ?? addDays(startKey, 1);
+  return startKey <= dateKey && dateKey < endKey;
 }
 
 export function formatEventTitle(event: CalendarEvent): string {
@@ -151,20 +161,22 @@ export function partitionEventsByDay(
   const tomorrowAllDay: CalendarEvent[] = [];
 
   for (const event of events) {
-    const dayKey = eventDayKey(event, tz);
     const isAllDay = isAllDayEvent(event);
-    if (dayKey === todayKey) {
-      if (isAllDay) {
+    if (isAllDay) {
+      if (allDayEventOverlapsDate(event, todayKey)) {
         todayAllDay.push(event);
-      } else {
-        todayTimed.push(event);
       }
-    } else if (dayKey === tomorrowKey) {
-      if (isAllDay) {
+      if (allDayEventOverlapsDate(event, tomorrowKey)) {
         tomorrowAllDay.push(event);
-      } else {
-        tomorrowTimed.push(event);
       }
+      continue;
+    }
+
+    const dayKey = eventDayKey(event, tz);
+    if (dayKey === todayKey) {
+      todayTimed.push(event);
+    } else if (dayKey === tomorrowKey) {
+      tomorrowTimed.push(event);
     }
     // Events outside today/tomorrow are dropped — the time window
     // limits API results, this is belt-and-suspenders for stragglers.
@@ -177,9 +189,16 @@ export function partitionEventsByDay(
 }
 
 function timedEventComparator(a: CalendarEvent, b: CalendarEvent): number {
-  const aStart = a.start.dateTime ?? '';
-  const bStart = b.start.dateTime ?? '';
-  return aStart.localeCompare(bStart);
+  const aStart = a.start.dateTime;
+  const bStart = b.start.dateTime;
+  const aTime = aStart ? Date.parse(aStart) : Number.POSITIVE_INFINITY;
+  const bTime = bStart ? Date.parse(bStart) : Number.POSITIVE_INFINITY;
+
+  if (Number.isFinite(aTime) && Number.isFinite(bTime)) {
+    return aTime - bTime;
+  }
+
+  return (aStart ?? '').localeCompare(bStart ?? '');
 }
 
 export function buildCalendarSectionTitle(accountEmail: string): string {

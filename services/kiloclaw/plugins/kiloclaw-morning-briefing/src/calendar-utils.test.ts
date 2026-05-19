@@ -50,6 +50,22 @@ describe('buildCalendarTimeWindow', () => {
     const window = buildCalendarTimeWindow(now, '');
     expect(window.timeMin).toBe('2026-05-19T00:00:00Z');
   });
+
+  it('uses the correct offset for each boundary across DST start', () => {
+    // 2026-03-08 starts in PST (-08:00), then switches to PDT (-07:00).
+    const now = new Date('2026-03-08T15:00:00Z');
+    const window = buildCalendarTimeWindow(now, 'America/Los_Angeles');
+    expect(window.timeMin).toBe('2026-03-08T00:00:00-08:00');
+    expect(window.timeMax).toBe('2026-03-09T12:00:00-07:00');
+  });
+
+  it('uses the correct offset for each boundary across DST end', () => {
+    // 2026-11-01 starts in PDT (-07:00), then switches to PST (-08:00).
+    const now = new Date('2026-11-01T15:00:00Z');
+    const window = buildCalendarTimeWindow(now, 'America/Los_Angeles');
+    expect(window.timeMin).toBe('2026-11-01T00:00:00-07:00');
+    expect(window.timeMax).toBe('2026-11-02T12:00:00-08:00');
+  });
 });
 
 describe('formatEventTitle', () => {
@@ -150,6 +166,47 @@ describe('partitionEventsByDay', () => {
     expect(partitioned.tomorrowTimed.map(e => e.id)).toEqual(['d']);
     expect(partitioned.tomorrowAllDay.map(e => e.id)).toEqual(['e']);
     // 'f' is two days out — dropped.
+  });
+
+  it('includes all-day events that overlap today or tomorrow even when they started earlier', () => {
+    const events: CalendarEvent[] = [
+      event({
+        id: 'a',
+        summary: 'Conference',
+        start: { date: '2026-05-18' },
+        end: { date: '2026-05-21' },
+      }),
+      event({
+        id: 'b',
+        summary: 'Ended yesterday',
+        start: { date: '2026-05-18' },
+        end: { date: '2026-05-19' },
+      }),
+    ];
+
+    const partitioned = partitionEventsByDay(events, now, tz);
+    expect(partitioned.todayAllDay.map(e => e.id)).toEqual(['a']);
+    expect(partitioned.tomorrowAllDay.map(e => e.id)).toEqual(['a']);
+  });
+
+  it('sorts timed events by instant when dateTime offsets differ', () => {
+    const events: CalendarEvent[] = [
+      event({
+        id: 'a',
+        summary: 'LA breakfast',
+        start: { dateTime: '2026-05-19T07:00:00-07:00' },
+        end: { dateTime: '2026-05-19T07:30:00-07:00' },
+      }),
+      event({
+        id: 'b',
+        summary: 'NY check-in',
+        start: { dateTime: '2026-05-19T09:00:00-04:00' },
+        end: { dateTime: '2026-05-19T09:30:00-04:00' },
+      }),
+    ];
+
+    const partitioned = partitionEventsByDay(events, now, tz);
+    expect(partitioned.todayTimed.map(e => e.id)).toEqual(['b', 'a']);
   });
 });
 

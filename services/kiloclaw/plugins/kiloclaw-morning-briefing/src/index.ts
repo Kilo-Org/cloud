@@ -1366,10 +1366,14 @@ async function generateBriefing(
   // Calendar uses the user's IANA timezone for time window + formatting.
   // Falls back to UTC when not configured (the brief plugin already
   // accepts that fallback elsewhere via `resolveEffectiveTimezone`).
+  const storedTimezone =
+    typeof storedConfig?.timezone === 'string' && storedConfig.timezone.trim().length > 0
+      ? storedConfig.timezone.trim()
+      : null;
+  const configuredTimezone = storedTimezone ?? api.config.agents?.defaults?.userTimezone;
   const briefingTimezone =
-    api.config.agents?.defaults?.userTimezone &&
-    isValidTimezone(api.config.agents.defaults.userTimezone)
-      ? api.config.agents.defaults.userTimezone
+    configuredTimezone && isValidTimezone(configuredTimezone)
+      ? configuredTimezone
       : DEFAULT_TIMEZONE;
 
   const corePromises = [

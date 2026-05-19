@@ -33,7 +33,7 @@ export function MessageAttachment({
     return (
       <div className="relative mt-1">
         {isLoading || !data ? (
-          <div className="bg-muted/40 h-40 w-60 max-w-full animate-pulse rounded-md" />
+          <div className="bg-muted/40 h-[240px] w-[320px] max-w-full animate-pulse rounded-md" />
         ) : (
           <ImageAttachment url={data.url} filename={block.filename} size={block.size} />
         )}

@@ -1,3 +1,6 @@
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import type { AttachmentBlock, KiloChatClient } from '@kilocode/kilo-chat';
+
 export type QueuedAttachmentStatus = 'uploading' | 'ready' | 'failed';
 
 export type QueuedAttachment = {
@@ -88,4 +91,214 @@ export function attachmentQueueReducer(
     case 'clear':
       return { rows: [] };
   }
+}
+
+export function selectReadyBlocks(rows: QueuedAttachment[]): AttachmentBlock[] {
+  return rows
+    .filter(
+      (r): r is QueuedAttachment & { attachmentId: string } =>
+        r.status === 'ready' && typeof r.attachmentId === 'string'
+    )
+    .map(r => ({
+      type: 'attachment' as const,
+      attachmentId: r.attachmentId,
+      mimeType: r.mimeType,
+      size: r.size,
+      filename: r.filename,
+    }));
+}
+
+export function selectIsUploading(rows: QueuedAttachment[]): boolean {
+  return rows.some(r => r.status === 'uploading');
+}
+
+export function selectHasFailed(rows: QueuedAttachment[]): boolean {
+  return rows.some(r => r.status === 'failed');
+}
+
+export type PerformUpload = (
+  blob: Blob,
+  putUrl: string,
+  putHeaders: Record<string, string>,
+  opts: { onProgress: (fraction: number) => void; signal: AbortSignal }
+) => Promise<void>;
+
+export type AddFileInput = {
+  blob: Blob;
+  filename: string;
+  mimeType: string;
+};
+
+export type UseAttachmentQueueOptions = {
+  performUpload: PerformUpload;
+  maxBytes: number;
+  generateTempId?: () => string;
+  onSizeRejected?: (input: AddFileInput) => void;
+};
+
+export type UseAttachmentQueueResult = {
+  rows: QueuedAttachment[];
+  addFile: (input: AddFileInput) => void;
+  removeFile: (tempId: string) => void;
+  retryFile: (tempId: string) => void;
+  clear: () => void;
+  readyBlocks: AttachmentBlock[];
+  isUploading: boolean;
+  hasFailed: boolean;
+};
+
+function defaultTempId(): string {
+  return `tmp-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+}
+
+export function useAttachmentQueue(
+  client: KiloChatClient,
+  conversationId: string | null,
+  options: UseAttachmentQueueOptions
+): UseAttachmentQueueResult {
+  const [state, dispatch] = useReducer(attachmentQueueReducer, { rows: [] });
+  const { performUpload, maxBytes, generateTempId, onSizeRejected } = options;
+  const generate = generateTempId ?? defaultTempId;
+
+  type Pending = {
+    blob: Blob;
+    abort: AbortController;
+    putUrl?: string;
+    putHeaders?: Record<string, string>;
+    putUrlMintedAt?: number;
+  };
+  const pendingRef = useRef<Map<string, Pending>>(new Map());
+
+  type UploadArgs = { tempId: string; filename: string; mimeType: string; size: number };
+
+  const startUpload = useCallback(
+    async (args: UploadArgs) => {
+      const { tempId, filename, mimeType, size } = args;
+      const pending = pendingRef.current.get(tempId);
+      if (!pending || !conversationId) return;
+
+      try {
+        let putUrl = pending.putUrl;
+        let putHeaders = pending.putHeaders;
+        const mintedAt = pending.putUrlMintedAt ?? 0;
+        const putUrlExpired = Date.now() - mintedAt > 14 * 60 * 1000;
+
+        if (!putUrl || !putHeaders || putUrlExpired) {
+          const res = await client.initAttachment({
+            conversationId,
+            mimeType,
+            size,
+            filename,
+            idempotencyKey: tempId,
+          });
+          if (pending.abort.signal.aborted) return;
+          pending.putUrl = res.putUrl;
+          pending.putHeaders = res.putHeaders;
+          pending.putUrlMintedAt = Date.now();
+          putUrl = res.putUrl;
+          putHeaders = res.putHeaders;
+          dispatch({ type: 'setInited', tempId, attachmentId: res.attachmentId });
+        }
+
+        await performUpload(pending.blob, putUrl, putHeaders, {
+          signal: pending.abort.signal,
+          onProgress: fraction => dispatch({ type: 'setProgress', tempId, progress: fraction }),
+        });
+        if (pending.abort.signal.aborted) return;
+        dispatch({ type: 'setReady', tempId });
+      } catch (err) {
+        if (pending.abort.signal.aborted) return;
+        const message = err instanceof Error ? err.message : 'Upload failed';
+        dispatch({ type: 'setFailed', tempId, error: message });
+      }
+    },
+    [client, conversationId, performUpload]
+  );
+
+  const addFile = useCallback(
+    (input: AddFileInput) => {
+      if (input.blob.size > maxBytes) {
+        onSizeRejected?.(input);
+        return;
+      }
+      if (!conversationId) return;
+      const tempId = generate();
+      const size = input.blob.size;
+      pendingRef.current.set(tempId, { blob: input.blob, abort: new AbortController() });
+      dispatch({
+        type: 'add',
+        row: {
+          tempId,
+          filename: input.filename,
+          mimeType: input.mimeType,
+          size,
+          status: 'uploading',
+          progress: 0,
+        },
+      });
+      void startUpload({ tempId, filename: input.filename, mimeType: input.mimeType, size });
+    },
+    [conversationId, generate, maxBytes, onSizeRejected, startUpload]
+  );
+
+  const removeFile = useCallback((tempId: string) => {
+    const pending = pendingRef.current.get(tempId);
+    pending?.abort.abort();
+    pendingRef.current.delete(tempId);
+    dispatch({ type: 'remove', tempId });
+  }, []);
+
+  const retryFile = useCallback(
+    (tempId: string) => {
+      const existing = pendingRef.current.get(tempId);
+      if (!existing) return;
+      const row = state.rows.find(r => r.tempId === tempId);
+      if (!row) return;
+      existing.abort.abort();
+      const fresh: Pending = {
+        blob: existing.blob,
+        abort: new AbortController(),
+        putUrl: existing.putUrl,
+        putHeaders: existing.putHeaders,
+        putUrlMintedAt: existing.putUrlMintedAt,
+      };
+      pendingRef.current.set(tempId, fresh);
+      dispatch({ type: 'retry', tempId });
+      void startUpload({
+        tempId,
+        filename: row.filename,
+        mimeType: row.mimeType,
+        size: row.size,
+      });
+    },
+    [startUpload, state.rows]
+  );
+
+  const clear = useCallback(() => {
+    for (const pending of pendingRef.current.values()) pending.abort.abort();
+    pendingRef.current.clear();
+    dispatch({ type: 'clear' });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      for (const pending of pendingRef.current.values()) pending.abort.abort();
+      pendingRef.current.clear();
+    };
+  }, []);
+
+  const readyBlocks = useMemo(() => selectReadyBlocks(state.rows), [state.rows]);
+  const isUploading = useMemo(() => selectIsUploading(state.rows), [state.rows]);
+  const hasFailed = useMemo(() => selectHasFailed(state.rows), [state.rows]);
+
+  return {
+    rows: state.rows,
+    addFile,
+    removeFile,
+    retryFile,
+    clear,
+    readyBlocks,
+    isUploading,
+    hasFailed,
+  };
 }

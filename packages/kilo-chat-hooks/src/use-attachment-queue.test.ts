@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   attachmentQueueReducer,
+  selectHasFailed,
+  selectIsUploading,
+  selectReadyBlocks,
   type AttachmentQueueAction,
   type AttachmentQueueState,
   type QueuedAttachment,
@@ -88,5 +91,50 @@ describe('attachmentQueueReducer', () => {
     const s = state([row({ tempId: 'tmp-1' }), row({ tempId: 'tmp-2' })]);
     const next = reduce(s, { type: 'clear' });
     expect(next.rows).toEqual([]);
+  });
+});
+
+describe('queue selectors', () => {
+  it('selectReadyBlocks returns only ready rows with attachmentId, mapped to AttachmentBlock', () => {
+    const rows: QueuedAttachment[] = [
+      row({ tempId: 'a', status: 'ready', attachmentId: '01HV0000000000000000000001' }),
+      row({ tempId: 'b', status: 'uploading' }),
+      row({ tempId: 'c', status: 'ready', attachmentId: undefined }),
+      row({
+        tempId: 'd',
+        status: 'ready',
+        attachmentId: '01HV0000000000000000000002',
+        filename: 'x.bin',
+        mimeType: 'application/octet-stream',
+        size: 1234,
+      }),
+    ];
+    expect(selectReadyBlocks(rows)).toEqual([
+      {
+        type: 'attachment',
+        attachmentId: '01HV0000000000000000000001',
+        mimeType: 'image/png',
+        size: 100,
+        filename: 'a.png',
+      },
+      {
+        type: 'attachment',
+        attachmentId: '01HV0000000000000000000002',
+        mimeType: 'application/octet-stream',
+        size: 1234,
+        filename: 'x.bin',
+      },
+    ]);
+  });
+
+  it('selectIsUploading is true when any row is uploading', () => {
+    expect(selectIsUploading([row({ status: 'ready' }), row({ status: 'uploading' })])).toBe(true);
+    expect(selectIsUploading([row({ status: 'ready' }), row({ status: 'failed' })])).toBe(false);
+    expect(selectIsUploading([])).toBe(false);
+  });
+
+  it('selectHasFailed is true when any row is failed', () => {
+    expect(selectHasFailed([row({ status: 'ready' }), row({ status: 'failed' })])).toBe(true);
+    expect(selectHasFailed([row({ status: 'ready' }), row({ status: 'uploading' })])).toBe(false);
   });
 });

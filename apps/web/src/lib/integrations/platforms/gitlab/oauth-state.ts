@@ -22,12 +22,7 @@ const GitLabOAuthStatePayloadSchema = z.object({
     z.object({ type: z.literal('org'), id: z.string().min(1) }),
   ]),
   instanceUrl: z.string().url().refine(isHttpInstanceUrl).optional(),
-  customCredentials: z
-    .object({
-      clientId: z.string().min(1),
-      clientSecret: z.string().min(1),
-    })
-    .optional(),
+  customCredentialsRef: z.string().min(1).optional(),
 });
 
 export type GitLabOAuthStatePayload = z.infer<typeof GitLabOAuthStatePayloadSchema>;

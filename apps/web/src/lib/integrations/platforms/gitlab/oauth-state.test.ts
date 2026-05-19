@@ -10,10 +10,7 @@ describe('gitlab oauth state', () => {
       {
         owner: { type: 'org', id: 'org_123' },
         instanceUrl: 'https://gitlab.example.com',
-        customCredentials: {
-          clientId: 'gitlab-client-id',
-          clientSecret: 'gitlab-client-secret',
-        },
+        customCredentialsRef: 'cached-credentials-ref',
       },
       'user_123'
     );
@@ -21,10 +18,7 @@ describe('gitlab oauth state', () => {
     expect(verifyGitLabOAuthState(state)).toEqual({
       owner: { type: 'org', id: 'org_123' },
       instanceUrl: 'https://gitlab.example.com',
-      customCredentials: {
-        clientId: 'gitlab-client-id',
-        clientSecret: 'gitlab-client-secret',
-      },
+      customCredentialsRef: 'cached-credentials-ref',
       userId: 'user_123',
     });
   });

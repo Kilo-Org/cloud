@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { buildGitLabOAuthUrl } from '@/lib/integrations/platforms/gitlab/adapter';
 import { createGitLabOAuthState } from '@/lib/integrations/platforms/gitlab/oauth-state';
+import { storeGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
 
 jest.mock('@/lib/user.server');
 jest.mock('@/routers/organizations/utils', () => ({
@@ -15,6 +16,9 @@ jest.mock('@/lib/integrations/platforms/gitlab/oauth-state', () => ({
   DEFAULT_GITLAB_OAUTH_INSTANCE_URL: 'https://gitlab.com',
   createGitLabOAuthState: jest.fn(),
 }));
+jest.mock('@/lib/integrations/platforms/gitlab/oauth-credentials', () => ({
+  storeGitLabOAuthCredentials: jest.fn(),
+}));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
@@ -22,6 +26,7 @@ jest.mock('@sentry/nextjs', () => ({
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedBuildGitLabOAuthUrl = jest.mocked(buildGitLabOAuthUrl);
 const mockedCreateGitLabOAuthState = jest.mocked(createGitLabOAuthState);
+const mockedStoreGitLabOAuthCredentials = jest.mocked(storeGitLabOAuthCredentials);
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 
@@ -44,6 +49,7 @@ describe('GET /api/integrations/gitlab/connect', () => {
       authFailedResponse: null,
     } as never);
     mockedCreateGitLabOAuthState.mockReturnValue('signed-gitlab-state');
+    mockedStoreGitLabOAuthCredentials.mockResolvedValue('cached-credentials-ref');
     mockedBuildGitLabOAuthUrl.mockReturnValue('https://gitlab.com/oauth/authorize?state=signed');
   });
 
@@ -78,7 +84,7 @@ describe('GET /api/integrations/gitlab/connect', () => {
     expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
   });
 
-  test('binds self-hosted instance URL and custom credentials into signed state', async () => {
+  test('stores self-hosted credentials and binds only their Redis reference into signed state', async () => {
     const { GET } = await import('./route');
     await GET(
       makeRequest(
@@ -86,14 +92,15 @@ describe('GET /api/integrations/gitlab/connect', () => {
       )
     );
 
+    expect(mockedStoreGitLabOAuthCredentials).toHaveBeenCalledWith({
+      clientId: 'client-id',
+      clientSecret: 'client-secret',
+    });
     expect(mockedCreateGitLabOAuthState).toHaveBeenCalledWith(
       {
         owner: { type: 'user', id: USER_ID },
         instanceUrl: 'https://gitlab.example.com',
-        customCredentials: {
-          clientId: 'client-id',
-          clientSecret: 'client-secret',
-        },
+        customCredentialsRef: 'cached-credentials-ref',
       },
       USER_ID
     );
@@ -105,5 +112,20 @@ describe('GET /api/integrations/gitlab/connect', () => {
         clientSecret: 'client-secret',
       }
     );
+  });
+
+  test('does not create OAuth state when credential caching is unavailable', async () => {
+    mockedStoreGitLabOAuthCredentials.mockResolvedValue(null);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        '/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fgitlab.example.com&clientId=client-id&clientSecret=client-secret'
+      )
+    );
+
+    expectRedirectLocation(response, '/integrations/gitlab?error=oauth_init_failed');
+    expect(mockedCreateGitLabOAuthState).not.toHaveBeenCalled();
+    expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
   });
 });

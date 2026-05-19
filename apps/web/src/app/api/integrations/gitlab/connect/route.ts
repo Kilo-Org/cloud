@@ -9,6 +9,7 @@ import {
   DEFAULT_GITLAB_OAUTH_INSTANCE_URL,
 } from '@/lib/integrations/platforms/gitlab/oauth-state';
 import type { Owner } from '@/lib/integrations/core/types';
+import { storeGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
 
 /**
  * GitLab OAuth Connect
@@ -51,11 +52,19 @@ export async function GET(request: NextRequest) {
       throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
     }
 
+    const customCredentialsRef = customCredentials
+      ? await storeGitLabOAuthCredentials(customCredentials)
+      : undefined;
+
+    if (customCredentials && !customCredentialsRef) {
+      throw new Error('GitLab OAuth credentials cache is unavailable');
+    }
+
     const state = createGitLabOAuthState(
       {
         owner,
         ...(usesCustomInstance ? { instanceUrl } : {}),
-        ...(customCredentials ? { customCredentials } : {}),
+        ...(customCredentialsRef ? { customCredentialsRef } : {}),
       },
       user.id
     );

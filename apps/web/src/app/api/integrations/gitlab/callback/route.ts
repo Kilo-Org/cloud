@@ -22,6 +22,7 @@ import {
   type VerifiedGitLabOAuthState,
   verifyGitLabOAuthState,
 } from '@/lib/integrations/platforms/gitlab/oauth-state';
+import { getGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
 
 /**
  * Generates a secure random webhook secret for GitLab webhook verification
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
     }
 
-    const { owner, instanceUrl, customCredentials } = verifiedState;
+    const { owner, instanceUrl, customCredentialsRef } = verifiedState;
 
     if (owner.type === 'org') {
       await ensureOrganizationAccess({ user }, owner.id);
@@ -129,6 +130,21 @@ export async function GET(request: NextRequest) {
       });
 
       const redirectPath = buildGitLabRedirectPath(verifiedState, 'error=missing_code');
+      return NextResponse.redirect(new URL(redirectPath, APP_URL));
+    }
+
+    const customCredentials = customCredentialsRef
+      ? await getGitLabOAuthCredentials(customCredentialsRef)
+      : undefined;
+
+    if (customCredentialsRef && !customCredentials) {
+      captureMessage('GitLab callback missing cached custom OAuth credentials', {
+        level: 'warning',
+        tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
+        extra: gitLabOAuthSentryContext(searchParams),
+      });
+
+      const redirectPath = buildGitLabRedirectPath(verifiedState, 'error=connection_failed');
       return NextResponse.redirect(new URL(redirectPath, APP_URL));
     }
 

@@ -31,7 +31,7 @@ import { NEXTAUTH_SECRET } from '@/lib/config.server';
 const HMAC_ALGORITHM = 'sha256';
 
 /** Maximum age of a state token in seconds (10 minutes). */
-const STATE_TTL_SECONDS = 10 * 60;
+export const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 
 /** Number of random bytes for the nonce (16 bytes = 128 bits). */
 const NONCE_BYTES = 16;
@@ -101,7 +101,7 @@ export function verifyOAuthState(state: string | null): VerifiedOAuthState | nul
     // Enforce TTL: reject tokens that are too old or have no timestamp
     if (typeof data.iat !== 'number') return null;
     const ageSeconds = Math.floor(Date.now() / 1000) - data.iat;
-    if (ageSeconds < 0 || ageSeconds > STATE_TTL_SECONDS) return null;
+    if (ageSeconds < 0 || ageSeconds > OAUTH_STATE_TTL_SECONDS) return null;
 
     // Require nonce to be present (guards against old-format tokens)
     if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;

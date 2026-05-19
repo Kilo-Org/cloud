@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { createGitLabOAuthState } from '@/lib/integrations/platforms/gitlab/oauth-state';
 import { exchangeGitLabOAuthCode } from '@/lib/integrations/platforms/gitlab/adapter';
+import { getGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
 
 jest.mock('@/lib/user.server');
 jest.mock('@/lib/drizzle', () => ({ db: {} }));
@@ -21,6 +22,9 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   fetchGitLabProjects: jest.fn(),
   calculateTokenExpiry: jest.fn(),
 }));
+jest.mock('@/lib/integrations/platforms/gitlab/oauth-credentials', () => ({
+  getGitLabOAuthCredentials: jest.fn(),
+}));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
@@ -28,6 +32,7 @@ jest.mock('@sentry/nextjs', () => ({
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedExchangeGitLabOAuthCode = jest.mocked(exchangeGitLabOAuthCode);
+const mockedGetGitLabOAuthCredentials = jest.mocked(getGitLabOAuthCredentials);
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 const OTHER_USER_ID = 'c00b91a1-6959-4b04-9ef8-e8d37b340f4a';
@@ -50,6 +55,7 @@ describe('GET /api/integrations/gitlab/callback', () => {
       user: { id: USER_ID },
       authFailedResponse: null,
     } as never);
+    mockedGetGitLabOAuthCredentials.mockResolvedValue(null);
   });
 
   test('rejects attacker-controlled raw state before exchanging an OAuth code', async () => {
@@ -88,10 +94,7 @@ describe('GET /api/integrations/gitlab/callback', () => {
       {
         owner: { type: 'user', id: USER_ID },
         instanceUrl: 'https://gitlab.example.com',
-        customCredentials: {
-          clientId: 'self-hosted-client',
-          clientSecret: 'self-hosted-secret',
-        },
+        customCredentialsRef: 'cached-credentials-ref',
       },
       USER_ID
     );
@@ -101,6 +104,60 @@ describe('GET /api/integrations/gitlab/callback', () => {
     );
 
     expectRedirectLocation(response, '/integrations/gitlab?error=missing_code');
+    expect(mockedGetGitLabOAuthCredentials).not.toHaveBeenCalled();
     expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
+  });
+
+  test('rejects callback exchange when cached custom OAuth credentials have expired', async () => {
+    const state = createGitLabOAuthState(
+      {
+        owner: { type: 'user', id: USER_ID },
+        instanceUrl: 'https://gitlab.example.com',
+        customCredentialsRef: 'expired-credentials-ref',
+      },
+      USER_ID
+    );
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/gitlab/callback?code=anything&state=${encodeURIComponent(state)}`
+      )
+    );
+
+    expectRedirectLocation(response, '/integrations/gitlab?error=connection_failed');
+    expect(mockedGetGitLabOAuthCredentials).toHaveBeenCalledWith('expired-credentials-ref');
+    expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
+  });
+
+  test('loads cached custom OAuth credentials before the code exchange', async () => {
+    mockedGetGitLabOAuthCredentials.mockResolvedValue({
+      clientId: 'self-hosted-client',
+      clientSecret: 'self-hosted-secret',
+    });
+    mockedExchangeGitLabOAuthCode.mockRejectedValueOnce(new Error('stop after exchange'));
+
+    const state = createGitLabOAuthState(
+      {
+        owner: { type: 'user', id: USER_ID },
+        instanceUrl: 'https://gitlab.example.com',
+        customCredentialsRef: 'cached-credentials-ref',
+      },
+      USER_ID
+    );
+    const { GET } = await import('./route');
+    await GET(
+      makeRequest(
+        `/api/integrations/gitlab/callback?code=anything&state=${encodeURIComponent(state)}`
+      )
+    );
+
+    expect(mockedExchangeGitLabOAuthCode).toHaveBeenCalledWith(
+      'anything',
+      'https://gitlab.example.com',
+      {
+        clientId: 'self-hosted-client',
+        clientSecret: 'self-hosted-secret',
+      }
+    );
   });
 });

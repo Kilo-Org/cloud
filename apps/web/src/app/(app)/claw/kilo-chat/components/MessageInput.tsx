@@ -328,6 +328,8 @@ export function MessageInput({
           <Send className="h-4 w-4" />
         </button>
       </div>
+      {/* Space is reserved unconditionally (invisible vs hidden) so the
+        counter appearing near the limit doesn't shove the input upward. */}
       <div
         className={`px-4 pb-2 text-right text-xs ${
           overLimit ? 'text-destructive' : 'text-muted-foreground'

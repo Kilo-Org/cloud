@@ -28,9 +28,9 @@ describe('readWastelandBeadOrigin', () => {
 describe('buildWastelandItemHref', () => {
   const origin = { wasteland_id: 'w-abc', item_id: 'item 7/x' };
 
-  it('builds a personal-scope href when pathname is not org-scoped', () => {
+  it('builds a personal-scope href via the by-id redirect when pathname is not org-scoped', () => {
     expect(buildWastelandItemHref(origin, '/gastown/town-1')).toBe(
-      '/wasteland/w-abc/wanted?itemId=item%207%2Fx'
+      '/wasteland/by-id/w-abc/wanted?itemId=item%207%2Fx'
     );
   });
 
@@ -40,9 +40,9 @@ describe('buildWastelandItemHref', () => {
     );
   });
 
-  it('falls back to personal scope when pathname is null', () => {
+  it('falls back to the personal by-id redirect when pathname is null', () => {
     expect(buildWastelandItemHref(origin, null)).toBe(
-      '/wasteland/w-abc/wanted?itemId=item%207%2Fx'
+      '/wasteland/by-id/w-abc/wanted?itemId=item%207%2Fx'
     );
   });
 });

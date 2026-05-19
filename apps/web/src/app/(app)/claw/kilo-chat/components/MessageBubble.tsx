@@ -10,9 +10,11 @@ import { ReactionPills } from './ReactionPills';
 import type {
   Message,
   ContentBlock,
+  AttachmentBlock,
   ExecApprovalDecision,
   ReplyToMessageSnapshot,
 } from '@kilocode/kilo-chat';
+import { MessageAttachment } from './MessageAttachment';
 import {
   buildMessageActionAvailability,
   MESSAGE_TEXT_MAX_CHARS,
@@ -57,6 +59,7 @@ type MessageBubbleProps = {
   onExecuteAction: (messageId: string, groupId: string, value: ExecApprovalDecision) => void;
   pendingActionGroupId: string | null;
   currentUserId: string | null;
+  conversationId: string;
 };
 
 function getReplyPreviewText(replyToMessage: Message | ReplyToMessageSnapshot): string {
@@ -82,10 +85,12 @@ export const MessageBubble = memo(function MessageBubble({
   onExecuteAction,
   pendingActionGroupId,
   currentUserId,
+  conversationId,
 }: MessageBubbleProps) {
   const { assistantName } = useKiloChatContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
+  const [removedAttachmentIds, setRemovedAttachmentIds] = useState<Set<string>>(new Set());
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [showQuickPick, setShowQuickPick] = useState(false);
@@ -124,11 +129,18 @@ export const MessageBubble = memo(function MessageBubble({
   function handleStartEdit() {
     if (!actionAvailability.canEdit) return;
     setEditText(textContent);
+    setRemovedAttachmentIds(new Set());
     setIsEditing(true);
   }
 
+  const remainingAttachmentsCount = message.content.filter(
+    b => b.type === 'attachment' && !removedAttachmentIds.has(b.attachmentId)
+  ).length;
   const canSaveEdit =
-    actionAvailability.canEdit && !isSavingEdit && editText.trim().length > 0 && !editOverLimit;
+    actionAvailability.canEdit &&
+    !isSavingEdit &&
+    !editOverLimit &&
+    (editText.trim().length > 0 || remainingAttachmentsCount > 0);
 
   async function handleSaveEdit() {
     if (!canSaveEdit) return;
@@ -138,10 +150,15 @@ export const MessageBubble = memo(function MessageBubble({
         messageId: message.id,
         editText,
         originalText: textContent,
+        originalAttachments: message.content.filter(
+          (b): b is AttachmentBlock => b.type === 'attachment'
+        ),
+        removedAttachmentIds,
         onEdit,
         closeEditor: () => {
           setIsEditing(false);
           setEditText('');
+          setRemovedAttachmentIds(new Set());
         },
       });
     } finally {
@@ -152,6 +169,7 @@ export const MessageBubble = memo(function MessageBubble({
   function handleCancelEdit() {
     setIsEditing(false);
     setEditText('');
+    setRemovedAttachmentIds(new Set());
     setIsSavingEdit(false);
   }
 
@@ -416,6 +434,29 @@ export const MessageBubble = memo(function MessageBubble({
                     </div>
                   );
                 })}
+
+            {!message.deleted &&
+              message.content
+                .filter((b): b is AttachmentBlock => b.type === 'attachment')
+                .filter(b => !isEditing || !removedAttachmentIds.has(b.attachmentId))
+                .map(block => (
+                  <MessageAttachment
+                    key={block.attachmentId}
+                    block={block}
+                    conversationId={conversationId}
+                    isOwn={isOwn}
+                    onRemove={
+                      isEditing
+                        ? () =>
+                            setRemovedAttachmentIds(prev => {
+                              const next = new Set(prev);
+                              next.add(block.attachmentId);
+                              return next;
+                            })
+                        : undefined
+                    }
+                  />
+                ))}
 
             <div
               className={`mt-1 flex items-center gap-1 text-[10px] ${

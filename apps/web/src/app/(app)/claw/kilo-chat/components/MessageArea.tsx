@@ -580,6 +580,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
                 onExecuteAction={handleExecuteAction}
                 pendingActionGroupId={pendingActionGroupIdForMessage(pendingAction, msg.id)}
                 currentUserId={currentUserId}
+                conversationId={conversationId}
               />
             ))}
           </div>

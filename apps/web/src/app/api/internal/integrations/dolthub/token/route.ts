@@ -53,9 +53,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const owner = parsed.data.userId
-    ? ({ type: 'user', id: parsed.data.userId } as const)
-    : ({ type: 'org', id: parsed.data.organizationId! } as const);
+  // The Zod `.refine` above guarantees exactly one of `userId` /
+  // `organizationId` is set, but TS can't see through the refinement.
+  // Branch on each property explicitly so flow-sensitive narrowing
+  // gives us a non-undefined `id` without the `!` assertion. The
+  // 500 fallback is unreachable in practice but keeps the function
+  // total.
+  const { userId, organizationId } = parsed.data;
+  let owner: { type: 'user'; id: string } | { type: 'org'; id: string };
+  if (userId !== undefined) {
+    owner = { type: 'user', id: userId };
+  } else if (organizationId !== undefined) {
+    owner = { type: 'org', id: organizationId };
+  } else {
+    return NextResponse.json(
+      { error: 'Invalid request body: missing userId/organizationId' },
+      { status: 400 }
+    );
+  }
 
   const integration = await dolthubService.getInstallation(owner);
   if (!integration) {

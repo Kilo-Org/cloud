@@ -90,7 +90,6 @@ export function WantedItemPanel({
   const pullLoading = actions !== null && (pullsQuery.isLoading || branchesQuery.isLoading);
 
   const hasBranch = branch !== null;
-  const hasPull = pull !== null;
 
   const resolvedInitial = useMemo<WantedItemTab>(() => initialTab ?? 'upstream', [initialTab]);
 

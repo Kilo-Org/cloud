@@ -13,7 +13,7 @@
  */
 
 import type { WrapperState, JobContext } from './state.js';
-import type { WrapperKiloClient } from './kilo-api.js';
+import type { WrapperKiloClient, WrapperPtySize } from './kilo-api.js';
 import type { PerTurnConfig } from './lifecycle.js';
 import { createLogUploader } from './log-uploader.js';
 import { logToFile } from './utils.js';
@@ -106,9 +106,34 @@ type RejectQuestionBody = {
   questionId: string;
 };
 
+type PtyCreateBody = {
+  cols?: number;
+  rows?: number;
+};
+
+type PtyResizeBody = {
+  cols?: number;
+  rows?: number;
+  size?: {
+    cols?: number;
+    rows?: number;
+  };
+};
+
 // ---------------------------------------------------------------------------
 // Helper Functions
 // ---------------------------------------------------------------------------
+
+const PTY_ID_RE = /^[a-zA-Z0-9_-]+$/;
+const MIN_PTY_COLS = 2;
+const MAX_PTY_COLS = 500;
+const MIN_PTY_ROWS = 2;
+const MAX_PTY_ROWS = 200;
+const WORKSPACE_TERMINAL_ENV = {
+  // Shell startup files may replace inherited PS1, so reapply it before each prompt.
+  PROMPT_COMMAND: "PS1='\\n\\W\\n\\$ '",
+  PS1: '\\n\\W\\n\\$ ',
+} satisfies Record<string, string>;
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -119,6 +144,54 @@ function jsonResponse(data: unknown, status = 200): Response {
 
 function errorResponse(error: string, message: string, status: number): Response {
   return jsonResponse({ error, message }, status);
+}
+
+async function readJsonBody<T>(req: Request, defaultValue: T): Promise<T> {
+  const text = await req.text();
+  if (!text.trim()) return defaultValue;
+  return JSON.parse(text) as T;
+}
+
+function validatePtyId(ptyId: string | undefined): string | null {
+  if (!ptyId || !PTY_ID_RE.test(ptyId)) return null;
+  return ptyId;
+}
+
+function parsePtySize(input: PtyCreateBody | PtyResizeBody): WrapperPtySize | null {
+  const rows = 'size' in input && input.size ? input.size.rows : input.rows;
+  const cols = 'size' in input && input.size ? input.size.cols : input.cols;
+
+  if (rows === undefined && cols === undefined) return null;
+
+  if (
+    typeof rows !== 'number' ||
+    typeof cols !== 'number' ||
+    !Number.isInteger(rows) ||
+    !Number.isInteger(cols) ||
+    rows < MIN_PTY_ROWS ||
+    rows > MAX_PTY_ROWS ||
+    cols < MIN_PTY_COLS ||
+    cols > MAX_PTY_COLS
+  ) {
+    throw new Error(
+      `PTY size must include integer cols ${MIN_PTY_COLS}-${MAX_PTY_COLS} and rows ${MIN_PTY_ROWS}-${MAX_PTY_ROWS}`
+    );
+  }
+
+  return { cols, rows };
+}
+
+function parsePtyPath(path: string): { ptyId: string; action?: 'connect' } | null {
+  const match = path.match(/^\/pty\/([^/]+)(?:\/(connect))?$/);
+  if (!match) return null;
+
+  const ptyId = validatePtyId(match[1]);
+  if (!ptyId) return null;
+
+  return {
+    ptyId,
+    action: match[2] === 'connect' ? 'connect' : undefined,
+  };
 }
 
 /**
@@ -529,6 +602,215 @@ function createAbortHandler(deps: ServerDependencies, triggerDrainAndClose: () =
   };
 }
 
+function createPtyCreateHandler(config: ServerConfig, deps: ServerDependencies) {
+  return async (req: Request): Promise<Response> => {
+    let body: PtyCreateBody;
+    try {
+      body = await readJsonBody<PtyCreateBody>(req, {});
+    } catch {
+      return errorResponse('INVALID_REQUEST', 'Invalid JSON body', 400);
+    }
+
+    let size: WrapperPtySize | null;
+    try {
+      size = parsePtySize(body);
+    } catch (error) {
+      return errorResponse(
+        'INVALID_REQUEST',
+        error instanceof Error ? error.message : String(error),
+        400
+      );
+    }
+
+    let createdPtyId: string | null = null;
+    try {
+      const pty = await deps.kiloClient.createPty({
+        cwd: config.workspacePath,
+        title: 'Workspace terminal',
+        env: WORKSPACE_TERMINAL_ENV,
+      });
+      createdPtyId = pty.id;
+      const sizedPty = size ? await deps.kiloClient.resizePty(pty.id, size) : pty;
+      logToFile(`pty/create: ptyId=${pty.id}`);
+      return jsonResponse(sizedPty);
+    } catch (error) {
+      if (createdPtyId) {
+        try {
+          await deps.kiloClient.deletePty(createdPtyId);
+          logToFile(`pty/create: cleaned up ptyId=${createdPtyId}`);
+        } catch (cleanupError) {
+          const cleanupMessage =
+            cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+          logToFile(`pty/create: cleanup failed ptyId=${createdPtyId}: ${cleanupMessage}`);
+        }
+      }
+
+      const msg = error instanceof Error ? error.message : String(error);
+      logToFile(`pty/create: failed: ${msg}`);
+      return errorResponse('PTY_ERROR', `Failed to create PTY: ${msg}`, 500);
+    }
+  };
+}
+
+function createPtyResizeHandler(deps: ServerDependencies, ptyId: string) {
+  return async (req: Request): Promise<Response> => {
+    let body: PtyResizeBody;
+    try {
+      body = await readJsonBody<PtyResizeBody>(req, {});
+    } catch {
+      return errorResponse('INVALID_REQUEST', 'Invalid JSON body', 400);
+    }
+
+    let size: WrapperPtySize | null;
+    try {
+      size = parsePtySize(body);
+    } catch (error) {
+      return errorResponse(
+        'INVALID_REQUEST',
+        error instanceof Error ? error.message : String(error),
+        400
+      );
+    }
+
+    if (!size) {
+      return errorResponse('INVALID_REQUEST', 'PTY size is required', 400);
+    }
+
+    try {
+      const pty = await deps.kiloClient.resizePty(ptyId, size);
+      logToFile(`pty/resize: ptyId=${ptyId} cols=${size.cols} rows=${size.rows}`);
+      return jsonResponse(pty);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logToFile(`pty/resize: failed ptyId=${ptyId}: ${msg}`);
+      return errorResponse('PTY_ERROR', `Failed to resize PTY: ${msg}`, 500);
+    }
+  };
+}
+
+function createPtyDeleteHandler(deps: ServerDependencies, ptyId: string) {
+  return async (_req: Request): Promise<Response> => {
+    try {
+      const success = await deps.kiloClient.deletePty(ptyId);
+      logToFile(`pty/delete: ptyId=${ptyId}`);
+      return jsonResponse({ success });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logToFile(`pty/delete: failed ptyId=${ptyId}: ${msg}`);
+      return errorResponse('PTY_ERROR', `Failed to delete PTY: ${msg}`, 500);
+    }
+  };
+}
+
+function buildPtyUpstreamUrl(
+  config: ServerConfig,
+  deps: ServerDependencies,
+  ptyId: string
+): string {
+  const upstream = new URL(`/pty/${encodeURIComponent(ptyId)}/connect`, deps.kiloClient.serverUrl);
+  upstream.protocol = upstream.protocol === 'https:' ? 'wss:' : 'ws:';
+  upstream.searchParams.set('directory', config.workspacePath);
+  return upstream.toString();
+}
+
+type WrapperWebSocketData = {
+  ptyId?: string;
+};
+
+type PtyClientClose = {
+  code: number;
+  reason: string;
+};
+
+function isForwardableCloseCode(code: number): boolean {
+  return (
+    Number.isInteger(code) && code >= 1000 && code <= 4999 && ![1005, 1006, 1015].includes(code)
+  );
+}
+
+export function resolvePtyClientClose(event: { code: number; reason: string }): PtyClientClose {
+  if (event.code === 1000) {
+    return { code: 1000, reason: 'PTY session ended' };
+  }
+
+  if (isForwardableCloseCode(event.code)) {
+    return { code: event.code, reason: event.reason || 'PTY upstream closed' };
+  }
+
+  return { code: 1011, reason: event.reason || 'PTY upstream closed' };
+}
+
+type BunUpgradeServer = {
+  upgrade: (req: Request, options: { data: WrapperWebSocketData }) => boolean;
+};
+
+function createWebSocketHandlers(config: ServerConfig, deps: ServerDependencies) {
+  const ptyUpstreams = new WeakMap<object, WebSocket>();
+
+  return {
+    open(ws: Bun.ServerWebSocket<WrapperWebSocketData>) {
+      const ptyId = ws.data.ptyId;
+      if (!ptyId) {
+        ws.close(1011, 'Missing PTY');
+        return;
+      }
+
+      const upstream = new WebSocket(buildPtyUpstreamUrl(config, deps, ptyId));
+      upstream.binaryType = 'arraybuffer';
+      ptyUpstreams.set(ws, upstream);
+
+      upstream.onmessage = event => {
+        try {
+          ws.send(event.data instanceof ArrayBuffer ? event.data : String(event.data));
+        } catch {
+          // Client disconnected.
+        }
+      };
+      upstream.onclose = event => {
+        const close = resolvePtyClientClose({ code: event.code, reason: event.reason });
+        try {
+          ws.close(close.code, close.reason);
+        } catch {
+          // Already closed.
+        }
+      };
+      upstream.onerror = () => {
+        try {
+          ws.close(1011, 'PTY upstream error');
+        } catch {
+          // Already closed.
+        }
+      };
+    },
+    message(
+      ws: Bun.ServerWebSocket<WrapperWebSocketData>,
+      message: string | ArrayBuffer | Uint8Array
+    ) {
+      const upstream = ptyUpstreams.get(ws);
+      if (upstream?.readyState === WebSocket.OPEN) {
+        if (typeof message === 'string' || message instanceof ArrayBuffer) {
+          upstream.send(message);
+          return;
+        }
+        const copy = new Uint8Array(message.byteLength);
+        copy.set(message);
+        upstream.send(copy.buffer);
+      }
+    },
+    close(ws: Bun.ServerWebSocket<WrapperWebSocketData>) {
+      const upstream = ptyUpstreams.get(ws);
+      if (upstream) {
+        try {
+          upstream.close();
+        } catch {
+          // Already closed.
+        }
+        ptyUpstreams.delete(ws);
+      }
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Server Creation
 // ---------------------------------------------------------------------------
@@ -538,11 +820,11 @@ export type WrapperServer = {
   stop: () => Promise<void>;
 };
 
-export function createServer(
+export function createFetchHandler(
   config: ServerConfig,
   deps: ServerDependencies,
   triggerDrainAndClose: () => void
-): WrapperServer {
+): (req: Request, server?: BunUpgradeServer) => Response | Promise<Response> | undefined {
   const { state } = deps;
 
   // Create route handlers
@@ -554,6 +836,7 @@ export function createServer(
   const answerQuestionHandler = createAnswerQuestionHandler(deps);
   const rejectQuestionHandler = createRejectQuestionHandler(deps);
   const abortHandler = createAbortHandler(deps, triggerDrainAndClose);
+  const ptyCreateHandler = createPtyCreateHandler(config, deps);
 
   // Route table
   type RouteHandler = (req: Request) => Response | Promise<Response>;
@@ -569,37 +852,79 @@ export function createServer(
       '/job/answer-question': answerQuestionHandler,
       '/job/reject-question': rejectQuestionHandler,
       '/job/abort': abortHandler,
+      '/pty': ptyCreateHandler,
     },
   };
 
-  const server = Bun.serve({
-    port: config.port,
-    fetch: async (req: Request): Promise<Response> => {
-      const url = new URL(req.url);
-      const method = req.method;
-      const path = url.pathname;
+  return (req: Request, server?: BunUpgradeServer): Response | Promise<Response> | undefined => {
+    const url = new URL(req.url);
+    const method = req.method;
+    const path = url.pathname;
 
-      logToFile(`HTTP ${method} ${path}`);
+    logToFile(`HTTP ${method} ${path}`);
 
-      // Look up route
-      const methodRoutes = routes[method];
-      if (!methodRoutes) {
-        return errorResponse('METHOD_NOT_ALLOWED', `Method ${method} not allowed`, 405);
+    const ptyPath = parsePtyPath(path);
+    if (ptyPath) {
+      if (ptyPath.action === 'connect') {
+        if (method !== 'GET') {
+          return errorResponse('METHOD_NOT_ALLOWED', `Method ${method} not allowed`, 405);
+        }
+        if (req.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
+          return errorResponse('UPGRADE_REQUIRED', 'Expected WebSocket upgrade', 426);
+        }
+        if (!server) {
+          return errorResponse('INTERNAL_ERROR', 'WebSocket server unavailable', 500);
+        }
+        const upgraded = server.upgrade(req, { data: { ptyId: ptyPath.ptyId } });
+        if (upgraded) return undefined;
+        return errorResponse('UPGRADE_FAILED', 'WebSocket upgrade failed', 400);
       }
 
-      const handler = methodRoutes[path];
-      if (!handler) {
-        return errorResponse('NOT_FOUND', `Path ${path} not found`, 404);
+      if (method === 'PUT') {
+        return createPtyResizeHandler(deps, ptyPath.ptyId)(req);
       }
+      if (method === 'DELETE') {
+        return createPtyDeleteHandler(deps, ptyPath.ptyId)(req);
+      }
+    }
 
-      try {
-        return await handler(req);
-      } catch (error) {
+    // Look up route
+    const methodRoutes = routes[method];
+    if (!methodRoutes) {
+      return errorResponse('METHOD_NOT_ALLOWED', `Method ${method} not allowed`, 405);
+    }
+
+    const handler = methodRoutes[path];
+    if (!handler) {
+      return errorResponse('NOT_FOUND', `Path ${path} not found`, 404);
+    }
+
+    try {
+      return Promise.resolve(handler(req)).catch(error => {
         const msg = error instanceof Error ? error.message : String(error);
         logToFile(`HTTP handler error: ${msg}`);
         return errorResponse('INTERNAL_ERROR', msg, 500);
-      }
-    },
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logToFile(`HTTP handler error: ${msg}`);
+      return errorResponse('INTERNAL_ERROR', msg, 500);
+    }
+  };
+}
+
+export function createServer(
+  config: ServerConfig,
+  deps: ServerDependencies,
+  triggerDrainAndClose: () => void
+): WrapperServer {
+  const fetchHandler = createFetchHandler(config, deps, triggerDrainAndClose);
+  const websocket = createWebSocketHandlers(config, deps);
+
+  const server = Bun.serve<WrapperWebSocketData>({
+    port: config.port,
+    fetch: fetchHandler,
+    websocket,
   });
 
   logToFile(`HTTP server listening on port ${config.port}`);

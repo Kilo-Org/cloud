@@ -91,6 +91,8 @@ import { stopWrapper } from '../kilo/wrapper-manager.js';
 import { SessionService } from '../session-service.js';
 import { executePreparationSteps } from './async-preparation.js';
 import { resolveManagedGitLabToken } from '../services/git-token-service-client.js';
+import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
+import type { WrapperPty } from '../kilo/wrapper-client.js';
 
 // ---------------------------------------------------------------------------
 // Alarm Constants
@@ -136,6 +138,13 @@ type DisconnectGraceState = {
   wsCloseCode: number;
   wsCloseReason: string;
 };
+
+type TerminalSizeInput = {
+  cols: number;
+  rows: number;
+};
+
+type TerminalCreateInput = Partial<TerminalSizeInput>;
 
 function validateModeAgainstRuntimeAgents(metadata: CloudAgentSessionState): string | null {
   const mode = metadata.mode;
@@ -376,6 +385,16 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.ingestHandler;
   }
 
+  private isAllowedWebSocketOrigin(origin: string | null): boolean {
+    const allowedOrigins = (this.env.WS_ALLOWED_ORIGINS || '')
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean);
+
+    const isRealOrigin = origin !== null && origin !== 'null';
+    return allowedOrigins.length === 0 || !isRealOrigin || allowedOrigins.includes(origin);
+  }
+
   // ---------------------------------------------------------------------------
   // HTTP/WebSocket Routing
   // ---------------------------------------------------------------------------
@@ -393,20 +412,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       const ticket = url.searchParams.get('ticket');
       const origin = request.headers.get('Origin');
 
-      const allowedOrigins = (this.env.WS_ALLOWED_ORIGINS || '')
-        .split(',')
-        .map(value => value.trim())
-        .filter(Boolean);
-
-      // Only enforce the Origin allowlist when the client sends a real browser
-      // Origin. Native clients (iOS/Android) either omit the header entirely or
-      // send the literal string "null" — both cases are allowed through because
-      // the Worker already authenticated the request via the JWT ticket before
-      // forwarding here.
-      const isRealOrigin = origin !== null && origin !== 'null';
-      if (allowedOrigins.length > 0 && isRealOrigin && !allowedOrigins.includes(origin)) {
+      if (!this.isAllowedWebSocketOrigin(origin)) {
         logger
-          .withFields({ origin, allowedOrigins, sessionId: sessionIdParam })
+          .withFields({ origin, sessionId: sessionIdParam })
           .warn('DO /stream: Origin not allowed');
         return new Response('Origin not allowed', { status: 403 });
       }
@@ -875,6 +883,97 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     this.sendToWrapper(activeExecutionId, { type: 'kill', signal: 'SIGTERM' });
 
     return { success: true };
+  }
+
+  private async getTerminalClient(): Promise<OperationResult<{ client: TerminalWrapperClient }>> {
+    const sessionId = await this.requireSessionId();
+    const terminal = await resolveTerminalWrapperClient({
+      env: this.env,
+      metadata: await this.getMetadata(),
+      sessionId,
+    });
+
+    if (!terminal.success || !terminal.data) {
+      return { success: false, error: terminal.error };
+    }
+
+    return { success: true, data: { client: terminal.data.client } };
+  }
+
+  async createTerminal(input: TerminalCreateInput): Promise<OperationResult<{ pty: WrapperPty }>> {
+    const terminal = await this.getTerminalClient();
+    if (!terminal.success || !terminal.data) {
+      return { success: false, error: terminal.error };
+    }
+
+    try {
+      const pty = await terminal.data.client.createTerminal(
+        input.cols !== undefined && input.rows !== undefined
+          ? { cols: input.cols, rows: input.rows }
+          : undefined
+      );
+      await this.updateLastActivity();
+      return { success: true, data: { pty } };
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Failed to create terminal');
+      return { success: false, error: 'Terminal is unavailable' };
+    }
+  }
+
+  async resizeTerminal(input: {
+    ptyId: string;
+    cols: number;
+    rows: number;
+  }): Promise<OperationResult<{ pty: WrapperPty }>> {
+    const terminal = await this.getTerminalClient();
+    if (!terminal.success || !terminal.data) {
+      return { success: false, error: terminal.error };
+    }
+
+    try {
+      const pty = await terminal.data.client.resizeTerminal(input.ptyId, {
+        cols: input.cols,
+        rows: input.rows,
+      });
+      await this.updateLastActivity();
+      return { success: true, data: { pty } };
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          ptyId: input.ptyId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Failed to resize terminal');
+      return { success: false, error: 'Terminal is unavailable' };
+    }
+  }
+
+  async closeTerminal(input: { ptyId: string }): Promise<OperationResult<{ success: boolean }>> {
+    const terminal = await this.getTerminalClient();
+    if (!terminal.success || !terminal.data) {
+      return { success: false, error: terminal.error };
+    }
+
+    try {
+      const result = await terminal.data.client.closeTerminal(input.ptyId);
+      await this.updateLastActivity();
+      return { success: true, data: result };
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          ptyId: input.ptyId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Failed to close terminal');
+      return { success: false, error: 'Terminal is unavailable' };
+    }
   }
 
   /**

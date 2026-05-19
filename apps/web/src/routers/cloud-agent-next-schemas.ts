@@ -279,6 +279,75 @@ export const baseGetSessionNextSchema = z.object({
   cloudAgentSessionId: z.string(),
 });
 
+export const cloudAgentTerminalSizeSchema = z.object({
+  cols: z.number().int().min(2).max(500),
+  rows: z.number().int().min(2).max(200),
+});
+
+export const cloudAgentTerminalPtyIdSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[a-zA-Z0-9_-]+$/);
+
+export const cloudAgentTerminalPtySchema = z.object({
+  id: cloudAgentTerminalPtyIdSchema,
+  title: z.string(),
+  command: z.string(),
+  args: z.array(z.string()),
+  cwd: z.string(),
+  status: z.enum(['running', 'exited']),
+  pid: z.number().int(),
+});
+
+export const baseCreateTerminalNextSchema = z
+  .object({
+    cloudAgentSessionId: z.string(),
+  })
+  .extend(cloudAgentTerminalSizeSchema.partial().shape)
+  .refine(data => (data.cols === undefined) === (data.rows === undefined), {
+    message: 'cols and rows must be provided together',
+  });
+
+export const baseResizeTerminalNextSchema = z
+  .object({
+    cloudAgentSessionId: z.string(),
+    ptyId: cloudAgentTerminalPtyIdSchema,
+  })
+  .extend(cloudAgentTerminalSizeSchema.shape);
+
+export const baseCloseTerminalNextSchema = z.object({
+  cloudAgentSessionId: z.string(),
+  ptyId: cloudAgentTerminalPtyIdSchema,
+});
+
+export const baseCreateTerminalNextOutputSchema = z.object({
+  pty: cloudAgentTerminalPtySchema,
+  ptyId: cloudAgentTerminalPtyIdSchema,
+  wsUrl: z.string().min(1),
+  ticket: z.string().min(1),
+  expiresAt: z.number().int().positive(),
+});
+
+export const baseRefreshTerminalTicketNextSchema = z.object({
+  cloudAgentSessionId: z.string(),
+  ptyId: cloudAgentTerminalPtyIdSchema,
+});
+
+export const baseRefreshTerminalTicketNextOutputSchema = z.object({
+  wsUrl: z.string().min(1),
+  ticket: z.string().min(1),
+  expiresAt: z.number().int().positive(),
+});
+
+export const baseResizeTerminalNextOutputSchema = z.object({
+  pty: cloudAgentTerminalPtySchema,
+});
+
+export const baseCloseTerminalNextOutputSchema = z.object({
+  success: z.boolean(),
+});
+
 // Execution status schema for getSession response
 export const executionStatusNextSchema = z
   .object({

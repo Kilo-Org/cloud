@@ -61,6 +61,9 @@ type MockSessionStub = {
   getActiveExecutionId?: ReturnType<typeof vi.fn>;
   getExecution?: ReturnType<typeof vi.fn>;
   getLatestAssistantMessage?: ReturnType<typeof vi.fn>;
+  createTerminal?: ReturnType<typeof vi.fn>;
+  resizeTerminal?: ReturnType<typeof vi.fn>;
+  closeTerminal?: ReturnType<typeof vi.fn>;
 };
 
 type MockCAS = {
@@ -1195,5 +1198,59 @@ describe('router sessionId validation', () => {
         ).rejects.toThrow('Authentication required');
       });
     });
+  });
+});
+
+describe('router terminal procedures', () => {
+  it('creates a terminal through the session Durable Object', async () => {
+    const createTerminal = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        pty: {
+          id: 'pty_123',
+          title: 'Workspace terminal',
+          command: '/bin/sh',
+          args: [],
+          cwd: '/workspace/repo',
+          status: 'running',
+          pid: 123,
+        },
+      },
+    });
+    const cloudAgentSession: MockCAS = {
+      idFromName: vi.fn().mockReturnValue('do-id'),
+      get: vi.fn().mockReturnValue({ createTerminal }),
+    };
+    const context = {
+      userId: 'test-user-123',
+      authToken: 'token',
+      botId: undefined,
+      request: new Request('http://test.local'),
+      env: {
+        CLOUD_AGENT_SESSION: cloudAgentSession,
+      },
+    } as unknown as TRPCContext;
+    const caller = appRouter.createCaller(context);
+    const sessionId = 'agent_12345678-1234-1234-1234-123456789abc' as SessionId;
+
+    const result = await caller.createTerminal({
+      cloudAgentSessionId: sessionId,
+      cols: 120,
+      rows: 32,
+    });
+
+    expect(result).toEqual({
+      pty: {
+        id: 'pty_123',
+        title: 'Workspace terminal',
+        command: '/bin/sh',
+        args: [],
+        cwd: '/workspace/repo',
+        status: 'running',
+        pid: 123,
+      },
+    });
+    expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
+    expect(createTerminal).toHaveBeenCalledWith({ cols: 120, rows: 32 });
   });
 });

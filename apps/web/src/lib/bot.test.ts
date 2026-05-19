@@ -127,8 +127,6 @@ jest.mock('@/lib/config.server', () => ({
   LINEAR_WEBHOOK_SECRET: 'linear-webhook-secret',
   TEAMS_APP_ID: 'teams-app-id',
   TEAMS_APP_PASSWORD: 'teams-app-password',
-  TEAMS_APP_TENANT_ID: 'teams-tenant-id',
-  TEAMS_APP_TYPE: 'MultiTenant',
 }));
 
 jest.mock('@/lib/integrations/platforms/github/app-selector', () => ({

@@ -359,8 +359,7 @@ export function TeamsIntegrationDetails({
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
-                      Configure TEAMS_APP_ID, TEAMS_APP_PASSWORD, and TEAMS_APP_TENANT_ID for
-                      SingleTenant apps, then restart the web server.
+                      Configure TEAMS_APP_ID and TEAMS_APP_PASSWORD, then restart the web server.
                     </p>
                   </div>
                 </div>

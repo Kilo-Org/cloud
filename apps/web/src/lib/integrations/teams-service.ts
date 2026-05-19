@@ -7,13 +7,7 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { APP_URL } from '@/lib/constants';
-import {
-  TEAMS_APP_ID,
-  TEAMS_APP_INSTALL_URL,
-  TEAMS_APP_PASSWORD,
-  TEAMS_APP_TENANT_ID,
-  TEAMS_APP_TYPE,
-} from '@/lib/config.server';
+import { TEAMS_APP_ID, TEAMS_APP_INSTALL_URL, TEAMS_APP_PASSWORD } from '@/lib/config.server';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import {
@@ -44,7 +38,6 @@ export class TeamsTenantAlreadyConnectedError extends Error {
 
 function isTeamsAppConfigured(): boolean {
   if (!TEAMS_APP_ID || !TEAMS_APP_PASSWORD) return false;
-  if (TEAMS_APP_TYPE === 'SingleTenant' && !TEAMS_APP_TENANT_ID) return false;
   return true;
 }
 

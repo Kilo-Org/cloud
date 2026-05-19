@@ -92,6 +92,7 @@ export type AgentMode = string;
 /** Input for prepareSession procedure */
 export type PrepareSessionInput = {
   prompt: string;
+  initialPayload?: SendMessagePayload;
   mode: AgentMode;
   model: string;
   variant?: string;

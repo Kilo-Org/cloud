@@ -48,7 +48,23 @@ const ConnectedAccountListResponseSchema = z.object({
 export type ComposioAgentIdentity = z.infer<typeof AgentSignupReadyResponseSchema>;
 export type ComposioConnectedAccount = z.infer<typeof ConnectedAccountSchema>;
 
+export type ComposioUserContextAuth = {
+  userApiKey: string;
+  orgId: string;
+  projectId?: string | null;
+};
+
 const GOOGLE_CALENDAR_TOOLKIT_SLUG = 'google_calendar';
+
+const SENSITIVE_RESPONSE_KEYS = new Set([
+  'redirect_url',
+  'link_token',
+  'token',
+  'api_key',
+  'user_api_key',
+  'access_token',
+  'refresh_token',
+]);
 
 class ComposioApiError extends Error {
   constructor(
@@ -66,20 +82,61 @@ function joinUrl(baseUrl: string, path: string): string {
   return `${normalizedBase}${path}`;
 }
 
-async function parseJsonResponse(response: Response, operation: string): Promise<unknown> {
-  if (!response.ok) {
-    throw new ComposioApiError(`Composio ${operation} failed`, response.status, operation);
-  }
+function contextAuthHeaders(auth: ComposioUserContextAuth): Record<string, string> {
+  return {
+    'x-user-api-key': auth.userApiKey,
+    'x-org-id': auth.orgId,
+    ...(auth.projectId ? { 'x-project-id': auth.projectId } : {}),
+  };
+}
 
+function sanitizeComposioErrorBody(value: unknown): unknown {
+  if (typeof value === 'string') return value.slice(0, 300);
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+
+  const source = value as Record<string, unknown>;
+  const sanitized: Record<string, unknown> = {};
+  for (const key of ['code', 'message', 'error', 'detail']) {
+    if (!(key in source) || SENSITIVE_RESPONSE_KEYS.has(key)) continue;
+    const field = source[key];
+    if (typeof field === 'string') sanitized[key] = field.slice(0, 300);
+    else if (typeof field === 'number' || typeof field === 'boolean') sanitized[key] = field;
+  }
+  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+}
+
+async function parseJsonResponse(response: Response, operation: string): Promise<unknown> {
+  const raw = await response.text();
+  let json: unknown;
   try {
-    return await response.json();
+    json = raw.length > 0 ? JSON.parse(raw) : null;
   } catch {
+    if (!response.ok) {
+      console.warn('[kiloclaw:composio] upstream request failed', {
+        operation,
+        status: response.status,
+        upstream: { invalidJson: true },
+      });
+      throw new ComposioApiError(`Composio ${operation} failed`, response.status, operation);
+    }
     throw new ComposioApiError(
       `Composio ${operation} returned invalid JSON`,
       response.status,
       operation
     );
   }
+
+  if (!response.ok) {
+    const upstream = sanitizeComposioErrorBody(json);
+    console.warn('[kiloclaw:composio] upstream request failed', {
+      operation,
+      status: response.status,
+      upstream,
+    });
+    throw new ComposioApiError(`Composio ${operation} failed`, response.status, operation);
+  }
+
+  return json;
 }
 
 export async function signupComposioAgentIdentity(
@@ -122,7 +179,7 @@ export async function getComposioAgentIdentity(
 }
 
 export async function createComposioGoogleCalendarConnectLink(params: {
-  apiKey: string;
+  auth: ComposioUserContextAuth;
   userId: string;
   callbackUrl: string;
   fetchImpl?: typeof fetch;
@@ -134,7 +191,7 @@ export async function createComposioGoogleCalendarConnectLink(params: {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-api-key': params.apiKey,
+        ...contextAuthHeaders(params.auth),
       },
       body: JSON.stringify({
         user_id: params.userId,
@@ -152,7 +209,7 @@ export async function createComposioGoogleCalendarConnectLink(params: {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-api-key': params.apiKey,
+        ...contextAuthHeaders(params.auth),
       },
       body: JSON.stringify({
         toolkit: GOOGLE_CALENDAR_TOOLKIT_SLUG,
@@ -169,7 +226,7 @@ export async function createComposioGoogleCalendarConnectLink(params: {
 }
 
 export async function listComposioConnectedAccounts(params: {
-  apiKey: string;
+  auth: ComposioUserContextAuth;
   userId: string;
   fetchImpl?: typeof fetch;
 }): Promise<ComposioConnectedAccount[]> {
@@ -179,7 +236,7 @@ export async function listComposioConnectedAccounts(params: {
   url.searchParams.append('limit', '25');
 
   const response = await (params.fetchImpl ?? fetch)(url, {
-    headers: { 'x-api-key': params.apiKey },
+    headers: contextAuthHeaders(params.auth),
   });
   const json = await parseJsonResponse(response, 'connected account list');
   return ConnectedAccountListResponseSchema.parse(json).items;

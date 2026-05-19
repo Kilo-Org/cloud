@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
 import { APP_URL } from '@/lib/constants';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
@@ -182,10 +181,14 @@ export async function completeManagedComposioGoogleCalendarConnection(params: {
   connectedAccountId: string;
 }): Promise<boolean> {
   const identity = await getActiveManagedComposioIdentity(params.scope);
-  if (!identity?.apiKey) return false;
+  if (!identity) return false;
 
   const accounts = await listComposioConnectedAccounts({
-    apiKey: identity.apiKey,
+    auth: {
+      userApiKey: identity.userApiKey,
+      orgId: identity.org,
+      projectId: identity.row.composio_project_id,
+    },
     userId: identity.consumerUserId,
   });
   const connected = accounts.some(
@@ -223,15 +226,13 @@ export async function createManagedComposioGoogleCalendarLink(params: {
   returnTo: string;
 }): Promise<{ redirectUrl: string; connectedAccountId: string }> {
   const identity = await ensureManagedComposioIdentity(params.scope);
-  if (!identity.apiKey) {
-    throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
-      message: 'Managed Composio identity is missing an API key',
-    });
-  }
 
   return await createComposioGoogleCalendarConnectLink({
-    apiKey: identity.apiKey,
+    auth: {
+      userApiKey: identity.userApiKey,
+      orgId: identity.org,
+      projectId: identity.row.composio_project_id,
+    },
     userId: identity.consumerUserId,
     callbackUrl: getComposioConnectCallbackUrl({
       organizationId: params.organizationId,
@@ -255,13 +256,17 @@ export async function getManagedComposioGoogleCalendarStatus(params: {
     : null;
 
   const identity = await getActiveManagedComposioIdentity(params.scope);
-  if (!identity?.apiKey) {
+  if (!identity) {
     return { enabled: true, status: 'disconnected', connectedAccountId: null, sandboxConfigSource };
   }
 
   try {
     const accounts = await listComposioConnectedAccounts({
-      apiKey: identity.apiKey,
+      auth: {
+        userApiKey: identity.userApiKey,
+        orgId: identity.org,
+        projectId: identity.row.composio_project_id,
+      },
       userId: identity.consumerUserId,
     });
     const active = accounts.find(account => account.status === 'ACTIVE');

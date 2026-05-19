@@ -64,7 +64,11 @@ describe('Composio client', () => {
     };
 
     const result = await createComposioGoogleCalendarConnectLink({
-      apiKey: 'api-key',
+      auth: {
+        userApiKey: 'uak_123',
+        orgId: 'org-1',
+        projectId: 'project-1',
+      },
       userId: 'kiloclaw:user:user-1',
       callbackUrl: 'https://app.example.com/api/integrations/composio/callback',
       fetchImpl: fetchImpl as typeof fetch,
@@ -77,7 +81,9 @@ describe('Composio client', () => {
     expect(requests[0].url).toBe('https://api.example.com/api/v3/tool_router/session');
     expect(requests[0].init?.headers).toEqual({
       'content-type': 'application/json',
-      'x-api-key': 'api-key',
+      'x-user-api-key': 'uak_123',
+      'x-org-id': 'org-1',
+      'x-project-id': 'project-1',
     });
     expect(JSON.parse(String(requests[0].init?.body))).toEqual({
       user_id: 'kiloclaw:user:user-1',
@@ -91,12 +97,18 @@ describe('Composio client', () => {
       toolkit: 'google_calendar',
       callback_url: 'https://app.example.com/api/integrations/composio/callback',
     });
+    expect(requests[1].init?.headers).toEqual({
+      'content-type': 'application/json',
+      'x-user-api-key': 'uak_123',
+      'x-org-id': 'org-1',
+      'x-project-id': 'project-1',
+    });
   });
 
   it('filters connected accounts by consumer user and Google Calendar toolkit', async () => {
-    const requests: string[] = [];
-    const fetchImpl = async (url: string | URL | Request) => {
-      requests.push(String(url));
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ url: String(url), init });
       return jsonResponse({
         items: [
           {
@@ -109,16 +121,25 @@ describe('Composio client', () => {
     };
 
     const accounts = await listComposioConnectedAccounts({
-      apiKey: 'api-key',
+      auth: {
+        userApiKey: 'uak_123',
+        orgId: 'org-1',
+        projectId: 'project-1',
+      },
       userId: 'kiloclaw:user:user-1',
       fetchImpl: fetchImpl as typeof fetch,
     });
 
     expect(accounts).toHaveLength(1);
-    const url = new URL(requests[0]);
+    const url = new URL(requests[0].url);
     expect(url.origin + url.pathname).toBe('https://api.example.com/api/v3/connected_accounts');
     expect(url.searchParams.get('user_ids')).toBe('kiloclaw:user:user-1');
     expect(url.searchParams.get('auth_config_ids')).toBeNull();
     expect(url.searchParams.get('toolkit_slugs')).toBe('google_calendar');
+    expect(requests[0].init?.headers).toEqual({
+      'x-user-api-key': 'uak_123',
+      'x-org-id': 'org-1',
+      'x-project-id': 'project-1',
+    });
   });
 });

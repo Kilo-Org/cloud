@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { contentBlockSchema } from '../src/schemas';
+import { attachmentMetadataSchema, contentBlockSchema } from '../src/schemas';
 import { ulid } from 'ulid';
 
 describe('attachmentBlockSchema', () => {
@@ -12,6 +12,10 @@ describe('attachmentBlockSchema', () => {
   };
   it('accepts a well-formed attachment block', () => {
     expect(contentBlockSchema.safeParse(goodBlock).success).toBe(true);
+  });
+  it('accepts shared metadata without a content block type', () => {
+    const { type: _type, ...metadata } = goodBlock;
+    expect(attachmentMetadataSchema.safeParse(metadata).success).toBe(true);
   });
   it('rejects empty mimeType', () => {
     expect(contentBlockSchema.safeParse({ ...goodBlock, mimeType: '' }).success).toBe(false);

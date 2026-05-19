@@ -93,12 +93,18 @@ export const textBlockSchema = z.object({
   text: trimmedNonEmptyString(MESSAGE_TEXT_MAX_CHARS),
 });
 
-export const attachmentBlockSchema = z.object({
-  type: z.literal('attachment'),
+const attachmentMetadataShape = {
   attachmentId: ulidSchema,
   mimeType: z.string().min(1).max(255),
   size: z.number().int().nonnegative(),
   filename: z.string().min(1).max(512),
+};
+
+export const attachmentMetadataSchema = z.object(attachmentMetadataShape);
+
+export const attachmentBlockSchema = z.object({
+  type: z.literal('attachment'),
+  ...attachmentMetadataShape,
 });
 
 export const contentBlockSchema = z.discriminatedUnion('type', [

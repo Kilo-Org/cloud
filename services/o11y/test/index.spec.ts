@@ -144,6 +144,7 @@ describe('o11y worker', () => {
       '0',
       'openai',
       '0',
+      'user_123',
     ]);
     expect(call.doubles).toEqual([45, 123, 200]);
 
@@ -156,6 +157,7 @@ describe('o11y worker', () => {
         is_error: false,
         inference_provider: 'openai',
         user_byok: false,
+        kilo_user_id: 'user_123',
         ttfb_ms: 45,
         complete_request_ms: 123,
         status_code: 200,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, memo } from 'react';
+import { useMemo, useState, useRef, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Pencil, Trash2, Reply, X, Check, AlertCircle, Smile, Copy } from 'lucide-react';
@@ -106,6 +106,10 @@ export const MessageBubble = memo(function MessageBubble({
   });
 
   const textContent = message.deleted ? '' : contentBlocksToText(message.content);
+  const attachmentBlocks = useMemo(
+    () => message.content.filter((b): b is AttachmentBlock => b.type === 'attachment'),
+    [message.content]
+  );
   const editOverLimit = isMessageEditOverLimit(editText);
   const showEditCounter = editText.length >= EDIT_COUNTER_SHOW_AT || editOverLimit;
   const baseActionAvailability = buildMessageActionAvailability(message, isOwn);
@@ -133,8 +137,8 @@ export const MessageBubble = memo(function MessageBubble({
     setIsEditing(true);
   }
 
-  const remainingAttachmentsCount = message.content.filter(
-    b => b.type === 'attachment' && !removedAttachmentIds.has(b.attachmentId)
+  const remainingAttachmentsCount = attachmentBlocks.filter(
+    b => !removedAttachmentIds.has(b.attachmentId)
   ).length;
   const canSaveEdit =
     actionAvailability.canEdit &&
@@ -150,9 +154,7 @@ export const MessageBubble = memo(function MessageBubble({
         messageId: message.id,
         editText,
         originalText: textContent,
-        originalAttachments: message.content.filter(
-          (b): b is AttachmentBlock => b.type === 'attachment'
-        ),
+        originalAttachments: attachmentBlocks,
         removedAttachmentIds,
         onEdit,
         closeEditor: () => {
@@ -436,8 +438,7 @@ export const MessageBubble = memo(function MessageBubble({
                 })}
 
             {!message.deleted &&
-              message.content
-                .filter((b): b is AttachmentBlock => b.type === 'attachment')
+              attachmentBlocks
                 .filter(b => !isEditing || !removedAttachmentIds.has(b.attachmentId))
                 .map(block => (
                   <MessageAttachment

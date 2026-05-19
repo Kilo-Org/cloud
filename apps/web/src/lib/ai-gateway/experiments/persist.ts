@@ -2,10 +2,7 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { model_experiment_request } from '@kilocode/db/schema';
 import { putPromptIfAbsent } from '@/lib/r2/experiment-prompts';
-import type {
-  ExperimentPromptCapture,
-  MicrodollarUsageContext,
-} from '@/lib/ai-gateway/processUsage.types';
+import type { ExperimentPromptCapture } from '@/lib/ai-gateway/processUsage.types';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 /**

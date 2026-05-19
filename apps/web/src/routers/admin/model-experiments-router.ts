@@ -263,7 +263,10 @@ const UpdateVariantLabelSchema = z.object({
 const SwapVariantVersionSchema = z.object({
   variantId: z.string().uuid(),
   upstream: ExperimentUpstreamSchema,
-  apiKey: apiKeySchema,
+  // Optional: if omitted, the prior version's encrypted_api_key is reused
+  // (so admins can hot-swap the upstream config without retyping the key).
+  // Required when the variant has no prior version.
+  apiKey: apiKeySchema.optional(),
 });
 
 const RotateApiKeySchema = z.object({
@@ -436,18 +439,40 @@ export const adminModelExperimentsRouter = createTRPCRouter({
   swapVariantVersion: adminProcedure
     .input(SwapVariantVersionSchema)
     .mutation(async ({ input, ctx }) => {
-      const key = ensureEncryptionKey();
       const variant = await loadVariantOrThrow(input.variantId);
       const experiment = await loadExperimentOrThrow(variant.experiment_id);
       assertNonTerminal(experiment.status as Status, 'Swapping variant version');
 
-      const encrypted = encryptApiKey(input.apiKey, key);
+      // If the caller supplied a key, encrypt it. Otherwise reuse the
+      // existing variant's latest encrypted_api_key blob — admins should
+      // be able to hot-swap the upstream config without retyping the key
+      // every time. If there is no prior version we have nothing to
+      // copy and the key is required.
+      let encrypted_api_key;
+      if (input.apiKey !== undefined) {
+        encrypted_api_key = encryptApiKey(input.apiKey, ensureEncryptionKey());
+      } else {
+        const previous = await db
+          .select({ encrypted_api_key: model_experiment_variant_version.encrypted_api_key })
+          .from(model_experiment_variant_version)
+          .where(eq(model_experiment_variant_version.variant_id, variant.id))
+          .orderBy(
+            desc(model_experiment_variant_version.effective_at),
+            desc(model_experiment_variant_version.id)
+          )
+          .limit(1);
+        if (previous.length === 0) {
+          badRequest('apiKey is required when the variant has no prior version');
+        }
+        encrypted_api_key = previous[0].encrypted_api_key;
+      }
+
       const [inserted] = await db
         .insert(model_experiment_variant_version)
         .values({
           variant_id: variant.id,
           upstream: input.upstream,
-          encrypted_api_key: encrypted,
+          encrypted_api_key,
           created_by: ctx.user.id,
         })
         .returning(variantVersionPublicColumns);

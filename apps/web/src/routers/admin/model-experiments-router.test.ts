@@ -430,6 +430,50 @@ describe('admin.modelExperiments — versions and api keys', () => {
       })
     ).rejects.toBeTruthy();
   });
+
+  it('swapVariantVersion without apiKey reuses the prior encrypted key', async () => {
+    const { caller, variantA } = await makeDraftWithTwoVariants('kilo/preview-reuse');
+    const before = await db.query.model_experiment_variant_version.findFirst({
+      where: eq(model_experiment_variant_version.variant_id, variantA.id),
+    });
+    if (!before) throw new Error('seed version missing');
+
+    const after = await caller.admin.modelExperiments.swapVariantVersion({
+      variantId: variantA.id,
+      upstream: validUpstreamRc2,
+      // apiKey deliberately omitted — should copy `before`'s encrypted blob.
+    });
+
+    const afterRow = await db.query.model_experiment_variant_version.findFirst({
+      where: eq(model_experiment_variant_version.id, after.id),
+    });
+    if (!afterRow) throw new Error('inserted row missing');
+
+    expect(afterRow.encrypted_api_key).toEqual(before.encrypted_api_key);
+    expect(decryptApiKey(afterRow.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('sk-control-key');
+    // Upstream changed.
+    expect(afterRow.upstream).toEqual(validUpstreamRc2);
+  });
+
+  it('swapVariantVersion without apiKey rejects when variant has no prior version', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const exp = await caller.admin.modelExperiments.create({
+      public_model_id: 'kilo/preview-firstver',
+      name: 'f',
+    });
+    const v = await caller.admin.modelExperiments.addVariant({
+      id: exp.id,
+      label: 'a',
+      weight: 1,
+    });
+    await expect(
+      caller.admin.modelExperiments.swapVariantVersion({
+        variantId: v.id,
+        upstream: validUpstream,
+        // apiKey omitted on a brand-new variant — must error.
+      })
+    ).rejects.toMatchObject({ message: expect.stringContaining('apiKey is required') });
+  });
 });
 
 describe('admin.modelExperiments — privacy and shape', () => {

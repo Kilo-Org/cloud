@@ -566,6 +566,9 @@ function VariantsSection({
           }}
           variantId={versionEditor.variantId}
           variantLabel={versionEditor.variantLabel}
+          hasExistingVersion={
+            variants.find(v => v.id === versionEditor.variantId)?.current_version != null
+          }
           initialUpstream={
             variants.find(v => v.id === versionEditor.variantId)?.current_version?.upstream
           }
@@ -673,12 +676,14 @@ function SwapVersionDialog({
   variantId,
   variantLabel,
   initialUpstream,
+  hasExistingVersion,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   variantId: string;
   variantLabel: string;
   initialUpstream: unknown;
+  hasExistingVersion: boolean;
 }) {
   const seed = useMemo<ExperimentUpstream>(() => {
     const parsed = ExperimentUpstreamSchema.safeParse(initialUpstream);
@@ -707,15 +712,19 @@ function SwapVersionDialog({
       );
       return;
     }
-    if (!apiKey.trim()) {
-      setError('api key is required');
+    const trimmedKey = apiKey.trim();
+    if (!hasExistingVersion && !trimmedKey) {
+      setError('api key is required for the first version');
       return;
     }
     try {
       await swap.mutateAsync({
         variantId,
         upstream: result.data,
-        apiKey: apiKey.trim(),
+        // Omit apiKey to reuse the existing variant's encrypted key. The
+        // server reads the prior version's encrypted_api_key blob in
+        // that case.
+        ...(trimmedKey ? { apiKey: trimmedKey } : {}),
       });
       toast.success('Variant version inserted');
       setApiKey('');
@@ -724,7 +733,7 @@ function SwapVersionDialog({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
     }
-  }, [apiKey, onOpenChange, swap, upstreamJson, variantId]);
+  }, [apiKey, hasExistingVersion, onOpenChange, swap, upstreamJson, variantId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -769,7 +778,7 @@ function SwapVersionDialog({
           </div>
 
           <div>
-            <Label htmlFor="api-key">API key</Label>
+            <Label htmlFor="api-key">API key{hasExistingVersion ? ' (optional)' : ''}</Label>
             <Input
               id="api-key"
               type="password"
@@ -779,8 +788,18 @@ function SwapVersionDialog({
                 setApiKey(e.target.value);
                 setError(null);
               }}
-              placeholder="Encrypted before storage; never displayed back"
+              placeholder={
+                hasExistingVersion
+                  ? 'Leave blank to keep the existing key'
+                  : 'Encrypted before storage; never displayed back'
+              }
             />
+            {hasExistingVersion && (
+              <p className="text-muted-foreground mt-1 text-xs">
+                Leave this blank to reuse the existing variant&rsquo;s encrypted key. Use the Rotate
+                key action instead if you only want to change the key.
+              </p>
+            )}
           </div>
 
           {error && (

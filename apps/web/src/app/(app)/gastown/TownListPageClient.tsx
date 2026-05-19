@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
@@ -15,8 +15,10 @@ import { Plus, Factory, Trash2, Skull } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import {
+  DeleteWastelandConfirmDialog,
   WastelandCard,
   WastelandListSkeleton,
+  type WastelandItem,
 } from '@/app/(app)/wasteland/_components/WastelandListComponents';
 import { parseDolthubUpstream } from '@/lib/wasteland/upstream';
 
@@ -68,6 +70,27 @@ export function TownListPageClient() {
       },
       onError: err => {
         toast.error(err.message);
+      },
+    })
+  );
+
+  // Wasteland deletion: track the targeted wasteland in local state so the
+  // confirm dialog can render its name and only act on the user's explicit
+  // confirmation. Keeping it here (rather than per-card) means we have a
+  // single dialog instance for the whole grid and no overlap when the
+  // mutation is in flight.
+  const [pendingWastelandDelete, setPendingWastelandDelete] = useState<WastelandItem | null>(null);
+  const deleteWasteland = useMutation(
+    wastelandTrpc.wasteland.deleteWasteland.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: wastelandTrpc.wasteland.listWastelands.queryKey({}),
+        });
+        toast.success('Wasteland deleted');
+        setPendingWastelandDelete(null);
+      },
+      onError: err => {
+        toast.error(`Failed to delete wasteland: ${err.message}`);
       },
     })
   );
@@ -239,11 +262,22 @@ export function TownListPageClient() {
                 key={wasteland.wasteland_id}
                 wasteland={wasteland}
                 onClick={() => router.push(linkForWasteland(wasteland))}
+                onDelete={() => setPendingWastelandDelete(wasteland)}
               />
             ))}
           </div>
         )}
       </section>
+
+      <DeleteWastelandConfirmDialog
+        wasteland={pendingWastelandDelete}
+        isPending={deleteWasteland.isPending}
+        onCancel={() => setPendingWastelandDelete(null)}
+        onConfirm={() => {
+          if (!pendingWastelandDelete) return;
+          deleteWasteland.mutate({ wastelandId: pendingWastelandDelete.wasteland_id });
+        }}
+      />
     </PageContainer>
   );
 }

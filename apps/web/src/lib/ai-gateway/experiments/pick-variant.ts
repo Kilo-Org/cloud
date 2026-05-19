@@ -18,19 +18,30 @@ import {
 } from '@/lib/ai-gateway/experiments/upstream-schema';
 import type { ResolvedExperimentUpstream } from '@/lib/ai-gateway/experiments/build-direct-provider';
 
-/** TTL for the per-public-id experiment cache. Doubles as the upper bound on
- *  api-key rotation lag (the cache holds decrypted plaintext). */
+/** TTL for the per-public-id experiment cache. The cache holds CIPHERTEXT
+ *  (encrypted api keys + the upstream blob); decryption happens per-pick
+ *  inside `pickModelExperimentVariant`, so this TTL only governs how stale
+ *  the variant set / current-version-per-variant resolution can be, not
+ *  how long plaintext keys can live in Redis. */
 const PER_PUBLIC_ID_CACHE_TTL_SECONDS = 600;
 
 type ExperimentStatus = 'active' | 'paused';
 
-/** Per-variant payload cached in Redis. `upstream` already includes the
- *  decrypted `api_key` merged in for hot-path use. */
+/**
+ * Per-variant payload cached in Redis.
+ *
+ * The api key is stored ENCRYPTED — the cache never holds plaintext.
+ * Decryption happens once per request, only on the chosen variant, inside
+ * `pickModelExperimentVariant`. This keeps `BYOK_ENCRYPTION_KEY` rotation
+ * effective immediately (no 10-minute "plaintext lives in Redis" window)
+ * and limits the blast radius of a Redis dump.
+ */
 type CachedVariant = {
   variantId: string;
   weight: number;
   variantVersionId: string;
-  upstream: ResolvedExperimentUpstream;
+  upstream: ExperimentUpstream;
+  encryptedApiKey: EncryptedData;
 };
 
 type CachedExperiment = {
@@ -140,14 +151,13 @@ function parseStringArray(raw: string): string[] | null {
 /**
  * Returns the routing-relevant experiment for `publicId` (status active or
  * paused) with all variants resolved to their current
- * `model_experiment_variant_version` and decrypted upstream blob. Returns
- * `none` only after Postgres has proven there is no routing-relevant
- * experiment for this id.
+ * `model_experiment_variant_version`. The cached payload holds CIPHERTEXT
+ * for partner-issued api keys; decryption is deferred to
+ * `pickModelExperimentVariant`. Returns `none` only after Postgres has
+ * proven there is no routing-relevant experiment for this id.
  *
- * Cached per-publicId for ~10 minutes. The cached payload contains
- * decrypted partner-issued api keys, so the TTL doubles as a key-rotation
- * lag bound. The cache is invalidated by every admin mutation that affects
- * routing.
+ * Cached per-publicId for ~10 minutes. The cache is invalidated by every
+ * admin mutation that affects routing.
  */
 export async function getRoutingExperimentForPublicId(publicId: string): Promise<ResolveResult> {
   const cacheKey = modelExperimentRedisKey(publicId);
@@ -318,11 +328,11 @@ async function loadExperimentFromDb(publicId: string): Promise<ResolveResult> {
     }
   }
 
-  if (!BYOK_ENCRYPTION_KEY) {
-    warnMissingEncryptionKeyOnce();
-    return { kind: 'unavailable' };
-  }
-
+  // We deliberately DO NOT call decryptApiKey here, even when
+  // BYOK_ENCRYPTION_KEY is missing. The encrypted blob is harmless on its
+  // own; decryption + the missing-key check happen per-pick in
+  // `pickModelExperimentVariant` so a warm cache cannot serve plaintext
+  // keys after key rotation/removal.
   const variants: CachedVariant[] = [];
   for (const v of variantRows) {
     const ver = versionByVariantId.get(v.id);
@@ -344,21 +354,12 @@ async function loadExperimentFromDb(publicId: string): Promise<ResolveResult> {
       });
       return { kind: 'unavailable' };
     }
-    let apiKey: string;
-    try {
-      apiKey = decryptApiKey(ver.encryptedApiKey, BYOK_ENCRYPTION_KEY);
-    } catch (err) {
-      captureException(err, {
-        tags: { source: 'model-experiments', operation: 'decryptApiKey' },
-        extra: { experimentId: experiment.id, variantId: v.id, variantVersionId: ver.id },
-      });
-      return { kind: 'unavailable' };
-    }
     variants.push({
       variantId: v.id,
       weight: v.weight,
       variantVersionId: ver.id,
-      upstream: { ...(parsedUpstream.data satisfies ExperimentUpstream), api_key: apiKey },
+      upstream: parsedUpstream.data,
+      encryptedApiKey: ver.encryptedApiKey,
     });
   }
 
@@ -428,12 +429,37 @@ export async function pickModelExperimentVariant(
   for (const v of exp.variants) {
     cumulative += v.weight;
     if (bucket < cumulative) {
+      // Decrypt only the chosen variant's key, here and now. This is the
+      // ONLY decryption point for experiment routing — the cache holds
+      // ciphertext exclusively. Doing it per-pick (a) keeps the
+      // BYOK_ENCRYPTION_KEY missing-key fail-closed effective on warm
+      // caches, (b) lets key rotation invalidate access immediately
+      // (next request after the key flips fails closed), and (c) means
+      // we never decrypt N-1 keys we won't use.
+      if (!BYOK_ENCRYPTION_KEY) {
+        warnMissingEncryptionKeyOnce();
+        return { status: 'unavailable' };
+      }
+      let apiKey: string;
+      try {
+        apiKey = decryptApiKey(v.encryptedApiKey, BYOK_ENCRYPTION_KEY);
+      } catch (err) {
+        captureException(err, {
+          tags: { source: 'model-experiments', operation: 'decryptApiKey' },
+          extra: {
+            experimentId: exp.experimentId,
+            variantId: v.variantId,
+            variantVersionId: v.variantVersionId,
+          },
+        });
+        return { status: 'unavailable' };
+      }
       return {
         status: 'active',
         experimentId: exp.experimentId,
         variantId: v.variantId,
         variantVersionId: v.variantVersionId,
-        upstream: v.upstream,
+        upstream: { ...v.upstream, api_key: apiKey },
         allocationSubject: subjectPick.subject,
       };
     }

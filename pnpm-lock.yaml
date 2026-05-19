@@ -1453,8 +1453,8 @@ importers:
   services/cloud-agent-next:
     dependencies:
       '@cloudflare/sandbox':
-        specifier: 0.9.4
-        version: 0.9.4(@xterm/xterm@6.0.0)
+        specifier: 0.10.1
+        version: 0.10.1(@xterm/xterm@6.0.0)
       '@hono/trpc-server':
         specifier: 0.4.2
         version: 0.4.2(@trpc/server@11.17.0(typescript@5.9.3))(hono@4.12.18)
@@ -1718,7 +1718,7 @@ importers:
         version: 7.0.0-dev.20260514.1
       jest:
         specifier: 30.3.0
-        version: 30.3.0(@types/node@24.12.4)(esbuild-register@3.6.0(esbuild@0.28.0))
+        version: 30.3.0(@types/node@25.7.0)(esbuild-register@3.6.0(esbuild@0.28.0))
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -3609,6 +3609,20 @@ packages:
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
     engines: {node: '>=22.0.0'}
 
+  '@cloudflare/sandbox@0.10.1':
+    resolution: {integrity: sha512-l5QH0zemshvsYGvF5K/Lee1WydL93Oc1jZlVC2gRQkRwsNxNvHpfNn59B4/u68lax6iLGemWGd/TdJHzoq6MiQ==}
+    peerDependencies:
+      '@openai/agents': ^0.3.3
+      '@opencode-ai/sdk': ^1.1.40
+      '@xterm/xterm': '>=5.0.0'
+    peerDependenciesMeta:
+      '@openai/agents':
+        optional: true
+      '@opencode-ai/sdk':
+        optional: true
+      '@xterm/xterm':
+        optional: true
+
   '@cloudflare/sandbox@0.6.11':
     resolution: {integrity: sha512-4hM+jfH5CWJTFBFjnW5bYx8fjVi878VY/cpfdpq4WAj43qq0WMrZW9hEeHYthUHsNZx6tCy6bpaJoLBw2Fyfyw==}
     peerDependencies:
@@ -3622,20 +3636,6 @@ packages:
 
   '@cloudflare/sandbox@0.7.21':
     resolution: {integrity: sha512-BlfbhIWF83NkmixxGVpE9zrcR0Ix5fVgV+zzfJByxyRnXUS+g2aUeIXK2opBcnX8WWlk6v5+RYTKkSz1XKQ4eg==}
-    peerDependencies:
-      '@openai/agents': ^0.3.3
-      '@opencode-ai/sdk': ^1.1.40
-      '@xterm/xterm': '>=5.0.0'
-    peerDependenciesMeta:
-      '@openai/agents':
-        optional: true
-      '@opencode-ai/sdk':
-        optional: true
-      '@xterm/xterm':
-        optional: true
-
-  '@cloudflare/sandbox@0.9.4':
-    resolution: {integrity: sha512-T7Z90ZlVaODyFJdwU7wxXN6ZWO9O9NEy95I45Uyliqjy5cGEsStJG1FNFhvIOJp+u0qFuN4/8b+StAiM78Lf3w==}
     peerDependencies:
       '@openai/agents': ^0.3.3
       '@opencode-ai/sdk': ^1.1.40
@@ -18024,6 +18024,15 @@ snapshots:
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 
+  '@cloudflare/sandbox@0.10.1(@xterm/xterm@6.0.0)':
+    dependencies:
+      '@cloudflare/containers': 0.3.4
+      aws4fetch: 1.0.20
+      capnweb: 0.6.1
+      hono: 4.12.18
+    optionalDependencies:
+      '@xterm/xterm': 6.0.0
+
   '@cloudflare/sandbox@0.6.11':
     dependencies:
       '@cloudflare/containers': 0.0.30
@@ -18032,15 +18041,6 @@ snapshots:
     dependencies:
       '@cloudflare/containers': 0.1.1
       aws4fetch: 1.0.20
-    optionalDependencies:
-      '@xterm/xterm': 6.0.0
-
-  '@cloudflare/sandbox@0.9.4(@xterm/xterm@6.0.0)':
-    dependencies:
-      '@cloudflare/containers': 0.3.4
-      aws4fetch: 1.0.20
-      capnweb: 0.6.1
-      hono: 4.12.18
     optionalDependencies:
       '@xterm/xterm': 6.0.0
 
@@ -24324,7 +24324,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.7.0)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.47.1)(tsx@4.22.2)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.47.1)(tsx@4.22.2)(yaml@2.8.4)
 
   '@vitest/expect@3.2.4':
     dependencies:
@@ -24430,7 +24430,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.7.0)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.47.1)(tsx@4.22.2)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.47.1)(tsx@4.22.2)(yaml@2.8.4)
 
   '@vitest/utils@3.2.4':
     dependencies:
@@ -28097,6 +28097,25 @@ snapshots:
       - supports-color
       - ts-node
 
+  jest-cli@30.3.0(@types/node@25.7.0)(esbuild-register@3.6.0(esbuild@0.28.0)):
+    dependencies:
+      '@jest/core': 30.3.0(esbuild-register@3.6.0(esbuild@0.28.0))
+      '@jest/test-result': 30.3.0
+      '@jest/types': 30.3.0
+      chalk: 4.1.2
+      exit-x: 0.2.2
+      import-local: 3.2.0
+      jest-config: 30.3.0(@types/node@25.7.0)(esbuild-register@3.6.0(esbuild@0.28.0))
+      jest-util: 30.3.0
+      jest-validate: 30.3.0
+      yargs: 17.7.2
+    transitivePeerDependencies:
+      - '@types/node'
+      - babel-plugin-macros
+      - esbuild-register
+      - supports-color
+      - ts-node
+
   jest-config@29.7.0(@types/node@20.19.41):
     dependencies:
       '@babel/core': 7.29.0
@@ -28246,6 +28265,38 @@ snapshots:
       strip-json-comments: 3.1.1
     optionalDependencies:
       '@types/node': 24.12.4
+      esbuild-register: 3.6.0(esbuild@0.28.0)
+    transitivePeerDependencies:
+      - babel-plugin-macros
+      - supports-color
+
+  jest-config@30.3.0(@types/node@25.7.0)(esbuild-register@3.6.0(esbuild@0.28.0)):
+    dependencies:
+      '@babel/core': 7.29.0
+      '@jest/get-type': 30.1.0
+      '@jest/pattern': 30.0.1
+      '@jest/test-sequencer': 30.3.0
+      '@jest/types': 30.3.0
+      babel-jest: 30.3.0(@babel/core@7.29.0)
+      chalk: 4.1.2
+      ci-info: 4.4.0
+      deepmerge: 4.3.1
+      glob: 13.0.6
+      graceful-fs: 4.2.11
+      jest-circus: 30.3.0
+      jest-docblock: 30.2.0
+      jest-environment-node: 30.3.0
+      jest-regex-util: 30.0.1
+      jest-resolve: 30.3.0
+      jest-runner: 30.3.0
+      jest-util: 30.3.0
+      jest-validate: 30.3.0
+      parse-json: 5.2.0
+      pretty-format: 30.3.0
+      slash: 3.0.0
+      strip-json-comments: 3.1.1
+    optionalDependencies:
+      '@types/node': 25.7.0
       esbuild-register: 3.6.0(esbuild@0.28.0)
     transitivePeerDependencies:
       - babel-plugin-macros
@@ -28815,6 +28866,19 @@ snapshots:
       '@jest/types': 30.3.0
       import-local: 3.2.0
       jest-cli: 30.3.0(@types/node@24.12.4)(esbuild-register@3.6.0(esbuild@0.28.0))
+    transitivePeerDependencies:
+      - '@types/node'
+      - babel-plugin-macros
+      - esbuild-register
+      - supports-color
+      - ts-node
+
+  jest@30.3.0(@types/node@25.7.0)(esbuild-register@3.6.0(esbuild@0.28.0)):
+    dependencies:
+      '@jest/core': 30.3.0(esbuild-register@3.6.0(esbuild@0.28.0))
+      '@jest/types': 30.3.0
+      import-local: 3.2.0
+      jest-cli: 30.3.0(@types/node@25.7.0)(esbuild-register@3.6.0(esbuild@0.28.0))
     transitivePeerDependencies:
       - '@types/node'
       - babel-plugin-macros

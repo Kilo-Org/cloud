@@ -27,7 +27,7 @@
     "typecheck": "tsgo --noEmit && pnpm -C wrapper run typecheck"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.9.4",
+    "@cloudflare/sandbox": "0.10.1",
     "@hono/trpc-server": "0.4.2",
     "@kilocode/cloud-agent-profile": "workspace:*",
     "@kilocode/db": "workspace:*",

@@ -5,7 +5,7 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException } from '@sentry/nextjs';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
 import { getDoltHubOAuthUrl } from '@/lib/integrations/dolthub-service';
-import { APP_URL, IS_DEVELOPMENT } from '@/lib/constants';
+import { APP_URL } from '@/lib/constants';
 
 /**
  * DoltHub OAuth Connect
@@ -17,10 +17,6 @@ import { APP_URL, IS_DEVELOPMENT } from '@/lib/constants';
  * - organizationId: (optional) Organization ID for org-owned integrations
  */
 export async function GET(request: NextRequest) {
-  if (!IS_DEVELOPMENT) {
-    return NextResponse.json({ error: 'not_found' }, { status: 404 });
-  }
-
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {

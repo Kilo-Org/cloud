@@ -1,4 +1,7 @@
 import {
+  buildGitLabOAuthUrl,
+  exchangeGitLabOAuthCode,
+  refreshGitLabOAuthToken,
   validateGitLabInstance,
   searchGitLabProjects,
   normalizeGitLabSearchQuery,
@@ -73,6 +76,32 @@ describe('normalizeGitLabSearchQuery', () => {
     // This doesn't start with http:// or https://, so it's treated as a search term
     const result = normalizeGitLabSearchQuery('gitlab.com/team/project');
     expect(result).toBe('gitlab.com/team/project');
+  });
+});
+
+describe('GitLab OAuth endpoint safety', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('refuses to build self-hosted authorization URLs without custom credentials', () => {
+    expect(() => buildGitLabOAuthUrl('signed-state', 'https://attacker.example')).toThrow(
+      'Custom GitLab OAuth credentials are required for self-hosted instances'
+    );
+  });
+
+  it('refuses to send default OAuth credentials to self-hosted token endpoints', async () => {
+    await expect(
+      exchangeGitLabOAuthCode('authorization-code', 'https://attacker.example')
+    ).rejects.toThrow('Custom GitLab OAuth credentials are required for self-hosted instances');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('refuses to refresh self-hosted OAuth tokens without custom credentials', async () => {
+    await expect(
+      refreshGitLabOAuthToken('refresh-token', 'https://attacker.example')
+    ).rejects.toThrow('Custom GitLab OAuth credentials are required for self-hosted instances');
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 

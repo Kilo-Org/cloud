@@ -327,9 +327,9 @@ function ProfilesListDialogWrapper({
   const [isCreating, setIsCreating] = useState(initialIsCreating);
   const [newProfileName, setNewProfileName] = useState('');
   const [newProfileDescription, setNewProfileDescription] = useState('');
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [togglingDefaultId, setTogglingDefaultId] = useState<string | null>(null);
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId] = useState<string | null>(null);
+  const [togglingDefaultId] = useState<string | null>(null);
+  const [savingId] = useState<string | null>(null);
 
   const handleStartEdit = (profile: ProfileSummary) => {
     setEditingProfileId(profile.id);
@@ -605,6 +605,7 @@ export const ManyProfiles: Story = {
       mcpServerCount: Math.floor(Math.random() * 3),
       skillCount: Math.floor(Math.random() * 3),
       agentCount: Math.floor(Math.random() * 2),
+      kiloCommandCount: 0,
     }));
     return <ProfilesListDialogWrapper profiles={manyProfiles} />;
   },

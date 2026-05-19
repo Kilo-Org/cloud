@@ -3,11 +3,13 @@ import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
 
 type StreamTicketPayload = {
   type: 'stream_ticket';
+  purpose?: 'stream' | 'terminal';
   userId?: string;
   kiloSessionId?: string;
   cloudAgentSessionId?: string;
   sessionId?: string;
   organizationId?: string;
+  ptyId?: string;
   nonce?: string;
 };
 

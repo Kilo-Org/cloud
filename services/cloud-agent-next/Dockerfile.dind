@@ -1,0 +1,142 @@
+ARG SANDBOX_VERSION="0.8.9"
+
+FROM docker.io/cloudflare/sandbox:${SANDBOX_VERSION}-musl AS cloudflare-sandbox
+
+FROM docker:dind-rootless
+
+USER root
+
+# Build arguments for metadata (all optional with defaults)
+ARG BUILD_DATE=""
+ARG VCS_REF=""
+ARG KILOCODE_CLI_VERSION="7.2.52"
+
+# Cloudflare Containers run without root privileges, so Docker must run in
+# rootless mode. The Sandbox SDK server is copied into this image so the
+# Durable Object can still control the container while dockerd runs as a child
+# process.
+COPY --from=cloudflare-sandbox /container-server/sandbox /sandbox
+COPY --from=cloudflare-sandbox /usr/lib/libstdc++.so.6 /usr/lib/libstdc++.so.6
+COPY --from=cloudflare-sandbox /usr/lib/libgcc_s.so.1 /usr/lib/libgcc_s.so.1
+COPY --from=cloudflare-sandbox /bin/bash /bin/bash
+COPY --from=cloudflare-sandbox /usr/lib/libreadline.so.8 /usr/lib/libreadline.so.8
+COPY --from=cloudflare-sandbox /usr/lib/libreadline.so.8.2 /usr/lib/libreadline.so.8.2
+
+RUN apk add --no-cache \
+    bash \
+    curl \
+    git \
+    git-lfs \
+    jq \
+    nodejs \
+    npm \
+    openssh-client \
+    tar \
+    wget \
+    && git lfs install --system --skip-repo
+
+# Install GitHub CLI from the official release. Alpine packages can lag the
+# Debian package used in Dockerfile, so pin the upstream binary archive here.
+RUN GH_VERSION="2.82.1" \
+    && wget -q -O /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+    && tar -xzf /tmp/gh.tar.gz -C /tmp \
+    && cp "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh \
+    && chmod +x /usr/local/bin/gh \
+    && rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64"
+
+# Install GitLab CLI from the official Linux amd64 binary archive.
+RUN GLAB_VERSION="1.93.0" \
+    && wget -q -O /tmp/glab.tar.gz "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.tar.gz" \
+    && tar -xzf /tmp/glab.tar.gz -C /tmp \
+    && cp /tmp/bin/glab /usr/local/bin/glab \
+    && chmod +x /usr/local/bin/glab \
+    && rm -rf /tmp/glab.tar.gz /tmp/bin
+
+# Tools used by the outer sandbox. Kilo itself is still installed globally for
+# the existing wrapper path; the platform package bundle under /opt/kilo-agent
+# is intended for mounting or copying into inner dev containers.
+RUN npm install -g bun pnpm @devcontainers/cli @kilocode/cli@${KILOCODE_CLI_VERSION}
+
+RUN mkdir -p /opt/kilo-agent/bin \
+    /opt/kilo-agent/cli-linux-x64 \
+    /opt/kilo-agent/cli-linux-x64-musl \
+    && npm pack \
+      "@kilocode/cli-linux-x64@${KILOCODE_CLI_VERSION}" \
+      "@kilocode/cli-linux-x64-musl@${KILOCODE_CLI_VERSION}" \
+      --pack-destination /tmp \
+    && tar -xzf "/tmp/kilocode-cli-linux-x64-${KILOCODE_CLI_VERSION}.tgz" \
+      -C /opt/kilo-agent/cli-linux-x64 --strip-components=1 \
+    && tar -xzf "/tmp/kilocode-cli-linux-x64-musl-${KILOCODE_CLI_VERSION}.tgz" \
+      -C /opt/kilo-agent/cli-linux-x64-musl --strip-components=1 \
+    && rm -f /tmp/kilocode-cli-linux-x64-*.tgz \
+    && rm -f /tmp/kilocode-cli-linux-x64-musl-*.tgz \
+    && rm -f /opt/kilo-agent/cli-linux-x64/bin/*.map \
+    && rm -f /opt/kilo-agent/cli-linux-x64-musl/bin/*.map \
+    && chmod +x /opt/kilo-agent/cli-linux-x64/bin/kilo \
+    && chmod +x /opt/kilo-agent/cli-linux-x64-musl/bin/kilo
+
+RUN cat > /opt/kilo-agent/bin/kilo <<'EOF' \
+    && chmod +x /opt/kilo-agent/bin/kilo
+#!/bin/sh
+set -eu
+
+root="${KILO_AGENT_ROOT:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
+arch="$(uname -m)"
+
+if ldd --version 2>&1 | grep -qi musl; then
+  libc="musl"
+else
+  libc="glibc"
+fi
+
+case "$arch:$libc" in
+  x86_64:glibc) exec "$root/cli-linux-x64/bin/kilo" "$@" ;;
+  x86_64:musl) exec "$root/cli-linux-x64-musl/bin/kilo" "$@" ;;
+  *) echo "Unsupported devcontainer platform: $arch/$libc" >&2; exit 1 ;;
+esac
+EOF
+
+# === Build wrapper bundle inside container ===
+# This mirrors Dockerfile but builds on Alpine, matching the DIND base image.
+# /opt/kilo-cloud/ is the canonical location so the wrapper bundle can be
+# bind-mounted read-only into a dev container; /usr/local/bin/ keeps symlinks
+# so existing outer-sandbox callers (`bun /usr/local/bin/kilocode-wrapper.js`)
+# continue to work unchanged.
+COPY wrapper /tmp/wrapper-build/wrapper
+COPY src/shared /tmp/wrapper-build/src/shared
+
+RUN mkdir -p /opt/kilo-cloud \
+    && cd /tmp/wrapper-build/wrapper \
+    && bun install --production \
+    && bun build src/main.ts --outfile=/opt/kilo-cloud/kilocode-wrapper.js --target=bun --minify \
+    && bun build src/restore-session.ts --outfile=/opt/kilo-cloud/kilo-restore-session.js --target=bun --minify \
+    && ln -sf /opt/kilo-cloud/kilocode-wrapper.js /usr/local/bin/kilocode-wrapper.js \
+    && ln -sf /opt/kilo-cloud/kilo-restore-session.js /usr/local/bin/kilo-restore-session.js \
+    && rm -rf /tmp/wrapper-build
+
+# Boot script for rootless Docker-in-Docker.
+#
+# `dockerd-entrypoint.sh` is the upstream rootless wrapper from the
+# `docker:dind-rootless` image. It performs the rootlesskit/user namespace
+# setup (mounting cgroup v2, /run, etc.) before exec'ing dockerd. Calling
+# `dockerd` directly skips that setup and breaks rootless mode.
+#
+# `--iptables=false --ip6tables=false` disables in-container iptables setup
+# because nf_tables / ip_tables modules are not available inside Cloudflare
+# Containers. Inner Docker commands must therefore use `--network=host`.
+#
+# `--exec-opt native.cgroupdriver=cgroupfs` is required in production: the
+# default systemd cgroup driver fails when starting inner containers with
+# `unable to start unit ... No such process`. The cgroupfs driver avoids
+# the systemd dependency. See cloudflare/sandbox-sdk#662.
+RUN printf '#!/bin/sh\n\
+set -eu\n\
+dockerd-entrypoint.sh dockerd --iptables=false --ip6tables=false --exec-opt native.cgroupdriver=cgroupfs &\n\
+until docker version >/dev/null 2>&1; do sleep 0.2; done\n\
+echo "Docker is ready"\n\
+wait\n' > /home/rootless/boot-docker-for-dind.sh \
+  && chmod +x /home/rootless/boot-docker-for-dind.sh \
+  && chown rootless:rootless /home/rootless/boot-docker-for-dind.sh
+
+ENTRYPOINT ["/sandbox"]
+CMD ["/home/rootless/boot-docker-for-dind.sh"]

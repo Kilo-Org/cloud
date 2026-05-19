@@ -59,6 +59,7 @@ import type { ProfileOwnerType } from '@kilocode/cloud-agent-profile';
 import { McpServersTab } from './profile-editor/McpServersTab';
 import { SkillsTab } from './profile-editor/SkillsTab';
 import { ProfileAgentsTab } from './profile-editor/ProfileAgentsTab';
+import { KiloCommandsTab } from './profile-editor/KiloCommandsTab';
 
 type ProfilesListDialogProps = {
   organizationId?: string;
@@ -518,7 +519,7 @@ function ProfileDetailPane({
 }: ProfileDetailPaneProps) {
   const { data: profile, isLoading, error } = useProfile(profileId, { organizationId });
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'vars' | 'commands' | 'mcps' | 'skills' | 'agents'
+    'overview' | 'vars' | 'commands' | 'mcps' | 'skills' | 'agents' | 'kilo-commands'
   >('overview');
 
   if (isLoading) {
@@ -554,18 +555,30 @@ function ProfileDetailPane({
       <div className="flex shrink-0 border-b">
         {(
           [
-            { id: 'overview', label: 'Overview' },
-            { id: 'vars', label: `Variables (${profile.vars.length})` },
-            { id: 'commands', label: `Setup Commands (${profile.commands.length})` },
-            { id: 'mcps', label: `MCP servers (${profile.mcpServers.length})` },
-            { id: 'skills', label: `Skills (${profile.skills.length})` },
-            { id: 'agents', label: `Agents (${profile.agents.length})` },
+            { id: 'overview', label: 'Overview', count: null },
+            { id: 'vars', label: 'Variables', count: profile.vars.length },
+            {
+              id: 'commands',
+              label: 'Setup',
+              count: profile.commands.length,
+              title: 'Setup Commands',
+            },
+            {
+              id: 'kilo-commands',
+              label: 'Slash Cmds',
+              count: profile.kiloCommands.length,
+              title: 'Slash Commands',
+            },
+            { id: 'mcps', label: 'MCP', count: profile.mcpServers.length, title: 'MCP servers' },
+            { id: 'skills', label: 'Skills', count: profile.skills.length },
+            { id: 'agents', label: 'Agents', count: profile.agents.length },
           ] as const
         ).map(tab => (
           <button
             key={tab.id}
+            title={'title' in tab ? tab.title : undefined}
             className={cn(
-              'border-b-2 px-3 py-2 text-xs font-medium transition-colors',
+              'flex items-center gap-1 border-b-2 px-3 py-2 text-xs font-medium transition-colors',
               activeTab === tab.id
                 ? 'border-primary text-foreground'
                 : 'text-muted-foreground hover:text-foreground border-transparent'
@@ -573,6 +586,18 @@ function ProfileDetailPane({
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
+            {tab.count !== null && (
+              <span
+                className={cn(
+                  'rounded px-1 py-0.5 text-[10px] font-normal leading-none',
+                  activeTab === tab.id
+                    ? 'bg-primary/15 text-foreground'
+                    : 'bg-muted text-muted-foreground'
+                )}
+              >
+                {tab.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -625,6 +650,13 @@ function ProfileDetailPane({
             profileId={profileId}
             organizationId={organizationId}
             agents={profile.agents}
+          />
+        )}
+        {activeTab === 'kilo-commands' && (
+          <KiloCommandsTab
+            profileId={profileId}
+            organizationId={organizationId}
+            kiloCommands={profile.kiloCommands}
           />
         )}
       </div>

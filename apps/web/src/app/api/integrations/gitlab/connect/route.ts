@@ -4,6 +4,12 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException } from '@sentry/nextjs';
 import { buildGitLabOAuthUrl } from '@/lib/integrations/platforms/gitlab/adapter';
+import {
+  createGitLabOAuthState,
+  DEFAULT_GITLAB_OAUTH_INSTANCE_URL,
+} from '@/lib/integrations/platforms/gitlab/oauth-state';
+import type { Owner } from '@/lib/integrations/core/types';
+import { storeGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
 
 /**
  * GitLab OAuth Connect
@@ -30,25 +36,38 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get('clientId') || undefined;
     const clientSecret = searchParams.get('clientSecret') || undefined;
 
-    let state: string;
+    let owner: Owner;
 
     if (organizationId) {
       await ensureOrganizationAccess({ user }, organizationId);
-      state = `org_${organizationId}`;
+      owner = { type: 'org', id: organizationId };
     } else {
-      state = `user_${user.id}`;
-    }
-
-    if (instanceUrl && instanceUrl !== 'https://gitlab.com') {
-      state = `${state}|${instanceUrl}`;
-    }
-
-    if (clientId && clientSecret) {
-      const encodedCreds = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-      state = `${state}|creds:${encodedCreds}`;
+      owner = { type: 'user', id: user.id };
     }
 
     const customCredentials = clientId && clientSecret ? { clientId, clientSecret } : undefined;
+    const usesCustomInstance = !!instanceUrl && instanceUrl !== DEFAULT_GITLAB_OAUTH_INSTANCE_URL;
+
+    if (usesCustomInstance && !customCredentials) {
+      throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
+    }
+
+    const customCredentialsRef = customCredentials
+      ? await storeGitLabOAuthCredentials(customCredentials)
+      : undefined;
+
+    if (customCredentials && !customCredentialsRef) {
+      throw new Error('GitLab OAuth credentials cache is unavailable');
+    }
+
+    const state = createGitLabOAuthState(
+      {
+        owner,
+        ...(usesCustomInstance ? { instanceUrl } : {}),
+        ...(customCredentialsRef ? { customCredentialsRef } : {}),
+      },
+      user.id
+    );
     const oauthUrl = buildGitLabOAuthUrl(state, instanceUrl, customCredentials);
 
     return NextResponse.redirect(oauthUrl);

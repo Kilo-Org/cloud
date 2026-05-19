@@ -52,7 +52,8 @@ import {
 import { getPgDb } from '../../db/pg.js';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import {
-  destroySandboxAfterInternalServerError,
+  destroySandboxAfterPreparationInfrastructureFailure,
+  getPreparationInfrastructureFailure,
   isSandboxInternalServerError,
 } from '../../sandbox-recovery.js';
 
@@ -147,6 +148,7 @@ function applyProfileResolution(
       mcpServers: input.mcpServers,
       runtimeSkills: input.runtimeSkills,
       runtimeAgents: input.runtimeAgents,
+      kiloCommands: input.kiloCommands,
     };
   }
 
@@ -157,6 +159,7 @@ function applyProfileResolution(
     mcpServers: profileMcpServersToClientRecord(resolved.mcpServers),
     runtimeSkills: resolved.skills,
     runtimeAgents: resolved.agents,
+    kiloCommands: resolved.kiloCommands,
   };
 }
 
@@ -188,6 +191,77 @@ function setCollectionUpdate<T>(
   }
 
   updates[key] = isEmpty(value) ? null : value;
+}
+
+type PrepareSessionWorkspaceFailureCategory =
+  | 'sandbox_api_or_storage_failure'
+  | 'workspace_filesystem_preparation_failure'
+  | 'wrapper_wait_for_port_timeout'
+  | 'wrapper_kilo_server_start_timeout'
+  | 'configured_session_lookup_failure'
+  | 'repo_clone_or_checkout_failure'
+  | 'other_workspace_preparation_failure';
+
+function prepareSessionErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function classifyPrepareSessionWorkspaceFailure(
+  error: unknown,
+  sandboxInternalServerError: boolean,
+  workspaceFilesystemPreparationFailure = false
+): PrepareSessionWorkspaceFailureCategory {
+  const message = prepareSessionErrorMessage(error).toLowerCase();
+
+  if (workspaceFilesystemPreparationFailure) {
+    return 'workspace_filesystem_preparation_failure';
+  }
+
+  if (
+    message.includes('configured session') &&
+    message.includes('not found: session get returned no data')
+  ) {
+    return 'configured_session_lookup_failure';
+  }
+
+  if (message.includes('failed to start kilo server: timeout waiting for server to start')) {
+    return 'wrapper_kilo_server_start_timeout';
+  }
+
+  if (
+    message.includes('wrapper did not become ready on port') &&
+    message.includes('waitforport timed out')
+  ) {
+    return 'wrapper_wait_for_port_timeout';
+  }
+
+  if (
+    message.includes('git clone timed out') ||
+    message.includes('failed to checkout pull ref') ||
+    message.includes('git-lfs filter-process') ||
+    message.includes('object does not exist on the server')
+  ) {
+    return 'repo_clone_or_checkout_failure';
+  }
+
+  if (
+    sandboxInternalServerError ||
+    message.includes('internal error in durable object storage') ||
+    message.includes('durable object storage operation exceeded timeout')
+  ) {
+    return 'sandbox_api_or_storage_failure';
+  }
+
+  return 'other_workspace_preparation_failure';
+}
+
+function isRetryableWrapperReadinessFailure(
+  failureCategory: PrepareSessionWorkspaceFailureCategory
+): boolean {
+  return (
+    failureCategory === 'wrapper_wait_for_port_timeout' ||
+    failureCategory === 'wrapper_kilo_server_start_timeout'
+  );
 }
 
 /**
@@ -234,6 +308,13 @@ const prepareSessionHandler = internalApiProtectedProcedure
     return withLogTags({ source: 'prepareSession' }, async () => {
       const sessionService = new SessionService();
 
+      if (input.devcontainer && !input.autoInitiate) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'devcontainer sessions must use autoInitiate',
+        });
+      }
+
       // 1. Generate new cloudAgentSessionId and sandboxId
       const cloudAgentSessionId = generateSessionId();
       const sandboxId = await generateSandboxId(
@@ -241,7 +322,8 @@ const prepareSessionHandler = internalApiProtectedProcedure
         input.kilocodeOrganizationId,
         ctx.userId,
         cloudAgentSessionId,
-        ctx.botId
+        ctx.botId,
+        input.devcontainer
       );
 
       logger.setTags({
@@ -249,6 +331,8 @@ const prepareSessionHandler = internalApiProtectedProcedure
         userId: ctx.userId,
         orgId: input.kilocodeOrganizationId ?? '(personal)',
         sandboxId,
+        botId: ctx.botId,
+        sandboxKind: ctx.botId ? 'bot' : 'user',
       });
       logger.info('Preparing new session with workspace setup');
 
@@ -361,6 +445,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           gitUrl: input.gitUrl,
           platform: input.platform,
           initialMessageId: input.initialMessageId,
+          initialPayload: input.initialPayload,
           // Carry the resolved profile into the DO up-front so the chat page
           // can render custom-mode options (runtimeAgents) immediately after
           // navigation, before the async prepare() alarm fires.
@@ -412,7 +497,9 @@ const prepareSessionHandler = internalApiProtectedProcedure
             gateThreshold: input.gateThreshold,
             kilocodeOrganizationId: input.kilocodeOrganizationId,
             autoInitiate: true,
+            devcontainer: input.devcontainer,
             initialMessageId: input.initialMessageId,
+            initialPayload: input.initialPayload,
           });
         } catch (error) {
           await rollbackCliSession();
@@ -466,7 +553,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
         });
 
         logger.info('Creating execution session');
-        const session = await sessionService.getOrCreateSession({
+        const sessionOptions = {
           sandbox,
           context,
           env: ctx.env,
@@ -476,7 +563,9 @@ const prepareSessionHandler = internalApiProtectedProcedure
           createdOnPlatform: input.createdOnPlatform,
           appendSystemPrompt: input.appendSystemPrompt,
           profile: effective,
-        });
+        };
+        const runtimeEnv = sessionService.buildRuntimeEnv(sessionOptions);
+        const session = await sessionService.getOrCreateSession(sessionOptions);
 
         // 7. Clone repository
         const cloneOptions = input.shallow ? { shallow: true } : undefined;
@@ -610,6 +699,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           userId: ctx.userId,
           workspacePath,
           sessionId: kiloSessionId,
+          runtimeEnv,
         });
 
         logger.info('Wrapper started');
@@ -621,8 +711,27 @@ const prepareSessionHandler = internalApiProtectedProcedure
       try {
         preparedWorkspace = await prepareWorkspace();
       } catch (error) {
+        const preparationFailure = getPreparationInfrastructureFailure(error);
         const sandboxInternalServerError = isSandboxInternalServerError(error);
-        await destroySandboxAfterInternalServerError(
+        const workspaceFilesystemPreparationFailure =
+          preparationFailure?.type === 'workspace_filesystem_preparation_error';
+        const failureCategory = classifyPrepareSessionWorkspaceFailure(
+          error,
+          sandboxInternalServerError,
+          workspaceFilesystemPreparationFailure
+        );
+        logger
+          .withFields({
+            error: prepareSessionErrorMessage(error),
+            failureCategory,
+            retryableSandboxInternalServerError: sandboxInternalServerError,
+            retryablePreparationInfrastructureFailure: preparationFailure !== undefined,
+            retryableWrapperReadinessFailure: isRetryableWrapperReadinessFailure(failureCategory),
+            sandboxKind: ctx.botId ? 'bot' : 'user',
+            logTag: 'prepare_session_workspace_preparation_failed',
+          })
+          .error('prepareSession workspace preparation failed');
+        await destroySandboxAfterPreparationInfrastructureFailure(
           {
             sandbox,
             sandboxId,
@@ -631,10 +740,10 @@ const prepareSessionHandler = internalApiProtectedProcedure
           },
           error
         );
-        if (sandboxInternalServerError) {
+        if (preparationFailure) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: 'Sandbox returned 500 during workspace preparation',
+            message: preparationFailure.message,
             cause: { error: 'sandbox_internal_server_error', retryable: true },
           });
         }
@@ -683,7 +792,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
       const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${cloudAgentSessionId}`);
       const stub = ctx.env.CLOUD_AGENT_SESSION.get(doId);
 
-      let prepareResult;
+      let prepareResult: Awaited<ReturnType<typeof stub.prepare>>;
       try {
         prepareResult = await stub.prepare({
           sessionId: cloudAgentSessionId,
@@ -710,6 +819,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           mcpServers: effective.mcpServers,
           runtimeSkills: effective.runtimeSkills,
           runtimeAgents: effective.runtimeAgents,
+          kiloCommands: effective.kiloCommands,
           upstreamBranch: input.upstreamBranch,
           autoCommit: input.autoCommit,
           condenseOnComplete: input.condenseOnComplete,
@@ -719,6 +829,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           createdOnPlatform: input.createdOnPlatform,
           gateThreshold: input.gateThreshold,
           initialMessageId: input.initialMessageId,
+          initialPayload: input.initialPayload,
           // Workspace metadata
           workspacePath,
           sessionHome,
@@ -823,6 +934,9 @@ const updateSessionHandler = internalApiProtectedProcedure
         return value.length === 0;
       });
       setCollectionUpdate(updates, 'runtimeAgents', input.runtimeAgents, value => {
+        return value.length === 0;
+      });
+      setCollectionUpdate(updates, 'kiloCommands', input.kiloCommands, value => {
         return value.length === 0;
       });
 

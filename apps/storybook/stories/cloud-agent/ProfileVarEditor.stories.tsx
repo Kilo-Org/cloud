@@ -24,7 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { ProfileVar, ProfileCommand, ProfileDetails } from '@/hooks/useCloudAgentProfiles';
+import type { ProfileVar, ProfileDetails } from '@/hooks/useCloudAgentProfiles';
 import {
   mockProfileDetails,
   mockEmptyProfileDetails,
@@ -873,6 +873,7 @@ export const ManyVariables: Story = {
       mcpServers: [],
       skills: [],
       agents: [],
+      kiloCommands: [],
     };
     return <ProfileVarEditorWrapper profile={manyVarsProfile} initialTab="vars" />;
   },
@@ -898,6 +899,7 @@ export const ManyCommands: Story = {
       mcpServers: [],
       skills: [],
       agents: [],
+      kiloCommands: [],
     };
     return <ProfileVarEditorWrapper profile={manyCommandsProfile} initialTab="commands" />;
   },

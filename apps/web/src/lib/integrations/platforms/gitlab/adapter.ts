@@ -84,6 +84,10 @@ export function buildGitLabOAuthUrl(
   instanceUrl: string = DEFAULT_GITLAB_URL,
   customCredentials?: GitLabOAuthCredentials
 ): string {
+  if (instanceUrl !== DEFAULT_GITLAB_URL && !customCredentials) {
+    throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
+  }
+
   const clientId = customCredentials?.clientId || GITLAB_CLIENT_ID;
 
   if (!clientId || !GITLAB_REDIRECT_URI) {
@@ -113,6 +117,10 @@ export async function exchangeGitLabOAuthCode(
   instanceUrl: string = DEFAULT_GITLAB_URL,
   customCredentials?: GitLabOAuthCredentials
 ): Promise<GitLabOAuthTokens> {
+  if (instanceUrl !== DEFAULT_GITLAB_URL && !customCredentials) {
+    throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
+  }
+
   const clientId = customCredentials?.clientId || GITLAB_CLIENT_ID;
   const clientSecret = customCredentials?.clientSecret || GITLAB_CLIENT_SECRET;
 
@@ -164,6 +172,10 @@ export async function refreshGitLabOAuthToken(
   instanceUrl: string = DEFAULT_GITLAB_URL,
   customCredentials?: GitLabOAuthCredentials
 ): Promise<GitLabOAuthTokens> {
+  if (instanceUrl !== DEFAULT_GITLAB_URL && !customCredentials) {
+    throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
+  }
+
   const clientId = customCredentials?.clientId || GITLAB_CLIENT_ID;
   const clientSecret = customCredentials?.clientSecret || GITLAB_CLIENT_SECRET;
 

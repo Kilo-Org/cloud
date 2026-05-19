@@ -140,6 +140,8 @@ function createMockKiloClient(overrides?: Partial<WrapperKiloClient>): WrapperKi
     getSessionStatuses: vi.fn().mockResolvedValue({}),
     getQuestions: vi.fn().mockResolvedValue([]),
     getPermissions: vi.fn().mockResolvedValue([]),
+    getNetworkWaits: vi.fn().mockResolvedValue([]),
+    resumeNetworkWait: vi.fn().mockResolvedValue(true),
     sdkClient: {
       event: {
         subscribe: vi.fn().mockResolvedValue({
@@ -470,6 +472,56 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     });
   });
 
+  it('replays non-network snapshot state when no network waits are pending', async () => {
+    const pendingQuestion = {
+      id: 'q_123',
+      sessionID: 'kilo_sess_456',
+      tool: { messageID: 'msg_1', callID: 'call_1' },
+      questions: [
+        { question: 'Pick a color', header: 'Color', options: [{ label: 'Red', description: '' }] },
+      ],
+    };
+    const pendingPermission = {
+      id: 'p_456',
+      sessionID: 'kilo_sess_456',
+      permission: 'file_write',
+      patterns: ['**/*.ts'],
+      metadata: {},
+      always: [],
+      tool: { messageID: 'msg_2', callID: 'call_2' },
+    };
+
+    const kiloClient = createMockKiloClient({
+      getSessionStatuses: vi.fn().mockResolvedValue({
+        kilo_sess_456: { type: 'busy' },
+      }),
+      getQuestions: vi.fn().mockResolvedValue([pendingQuestion]),
+      getPermissions: vi.fn().mockResolvedValue([pendingPermission]),
+      getNetworkWaits: vi.fn().mockResolvedValue([]),
+    });
+
+    state.startJob(createJobContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+
+    expect(
+      messages.filter(m => m.streamEventType === 'kilocode' && m.data.event === 'session.status')
+    ).toHaveLength(1);
+    expect(
+      messages.filter(m => m.streamEventType === 'kilocode' && m.data.event === 'question.asked')
+    ).toHaveLength(1);
+    expect(
+      messages.filter(m => m.streamEventType === 'kilocode' && m.data.event === 'permission.asked')
+    ).toHaveLength(1);
+    expect(
+      messages.filter(
+        m => m.streamEventType === 'kilocode' && m.data.event === 'session.network.asked'
+      )
+    ).toHaveLength(0);
+  });
+
   // -----------------------------------------------------------------------
   // 6. does not send question event when no question is pending
   // -----------------------------------------------------------------------
@@ -510,6 +562,27 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     );
 
     expect(permissionEvents).toHaveLength(0);
+  });
+
+  it('does not resume restored network waits while sending a snapshot', async () => {
+    const resumeNetworkWait = vi.fn().mockResolvedValue(true);
+    const kiloClient = createMockKiloClient({
+      getNetworkWaits: vi.fn().mockResolvedValue([
+        {
+          id: 'net_req_restored',
+          sessionID: 'kilo_sess_456',
+          message: 'Network restored',
+          restored: true,
+        },
+      ]),
+      resumeNetworkWait,
+    });
+
+    state.startJob(createJobContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    await manager.sendKiloSnapshot();
+
+    expect(resumeNetworkWait).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------

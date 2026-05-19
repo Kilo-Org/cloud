@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { CheckCircle2, XCircle, Database, Info } from 'lucide-react';
+import { CheckCircle2, XCircle, Database } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -106,12 +106,6 @@ export function DoltHubIntegrationDetails({
           <AlertDescription>Connection failed: {error}</AlertDescription>
         </Alert>
       )}
-
-      <Alert variant="default" className="bg-blue-50 text-blue-900 border-blue-200">
-        <Info className="h-4 w-4 text-blue-600" />
-        <AlertTitle>Dev-only integration</AlertTitle>
-        <AlertDescription>DoltHub app pending approval</AlertDescription>
-      </Alert>
 
       <Card>
         <CardHeader>

@@ -7,6 +7,7 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
+  CODE_REVIEW_PERMISSION_REJECTION_MESSAGE,
   createConnectionManager,
   type ConnectionCallbacks,
 } from '../../../wrapper/src/connection.js';
@@ -163,11 +164,13 @@ const createMockKiloClient = (overrides?: Partial<WrapperKiloClient>): WrapperKi
   getSessionStatuses: vi.fn().mockResolvedValue({}),
   getQuestions: vi.fn().mockResolvedValue([]),
   getPermissions: vi.fn().mockResolvedValue([]),
+  getNetworkWaits: vi.fn().mockResolvedValue([]),
+  resumeNetworkWait: vi.fn().mockResolvedValue(true),
   sdkClient: {
     event: {
-      // Return a stream that never yields — keeps event subscription alive
+      // Return a stream that connects, then never yields again.
       subscribe: vi.fn().mockResolvedValue({
-        stream: createEventStream([]),
+        stream: createEventStream([{ type: 'server.connected' }]),
       }),
     },
   } as unknown as WrapperKiloClient['sdkClient'],
@@ -625,6 +628,7 @@ describe('ingest WS reconnection', () => {
   it('returns false from isConnected during reconnection', async () => {
     const manager = createManager();
     await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
 
     // Initially connected
     expect(manager.isConnected()).toBe(true);
@@ -826,7 +830,11 @@ describe('ingest WS reconnection', () => {
       event => event.streamEventType === 'kilocode' && event.data.event === 'permission.asked'
     );
     expect(permissionEvents).toHaveLength(0);
-    expect(answerPermission).toHaveBeenCalledWith('p_456', 'reject');
+    expect(answerPermission).toHaveBeenCalledWith(
+      'p_456',
+      'reject',
+      CODE_REVIEW_PERMISSION_REJECTION_MESSAGE
+    );
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
     expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
     expect(callbacks.onSseEvent).toHaveBeenCalledTimes(1);

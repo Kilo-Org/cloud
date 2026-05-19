@@ -22,7 +22,8 @@
     "**/.wrangler/**",
     "supabase/functions/**",
     "**/types/opencode.gen.ts",
-    "**/gastown/types/**"
+    "**/gastown/types/**",
+    "**/wasteland/types/**"
   ],
   "rules": {
     "constructor-super": "off",
@@ -182,6 +183,7 @@
         "services/cloud-agent/src/session/queries/*.ts",
         "services/cloud-agent-next/src/session/queries/*.ts",
         "services/gastown/**/*.ts",
+        "services/wasteland/**/*.ts",
         "services/webhook-agent-ingest/**/*.ts",
         "services/kiloclaw/**/*.ts"
       ],

@@ -315,6 +315,57 @@ export declare const RigDetailOutput: z.ZodObject<
     platform_integration_id: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
     created_at: z.ZodString;
     updated_at: z.ZodString;
+    config: z.ZodOptional<
+      z.ZodObject<
+        {
+          default_model: z.ZodOptional<z.ZodString>;
+          role_models: z.ZodOptional<
+            z.ZodObject<
+              {
+                polecat: z.ZodOptional<z.ZodString>;
+                refinery: z.ZodOptional<z.ZodString>;
+              },
+              z.core.$strip
+            >
+          >;
+          review_mode: z.ZodOptional<
+            z.ZodEnum<{
+              comments: 'comments';
+              rework: 'rework';
+            }>
+          >;
+          code_review: z.ZodOptional<z.ZodBoolean>;
+          auto_resolve_pr_feedback: z.ZodOptional<z.ZodBoolean>;
+          auto_resolve_merge_conflicts: z.ZodOptional<z.ZodBoolean>;
+          auto_merge_delay_minutes: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+          merge_strategy: z.ZodOptional<
+            z.ZodEnum<{
+              direct: 'direct';
+              pr: 'pr';
+            }>
+          >;
+          convoy_merge_mode: z.ZodOptional<
+            z.ZodEnum<{
+              'review-and-merge': 'review-and-merge';
+              'review-then-land': 'review-then-land';
+            }>
+          >;
+          custom_instructions: z.ZodOptional<
+            z.ZodObject<
+              {
+                polecat: z.ZodOptional<z.ZodString>;
+                refinery: z.ZodOptional<z.ZodString>;
+              },
+              z.core.$strip
+            >
+          >;
+          git_push_flags: z.ZodOptional<z.ZodString>;
+          max_concurrent_polecats: z.ZodOptional<z.ZodNumber>;
+          max_dispatch_attempts: z.ZodOptional<z.ZodNumber>;
+        },
+        z.core.$strip
+      >
+    >;
     agents: z.ZodArray<
       z.ZodObject<
         {
@@ -807,6 +858,57 @@ export declare const RpcRigDetailOutput: z.ZodPipe<
       platform_integration_id: z.ZodDefault<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
       created_at: z.ZodString;
       updated_at: z.ZodString;
+      config: z.ZodOptional<
+        z.ZodObject<
+          {
+            default_model: z.ZodOptional<z.ZodString>;
+            role_models: z.ZodOptional<
+              z.ZodObject<
+                {
+                  polecat: z.ZodOptional<z.ZodString>;
+                  refinery: z.ZodOptional<z.ZodString>;
+                },
+                z.core.$strip
+              >
+            >;
+            review_mode: z.ZodOptional<
+              z.ZodEnum<{
+                comments: 'comments';
+                rework: 'rework';
+              }>
+            >;
+            code_review: z.ZodOptional<z.ZodBoolean>;
+            auto_resolve_pr_feedback: z.ZodOptional<z.ZodBoolean>;
+            auto_resolve_merge_conflicts: z.ZodOptional<z.ZodBoolean>;
+            auto_merge_delay_minutes: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+            merge_strategy: z.ZodOptional<
+              z.ZodEnum<{
+                direct: 'direct';
+                pr: 'pr';
+              }>
+            >;
+            convoy_merge_mode: z.ZodOptional<
+              z.ZodEnum<{
+                'review-and-merge': 'review-and-merge';
+                'review-then-land': 'review-then-land';
+              }>
+            >;
+            custom_instructions: z.ZodOptional<
+              z.ZodObject<
+                {
+                  polecat: z.ZodOptional<z.ZodString>;
+                  refinery: z.ZodOptional<z.ZodString>;
+                },
+                z.core.$strip
+              >
+            >;
+            git_push_flags: z.ZodOptional<z.ZodString>;
+            max_concurrent_polecats: z.ZodOptional<z.ZodNumber>;
+            max_dispatch_attempts: z.ZodOptional<z.ZodNumber>;
+          },
+          z.core.$strip
+        >
+      >;
       agents: z.ZodArray<
         z.ZodObject<
           {

@@ -6,8 +6,6 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { IS_DEVELOPMENT } from '@/lib/constants';
-import { notFound } from 'next/navigation';
 
 export default async function OrgDoltHubIntegrationPage({
   params,
@@ -19,10 +17,6 @@ export default async function OrgDoltHubIntegrationPage({
     error?: string;
   }>;
 }) {
-  if (!IS_DEVELOPMENT) {
-    notFound();
-  }
-
   const search = await searchParams;
 
   return (

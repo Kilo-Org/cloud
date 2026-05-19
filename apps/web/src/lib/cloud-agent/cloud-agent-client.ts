@@ -107,12 +107,19 @@ export type SendMessageInput = {
   images?: Images;
 };
 
+/**
+ * Discriminated payload for sendMessageV2 — free-text prompt or structured
+ * slash command. Mirrors the worker's SendMessageV2Payload schema; both
+ * variants ride the same execution pipeline on the cloud-agent-next side.
+ */
+export type SendMessageV2Payload =
+  | { type: 'prompt'; prompt: string; mode: string; model: string; variant?: string }
+  | { type: 'command'; command: string; arguments: string };
+
 /** Input for sendMessageV2 procedure (V2 - uses cloudAgentSessionId) */
 export type SendMessageV2Input = {
   cloudAgentSessionId: string;
-  prompt: string;
-  mode: string;
-  model: string;
+  payload: SendMessageV2Payload;
   autoCommit?: boolean;
   githubToken?: string;
   gitToken?: string;

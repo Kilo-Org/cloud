@@ -45,6 +45,8 @@ const MayorSlingBatchBody = z
     /** Set to true only when ALL tasks are genuinely independent (no shared files, no shared state). */
     parallel: z.boolean().optional(),
     staged: z.boolean().optional(),
+    /** Metadata stamped onto BOTH the convoy bead AND every task bead. */
+    metadata: z.record(z.string(), z.unknown()).optional(),
   })
   .superRefine((data, ctx) => {
     // Require dependency graph unless explicitly opted out with parallel: true.
@@ -315,6 +317,7 @@ export async function handleMayorSlingBatch(c: Context<GastownEnv>, params: { to
     tasks: parsed.data.tasks,
     merge_mode: parsed.data.merge_mode,
     staged: parsed.data.staged,
+    metadata: parsed.data.metadata,
   });
 
   console.log(

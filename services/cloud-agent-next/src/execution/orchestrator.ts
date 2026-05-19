@@ -15,18 +15,26 @@ import type {
 } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { ExecutionPlan, ExecutionResult } from './types.js';
+import type { DevContainerHandle } from '../kilo/devcontainer.js';
 import { ExecutionError } from './errors.js';
 import { SessionService, type PreparedSession } from '../session-service.js';
 import type { SessionProfileBundle } from '../session-profile.js';
 import { logger } from '../logger.js';
 import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
 import { updateGitRemoteToken } from '../workspace.js';
-import { WrapperClient, type WrapperPromptOptions } from '../kilo/wrapper-client.js';
+import { WrapperClient } from '../kilo/wrapper-client.js';
+import {
+  bringUpDevContainer,
+  getDevContainerOverridePath,
+  KILO_CLI_VERSION,
+} from '../kilo/devcontainer.js';
+import { findWrapperContainerForSession } from '../kilo/wrapper-manager.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { normalizeAgentMode } from '../schema.js';
-import { buildImagePromptParts, downloadImagePromptParts } from './image-prompt-parts.js';
+import { downloadImagePromptParts } from './image-prompt-parts.js';
+import { dispatchToWrapper, type WrapperCallContext } from './wrapper-call.js';
 import { withTimeout } from '@kilocode/worker-utils';
-import { withSandboxInternalServerErrorRecovery } from '../sandbox-recovery.js';
+import { withPreparationInfrastructureRecovery } from '../sandbox-recovery.js';
 
 /** Maximum time allowed for workspace preparation (resume, init, fast path). */
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -115,7 +123,7 @@ export class ExecutionOrchestrator {
     plan: ExecutionPlan,
     options?: { onProgress?: (step: string, message: string) => void }
   ): Promise<ExecutionResult> {
-    const { executionId, sessionId, userId, orgId, prompt, mode, workspace, wrapper } = plan;
+    const { executionId, sessionId, userId, orgId, payload, mode, workspace, wrapper } = plan;
 
     logger.setTags({
       executionId,
@@ -160,11 +168,16 @@ export class ExecutionOrchestrator {
       let wrapperClient: WrapperClient;
       let kiloSessionId: string;
       try {
+        const devcontainer = await this.ensureDevContainerHandleIfNeeded(prepared, plan);
+        const fixedPort = plan.workspace.existingMetadata?.devcontainer?.wrapperPort;
         const result = await WrapperClient.ensureWrapper(sandbox, prepared.session, {
           agentSessionId: sessionId,
           userId,
           workspacePath: prepared.context.workspacePath,
           sessionId: wrapper.kiloSessionId,
+          runtimeEnv: prepared.runtimeEnv,
+          devcontainer,
+          fixedPort: devcontainer ? fixedPort : undefined,
         });
         wrapperClient = result.client;
         kiloSessionId = result.sessionId;
@@ -200,7 +213,7 @@ export class ExecutionOrchestrator {
     };
 
     const { prepared, wrapperClient, kiloSessionId, fileParts } =
-      await withSandboxInternalServerErrorRecovery(
+      await withPreparationInfrastructureRecovery(
         {
           sandbox,
           sandboxId,
@@ -226,34 +239,29 @@ export class ExecutionOrchestrator {
     // Normalize mode to internal mode (e.g., 'architect' -> 'plan', 'orchestrator' -> 'code')
     const normalizedMode = normalizeAgentMode(mode);
 
-    // Build prompt options, using parts when images are attached
-    const promptOptions: WrapperPromptOptions = {
-      messageId: plan.messageId,
+    const wrapperCtx: WrapperCallContext = {
+      execution,
+      normalizedMode,
       model: wrapper.model,
       variant: wrapper.variant,
-      agent: normalizedMode,
       autoCommit: wrapper.autoCommit,
       condenseOnComplete: wrapper.condenseOnComplete,
-      execution,
       tools: this.getToolOverrides(plan),
+      messageId: plan.messageId,
+      fileParts,
     };
 
-    if (fileParts.length > 0) {
-      promptOptions.parts = buildImagePromptParts(prompt, fileParts);
-    } else {
-      promptOptions.prompt = prompt;
-    }
-
     try {
-      const result = await wrapperClient.prompt(promptOptions);
+      const result = await dispatchToWrapper(wrapperClient, wrapperCtx, payload);
+      const action = payload.type === 'command' ? 'Command' : 'Prompt';
       if (result.messageId) {
-        logger.withFields({ messageId: result.messageId }).info('Prompt sent to wrapper');
+        logger.withFields({ messageId: result.messageId }).info(`${action} sent to wrapper`);
       } else {
-        logger.info('Prompt sent to wrapper');
+        logger.info(`${action} sent to wrapper`);
       }
     } catch (error) {
       throw ExecutionError.wrapperStartFailed(
-        `Failed to send prompt: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to send ${payload.type}: ${error instanceof Error ? error.message : String(error)}`,
         error
       );
     }
@@ -265,6 +273,44 @@ export class ExecutionOrchestrator {
   // ---------------------------------------------------------------------------
   // Private Helpers
   // ---------------------------------------------------------------------------
+
+  private async ensureDevContainerHandleIfNeeded(
+    prepared: PreparedSession,
+    plan: ExecutionPlan
+  ): Promise<DevContainerHandle | undefined> {
+    if (prepared.devcontainer) return prepared.devcontainer;
+
+    const devcontainer = plan.workspace.existingMetadata?.devcontainer;
+    if (!devcontainer) return undefined;
+
+    const existingContainer = await findWrapperContainerForSession(
+      prepared.session,
+      plan.sessionId
+    );
+    if (existingContainer) {
+      return {
+        containerId: existingContainer.process.id,
+        innerWorkspaceFolder: devcontainer.innerWorkspaceFolder,
+        workspacePath: devcontainer.workspacePath,
+        agentSessionId: plan.sessionId,
+        overrideConfigPath: getDevContainerOverridePath(
+          plan.sessionId,
+          devcontainer.workspacePath,
+          devcontainer.configPath
+        ),
+        teardown: async () => undefined,
+      };
+    }
+
+    return bringUpDevContainer(prepared.session, {
+      workspacePath: devcontainer.workspacePath,
+      sessionHome: prepared.context.sessionHome,
+      agentSessionId: plan.sessionId,
+      wrapperPort: devcontainer.wrapperPort,
+      kiloCliVersion: KILO_CLI_VERSION,
+      configPath: devcontainer.configPath,
+    });
+  }
 
   /**
    * Prepare workspace based on the workspace plan.
@@ -340,17 +386,22 @@ export class ExecutionOrchestrator {
           envVars: initContext.profile?.envVars,
         };
 
+        const sessionOptions = {
+          sandbox,
+          context,
+          env: this.deps.env,
+          originalToken: initContext.kilocodeToken,
+          kilocodeModel: initContext.kilocodeModel ?? 'default',
+          originalOrgId: orgId,
+          createdOnPlatform: this.getCreatedOnPlatform(plan),
+          appendSystemPrompt: existingMetadata.appendSystemPrompt,
+          profile: mergeFastPathProfile(initContext.profile, existingMetadata.profile),
+        };
+        const runtimeEnv = this.sessionService.buildRuntimeEnv(sessionOptions);
         const session = await withWorkspacePreparationTimeout(
           this.sessionService.getOrCreateSession({
+            ...sessionOptions,
             sandbox,
-            context,
-            env: this.deps.env,
-            originalToken: initContext.kilocodeToken,
-            kilocodeModel: initContext.kilocodeModel ?? 'default',
-            originalOrgId: orgId,
-            createdOnPlatform: this.getCreatedOnPlatform(plan),
-            appendSystemPrompt: existingMetadata.appendSystemPrompt,
-            profile: mergeFastPathProfile(initContext.profile, existingMetadata.profile),
           }),
           'prepared session creation'
         );
@@ -358,6 +409,7 @@ export class ExecutionOrchestrator {
         return {
           context,
           session,
+          runtimeEnv,
         };
       }
 

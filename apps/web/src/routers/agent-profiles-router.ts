@@ -8,6 +8,7 @@ import * as profileCommandsService from '@kilocode/cloud-agent-profile';
 import * as profileMcpService from '@kilocode/cloud-agent-profile';
 import * as profileSkillsService from '@kilocode/cloud-agent-profile';
 import * as profileAgentsService from '@kilocode/cloud-agent-profile';
+import * as profileKiloCommandsService from '@kilocode/cloud-agent-profile';
 import * as repoBindingService from '@kilocode/cloud-agent-profile';
 import { AgentConfigSchema } from '@kilocode/db/schema-types';
 import type { ProfileOwner } from '@kilocode/cloud-agent-profile';
@@ -59,6 +60,7 @@ const ProfileSummarySchema = z.object({
   mcpServerCount: z.number(),
   skillCount: z.number(),
   agentCount: z.number(),
+  kiloCommandCount: z.number(),
 });
 
 const ProfileSummaryWithOwnerSchema = ProfileSummarySchema.extend({
@@ -122,6 +124,20 @@ const ProfileAgentResponseSchema = z.object({
   updatedAt: z.string(),
 });
 
+const ProfileKiloCommandResponseSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  template: z.string(),
+  agent: z.string().nullable(),
+  model: z.string().nullable(),
+  subtask: z.boolean(),
+  enabled: z.boolean(),
+  sortOrder: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 const ProfileResponseSchema = z.object({
   id: z.uuid(),
   name: z.string(),
@@ -134,6 +150,7 @@ const ProfileResponseSchema = z.object({
   mcpServers: z.array(ProfileMcpServerResponseSchema),
   skills: z.array(ProfileSkillResponseSchema),
   agents: z.array(ProfileAgentResponseSchema),
+  kiloCommands: z.array(ProfileKiloCommandResponseSchema),
 });
 
 /**
@@ -735,6 +752,133 @@ export const agentProfilesRouter = createTRPCRouter({
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileAgentsService.deleteAgent(db, input.profileId, input.agentId, owner);
+      return { success: true };
+    }),
+
+  // ============ KILO COMMANDS ============
+
+  createKiloCommand: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+      }).merge(profileKiloCommandsService.kiloCommandCreateInputSchema)
+    )
+    .output(z.object({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileKiloCommandsService.createKiloCommand(
+        db,
+        input.profileId,
+        {
+          name: input.name,
+          description: input.description,
+          template: input.template,
+          agent: input.agent,
+          model: input.model,
+          subtask: input.subtask,
+        },
+        owner
+      );
+    }),
+
+  updateKiloCommand: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        commandId: z.uuid(),
+      }).merge(profileKiloCommandsService.kiloCommandUpdateInputSchema)
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileKiloCommandsService.updateKiloCommand(
+        db,
+        input.profileId,
+        input.commandId,
+        {
+          name: input.name,
+          description: input.description,
+          template: input.template,
+          agent: input.agent,
+          model: input.model,
+          subtask: input.subtask,
+        },
+        owner
+      );
+      return { success: true };
+    }),
+
+  deleteKiloCommand: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        commandId: z.uuid(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileKiloCommandsService.deleteKiloCommand(
+        db,
+        input.profileId,
+        input.commandId,
+        owner
+      );
+      return { success: true };
+    }),
+
+  setKiloCommandEnabled: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        commandId: z.uuid(),
+        enabled: z.boolean(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileKiloCommandsService.setKiloCommandEnabled(
+        db,
+        input.profileId,
+        input.commandId,
+        input.enabled,
+        owner
+      );
+      return { success: true };
+    }),
+
+  reorderKiloCommands: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        orderedIds: z.array(z.uuid()),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileKiloCommandsService.reorderKiloCommands(
+        db,
+        input.profileId,
+        input.orderedIds,
+        owner
+      );
       return { success: true };
     }),
 });

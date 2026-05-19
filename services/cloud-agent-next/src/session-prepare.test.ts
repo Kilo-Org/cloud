@@ -106,6 +106,10 @@ vi.mock('./session-service.js', async importOriginal => {
       createCliSessionViaSessionIngest = createCliSessionViaSessionIngestMock;
       deleteCliSessionViaSessionIngest = deleteCliSessionViaSessionIngestMock;
       getOrCreateSession = vi.fn().mockResolvedValue(createMockExecutionSession());
+      buildRuntimeEnv = vi.fn().mockReturnValue({
+        SESSION_HOME: '/home/test',
+        KILO_SESSION_INGEST_URL: 'https://ingest.example',
+      });
       buildContext = vi.fn().mockReturnValue({
         sandboxId: 'test-sandbox',
         orgId: 'test-org',
@@ -126,7 +130,9 @@ import {
   GitRepositoryNotFoundError,
   cloneGitHubRepo as mockedCloneGitHubRepo,
   manageBranch as mockedManageBranch,
+  setupWorkspace as mockedSetupWorkspace,
 } from './workspace.js';
+import { WorkspaceFilesystemPreparationError } from './workspace-errors.js';
 import {
   SetupCommandFailedError,
   runSetupCommands as mockedRunSetupCommands,
@@ -467,6 +473,21 @@ describe('prepareSession endpoint', () => {
         })
       ).rejects.toThrow();
     });
+
+    it('should reject devcontainer without autoInitiate', async () => {
+      const ctx = createInternalApiContext({});
+      const caller = appRouter.createCaller(ctx);
+
+      await expect(
+        caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          devcontainer: true,
+        })
+      ).rejects.toThrow('devcontainer sessions must use autoInitiate');
+    });
   });
 
   describe('error handling', () => {
@@ -521,6 +542,51 @@ describe('prepareSession endpoint', () => {
         const trpcError = error as TRPCError;
         expect(trpcError.code).toBe('INTERNAL_SERVER_ERROR');
         expect(trpcError.message).toBe('Sandbox returned 500 during workspace preparation');
+        expect(trpcError.cause).toMatchObject({
+          error: 'sandbox_internal_server_error',
+          retryable: true,
+        });
+      }
+
+      expect(sandbox.destroy).toHaveBeenCalledOnce();
+      expect(doStub.prepare).not.toHaveBeenCalled();
+    });
+
+    it('marks workspace mkdir preparation failures as retryable', async () => {
+      const sandbox = createMockSandbox();
+      const cause = new Error('FileSystemError: mkdir operation failed with exit code NaN');
+      vi.mocked(mockedSetupWorkspace).mockRejectedValueOnce(
+        new WorkspaceFilesystemPreparationError(
+          'workspace_directory',
+          'Failed to create workspace directory: FileSystemError: mkdir operation failed with exit code NaN',
+          cause
+        )
+      );
+      const { getSandbox } = await import('@cloudflare/sandbox');
+      vi.mocked(getSandbox).mockReturnValueOnce(
+        sandbox as unknown as ReturnType<typeof getSandbox>
+      );
+
+      const doStub = createMockDOStub();
+      const ctx = createInternalApiContext({ doStub });
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          githubToken: 'ghp_test_token',
+        });
+        expect.unreachable('should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(TRPCError);
+        const trpcError = error as TRPCError;
+        expect(trpcError.code).toBe('INTERNAL_SERVER_ERROR');
+        expect(trpcError.message).toBe(
+          'Failed to create workspace directory: FileSystemError: mkdir operation failed with exit code NaN'
+        );
         expect(trpcError.cause).toMatchObject({
           error: 'sandbox_internal_server_error',
           retryable: true,

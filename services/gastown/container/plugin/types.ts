@@ -94,6 +94,30 @@ export type SlingBatchResult = {
   beads: Array<{ bead: Bead; agent: Agent | null }>;
 };
 
+// Wasteland origin tag carried on beads created in response to a wanted-item event.
+// Mirrors `WastelandBeadOrigin` in services/gastown/src/dos/town/wasteland-bead-origin.ts.
+export type WastelandOrigin = {
+  kind: 'wanted-item-claim';
+  wasteland_id: string;
+  item_id: string;
+  pull_id?: string | null;
+  source_url?: string | null;
+};
+
+// Result of POST /wasteland/claim — returned to gt_wasteland_claim so the
+// mayor has everything it needs to plan the work without a second round-trip.
+export type WastelandClaimResult = {
+  claim: { success: true; pr_url: string | null };
+  /** The full wanted-item row from the upstream board, or null if not found. */
+  item: Record<string, unknown> | null;
+  planning: {
+    /** Origin tag the mayor MUST attach to whatever beads it creates next. */
+    wasteland_origin: WastelandOrigin;
+    /** A local rig_id the mayor should consider scoping the work to. May be null. */
+    suggested_rig_id: string | null;
+  };
+};
+
 // Convoy summary (returned by list and status endpoints)
 // Staging is tracked by the `staged` boolean, not the status field.
 // status tracks the convoy lifecycle: active (in progress) or landed (complete).

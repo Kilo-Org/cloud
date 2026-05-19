@@ -156,9 +156,9 @@ export function MessageInput({
     }
     const toAdd = list.slice(0, remaining);
     if (toAdd.length < list.length) {
-      toast.error(
-        `Only the first ${remaining} files were added (max ${MAX_ATTACHMENTS} per message)`
-      );
+      const noun =
+        remaining === 1 ? 'Only the first file was' : `Only the first ${remaining} files were`;
+      toast.error(`${noun} added (max ${MAX_ATTACHMENTS} per message)`);
     }
     for (const file of toAdd) {
       const filename = file.name || 'attachment';

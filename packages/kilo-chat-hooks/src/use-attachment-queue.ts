@@ -175,7 +175,11 @@ export function useAttachmentQueue(
     async (args: UploadArgs) => {
       const { tempId, filename, mimeType, size } = args;
       const pending = pendingRef.current.get(tempId);
-      if (!pending || !conversationId) return;
+      if (!pending) return;
+      if (!conversationId) {
+        dispatch({ type: 'setFailed', tempId, error: 'No active conversation' });
+        return;
+      }
 
       try {
         let putUrl = pending.putUrl;

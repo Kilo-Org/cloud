@@ -275,20 +275,6 @@ export async function destroySandboxAfterPreparationInfrastructureFailure(
   }
 }
 
-export async function withSandboxInternalServerErrorRecovery<T>(
-  context: RecoveryContext,
-  operation: () => Promise<T>
-): Promise<T> {
-  try {
-    return await operation();
-  } catch (error) {
-    const cause = getNestedProperty(error, 'cause');
-    const recoveryError = isSandboxInternalServerError(cause) ? cause : error;
-    await destroySandboxAfterInternalServerError(context, recoveryError);
-    throw error;
-  }
-}
-
 export async function withPreparationInfrastructureRecovery<T>(
   context: RecoveryContext,
   operation: () => Promise<T>

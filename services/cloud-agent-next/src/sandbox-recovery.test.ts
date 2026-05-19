@@ -19,7 +19,6 @@ import {
   destroySandboxAfterInternalServerError,
   isSandboxInternalServerError,
   withPreparationInfrastructureRecovery,
-  withSandboxInternalServerErrorRecovery,
 } from './sandbox-recovery.js';
 import { WrapperNotReadyError } from './kilo/wrapper-client.js';
 import { WorkspaceFilesystemPreparationError } from './workspace-errors.js';
@@ -102,7 +101,7 @@ describe('sandbox recovery', () => {
     Object.assign(error, { name: 'SandboxError' });
 
     await expect(
-      withSandboxInternalServerErrorRecovery(
+      withPreparationInfrastructureRecovery(
         {
           sandbox,
           sandboxId: 'ses-test',

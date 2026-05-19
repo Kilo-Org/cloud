@@ -66,6 +66,9 @@ export type WrapperPromptOptions = {
 export type WrapperCommandOptions = {
   command: string;
   args?: string;
+  messageId?: string;
+  autoCommit?: boolean;
+  condenseOnComplete?: boolean;
   execution?: ExecutionBinding;
 };
 
@@ -593,12 +596,13 @@ export class WrapperClient {
    */
   async answerPermission(
     permissionId: string,
-    response: WrapperPermissionResponse
+    response: WrapperPermissionResponse,
+    message?: string
   ): Promise<{ success: boolean }> {
     const result = await this.request<{
       status: string;
       success: boolean;
-    }>('POST', '/job/answer-permission', { permissionId, response });
+    }>('POST', '/job/answer-permission', { permissionId, response, message });
 
     return { success: result.success };
   }

@@ -1662,6 +1662,89 @@ export const gastownRouter = router({
       return rig;
     }),
 
+  // ── Wasteland Connection ───────────────────────────────────────────
+
+  getTownWastelandConnection: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .output(
+      z
+        .object({
+          connection_id: z.string(),
+          wasteland_id: z.string(),
+          upstream: z.string(),
+          rig_handle: z.string(),
+          dolthub_org: z.string(),
+          connected_at: z.string(),
+          status: z.enum(['active', 'disconnecting']),
+        })
+        .nullable()
+    )
+    .query(async ({ ctx, input }) => {
+      await resolveTownOwnership(ctx.env, ctx, input.townId);
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.getWastelandConnection();
+    }),
+
+  connectTownToWasteland: gastownProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        wastelandId: z.string().uuid(),
+        upstream: z.string().min(1),
+        rigHandle: z.string().min(1),
+        dolthubOrg: z.string().min(1),
+      })
+    )
+    .output(
+      z.object({
+        connection_id: z.string(),
+        wasteland_id: z.string(),
+        upstream: z.string(),
+        rig_handle: z.string(),
+        dolthub_org: z.string(),
+        connected_at: z.string(),
+        status: z.enum(['active', 'disconnecting']),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot connect wastelands on towns they do not own',
+        });
+      }
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.connectWasteland({
+        connectionId: crypto.randomUUID(),
+        wastelandId: input.wastelandId,
+        upstream: input.upstream,
+        rigHandle: input.rigHandle,
+        dolthubOrg: input.dolthubOrg,
+      });
+    }),
+
+  disconnectTownFromWasteland: gastownProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        wastelandId: z.string().uuid(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot disconnect wastelands on towns they do not own',
+        });
+      }
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      await townStub.disconnectWasteland(input.wastelandId);
+      return { success: true };
+    }),
+
   // ── Admin-only routes (bypass ownership checks) ──────────────────────
 
   adminListBeads: adminProcedure

@@ -22,10 +22,12 @@ import {
   handleKilocodeEvent,
   handleBranchCapture,
   handleExecutionComplete,
+  handleCommandsAvailable,
   extractEntityId,
   type KiloSessionCaptureState,
 } from '../session/ingest-handlers/index.js';
 import type { CompleteEventData, KilocodeEventData, CloudStatusData } from '../shared/protocol.js';
+import type { SlashCommandInfo } from '../shared/slash-commands.js';
 
 // ---------------------------------------------------------------------------
 // Ingest Attachment
@@ -174,6 +176,8 @@ export type IngestDOContext = {
   ) => Promise<void>;
   /** Cancel the disconnect grace period when wrapper reconnects */
   cancelDisconnectGrace?: () => Promise<void>;
+  /** Persist the slash-command catalog so connecting clients can be hydrated. */
+  setAvailableCommands: (commands: SlashCommandInfo[]) => Promise<void>;
 };
 
 // ---------------------------------------------------------------------------
@@ -425,6 +429,14 @@ export function createIngestHandler(
         }
 
         // -- Handler integrations --
+
+        // Handle commands.available (cache catalog in DO metadata)
+        if (eventType === 'commands.available') {
+          await handleCommandsAvailable(ingestEvent.data, {
+            setAvailableCommands: cmds => doContext.setAvailableCommands(cmds),
+            logger: console,
+          });
+        }
 
         // Handle kilocode events (session ID capture)
         if (eventType === 'kilocode') {

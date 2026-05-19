@@ -136,6 +136,7 @@ export const mockProfiles: ProfileSummary[] = [
     mcpServerCount: 2,
     skillCount: 1,
     agentCount: 1,
+    kiloCommandCount: 0,
   },
   {
     id: 'profile-2',
@@ -149,6 +150,7 @@ export const mockProfiles: ProfileSummary[] = [
     mcpServerCount: 0,
     skillCount: 0,
     agentCount: 0,
+    kiloCommandCount: 0,
   },
   {
     id: 'profile-3',
@@ -162,6 +164,7 @@ export const mockProfiles: ProfileSummary[] = [
     mcpServerCount: 1,
     skillCount: 0,
     agentCount: 0,
+    kiloCommandCount: 1,
   },
   {
     id: 'profile-4',
@@ -175,6 +178,7 @@ export const mockProfiles: ProfileSummary[] = [
     mcpServerCount: 0,
     skillCount: 0,
     agentCount: 0,
+    kiloCommandCount: 2,
   },
   {
     id: 'profile-5',
@@ -188,6 +192,7 @@ export const mockProfiles: ProfileSummary[] = [
     mcpServerCount: 0,
     skillCount: 0,
     agentCount: 0,
+    kiloCommandCount: 0,
   },
 ];
 
@@ -203,6 +208,7 @@ export const mockProfileDetails: ProfileDetails = {
   mcpServers: mockProfileMcpServers,
   skills: mockProfileSkills,
   agents: mockProfileAgents,
+  kiloCommands: [],
 };
 
 export const mockEmptyProfileDetails: ProfileDetails = {
@@ -217,6 +223,7 @@ export const mockEmptyProfileDetails: ProfileDetails = {
   mcpServers: [],
   skills: [],
   agents: [],
+  kiloCommands: [],
 };
 
 export const mockLocalDevProfileDetails: ProfileDetails = {
@@ -253,6 +260,7 @@ export const mockLocalDevProfileDetails: ProfileDetails = {
   mcpServers: [],
   skills: [],
   agents: [],
+  kiloCommands: [],
 };
 
 export const mockStagingProfileDetails: ProfileDetails = {
@@ -293,4 +301,5 @@ export const mockStagingProfileDetails: ProfileDetails = {
   mcpServers: [mockProfileMcpServers[1]],
   skills: [],
   agents: [],
+  kiloCommands: [],
 };

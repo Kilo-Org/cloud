@@ -2233,6 +2233,14 @@ const MorningBriefingInterestsSchema = z.object({
   topics: z.array(z.string().trim().min(1).max(MAX_INTEREST_TOPIC_LENGTH)).max(MAX_INTEREST_TOPICS),
 });
 
+// Keep in sync with `userLocationSchema` in apps/web/src/routers/kiloclaw-router.ts
+// and the MAX_USER_LOCATION_LENGTH in the morning-briefing plugin's user-location route.
+const MAX_USER_LOCATION_LENGTH = 200;
+const MorningBriefingUserLocationSchema = z.object({
+  userId: z.string().min(1),
+  userLocation: z.string().trim().max(MAX_USER_LOCATION_LENGTH).nullable(),
+});
+
 type MorningBriefingWarmupRetryPolicy = {
   includeTimeout: boolean;
 };
@@ -2451,6 +2459,46 @@ platform.post('/morning-briefing/interests', async c => {
     const { message, status, code } = sanitizeOpenclawConfigError(
       err,
       'morning-briefing/interests'
+    );
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/morning-briefing/user-location
+platform.post('/morning-briefing/user-location', async c => {
+  const result = await parseBody(c, MorningBriefingUserLocationSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, userLocation } = result.data;
+  const normalized = userLocation === null ? null : userLocation.length > 0 ? userLocation : null;
+  try {
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
+        stub => stub.updateUserLocation({ userLocation: normalized }),
+        'updateUserLocation'
+      )
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'morning-briefing/user-location'
     );
     return jsonError(message, status, code);
   }

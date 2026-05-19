@@ -6880,6 +6880,50 @@ describe('provision: auto-start after fresh provision', () => {
     );
   });
 
+  it('does not fail provision when the morning-briefing user-location sync errors', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', {
+      userTimezone: 'Europe/Amsterdam',
+      userLocation: 'Amsterdam, North Holland, Netherlands',
+    });
+    await Promise.all(waitUntilPromises);
+
+    vi.mocked(fetch).mockImplementation((url: unknown) => {
+      if (typeof url === 'string' && url.includes('/_kilo/morning-briefing/user-location')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: 'Gateway not running' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      if (typeof url === 'string' && url.includes('/_kilo/user-profile')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, path: 'workspace/USER.md' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      return Promise.resolve(new Response(null, { status: 200 }));
+    });
+
+    await expect(
+      instance.provision('user-1', { userLocation: 'Paris, France' })
+    ).resolves.toBeDefined();
+
+    expect(storage._store.get('userLocation')).toBe('Paris, France');
+  });
+
   it('leaves user location absent when weather setup is skipped', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
 
@@ -11280,5 +11324,124 @@ describe('non-Fly lifecycle push dispatch', () => {
     expect(calls[0].event).toBe('start_failed');
     expect(calls[0].errorMessage).toBe('Start failed.');
     expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+});
+
+describe('updateUserLocation', () => {
+  it('throws "Instance is not running" when the instance is stopped', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { status: 'stopped', userLocation: null });
+    vi.mocked(fetch).mockClear();
+
+    await expect(instance.updateUserLocation({ userLocation: 'Paris, France' })).rejects.toThrow(
+      'Instance is not running'
+    );
+
+    expect(storage._store.get('userLocation') ?? null).toBeNull();
+    const gatewayCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter(
+        call =>
+          typeof call[0] === 'string' &&
+          (call[0].includes('/_kilo/user-profile') ||
+            call[0].includes('/_kilo/morning-briefing/user-location'))
+      );
+    expect(gatewayCalls).toHaveLength(0);
+  });
+
+  it('throws "Instance is not running" when the instance is starting', async () => {
+    const { instance, storage } = createInstance();
+    await seedStarting(storage, { userLocation: 'Old, NY' });
+    vi.mocked(fetch).mockClear();
+
+    await expect(instance.updateUserLocation({ userLocation: 'Paris, France' })).rejects.toThrow(
+      'Instance is not running'
+    );
+
+    expect(storage._store.get('userLocation')).toBe('Old, NY');
+  });
+
+  it('throws "Instance is not running" when the instance is restarting', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage, { userLocation: 'Old, NY' });
+    vi.mocked(fetch).mockClear();
+
+    await expect(instance.updateUserLocation({ userLocation: 'Paris, France' })).rejects.toThrow(
+      'Instance is not running'
+    );
+
+    expect(storage._store.get('userLocation')).toBe('Old, NY');
+  });
+
+  it('does not persist DO state when the required writeUserProfile call fails', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { userLocation: 'Old, NY' });
+
+    vi.mocked(fetch).mockImplementation((url: unknown) => {
+      if (typeof url === 'string' && url.includes('/_kilo/user-profile')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: 'boom' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      return Promise.resolve(new Response(null, { status: 200 }));
+    });
+
+    await expect(
+      instance.updateUserLocation({ userLocation: 'Paris, France' })
+    ).rejects.toBeDefined();
+
+    expect(storage._store.get('userLocation')).toBe('Old, NY');
+  });
+
+  it('returns success and persists DO state when the best-effort plugin sync fails', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { userLocation: null });
+
+    vi.mocked(fetch).mockImplementation((url: unknown) => {
+      if (typeof url === 'string' && url.includes('/_kilo/morning-briefing/user-location')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: 'Gateway not running' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      if (typeof url === 'string' && url.includes('/_kilo/user-profile')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, path: 'workspace/USER.md' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      return Promise.resolve(new Response(null, { status: 200 }));
+    });
+
+    const result = await instance.updateUserLocation({ userLocation: 'Paris, France' });
+
+    expect(result).toEqual({ ok: true, userLocation: 'Paris, France' });
+    expect(storage._store.get('userLocation')).toBe('Paris, France');
+  });
+
+  it('short-circuits when the input matches the current location', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { userLocation: 'Same, NY' });
+    vi.mocked(fetch).mockClear();
+
+    const result = await instance.updateUserLocation({ userLocation: 'Same, NY' });
+
+    expect(result).toEqual({ ok: true, userLocation: 'Same, NY' });
+    const gatewayCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter(
+        call =>
+          typeof call[0] === 'string' &&
+          (call[0].includes('/_kilo/user-profile') ||
+            call[0].includes('/_kilo/morning-briefing/user-location'))
+      );
+    expect(gatewayCalls).toHaveLength(0);
   });
 });

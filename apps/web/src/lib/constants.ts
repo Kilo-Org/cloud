@@ -73,6 +73,11 @@ export const EVENT_SERVICE_URL = requireEnv(
   process.env.NEXT_PUBLIC_EVENT_SERVICE_URL
 );
 
+// Wasteland worker URL (client-side, inlined at build time)
+// The browser talks directly to the Wasteland Cloudflare Worker for tRPC.
+// Must use NEXT_PUBLIC_ prefix so Next.js exposes it to the browser bundle.
+export const WASTELAND_URL = process.env.NEXT_PUBLIC_WASTELAND_URL ?? '';
+
 // Free model rate limits: per-IP for client-side products, per-user for server-side products
 export const FREE_MODEL_RATE_LIMIT_WINDOW_HOURS = 1;
 export const FREE_MODEL_MAX_REQUESTS_PER_WINDOW = 200;

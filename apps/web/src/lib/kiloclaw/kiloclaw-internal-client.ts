@@ -43,6 +43,7 @@ import type {
   MorningBriefingStatusResponse,
   MorningBriefingActionResponse,
   MorningBriefingInterestsResponse,
+  MorningBriefingUserLocationResponse,
   MorningBriefingReadResponse,
   GoogleCredentialsInput,
   GoogleCredentialsResponse,
@@ -441,6 +442,22 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId, topics }),
+      },
+      { userId }
+    );
+  }
+
+  async updateUserLocation(
+    userId: string,
+    userLocation: string | null,
+    instanceId?: string
+  ): Promise<MorningBriefingUserLocationResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/user-location${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, userLocation }),
       },
       { userId }
     );

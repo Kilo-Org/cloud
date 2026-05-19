@@ -609,6 +609,13 @@ export type MorningBriefingInterestsResponse = {
   error?: string;
 };
 
+export type MorningBriefingUserLocationResponse = {
+  ok: boolean;
+  userLocation?: string | null;
+  code?: string;
+  error?: string;
+};
+
 export type MorningBriefingReadResponse = {
   ok: boolean;
   dateKey?: string;

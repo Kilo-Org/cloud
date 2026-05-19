@@ -52,6 +52,7 @@ describe('Secret Catalog', () => {
         'credit-card',
         'lock',
         'brave',
+        'plug',
       ]);
       for (const entry of SECRET_CATALOG) {
         expect(validIcons.has(entry.icon)).toBe(true);
@@ -128,6 +129,8 @@ describe('Secret Catalog', () => {
         'GITHUB_EMAIL',
         'BRAVE_API_KEY',
         'LINEAR_API_KEY',
+        'COMPOSIO_USER_API_KEY',
+        'COMPOSIO_ORG',
       ]);
 
       const catalogEnvVars = new Set(FIELD_KEY_TO_ENV_VAR.values());
@@ -146,6 +149,8 @@ describe('Secret Catalog', () => {
       expect(FIELD_KEY_TO_ENV_VAR.get('githubUsername')).toBe('GITHUB_USERNAME');
       expect(FIELD_KEY_TO_ENV_VAR.get('githubEmail')).toBe('GITHUB_EMAIL');
       expect(FIELD_KEY_TO_ENV_VAR.get('braveSearchApiKey')).toBe('BRAVE_API_KEY');
+      expect(FIELD_KEY_TO_ENV_VAR.get('composioUserApiKey')).toBe('COMPOSIO_USER_API_KEY');
+      expect(FIELD_KEY_TO_ENV_VAR.get('composioOrg')).toBe('COMPOSIO_ORG');
     });
 
     it('ENV_VAR_TO_FIELD_KEY is the exact reverse of FIELD_KEY_TO_ENV_VAR', () => {
@@ -164,6 +169,8 @@ describe('Secret Catalog', () => {
       expect(ENV_VAR_TO_FIELD_KEY.get('GITHUB_USERNAME')).toBe('githubUsername');
       expect(ENV_VAR_TO_FIELD_KEY.get('GITHUB_EMAIL')).toBe('githubEmail');
       expect(ENV_VAR_TO_FIELD_KEY.get('BRAVE_API_KEY')).toBe('braveSearchApiKey');
+      expect(ENV_VAR_TO_FIELD_KEY.get('COMPOSIO_USER_API_KEY')).toBe('composioUserApiKey');
+      expect(ENV_VAR_TO_FIELD_KEY.get('COMPOSIO_ORG')).toBe('composioOrg');
     });
   });
 
@@ -205,12 +212,13 @@ describe('Secret Catalog', () => {
 
     it('returns all tool entries sorted by order', () => {
       const tools = getEntriesByCategory('tool');
-      expect(tools.length).toBe(5);
+      expect(tools.length).toBe(6);
       expect(tools[0].id).toBe('github');
       expect(tools[1].id).toBe('agentcard');
       expect(tools[2].id).toBe('onepassword');
       expect(tools[3].id).toBe('brave-search');
       expect(tools[4].id).toBe('linear');
+      expect(tools[5].id).toBe('composio');
     });
 
     it('returns empty array for categories with no entries', () => {
@@ -238,7 +246,9 @@ describe('Secret Catalog', () => {
       expect(keys).toContain('agentcardApiKey');
       expect(keys).toContain('onepasswordServiceAccountToken');
       expect(keys).toContain('braveSearchApiKey');
-      expect(keys.size).toBe(7);
+      expect(keys).toContain('composioUserApiKey');
+      expect(keys).toContain('composioOrg');
+      expect(keys.size).toBe(9);
     });
 
     it('returns empty set for categories with no entries', () => {
@@ -390,6 +400,19 @@ describe('Secret Catalog', () => {
       expect(validateFieldValue('bsa' + 'A'.repeat(20), pattern)).toBe(false);
     });
 
+    it('accepts valid Composio user API keys', () => {
+      const pattern = '^uak_[A-Za-z0-9_-]{16,}$';
+      expect(validateFieldValue('uak_FAKE_TEST_KEY_1234567890', pattern)).toBe(true);
+      expect(validateFieldValue('uak_' + 'A'.repeat(16), pattern)).toBe(true);
+    });
+
+    it('rejects invalid Composio user API keys', () => {
+      const pattern = '^uak_[A-Za-z0-9_-]{16,}$';
+      expect(validateFieldValue('invalid', pattern)).toBe(false);
+      expect(validateFieldValue('uak_short', pattern)).toBe(false);
+      expect(validateFieldValue('ak_' + 'A'.repeat(16), pattern)).toBe(false);
+    });
+
     it('rejects empty strings', () => {
       const pattern = '^\\d{8,}:[A-Za-z0-9_-]{30,50}$';
       expect(validateFieldValue('', pattern)).toBe(false);
@@ -442,6 +465,15 @@ describe('Secret Catalog', () => {
         'githubEmail',
         'githubToken',
       ]);
+    });
+
+    it('composio entry requires user API key and organization', () => {
+      const composio = SECRET_CATALOG_MAP.get('composio');
+      expect(composio?.allFieldsRequired).toBe(true);
+      expect(composio?.fields.map(f => f.key)).toEqual(['composioUserApiKey', 'composioOrg']);
+      expect(
+        composio?.fields.find(f => f.key === 'composioOrg')?.validationPattern
+      ).toBeUndefined();
     });
 
     it('telegram and discord do not have allFieldsRequired', () => {

@@ -1715,9 +1715,59 @@ describe('SessionService', () => {
         };
       };
 
-      // Denied commands use "cmd *" glob pattern format
+      expect(configContent.permission?.bash?.ls).toBe('allow');
+      expect(configContent.permission?.bash?.pwd).toBe('allow');
+      expect(configContent.permission?.bash?.git).toBe('allow');
+      expect(configContent.permission?.bash?.gh).toBe('allow');
+      for (const command of ['wc', 'sort', 'uniq', 'cut', 'tr', 'nl', 'jq', 'stat', 'file']) {
+        expect(configContent.permission?.bash?.[command]).toBe('allow');
+        expect(configContent.permission?.bash?.[`${command} *`]).toBe('allow');
+      }
+      expect(configContent.permission?.bash?.sed).toBe('allow');
+      expect(configContent.permission?.bash?.['ls *']).toBe('allow');
+      expect(configContent.permission?.bash?.['git *']).toBe('allow');
+      expect(configContent.permission?.bash?.['gh *']).toBe('allow');
+      expect(configContent.permission?.bash?.['sed *']).toBe('allow');
+      expect(configContent.permission?.bash?.['sed -i']).toBe('deny');
+      expect(configContent.permission?.bash?.['sed -i *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sed -*i']).toBe('deny');
+      expect(configContent.permission?.bash?.['sed -*i *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sed --in-place']).toBe('deny');
+      expect(configContent.permission?.bash?.['sed --in-place *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sed --in-place*']).toBe('deny');
+      expect(configContent.permission?.bash?.['sed --in-place* *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sed * -i']).toBe('deny');
+      expect(configContent.permission?.bash?.['sed * -i *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sed * -*i']).toBe('deny');
+      expect(configContent.permission?.bash?.['sed * -*i *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sed * --in-place*']).toBe('deny');
+      expect(configContent.permission?.bash?.['sed * --in-place* *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort -o']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort -o *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort -o*']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort -o* *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort -*o']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort -*o *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort --output']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort --output *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort --output*']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort --output* *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * -o']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * -o *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * -o*']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * -o* *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * -*o']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * -*o *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * --output']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * --output *']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * --output*']).toBe('deny');
+      expect(configContent.permission?.bash?.['sort * --output* *']).toBe('deny');
+      expect(configContent.permission?.bash?.['uniq * *']).toBe('deny');
+      expect(configContent.permission?.bash?.['uniq * * *']).toBe('deny');
       expect(configContent.permission?.bash?.['git commit *']).toBe('deny');
+      expect(configContent.permission?.bash?.['git commit']).toBe('deny');
       expect(configContent.permission?.bash?.['gh pr merge *']).toBe('deny');
+      expect(configContent.permission?.bash?.['gh pr merge']).toBe('deny');
       expect(configContent.permission?.bash?.bash).toBe('deny');
       expect(configContent.permission?.bash?.['bash *']).toBe('deny');
       expect(configContent.permission?.bash?.['vim *']).toBe('deny');
@@ -2555,6 +2605,168 @@ describe('SessionService', () => {
         type: 'remote',
         url: 'https://example.com/mcp',
         headers: { 'X-Region': 'eu-west-1' },
+      });
+    });
+  });
+
+  describe('Kilo Commands in KILO_CONFIG_CONTENT', () => {
+    it('should include kilo commands in KILO_CONFIG_CONTENT.command', async () => {
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
+      const sandbox = {
+        createSession: sandboxCreateSession,
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      const sessionId: SessionId = 'agent_kilo_cmd_test';
+      mockedSetupWorkspace.mockResolvedValue({
+        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
+        sessionHome: `/home/${sessionId}`,
+      });
+
+      const service = new SessionService();
+      const kiloCommands = [
+        {
+          name: 'commit',
+          template: 'Create a git commit with $ARGUMENTS',
+          description: 'Commit changes',
+          subtask: false,
+        },
+        {
+          name: 'review-pr',
+          template: 'Review the current PR',
+          agent: 'code',
+          model: 'kilo/claude-sonnet-4-20250514',
+          subtask: true,
+        },
+      ];
+
+      await service.initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        githubRepo: 'acme/repo',
+        env: mockEnv,
+        profile: { kiloCommands },
+      });
+
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
+        command: Record<string, unknown>;
+      };
+      expect(configContent.command).toBeDefined();
+      expect(configContent.command.commit).toEqual({
+        template: 'Create a git commit with $ARGUMENTS',
+        description: 'Commit changes',
+        subtask: false,
+      });
+      expect(configContent.command['review-pr']).toEqual({
+        template: 'Review the current PR',
+        agent: 'code',
+        model: 'kilo/claude-sonnet-4-20250514',
+        subtask: true,
+      });
+    });
+
+    it('should not include command key when kiloCommands is empty', async () => {
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
+      const sandbox = {
+        createSession: sandboxCreateSession,
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      const sessionId: SessionId = 'agent_empty_kilo_cmd';
+      mockedSetupWorkspace.mockResolvedValue({
+        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
+        sessionHome: `/home/${sessionId}`,
+      });
+
+      const service = new SessionService();
+      await service.initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        githubRepo: 'acme/repo',
+        env: mockEnv,
+        profile: { kiloCommands: [] },
+      });
+
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
+        command?: Record<string, unknown>;
+      };
+      expect(configContent.command).toBeUndefined();
+    });
+
+    it('should omit null/undefined optional fields from command entries', async () => {
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
+      const sandbox = {
+        createSession: sandboxCreateSession,
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      const sessionId: SessionId = 'agent_minimal_kilo_cmd';
+      mockedSetupWorkspace.mockResolvedValue({
+        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
+        sessionHome: `/home/${sessionId}`,
+      });
+
+      const service = new SessionService();
+      const kiloCommands = [
+        {
+          name: 'test',
+          template: 'Do the thing',
+        },
+      ];
+
+      await service.initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        githubRepo: 'acme/repo',
+        env: mockEnv,
+        profile: { kiloCommands },
+      });
+
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
+        command: Record<string, unknown>;
+      };
+      expect(configContent.command.test).toEqual({
+        template: 'Do the thing',
+        subtask: false,
       });
     });
   });

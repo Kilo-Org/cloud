@@ -147,6 +147,7 @@ function applyProfileResolution(
       mcpServers: input.mcpServers,
       runtimeSkills: input.runtimeSkills,
       runtimeAgents: input.runtimeAgents,
+      kiloCommands: input.kiloCommands,
     };
   }
 
@@ -157,6 +158,7 @@ function applyProfileResolution(
     mcpServers: profileMcpServersToClientRecord(resolved.mcpServers),
     runtimeSkills: resolved.skills,
     runtimeAgents: resolved.agents,
+    kiloCommands: resolved.kiloCommands,
   };
 }
 
@@ -428,6 +430,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           gitUrl: input.gitUrl,
           platform: input.platform,
           initialMessageId: input.initialMessageId,
+          initialPayload: input.initialPayload,
           // Carry the resolved profile into the DO up-front so the chat page
           // can render custom-mode options (runtimeAgents) immediately after
           // navigation, before the async prepare() alarm fires.
@@ -480,6 +483,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
             kilocodeOrganizationId: input.kilocodeOrganizationId,
             autoInitiate: true,
             initialMessageId: input.initialMessageId,
+            initialPayload: input.initialPayload,
           });
         } catch (error) {
           await rollbackCliSession();
@@ -791,6 +795,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           mcpServers: effective.mcpServers,
           runtimeSkills: effective.runtimeSkills,
           runtimeAgents: effective.runtimeAgents,
+          kiloCommands: effective.kiloCommands,
           upstreamBranch: input.upstreamBranch,
           autoCommit: input.autoCommit,
           condenseOnComplete: input.condenseOnComplete,
@@ -800,6 +805,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           createdOnPlatform: input.createdOnPlatform,
           gateThreshold: input.gateThreshold,
           initialMessageId: input.initialMessageId,
+          initialPayload: input.initialPayload,
           // Workspace metadata
           workspacePath,
           sessionHome,
@@ -904,6 +910,9 @@ const updateSessionHandler = internalApiProtectedProcedure
         return value.length === 0;
       });
       setCollectionUpdate(updates, 'runtimeAgents', input.runtimeAgents, value => {
+        return value.length === 0;
+      });
+      setCollectionUpdate(updates, 'kiloCommands', input.kiloCommands, value => {
         return value.length === 0;
       });
 

@@ -9,6 +9,7 @@ import {
   type MergeStrategy,
   type RigOverrideConfig,
 } from '../../types';
+import { resolveGitHubTokenString } from './town-scm';
 
 const CONFIG_KEY = 'town:config';
 const NEW_TOWN_DEFAULTS_SEEDED_KEY = 'town:config:newDefaultsSeeded';
@@ -295,17 +296,47 @@ export function resolveRigConfig(
 /**
  * Build the ContainerConfig payload for X-Town-Config header.
  * Sent with every fetch() to the container.
+ *
+ * The container's `syncTownConfigToProcessEnv` reads `git_auth.github_token`
+ * from this payload on every request and writes it to `process.env.GIT_TOKEN`,
+ * which the SDK server's `gh` CLI inherits via `GH_TOKEN`. To prevent serving
+ * an expired installation token (TTL ~1h) we resolve through `resolveGitHubToken`
+ * so a configured platform integration always returns a fresh value.
+ *
+ * `townId` is required so we can always perform the integration lookup.
+ * Making it optional was a foot-gun — a forgotten arg silently re-introduces
+ * the stale-token bug this function exists to prevent.
  */
 export async function buildContainerConfig(
   storage: DurableObjectStorage,
-  env: Env
+  env: Env,
+  townId: string
 ): Promise<Record<string, unknown>> {
   const config = await getTownConfig(storage);
+
+  let resolvedGithubToken = config.git_auth?.github_token;
+  try {
+    const fresh = await resolveGitHubTokenString({
+      env,
+      townId,
+      getTownConfig: () => Promise.resolve(config),
+    });
+    if (fresh) resolvedGithubToken = fresh;
+  } catch (err) {
+    console.warn(
+      `${TOWN_LOG} buildContainerConfig: resolveGitHubTokenString failed; falling back to stored token`,
+      err
+    );
+  }
+
   return {
     env_vars: config.env_vars,
     default_model: resolveModel(config, null, ''),
     small_model: resolveSmallModel(config),
-    git_auth: config.git_auth,
+    git_auth: {
+      ...config.git_auth,
+      github_token: resolvedGithubToken,
+    },
     kilocode_token: config.kilocode_token,
     github_cli_pat: config.github_cli_pat,
     git_author_name: config.git_author_name,

@@ -10,7 +10,12 @@
 import type { ExecutionId, SessionId, UserId } from '../types/ids.js';
 import type { AgentMode } from '../schema.js';
 import type { Images, EncryptedSecrets as SchemaEncryptedSecrets } from '../router/schemas.js';
-import type { MCPServerConfig, RuntimeSkill, RuntimeAgent } from '../persistence/types.js';
+import type {
+  MCPServerConfig,
+  RuntimeSkill,
+  RuntimeAgent,
+  RuntimeKiloCommand,
+} from '../persistence/types.js';
 import type { SessionProfileBundle } from '../session-profile.js';
 
 // ---------------------------------------------------------------------------
@@ -120,6 +125,7 @@ type InitiateExecutionRequest = BaseExecutionRequest & {
   mcpServers?: Record<string, MCPServerConfig>;
   runtimeSkills?: readonly RuntimeSkill[];
   runtimeAgents?: readonly RuntimeAgent[];
+  kiloCommands?: readonly RuntimeKiloCommand[];
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   upstreamBranch?: string;
@@ -139,14 +145,41 @@ type InitiatePreparedRequest = BaseExecutionRequest & {
 };
 
 /**
+ * Discriminated payload for follow-up execution.
+ *
+ * Kept as a typed bundle so call sites stop juggling loose `prompt|command|args`
+ * fields across five+ functions. The orchestrator's only branch point on this
+ * union is the final wrapper call (prompt vs structured command).
+ */
+export type PromptExecutionPayload = {
+  type: 'prompt';
+  prompt: string;
+  /** Defaults to the session's stored mode when omitted. */
+  mode?: ExecutionMode;
+  /** Defaults to the session's stored model when omitted. */
+  model?: string;
+  variant?: string;
+};
+
+export type CommandExecutionPayload = {
+  type: 'command';
+  /** Kilo command name (e.g. "review"). */
+  command: string;
+  /**
+   * Verbatim args string passed after the command name. Kilo expands
+   * `$1`, `$2`, `$ARGUMENTS` against the template server-side.
+   */
+  arguments: string;
+};
+
+export type ExecutionPayload = PromptExecutionPayload | CommandExecutionPayload;
+
+/**
  * Request for follow-up message on existing session.
  */
 type FollowupExecutionRequest = BaseExecutionRequest & {
   kind: 'followup';
-  prompt: string;
-  mode?: ExecutionMode;
-  model?: string;
-  variant?: string;
+  payload: ExecutionPayload;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   messageId?: string;
@@ -325,7 +358,7 @@ export type WrapperPlan = {
 // ---------------------------------------------------------------------------
 
 /**
- * Complete plan for executing a prompt.
+ * Complete plan for executing a prompt or slash command.
  * Contains all information needed to set up and execute.
  */
 export type ExecutionPlan = {
@@ -337,15 +370,19 @@ export type ExecutionPlan = {
   userId: UserId;
   /** Organization ID (optional) */
   orgId?: string;
-  /** The prompt to execute */
-  prompt: string;
-  /** Execution mode */
+  /** What the user asked the agent to do (free-text prompt or structured slash command). */
+  payload: ExecutionPayload;
+  /**
+   * Execution mode. For prompt payloads this is the picked agent. For command
+   * payloads this is the session's existing mode (used for logger tags;
+   * kilo applies the command's own `agent` override).
+   */
   mode: AgentMode;
   /** Workspace preparation plan */
   workspace: WorkspacePlan;
   /** Wrapper configuration plan */
   wrapper: WrapperPlan;
-  /** Optional image attachments */
+  /** Optional image attachments (prompt payloads only). */
   images?: Images;
   /** Optional message ID for correlating the request */
   messageId?: string;

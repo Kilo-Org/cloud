@@ -24,10 +24,11 @@
     "test:integration:watch": "vitest --config vitest.workers.config.ts",
     "test:wrapper": "pnpm -C wrapper run test",
     "test:all": "vitest run && vitest run --config vitest.workers.config.ts && pnpm run test:wrapper",
-    "typecheck": "tsgo --noEmit && pnpm -C wrapper run typecheck"
+    "typecheck": "tsgo --noEmit && pnpm -C wrapper run typecheck",
+    "update-default-slash-commands": "node scripts/update-default-slash-commands.mjs"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.9.4",
+    "@cloudflare/sandbox": "0.10.1",
     "@hono/trpc-server": "0.4.2",
     "@kilocode/cloud-agent-profile": "workspace:*",
     "@kilocode/db": "workspace:*",

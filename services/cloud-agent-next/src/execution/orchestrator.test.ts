@@ -44,7 +44,10 @@ const basePlan = {
   executionId: 'exc_test',
   sessionId: 'agent_test',
   userId: 'user_test',
-  prompt: 'Review this change',
+  payload: {
+    type: 'prompt',
+    prompt: 'Review this change',
+  },
   mode: 'code',
   workspace: {
     shouldPrepare: false,

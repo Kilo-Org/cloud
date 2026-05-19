@@ -288,12 +288,15 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
         ? selectedRuntimeAgentForSend?.variant?.trim() || undefined
         : undefined;
       const acceptedPromise = manager.send({
-        prompt,
-        mode: sessionConfig?.mode ?? 'code',
-        model: agentModelOverrideForSend ?? sessionConfig?.model ?? '',
-        variant: agentModelOverrideForSend
-          ? agentVariantOverrideForSend
-          : (sessionConfig?.variant ?? undefined),
+        payload: {
+          type: 'prompt',
+          prompt,
+          mode: sessionConfig?.mode ?? 'code',
+          model: agentModelOverrideForSend ?? sessionConfig?.model ?? '',
+          variant: agentModelOverrideForSend
+            ? agentVariantOverrideForSend
+            : (sessionConfig?.variant ?? undefined),
+        },
         images,
       });
       scheduleScrollToBottom();
@@ -306,6 +309,24 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
       return accepted;
     },
     [manager, scheduleScrollToBottom, sessionConfig, setChatUI]
+  );
+
+  const handleSendSlashCommand = useCallback(
+    async (command: string, args: string, images?: Images) => {
+      setChatUI({ shouldAutoScroll: true });
+      const acceptedPromise = manager.send({
+        payload: { type: 'command', command, arguments: args },
+        images,
+      });
+      scheduleScrollToBottom();
+      const accepted = await acceptedPromise;
+      if (accepted) {
+        setImageMessageUuid(crypto.randomUUID());
+        scheduleScrollToBottom();
+      }
+      return accepted;
+    },
+    [manager, scheduleScrollToBottom, setChatUI]
   );
 
   const handleStopExecution = useCallback(() => {
@@ -555,6 +576,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                     <div className={activeQuestion || activePermission ? 'hidden' : ''}>
                       <ChatInput
                         onSend={handleSendMessage}
+                        onSendCommand={handleSendSlashCommand}
                         onStop={handleStopExecution}
                         disabled={(isStreaming && !activeSuggestion) || !canSend}
                         isStreaming={isStreaming && !activeSuggestion}

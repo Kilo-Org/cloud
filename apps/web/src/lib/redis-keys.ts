@@ -58,3 +58,6 @@ export const EXPERIMENTED_PUBLIC_IDS_REDIS_KEY = redisKey(
  */
 export const modelExperimentRedisKey = (publicId: string) =>
   redisKey(`ai-gateway.model-experiments:by-public-id:${publicId}`);
+
+export const gitLabOAuthCredentialsRedisKey = (credentialRef: string) =>
+  redisKey(`auth-credentials:gitlab:${credentialRef}`);

@@ -1,8 +1,12 @@
 /**
  * Wanted board operations — shared business logic used by both the tRPC
  * router and the WastelandRPCEntrypoint. Each function owns the full
- * operation: credential decryption, container dispatch, result parsing,
+ * operation: credential resolution, libwl dispatch, result parsing,
  * cache refresh, and metering.
+ *
+ * Implementation: every op runs through the libwl WASM bundle. The
+ * Cloudflare Container is no longer dispatched to from this file —
+ * see `docs/wasm-poc.md` for the migration story.
  *
  * All ownership/auth checks happen in the callers (tRPC via
  * resolveWastelandOwnership, RPC via the fact that only peer workers
@@ -28,11 +32,22 @@ declare const TypeEnum: z.ZodEnum<{
     feature: "feature";
     other: "other";
 }>;
+/**
+ * Browse via the libwl WASM bundle (`services/wasteland/src/wasm/libwl.wasm`).
+ *
+ * Replaces the previous container-backed implementation. The wasm path
+ * runs the wasteland Go SDK in-process inside the Worker, calling the
+ * DoltHub REST API directly via Go's `net/http` (which on `js/wasm`
+ * uses `globalThis.fetch`). No container is involved.
+ *
+ * Background and validation: see `docs/wasm-poc.md`.
+ */
 export declare function browseWantedBoard(env: Env, wastelandId: string, userId: string): Promise<Array<Record<string, unknown>>>;
 export declare function claimWantedItem(env: Env, wastelandId: string, userId: string, itemId: string, options?: {
     direct?: boolean;
 }): Promise<{
     success: true;
+    pr_url: string | null;
 }>;
 export declare function unclaimWantedItem(env: Env, wastelandId: string, userId: string, itemId: string, options?: {
     direct?: boolean;

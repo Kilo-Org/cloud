@@ -7,6 +7,8 @@ import type { Images } from '@/lib/images-schema';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import type { SendMessagePayload } from './types.js';
+export type { SendMessagePayload } from './types.js';
 
 /**
  * Cloud Agent Next Client
@@ -151,11 +153,7 @@ export type InitiateFromPreparedSessionInput = {
 /** Input for sendMessage procedure (V2 - uses cloudAgentSessionId) */
 export type SendMessageInput = {
   cloudAgentSessionId: string;
-  prompt: string;
-  /** Built-in slug or a slug in the session's runtimeAgents. `custom` is rejected here. */
-  mode: AgentMode;
-  model: string;
-  variant?: string;
+  payload: SendMessagePayload;
   autoCommit?: boolean;
   githubToken?: string;
   gitToken?: string;

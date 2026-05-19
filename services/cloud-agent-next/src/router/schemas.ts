@@ -13,6 +13,7 @@ import {
   RuntimeSkillsSchema,
   RuntimeAgentSchema,
   RuntimeAgentsSchema,
+  RuntimeKiloCommandsSchema,
 } from '../persistence/schemas.js';
 import { AgentModeSchema, BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 
@@ -75,6 +76,40 @@ export const PromptPayload = z.object({
 });
 
 /**
+ * Discriminated payload variants for sendMessageV2.
+ *
+ * The same execution pipeline (auth, queueing, optimistic message, ingest,
+ * stream broadcast) handles both — only the final wrapper call differs:
+ * `wrapperClient.prompt()` for prompts vs `wrapperClient.command()` for slash
+ * commands. See execution/wrapper-call.ts for the branch.
+ */
+export const PromptSendPayload = z.object({
+  type: z.literal('prompt'),
+  prompt: z.string().min(1, 'Prompt is required'),
+  mode: ModeSlugSchema,
+  model: modelIdSchema,
+  variant: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .optional(),
+});
+
+export const CommandSendPayload = z.object({
+  type: z.literal('command'),
+  command: z.string().min(1, 'Command name is required'),
+  /** Verbatim args. Kilo expands $1/$2/$ARGUMENTS server-side. */
+  arguments: z.string().default(''),
+});
+
+export const SendMessageV2Payload = z.discriminatedUnion('type', [
+  PromptSendPayload,
+  CommandSendPayload,
+]);
+
+export type InitialExecutionPayload = z.infer<typeof SendMessageV2Payload>;
+
+/**
  * Shared validation: ensure exactly one of githubRepo or gitUrl is provided.
  * Used in .refine() for input schemas that support both git sources.
  */
@@ -85,8 +120,6 @@ export function validateGitSource<T extends { githubRepo?: unknown; gitUrl?: unk
   const hasGitUrl = !!data.gitUrl;
   return (hasGithubRepo || hasGitUrl) && !(hasGithubRepo && hasGitUrl);
 }
-
-const rejectCustomMode = (data: { mode?: string | null }) => data.mode !== 'custom';
 
 const requiresAppendSystemPrompt = (data: {
   mode?: string | null;
@@ -139,12 +172,16 @@ export const SendMessageV2Input = z
       .length(30)
       .optional()
       .describe('Optional message ID for correlating the request'),
+    payload: SendMessageV2Payload.describe(
+      'Discriminated execution payload — either a free-text prompt or a structured slash command invocation'
+    ),
   })
-  .extend(PromptPayload.shape)
-  .refine(rejectCustomMode, {
+  .refine(data => data.payload.type !== 'prompt' || data.payload.mode !== 'custom', {
     message: 'custom mode requires appendSystemPrompt (use prepareSession/updateSession)',
-    path: ['mode'],
+    path: ['payload', 'mode'],
   });
+
+export type SendMessageV2InputPayload = z.infer<typeof SendMessageV2Payload>;
 
 /**
  * Input schema for prepareSession endpoint.
@@ -207,6 +244,9 @@ export const PrepareSessionInput = z
     ),
     runtimeAgents: RuntimeAgentsSchema.optional().describe(
       'Custom kilo agents materialized into KILO_CONFIG_CONTENT.agent.<slug>'
+    ),
+    kiloCommands: RuntimeKiloCommandsSchema.optional().describe(
+      'Custom slash commands materialized into KILO_CONFIG_CONTENT.command.<name>'
     ),
     upstreamBranch: branchNameSchema
       .optional()
@@ -284,6 +324,10 @@ export const PrepareSessionInput = z
       .length(30)
       .optional()
       .describe('Initial message ID for correlation with external systems'),
+
+    initialPayload: SendMessageV2Payload.optional().describe(
+      'Discriminated initial execution payload — command variant allows starting a session with a slash command instead of a free-text prompt'
+    ),
   })
   .refine(validateGitSource, {
     message: 'Must provide either githubRepo or gitUrl, but not both',
@@ -360,6 +404,9 @@ export const UpdateSessionInput = z
     runtimeSkills: RuntimeSkillsSchema.optional().describe('Runtime skills (empty array to clear)'),
     runtimeAgents: RuntimeAgentsSchema.optional().describe(
       'Custom kilo agents (empty array to clear)'
+    ),
+    kiloCommands: RuntimeKiloCommandsSchema.optional().describe(
+      'Custom slash commands (empty array to clear)'
     ),
     callbackTarget: CallbackTargetSchema.nullable()
       .optional()

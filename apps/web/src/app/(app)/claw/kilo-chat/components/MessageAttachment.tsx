@@ -35,7 +35,7 @@ export function MessageAttachment({
         {isLoading || !data ? (
           <div className="bg-muted/40 h-40 w-60 max-w-full animate-pulse rounded-md" />
         ) : (
-          <ImageAttachment url={data.url} filename={block.filename} />
+          <ImageAttachment url={data.url} filename={block.filename} size={block.size} />
         )}
         {isError && (
           <div className="text-destructive mt-1 flex items-center gap-1 text-xs">
@@ -70,10 +70,10 @@ export function MessageAttachment({
   );
 }
 
-function ImageAttachment({ url, filename }: { url: string; filename: string }) {
+function ImageAttachment({ url, filename, size }: { url: string; filename: string; size: number }) {
   const [errored, setErrored] = useState(false);
   if (errored) {
-    return <FileChip url={url} filename={filename} size={0} loading={false} error={false} />;
+    return <FileChip url={url} filename={filename} size={size} loading={false} error={false} />;
   }
   return (
     <a href={url} target="_blank" rel="noopener noreferrer">

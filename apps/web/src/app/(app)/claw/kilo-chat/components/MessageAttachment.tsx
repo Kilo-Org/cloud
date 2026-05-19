@@ -110,7 +110,7 @@ function FileChip({ url, filename, size, loading, error, onRemove }: FileChipPro
     </>
   );
   const baseClass =
-    'inline-flex items-center gap-2 rounded-md border border-current/20 px-2 py-1 max-w-[280px]';
+    'inline-flex items-center gap-2 rounded-md border border-border px-2 py-1 max-w-[280px]';
   if (error) {
     return (
       <span className={`${baseClass} text-muted-foreground italic opacity-70`}>
@@ -124,7 +124,7 @@ function FileChip({ url, filename, size, loading, error, onRemove }: FileChipPro
   }
   return (
     <span className="relative inline-flex">
-      <a href={url} download className={`${baseClass} hover:bg-current/5 cursor-pointer`}>
+      <a href={url} download className={`${baseClass} hover:bg-muted/40 cursor-pointer`}>
         {content}
       </a>
       {onRemove && (

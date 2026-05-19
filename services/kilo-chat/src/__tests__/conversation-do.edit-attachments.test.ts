@@ -132,30 +132,32 @@ describe('ConversationDO.editMessage with attachments', () => {
         filename: 'a2',
       })
     );
-    await runInDurableObject(stub, async instance => {
-      expect(() =>
-        instance.editMessage({
-          messageId,
-          senderId: 'user-A',
-          clientTimestamp: Date.now() + 1,
-          content: [
-            {
-              type: 'attachment',
-              attachmentId: a1.attachmentId,
-              mimeType: 'image/png',
-              size: 1,
-              filename: 'a1',
-            },
-            {
-              type: 'attachment',
-              attachmentId: a2.attachmentId,
-              mimeType: 'image/png',
-              size: 2,
-              filename: 'a2',
-            },
-          ],
-        })
-      ).toThrow(/add/i);
+    const edit = await stub.editMessage({
+      messageId,
+      senderId: 'user-A',
+      clientTimestamp: Date.now() + 1,
+      content: [
+        {
+          type: 'attachment',
+          attachmentId: a1.attachmentId,
+          mimeType: 'image/png',
+          size: 1,
+          filename: 'a1',
+        },
+        {
+          type: 'attachment',
+          attachmentId: a2.attachmentId,
+          mimeType: 'image/png',
+          size: 2,
+          filename: 'a2',
+        },
+      ],
+    });
+
+    expect(edit).toMatchObject({
+      ok: false,
+      code: 'conflict',
+      error: 'Cannot add attachments',
     });
   });
 

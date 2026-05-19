@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { env, runInDurableObject } from 'cloudflare:test';
+import { env } from 'cloudflare:test';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
 import { bootstrapConversationForTest, putUploadedAttachmentObject, unwrap } from './helpers';
@@ -35,10 +35,11 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
       ],
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toMatch(/upload/i);
-    }
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'conflict',
+      error: 'Attachment upload is missing',
+    });
   });
 
   it('flips referenced attachment rows to linked', async () => {
@@ -131,21 +132,23 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
         filename: 'a.png',
       })
     );
-    await runInDurableObject(stub, async (instance: ConversationDO) => {
-      await expect(
-        instance.createMessage({
-          senderId: 'user-B',
-          content: [
-            {
-              type: 'attachment',
-              attachmentId,
-              mimeType: 'image/png',
-              size: 100,
-              filename: 'a.png',
-            },
-          ],
-        })
-      ).rejects.toThrow(/uploader/i);
+    const result = await stub.createMessage({
+      senderId: 'user-B',
+      content: [
+        {
+          type: 'attachment',
+          attachmentId,
+          mimeType: 'image/png',
+          size: 100,
+          filename: 'a.png',
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'forbidden',
+      error: 'Attachment uploader does not match sender',
     });
   });
 
@@ -174,21 +177,23 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
         },
       ],
     });
-    await runInDurableObject(stub, async (instance: ConversationDO) => {
-      await expect(
-        instance.createMessage({
-          senderId: 'user-A',
-          content: [
-            {
-              type: 'attachment',
-              attachmentId,
-              mimeType: 'image/png',
-              size: 100,
-              filename: 'a.png',
-            },
-          ],
-        })
-      ).rejects.toThrow(/pending/i);
+    const result = await stub.createMessage({
+      senderId: 'user-A',
+      content: [
+        {
+          type: 'attachment',
+          attachmentId,
+          mimeType: 'image/png',
+          size: 100,
+          filename: 'a.png',
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'conflict',
+      error: 'Attachment is already linked',
     });
   });
 
@@ -221,10 +226,12 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
         filename: `a${i}.png`,
       });
     }
-    await runInDurableObject(stub, async (instance: ConversationDO) => {
-      await expect(instance.createMessage({ senderId: 'user-A', content: blocks })).rejects.toThrow(
-        /10/
-      );
+    const result = await stub.createMessage({ senderId: 'user-A', content: blocks });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'invalid',
+      error: 'At most 10 attachments per message',
     });
   });
 });

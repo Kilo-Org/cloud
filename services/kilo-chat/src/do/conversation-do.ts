@@ -158,7 +158,7 @@ export type CreateMessageParams = {
 
 export type CreateMessageResult =
   | { ok: true; messageId: string; message: MessageRow; info: ConversationInfo }
-  | { ok: false; code: 'forbidden' | 'internal'; error: string };
+  | { ok: false; code: 'forbidden' | 'invalid' | 'conflict' | 'internal'; error: string };
 
 export type ListMessagesParams = {
   limit: number;
@@ -206,7 +206,7 @@ export type EditMessageResult =
       memberContext: MemberContext;
     }
   | { ok: true; stale: true; messageId: string }
-  | { ok: false; code: 'not_found' | 'forbidden'; error: string };
+  | { ok: false; code: 'not_found' | 'forbidden' | 'conflict'; error: string };
 
 export type DeleteMessageParams = {
   messageId: string;
@@ -349,14 +349,17 @@ export class ConversationDO extends DurableObject<Env> {
 
   private async validateUploadedAttachmentObjects(
     rows: readonly StoredAttachmentRow[]
-  ): Promise<string | null> {
+  ): Promise<{ code: 'conflict'; error: string } | null> {
     for (const row of rows) {
       const object = await this.env.MEDIA_BUCKET.head(row.r2_key);
       if (!object) {
-        return `Attachment ${row.id} upload is missing`;
+        return { code: 'conflict', error: 'Attachment upload is missing' };
       }
       if (object.size !== row.size) {
-        return `Attachment ${row.id} upload size ${object.size} does not match declared size ${row.size}`;
+        return {
+          code: 'conflict',
+          error: `Attachment upload size ${object.size} does not match declared size ${row.size}`,
+        };
       }
     }
     return null;
@@ -669,9 +672,11 @@ export class ConversationDO extends DurableObject<Env> {
       (b): b is Extract<ContentBlock, { type: 'attachment' }> => b.type === 'attachment'
     );
     if (attachmentBlocks.length > MAX_ATTACHMENTS_PER_MESSAGE) {
-      throw new Error(
-        `createMessage: at most ${MAX_ATTACHMENTS_PER_MESSAGE} attachments per message`
-      );
+      return {
+        ok: false,
+        code: 'invalid',
+        error: `At most ${MAX_ATTACHMENTS_PER_MESSAGE} attachments per message`,
+      };
     }
     const attachmentRows: StoredAttachmentRow[] = [];
     for (const block of attachmentBlocks) {
@@ -681,23 +686,19 @@ export class ConversationDO extends DurableObject<Env> {
         .where(eq(attachments.id, block.attachmentId))
         .get();
       if (!row) {
-        throw new Error(`createMessage: attachment ${block.attachmentId} not found`);
+        return { ok: false, code: 'invalid', error: 'Attachment not found' };
       }
       if (row.status !== 'pending') {
-        throw new Error(
-          `createMessage: attachment ${block.attachmentId} is not pending (status=${row.status})`
-        );
+        return { ok: false, code: 'conflict', error: 'Attachment is already linked' };
       }
       if (row.uploader_id !== params.senderId) {
-        throw new Error(
-          `createMessage: attachment ${block.attachmentId} uploader ${row.uploader_id} does not match sender ${params.senderId}`
-        );
+        return { ok: false, code: 'forbidden', error: 'Attachment uploader does not match sender' };
       }
       attachmentRows.push(row);
     }
     const uploadError = await this.validateUploadedAttachmentObjects(attachmentRows);
     if (uploadError) {
-      return { ok: false, code: 'internal', error: uploadError };
+      return { ok: false, ...uploadError };
     }
     const content = this.canonicalizeAttachmentBlocks(params.content, attachmentRows);
 
@@ -923,7 +924,7 @@ export class ConversationDO extends DurableObject<Env> {
     );
     for (const id of newAttachmentIds) {
       if (!existingIds.has(id)) {
-        throw new Error(`editMessage: cannot add new attachment ${id}`);
+        return { ok: false, code: 'conflict', error: 'Cannot add attachments' };
       }
     }
     const removedRows = existingAttachmentRows.filter(r => !newAttachmentIds.has(r.id));

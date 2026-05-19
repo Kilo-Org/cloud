@@ -139,6 +139,8 @@ export async function handleCreateMessage(c: HonoCtx) {
   const result = await createMessageFor(c.env, callerId, body.data, makeSchedule(c));
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+    if (result.code === 'invalid') return c.json({ error: result.error }, 400);
+    if (result.code === 'conflict') return c.json({ error: result.error }, 409);
     return c.json({ error: result.error }, 500);
   }
   return c.json(
@@ -173,6 +175,7 @@ export async function handleEditMessage(c: HonoCtx) {
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
+    if (result.code === 'conflict') return c.json({ error: result.error }, 409);
     return c.json({ error: result.error }, 500);
   }
   if (result.stale) {

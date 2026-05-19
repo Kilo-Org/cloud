@@ -10,12 +10,127 @@ import { resolveApprovalOverGateway } from 'openclaw/plugin-sdk/approval-gateway
 
 import { createKiloChatClient, type KiloChatClient } from '../client.js';
 import { resolveControllerUrl, resolveGatewayToken } from '../env.js';
-import { DEFAULT_ACCOUNT_ID } from '../channel.js';
+import { DEFAULT_ACCOUNT_ID, PLUGIN_CAPABILITIES } from '../channel.js';
 import { readSessionUsage, toContextPayload } from '../bot-status.js';
+import { ATTACHMENT_MAX_BYTES } from '../synced/schemas.js';
 
 import { buildDeliverWiring } from './deliver.js';
 import { buildTypingParams } from './typing.js';
 import type { ActionExecutedPayload, KiloChatInboundPayload } from './schemas.js';
+
+// Test seam — allows tests to inject a fake fetch for the R2 GET path so we
+// can exercise the download loop without touching the network.
+export const __dispatchInternals: {
+  fetchImpl: typeof fetch | undefined;
+} = {
+  fetchImpl: undefined,
+};
+
+type InboundAttachmentMeta = NonNullable<KiloChatInboundPayload['attachments']>[number];
+
+type SaveMediaBuffer = (
+  buffer: Buffer,
+  contentType?: string,
+  subdir?: string,
+  maxBytes?: number,
+  originalFilename?: string
+) => Promise<{ id: string; path: string; size: number; contentType?: string }>;
+
+export type DownloadedAttachments = {
+  mediaPaths: string[];
+  mediaTypes: string[];
+  failedCount: number;
+};
+
+async function readResponseBodyCapped(response: Response, maxBytes: number): Promise<Buffer> {
+  const declaredLength = response.headers.get('content-length');
+  if (declaredLength != null) {
+    const size = Number(declaredLength);
+    if (Number.isFinite(size) && size > maxBytes) {
+      await response.body?.cancel();
+      throw new Error(`Attachment exceeds maximum size of ${maxBytes} bytes`);
+    }
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > maxBytes) {
+      throw new Error(`Attachment exceeds maximum size of ${maxBytes} bytes`);
+    }
+    return Buffer.from(arrayBuffer);
+  }
+
+  const chunks: Buffer[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error(`Attachment exceeds maximum size of ${maxBytes} bytes`);
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks, total);
+}
+
+/**
+ * For each inbound attachment, fetch a fresh signed GET URL from the controller,
+ * download the bytes, and persist them via `saveMediaBuffer` so the agent runner
+ * can address them as local `MediaPath` entries. Failures on individual
+ * attachments are logged and the rest of the list is still processed — webhook
+ * delivery never fails because a single attachment download flaked. `failedCount`
+ * lets callers surface a fallback note to the agent when nothing usable made it
+ * through.
+ */
+export async function downloadInboundAttachments(params: {
+  client: KiloChatClient;
+  conversationId: string;
+  attachments: readonly InboundAttachmentMeta[];
+  saveMediaBuffer: SaveMediaBuffer;
+  fetchImpl?: typeof fetch;
+}): Promise<DownloadedAttachments> {
+  const mediaPaths: string[] = [];
+  const mediaTypes: string[] = [];
+  let failedCount = 0;
+  if (params.attachments.length === 0) return { mediaPaths, mediaTypes, failedCount };
+  const fetchImpl = params.fetchImpl ?? fetch;
+
+  for (const att of params.attachments) {
+    try {
+      const signed = await params.client.getAttachmentUrl({
+        conversationId: params.conversationId,
+        attachmentId: att.attachmentId,
+      });
+      const response = await fetchImpl(signed.url);
+      if (!response.ok) {
+        console.warn(
+          `[kilo-chat] inbound attachment ${att.attachmentId} download responded ${response.status}; skipping`
+        );
+        void response.body?.cancel();
+        failedCount++;
+        continue;
+      }
+      const buffer = await readResponseBodyCapped(response, ATTACHMENT_MAX_BYTES);
+      const saved = await params.saveMediaBuffer(
+        buffer,
+        att.mimeType,
+        'inbound',
+        ATTACHMENT_MAX_BYTES,
+        att.filename
+      );
+      mediaPaths.push(saved.path);
+      mediaTypes.push(att.mimeType);
+    } catch (err) {
+      console.warn(`[kilo-chat] inbound attachment ${att.attachmentId} failed:`, err);
+      failedCount++;
+    }
+  }
+
+  return { mediaPaths, mediaTypes, failedCount };
+}
 
 export async function handleActionExecuted(
   api: OpenClawPluginApi,
@@ -42,7 +157,11 @@ export async function handleBotStatusRequest(client?: KiloChatClient): Promise<v
       controllerBaseUrl: resolveControllerUrl(),
       gatewayToken: resolveGatewayToken(),
     });
-  await c.sendBotStatus({ online: true, at: Date.now() });
+  await c.sendBotStatus({
+    online: true,
+    at: Date.now(),
+    capabilities: [...PLUGIN_CAPABILITIES],
+  });
 }
 
 function readSessionStore(cfg: unknown): string | undefined {
@@ -90,9 +209,39 @@ export async function dispatchInbound(
     body: payload.text,
   });
 
+  const client = createKiloChatClient({
+    controllerBaseUrl: resolveControllerUrl(),
+    gatewayToken: resolveGatewayToken(),
+  });
+
+  const { mediaPaths, mediaTypes, failedCount } = await downloadInboundAttachments({
+    client,
+    conversationId: payload.conversationId,
+    attachments: payload.attachments ?? [],
+    saveMediaBuffer: channelRuntime.media.saveMediaBuffer,
+    fetchImpl: __dispatchInternals.fetchImpl,
+  });
+
+  const mediaFields: Record<string, string | string[] | undefined> = {};
+  if (mediaPaths.length > 0) {
+    mediaFields.MediaPath = mediaPaths[0];
+    mediaFields.MediaType = mediaTypes[0];
+    mediaFields.MediaPaths = mediaPaths;
+    mediaFields.MediaTypes = mediaTypes;
+  }
+
+  // If the message has no text and every attachment download failed, the
+  // agent would otherwise be invoked with an empty body and silently respond
+  // to nothing. Inject a synthetic note so the bot can ask the user to
+  // resend.
+  const bodyForAgent =
+    payload.text.length === 0 && mediaPaths.length === 0 && failedCount > 0
+      ? `[system: ${failedCount} attachment(s) failed to download — ask the user to resend]`
+      : payload.text;
+
   const ctxPayload = channelRuntime.reply.finalizeInboundContext({
     Body: body,
-    BodyForAgent: payload.text,
+    BodyForAgent: bodyForAgent,
     RawBody: payload.text,
     CommandBody: payload.text,
     From: `kilo-chat:${payload.from}`,
@@ -110,11 +259,7 @@ export async function dispatchInbound(
     ReplyToId: payload.inReplyToMessageId,
     ReplyToBody: payload.inReplyToBody,
     ReplyToSender: payload.inReplyToSender,
-  });
-
-  const client = createKiloChatClient({
-    controllerBaseUrl: resolveControllerUrl(),
-    gatewayToken: resolveGatewayToken(),
+    ...mediaFields,
   });
 
   const wiring = buildDeliverWiring({

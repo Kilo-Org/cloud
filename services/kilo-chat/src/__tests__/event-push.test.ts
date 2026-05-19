@@ -1,10 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  pushBotStatus,
   pushEventToHumanMembers,
   pushInstanceEvent,
   pushInstanceEventToUser,
 } from '../services/event-push';
+
+vi.mock('../services/sandbox-ownership', () => ({
+  lookupSandboxOwnerUserId: async () => 'owner-1',
+}));
 
 const conversationId = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
 
@@ -138,5 +143,38 @@ describe('pushInstanceEvent', () => {
     });
 
     expect(result).toEqual(new Map([['member-1', true]]));
+  });
+});
+
+describe('pushBotStatus', () => {
+  it('includes capabilities in the pushed bot.status event when set', async () => {
+    const pushEvent = vi.fn().mockResolvedValue(true);
+    const putBotStatus = vi.fn();
+    const stub = { putBotStatus } as unknown as DurableObjectStub;
+    const env = {
+      EVENT_SERVICE: { pushEvent },
+      SANDBOX_STATUS_DO: {
+        idFromName: (name: string) => name as unknown as DurableObjectId,
+        get: () => stub,
+      },
+    } as unknown as Env;
+
+    await pushBotStatus(env, 'sandbox-1', {
+      online: true,
+      at: 1_700_000_000_000,
+      capabilities: ['attachments'],
+    });
+
+    expect(pushEvent).toHaveBeenCalledOnce();
+    const [userId, context, eventName, payload] = pushEvent.mock.calls[0]!;
+    expect(userId).toBe('owner-1');
+    expect(context).toBe('/kiloclaw/sandbox-1');
+    expect(eventName).toBe('bot.status');
+    expect(payload).toMatchObject({
+      sandboxId: 'sandbox-1',
+      online: true,
+      at: 1_700_000_000_000,
+      capabilities: ['attachments'],
+    });
   });
 });

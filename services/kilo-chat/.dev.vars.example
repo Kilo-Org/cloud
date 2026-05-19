@@ -1,2 +1,19 @@
-# Local worker auth must match Kilo JWTs minted by the Next.js dev server.
+# WORKER_ENV — local worker auth must match Kilo JWTs minted by the Next.js dev server.
 WORKER_ENV=development
+
+# ── R2 attachment storage ──────────────────────────────────────────────────────
+# R2 credentials are sourced from the Secrets Store binding declared in
+# wrangler.jsonc:
+#   binding R2_ACCESS_KEY_ID     → secret R2_ACCESS_KEY_ID_KILOCHAT_MEDIA
+#   binding R2_SECRET_ACCESS_KEY → secret R2_SECRET_ACCESS_KEY_KILOCHAT_MEDIA
+#   store_id 342a86d9e3a94da698e82d0c6e2a36f0
+#
+# For local dev:
+#   1. Cloudflare dashboard → R2 → Manage R2 API tokens → Create. Scope to your
+#      personal dev bucket with Object Read+Write.
+#   2. Put the access key id and secret into the Secrets Store under store_id
+#      342a86d9e3a94da698e82d0c6e2a36f0 with the secret names above.
+#
+# `wrangler dev` reads from the same Secrets Store binding as production, so do
+# NOT redefine R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY in this file — doing so
+# silently shadows the binding and drifts local from prod behavior.

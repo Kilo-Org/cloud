@@ -40,6 +40,22 @@ import {
   useUpstreamVerification,
   type UpstreamIntent,
 } from '@/components/wasteland/UpstreamIntent';
+import { parseDolthubUpstream } from '@/lib/wasteland/upstream';
+
+/**
+ * Build the canonical wasteland dashboard URL for a given connection.
+ *
+ * Prefer the `/wasteland/{owner}/{repo}` route when the connection has a
+ * parseable upstream — that's the M2.2 path the rest of the product
+ * navigates to. Fall back to `/wasteland/by-id/{wastelandId}` only when
+ * the upstream is missing or malformed; that page resolves the upstream
+ * server-side and redirects to the owner/repo URL when it can.
+ */
+function wastelandHref(args: { wastelandId: string; upstream: string | null }): string {
+  const parsed = parseDolthubUpstream(args.upstream);
+  if (parsed) return `/wasteland/${parsed.owner}/${parsed.repo}`;
+  return `/wasteland/by-id/${args.wastelandId}`;
+}
 
 /**
  * Derive the default wasteland name when the user hasn't typed one.
@@ -137,7 +153,10 @@ function ConnectedState({
   return (
     <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 pr-4">
       <Link
-        href={`/wasteland/${connection.wasteland_id}`}
+        href={wastelandHref({
+          wastelandId: connection.wasteland_id,
+          upstream: connection.upstream,
+        })}
         className="group flex flex-1 items-center gap-3 rounded-l-lg px-4 py-3 transition-colors hover:bg-emerald-500/10"
       >
         <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
@@ -932,7 +951,10 @@ function ConnectWastelandDialog({
               </Button>
               {connectedWastelandId && (
                 <Link
-                  href={`/wasteland/${connectedWastelandId}`}
+                  href={wastelandHref({
+                    wastelandId: connectedWastelandId,
+                    upstream: connectedUpstream,
+                  })}
                   className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500"
                 >
                   Visit wasteland

@@ -417,6 +417,30 @@ export function registerKiloChatActionDeliveryFailedRoute(
   );
 }
 
+export function registerKiloChatAttachmentInitRoute(
+  app: Hono,
+  options: KiloChatRouteOptions
+): void {
+  app.post('/_kilo/kilo-chat/attachments/init', c =>
+    relayRoute(c, options, {
+      method: 'POST',
+      upstreamSuffix: () => '/attachments/init',
+      body: { kind: 'forward', limit: MAX_SMALL_BODY_BYTES },
+    })
+  );
+}
+
+export function registerKiloChatAttachmentUrlRoute(app: Hono, options: KiloChatRouteOptions): void {
+  app.get('/_kilo/kilo-chat/attachments/:attachmentId/url', c =>
+    relayRoute(c, options, {
+      method: 'GET',
+      upstreamSuffix: ctx =>
+        withSearch(ctx, `/attachments/${encodeURIComponent(routeParam(ctx, 'attachmentId'))}/url`),
+      body: { kind: 'none' },
+    })
+  );
+}
+
 async function parseConversationId(c: Context): Promise<string | Response> {
   const read = await readBodyWithLimit(c, MAX_SMALL_BODY_BYTES);
   if (!read.ok) return read.response;

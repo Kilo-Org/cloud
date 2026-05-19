@@ -1,4 +1,5 @@
 import {
+  attachmentInitRequestSchema,
   buildReplyToMessageSnapshot,
   type ContentBlock,
   type ActionsBlock,
@@ -7,6 +8,7 @@ import {
   type ExecApprovalDecision,
 } from '@kilocode/kilo-chat';
 import { DurableObject } from 'cloudflare:workers';
+import { z } from 'zod';
 import { logger } from '../util/logger';
 import {
   deliverToBot,
@@ -33,14 +35,16 @@ function parseStoredContent(rawContent: string, messageId: string): ContentBlock
 }
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { eq, lt, desc, and, sql, inArray } from 'drizzle-orm';
+import { eq, lt, gte, desc, and, sql, inArray } from 'drizzle-orm';
 import {
+  attachments,
   botMessageNotifications,
   conversation,
   members,
   messages,
   reactions,
 } from '../db/conversation-schema';
+import { buildAttachmentR2Key } from '../util/attachment-key';
 import {
   BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS,
   BOT_MESSAGE_NOTIFICATION_TIMEOUT_MS,
@@ -52,6 +56,19 @@ import { monotonicFactory } from 'ulid';
 
 type StoredMessageRow = typeof messages.$inferSelect;
 type BotMessageNotificationReason = 'length' | 'typing_stop' | 'timeout';
+type StoredAttachmentRow = typeof attachments.$inferSelect;
+
+const INIT_DEDUPE_WINDOW_MS = 30_000;
+const MAX_ATTACHMENTS_PER_MESSAGE = 10;
+
+class AttachmentAlreadyLinkedError extends Error {}
+
+// Validates the RPC input for initAttachment. Reuses the size/mimeType/filename
+// rules from the public request schema so the DO and the HTTP route stay in
+// lockstep — only swapping conversationId for the trusted uploaderId.
+const initAttachmentInternalSchema = attachmentInitRequestSchema
+  .omit({ conversationId: true })
+  .extend({ uploaderId: z.string().min(1) });
 
 function buildReplySnapshot(
   messageId: string,
@@ -143,7 +160,7 @@ export type CreateMessageParams = {
 
 export type CreateMessageResult =
   | { ok: true; messageId: string; message: MessageRow; info: ConversationInfo }
-  | { ok: false; code: 'forbidden' | 'internal'; error: string };
+  | { ok: false; code: 'forbidden' | 'invalid' | 'conflict' | 'internal'; error: string };
 
 export type ListMessagesParams = {
   limit: number;
@@ -183,9 +200,15 @@ export type EditMessageParams = {
 };
 
 export type EditMessageResult =
-  | { ok: true; stale: false; messageId: string; memberContext: MemberContext }
+  | {
+      ok: true;
+      stale: false;
+      messageId: string;
+      content: ContentBlock[];
+      memberContext: MemberContext;
+    }
   | { ok: true; stale: true; messageId: string }
-  | { ok: false; code: 'not_found' | 'forbidden'; error: string };
+  | { ok: false; code: 'not_found' | 'forbidden' | 'conflict'; error: string };
 
 export type DeleteMessageParams = {
   messageId: string;
@@ -231,6 +254,39 @@ export type NotifyDeliveryFailedResult =
   | { ok: true; changed: boolean }
   | { ok: false; code: 'not_found'; error: string };
 
+export type InitAttachmentParams = {
+  uploaderId: string;
+  mimeType: string;
+  size: number;
+  filename: string;
+  idempotencyKey?: string;
+};
+
+export type InitAttachmentOk = {
+  ok: true;
+  attachmentId: string;
+  r2Key: string;
+};
+export type InitAttachmentErr = {
+  ok: false;
+  code: 'forbidden' | 'invalid';
+  error: string;
+};
+export type InitAttachmentResult = InitAttachmentOk | InitAttachmentErr;
+
+export type AttachmentForRead = {
+  id: string;
+  r2Key: string;
+  mimeType: string;
+  size: number;
+  filename: string;
+};
+
+export type GetAttachmentForReadParams = { requesterId: string; attachmentId: string };
+export type GetAttachmentForReadResult =
+  | { ok: true; row: AttachmentForRead | null }
+  | { ok: false; code: 'forbidden'; error: string };
+
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
 export type AddReactionResult =
   | { ok: true; added: true; id: string; memberContext: MemberContext }
@@ -245,6 +301,8 @@ export type RemoveReactionResult =
 export class ConversationDO extends DurableObject<Env> {
   private db;
   private nextUlid = monotonicFactory();
+  private keyPrefix: string;
+  private static readonly ORPHAN_TTL_MS = 24 * 60 * 60 * 1000;
 
   // Per-conversation serializer for outbound bot webhooks. createMessage
   // RPCs are already serialized by the DO's single-threaded model, so the
@@ -264,7 +322,70 @@ export class ConversationDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { logger: false });
+    this.keyPrefix = env.KEY_PREFIX ?? '';
     void ctx.blockConcurrencyWhile(() => migrate(this.db, migrations));
+  }
+
+  /**
+   * Returns the canonical conversation id used for R2 key construction.
+   * Falls back to `ctx.id.name` (set when the DO is referenced via
+   * `idFromName`) if `initialize` has not been called.
+   */
+  private getConversationId(): string {
+    const info = this.getInfo();
+    const id = info?.id ?? this.ctx.id.name;
+    if (!id) {
+      throw new Error('ConversationDO: conversation id not available');
+    }
+    return id;
+  }
+
+  private async scheduleR2Deletes(keys: readonly string[]): Promise<void> {
+    await Promise.all(
+      keys.map(k =>
+        this.env.MEDIA_BUCKET.delete(k).catch((err: unknown) => {
+          logger.warn('R2 delete failed', { key: k, error: String(err) });
+        })
+      )
+    );
+  }
+
+  private async validateUploadedAttachmentObjects(
+    rows: readonly StoredAttachmentRow[]
+  ): Promise<{ code: 'conflict'; error: string } | null> {
+    for (const row of rows) {
+      const object = await this.env.MEDIA_BUCKET.head(row.r2_key);
+      if (!object) {
+        return { code: 'conflict', error: 'Attachment upload is missing' };
+      }
+      if (object.size !== row.size) {
+        return {
+          code: 'conflict',
+          error: `Attachment upload size ${object.size} does not match declared size ${row.size}`,
+        };
+      }
+    }
+    return null;
+  }
+
+  private canonicalizeAttachmentBlocks(
+    content: readonly ContentBlock[],
+    attachmentRows: readonly StoredAttachmentRow[]
+  ): ContentBlock[] {
+    if (attachmentRows.length === 0) return [...content];
+    const attachmentsById = new Map(attachmentRows.map(row => [row.id, row]));
+    return content.map(block => {
+      if (block.type !== 'attachment') return block;
+      const row = attachmentsById.get(block.attachmentId);
+      if (!row) return block;
+      return {
+        type: 'attachment',
+        attachmentId: row.id,
+        mimeType: row.mime_type,
+        size: row.size,
+        filename: row.filename,
+      };
+    });
   }
 
   async enqueueMessageWebhook(msg: WebhookMessage, convContext: MemberContext): Promise<void> {
@@ -536,7 +657,7 @@ export class ConversationDO extends DurableObject<Env> {
     return true;
   }
 
-  createMessage(params: CreateMessageParams): CreateMessageResult {
+  async createMessage(params: CreateMessageParams): Promise<CreateMessageResult> {
     const info = this.getInfo();
     if (!info) return { ok: false, code: 'internal', error: 'Conversation not initialized' };
 
@@ -548,21 +669,79 @@ export class ConversationDO extends DurableObject<Env> {
       };
     }
 
+    // Validate attachment blocks (status must be pending, uploader must match
+    // sender). The actual link UPDATE is performed after the message INSERT.
+    const attachmentBlocks = params.content.filter(
+      (b): b is Extract<ContentBlock, { type: 'attachment' }> => b.type === 'attachment'
+    );
+    if (attachmentBlocks.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+      return {
+        ok: false,
+        code: 'invalid',
+        error: `At most ${MAX_ATTACHMENTS_PER_MESSAGE} attachments per message`,
+      };
+    }
+    const attachmentRows: StoredAttachmentRow[] = [];
+    for (const block of attachmentBlocks) {
+      const row = this.db
+        .select()
+        .from(attachments)
+        .where(eq(attachments.id, block.attachmentId))
+        .get();
+      if (!row) {
+        return { ok: false, code: 'invalid', error: 'Attachment not found' };
+      }
+      if (row.status !== 'pending') {
+        return { ok: false, code: 'conflict', error: 'Attachment is already linked' };
+      }
+      if (row.uploader_id !== params.senderId) {
+        return { ok: false, code: 'forbidden', error: 'Attachment uploader does not match sender' };
+      }
+      attachmentRows.push(row);
+    }
+    const uploadError = await this.validateUploadedAttachmentObjects(attachmentRows);
+    if (uploadError) {
+      return { ok: false, ...uploadError };
+    }
+    const content = this.canonicalizeAttachmentBlocks(params.content, attachmentRows);
+
     const messageId = this.nextUlid();
 
+    // The pending-status check above is necessary but not sufficient: the
+    // R2 HEAD await in validateUploadedAttachmentObjects releases the DO
+    // input gate, so a concurrent createMessage can race past the same
+    // check before we get here. The UPDATE below guards against that by
+    // requiring status='pending' and aborting the transaction if the row
+    // has already been claimed.
     try {
-      this.db
-        .insert(messages)
-        .values({
-          id: messageId,
-          sender_id: params.senderId,
-          content: JSON.stringify(params.content),
-          in_reply_to_message_id: params.inReplyToMessageId ?? null,
-          version: 1,
-          deleted: 0,
-        })
-        .run();
+      this.db.transaction(tx => {
+        tx.insert(messages)
+          .values({
+            id: messageId,
+            sender_id: params.senderId,
+            content: JSON.stringify(content),
+            in_reply_to_message_id: params.inReplyToMessageId ?? null,
+            version: 1,
+            deleted: 0,
+          })
+          .run();
+
+        for (const row of attachmentRows) {
+          const linked = tx
+            .update(attachments)
+            .set({ status: 'linked', message_id: messageId })
+            .where(and(eq(attachments.id, row.id), eq(attachments.status, 'pending')))
+            .returning({ id: attachments.id })
+            .all();
+          if (linked.length === 0) {
+            throw new AttachmentAlreadyLinkedError();
+          }
+        }
+      });
     } catch (err) {
+      if (err instanceof AttachmentAlreadyLinkedError) {
+        return { ok: false, code: 'conflict', error: 'Attachment is already linked' };
+      }
       if (err instanceof Error && /constraint/i.test(err.message)) {
         return { ok: false, code: 'internal', error: err.message };
       }
@@ -582,10 +761,8 @@ export class ConversationDO extends DurableObject<Env> {
       : new Map<string, StoredMessageRow>();
 
     if (this.isBotMember(params.senderId)) {
-      this.registerBotMessageNotification(messageId, params.senderId, params.content);
-      if (
-        botMessageNotificationTextLength(params.content) >= BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS
-      ) {
+      this.registerBotMessageNotification(messageId, params.senderId, content);
+      if (botMessageNotificationTextLength(content) >= BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS) {
         this.notifyBotMessageIfClaimable(messageId, 'length');
       }
     }
@@ -747,11 +924,40 @@ export class ConversationDO extends DurableObject<Env> {
       return { ok: true, stale: true, messageId: params.messageId };
     }
 
+    // Attachment reconciliation: edits may drop existing attachments but
+    // never add new ones (uploads must go through initAttachment + a fresh
+    // createMessage). Rows removed from the message are deleted and their
+    // R2 objects are purged best-effort.
+    const existingAttachmentRows = this.db
+      .select()
+      .from(attachments)
+      .where(eq(attachments.message_id, params.messageId))
+      .all();
+    const existingIds = new Set(existingAttachmentRows.map(r => r.id));
+    const newAttachmentIds = new Set(
+      params.content
+        .filter((b): b is Extract<ContentBlock, { type: 'attachment' }> => b.type === 'attachment')
+        .map(b => b.attachmentId)
+    );
+    for (const id of newAttachmentIds) {
+      if (!existingIds.has(id)) {
+        return { ok: false, code: 'conflict', error: 'Cannot add attachments' };
+      }
+    }
+    const removedRows = existingAttachmentRows.filter(r => !newAttachmentIds.has(r.id));
+    const content = this.canonicalizeAttachmentBlocks(params.content, existingAttachmentRows);
+    if (removedRows.length > 0) {
+      const removedIds = removedRows.map(r => r.id);
+      this.db.delete(attachments).where(inArray(attachments.id, removedIds)).run();
+      const removedKeys = removedRows.map(r => r.r2_key);
+      this.ctx.waitUntil(this.scheduleR2Deletes(removedKeys));
+    }
+
     const newVersion = row.version + 1;
     this.db
       .update(messages)
       .set({
-        content: JSON.stringify(params.content),
+        content: JSON.stringify(content),
         version: newVersion,
         updated_at: Date.now(),
         client_updated_at: params.clientTimestamp,
@@ -762,7 +968,7 @@ export class ConversationDO extends DurableObject<Env> {
     if (this.isBotMember(params.senderId)) {
       this.db
         .update(botMessageNotifications)
-        .set({ content: JSON.stringify(params.content) })
+        .set({ content: JSON.stringify(content) })
         .where(
           and(
             eq(botMessageNotifications.message_id, params.messageId),
@@ -771,9 +977,7 @@ export class ConversationDO extends DurableObject<Env> {
         )
         .run();
 
-      if (
-        botMessageNotificationTextLength(params.content) >= BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS
-      ) {
+      if (botMessageNotificationTextLength(content) >= BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS) {
         this.notifyBotMessageIfClaimable(params.messageId, 'length');
       }
     }
@@ -782,6 +986,7 @@ export class ConversationDO extends DurableObject<Env> {
       ok: true,
       stale: false,
       messageId: params.messageId,
+      content,
       memberContext,
     };
   }
@@ -841,6 +1046,8 @@ export class ConversationDO extends DurableObject<Env> {
     if (next) {
       await this.ctx.storage.setAlarm(next.notifyAfter);
     }
+
+    await this.sweepOrphanAttachments();
   }
 
   setTyping(
@@ -885,12 +1092,22 @@ export class ConversationDO extends DurableObject<Env> {
       return { ok: true, memberContext };
     }
 
+    const attachmentRows = this.db
+      .select()
+      .from(attachments)
+      .where(eq(attachments.message_id, params.messageId))
+      .all();
+
     const clearPendingBotNotification = this.isBotMember(params.senderId);
     this.db.transaction(tx => {
       tx.update(messages)
         .set({ deleted: 1, updated_at: Date.now() })
         .where(eq(messages.id, params.messageId))
         .run();
+
+      if (attachmentRows.length > 0) {
+        tx.delete(attachments).where(eq(attachments.message_id, params.messageId)).run();
+      }
 
       if (clearPendingBotNotification) {
         tx.delete(botMessageNotifications)
@@ -903,6 +1120,11 @@ export class ConversationDO extends DurableObject<Env> {
           .run();
       }
     });
+
+    if (attachmentRows.length > 0) {
+      const keys = attachmentRows.map(r => r.r2_key);
+      this.ctx.waitUntil(this.scheduleR2Deletes(keys));
+    }
 
     return { ok: true, memberContext };
   }
@@ -1166,11 +1388,182 @@ export class ConversationDO extends DurableObject<Env> {
     };
   }
 
-  destroyAndReturnMembers(): DestroyResult {
+  initAttachment(rawParams: InitAttachmentParams): InitAttachmentResult {
+    const parsed = initAttachmentInternalSchema.safeParse(rawParams);
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      const path = first?.path.join('.') || 'input';
+      return { ok: false, code: 'invalid', error: `${path}: ${first?.message ?? 'invalid'}` };
+    }
+    const params = parsed.data;
+    if (!this.isMember(params.uploaderId)) {
+      return { ok: false, code: 'forbidden', error: 'Forbidden' };
+    }
+
+    const now = Date.now();
+
+    // Dedupe is opt-in via idempotencyKey. Without it, every init mints a
+    // fresh attachment id — two genuinely distinct files with identical
+    // metadata uploaded back-to-back will not collide. Clients that want
+    // retry-safety pass a key; we bound replay reuse to INIT_DEDUPE_WINDOW_MS.
+    if (params.idempotencyKey !== undefined) {
+      const dedupeCutoff = now - INIT_DEDUPE_WINDOW_MS;
+      const existing = this.db
+        .select()
+        .from(attachments)
+        .where(
+          and(
+            eq(attachments.uploader_id, params.uploaderId),
+            eq(attachments.idempotency_key, params.idempotencyKey),
+            eq(attachments.status, 'pending'),
+            gte(attachments.created_at, dedupeCutoff)
+          )
+        )
+        .orderBy(desc(attachments.created_at))
+        .limit(1)
+        .get();
+      if (existing) {
+        return {
+          ok: true,
+          attachmentId: existing.id,
+          r2Key: existing.r2_key,
+        };
+      }
+    }
+
+    const conversationId = this.getConversationId();
+    const attachmentId = this.nextUlid();
+    const r2Key = buildAttachmentR2Key({
+      keyPrefix: this.keyPrefix,
+      conversationId,
+      uploaderId: params.uploaderId,
+      attachmentId,
+    });
+
+    this.db
+      .insert(attachments)
+      .values({
+        id: attachmentId,
+        uploader_id: params.uploaderId,
+        r2_key: r2Key,
+        mime_type: params.mimeType,
+        size: params.size,
+        filename: params.filename,
+        status: 'pending',
+        message_id: null,
+        idempotency_key: params.idempotencyKey ?? null,
+        created_at: now,
+      })
+      .run();
+
+    this.scheduleOrphanSweepIfNeeded();
+
+    return { ok: true, attachmentId, r2Key };
+  }
+
+  getAttachmentForRead(params: GetAttachmentForReadParams): GetAttachmentForReadResult {
+    if (!this.isMember(params.requesterId)) {
+      return { ok: false, code: 'forbidden', error: 'Forbidden' };
+    }
+    const row = this.db
+      .select()
+      .from(attachments)
+      .where(eq(attachments.id, params.attachmentId))
+      .get();
+    if (!row || row.status !== 'linked') return { ok: true, row: null };
+    return {
+      ok: true,
+      row: {
+        id: row.id,
+        r2Key: row.r2_key,
+        mimeType: row.mime_type,
+        size: row.size,
+        filename: row.filename,
+      },
+    };
+  }
+
+  /**
+   * Ensures an alarm is set so the orphan sweep eventually runs. Storage
+   * alarm APIs are async; the sync `initAttachment` path schedules via
+   * `ctx.waitUntil`. The DO shares one alarm slot with bot-notification
+   * timeouts. Bot-notification alarms always fire within seconds-to-minutes,
+   * so they are always earlier than the ~24h orphan-sweep target. We set the
+   * alarm when there is none, when the existing alarm is already past, or when
+   * the existing alarm is *later* than our target (which only happens when the
+   * existing alarm is itself an old orphan-sweep alarm — safe to pull in).
+   */
+  private scheduleOrphanSweepIfNeeded(): void {
+    this.ctx.waitUntil(
+      (async () => {
+        const existing = await this.ctx.storage.getAlarm();
+        const target = Date.now() + ConversationDO.ORPHAN_TTL_MS;
+        if (existing === null || existing < Date.now() || existing > target) {
+          await this.ctx.storage.setAlarm(target);
+        }
+      })()
+    );
+  }
+
+  private async sweepOrphanAttachments(): Promise<void> {
+    const cutoff = Date.now() - ConversationDO.ORPHAN_TTL_MS;
+    const stale = this.db
+      .select()
+      .from(attachments)
+      .where(and(eq(attachments.status, 'pending'), lt(attachments.created_at, cutoff)))
+      .all();
+    if (stale.length > 0) {
+      const ids = stale.map(r => r.id);
+      this.db.delete(attachments).where(inArray(attachments.id, ids)).run();
+      await this.scheduleR2Deletes(stale.map(r => r.r2_key));
+    }
+
+    // If anything is still pending, re-arm the alarm so we sweep it later.
+    const remaining = this.db
+      .select({ id: attachments.id })
+      .from(attachments)
+      .where(eq(attachments.status, 'pending'))
+      .limit(1)
+      .get();
+    if (remaining) {
+      const existing = await this.ctx.storage.getAlarm();
+      const target = Date.now() + ConversationDO.ORPHAN_TTL_MS;
+      if (existing === null || existing < Date.now() || existing > target) {
+        await this.ctx.storage.setAlarm(target);
+      }
+    }
+  }
+
+  async destroyAndReturnMembers(): Promise<DestroyResult> {
     const info = this.getInfo();
     if (!info) return null;
     const membersCopy = info.members;
+
+    // Walk every R2 object under this conversation's prefix and delete it.
+    // This covers attachments whose DB rows we'll wipe below as well as any
+    // orphaned objects (e.g. uploads that completed after the row was
+    // expired by the orphan sweeper).
+    //
+    // Known gap (accepted): a client that obtained a presigned PUT URL before
+    // destroy can still upload bytes *after* this list() — up to the URL's
+    // remaining TTL (PUT_URL_TTL_SECONDS in handler.ts). Those bytes will
+    // remain in R2 with no DB row and no future sweeper, since this DO is
+    // gone. The window is short and worst-case cost is a few KB per destroyed
+    // conversation; revisit by shortening the PUT TTL if it ever shows up in
+    // R2 usage.
+    const prefix = `${this.keyPrefix}attachments/${info.id}/`;
+    let cursor: string | undefined;
+    do {
+      const listed = await this.env.MEDIA_BUCKET.list({ prefix, cursor });
+      const keys = listed.objects.map(o => o.key);
+      if (keys.length > 0) {
+        await this.scheduleR2Deletes(keys);
+      }
+      cursor = listed.truncated ? listed.cursor : undefined;
+    } while (cursor);
+
     this.db.transaction(tx => {
+      tx.delete(attachments).run();
       tx.delete(reactions).run();
       tx.delete(botMessageNotifications).run();
       tx.delete(messages).run();

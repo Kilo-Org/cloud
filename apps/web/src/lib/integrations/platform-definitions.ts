@@ -1,5 +1,4 @@
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { IS_DEVELOPMENT } from '@/lib/constants';
 
 export type PlatformType =
   | 'github'
@@ -81,7 +80,7 @@ export const PLATFORM_DEFINITIONS: PlatformDefinition[] = [
     id: PLATFORM.DOLTHUB,
     name: 'DoltHub',
     description: 'Query Dolt-versioned data directly from your workspace',
-    enabled: IS_DEVELOPMENT,
+    enabled: true,
     personalRoute: '/integrations/dolthub',
     orgRoute: organizationId => `/organizations/${organizationId}/integrations/dolthub`,
   },

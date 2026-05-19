@@ -231,6 +231,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Fallback session id used when `x-kilocode-taskid` is absent (e.g.
   // non-kilocode clients). `taskId` still wins when both are present.
   const sessionHeader = extractHeaderAndLimitLength(request, 'x-kilo-session');
+  const machineIdHeader = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
@@ -380,7 +381,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
-  const machineIdHeader = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
   const providerResult = await getProvider({
     requestedModel: originalModelIdLowerCased,
     request: requestBodyParsed,

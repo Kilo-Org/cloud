@@ -407,6 +407,19 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     skipKiloExclusiveModelSettings,
     experiment,
   } = providerResult;
+
+  // Request-level data-collection opt-out: a caller can set
+  // `provider.data_collection: 'deny'` or `provider.zdr: true` on any
+  // request to opt that single request out of training/data-retention.
+  // Direct experiment upstreams ignore those OpenRouter/Vercel flags
+  // (we never reach OpenRouter), but we still capture the prompt to R2
+  // for partner evaluation — which violates the caller's stated
+  // intent. Refuse here regardless of org settings, anon/BYOK status,
+  // or the org-level check below.
+  if (experiment && !isFreePromptTrainingAllowed(requestBodyParsed.body.provider)) {
+    return dataCollectionRequiredResponse();
+  }
+
   if (!provider.supportedChatApis.includes(requestBodyParsed.kind)) {
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,

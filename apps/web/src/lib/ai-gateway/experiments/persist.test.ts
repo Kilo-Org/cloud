@@ -60,7 +60,10 @@ describe('truncateToUtf8Bytes', () => {
 
 describe('buildExperimentPromptCapture', () => {
   function chatRequest(body: Record<string, unknown>): GatewayRequest {
-    return { kind: 'chat_completions', body } as GatewayRequest;
+    // Tests may pass synthetic message shapes that don't fully match
+    // the production OpenAI types; double-cast through unknown is the
+    // pragmatic test-only escape hatch.
+    return { kind: 'chat_completions', body } as unknown as GatewayRequest;
   }
 
   it('extracts a leading system message into systemPromptContent', () => {
@@ -151,7 +154,7 @@ describe('buildExperimentPromptCapture', () => {
           { role: 'user', content: 'x' },
         ],
       },
-    } as GatewayRequest);
+    } as unknown as GatewayRequest);
     // We can't trigger this against the real 4 MB cap in a unit test, but
     // we can assert the UTF-8 byte count of the captured content directly.
     expect(cap.systemPromptContent).toBe('日'.repeat(5));

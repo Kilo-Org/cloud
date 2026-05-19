@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
+import type { AttachmentGetUrlResponse, KiloChatClient } from '@kilocode/kilo-chat';
 
-import { computeAttachmentUrlStaleMs } from './use-attachment-url';
+import { attachmentUrlKey } from './query-keys';
+import { attachmentUrlQueryOptions, computeAttachmentUrlStaleMs } from './use-attachment-url';
 
 describe('computeAttachmentUrlStaleMs', () => {
   it('returns the lifetime minus the refresh buffer in ms', () => {
@@ -20,5 +23,107 @@ describe('computeAttachmentUrlStaleMs', () => {
     const now = 1_000_000_000_000;
     const expiresAt = Math.floor(now / 1000) - 10;
     expect(computeAttachmentUrlStaleMs(expiresAt, now)).toBe(0);
+  });
+});
+
+describe('attachmentUrlQueryOptions', () => {
+  const conversationId = '01HV0000000000000000CONV01';
+  const attachmentId = '01HV0000000000000000ATT001';
+
+  function makeClient(response: AttachmentGetUrlResponse) {
+    const getAttachmentUrl = vi.fn().mockResolvedValue(response);
+    const client = { getAttachmentUrl } as unknown as KiloChatClient;
+    return { client, getAttachmentUrl };
+  }
+
+  function makeQueryClient() {
+    return new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+  }
+
+  it('produces a stable queryKey for the same ids', () => {
+    const { client } = makeClient({
+      url: 'https://r2/x',
+      mimeType: 'image/png',
+      size: 10,
+      filename: 'a.png',
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const a = attachmentUrlQueryOptions(client, conversationId, attachmentId);
+    const b = attachmentUrlQueryOptions(client, conversationId, attachmentId);
+    expect(a.queryKey).toEqual(b.queryKey);
+    expect(a.queryKey).toEqual(attachmentUrlKey(conversationId, attachmentId));
+  });
+
+  it('fires queryFn only once across multiple observers on the same ids', async () => {
+    const { client, getAttachmentUrl } = makeClient({
+      url: 'https://r2/x',
+      mimeType: 'image/png',
+      size: 10,
+      filename: 'a.png',
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const queryClient = makeQueryClient();
+    const options = attachmentUrlQueryOptions(client, conversationId, attachmentId);
+
+    // Simulate multiple MessageAttachment renders subscribing to the same key.
+    const obs1 = new QueryObserver(queryClient, options);
+    const obs2 = new QueryObserver(queryClient, options);
+    const obs3 = new QueryObserver(queryClient, options);
+    const unsubs = [obs1.subscribe(() => {}), obs2.subscribe(() => {}), obs3.subscribe(() => {})];
+
+    await queryClient.getQueryCache().find({ queryKey: options.queryKey })?.fetch();
+    unsubs.forEach(u => u());
+
+    expect(getAttachmentUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refetch within the fresh window when a new observer subscribes', async () => {
+    const { client, getAttachmentUrl } = makeClient({
+      url: 'https://r2/x',
+      mimeType: 'image/png',
+      size: 10,
+      filename: 'a.png',
+      // 1h out: stale window starts only 5 min before, so we are squarely fresh.
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const queryClient = makeQueryClient();
+    const options = attachmentUrlQueryOptions(client, conversationId, attachmentId);
+
+    const obs1 = new QueryObserver(queryClient, options);
+    const unsub1 = obs1.subscribe(() => {});
+    await queryClient.getQueryCache().find({ queryKey: options.queryKey })?.fetch();
+    unsub1();
+
+    expect(getAttachmentUrl).toHaveBeenCalledTimes(1);
+
+    // Re-subscribe (e.g. component remounts because of scroll virtualization).
+    const obs2 = new QueryObserver(queryClient, options);
+    const unsub2 = obs2.subscribe(() => {});
+    // Yield so any auto-refetch would have a chance to fire.
+    await new Promise(r => setTimeout(r, 0));
+    unsub2();
+
+    expect(getAttachmentUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call queryFn when ids are null', async () => {
+    const { client, getAttachmentUrl } = makeClient({
+      url: 'https://r2/x',
+      mimeType: 'image/png',
+      size: 10,
+      filename: 'a.png',
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const queryClient = makeQueryClient();
+    const options = attachmentUrlQueryOptions(client, null, null);
+
+    const obs = new QueryObserver(queryClient, options);
+    const unsub = obs.subscribe(() => {});
+    await new Promise(r => setTimeout(r, 0));
+    unsub();
+
+    expect(getAttachmentUrl).not.toHaveBeenCalled();
   });
 });

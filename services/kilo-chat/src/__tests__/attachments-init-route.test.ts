@@ -151,6 +151,37 @@ describe('POST /v1/attachments/init (user)', () => {
     expect(res.status).toBe(400);
   });
 
+  it('accepts a long multi-byte UTF-8 filename without timing out', async () => {
+    const { userId, conversationId, testEnv } = await createConversationAsUser('att-init-utf8');
+    const userApp = makeUserApp(userId);
+
+    const filename =
+      'very-long-attachment-filename-with-unicode-åß∂ƒ-and-many-segments-for-truncation-check.txt';
+
+    const start = Date.now();
+    const res = await userApp.request(
+      '/v1/attachments/init',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          mimeType: 'text/plain',
+          size: 21,
+          filename,
+        }),
+      },
+      testEnv
+    );
+    const elapsedMs = Date.now() - start;
+
+    expect(res.status).toBe(200);
+    expect(elapsedMs).toBeLessThan(5_000);
+    const body = await res.json<{ attachmentId: string; putUrl: string }>();
+    expect(body.attachmentId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+    expect(body.putUrl).toContain('.r2.cloudflarestorage.com/');
+  });
+
   it('rejects non-member with 403', async () => {
     const { conversationId, testEnv } = await createConversationAsUser('att-init-stranger');
     const strangerApp = makeUserApp('user-stranger-att-init');

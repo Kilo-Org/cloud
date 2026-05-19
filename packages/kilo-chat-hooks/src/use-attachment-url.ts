@@ -1,4 +1,4 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 import type { AttachmentGetUrlResponse, KiloChatClient } from '@kilocode/kilo-chat';
 
 import { attachmentUrlKey } from './query-keys';
@@ -11,12 +11,12 @@ export function computeAttachmentUrlStaleMs(expiresAtSeconds: number, nowMs: num
   return Math.max(0, remaining);
 }
 
-export function useAttachmentUrl(
+export function attachmentUrlQueryOptions(
   client: KiloChatClient,
   conversationId: string | null,
   attachmentId: string | null
-): UseQueryResult<AttachmentGetUrlResponse> {
-  return useQuery({
+): UseQueryOptions<AttachmentGetUrlResponse> {
+  return {
     queryKey: attachmentUrlKey(conversationId, attachmentId),
     queryFn: async () => {
       if (!conversationId || !attachmentId) {
@@ -38,5 +38,13 @@ export function useAttachmentUrl(
       return ms > 0 ? ms : false;
     },
     refetchOnWindowFocus: false,
-  });
+  };
+}
+
+export function useAttachmentUrl(
+  client: KiloChatClient,
+  conversationId: string | null,
+  attachmentId: string | null
+): UseQueryResult<AttachmentGetUrlResponse> {
+  return useQuery(attachmentUrlQueryOptions(client, conversationId, attachmentId));
 }

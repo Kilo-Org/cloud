@@ -1262,6 +1262,16 @@ async function collectLinear(api: {
  */
 async function collectCalendar(now: Date, userTimezone: string): Promise<SourceCollectionResult> {
   const readiness = await resolveCalendarReady();
+  if (!readiness.statusOk) {
+    return {
+      source: 'calendar',
+      configured: true,
+      ok: false,
+      summary: readiness.reason,
+      sectionLines: [],
+    };
+  }
+
   if (!readiness.connected || !readiness.hasCalendarCapability) {
     return {
       source: 'calendar',

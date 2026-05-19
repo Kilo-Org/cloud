@@ -30,6 +30,7 @@ describe('resolveCalendarReady', () => {
   it('returns connected=false when the broker reports no connection', async () => {
     const fetchImpl = mockFetch(async () => jsonResponse({ connected: false, accounts: [] }, 200));
     const result = await resolveCalendarReady({ fetchImpl });
+    expect(result.statusOk).toBe(true);
     expect(result.connected).toBe(false);
     expect(result.accountEmail).toBeNull();
     expect(result.hasCalendarCapability).toBe(false);
@@ -58,6 +59,7 @@ describe('resolveCalendarReady', () => {
       )
     );
     const result = await resolveCalendarReady({ fetchImpl });
+    expect(result.statusOk).toBe(true);
     expect(result.connected).toBe(true);
     expect(result.accountEmail).toBe('astorms@kilocode.ai');
     expect(result.hasCalendarCapability).toBe(true);
@@ -118,6 +120,7 @@ describe('resolveCalendarReady', () => {
   it('returns a failure reason when the broker returns 5xx', async () => {
     const fetchImpl = mockFetch(async () => jsonResponse({ error: 'boom' }, 503));
     const result = await resolveCalendarReady({ fetchImpl });
+    expect(result.statusOk).toBe(false);
     expect(result.connected).toBe(false);
     expect(result.reason).toContain('(503)');
     expect(result.reason).toContain('boom');

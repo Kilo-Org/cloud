@@ -28,6 +28,7 @@ export interface CalendarClientDeps {
 }
 
 export interface CalendarReadiness {
+  statusOk: boolean;
   connected: boolean;
   accountEmail: string | null;
   hasCalendarCapability: boolean;
@@ -117,6 +118,7 @@ export async function resolveCalendarReady(
   const result = await brokerPost<BrokerStatusResponse>('/_kilo/google-oauth/status', {}, deps);
   if (!result.ok) {
     return {
+      statusOk: false,
       connected: false,
       accountEmail: null,
       hasCalendarCapability: false,
@@ -125,6 +127,7 @@ export async function resolveCalendarReady(
   }
   if (!result.data.connected || result.data.accounts.length === 0) {
     return {
+      statusOk: true,
       connected: false,
       accountEmail: null,
       hasCalendarCapability: false,
@@ -136,6 +139,7 @@ export async function resolveCalendarReady(
     account.services.includes(CALENDAR_CAPABILITY) ||
     account.scopes.some(scope => scope.includes('calendar'));
   return {
+    statusOk: true,
     connected: true,
     accountEmail: account.email,
     hasCalendarCapability,

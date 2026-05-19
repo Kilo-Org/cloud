@@ -2,29 +2,34 @@ import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { eq, sql } from 'drizzle-orm';
-import type {
-  BotStatusRecord,
-  ConversationStatusRecord,
-  BotStatusRequest,
-  ConversationStatusRequest,
-  Capability,
+import { z } from 'zod';
+import {
+  capabilitySchema,
+  type BotStatusRecord,
+  type ConversationStatusRecord,
+  type BotStatusRequest,
+  type ConversationStatusRequest,
+  type Capability,
 } from '@kilocode/kilo-chat';
 import { botStatus, conversationStatus } from '../db/sandbox-status-schema';
 import migrations from '../../drizzle/sandbox-status/migrations';
 
+const storedCapabilitiesSchema = z.array(capabilitySchema);
+
 // Defensive parser: the column stores a JSON-encoded Capability[] (or NULL).
-// Malformed JSON or non-array shapes return undefined so a corrupt row never
-// breaks bot status reads.
+// Malformed JSON, unknown capability strings, or non-array shapes return
+// undefined so a corrupt row never breaks bot status reads.
 function parseCapabilities(raw: string | null): Capability[] | undefined {
   if (raw === null || raw === '') return undefined;
+  let json: unknown;
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed) || parsed.length === 0) return undefined;
-    if (!parsed.every(c => typeof c === 'string')) return undefined;
-    return parsed as Capability[];
+    json = JSON.parse(raw);
   } catch {
     return undefined;
   }
+  const result = storedCapabilitiesSchema.safeParse(json);
+  if (!result.success || result.data.length === 0) return undefined;
+  return result.data;
 }
 
 // Internal RPC input shapes derived from the shared zod schemas. The

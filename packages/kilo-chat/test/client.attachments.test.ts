@@ -16,6 +16,37 @@ function makeClient(fetchFn: typeof globalThis.fetch) {
   });
 }
 
+describe('KiloChatClient.getAttachmentUrl', () => {
+  it('GETs /v1/attachments/:id/url with conversationId query and parses the response', async () => {
+    const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe(
+        'https://chat.test/v1/attachments/01HV0000000000000000000001/url' +
+          '?conversationId=01HV0000000000000000000000'
+      );
+      expect(init?.method ?? 'GET').toBe('GET');
+      expect(init?.headers).toMatchObject({ Authorization: 'Bearer tok' });
+      return new Response(
+        JSON.stringify({
+          url: 'https://r2.test/get?sig=x',
+          mimeType: 'image/png',
+          size: 42,
+          filename: 'a.png',
+          expiresAt: 1_700_000_000,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+    const client = makeClient(fetchFn as unknown as typeof globalThis.fetch);
+    const res = await client.getAttachmentUrl({
+      attachmentId: '01HV0000000000000000000001',
+      conversationId: '01HV0000000000000000000000',
+    });
+    expect(res.url).toContain('https://r2.test/get');
+    expect(res.mimeType).toBe('image/png');
+    expect(res.expiresAt).toBe(1_700_000_000);
+  });
+});
+
 describe('KiloChatClient.initAttachment', () => {
   it('POSTs body to /v1/attachments/init and parses the response', async () => {
     const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

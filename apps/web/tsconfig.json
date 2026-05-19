@@ -2,38 +2,19 @@
   "compilerOptions": {
     "target": "es2017",
     "module": "commonjs",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext",
-      "esnext.asynciterable"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext", "esnext.asynciterable"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "@kilocode/db": [
-        "../../packages/db/src/index.ts"
-      ],
-      "@kilocode/db/*": [
-        "../../packages/db/src/*"
-      ],
-      "@kilocode/cloud-agent-profile": [
-        "../../packages/cloud-agent-profile/src/index.ts"
-      ],
-      "@kilocode/encryption": [
-        "../../packages/encryption/src/index.ts"
-      ],
-      "@kilocode/worker-utils": [
-        "../../packages/worker-utils/src/index.ts"
-      ],
-      "@kilocode/worker-utils/*": [
-        "../../packages/worker-utils/src/*"
-      ]
+      "@/*": ["./src/*"],
+      "@kilocode/db": ["../../packages/db/src/index.ts"],
+      "@kilocode/db/*": ["../../packages/db/src/*"],
+      "@kilocode/cloud-agent-profile": ["../../packages/cloud-agent-profile/src/index.ts"],
+      "@kilocode/encryption": ["../../packages/encryption/src/index.ts"],
+      "@kilocode/worker-utils": ["../../packages/worker-utils/src/index.ts"],
+      "@kilocode/worker-utils/*": ["../../packages/worker-utils/src/*"]
     },
     "allowJs": true,
     "noEmit": true,
@@ -41,9 +22,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
-    "typeRoots": [
-      "./node_modules/@types"
-    ],
+    "typeRoots": ["./node_modules/@types"],
     "plugins": [
       {
         "name": "next"
@@ -54,8 +33,7 @@
     "strictPropertyInitialization": false,
     "noErrorTruncation": true,
     "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "moduleResolution": "node"
+    "noFallthroughCasesInSwitch": true
   },
   "include": [
     "next-env.d.ts",
@@ -70,8 +48,5 @@
     ".next/dev/types/**/*.ts",
     "dev/discord-gateway-cron.ts"
   ],
-  "exclude": [
-    "node_modules",
-    ".next"
-  ]
+  "exclude": ["node_modules", ".next"]
 }

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { createOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 
 const GITLAB_OAUTH_STATE_PREFIX = 'gitlab:';
 
@@ -23,6 +24,10 @@ const GitLabOAuthStatePayloadSchema = z.object({
   ]),
   instanceUrl: z.string().url().refine(isHttpInstanceUrl).optional(),
   customCredentialsRef: z.string().min(1).optional(),
+  returnTo: z
+    .string()
+    .refine(value => validateReturnPath(value) !== null)
+    .optional(),
 });
 
 export type GitLabOAuthStatePayload = z.infer<typeof GitLabOAuthStatePayloadSchema>;

@@ -8,10 +8,17 @@ import { exchangeDiscordCode, upsertDiscordInstallation } from '@/lib/integratio
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 
+const appendQueryParam = (path: string, queryParam: string): string =>
+  `${path}${path.includes('?') ? '&' : '?'}${queryParam}`;
+
 const buildDiscordRedirectPath = (state: string | null, queryParam: string): string => {
   // Try to extract the owner from a signed state for best-effort redirects on error paths.
   // We use verifyOAuthState so we don't trust unsigned/tampered values for routing.
   const verified = state ? verifyOAuthState(state) : null;
+  if (verified?.returnTo) {
+    return appendQueryParam(verified.returnTo, queryParam);
+  }
+
   const owner = verified?.owner;
 
   if (owner?.startsWith('org_')) {
@@ -125,8 +132,9 @@ export async function GET(request: NextRequest) {
     await upsertDiscordInstallation(owner, oauthData);
 
     // 9. Redirect to success page
-    const successPath =
-      owner.type === 'org'
+    const successPath = verified.returnTo
+      ? appendQueryParam(verified.returnTo, 'success=discord_installed')
+      : owner.type === 'org'
         ? `/organizations/${owner.id}/integrations/discord?success=installed`
         : `/integrations/discord?success=installed`;
 

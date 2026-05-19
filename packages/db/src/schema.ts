@@ -4816,6 +4816,8 @@ export type NewCloudAgentFeedback = typeof cloud_agent_feedback.$inferInsert;
 
 // ─── KiloClaw (multi-tenant sandbox instances) ──────────────────────
 
+export type KiloClawComposioInstanceConfigSource = 'managed' | 'manual';
+
 export const kiloclaw_instances = pgTable(
   'kiloclaw_instances',
   {
@@ -4850,6 +4852,7 @@ export const kiloclaw_instances = pgTable(
     // set/clear, plus auto-cleared as part of a tier resize.
     // Shape: { size: { cpus, memory_mb, cpu_kind? }, reason, actorId, actorEmail, setAt }.
     admin_size_override: jsonb(),
+    composio_config_source: text().$type<KiloClawComposioInstanceConfigSource>(),
   },
   table => [
     // One active instance per user+sandbox combination.
@@ -4888,6 +4891,10 @@ export const kiloclaw_instances = pgTable(
     index('IDX_kiloclaw_instances_admin_size_override')
       .on(table.id)
       .where(sql`${table.admin_size_override} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
+    check(
+      'kiloclaw_instances_composio_config_source_check',
+      sql`${table.composio_config_source} IS NULL OR ${table.composio_config_source} IN ('managed', 'manual')`
+    ),
   ]
 );
 
@@ -4982,6 +4989,7 @@ export const kiloclaw_composio_identities = pgTable(
     composio_org_name: text(),
     composio_project_id: text(),
     composio_consumer_user_id: text(),
+    google_calendar_connected_account_id: text(),
     composio_agent_email: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -5012,40 +5020,6 @@ export const kiloclaw_composio_identities = pgTable(
 
 export type KiloClawComposioIdentity = typeof kiloclaw_composio_identities.$inferSelect;
 export type NewKiloClawComposioIdentity = typeof kiloclaw_composio_identities.$inferInsert;
-
-export type KiloClawComposioInstanceConfigSource = 'managed' | 'manual';
-
-export const kiloclaw_composio_instance_configs = pgTable(
-  'kiloclaw_composio_instance_configs',
-  {
-    instance_id: uuid()
-      .primaryKey()
-      .notNull()
-      .references(() => kiloclaw_instances.id),
-    source: text().$type<KiloClawComposioInstanceConfigSource>().notNull(),
-    composio_identity_id: uuid().references(() => kiloclaw_composio_identities.id),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    index('IDX_kiloclaw_composio_instance_configs_identity').on(table.composio_identity_id),
-    check(
-      'kiloclaw_composio_instance_configs_source_check',
-      sql`${table.source} IN ('managed', 'manual')`
-    ),
-    check(
-      'kiloclaw_composio_instance_configs_source_identity_check',
-      sql`(${table.source} = 'managed' AND ${table.composio_identity_id} IS NOT NULL) OR (${table.source} = 'manual' AND ${table.composio_identity_id} IS NULL)`
-    ),
-  ]
-);
-
-export type KiloClawComposioInstanceConfig = typeof kiloclaw_composio_instance_configs.$inferSelect;
-export type NewKiloClawComposioInstanceConfig =
-  typeof kiloclaw_composio_instance_configs.$inferInsert;
 
 export const kiloclaw_inbound_email_reserved_aliases = pgTable(
   'kiloclaw_inbound_email_reserved_aliases',

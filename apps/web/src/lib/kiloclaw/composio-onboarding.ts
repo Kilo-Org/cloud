@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { APP_URL } from '@/lib/constants';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
@@ -10,7 +10,8 @@ import {
   type ComposioUserContextAuth,
 } from '@/lib/kiloclaw/composio-client';
 import {
-  kiloclaw_composio_instance_configs,
+  kiloclaw_composio_identities,
+  kiloclaw_instances,
   type KiloClawComposioInstanceConfigSource,
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
@@ -96,51 +97,27 @@ export async function markComposioInstanceConfig(params: {
   composioIdentityId?: string;
 }): Promise<void> {
   await db
-    .insert(kiloclaw_composio_instance_configs)
-    .values({
-      instance_id: params.instanceId,
-      source: params.source,
-      composio_identity_id: params.source === 'managed' ? params.composioIdentityId : null,
-    })
-    .onConflictDoUpdate({
-      target: kiloclaw_composio_instance_configs.instance_id,
-      set: {
-        source: params.source,
-        composio_identity_id: params.source === 'managed' ? params.composioIdentityId : null,
-        updated_at: new Date().toISOString(),
-      },
-    });
+    .update(kiloclaw_instances)
+    .set({ composio_config_source: params.source })
+    .where(eq(kiloclaw_instances.id, params.instanceId));
 }
 
 export async function clearComposioInstanceConfig(instanceId: string): Promise<void> {
   await db
-    .delete(kiloclaw_composio_instance_configs)
-    .where(eq(kiloclaw_composio_instance_configs.instance_id, instanceId));
+    .update(kiloclaw_instances)
+    .set({ composio_config_source: null })
+    .where(eq(kiloclaw_instances.id, instanceId));
 }
 
 export async function getComposioInstanceConfigSource(
   instanceId: string
 ): Promise<ComposioSandboxConfigSource> {
   const [row] = await db
-    .select({ source: kiloclaw_composio_instance_configs.source })
-    .from(kiloclaw_composio_instance_configs)
-    .where(eq(kiloclaw_composio_instance_configs.instance_id, instanceId))
+    .select({ source: kiloclaw_instances.composio_config_source })
+    .from(kiloclaw_instances)
+    .where(eq(kiloclaw_instances.id, instanceId))
     .limit(1);
   return row?.source ?? null;
-}
-
-async function hasManagedComposioInstanceConfig(composioIdentityId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ instanceId: kiloclaw_composio_instance_configs.instance_id })
-    .from(kiloclaw_composio_instance_configs)
-    .where(
-      and(
-        eq(kiloclaw_composio_instance_configs.source, 'managed'),
-        eq(kiloclaw_composio_instance_configs.composio_identity_id, composioIdentityId)
-      )
-    )
-    .limit(1);
-  return Boolean(row);
 }
 
 function hasComposioProvisionSecrets(secrets: Record<string, string> | undefined): boolean {
@@ -160,7 +137,7 @@ async function getReusableManagedComposioIdentityForProvision(params: {
     return null;
   }
 
-  return (await hasManagedComposioInstanceConfig(identity.row.id)) ? identity : null;
+  return identity.row.google_calendar_connected_account_id ? identity : null;
 }
 
 export async function buildComposioProvisionSecrets(params: {
@@ -230,6 +207,10 @@ export async function completeManagedComposioGoogleCalendarConnection(params: {
     source: 'managed',
     composioIdentityId: identity.row.id,
   });
+  await db
+    .update(kiloclaw_composio_identities)
+    .set({ google_calendar_connected_account_id: params.connectedAccountId })
+    .where(eq(kiloclaw_composio_identities.id, identity.row.id));
   return true;
 }
 
@@ -278,6 +259,7 @@ export async function getManagedComposioGoogleCalendarStatus(params: {
   if (!identity) {
     return { enabled: true, status: 'disconnected', connectedAccountId: null, sandboxConfigSource };
   }
+  const knownConnectedAccountId = identity.row.google_calendar_connected_account_id;
   const auth = composioUserContextAuth(identity);
   if (!auth)
     return { enabled: true, status: 'error', connectedAccountId: null, sandboxConfigSource };
@@ -287,7 +269,11 @@ export async function getManagedComposioGoogleCalendarStatus(params: {
       auth,
       userId: identity.consumerUserId,
     });
-    const active = accounts.find(account => account.status === 'ACTIVE');
+    const active = accounts.find(
+      account =>
+        account.status === 'ACTIVE' &&
+        (!knownConnectedAccountId || account.id === knownConnectedAccountId)
+    );
     if (active && params.sandboxHasComposioSecrets && sandboxConfigSource === 'managed') {
       return {
         enabled: true,

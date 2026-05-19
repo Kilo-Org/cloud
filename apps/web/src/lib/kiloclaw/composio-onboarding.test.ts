@@ -38,6 +38,11 @@ jest.mock('@/lib/drizzle', () => ({
         onConflictDoUpdate: jest.fn(async () => undefined),
       })),
     })),
+    update: jest.fn(() => ({
+      set: jest.fn(() => ({
+        where: jest.fn(async () => undefined),
+      })),
+    })),
     delete: jest.fn(),
   },
 }));
@@ -63,11 +68,16 @@ const instance = {
   organizationId: null,
   name: null,
   inboundEmailEnabled: false,
+  composioConfigSource: null,
 };
 
 function mockManagedIdentity() {
   mockedGetActiveManagedComposioIdentity.mockResolvedValue({
-    row: { id: 'identity-1', composio_project_id: 'project-1' },
+    row: {
+      id: 'identity-1',
+      composio_project_id: 'project-1',
+      google_calendar_connected_account_id: 'ca_123',
+    },
     agentKey: 'agent-key',
     userApiKey: 'uak_123',
     apiKey: 'api-key',

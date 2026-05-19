@@ -61,8 +61,8 @@ KiloClaw injects those credentials into the sandbox and signs the local
 available without Kilo provisioning or owning a Composio identity.
 
 Later, Kilo may provision managed Composio identities during onboarding.
-Managed personal identities are reused across a user's personal KiloClaw
-instance recreates. Managed organization-context identities are scoped per
+Managed personal identities are reused across new personal KiloClaw
+instances created after a prior instance is destroyed. Managed organization-context identities are scoped per
 organization user, not shared across the whole organization: the same Kilo
 user receives a distinct Composio identity for each organization context
 where they use KiloClaw. Kilo may create Connect Links during onboarding
@@ -176,8 +176,8 @@ fully provisioned.
     members of an organization unless a future spec explicitly introduces
     shared organization-level identities.
 29. A managed organization-context identity MAY be reused by the same
-    Kilo user across that user's KiloClaw instance recreates in the same
-    Kilo organization.
+    Kilo user across new KiloClaw instances created after prior instances
+    are destroyed in the same Kilo organization.
 30. Connected accounts associated with a managed organization-context
     identity are scoped to that Kilo user in that Kilo organization
     context. They MUST NOT become implicitly usable by other organization

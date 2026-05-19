@@ -30,6 +30,7 @@ const fakeInstance = {
   organizationId: null,
   name: null,
   inboundEmailEnabled: false,
+  composioConfigSource: null,
 };
 
 function makeRequest(path: string) {

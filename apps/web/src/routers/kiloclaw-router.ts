@@ -75,6 +75,13 @@ import {
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
 import {
+  createManagedComposioGoogleCalendarLink,
+  clearComposioInstanceConfig,
+  getManagedComposioGoogleCalendarStatus,
+  getComposioInstanceConfigSource,
+  markComposioInstanceConfig,
+} from '@/lib/kiloclaw/composio-onboarding';
+import {
   clearSubscriptionLifecycleAfterInstanceDestroy,
   clearTrialInactivityStopAfterStart,
 } from '@/lib/kiloclaw/instance-lifecycle';
@@ -848,6 +855,30 @@ const patchBotIdentitySchema = z.object({
   botVibe: z.string().trim().min(1).max(120).nullable().optional(),
   botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
 });
+
+const composioConnectLinkSchema = z.object({
+  returnTo: z
+    .string()
+    .min(1)
+    .max(500)
+    .refine(value => value.startsWith('/'), {
+      message: 'returnTo must be a relative path',
+    }),
+});
+
+function composioSecretsPatchSource(
+  secrets: Record<string, string | null>
+): 'upsert_manual' | 'clear' | 'none' {
+  const touchedEntries = Object.entries(secrets).filter(
+    ([key]) => key === 'composioUserApiKey' || key === 'composioOrg'
+  );
+  if (touchedEntries.length === 0) return 'none';
+  if (touchedEntries.length === 2 && touchedEntries.every(([, value]) => value === null)) {
+    return 'clear';
+  }
+  if (touchedEntries.some(([, value]) => value !== null)) return 'upsert_manual';
+  return 'none';
+}
 
 /**
  * Build the worker provision payload from plaintext channel tokens.
@@ -3402,11 +3433,18 @@ export const kiloclawRouter = createTRPCRouter({
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       try {
-        return await client.patchSecrets(
+        const result = await client.patchSecrets(
           ctx.user.id,
           { secrets: encryptedPatch, meta: input.meta },
           workerInstanceId(instance)
         );
+        const sourceAction = instance ? composioSecretsPatchSource(secrets) : 'none';
+        if (instance && sourceAction === 'upsert_manual') {
+          await markComposioInstanceConfig({ instanceId: instance.id, source: 'manual' });
+        } else if (instance && sourceAction === 'clear') {
+          await clearComposioInstanceConfig(instance.id);
+        }
+        return result;
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           // Extract message from worker response body (JSON or plain text)
@@ -3432,6 +3470,56 @@ export const kiloclawRouter = createTRPCRouter({
     );
     return client.getConfig({ userId: ctx.user.id, instanceId: workerInstanceId(instance) });
   }),
+
+  getComposioOnboardingStatus: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    let sandboxHasComposioSecrets = false;
+    if (instance) {
+      const client = new KiloClawUserClient(
+        generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
+      );
+      const config = await client.getConfig({
+        userId: ctx.user.id,
+        instanceId: workerInstanceId(instance),
+      });
+      sandboxHasComposioSecrets = config.configuredSecrets.composio === true;
+    }
+    return await getManagedComposioGoogleCalendarStatus({
+      scope: {
+        ownerType: 'user',
+        userId: ctx.user.id,
+      },
+      instance,
+      sandboxHasComposioSecrets,
+    });
+  }),
+
+  createComposioGoogleCalendarLink: baseProcedure
+    .input(composioConnectLinkSchema)
+    .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      if (!instance) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'No active KiloClaw instance found',
+        });
+      }
+
+      const sandboxConfigSource = await getComposioInstanceConfigSource(instance.id);
+      if (sandboxConfigSource === 'manual') {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This sandbox already uses your own Composio credentials.',
+        });
+      }
+
+      return await createManagedComposioGoogleCalendarLink({
+        userId: ctx.user.id,
+        instance,
+        scope: { ownerType: 'user', userId: ctx.user.id },
+        returnTo: input.returnTo,
+      });
+    }),
 
   getChannelCatalog: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);

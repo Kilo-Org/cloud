@@ -17,6 +17,16 @@ export function useKiloClawConfig() {
   return useQuery(trpc.kiloclaw.getConfig.queryOptions());
 }
 
+export function useKiloClawComposioOnboardingStatus(enabled = true) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.getComposioOnboardingStatus.queryOptions(undefined, {
+      enabled,
+      refetchInterval: enabled ? 15_000 : false,
+    })
+  );
+}
+
 export function useKiloClawPairing(enabled = true) {
   const trpc = useTRPC();
   return useQuery(
@@ -222,6 +232,17 @@ export function useKiloClawMutations() {
       trpc.kiloclaw.patchSecrets.mutationOptions({
         onSuccess: async () => {
           await invalidateStatus();
+          await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
+        },
+      })
+    ),
+    createComposioGoogleCalendarLink: useMutation(
+      trpc.kiloclaw.createComposioGoogleCalendarLink.mutationOptions({
+        onSuccess: async () => {
+          await invalidateStatus();
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getComposioOnboardingStatus.queryKey(),
+          });
           await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
         },
       })

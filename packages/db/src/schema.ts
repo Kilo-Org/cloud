@@ -4961,6 +4961,92 @@ export type KiloClawGoogleOAuthConnection = typeof kiloclaw_google_oauth_connect
 export type NewKiloClawGoogleOAuthConnection =
   typeof kiloclaw_google_oauth_connections.$inferInsert;
 
+export type KiloClawComposioIdentityOwnerType = 'user' | 'organization_user';
+
+export const kiloclaw_composio_identities = pgTable(
+  'kiloclaw_composio_identities',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owner_type: text().$type<KiloClawComposioIdentityOwnerType>().notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id),
+    organization_id: uuid().references(() => organizations.id),
+    composio_agent_key_encrypted: text().notNull(),
+    composio_user_api_key_encrypted: text().notNull(),
+    composio_api_key_encrypted: text(),
+    composio_org_id: text().notNull(),
+    composio_org_name: text(),
+    composio_project_id: text(),
+    composio_consumer_user_id: text(),
+    composio_agent_email: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    uniqueIndex('UQ_kiloclaw_composio_identities_active_user')
+      .on(table.user_id)
+      .where(sql`${table.owner_type} = 'user' AND ${table.revoked_at} IS NULL`),
+    uniqueIndex('UQ_kiloclaw_composio_identities_active_org_user')
+      .on(table.organization_id, table.user_id)
+      .where(sql`${table.owner_type} = 'organization_user' AND ${table.revoked_at} IS NULL`),
+    index('IDX_kiloclaw_composio_identities_user').on(table.user_id),
+    index('IDX_kiloclaw_composio_identities_organization').on(table.organization_id),
+    check(
+      'kiloclaw_composio_identities_owner_type_check',
+      sql`${table.owner_type} IN ('user', 'organization_user')`
+    ),
+    check(
+      'kiloclaw_composio_identities_owner_scope_check',
+      sql`(${table.owner_type} = 'user' AND ${table.organization_id} IS NULL) OR (${table.owner_type} = 'organization_user' AND ${table.organization_id} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type KiloClawComposioIdentity = typeof kiloclaw_composio_identities.$inferSelect;
+export type NewKiloClawComposioIdentity = typeof kiloclaw_composio_identities.$inferInsert;
+
+export type KiloClawComposioInstanceConfigSource = 'managed' | 'manual';
+
+export const kiloclaw_composio_instance_configs = pgTable(
+  'kiloclaw_composio_instance_configs',
+  {
+    instance_id: uuid()
+      .primaryKey()
+      .notNull()
+      .references(() => kiloclaw_instances.id),
+    source: text().$type<KiloClawComposioInstanceConfigSource>().notNull(),
+    composio_identity_id: uuid().references(() => kiloclaw_composio_identities.id),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_kiloclaw_composio_instance_configs_identity').on(table.composio_identity_id),
+    check(
+      'kiloclaw_composio_instance_configs_source_check',
+      sql`${table.source} IN ('managed', 'manual')`
+    ),
+    check(
+      'kiloclaw_composio_instance_configs_source_identity_check',
+      sql`(${table.source} = 'managed' AND ${table.composio_identity_id} IS NOT NULL) OR (${table.source} = 'manual' AND ${table.composio_identity_id} IS NULL)`
+    ),
+  ]
+);
+
+export type KiloClawComposioInstanceConfig = typeof kiloclaw_composio_instance_configs.$inferSelect;
+export type NewKiloClawComposioInstanceConfig =
+  typeof kiloclaw_composio_instance_configs.$inferInsert;
+
 export const kiloclaw_inbound_email_reserved_aliases = pgTable(
   'kiloclaw_inbound_email_reserved_aliases',
   {

@@ -22,6 +22,16 @@ export function useOrgKiloClawConfig(organizationId: string) {
   return useQuery(trpc.organizations.kiloclaw.getConfig.queryOptions({ organizationId }));
 }
 
+export function useOrgKiloClawComposioOnboardingStatus(organizationId: string, enabled = true) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryOptions(
+      { organizationId },
+      { enabled, refetchInterval: enabled ? 15_000 : false }
+    )
+  );
+}
+
 export function useOrgKiloClawPairing(organizationId: string, enabled = true) {
   const trpc = useTRPC();
   return useQuery(
@@ -307,6 +317,21 @@ export function useOrgKiloClawMutations(
       },
     })
   );
+  const rawCreateComposioGoogleCalendarLink = useMutation(
+    trpc.organizations.kiloclaw.createComposioGoogleCalendarLink.mutationOptions({
+      onSuccess: async () => {
+        await invalidateStatus();
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryKey({
+            organizationId,
+          }),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getConfig.queryKey({ organizationId }),
+        });
+      },
+    })
+  );
   const rawRestartMachine = useMutation(
     trpc.organizations.kiloclaw.restartMachine.mutationOptions({
       onSuccess: async () => {
@@ -525,6 +550,7 @@ export function useOrgKiloClawMutations(
     updateKiloCodeConfig: bind(rawUpdateKiloCodeConfig),
     patchChannels: bind(rawPatchChannels),
     patchSecrets: bind(rawPatchSecrets),
+    createComposioGoogleCalendarLink: bind(rawCreateComposioGoogleCalendarLink),
     restartMachine: bind(rawRestartMachine),
     restartOpenClaw: bindVoid(rawRestartOpenClaw),
     approvePairingRequest: bind(rawApprovePairing),

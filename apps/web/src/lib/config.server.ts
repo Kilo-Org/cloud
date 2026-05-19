@@ -234,6 +234,16 @@ export const KILOCLAW_API_URL = getEnvVariable('KILOCLAW_API_URL') || '';
 export const KILOCLAW_INTERNAL_API_SECRET = getEnvVariable('KILOCLAW_INTERNAL_API_SECRET') || '';
 export const KILOCLAW_INBOUND_EMAIL_DOMAIN =
   getEnvVariable('KILOCLAW_INBOUND_EMAIL_DOMAIN') || 'kiloclaw.ai';
+export const KILOCLAW_COMPOSIO_MANAGED_ONBOARDING_ENABLED =
+  getEnvVariable('KILOCLAW_COMPOSIO_MANAGED_ONBOARDING_ENABLED') === 'true';
+export const COMPOSIO_AGENTS_API_BASE_URL =
+  getEnvVariable('COMPOSIO_AGENTS_API_BASE_URL') || 'https://agents.composio.dev';
+export const COMPOSIO_API_BASE_URL =
+  getEnvVariable('COMPOSIO_API_BASE_URL') || 'https://backend.composio.dev';
+export const COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID =
+  getEnvVariable('COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID') || '';
+export const COMPOSIO_MANAGED_IDENTITY_ENCRYPTION_KEY =
+  getEnvVariable('COMPOSIO_MANAGED_IDENTITY_ENCRYPTION_KEY') || '';
 
 /**
  * Per-instance worker URL template.

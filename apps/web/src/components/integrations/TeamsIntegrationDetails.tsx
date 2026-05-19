@@ -17,6 +17,7 @@ import {
 import {
   AlertTriangle,
   CheckCircle2,
+  Download,
   ExternalLink,
   MessageSquareText,
   RefreshCw,
@@ -293,6 +294,14 @@ export function TeamsIntegrationDetails({
                     Open Teams install
                   </Button>
                 )}
+                {setupInfo?.appPackageUrl && (
+                  <Button variant="outline" asChild>
+                    <a href={setupInfo.appPackageUrl} download>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download Teams app package
+                    </a>
+                  </Button>
+                )}
                 <Button
                   variant="destructive"
                   onClick={() => setDisconnectDialogOpen(true)}
@@ -327,10 +336,10 @@ export function TeamsIntegrationDetails({
                   <Badge variant="secondary" className="mb-3">
                     Step 1
                   </Badge>
-                  <h4 className="mb-1 text-sm font-medium">Install the Teams app</h4>
+                  <h4 className="mb-1 text-sm font-medium">Download and sideload the app</h4>
                   <p className="text-sm text-muted-foreground">
-                    Add Kilo to your Teams tenant. The messaging endpoint should point at the
-                    webhook below.
+                    Download the Teams app package ZIP, then upload it in Microsoft Teams from Apps
+                    &gt; Manage your apps &gt; Upload an app.
                   </p>
                 </div>
                 <div className="rounded-lg border p-4">
@@ -363,19 +372,49 @@ export function TeamsIntegrationDetails({
                     </p>
                   </div>
                 </div>
-              ) : setupInfo?.installUrl ? (
-                <Button onClick={handleOpenInstallUrl} size="lg" className="w-full">
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Open Teams install
-                </Button>
               ) : (
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button asChild size="lg" className="flex-1">
+                    <a
+                      href={setupInfo?.appPackageUrl ?? '/api/integrations/teams/app-package'}
+                      download
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Download Teams app package
+                    </a>
+                  </Button>
+                  {setupInfo?.installUrl && (
+                    <Button
+                      variant="outline"
+                      onClick={handleOpenInstallUrl}
+                      size="lg"
+                      className="flex-1"
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open Teams install
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {setupInfo?.configured !== false && (
+                <div className="space-y-2 rounded-lg border p-4">
+                  <span className="text-sm font-medium">Sideload the ZIP in Teams</span>
+                  <p className="text-sm text-muted-foreground">
+                    In Microsoft Teams, go to Apps, choose Manage your apps, select Upload an app,
+                    then upload the downloaded ZIP file. After Teams installs Kilo, mention Kilo in
+                    a chat or channel to finish linking this tenant.
+                  </p>
+                </div>
+              )}
+
+              {setupInfo?.configured !== false && !setupInfo?.installUrl && (
                 <div className="space-y-3 rounded-lg border p-4">
                   <div className="flex items-start gap-3">
                     <RefreshCw className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
-                      No Teams install URL is configured yet. Use the Teams app manifest or app
-                      catalog entry for this environment, then mention Kilo in Teams to complete
-                      setup.
+                      No Teams install URL is configured yet. Use the app package ZIP above to
+                      sideload Kilo into Teams.
                     </p>
                   </div>
                 </div>

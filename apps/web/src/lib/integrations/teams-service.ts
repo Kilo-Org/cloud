@@ -76,6 +76,7 @@ export function getTeamsSetupInfo() {
   return {
     configured: isTeamsAppConfigured(),
     installUrl: TEAMS_APP_INSTALL_URL || null,
+    appPackageUrl: '/api/integrations/teams/app-package',
     webhookUrl: `${APP_URL}/api/chat/webhooks/teams`,
   };
 }

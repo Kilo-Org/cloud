@@ -10,6 +10,7 @@ import { buildMayorSystemPrompt } from '../../prompts/mayor-system.prompt';
 import type { TownConfig, RigOverrideConfig } from '../../types';
 import { buildContainerConfig, resolveModel, resolveSmallModel, resolveRigConfig } from './config';
 import { writeEvent } from '../../util/analytics.util';
+import { resolveGitHubTokenString } from './town-scm';
 
 const TOWN_LOG = '[Town.do]';
 
@@ -409,9 +410,20 @@ export async function startAgentInContainer(
     // Build env vars from town config
     const envVars: Record<string, string> = { ...(params.townConfig.env_vars ?? {}) };
 
-    // Map git_auth tokens
-    if (params.townConfig.git_auth?.github_token) {
-      envVars.GIT_TOKEN = params.townConfig.git_auth.github_token;
+    // Map git_auth tokens. Resolve GitHub token through resolveGitHubTokenString so
+    // we mint a fresh installation token when a platform integration is
+    // configured; otherwise we'd hand the agent a `git_auth.github_token`
+    // value that may have been written hours ago and is well past its 1h
+    // installation-token TTL. The resolved value is also what the agent's
+    // `gh` CLI sees as `GH_TOKEN`.
+    const githubToken = await resolveGitHubTokenString({
+      env,
+      townId: params.townId,
+      getTownConfig: () => Promise.resolve(params.townConfig),
+      platformIntegrationId: params.platformIntegrationId,
+    });
+    if (githubToken) {
+      envVars.GIT_TOKEN = githubToken;
     }
     if (params.townConfig.git_auth?.gitlab_token) {
       envVars.GITLAB_TOKEN = params.townConfig.git_auth.gitlab_token;
@@ -449,7 +461,7 @@ export async function startAgentInContainer(
       `${TOWN_LOG} startAgentInContainer: envVars built: keys=[${Object.keys(envVars).join(',')}] hasGitToken=${!!envVars.GIT_TOKEN} hasGitlabToken=${!!envVars.GITLAB_TOKEN} hasContainerToken=${!!containerToken} hasAgentJwt=${!!agentToken} hasKilocodeToken=${!!kilocodeToken} git_auth_keys=[${Object.keys(params.townConfig.git_auth ?? {}).join(',')}]`
     );
 
-    const containerConfig = await buildContainerConfig(storage, env);
+    const containerConfig = await buildContainerConfig(storage, env, params.townId);
     const container = getTownContainerStub(env, params.townId);
 
     const rigOverride = params.rigOverride ?? null;
@@ -596,6 +608,12 @@ export async function startMergeInContainer(
 ): Promise<boolean> {
   try {
     const userId = params.townConfig.owner_user_id ?? params.townId;
+    if (!params.townConfig.owner_user_id) {
+      console.warn(
+        `${TOWN_LOG} startMergeInContainer: owner_user_id missing from town config for town ${params.townId}. ` +
+          'Falling back to townId — this breaks session-ingest authorization and should not happen for properly provisioned towns.'
+      );
+    }
     const containerToken = await ensureContainerToken(env, params.townId, userId);
     const agentToken = await mintAgentToken(env, {
       agentId: params.agentId,
@@ -613,8 +631,16 @@ export async function startMergeInContainer(
     }
 
     const envVars: Record<string, string> = { ...(params.townConfig.env_vars ?? {}) };
-    if (params.townConfig.git_auth?.github_token) {
-      envVars.GIT_TOKEN = params.townConfig.git_auth.github_token;
+    // Resolve GitHub token through resolveGitHubTokenString so a configured
+    // platform integration mints a fresh installation token for the
+    // merge process. See startAgentInContainer for the rationale.
+    const mergeGithubToken = await resolveGitHubTokenString({
+      env,
+      townId: params.townId,
+      getTownConfig: () => Promise.resolve(params.townConfig),
+    });
+    if (mergeGithubToken) {
+      envVars.GIT_TOKEN = mergeGithubToken;
     }
     if (params.townConfig.git_auth?.gitlab_token) {
       envVars.GITLAB_TOKEN = params.townConfig.git_auth.gitlab_token;
@@ -628,7 +654,7 @@ export async function startMergeInContainer(
     const mergeKilocodeToken = params.kilocodeToken ?? params.townConfig.kilocode_token;
     if (mergeKilocodeToken) envVars.KILOCODE_TOKEN = mergeKilocodeToken;
 
-    const containerConfig = await buildContainerConfig(storage, env);
+    const containerConfig = await buildContainerConfig(storage, env, params.townId);
     const container = getTownContainerStub(env, params.townId);
 
     const response = await container.fetch('http://container/git/merge', {

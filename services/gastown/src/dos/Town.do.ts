@@ -960,9 +960,22 @@ export class TownDO extends DurableObject<Env> {
     const townConfig = await this.getTownConfig();
     const container = getTownContainerStub(this.env, townId);
 
+    // Resolve a fresh GitHub token here too — this method runs both at
+    // initial config push and on every config change, so the persisted
+    // GIT_TOKEN must be live rather than the stale value stored in
+    // git_auth.github_token from rig creation. The container's
+    // syncTownConfigToProcessEnv path reads `git_auth.github_token`
+    // from the X-Town-Config header on every request, so the in-process
+    // GIT_TOKEN follows the same source-of-truth as the persisted one.
+    const githubToken = await scm.resolveGitHubTokenString({
+      env: this.env,
+      townId,
+      getTownConfig: () => Promise.resolve(townConfig),
+    });
+
     // Phase 1: Persist to DO storage for next boot.
     const envMapping: Array<[string, string | undefined]> = [
-      ['GIT_TOKEN', townConfig.git_auth?.github_token],
+      ['GIT_TOKEN', githubToken ?? undefined],
       ['GITLAB_TOKEN', townConfig.git_auth?.gitlab_token],
       ['GITLAB_INSTANCE_URL', townConfig.git_auth?.gitlab_instance_url],
       ['GITHUB_CLI_PAT', townConfig.github_cli_pat],
@@ -1035,7 +1048,11 @@ export class TownDO extends DurableObject<Env> {
     // /sync-config endpoint. The X-Town-Config header delivers the
     // full config; the endpoint applies CONFIG_ENV_MAP to process.env.
     try {
-      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+      const containerConfig = await config.buildContainerConfig(
+        this.ctx.storage,
+        this.env,
+        this.townId
+      );
       await container.fetch('http://container/sync-config', {
         method: 'POST',
         headers: {
@@ -1179,8 +1196,19 @@ export class TownDO extends DurableObject<Env> {
     logger.setTags({ rigId: rigConfig.rigId });
     const townConfig = await this.getTownConfig();
     const envVars: Record<string, string> = {};
-    if (townConfig.git_auth?.github_token) {
-      envVars.GIT_TOKEN = townConfig.git_auth.github_token;
+    // Resolve GitHub token through scm.resolveGitHubTokenString so the rig
+    // setup uses a fresh installation token when a platform integration
+    // is configured. The rig's own integration ID takes precedence over
+    // the town-level one (this rig may be wired to a different repo
+    // installation than the rest of the town).
+    const githubToken = await scm.resolveGitHubTokenString({
+      env: this.env,
+      townId: this.townId,
+      getTownConfig: () => Promise.resolve(townConfig),
+      platformIntegrationId: rigConfig.platformIntegrationId,
+    });
+    if (githubToken) {
+      envVars.GIT_TOKEN = githubToken;
     }
     if (townConfig.git_auth?.gitlab_token) {
       envVars.GITLAB_TOKEN = townConfig.git_auth.gitlab_token;
@@ -1195,7 +1223,11 @@ export class TownDO extends DurableObject<Env> {
       envVars.KILOCODE_TOKEN = kilocodeToken;
     }
 
-    const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+    const containerConfig = await config.buildContainerConfig(
+      this.ctx.storage,
+      this.env,
+      this.townId
+    );
     const container = getTownContainerStub(this.env, this.townId);
     const response = await container.fetch('http://container/repos/setup', {
       method: 'POST',
@@ -2861,6 +2893,63 @@ export class TownDO extends DurableObject<Env> {
     return mayor?.id ?? null;
   }
 
+  /**
+   * Returns everything the container needs to prewarm the mayor SDK
+   * server with a config that matches what the next /agents/start will
+   * use — so the prewarm cache hit is real instead of triggering the
+   * "config mismatch, evicting prewarmed server" eviction path.
+   *
+   * Returns null only when there's no mayor at all. When the mayor
+   * exists but the kilocode token isn't available, returns a partial
+   * shape with just { agentId } so callers can derive the fallback
+   * agentId without a second RPC hop.
+   */
+  async getMayorPrewarmContext(): Promise<{
+    agentId: string;
+    model?: string;
+    smallModel?: string;
+    kilocodeToken?: string;
+    organizationId?: string | null;
+    githubToken?: string;
+    githubCliPat?: string;
+  } | null> {
+    const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
+    if (!mayor) return null;
+
+    const kilocodeToken = await this.resolveKilocodeToken();
+    if (!kilocodeToken) {
+      return { agentId: mayor.id };
+    }
+
+    const townConfig = await this.getTownConfig();
+
+    // Resolve the GitHub token using the same chain as startAgentInContainer
+    // so the prewarmed mayor SDK boots with `gh` CLI auth (`GH_TOKEN`)
+    // already populated. Without this, the mayor's bash tool sees an
+    // empty environment for git/gh until the SDK is torn down and the
+    // /agents/start path's buildAgentEnv runs — which never happens
+    // while ensureMayor short-circuits on a warm session.
+    const githubToken = await scm.resolveGitHubTokenString({
+      env: this.env,
+      townId: this.townId,
+      getTownConfig: () => Promise.resolve(townConfig),
+    });
+
+    // _ensureMayor dispatches the mayor without a per-rig override
+    // (Town.do.ts:2766-2790). Match that resolution here so the prewarm
+    // KILO_CONFIG_CONTENT is byte-identical to what /agents/start will
+    // build, and ensureSDKServer's config-mismatch eviction never fires.
+    return {
+      agentId: mayor.id,
+      model: config.resolveModel(townConfig, null, 'mayor'),
+      smallModel: config.resolveSmallModel(townConfig),
+      kilocodeToken,
+      organizationId: townConfig.organization_id ?? null,
+      ...(githubToken ? { githubToken } : {}),
+      ...(townConfig.github_cli_pat ? { githubCliPat: townConfig.github_cli_pat } : {}),
+    };
+  }
+
   async ensureMayor(): Promise<{
     agentId: string;
     sessionStatus: 'idle' | 'active' | 'starting';
@@ -3016,7 +3105,11 @@ export class TownDO extends DurableObject<Env> {
     if (isAlive) {
       // Attach fresh town config so the container can update process.env
       // before restarting the SDK server (tokens, git identity, etc.).
-      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+      const containerConfig = await config.buildContainerConfig(
+        this.ctx.storage,
+        this.env,
+        this.townId
+      );
 
       // Resolve townConfig to thread the organization_id into the request body
       // (belt-and-suspenders: ensures org billing survives even if X-Town-Config
@@ -4861,7 +4954,11 @@ export class TownDO extends DurableObject<Env> {
       // This ensures org context and credentials are available immediately
       // after a container restart when the first request is a model update
       // (PATCH /model) rather than a new agent start.
-      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+      const containerConfig = await config.buildContainerConfig(
+        this.ctx.storage,
+        this.env,
+        this.townId
+      );
       const headers: Record<string, string> = {
         'X-Town-Config': JSON.stringify(containerConfig),
       };
@@ -4997,7 +5094,9 @@ export class TownDO extends DurableObject<Env> {
   /**
    * Health check: verify the alarm is set and return basic town status.
    * Called by the GastownUserDO watchdog alarm to ensure each town's
-   * alarm loop is firing. Re-arms the alarm if it's missing.
+   * alarm loop is firing. Re-arms the alarm if it's missing, picking the
+   * cadence based on `hasActiveWork` so idle towns don't all wake up
+   * on the fast 5s cadence after a deploy.
    */
   async healthCheck(): Promise<{
     townId: string;
@@ -5011,10 +5110,17 @@ export class TownDO extends DurableObject<Env> {
     const currentAlarm = await this.ctx.storage.getAlarm();
     const alarmSet = currentAlarm !== null && currentAlarm > Date.now();
 
-    // Re-arm if missing — this is the whole point of the watchdog
+    // Re-arm if missing — this is the whole point of the watchdog. Pick
+    // the cadence to match observed activity: active towns recover fast,
+    // idle towns don't pay the cost of a 5s wake-up storm across the fleet.
     if (!alarmSet) {
-      console.warn(`${TOWN_LOG} healthCheck: alarm not set for town=${townId}, re-arming`);
-      await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
+      const interval = scheduling.hasActiveWork(this.sql)
+        ? ACTIVE_ALARM_INTERVAL_MS
+        : IDLE_ALARM_INTERVAL_MS;
+      console.warn(
+        `${TOWN_LOG} healthCheck: alarm not set for town=${townId}, re-arming with ${interval}ms`
+      );
+      await this.ctx.storage.setAlarm(Date.now() + interval);
     }
 
     const activeAgents = Number(

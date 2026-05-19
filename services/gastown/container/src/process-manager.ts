@@ -11,7 +11,11 @@ import { z } from 'zod';
 import * as fs from 'node:fs/promises';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
-import { buildKiloConfigContent, mayorWorkdirForTown } from './agent-runner';
+import {
+  buildKiloConfigContent,
+  ensureMayorWorkspaceForTown,
+  mayorWorkdirForTown,
+} from './agent-runner';
 import {
   getCurrentTownConfig,
   getLastAppliedEnvVarKeys,
@@ -64,6 +68,19 @@ let _draining = false;
 
 export function isDraining(): boolean {
   return _draining;
+}
+
+// Resolved when bootHydration() returns. /agents/start and /refresh-token
+// must await this before contending for the global sdkServerLock — without
+// this gate, fresh dispatches arriving during boot queue behind every
+// in-flight registry agent + the mayor prewarm and the DO-side 60s
+// AbortSignal.timeout fires before they ever get the lock. We resolve
+// the promise immediately so non-hydrating containers (tests, dev)
+// don't block; bootHydration replaces it on entry and resolves it on exit.
+let _hydrationComplete: Promise<void> = Promise.resolve();
+
+export function awaitHydration(): Promise<void> {
+  return _hydrationComplete;
 }
 
 // Mutex for ensureSDKServer — createKilo() reads process.cwd() and
@@ -588,6 +605,25 @@ const PERSIST_ENV_KEYS = new Set([
   'GASTOWN_ORGANIZATION_ID',
 ]);
 
+const CACHE_HIT_ENV_KEYS = new Set([
+  ...PERSIST_ENV_KEYS,
+  'GH_TOKEN',
+  'GIT_TOKEN',
+  'GITHUB_TOKEN',
+  'GITHUB_CLI_PAT',
+]);
+
+function applyCacheHitEnv(env: Record<string, string>): void {
+  for (const key of CACHE_HIT_ENV_KEYS) {
+    const value = env[key];
+    if (value) {
+      process.env[key] = value;
+    } else if (!PERSIST_ENV_KEYS.has(key)) {
+      delete process.env[key];
+    }
+  }
+}
+
 async function ensureSDKServer(
   workdir: string,
   env: Record<string, string>
@@ -603,10 +639,7 @@ async function ensureSDKServer(
       existing.server.close();
       sdkInstances.delete(workdir);
     } else {
-      for (const key of PERSIST_ENV_KEYS) {
-        const value = env[key];
-        if (value) process.env[key] = value;
-      }
+      applyCacheHitEnv(env);
       return {
         client: existing.client,
         port: parseInt(new URL(existing.server.url).port),
@@ -639,10 +672,7 @@ async function ensureSDKServer(
         cached.server.close();
         sdkInstances.delete(workdir);
       } else {
-        for (const key of PERSIST_ENV_KEYS) {
-          const value = env[key];
-          if (value) process.env[key] = value;
-        }
+        applyCacheHitEnv(env);
         return {
           client: cached.client,
           port: parseInt(new URL(cached.server.url).port),
@@ -2609,47 +2639,88 @@ function postEventToWorker(event: string, data: Record<string, unknown>): void {
   });
 }
 
-async function fetchMayorAgentId(
+type MayorPrewarmContext = {
+  agentId: string;
+  model?: string;
+  smallModel?: string;
+  kilocodeToken?: string;
+  organizationId?: string | null;
+  githubToken?: string;
+  githubCliPat?: string;
+};
+
+// Mirrors the response contract documented at
+// `/api/towns/:townId/mayor-id` in gastown.worker.ts. agentId is nullable
+// because the worker returns `{ agentId: null }` when no mayor exists.
+const MayorPrewarmResponse = z
+  .object({
+    success: z.boolean().optional(),
+    agentId: z.string().nullable().optional(),
+    model: z.string().optional(),
+    smallModel: z.string().optional(),
+    kilocodeToken: z.string().optional(),
+    organizationId: z.string().nullable().optional(),
+    githubToken: z.string().optional(),
+    githubCliPat: z.string().optional(),
+  })
+  .passthrough();
+
+async function fetchMayorPrewarmContext(
   townId: string,
   apiUrl: string,
   token: string
-): Promise<string | null> {
+): Promise<MayorPrewarmContext | null> {
   try {
     const resp = await fetch(`${apiUrl}/api/towns/${townId}/mayor-id`, {
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(10_000),
     });
     if (!resp.ok) {
-      console.log(`${MANAGER_LOG} fetchMayorAgentId: ${resp.status} for town ${townId}`);
+      console.log(`${MANAGER_LOG} fetchMayorPrewarmContext: ${resp.status} for town ${townId}`);
       return null;
     }
     const json: unknown = await resp.json();
-    if (
-      typeof json === 'object' &&
-      json !== null &&
-      'agentId' in json &&
-      typeof (json as { agentId: unknown }).agentId === 'string'
-    ) {
-      return (json as { agentId: string }).agentId;
-    }
-    return null;
+    const parsed = MayorPrewarmResponse.safeParse(json);
+    if (!parsed.success) return null;
+    const { agentId, model, smallModel, kilocodeToken, organizationId, githubToken, githubCliPat } =
+      parsed.data;
+    if (!agentId) return null;
+    return {
+      agentId,
+      model,
+      smallModel,
+      kilocodeToken,
+      organizationId,
+      githubToken,
+      githubCliPat,
+    };
   } catch (err) {
-    console.warn(`${MANAGER_LOG} fetchMayorAgentId failed:`, err);
+    console.warn(`${MANAGER_LOG} fetchMayorPrewarmContext failed:`, err);
     return null;
   }
 }
 
-function buildPrewarmEnv(mayorAgentId: string): Record<string, string> {
+function buildPrewarmEnv(ctx: MayorPrewarmContext, townId: string): Record<string, string> | null {
+  // Must mirror the mayor-shaped subset of buildAgentEnv (agent-runner.ts):
+  // the kilo serve child snapshots process.env at spawn and loads
+  // GastownPlugin (plugin/index.ts), which gates mayor-tool registration
+  // on GASTOWN_AGENT_ROLE === 'mayor' and createMayorClientFromEnv()
+  // requires GASTOWN_AGENT_ID + GASTOWN_TOWN_ID. If we omit them, the
+  // prewarmed mayor boots with NO tools, and ensureSDKServer's cache
+  // hit on the next /agents/start hands back that defective server
+  // (KILO_CONFIG_CONTENT matches, so the eviction path doesn't fire).
   const env: Record<string, string> = {
-    KILO_TEST_HOME: `/tmp/agent-home-${mayorAgentId}`,
-    XDG_DATA_HOME: `/tmp/agent-home-${mayorAgentId}/.local/share`,
+    GASTOWN_AGENT_ID: ctx.agentId,
+    GASTOWN_TOWN_ID: townId,
+    GASTOWN_AGENT_ROLE: 'mayor',
+    KILOCODE_FEATURE: 'gastown',
+    KILO_TEST_HOME: `/tmp/agent-home-${ctx.agentId}`,
+    XDG_DATA_HOME: `/tmp/agent-home-${ctx.agentId}/.local/share`,
   };
   const keys = [
     'GASTOWN_API_URL',
     'GASTOWN_CONTAINER_TOKEN',
-    'GASTOWN_TOWN_ID',
-    'KILOCODE_TOKEN',
-    'GASTOWN_ORGANIZATION_ID',
+    'GASTOWN_SESSION_TOKEN',
     'KILO_API_URL',
     'KILO_OPENROUTER_BASE',
   ];
@@ -2658,18 +2729,58 @@ function buildPrewarmEnv(mayorAgentId: string): Record<string, string> {
     if (value) env[key] = value;
   }
 
-  const kilocodeToken = env.KILOCODE_TOKEN;
-  if (kilocodeToken) {
-    const organizationId = env.GASTOWN_ORGANIZATION_ID || undefined;
-    const configJson = buildKiloConfigContent(
-      kilocodeToken,
-      'anthropic/claude-sonnet-4.6',
-      'anthropic/claude-haiku-4.5',
-      organizationId
-    );
-    env.KILO_CONFIG_CONTENT = configJson;
-    env.OPENCODE_CONFIG_CONTENT = configJson;
+  // Prefer the worker-supplied token/org so KILO_CONFIG_CONTENT matches
+  // what /agents/start will send. Fall back to process.env for back-
+  // compat with workers that haven't deployed the richer endpoint yet.
+  const kilocodeToken = ctx.kilocodeToken ?? process.env.KILOCODE_TOKEN;
+  if (!kilocodeToken) return null;
+  env.KILOCODE_TOKEN = kilocodeToken;
+
+  // When the worker explicitly returned organizationId (including null
+  // for "this town has no org"), trust it. Only fall back to process.env
+  // when the field was omitted entirely (older worker version that
+  // didn't yet include the prewarm context).
+  const organizationId =
+    ctx.organizationId !== undefined
+      ? ctx.organizationId
+      : (process.env.GASTOWN_ORGANIZATION_ID ?? null);
+  if (organizationId) env.GASTOWN_ORGANIZATION_ID = organizationId;
+
+  // Plumb GitHub auth into the prewarmed SDK env so `gh` CLI and `git`
+  // subprocesses spawned from the mayor's bash tool see credentials.
+  // Mirror buildAgentEnv (agent-runner.ts:180-188): GITHUB_CLI_PAT wins
+  // for `gh` (PRs/issues appear under the user's identity), else fall
+  // back to the integration-resolved GIT_TOKEN.
+  //
+  // Without this, ensureMayor's short-circuit path returns a prewarmed
+  // SDK whose process.env is missing GH_TOKEN entirely — `gh auth status`
+  // reports "not logged in" until the SDK is torn down and rebuilt.
+  if (ctx.githubToken) {
+    env.GIT_TOKEN = ctx.githubToken;
+    env.GITHUB_TOKEN = ctx.githubToken;
   }
+  if (ctx.githubCliPat) {
+    env.GITHUB_CLI_PAT = ctx.githubCliPat;
+  }
+  const ghToken = ctx.githubCliPat ?? ctx.githubToken;
+  if (ghToken) {
+    env.GH_TOKEN = ghToken;
+  }
+
+  // Without the worker-resolved model, skip prewarm: any guess we make
+  // here will almost certainly differ from /agents/start's resolved
+  // model and trigger ensureSDKServer's eviction-and-respawn path,
+  // making the prewarm a net negative on the critical path.
+  if (!ctx.model || !ctx.smallModel) return null;
+
+  const configJson = buildKiloConfigContent(
+    kilocodeToken,
+    ctx.model,
+    ctx.smallModel,
+    organizationId ?? undefined
+  );
+  env.KILO_CONFIG_CONTENT = configJson;
+  env.OPENCODE_CONFIG_CONTENT = configJson;
 
   return env;
 }
@@ -2677,30 +2788,47 @@ function buildPrewarmEnv(mayorAgentId: string): Record<string, string> {
 async function prewarmMayorSDK(townId: string, apiUrl: string, token: string): Promise<void> {
   const t0 = Date.now();
 
-  const mayorAgentId = await fetchMayorAgentId(townId, apiUrl, token);
-  if (!mayorAgentId) {
+  const ctx = await fetchMayorPrewarmContext(townId, apiUrl, token);
+  if (!ctx) {
     console.log(`${MANAGER_LOG} prewarmMayorSDK: no mayor agent for town ${townId}`);
     return;
   }
 
-  const workdir = mayorWorkdirForTown(townId);
+  const env = buildPrewarmEnv(ctx, townId);
+  if (!env) {
+    console.log(
+      `${MANAGER_LOG} prewarmMayorSDK: skipping for town ${townId} — missing model/token (would cause eviction churn)`
+    );
+    return;
+  }
 
-  await hydrateDbFromSnapshot(mayorAgentId, apiUrl, token, `mayor-${townId}`, townId);
+  // Materialize the mayor workdir before ensureSDKServer's process.chdir.
+  // Without this, prewarm on a cold container throws ENOENT because
+  // createMayorWorkspace runs from runAgent (i.e. /agents/start) only.
+  const workdir = await ensureMayorWorkspaceForTown(townId);
+  if (workdir !== mayorWorkdirForTown(townId)) {
+    // Defensive: if the workspace helper ever changes its layout, the
+    // sdkInstances key (workdir) and the path /agents/start uses must
+    // stay aligned or the cache hit won't fire.
+    console.warn(
+      `${MANAGER_LOG} prewarmMayorSDK: workdir mismatch (got=${workdir}, expected=${mayorWorkdirForTown(townId)})`
+    );
+  }
 
-  const env = buildPrewarmEnv(mayorAgentId);
+  await hydrateDbFromSnapshot(ctx.agentId, apiUrl, token, `mayor-${townId}`, townId);
 
   const existing = sdkInstances.get(workdir);
   if (existing) {
     const durationMs = Date.now() - t0;
     log.info('mayor.prewarm_complete', {
-      agentId: mayorAgentId,
+      agentId: ctx.agentId,
       townId,
       port: parseInt(new URL(existing.server.url).port),
       durationMs,
       alreadyRunning: true,
     });
     postEventToWorker('mayor.prewarm_complete', {
-      agentId: mayorAgentId,
+      agentId: ctx.agentId,
       role: 'mayor',
       durationMs,
     });
@@ -2711,14 +2839,14 @@ async function prewarmMayorSDK(townId: string, apiUrl: string, token: string): P
 
   const durationMs = Date.now() - t0;
   log.info('mayor.prewarm_complete', {
-    agentId: mayorAgentId,
+    agentId: ctx.agentId,
     townId,
     port,
     durationMs,
     alreadyRunning: false,
   });
   postEventToWorker('mayor.prewarm_complete', {
-    agentId: mayorAgentId,
+    agentId: ctx.agentId,
     role: 'mayor',
     durationMs,
   });
@@ -2729,9 +2857,25 @@ async function prewarmMayorSDK(townId: string, apiUrl: string, token: string): P
  * Gastown worker and resumes all registered agents.
  *
  * Called from main.ts when GASTOWN_TOWN_ID and GASTOWN_API_URL are set.
+ *
+ * Installs a hydration gate (see `awaitHydration`) for the duration of
+ * the call so /agents/start and /refresh-token wait for the registry
+ * loop and mayor prewarm to release the global sdkServerLock before
+ * contending for it themselves.
  */
 export async function bootHydration(): Promise<void> {
-  const LOG = '[boot-hydration]';
+  let resolve!: () => void;
+  _hydrationComplete = new Promise<void>(r => {
+    resolve = r;
+  });
+  try {
+    await bootHydrationImpl('[boot-hydration]');
+  } finally {
+    resolve();
+  }
+}
+
+async function bootHydrationImpl(LOG: string): Promise<void> {
   const apiUrl = process.env.GASTOWN_API_URL;
   const townId = process.env.GASTOWN_TOWN_ID;
   const initialToken = process.env.GASTOWN_CONTAINER_TOKEN;
@@ -2760,6 +2904,7 @@ export async function bootHydration(): Promise<void> {
   try {
     const resp = await fetch(`${apiUrl}/api/towns/${townId}/container-registry`, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!resp.ok) {
       console.warn(`${LOG} Failed to fetch registry: ${resp.status}`);

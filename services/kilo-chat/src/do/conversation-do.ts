@@ -1,5 +1,5 @@
 import {
-  ATTACHMENT_MAX_BYTES,
+  attachmentInitRequestSchema,
   buildReplyToMessageSnapshot,
   type ContentBlock,
   type ActionsBlock,
@@ -8,6 +8,7 @@ import {
   type ExecApprovalDecision,
 } from '@kilocode/kilo-chat';
 import { DurableObject } from 'cloudflare:workers';
+import { z } from 'zod';
 import { logger } from '../util/logger';
 import {
   deliverToBot,
@@ -59,6 +60,13 @@ type StoredAttachmentRow = typeof attachments.$inferSelect;
 
 const INIT_DEDUPE_WINDOW_MS = 30_000;
 const MAX_ATTACHMENTS_PER_MESSAGE = 10;
+
+// Validates the RPC input for initAttachment. Reuses the size/mimeType/filename
+// rules from the public request schema so the DO and the HTTP route stay in
+// lockstep — only swapping conversationId for the trusted uploaderId.
+const initAttachmentInternalSchema = attachmentInitRequestSchema
+  .omit({ conversationId: true })
+  .extend({ uploaderId: z.string().min(1) });
 
 function buildReplySnapshot(
   messageId: string,
@@ -1318,33 +1326,14 @@ export class ConversationDO extends DurableObject<Env> {
     };
   }
 
-  initAttachment(params: InitAttachmentParams): InitAttachmentResult {
-    if (
-      typeof params.size !== 'number' ||
-      !Number.isInteger(params.size) ||
-      params.size < 0 ||
-      params.size > ATTACHMENT_MAX_BYTES
-    ) {
-      return {
-        ok: false,
-        code: 'invalid',
-        error: `Invalid size ${params.size}; must be 0..${ATTACHMENT_MAX_BYTES}`,
-      };
+  initAttachment(rawParams: InitAttachmentParams): InitAttachmentResult {
+    const parsed = initAttachmentInternalSchema.safeParse(rawParams);
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      const path = first?.path.join('.') || 'input';
+      return { ok: false, code: 'invalid', error: `${path}: ${first?.message ?? 'invalid'}` };
     }
-    if (
-      typeof params.mimeType !== 'string' ||
-      params.mimeType.length < 1 ||
-      params.mimeType.length > 255
-    ) {
-      return { ok: false, code: 'invalid', error: 'mimeType must be 1..255 chars' };
-    }
-    if (
-      typeof params.filename !== 'string' ||
-      params.filename.length < 1 ||
-      params.filename.length > 512
-    ) {
-      return { ok: false, code: 'invalid', error: 'filename must be 1..512 chars' };
-    }
+    const params = parsed.data;
     if (!this.isMember(params.uploaderId)) {
       return { ok: false, code: 'forbidden', error: 'Forbidden' };
     }

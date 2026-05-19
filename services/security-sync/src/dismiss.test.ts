@@ -122,6 +122,53 @@ describe('processSecurityFindingDismissal', () => {
     expect(auditRows).toHaveLength(0);
   });
 
+  it('dismisses non-Dependabot findings locally without upstream writeback', async () => {
+    const { db, updates, auditRows } = createDb({ ...finding, source: 'pnpm_audit' });
+    const getToken = vi.fn().mockResolvedValue('github-token');
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await expect(
+      processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getToken } as unknown as GitTokenService,
+        message: createMessage(),
+      })
+    ).resolves.toEqual({ dismissed: true, findingSource: 'pnpm_audit' });
+
+    expect(getToken).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(updates[0]).toMatchObject({
+      status: 'ignored',
+      ignored_reason: 'not_used',
+      ignored_by: 'owner@example.com',
+    });
+    expect(auditRows[0]).toMatchObject({
+      action: 'security.finding.dismissed',
+      metadata: { source: 'pnpm_audit' },
+    });
+  });
+
+  it('leaves already ignored findings untouched', async () => {
+    const { db, updates, auditRows } = createDb({ ...finding, status: 'ignored' });
+    const getToken = vi.fn().mockResolvedValue('github-token');
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await expect(
+      processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getToken } as unknown as GitTokenService,
+        message: createMessage(),
+      })
+    ).resolves.toEqual({ dismissed: false, findingSource: 'dependabot' });
+
+    expect(getToken).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
+  });
+
   it('ignores dismissal commands for findings owned by another tenant', async () => {
     const { db, updates, auditRows } = createDb({
       ...finding,

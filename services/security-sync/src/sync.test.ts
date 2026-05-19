@@ -58,7 +58,7 @@ describe('Worker auto-analysis queue sync', () => {
         autoAnalysisEnabled: true,
         autoAnalysisMinSeverity: 'all',
       })
-    ).toEqual({ eligible: false, severityRank: null });
+    ).toEqual({ eligible: true, severityRank: 3 });
   });
 
   it('enqueues eligible findings for Worker-owned automatic analysis', async () => {
@@ -108,6 +108,56 @@ describe('Worker auto-analysis queue sync', () => {
       owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       queue_status: 'queued',
       severity_rank: 0,
+    });
+  });
+
+  it('enqueues unknown severity at the all threshold using the durable low queue rank', async () => {
+    const inserted: unknown[] = [];
+    const tx = {
+      update: () => ({
+        set: () => ({
+          where: async () => undefined,
+        }),
+      }),
+      insert: () => ({
+        values: (values: unknown) => ({
+          onConflictDoNothing: () => ({
+            returning: async () => {
+              inserted.push(values);
+              return [{ id: 'queue-row' }];
+            },
+          }),
+        }),
+      }),
+    };
+    const db = {
+      transaction: async (callback: (transaction: typeof tx) => Promise<void>) => callback(tx),
+    };
+
+    await expect(
+      syncAutoAnalysisQueueForFinding(db as never, {
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        findingId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        findingCreatedAt: '2026-05-18T10:00:00.000Z',
+        previousStatus: null,
+        currentStatus: 'open',
+        severity: 'unexpected',
+        isAgentEnabled: true,
+        autoAnalysisEnabled: true,
+        autoAnalysisMinSeverity: 'all',
+        ownerAutoAnalysisEnabledAt: '2026-05-18T09:00:00.000Z',
+      })
+    ).resolves.toEqual({
+      enqueueCount: 1,
+      eligibleCount: 1,
+      boundarySkipCount: 0,
+      unknownSeverityCount: 1,
+    });
+    expect(inserted[0]).toMatchObject({
+      finding_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      queue_status: 'queued',
+      severity_rank: 3,
     });
   });
 });

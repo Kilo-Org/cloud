@@ -1,6 +1,7 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import { security_audit_log, security_findings } from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import { parseDependabotDismissalTarget } from '@kilocode/worker-utils/dependabot-dismissal-target';
 import { eq, sql } from 'drizzle-orm';
 import type { SecurityDismissMessage } from './index.js';
 
@@ -57,13 +58,12 @@ export async function processSecurityFindingDismissal(params: {
   }
 
   if (finding.source === 'dependabot') {
-    const alertNumber = /^\d+$/.test(finding.source_id)
-      ? Number.parseInt(finding.source_id, 10)
-      : Number.NaN;
-    const repoParts = finding.repo_full_name.split('/');
-    const [repoOwner, repoName] = repoParts;
+    const target = parseDependabotDismissalTarget({
+      sourceId: finding.source_id,
+      repoFullName: finding.repo_full_name,
+    });
 
-    if (!Number.isSafeInteger(alertNumber) || repoParts.length !== 2 || !repoOwner || !repoName) {
+    if (!target) {
       console.warn('Dependabot dismissal skipped because source metadata is invalid', {
         runId: params.message.runId,
         findingId: params.message.findingId,
@@ -73,7 +73,8 @@ export async function processSecurityFindingDismissal(params: {
 
     const token = await params.gitTokenService.getToken(params.message.installationId);
     const response = await fetch(
-      `https://api.github.com/repos/${repoOwner}/${repoName}/dependabot/alerts/${alertNumber}`,
+      `https://api.github.com/repos/${target.repoOwner}/${target.repoName}/dependabot/alerts/${target.alertNumber}`,
+
       {
         method: 'PATCH',
         headers: {

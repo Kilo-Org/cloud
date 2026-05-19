@@ -17,6 +17,10 @@ import {
   security_audit_log,
 } from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import {
+  decideAutoAnalysisEligibility,
+  type AutoAnalysisMinSeverity,
+} from '@kilocode/worker-utils/security-auto-analysis-policy';
 
 const SecurityFindingSource = { DEPENDABOT: 'dependabot' } as const;
 
@@ -92,8 +96,6 @@ type ParsedSecurityFinding = {
   cvss_score: number | null;
   dependency_scope: 'development' | 'runtime' | null;
 };
-
-type AutoAnalysisMinSeverity = 'critical' | 'high' | 'medium' | 'all';
 
 type SecurityAgentConfig = {
   sla_critical_days: number;
@@ -620,26 +622,6 @@ type AutoAnalysisQueueSyncResult = {
 };
 
 const AUTO_ANALYSIS_REOPEN_REQUEUE_CAP = 2;
-const severityRankBySeverity = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-} satisfies Record<SecuritySeverity, number>;
-
-function minSeverityToMaxRank(minSeverity: AutoAnalysisMinSeverity): number {
-  switch (minSeverity) {
-    case 'critical':
-      return severityRankBySeverity.critical;
-    case 'high':
-      return severityRankBySeverity.high;
-    case 'medium':
-      return severityRankBySeverity.medium;
-    case 'all':
-      return severityRankBySeverity.low;
-  }
-}
-
 export function isFindingEligibleForAutoAnalysis(params: {
   findingCreatedAt: string;
   findingStatus: string;
@@ -649,32 +631,19 @@ export function isFindingEligibleForAutoAnalysis(params: {
   autoAnalysisEnabled: boolean;
   autoAnalysisMinSeverity: AutoAnalysisMinSeverity;
   autoAnalysisIncludeExisting?: boolean;
-}): { eligible: boolean; severityRank: number | null } {
-  const severityRank = securitySeveritySchema.safeParse(params.severity);
-  const normalizedSeverityRank = severityRank.success
-    ? severityRankBySeverity[severityRank.data]
-    : null;
-  if (!params.isAgentEnabled || !params.autoAnalysisEnabled) {
-    return { eligible: false, severityRank: normalizedSeverityRank };
-  }
-  if (params.findingStatus !== SecurityFindingStatus.OPEN) {
-    return { eligible: false, severityRank: normalizedSeverityRank };
-  }
-  if (!params.ownerAutoAnalysisEnabledAt) {
-    return { eligible: false, severityRank: normalizedSeverityRank };
-  }
-  if (
-    !params.autoAnalysisIncludeExisting &&
-    Date.parse(params.findingCreatedAt) < Date.parse(params.ownerAutoAnalysisEnabledAt)
-  ) {
-    return { eligible: false, severityRank: normalizedSeverityRank };
-  }
-  return {
-    eligible:
-      normalizedSeverityRank !== null &&
-      normalizedSeverityRank <= minSeverityToMaxRank(params.autoAnalysisMinSeverity),
-    severityRank: normalizedSeverityRank,
-  };
+}): { eligible: boolean; severityRank: number } {
+  const decision = decideAutoAnalysisEligibility({
+    findingCreatedAt: params.findingCreatedAt,
+    findingStatus: params.findingStatus,
+    findingSeverity: params.severity,
+    autoAnalysisEnabledAt: params.ownerAutoAnalysisEnabledAt,
+    isAgentEnabled: params.isAgentEnabled,
+    autoAnalysisEnabled: params.autoAnalysisEnabled,
+    autoAnalysisMinSeverity: params.autoAnalysisMinSeverity,
+    autoAnalysisIncludeExisting: params.autoAnalysisIncludeExisting,
+  });
+
+  return { eligible: decision.eligible, severityRank: decision.severityRank };
 }
 
 export async function syncAutoAnalysisQueueForFinding(
@@ -693,37 +662,33 @@ export async function syncAutoAnalysisQueueForFinding(
     autoAnalysisIncludeExisting?: boolean;
   }
 ): Promise<AutoAnalysisQueueSyncResult> {
-  const { eligible, severityRank } = isFindingEligibleForAutoAnalysis({
+  const decision = decideAutoAnalysisEligibility({
     findingCreatedAt: params.findingCreatedAt,
     findingStatus: params.currentStatus,
-    severity: params.severity,
-    ownerAutoAnalysisEnabledAt: params.ownerAutoAnalysisEnabledAt,
+    findingSeverity: params.severity,
+    autoAnalysisEnabledAt: params.ownerAutoAnalysisEnabledAt,
     isAgentEnabled: params.isAgentEnabled,
     autoAnalysisEnabled: params.autoAnalysisEnabled,
     autoAnalysisMinSeverity: params.autoAnalysisMinSeverity,
     autoAnalysisIncludeExisting: params.autoAnalysisIncludeExisting,
   });
-  const boundarySkip =
-    !params.autoAnalysisIncludeExisting &&
-    params.ownerAutoAnalysisEnabledAt != null &&
-    Date.parse(params.findingCreatedAt) < Date.parse(params.ownerAutoAnalysisEnabledAt);
-  const unknownSeverityCount = severityRank == null ? 1 : 0;
+  const { eligible, severityRank } = decision;
+  const boundarySkip = decision.boundarySkipped;
+  const unknownSeverityCount = decision.severityWasUnknown ? 1 : 0;
   let enqueueCount = 0;
   const ownedByOrganizationId = isOrgOwner(params.owner) ? params.owner.organizationId : null;
   const ownedByUserId = isOrgOwner(params.owner) ? null : params.owner.userId;
 
   await db.transaction(async tx => {
-    if (severityRank != null) {
-      await tx
-        .update(security_analysis_queue)
-        .set({ severity_rank: severityRank, updated_at: sql`now()` })
-        .where(
-          and(
-            eq(security_analysis_queue.finding_id, params.findingId),
-            eq(security_analysis_queue.queue_status, 'queued')
-          )
-        );
-    }
+    await tx
+      .update(security_analysis_queue)
+      .set({ severity_rank: severityRank, updated_at: sql`now()` })
+      .where(
+        and(
+          eq(security_analysis_queue.finding_id, params.findingId),
+          eq(security_analysis_queue.queue_status, 'queued')
+        )
+      );
 
     if (!eligible) {
       await tx
@@ -801,7 +766,7 @@ export async function syncAutoAnalysisQueueForFinding(
           owned_by_organization_id: ownedByOrganizationId,
           owned_by_user_id: ownedByUserId,
           queue_status: 'queued',
-          severity_rank: severityRank ?? severityRankBySeverity.low,
+          severity_rank: severityRank,
           queued_at: sql`now()`,
           updated_at: sql`now()`,
         })

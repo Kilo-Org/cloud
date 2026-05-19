@@ -224,4 +224,63 @@ describe('consumeOwnerBatch scheduled lifecycle handoff', () => {
     expect(message.ack).toHaveBeenCalledTimes(1);
     expect(message.retry).not.toHaveBeenCalled();
   });
+
+  it('launches unknown severity at the all threshold to match sync-side queue eligibility', async () => {
+    vi.mocked(claimRowsForOwner).mockResolvedValue({
+      rows: [
+        {
+          id: queueRowId,
+          finding_id: findingId,
+          claim_token: 'scheduled-claim-token',
+          attempt_count: 0,
+          owned_by_organization_id: null,
+          owned_by_user_id: userId,
+        },
+      ],
+      config: {
+        analysis_mode: 'auto',
+        auto_analysis_enabled: true,
+        auto_analysis_min_severity: 'all',
+        auto_analysis_include_existing: true,
+      },
+      isAgentEnabled: true,
+      autoAnalysisEnabledAt: '2026-05-19T08:00:00.000Z',
+      blocked: false,
+    } as never);
+    vi.mocked(getSecurityFindingById).mockResolvedValue({
+      id: findingId,
+      created_at: '2026-05-19T08:01:00.000Z',
+      status: 'open',
+      severity: 'unexpected',
+      repo_full_name: 'kilo/repo',
+    } as never);
+    const message = {
+      body: {
+        ownerType: 'user',
+        ownerId: userId,
+        dispatchId: 'dispatch-unknown-severity',
+        enqueuedAt: '2026-05-19T08:00:00.000Z',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await consumeOwnerBatch(
+      { queue: 'security-auto-analysis-owner', messages: [message] } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://example' },
+        NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+        INTERNAL_API_SECRET: { get: async () => 'internal-api-secret' },
+        GIT_TOKEN_SERVICE: {
+          getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+        },
+      } as unknown as CloudflareEnv
+    );
+
+    expect(startSecurityAnalysis).toHaveBeenCalledTimes(1);
+    expect(updateQueueFromPending).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
 });

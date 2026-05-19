@@ -16,7 +16,9 @@
     "./git-url": "./src/git-url.ts",
     "./callback-token": "./src/callback-token.ts",
     "./kilo-model-id": "./src/kilo-model-id.ts",
-    "./cloud-agent-queue-report": "./src/cloud-agent-queue-report.ts"
+    "./cloud-agent-queue-report": "./src/cloud-agent-queue-report.ts",
+    "./security-auto-analysis-policy": "./src/security-auto-analysis-policy.ts",
+    "./dependabot-dismissal-target": "./src/dependabot-dismissal-target.ts"
   },
   "scripts": {
     "test": "vitest run",

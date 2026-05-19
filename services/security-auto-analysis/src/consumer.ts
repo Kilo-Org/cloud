@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
+import { decideAutoAnalysisEligibility } from '@kilocode/worker-utils/security-auto-analysis-policy';
 import {
   claimRowsForOwner,
   clearOwnerActorResolutionFailure,
@@ -148,23 +149,6 @@ function ownerFromQueueRow(row: ClaimedQueueRow): QueueOwner | null {
   return null;
 }
 
-function getSeverityRankForAutoAnalysis(severity: string | null): number | null {
-  if (severity === 'critical') return 0;
-  if (severity === 'high') return 1;
-  if (severity === 'medium') return 2;
-  if (severity === 'low') return 3;
-  return null;
-}
-
-function maxSeverityRankForThreshold(
-  minSeverity: SecurityAgentConfig['auto_analysis_min_severity']
-): number {
-  if (minSeverity === 'critical') return 0;
-  if (minSeverity === 'high') return 1;
-  if (minSeverity === 'medium') return 2;
-  return 3;
-}
-
 function isEligibleForAutoLaunch(params: {
   findingCreatedAt: string;
   findingStatus: string;
@@ -173,27 +157,16 @@ function isEligibleForAutoLaunch(params: {
   config: SecurityAgentConfig;
   isAgentEnabled: boolean;
 }): boolean {
-  if (!params.isAgentEnabled || !params.config.auto_analysis_enabled) {
-    return false;
-  }
-  if (params.findingStatus !== 'open') {
-    return false;
-  }
-  if (!params.autoAnalysisEnabledAt) {
-    return false;
-  }
-  if (
-    !params.config.auto_analysis_include_existing &&
-    Date.parse(params.findingCreatedAt) < Date.parse(params.autoAnalysisEnabledAt)
-  ) {
-    return false;
-  }
-
-  // Treat null/unknown severity as low (rank 3) so these findings are not
-  // silently skipped. They still respect the severity threshold.
-  const severityRank = getSeverityRankForAutoAnalysis(params.findingSeverity) ?? 3;
-
-  return severityRank <= maxSeverityRankForThreshold(params.config.auto_analysis_min_severity);
+  return decideAutoAnalysisEligibility({
+    findingCreatedAt: params.findingCreatedAt,
+    findingStatus: params.findingStatus,
+    findingSeverity: params.findingSeverity,
+    autoAnalysisEnabledAt: params.autoAnalysisEnabledAt,
+    isAgentEnabled: params.isAgentEnabled,
+    autoAnalysisEnabled: params.config.auto_analysis_enabled,
+    autoAnalysisMinSeverity: params.config.auto_analysis_min_severity,
+    autoAnalysisIncludeExisting: params.config.auto_analysis_include_existing,
+  }).eligible;
 }
 
 function nextRetryAt(attemptCount: number): Date {

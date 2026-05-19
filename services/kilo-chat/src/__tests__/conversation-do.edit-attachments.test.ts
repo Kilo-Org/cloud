@@ -158,4 +158,61 @@ describe('ConversationDO.editMessage with attachments', () => {
       ).toThrow(/add/i);
     });
   });
+
+  it('uses stored attachment metadata when editing message content', async () => {
+    const conversationId = ulid();
+    const stub = getDO(conversationId);
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
+
+    const a1 = await unwrap(
+      stub.initAttachment({
+        uploaderId: 'user-A',
+        mimeType: 'image/png',
+        size: 1,
+        filename: 'a1',
+      })
+    );
+    await putUploadedAttachmentObject({ r2Key: a1.r2Key, size: 1, mimeType: 'image/png' });
+    const create = await stub.createMessage({
+      senderId: 'user-A',
+      content: [
+        {
+          type: 'attachment',
+          attachmentId: a1.attachmentId,
+          mimeType: 'image/png',
+          size: 1,
+          filename: 'a1',
+        },
+      ],
+    });
+    expect(create.ok).toBe(true);
+    const messageId = create.ok ? create.messageId : '';
+
+    const edit = await stub.editMessage({
+      messageId,
+      senderId: 'user-A',
+      clientTimestamp: Date.now(),
+      content: [
+        {
+          type: 'attachment',
+          attachmentId: a1.attachmentId,
+          mimeType: 'application/x-msdownload',
+          size: 999_999_999,
+          filename: 'evil.exe',
+        },
+      ],
+    });
+    expect(edit.ok).toBe(true);
+
+    const message = await stub.getMessage(messageId);
+    expect(message?.content).toEqual([
+      {
+        type: 'attachment',
+        attachmentId: a1.attachmentId,
+        mimeType: 'image/png',
+        size: 1,
+        filename: 'a1',
+      },
+    ]);
+  });
 });

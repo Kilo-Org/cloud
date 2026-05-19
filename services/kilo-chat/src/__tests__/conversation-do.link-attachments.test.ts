@@ -74,6 +74,47 @@ describe('ConversationDO.createMessage with attachment blocks', () => {
     expect(linked.row).not.toBeNull();
   });
 
+  it('uses stored attachment metadata in message content', async () => {
+    const conversationId = ulid();
+    const stub = getDO(conversationId);
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
+    const { attachmentId, r2Key } = await unwrap(
+      stub.initAttachment({
+        uploaderId: 'user-A',
+        mimeType: 'image/png',
+        size: 100,
+        filename: 'a.png',
+      })
+    );
+    await putUploadedAttachmentObject({ r2Key, size: 100, mimeType: 'image/png' });
+
+    const result = await stub.createMessage({
+      senderId: 'user-A',
+      content: [
+        {
+          type: 'attachment',
+          attachmentId,
+          mimeType: 'application/x-msdownload',
+          size: 999_999_999,
+          filename: 'evil.exe',
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.message.content).toEqual([
+        {
+          type: 'attachment',
+          attachmentId,
+          mimeType: 'image/png',
+          size: 100,
+          filename: 'a.png',
+        },
+      ]);
+    }
+  });
+
   it('rejects when attachment uploaderId != sender', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);

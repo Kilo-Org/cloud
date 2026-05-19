@@ -198,7 +198,13 @@ export type EditMessageParams = {
 };
 
 export type EditMessageResult =
-  | { ok: true; stale: false; messageId: string; memberContext: MemberContext }
+  | {
+      ok: true;
+      stale: false;
+      messageId: string;
+      content: ContentBlock[];
+      memberContext: MemberContext;
+    }
   | { ok: true; stale: true; messageId: string }
   | { ok: false; code: 'not_found' | 'forbidden'; error: string };
 
@@ -354,6 +360,26 @@ export class ConversationDO extends DurableObject<Env> {
       }
     }
     return null;
+  }
+
+  private canonicalizeAttachmentBlocks(
+    content: readonly ContentBlock[],
+    attachmentRows: readonly StoredAttachmentRow[]
+  ): ContentBlock[] {
+    if (attachmentRows.length === 0) return [...content];
+    const attachmentsById = new Map(attachmentRows.map(row => [row.id, row]));
+    return content.map(block => {
+      if (block.type !== 'attachment') return block;
+      const row = attachmentsById.get(block.attachmentId);
+      if (!row) return block;
+      return {
+        type: 'attachment',
+        attachmentId: row.id,
+        mimeType: row.mime_type,
+        size: row.size,
+        filename: row.filename,
+      };
+    });
   }
 
   async enqueueMessageWebhook(msg: WebhookMessage, convContext: MemberContext): Promise<void> {
@@ -673,6 +699,7 @@ export class ConversationDO extends DurableObject<Env> {
     if (uploadError) {
       return { ok: false, code: 'internal', error: uploadError };
     }
+    const content = this.canonicalizeAttachmentBlocks(params.content, attachmentRows);
 
     const messageId = this.nextUlid();
 
@@ -682,7 +709,7 @@ export class ConversationDO extends DurableObject<Env> {
           .values({
             id: messageId,
             sender_id: params.senderId,
-            content: JSON.stringify(params.content),
+            content: JSON.stringify(content),
             in_reply_to_message_id: params.inReplyToMessageId ?? null,
             version: 1,
             deleted: 0,
@@ -716,10 +743,8 @@ export class ConversationDO extends DurableObject<Env> {
       : new Map<string, StoredMessageRow>();
 
     if (this.isBotMember(params.senderId)) {
-      this.registerBotMessageNotification(messageId, params.senderId, params.content);
-      if (
-        botMessageNotificationTextLength(params.content) >= BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS
-      ) {
+      this.registerBotMessageNotification(messageId, params.senderId, content);
+      if (botMessageNotificationTextLength(content) >= BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS) {
         this.notifyBotMessageIfClaimable(messageId, 'length');
       }
     }
@@ -902,6 +927,7 @@ export class ConversationDO extends DurableObject<Env> {
       }
     }
     const removedRows = existingAttachmentRows.filter(r => !newAttachmentIds.has(r.id));
+    const content = this.canonicalizeAttachmentBlocks(params.content, existingAttachmentRows);
     if (removedRows.length > 0) {
       const removedIds = removedRows.map(r => r.id);
       this.db.delete(attachments).where(inArray(attachments.id, removedIds)).run();
@@ -913,7 +939,7 @@ export class ConversationDO extends DurableObject<Env> {
     this.db
       .update(messages)
       .set({
-        content: JSON.stringify(params.content),
+        content: JSON.stringify(content),
         version: newVersion,
         updated_at: Date.now(),
         client_updated_at: params.clientTimestamp,
@@ -924,7 +950,7 @@ export class ConversationDO extends DurableObject<Env> {
     if (this.isBotMember(params.senderId)) {
       this.db
         .update(botMessageNotifications)
-        .set({ content: JSON.stringify(params.content) })
+        .set({ content: JSON.stringify(content) })
         .where(
           and(
             eq(botMessageNotifications.message_id, params.messageId),
@@ -933,9 +959,7 @@ export class ConversationDO extends DurableObject<Env> {
         )
         .run();
 
-      if (
-        botMessageNotificationTextLength(params.content) >= BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS
-      ) {
+      if (botMessageNotificationTextLength(content) >= BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS) {
         this.notifyBotMessageIfClaimable(params.messageId, 'length');
       }
     }
@@ -944,6 +968,7 @@ export class ConversationDO extends DurableObject<Env> {
       ok: true,
       stale: false,
       messageId: params.messageId,
+      content,
       memberContext,
     };
   }

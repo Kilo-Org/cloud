@@ -113,7 +113,7 @@ export async function createMessageFor(
     callerId,
     conversationId,
     messageId,
-    content,
+    message.content,
     inReplyToMessageId,
     clientId
   );
@@ -407,7 +407,7 @@ export async function editMessageFor(
       result.memberContext.sandboxId,
       result.memberContext.humanMemberIds,
       'message.updated',
-      { messageId: result.messageId, content, clientUpdatedAt: timestamp }
+      { messageId: result.messageId, content: result.content, clientUpdatedAt: timestamp }
     );
     ctx.waitUntil(pushPromise);
   }

@@ -154,7 +154,7 @@ function defaultTempId(): string {
 
 export function useAttachmentQueue(
   client: KiloChatClient,
-  conversationId: string | null,
+  conversationId: string,
   options: UseAttachmentQueueOptions
 ): UseAttachmentQueueResult {
   const [state, dispatch] = useReducer(attachmentQueueReducer, { rows: [] });
@@ -182,10 +182,6 @@ export function useAttachmentQueue(
       const pending = pendingRef.current.get(tempId);
       const blob = blobsRef.current.get(tempId);
       if (!pending || !blob) return;
-      if (!conversationId) {
-        dispatch({ type: 'setFailed', tempId, error: 'No active conversation' });
-        return;
-      }
 
       try {
         let putUrl = pending.putUrl;
@@ -235,7 +231,6 @@ export function useAttachmentQueue(
         onSizeRejected?.(input);
         return null;
       }
-      if (!conversationId) return null;
       const tempId = generate();
       const size = input.blob.size;
       blobsRef.current.set(tempId, input.blob);

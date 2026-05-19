@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { downloadInboundAttachments } from './dispatch.js';
+import { ATTACHMENT_MAX_BYTES } from '../synced/schemas.js';
 import type { KiloChatClient } from '../client.js';
 
 const ATT_1 = '01JX0000000000000000000A01';
@@ -164,6 +165,45 @@ describe('downloadInboundAttachments', () => {
     expect(saveMediaBuffer).not.toHaveBeenCalled();
     expect(result.mediaPaths).toEqual([]);
     expect(result.mediaTypes).toEqual([]);
+    expect(result.failedCount).toBe(1);
+  });
+
+  it('skips oversized responses before buffering the body', async () => {
+    const attachments: FakeAttachment[] = [
+      {
+        attachmentId: ATT_1,
+        mimeType: 'application/octet-stream',
+        size: ATTACHMENT_MAX_BYTES + 1,
+        filename: 'oversized.bin',
+      },
+    ];
+    const client = makeClient({
+      [ATT_1]: { url: 'https://r2/oversized.bin' },
+    });
+    const arrayBuffer = vi.fn(async () => new Uint8Array([1, 2, 3]).buffer);
+    const fetchImpl = (async () =>
+      ({
+        ok: true,
+        headers: new Headers({ 'content-length': String(ATTACHMENT_MAX_BYTES + 1) }),
+        arrayBuffer,
+        body: { cancel: vi.fn() },
+      }) as unknown as Response) as typeof fetch;
+    const saveMediaBuffer = vi.fn(async (buffer: Buffer) => ({
+      id: 'a',
+      path: '/tmp/x',
+      size: buffer.length,
+    }));
+
+    const result = await downloadInboundAttachments({
+      client,
+      conversationId: 'conv-1',
+      attachments,
+      saveMediaBuffer,
+      fetchImpl,
+    });
+
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(saveMediaBuffer).not.toHaveBeenCalled();
     expect(result.failedCount).toBe(1);
   });
 

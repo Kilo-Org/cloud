@@ -47,6 +47,40 @@ export type DownloadedAttachments = {
   failedCount: number;
 };
 
+async function readResponseBodyCapped(response: Response, maxBytes: number): Promise<Buffer> {
+  const declaredLength = response.headers.get('content-length');
+  if (declaredLength != null) {
+    const size = Number(declaredLength);
+    if (Number.isFinite(size) && size > maxBytes) {
+      await response.body?.cancel();
+      throw new Error(`Attachment exceeds maximum size of ${maxBytes} bytes`);
+    }
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > maxBytes) {
+      throw new Error(`Attachment exceeds maximum size of ${maxBytes} bytes`);
+    }
+    return Buffer.from(arrayBuffer);
+  }
+
+  const chunks: Buffer[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error(`Attachment exceeds maximum size of ${maxBytes} bytes`);
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks, total);
+}
+
 /**
  * For each inbound attachment, fetch a fresh signed GET URL from the controller,
  * download the bytes, and persist them via `saveMediaBuffer` so the agent runner
@@ -84,8 +118,7 @@ export async function downloadInboundAttachments(params: {
         failedCount++;
         continue;
       }
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+      const buffer = await readResponseBodyCapped(response, ATTACHMENT_MAX_BYTES);
       const saved = await params.saveMediaBuffer(
         buffer,
         att.mimeType,

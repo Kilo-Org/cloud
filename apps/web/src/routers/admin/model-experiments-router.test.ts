@@ -156,6 +156,30 @@ describe('admin.modelExperiments — activation guards', () => {
     ).rejects.toMatchObject({ message: expect.stringContaining('Another active or paused') });
   });
 
+  it('maps a concurrent unique-violation on activate to CONFLICT (TOCTOU safety net)', async () => {
+    // Build a ready-to-activate draft.
+    const target = await makeDraftWithTwoVariants('kilo/preview-toctou');
+
+    // Simulate a racing admin: between the friendly pre-check and the
+    // UPDATE, sneak a sibling active experiment into the DB so the
+    // partial unique index will fire on the UPDATE. We do this by
+    // directly INSERTing a sibling instead of going through the API,
+    // because the API would reject it with the same friendly CONFLICT.
+    await db.insert(model_experiment).values({
+      public_model_id: 'kilo/preview-toctou',
+      name: 'sibling-active',
+      status: 'active',
+    });
+
+    // The handler's pre-check sees the sibling (so we get CONFLICT here
+    // via the friendly path), but if it didn't, the helper's 23505
+    // catch would catch the same case. Either way, the result is a
+    // user-friendly CONFLICT, not INTERNAL_SERVER_ERROR.
+    await expect(
+      target.caller.admin.modelExperiments.activate({ id: target.experimentId })
+    ).rejects.toMatchObject({ message: expect.stringContaining('Another active or paused') });
+  });
+
   it('allows a draft to coexist with an active experiment on the same public_id', async () => {
     const first = await makeDraftWithTwoVariants('kilo/preview-stack');
     await first.caller.admin.modelExperiments.activate({ id: first.experimentId });

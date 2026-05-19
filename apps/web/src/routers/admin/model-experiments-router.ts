@@ -23,9 +23,12 @@ function trpcThrow(code: TrpcErrorCode, message: string): never {
 const notFound = (entity: string): never => trpcThrow('NOT_FOUND', `${entity} not found`);
 const badRequest = (message: string): never => trpcThrow('BAD_REQUEST', message);
 
-const RoutingStatuses = ['active', 'paused'] as const;
 const AllStatuses = ['draft', 'active', 'paused', 'completed'] as const;
 type Status = (typeof AllStatuses)[number];
+
+// Routing-relevant statuses. Drizzle's `inArray` types its second arg as
+// a mutable array, so this is a plain `Status[]`, not `readonly`.
+const ROUTING_STATUSES: Status[] = ['active', 'paused'];
 
 const idSchema = z.object({ id: z.string().uuid() });
 const variantIdSchema = z.object({ variantId: z.string().uuid() });
@@ -60,9 +63,69 @@ async function recomputeExperimentedPublicIds() {
   const rows = await db
     .select({ public_model_id: model_experiment.public_model_id })
     .from(model_experiment)
-    .where(inArray(model_experiment.status, RoutingStatuses as readonly Status[] as Status[]));
+    .where(inArray(model_experiment.status, ROUTING_STATUSES));
   const ids = Array.from(new Set(rows.map(r => r.public_model_id))).sort();
   await redisSet(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, JSON.stringify(ids));
+}
+
+/**
+ * Postgres unique-constraint violation. We use this to convert the
+ * `UQ_model_experiment_public_model_id_routing` partial unique index
+ * violation (raised when two activates race past the friendly
+ * pre-check) into a CONFLICT instead of an INTERNAL_SERVER_ERROR.
+ */
+function isUniqueViolation(err: unknown): boolean {
+  return err instanceof Error && 'code' in err && (err as { code?: unknown }).code === '23505';
+}
+
+type ExperimentRow = typeof model_experiment.$inferSelect;
+
+/**
+ * Common shape of every state-change mutation: load existing, run a
+ * guard, write a `.set(...)` patch, return updated. The DB partial
+ * unique index on `(public_model_id) WHERE status IN ('active','paused')`
+ * is the authoritative concurrency guard; this helper turns its 23505
+ * into a CONFLICT so the friendly message survives a TOCTOU race past
+ * the pre-checks in each handler.
+ *
+ * `guard` may short-circuit by returning the existing row (idempotent
+ * no-op transitions, e.g. re-activating an already-active experiment).
+ */
+// Drizzle's `.set()` accepts both column values and `SQL<unknown>` per column
+// (e.g. `started_at: sql\`now()\``). `Partial<$inferInsert>` is too narrow for
+// that, so we capture the actual parameter type of `.set()` here.
+type UpdateExperimentValues = Parameters<
+  ReturnType<typeof db.update<typeof model_experiment>>['set']
+>[0];
+
+type TransitionDecision =
+  | { kind: 'proceed'; values: UpdateExperimentValues }
+  | { kind: 'noop'; row: ExperimentRow };
+
+async function applyExperimentTransition(opts: {
+  id: string;
+  guard: (existing: ExperimentRow) => Promise<TransitionDecision>;
+}): Promise<ExperimentRow> {
+  const existing = await loadExperimentOrThrow(opts.id);
+  const decision = await opts.guard(existing);
+  if (decision.kind === 'noop') return decision.row;
+  try {
+    const [updated] = await db
+      .update(model_experiment)
+      .set(decision.values)
+      .where(eq(model_experiment.id, opts.id))
+      .returning();
+    await invalidateExperimentCaches(updated.public_model_id);
+    return updated;
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      trpcThrow(
+        'CONFLICT',
+        `Another active or paused experiment exists for ${existing.public_model_id}`
+      );
+    }
+    throw err;
+  }
 }
 
 async function invalidateExperimentCaches(publicModelId: string) {
@@ -162,7 +225,7 @@ async function assertActivatable(experimentId: string, publicModelId: string) {
     .where(
       and(
         eq(model_experiment.public_model_id, publicModelId),
-        inArray(model_experiment.status, RoutingStatuses as readonly Status[] as Status[]),
+        inArray(model_experiment.status, ROUTING_STATUSES),
         sql`${model_experiment.id} <> ${experimentId}`
       )
     )
@@ -262,8 +325,10 @@ export const adminModelExperimentsRouter = createTRPCRouter({
       .set(next)
       .where(eq(model_experiment.id, input.id))
       .returning();
-    await invalidateExperimentCaches(updated.public_model_id);
+    // Only routing-relevant edits touch the per-public-id cache; cosmetic
+    // name/description-only changes don't invalidate.
     if (existing.public_model_id !== updated.public_model_id) {
+      await invalidateExperimentCaches(updated.public_model_id);
       await invalidateExperimentCaches(existing.public_model_id);
     }
     return updated;
@@ -276,50 +341,46 @@ export const adminModelExperimentsRouter = createTRPCRouter({
     return { success: true };
   }),
 
-  activate: adminProcedure.input(idSchema).mutation(async ({ input }) => {
-    const existing = await loadExperimentOrThrow(input.id);
-    if (existing.status === 'completed') badRequest('Cannot activate a completed experiment');
-    if (existing.status === 'active') return existing;
-    await assertActivatable(input.id, existing.public_model_id);
-    const [updated] = await db
-      .update(model_experiment)
-      .set({
-        status: 'active',
-        started_at: existing.started_at ?? sql`now()`,
-      })
-      .where(eq(model_experiment.id, input.id))
-      .returning();
-    await invalidateExperimentCaches(updated.public_model_id);
-    return updated;
-  }),
+  activate: adminProcedure.input(idSchema).mutation(({ input }) =>
+    applyExperimentTransition({
+      id: input.id,
+      guard: async existing => {
+        if (existing.status === 'completed') {
+          badRequest('Cannot activate a completed experiment');
+        }
+        if (existing.status === 'active') return { kind: 'noop', row: existing };
+        await assertActivatable(existing.id, existing.public_model_id);
+        return {
+          kind: 'proceed',
+          values: { status: 'active', started_at: existing.started_at ?? sql`now()` },
+        };
+      },
+    })
+  ),
 
-  pause: adminProcedure.input(idSchema).mutation(async ({ input }) => {
-    const existing = await loadExperimentOrThrow(input.id);
-    if (existing.status === 'paused') return existing;
-    if (existing.status !== 'active') badRequest('Only active experiments can be paused');
-    const [updated] = await db
-      .update(model_experiment)
-      .set({ status: 'paused' })
-      .where(eq(model_experiment.id, input.id))
-      .returning();
-    await invalidateExperimentCaches(updated.public_model_id);
-    return updated;
-  }),
+  pause: adminProcedure.input(idSchema).mutation(({ input }) =>
+    applyExperimentTransition({
+      id: input.id,
+      guard: async existing => {
+        if (existing.status === 'paused') return { kind: 'noop', row: existing };
+        if (existing.status !== 'active') badRequest('Only active experiments can be paused');
+        return { kind: 'proceed', values: { status: 'paused' } };
+      },
+    })
+  ),
 
-  complete: adminProcedure.input(idSchema).mutation(async ({ input }) => {
-    const existing = await loadExperimentOrThrow(input.id);
-    if (existing.status === 'completed') return existing;
-    if (existing.status !== 'active' && existing.status !== 'paused') {
-      badRequest('Only active or paused experiments can be completed');
-    }
-    const [updated] = await db
-      .update(model_experiment)
-      .set({ status: 'completed', ended_at: sql`now()` })
-      .where(eq(model_experiment.id, input.id))
-      .returning();
-    await invalidateExperimentCaches(updated.public_model_id);
-    return updated;
-  }),
+  complete: adminProcedure.input(idSchema).mutation(({ input }) =>
+    applyExperimentTransition({
+      id: input.id,
+      guard: async existing => {
+        if (existing.status === 'completed') return { kind: 'noop', row: existing };
+        if (existing.status !== 'active' && existing.status !== 'paused') {
+          badRequest('Only active or paused experiments can be completed');
+        }
+        return { kind: 'proceed', values: { status: 'completed', ended_at: sql`now()` } };
+      },
+    })
+  ),
 
   setArchived: adminProcedure.input(SetArchivedSchema).mutation(async ({ input }) => {
     const existing = await loadExperimentOrThrow(input.id);

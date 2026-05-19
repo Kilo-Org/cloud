@@ -396,6 +396,11 @@ export const attachmentInitResponseSchema = z.object({
   putHeaders: z.record(z.string(), z.string()),
 });
 
+export const attachmentGetUrlRequestSchema = z.object({
+  attachmentId: ulidSchema,
+  conversationId: ulidSchema,
+});
+
 export const attachmentGetUrlResponseSchema = z.object({
   url: z.string().min(1),
   mimeType: z.string().min(1),

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   actionDeliveryFailedRequestSchema,
   addReactionResponseSchema,
+  attachmentGetUrlRequestSchema,
   attachmentGetUrlResponseSchema,
   attachmentInitRequestSchema,
   attachmentInitResponseSchema,
@@ -98,7 +99,7 @@ export type ReportActionDeliveryFailedParams = {
 export type InitAttachmentParams = z.input<typeof attachmentInitRequestSchema>;
 export type InitAttachmentResult = z.infer<typeof attachmentInitResponseSchema>;
 
-export type GetAttachmentUrlParams = { conversationId: string; attachmentId: string };
+export type GetAttachmentUrlParams = z.input<typeof attachmentGetUrlRequestSchema>;
 export type GetAttachmentUrlResult = z.infer<typeof attachmentGetUrlResponseSchema>;
 
 export type KiloChatClient = {

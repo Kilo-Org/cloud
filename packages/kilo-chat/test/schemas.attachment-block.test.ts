@@ -1,6 +1,32 @@
 import { describe, it, expect } from 'vitest';
-import { attachmentMetadataSchema, contentBlockSchema } from '../src/schemas';
+import {
+  attachmentGetUrlRequestSchema,
+  attachmentMetadataSchema,
+  contentBlockSchema,
+} from '../src/schemas';
 import { ulid } from 'ulid';
+
+describe('attachmentGetUrlRequestSchema', () => {
+  it('validates attachment and conversation ids together', () => {
+    const attachmentId = ulid();
+    const conversationId = ulid();
+    expect(attachmentGetUrlRequestSchema.parse({ attachmentId, conversationId })).toEqual({
+      attachmentId,
+      conversationId,
+    });
+  });
+
+  it('rejects invalid attachment or conversation ids', () => {
+    expect(
+      attachmentGetUrlRequestSchema.safeParse({ attachmentId: 'bad', conversationId: ulid() })
+        .success
+    ).toBe(false);
+    expect(
+      attachmentGetUrlRequestSchema.safeParse({ attachmentId: ulid(), conversationId: 'bad' })
+        .success
+    ).toBe(false);
+  });
+});
 
 describe('attachmentBlockSchema', () => {
   const goodBlock = {

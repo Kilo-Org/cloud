@@ -46,6 +46,7 @@ import type {
 import {
   ulidSchema,
   sandboxIdSchema,
+  attachmentGetUrlRequestSchema,
   attachmentInitRequestSchema,
   createMessageRequestSchema,
   createBotConversationRequestSchema,
@@ -644,21 +645,22 @@ const PUT_URL_TTL_SECONDS = 900;
 const GET_URL_TTL_SECONDS = 3600;
 
 export async function handleAttachmentGetUrl(c: HonoCtx) {
-  const attachmentIdParsed = ulidSchema.safeParse(c.req.param('id'));
-  if (!attachmentIdParsed.success) {
-    return c.json({ error: 'Invalid attachment ID' }, 400);
-  }
-  const attachmentId = attachmentIdParsed.data;
-
   const conversationIdRaw = c.req.query('conversationId');
-  if (!conversationIdRaw) {
-    return c.json({ error: 'Missing conversationId query parameter' }, 400);
-  }
-  const conversationIdParsed = ulidSchema.safeParse(conversationIdRaw);
-  if (!conversationIdParsed.success) {
+  const request = attachmentGetUrlRequestSchema.safeParse({
+    attachmentId: c.req.param('id'),
+    conversationId: conversationIdRaw,
+  });
+  if (!request.success) {
+    const firstPath = request.error.issues[0]?.path[0];
+    if (firstPath === 'attachmentId') {
+      return c.json({ error: 'Invalid attachment ID' }, 400);
+    }
+    if (!conversationIdRaw) {
+      return c.json({ error: 'Missing conversationId query parameter' }, 400);
+    }
     return c.json({ error: 'Invalid conversationId' }, 400);
   }
-  const conversationId = conversationIdParsed.data;
+  const { attachmentId, conversationId } = request.data;
 
   const callerId = c.get('callerId');
 

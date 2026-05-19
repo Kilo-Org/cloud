@@ -297,6 +297,8 @@ function ClawOnboardingFlowInner({
   const hasCapturedInterestsView = useRef(false);
   const hasCapturedDoneView = useRef(false);
   const composioPopupRef = useRef<Window | null>(null);
+  const composioPopupPendingRef = useRef(false);
+  const composioPopupResultHandledRef = useRef(false);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
 
   const stateInput = {
@@ -355,11 +357,19 @@ function ClawOnboardingFlowInner({
     mutations,
   });
 
+  const setComposioPopupPendingState = useCallback((pending: boolean) => {
+    composioPopupPendingRef.current = pending;
+    if (pending) composioPopupResultHandledRef.current = false;
+    setComposioPopupPending(pending);
+  }, []);
+
   const handleComposioPopupResult = useCallback(
     (result: 'success' | 'failed' | 'unknown') => {
+      if (!composioPopupPendingRef.current || composioPopupResultHandledRef.current) return;
+      composioPopupResultHandledRef.current = true;
       composioPopupRef.current?.close();
       composioPopupRef.current = null;
-      setComposioPopupPending(false);
+      setComposioPopupPendingState(false);
       setOnboardingStep('tools');
       void composioStatus.refetch();
 
@@ -374,7 +384,7 @@ function ClawOnboardingFlowInner({
       });
       toast.error('Could not connect Google Calendar. Try again or skip for now.');
     },
-    [composioStatus, posthog]
+    [composioStatus, posthog, setComposioPopupPendingState]
   );
 
   useEffect(() => {
@@ -422,7 +432,7 @@ function ClawOnboardingFlowInner({
       if (!popup || !popup.closed) return;
 
       composioPopupRef.current = null;
-      setComposioPopupPending(false);
+      setComposioPopupPendingState(false);
       void composioStatus.refetch();
       posthog?.capture('claw_setup_tools_connect_failed', {
         toolkit: 'googlecalendar',
@@ -432,17 +442,17 @@ function ClawOnboardingFlowInner({
     }, 700);
 
     return () => window.clearInterval(intervalId);
-  }, [composioPopupPending, composioStatus, posthog]);
+  }, [composioPopupPending, composioStatus, posthog, setComposioPopupPendingState]);
 
   useEffect(() => {
     if (!composioPopupPending || composioStatus.data?.status !== 'connected') return;
 
     composioPopupRef.current?.close();
     composioPopupRef.current = null;
-    setComposioPopupPending(false);
+    setComposioPopupPendingState(false);
     posthog?.capture('claw_setup_tools_composio_completed', { source: 'status_refetch' });
     toast.success('Google Calendar connected');
-  }, [composioPopupPending, composioStatus.data?.status, posthog]);
+  }, [composioPopupPending, composioStatus.data?.status, posthog, setComposioPopupPendingState]);
 
   useEffect(() => {
     if (!composioPopupPending) return;
@@ -813,7 +823,7 @@ function ClawOnboardingFlowInner({
           );
           composioPopupRef.current = popup;
           if (popup) {
-            setComposioPopupPending(true);
+            setComposioPopupPendingState(true);
             writeComposioPopupLoadingPage(popup);
           }
           mutations.createComposioGoogleCalendarLink.mutate(
@@ -829,7 +839,7 @@ function ClawOnboardingFlowInner({
               onError: err => {
                 popup?.close();
                 composioPopupRef.current = null;
-                setComposioPopupPending(false);
+                setComposioPopupPendingState(false);
                 posthog?.capture('claw_setup_tools_connect_failed', {
                   toolkit: 'googlecalendar',
                 });

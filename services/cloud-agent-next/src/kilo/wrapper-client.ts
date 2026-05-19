@@ -100,16 +100,17 @@ export class WrapperError extends Error {
   constructor(
     message: string,
     public readonly code: string,
-    public readonly statusCode: number
+    public readonly statusCode: number,
+    options?: ErrorOptions
   ) {
-    super(message);
+    super(message, options);
     this.name = 'WrapperError';
   }
 }
 
 export class WrapperNotReadyError extends WrapperError {
-  constructor(message: string) {
-    super(message, 'NOT_READY', 503);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, 'NOT_READY', 503, options);
     this.name = 'WrapperNotReadyError';
   }
 }
@@ -445,7 +446,8 @@ export class WrapperClient {
       });
 
       throw new WrapperNotReadyError(
-        `Wrapper did not become ready on port ${this.port} within ${maxWaitMs}ms: ${diagParts}`
+        `Wrapper did not become ready on port ${this.port} within ${maxWaitMs}ms: ${diagParts}`,
+        { cause: startupError }
       );
     }
   }

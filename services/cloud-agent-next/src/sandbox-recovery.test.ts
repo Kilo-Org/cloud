@@ -21,6 +21,7 @@ import {
   withPreparationInfrastructureRecovery,
   withSandboxInternalServerErrorRecovery,
 } from './sandbox-recovery.js';
+import { WrapperNotReadyError } from './kilo/wrapper-client.js';
 import { WorkspaceFilesystemPreparationError } from './workspace-errors.js';
 
 describe('sandbox recovery', () => {
@@ -47,6 +48,18 @@ describe('sandbox recovery', () => {
       name: 'ExecutionError',
       code: 'WRAPPER_START_FAILED',
     });
+
+    expect(isSandboxInternalServerError(error)).toBe(true);
+  });
+
+  it('classifies wrapper not-ready errors caused by sandbox startup 500s', () => {
+    const cause = new Error('Process exited before ready');
+    Object.assign(cause, {
+      name: 'ProcessExitedBeforeReadyError',
+      httpStatus: 500,
+    });
+
+    const error = new WrapperNotReadyError('Wrapper did not become ready', { cause });
 
     expect(isSandboxInternalServerError(error)).toBe(true);
   });

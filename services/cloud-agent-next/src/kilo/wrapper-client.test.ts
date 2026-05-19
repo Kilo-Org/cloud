@@ -600,6 +600,36 @@ describe('WrapperClient', () => {
       expect(session.startProcess).toHaveBeenCalledTimes(1);
     });
 
+    it('preserves sandbox waitForPort failures as the not-ready cause', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      const sandboxStartupError = new Error('Process exited before ready');
+      Object.assign(sandboxStartupError, {
+        name: 'ProcessExitedBeforeReadyError',
+        httpStatus: 500,
+      });
+
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'mock-process-1',
+        waitForPort: vi.fn().mockRejectedValue(sandboxStartupError),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      try {
+        await client.ensureRunning({
+          agentSessionId,
+          userId,
+          maxWaitMs: 100,
+          workspacePath: '/workspace/test',
+        });
+        expect.fail('Expected ensureRunning to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(WrapperNotReadyError);
+        expect(error).toHaveProperty('cause', sandboxStartupError);
+      }
+    });
+
     it('calls getLogs on process when startup fails', async () => {
       const session = createMockSession(createCurlError(7, 'Connection refused'));
 

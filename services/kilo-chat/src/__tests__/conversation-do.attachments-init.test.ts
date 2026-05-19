@@ -26,6 +26,37 @@ describe('ConversationDO.initAttachment', () => {
     expect(result.row.status).toBe('pending');
   });
 
+  it('accepts size 0 (empty file)', async () => {
+    const conversationId = ulid();
+    const stub = getDO(conversationId);
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
+    const result = await stub.initAttachment({
+      uploaderId: 'user-A',
+      mimeType: 'application/octet-stream',
+      size: 0,
+      filename: 'empty.bin',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.row.size).toBe(0);
+    expect(result.row.status).toBe('pending');
+  });
+
+  it('rejects non-integer size with invalid code', async () => {
+    const conversationId = ulid();
+    const stub = getDO(conversationId);
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
+    const result = await stub.initAttachment({
+      uploaderId: 'user-A',
+      mimeType: 'image/png',
+      size: 1.5,
+      filename: 'a.png',
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid');
+  });
+
   it('rejects size > 100 MB with invalid code', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);

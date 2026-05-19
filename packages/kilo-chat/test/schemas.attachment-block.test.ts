@@ -19,8 +19,8 @@ describe('attachmentBlockSchema', () => {
   it('rejects negative size', () => {
     expect(contentBlockSchema.safeParse({ ...goodBlock, size: -1 }).success).toBe(false);
   });
-  it('rejects zero size', () => {
-    expect(contentBlockSchema.safeParse({ ...goodBlock, size: 0 }).success).toBe(false);
+  it('accepts zero size (empty file)', () => {
+    expect(contentBlockSchema.safeParse({ ...goodBlock, size: 0 }).success).toBe(true);
   });
   it('rejects non-ulid attachmentId', () => {
     expect(contentBlockSchema.safeParse({ ...goodBlock, attachmentId: 'not-a-ulid' }).success).toBe(

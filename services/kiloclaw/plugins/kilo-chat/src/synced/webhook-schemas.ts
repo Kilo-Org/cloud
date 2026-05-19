@@ -20,7 +20,7 @@ export const messageCreatedWebhookSchema = z
         z.object({
           attachmentId: ulidSchema,
           mimeType: z.string().min(1).max(255),
-          size: z.number().int().positive(),
+          size: z.number().int().nonnegative(),
           filename: z.string().min(1).max(512),
         })
       )

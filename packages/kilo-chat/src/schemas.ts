@@ -97,7 +97,7 @@ export const attachmentBlockSchema = z.object({
   type: z.literal('attachment'),
   attachmentId: ulidSchema,
   mimeType: z.string().min(1).max(255),
-  size: z.number().int().positive(),
+  size: z.number().int().nonnegative(),
   filename: z.string().min(1).max(512),
 });
 
@@ -380,7 +380,7 @@ export const createBotConversationRequestSchema = z.object({
 export const attachmentInitRequestSchema = z.object({
   conversationId: ulidSchema,
   mimeType: z.string().min(1).max(255),
-  size: z.number().int().positive().max(ATTACHMENT_MAX_BYTES),
+  size: z.number().int().nonnegative().max(ATTACHMENT_MAX_BYTES),
   filename: z.string().min(1).max(512),
 });
 

@@ -1322,7 +1322,7 @@ export class ConversationDO extends DurableObject<Env> {
   initAttachment(params: InitAttachmentParams): InitAttachmentResult {
     if (
       typeof params.size !== 'number' ||
-      !Number.isFinite(params.size) ||
+      !Number.isInteger(params.size) ||
       params.size < 0 ||
       params.size > ATTACHMENT_MAX_BYTES
     ) {

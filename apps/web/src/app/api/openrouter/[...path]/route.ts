@@ -18,6 +18,7 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
+import { buildExperimentPromptCapture } from '@/lib/ai-gateway/experiments/persist';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
@@ -558,6 +559,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     fraudHeaders,
     { skipKiloExclusiveModelSettings: skipKiloExclusiveModelSettings === true }
   );
+
+  // Capture the bounded prompt for experimented requests AFTER provider
+  // transforms have produced the canonical upstream body. Stored on the
+  // usage context so the async `after()` hook can persist it without
+  // retaining a reference to the full uncapped body.
+  if (experiment) {
+    usageContext.experimentPromptCapture = buildExperimentPromptCapture(requestBodyParsed);
+  }
 
   const response = await upstreamRequest({
     path,

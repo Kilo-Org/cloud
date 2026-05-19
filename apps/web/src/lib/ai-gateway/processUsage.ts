@@ -245,7 +245,7 @@ export function toInsertableDbUsageRecord(
 export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext
-) {
+): Promise<{ usageId: string; createdAt: string }> {
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
   const { core, metadata } = toInsertableDbUsageRecord(usageStats, contextInfo);
@@ -256,6 +256,8 @@ export async function logMicrodollarUsage(
     usageContext.prior_microdollar_usage,
     usageContext.posthog_distinct_id ?? null
   );
+
+  return { usageId: core.id, createdAt: core.created_at };
 }
 
 async function saveUsageRelatedData(
@@ -909,14 +911,14 @@ export function calculateKiloExclusiveCost_mUsd(
 export async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
-) {
+): Promise<{ usageId: string; createdAt: string } | null> {
   if (!usageStats) {
     captureMessage('SUSPICIOUS: No usage information', {
       level: 'error',
       tags: { source: 'usage_processing' },
       extra: { usageContext },
     });
-    return;
+    return null;
   }
 
   const timer = createTimer();
@@ -987,7 +989,7 @@ export async function processTokenData(
     usageStats.cacheDiscount_mUsd = 0;
   }
 
-  await logMicrodollarUsage(usageStats, usageContext);
+  return logMicrodollarUsage(usageStats, usageContext);
 }
 
 function useAnthropicStyleTokenCounting(requestedModel: string, provider: ProviderId) {

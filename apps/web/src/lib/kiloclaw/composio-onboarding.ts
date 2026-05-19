@@ -7,6 +7,7 @@ import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client'
 import {
   createComposioGoogleCalendarConnectLink,
   listComposioConnectedAccounts,
+  type ComposioUserContextAuth,
 } from '@/lib/kiloclaw/composio-client';
 import {
   kiloclaw_composio_instance_configs,
@@ -17,6 +18,7 @@ import { db } from '@/lib/drizzle';
 import {
   ensureManagedComposioIdentity,
   getActiveManagedComposioIdentity,
+  type DecryptedComposioIdentity,
   type ComposioOwnerScope,
 } from '@/lib/kiloclaw/composio-identities';
 import type { ActiveKiloClawInstance } from '@/lib/kiloclaw/instance-registry';
@@ -29,6 +31,17 @@ export type ProvisionComposioConfigToMark =
   | { source: 'manual' }
   | { source: 'managed'; composioIdentityId: string }
   | null;
+
+function composioUserContextAuth(
+  identity: DecryptedComposioIdentity
+): ComposioUserContextAuth | null {
+  if (!identity.row.composio_project_id) return null;
+  return {
+    userApiKey: identity.userApiKey,
+    orgId: identity.org,
+    projectId: identity.row.composio_project_id,
+  };
+}
 
 export function getComposioConnectCallbackUrl(params: {
   organizationId?: string;
@@ -182,13 +195,11 @@ export async function completeManagedComposioGoogleCalendarConnection(params: {
 }): Promise<boolean> {
   const identity = await getActiveManagedComposioIdentity(params.scope);
   if (!identity) return false;
+  const auth = composioUserContextAuth(identity);
+  if (!auth) return false;
 
   const accounts = await listComposioConnectedAccounts({
-    auth: {
-      userApiKey: identity.userApiKey,
-      orgId: identity.org,
-      projectId: identity.row.composio_project_id,
-    },
+    auth,
     userId: identity.consumerUserId,
   });
   const connected = accounts.some(
@@ -226,13 +237,13 @@ export async function createManagedComposioGoogleCalendarLink(params: {
   returnTo: string;
 }): Promise<{ redirectUrl: string; connectedAccountId: string }> {
   const identity = await ensureManagedComposioIdentity(params.scope);
+  const auth = composioUserContextAuth(identity);
+  if (!auth) {
+    throw new Error('Managed Composio identity is missing project context');
+  }
 
   return await createComposioGoogleCalendarConnectLink({
-    auth: {
-      userApiKey: identity.userApiKey,
-      orgId: identity.org,
-      projectId: identity.row.composio_project_id,
-    },
+    auth,
     userId: identity.consumerUserId,
     callbackUrl: getComposioConnectCallbackUrl({
       organizationId: params.organizationId,
@@ -259,14 +270,13 @@ export async function getManagedComposioGoogleCalendarStatus(params: {
   if (!identity) {
     return { enabled: true, status: 'disconnected', connectedAccountId: null, sandboxConfigSource };
   }
+  const auth = composioUserContextAuth(identity);
+  if (!auth)
+    return { enabled: true, status: 'error', connectedAccountId: null, sandboxConfigSource };
 
   try {
     const accounts = await listComposioConnectedAccounts({
-      auth: {
-        userApiKey: identity.userApiKey,
-        orgId: identity.org,
-        projectId: identity.row.composio_project_id,
-      },
+      auth,
       userId: identity.consumerUserId,
     });
     const active = accounts.find(account => account.status === 'ACTIVE');

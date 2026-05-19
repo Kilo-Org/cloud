@@ -23,6 +23,15 @@ const AgentWhoamiResponseSchema = AgentSignupReadyResponseSchema.extend({
   claimed_at: z.string().nullable().optional(),
 });
 
+const ConsumerProjectResolveResponseSchema = z.object({
+  project_id: z.string(),
+  project_nano_id: z.string(),
+  project_name: z.string(),
+  org_id: z.string(),
+  project_type: z.literal('CONSUMER'),
+  consumer_user_id: z.string(),
+});
+
 const LinkCreateResponseSchema = z.object({
   redirect_url: z.string().url(),
   connected_account_id: z.string(),
@@ -47,11 +56,12 @@ const ConnectedAccountListResponseSchema = z.object({
 
 export type ComposioAgentIdentity = z.infer<typeof AgentSignupReadyResponseSchema>;
 export type ComposioConnectedAccount = z.infer<typeof ConnectedAccountSchema>;
+export type ComposioConsumerProject = z.infer<typeof ConsumerProjectResolveResponseSchema>;
 
 export type ComposioUserContextAuth = {
   userApiKey: string;
   orgId: string;
-  projectId?: string | null;
+  projectId: string;
 };
 
 const GOOGLE_CALENDAR_TOOLKIT_SLUG = 'google_calendar';
@@ -86,21 +96,32 @@ function contextAuthHeaders(auth: ComposioUserContextAuth): Record<string, strin
   return {
     'x-user-api-key': auth.userApiKey,
     'x-org-id': auth.orgId,
-    ...(auth.projectId ? { 'x-project-id': auth.projectId } : {}),
+    'x-project-id': auth.projectId,
+  };
+}
+
+function userOrgAuthHeaders(params: { userApiKey: string; orgId: string }): Record<string, string> {
+  return {
+    'x-user-api-key': params.userApiKey,
+    'x-org-id': params.orgId,
   };
 }
 
 function sanitizeComposioErrorBody(value: unknown): unknown {
   if (typeof value === 'string') return value.slice(0, 300);
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  if (Array.isArray(value)) return value.slice(0, 5).map(sanitizeComposioErrorBody);
+  if (typeof value !== 'object' || value === null) return undefined;
 
   const source = value as Record<string, unknown>;
   const sanitized: Record<string, unknown> = {};
-  for (const key of ['code', 'message', 'error', 'detail']) {
+  for (const key of ['code', 'message', 'error', 'detail', 'details', 'errors', 'field', 'path']) {
     if (!(key in source) || SENSITIVE_RESPONSE_KEYS.has(key)) continue;
     const field = source[key];
     if (typeof field === 'string') sanitized[key] = field.slice(0, 300);
     else if (typeof field === 'number' || typeof field === 'boolean') sanitized[key] = field;
+    else if (typeof field === 'object' && field !== null) {
+      sanitized[key] = sanitizeComposioErrorBody(field);
+    }
   }
   return Object.keys(sanitized).length > 0 ? sanitized : undefined;
 }
@@ -176,6 +197,27 @@ export async function getComposioAgentIdentity(
     );
   }
   return parsed.data;
+}
+
+export async function resolveComposioConsumerProject(
+  params: {
+    userApiKey: string;
+    orgId: string;
+  },
+  fetchImpl: typeof fetch = fetch
+): Promise<ComposioConsumerProject> {
+  const response = await fetchImpl(
+    joinUrl(COMPOSIO_API_BASE_URL, '/api/v3/org/consumer/project/resolve'),
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...userOrgAuthHeaders(params),
+      },
+    }
+  );
+  const json = await parseJsonResponse(response, 'consumer project resolve');
+  return ConsumerProjectResolveResponseSchema.parse(json);
 }
 
 export async function createComposioGoogleCalendarConnectLink(params: {

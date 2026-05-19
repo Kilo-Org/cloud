@@ -7,6 +7,7 @@ import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { withKiloclawProvisionContextLock } from '@/lib/kiloclaw/provision-lock';
 import {
   getComposioAgentIdentity,
+  resolveComposioConsumerProject,
   signupComposioAgentIdentity,
   type ComposioAgentIdentity,
 } from '@/lib/kiloclaw/composio-client';
@@ -107,8 +108,12 @@ function scopeFromRow(row: KiloClawComposioIdentity): ComposioOwnerScope {
   };
 }
 
-function encryptComposioIdentity(scope: ComposioOwnerScope, identity: ComposioAgentIdentity) {
+async function encryptComposioIdentity(scope: ComposioOwnerScope, identity: ComposioAgentIdentity) {
   const encryptionKey = requireComposioEncryptionKey();
+  const consumerProject = await resolveComposioConsumerProject({
+    userApiKey: identity.composio.user_api_key,
+    orgId: identity.composio.org_id,
+  });
   return {
     owner_type: scope.ownerType,
     user_id: scope.userId,
@@ -123,10 +128,18 @@ function encryptComposioIdentity(scope: ComposioOwnerScope, identity: ComposioAg
       : null,
     composio_org_id: identity.composio.org_id,
     composio_org_name: identity.slug,
-    composio_project_id: identity.composio.project_id,
-    composio_consumer_user_id: composioConsumerUserId(scope),
+    composio_project_id: consumerProject.project_nano_id,
+    composio_consumer_user_id: consumerProject.consumer_user_id,
     composio_agent_email: identity.email,
   };
+}
+
+function needsComposioIdentityRefresh(row: KiloClawComposioIdentity): boolean {
+  return (
+    !row.composio_project_id ||
+    !row.composio_consumer_user_id ||
+    row.composio_consumer_user_id.startsWith('kiloclaw:')
+  );
 }
 
 export async function getActiveManagedComposioIdentity(
@@ -143,12 +156,12 @@ export async function ensureManagedComposioIdentity(
     const existing = await findActiveComposioIdentity(scope);
     if (existing) {
       const decrypted = decryptComposioIdentity(existing);
-      if (decrypted.apiKey) return decrypted;
+      if (!needsComposioIdentityRefresh(existing)) return decrypted;
 
       const refreshed = await getComposioAgentIdentity(decrypted.agentKey);
       const [updated] = await db
         .update(kiloclaw_composio_identities)
-        .set(encryptComposioIdentity(scope, refreshed))
+        .set(await encryptComposioIdentity(scope, refreshed))
         .where(eq(kiloclaw_composio_identities.id, existing.id))
         .returning();
       return decryptComposioIdentity(updated);
@@ -157,7 +170,7 @@ export async function ensureManagedComposioIdentity(
     const identity = await signupComposioAgentIdentity();
     const [inserted] = await db
       .insert(kiloclaw_composio_identities)
-      .values(encryptComposioIdentity(scope, identity))
+      .values(await encryptComposioIdentity(scope, identity))
       .returning();
     return decryptComposioIdentity(inserted);
   });

@@ -6,6 +6,7 @@ jest.mock('@/lib/config.server', () => ({
 import {
   createComposioGoogleCalendarConnectLink,
   listComposioConnectedAccounts,
+  resolveComposioConsumerProject,
   signupComposioAgentIdentity,
 } from './composio-client';
 
@@ -103,6 +104,42 @@ describe('Composio client', () => {
       'x-org-id': 'org-1',
       'x-project-id': 'project-1',
     });
+  });
+
+  it('resolves the consumer project using user API key and org context', async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ url: String(url), init });
+      return jsonResponse({
+        project_id: 'project-db-id',
+        project_nano_id: 'proj_nano_123',
+        project_name: 'Consumer Project',
+        org_id: 'org-1',
+        project_type: 'CONSUMER',
+        consumer_user_id: 'consumer-user-1',
+      });
+    };
+
+    const project = await resolveComposioConsumerProject(
+      { userApiKey: 'uak_123', orgId: 'org-1' },
+      fetchImpl as typeof fetch
+    );
+
+    expect(project.project_nano_id).toBe('proj_nano_123');
+    expect(project.consumer_user_id).toBe('consumer-user-1');
+    expect(requests).toEqual([
+      {
+        url: 'https://api.example.com/api/v3/org/consumer/project/resolve',
+        init: {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-user-api-key': 'uak_123',
+            'x-org-id': 'org-1',
+          },
+        },
+      },
+    ]);
   });
 
   it('filters connected accounts by consumer user and Google Calendar toolkit', async () => {

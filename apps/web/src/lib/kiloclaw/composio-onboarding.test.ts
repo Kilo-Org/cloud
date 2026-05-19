@@ -59,12 +59,12 @@ const instance = {
 
 function mockManagedIdentity() {
   mockedGetActiveManagedComposioIdentity.mockResolvedValue({
-    row: { id: 'identity-1' },
+    row: { id: 'identity-1', composio_project_id: 'project-1' },
     agentKey: 'agent-key',
     userApiKey: 'uak_123',
     apiKey: 'api-key',
     org: 'org-1',
-    consumerUserId: 'kiloclaw:user:user-1',
+    consumerUserId: 'consumer-user-1',
   } as never);
 }
 

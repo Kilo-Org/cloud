@@ -80,9 +80,11 @@ export function verifyOAuthState(state: string | null): VerifiedOAuthState | nul
 
   // Constant-time comparison to prevent timing attacks
   const expectedSig = sign(payload);
+  const providedSigBytes = Buffer.from(providedSig);
+  const expectedSigBytes = Buffer.from(expectedSig);
   if (
-    providedSig.length !== expectedSig.length ||
-    !crypto.timingSafeEqual(Buffer.from(providedSig), Buffer.from(expectedSig))
+    providedSigBytes.length !== expectedSigBytes.length ||
+    !crypto.timingSafeEqual(providedSigBytes, expectedSigBytes)
   ) {
     return null;
   }

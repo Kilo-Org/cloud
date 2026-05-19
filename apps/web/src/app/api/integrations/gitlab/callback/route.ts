@@ -5,7 +5,6 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { db } from '@/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
-import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
@@ -17,13 +16,50 @@ import {
 import { normalizeInstanceUrl } from '@/lib/integrations/gitlab-service';
 import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { APP_URL } from '@/lib/constants';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
+import {
+  DEFAULT_GITLAB_OAUTH_INSTANCE_URL,
+  type VerifiedGitLabOAuthState,
+  verifyGitLabOAuthState,
+} from '@/lib/integrations/platforms/gitlab/oauth-state';
 
 /**
  * Generates a secure random webhook secret for GitLab webhook verification
  */
 function generateWebhookSecret(): string {
   return randomBytes(32).toString('hex');
+}
+
+function buildGitLabRedirectPath(
+  state: Pick<VerifiedGitLabOAuthState, 'owner'> | null | undefined,
+  queryParams: string
+): string {
+  if (state?.owner.type === 'org') {
+    return `/organizations/${state.owner.id}/integrations/gitlab?${queryParams}`;
+  }
+
+  if (state?.owner.type === 'user') {
+    return `/integrations/gitlab?${queryParams}`;
+  }
+
+  return `/integrations?${queryParams}`;
+}
+
+function gitLabOAuthSentryContext(searchParams: URLSearchParams): {
+  hasCode: boolean;
+  hasState: boolean;
+  stateHash: string | null;
+  error: string | null;
+  errorDescription: string | null;
+} {
+  const state = searchParams.get('state');
+  return {
+    hasCode: !!searchParams.get('code'),
+    hasState: !!state,
+    stateHash: state ? createHash('sha256').update(state).digest('hex').slice(0, 8) : null,
+    error: searchParams.get('error'),
+    errorDescription: searchParams.get('error_description'),
+  };
 }
 
 /**
@@ -41,18 +77,47 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
-    const state = searchParams.get('state'); // Contains owner info (org_ID or user_ID) and optional instance URL
+    const state = searchParams.get('state');
     const error = searchParams.get('error');
-    const errorDescription = searchParams.get('error_description');
+
+    const verifiedState = verifyGitLabOAuthState(state);
+    if (!verifiedState) {
+      captureMessage('GitLab callback invalid or tampered state signature', {
+        level: 'warning',
+        tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
+        extra: gitLabOAuthSentryContext(searchParams),
+      });
+      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
+    }
+
+    if (verifiedState.userId !== user.id) {
+      captureMessage('GitLab callback user mismatch (possible CSRF)', {
+        level: 'warning',
+        tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
+        extra: { stateUserId: verifiedState.userId, sessionUserId: user.id },
+      });
+      return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+    }
+
+    const { owner, instanceUrl, customCredentials } = verifiedState;
+
+    if (owner.type === 'org') {
+      await ensureOrganizationAccess({ user }, owner.id);
+    } else if (user.id !== owner.id) {
+      return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+    }
 
     if (error) {
       captureMessage('GitLab OAuth error', {
         level: 'warning',
         tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
-        extra: { error, errorDescription, state },
+        extra: gitLabOAuthSentryContext(searchParams),
       });
 
-      const redirectPath = parseRedirectPath(state, `error=${error}`);
+      const redirectPath = buildGitLabRedirectPath(
+        verifiedState,
+        `error=${encodeURIComponent(error)}`
+      );
       return NextResponse.redirect(new URL(redirectPath, APP_URL));
     }
 
@@ -60,31 +125,11 @@ export async function GET(request: NextRequest) {
       captureMessage('GitLab callback missing code', {
         level: 'warning',
         tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
-        extra: { state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: gitLabOAuthSentryContext(searchParams),
       });
 
-      const redirectPath = parseRedirectPath(state, 'error=missing_code');
+      const redirectPath = buildGitLabRedirectPath(verifiedState, 'error=missing_code');
       return NextResponse.redirect(new URL(redirectPath, APP_URL));
-    }
-
-    // State format: "org_xxx" or "user_xxx" or "org_xxx|instance_url" or "org_xxx|instance_url|creds:base64"
-    const { owner, instanceUrl, customCredentials } = parseState(state);
-
-    if (!owner) {
-      captureMessage('GitLab callback missing or invalid owner in state', {
-        level: 'warning',
-        tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
-        extra: { state, allParams: Object.fromEntries(searchParams.entries()) },
-      });
-      return NextResponse.redirect(new URL('/', APP_URL));
-    }
-
-    if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id);
-    } else {
-      if (user.id !== owner.id) {
-        return NextResponse.redirect(new URL('/', APP_URL));
-      }
     }
 
     const tokens = await exchangeGitLabOAuthCode(code, instanceUrl, customCredentials);
@@ -114,7 +159,7 @@ export async function GET(request: NextRequest) {
 
     const existingMetadata = existing?.metadata as Record<string, unknown> | null;
 
-    // Detect if the GitLab instance URL changed (e.g. gitlab.com → self-hosted)
+    // Detect if the GitLab instance URL changed (e.g. gitlab.com -> self-hosted)
     const isInstanceChange =
       existing !== undefined &&
       normalizeInstanceUrl(existingMetadata?.gitlab_instance_url as string | undefined) !==
@@ -128,7 +173,8 @@ export async function GET(request: NextRequest) {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       token_expires_at: tokenExpiresAt,
-      gitlab_instance_url: instanceUrl !== 'https://gitlab.com' ? instanceUrl : undefined,
+      gitlab_instance_url:
+        instanceUrl !== DEFAULT_GITLAB_OAUTH_INSTANCE_URL ? instanceUrl : undefined,
       webhook_secret: webhookSecret,
       auth_type: 'oauth',
       // Only preserve webhooks/tokens if same instance
@@ -156,7 +202,7 @@ export async function GET(request: NextRequest) {
         .where(eq(platform_integrations.id, existing.id));
 
       // If instance changed, reset the code review agent config
-      if (isInstanceChange && owner) {
+      if (isInstanceChange) {
         await resetCodeReviewConfigForOwner(owner, PLATFORM.GITLAB);
       }
     } else {
@@ -195,93 +241,13 @@ export async function GET(request: NextRequest) {
         endpoint: 'gitlab/callback',
         source: 'gitlab_oauth',
       },
-      extra: {
-        code: searchParams.get('code') ? '[REDACTED]' : null,
-        state,
-      },
+      extra: gitLabOAuthSentryContext(searchParams),
     });
 
-    const redirectPath = parseRedirectPath(state, 'error=connection_failed');
+    const redirectPath = buildGitLabRedirectPath(
+      verifyGitLabOAuthState(state),
+      'error=connection_failed'
+    );
     return NextResponse.redirect(new URL(redirectPath, APP_URL));
   }
-}
-
-/**
- * Parses the state parameter to extract owner, optional instance URL, and custom credentials
- *
- * State format:
- * - "org_xxx" - Organization-owned integration on gitlab.com
- * - "user_xxx" - User-owned integration on gitlab.com
- * - "org_xxx|https://gitlab.example.com" - Organization-owned on self-hosted
- * - "org_xxx|https://gitlab.example.com|creds:base64" - Self-hosted with custom credentials
- */
-function parseState(state: string | null): {
-  owner: Owner | null;
-  instanceUrl: string;
-  customCredentials?: { clientId: string; clientSecret: string };
-} {
-  const DEFAULT_INSTANCE = 'https://gitlab.com';
-
-  if (!state) {
-    return { owner: null, instanceUrl: DEFAULT_INSTANCE };
-  }
-
-  const parts = state.split('|');
-  const ownerPart = parts[0];
-  let instanceUrl = DEFAULT_INSTANCE;
-  let customCredentials: { clientId: string; clientSecret: string } | undefined;
-
-  for (let i = 1; i < parts.length; i++) {
-    const part = parts[i];
-    if (part.startsWith('creds:')) {
-      try {
-        const encoded = part.replace('creds:', '');
-        const decoded = Buffer.from(encoded, 'base64').toString('utf-8');
-        const [clientId, clientSecret] = decoded.split(':');
-        if (clientId && clientSecret) {
-          customCredentials = { clientId, clientSecret };
-        }
-      } catch (e) {
-        console.error('Failed to decode credentials from state:', e);
-      }
-    } else if (part.startsWith('http')) {
-      instanceUrl = part;
-    }
-  }
-
-  if (ownerPart.startsWith('org_')) {
-    return {
-      owner: { type: 'org', id: ownerPart.replace('org_', '') },
-      instanceUrl,
-      customCredentials,
-    };
-  } else if (ownerPart.startsWith('user_')) {
-    return {
-      owner: { type: 'user', id: ownerPart.replace('user_', '') },
-      instanceUrl,
-      customCredentials,
-    };
-  }
-
-  return { owner: null, instanceUrl, customCredentials };
-}
-
-/**
- * Determines the redirect path based on state parameter
- */
-function parseRedirectPath(state: string | null, queryParams: string): string {
-  if (!state) {
-    return `/?${queryParams}`;
-  }
-
-  const [ownerPart] = state.split('|');
-
-  if (ownerPart.startsWith('org_')) {
-    const orgId = ownerPart.replace('org_', '');
-    return `/organizations/${orgId}/integrations/gitlab?${queryParams}`;
-  } else if (ownerPart.startsWith('user_')) {
-    return `/integrations/gitlab?${queryParams}`;
-  }
-
-  return `/?${queryParams}`;
 }

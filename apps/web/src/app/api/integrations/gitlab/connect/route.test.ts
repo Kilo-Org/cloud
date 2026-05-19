@@ -1,0 +1,111 @@
+import { beforeEach, describe, expect, test } from '@jest/globals';
+import { NextRequest } from 'next/server';
+import { getUserFromAuth } from '@/lib/user.server';
+import { buildGitLabOAuthUrl } from '@/lib/integrations/platforms/gitlab/adapter';
+import { createGitLabOAuthState } from '@/lib/integrations/platforms/gitlab/oauth-state';
+
+jest.mock('@/lib/user.server');
+jest.mock('@/routers/organizations/utils', () => ({
+  ensureOrganizationAccess: jest.fn(),
+}));
+jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  buildGitLabOAuthUrl: jest.fn(),
+}));
+jest.mock('@/lib/integrations/platforms/gitlab/oauth-state', () => ({
+  DEFAULT_GITLAB_OAUTH_INSTANCE_URL: 'https://gitlab.com',
+  createGitLabOAuthState: jest.fn(),
+}));
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+}));
+
+const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
+const mockedBuildGitLabOAuthUrl = jest.mocked(buildGitLabOAuthUrl);
+const mockedCreateGitLabOAuthState = jest.mocked(createGitLabOAuthState);
+
+const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
+
+function makeRequest(pathWithQuery: string) {
+  return new NextRequest(`http://localhost:3000${pathWithQuery}`);
+}
+
+function expectRedirectLocation(response: Response, expectedPathWithQuery: string) {
+  const location = response.headers.get('location');
+  expect(location).toBeTruthy();
+  const url = new URL(location ?? '');
+  expect(`${url.pathname}${url.search}`).toBe(expectedPathWithQuery);
+}
+
+describe('GET /api/integrations/gitlab/connect', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: USER_ID },
+      authFailedResponse: null,
+    } as never);
+    mockedCreateGitLabOAuthState.mockReturnValue('signed-gitlab-state');
+    mockedBuildGitLabOAuthUrl.mockReturnValue('https://gitlab.com/oauth/authorize?state=signed');
+  });
+
+  test('creates signed personal OAuth state before redirecting to GitLab', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(makeRequest('/api/integrations/gitlab/connect'));
+
+    expect(response.headers.get('location')).toBe(
+      'https://gitlab.com/oauth/authorize?state=signed'
+    );
+    expect(mockedCreateGitLabOAuthState).toHaveBeenCalledWith(
+      {
+        owner: { type: 'user', id: USER_ID },
+      },
+      USER_ID
+    );
+    expect(mockedBuildGitLabOAuthUrl).toHaveBeenCalledWith(
+      'signed-gitlab-state',
+      undefined,
+      undefined
+    );
+  });
+
+  test('does not initialize a self-hosted flow without custom OAuth credentials', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        '/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fattacker.example'
+      )
+    );
+
+    expectRedirectLocation(response, '/integrations/gitlab?error=oauth_init_failed');
+    expect(mockedCreateGitLabOAuthState).not.toHaveBeenCalled();
+    expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
+  });
+
+  test('binds self-hosted instance URL and custom credentials into signed state', async () => {
+    const { GET } = await import('./route');
+    await GET(
+      makeRequest(
+        '/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fgitlab.example.com&clientId=client-id&clientSecret=client-secret'
+      )
+    );
+
+    expect(mockedCreateGitLabOAuthState).toHaveBeenCalledWith(
+      {
+        owner: { type: 'user', id: USER_ID },
+        instanceUrl: 'https://gitlab.example.com',
+        customCredentials: {
+          clientId: 'client-id',
+          clientSecret: 'client-secret',
+        },
+      },
+      USER_ID
+    );
+    expect(mockedBuildGitLabOAuthUrl).toHaveBeenCalledWith(
+      'signed-gitlab-state',
+      'https://gitlab.example.com',
+      {
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+      }
+    );
+  });
+});

@@ -321,5 +321,5 @@ export function triggerBatchReviewDecisionFetchIfNeeded(
   owner: TenantOwner
 ): void {
   if (!hasPendingRows) return;
-  executeBatchReviewDecisionFetch(owner).catch(captureException);
+  void executeBatchReviewDecisionFetch(owner).catch(captureException);
 }

@@ -26,8 +26,8 @@ async function signInFreshUser(
     url =>
       url.pathname === '/gastown/onboarding' ||
       url.pathname === '/customer-source-survey' ||
-      url.pathname === '/get-started' ||
-      url.pathname === '/profile',
+      url.pathname === '/profile' ||
+      url.pathname.startsWith('/organizations/'),
     { timeout: 30000, waitUntil: 'networkidle' }
   );
 
@@ -37,13 +37,13 @@ async function signInFreshUser(
     await page.waitForURL(
       url =>
         url.pathname === '/gastown/onboarding' ||
-        url.pathname === '/get-started' ||
-        url.pathname === '/profile',
+        url.pathname === '/profile' ||
+        url.pathname.startsWith('/organizations/'),
       { timeout: 15000, waitUntil: 'networkidle' }
     );
   }
 
-  // If we're on /get-started rather than /gastown/onboarding, navigate directly
+  // If we're not on /gastown/onboarding, navigate directly
   if (new URL(page.url()).pathname !== '/gastown/onboarding') {
     await page.goto('/gastown/onboarding');
     await page.waitForURL(url => url.pathname === '/gastown/onboarding', {

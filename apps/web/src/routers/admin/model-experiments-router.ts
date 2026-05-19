@@ -206,8 +206,8 @@ function assertNonTerminal(status: Status, op: string) {
 
 async function assertActivatable(experimentId: string, publicModelId: string) {
   const variants = await listVariantsWithCurrentVersion(experimentId);
-  if (variants.length < 2) {
-    badRequest('Active experiments must have at least 2 variants');
+  if (variants.length < 1) {
+    badRequest('Active experiments must have at least 1 variant');
   }
   if (variants.some(v => v.weight <= 0)) {
     badRequest('Every variant must have a positive weight');

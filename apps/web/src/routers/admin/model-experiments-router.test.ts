@@ -103,7 +103,7 @@ describe('admin.modelExperiments — basic CRUD', () => {
 });
 
 describe('admin.modelExperiments — activation guards', () => {
-  it('rejects activation with fewer than 2 variants', async () => {
+  it('allows activation with one variant for sequential testing', async () => {
     const caller = await createCallerForUser(admin.id);
     const exp = await caller.admin.modelExperiments.create({
       public_model_id: 'kilo/preview-thin',
@@ -119,8 +119,20 @@ describe('admin.modelExperiments — activation guards', () => {
       upstream: validUpstream,
       apiKey: 'sk',
     });
+
+    const activated = await caller.admin.modelExperiments.activate({ id: exp.id });
+    expect(activated.status).toBe('active');
+  });
+
+  it('rejects activation with no variants', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const exp = await caller.admin.modelExperiments.create({
+      public_model_id: 'kilo/preview-empty',
+      name: 'empty',
+    });
+
     await expect(caller.admin.modelExperiments.activate({ id: exp.id })).rejects.toMatchObject({
-      message: expect.stringContaining('at least 2 variants'),
+      message: expect.stringContaining('at least 1 variant'),
     });
   });
 

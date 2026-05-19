@@ -66,8 +66,8 @@ function StatusBadge({ status }: { status: Status }) {
 }
 
 function getActivationDisabledReason(variants: readonly Variant[]) {
-  if (variants.length < 2) {
-    return 'Active experiments must have at least 2 variants';
+  if (variants.length < 1) {
+    return 'Active experiments must have at least 1 variant';
   }
   if (variants.some(v => v.weight <= 0)) {
     return 'Every variant must have a positive weight';
@@ -286,7 +286,7 @@ function CreateExperimentDialog({
         <DialogHeader>
           <DialogTitle>New experiment</DialogTitle>
           <DialogDescription>
-            Creates a draft experiment. Add variants and at least one variant version before
+            Creates a draft experiment. Add a variant and at least one variant version before
             activating.
           </DialogDescription>
         </DialogHeader>

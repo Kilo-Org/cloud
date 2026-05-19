@@ -10,14 +10,14 @@
     [todo] not started
 -->
 
-| Phase                               | Status        | Notes                                                                                                                                   |
-| ----------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Phase 1 — Schema + Migration        | [done]        | Migration `0134_black_union_jack.sql` in main. PR #3299.                                                                                |
-| Phase 2 — Gateway Header Capture    | [todo]        |                                                                                                                                         |
-| Phase 3 — Variant Picker + Routing  | [todo]        |                                                                                                                                         |
-| Phase 4 — Usage, Metrics, Reporting | [todo]        |                                                                                                                                         |
-| Phase 5 — Admin tRPC + UI           | [in-progress] | Branch `mark/experimental-models-admin`. tRPC router + UI tab landed; `getLiveStats` and `getPromptByHash` deferred to Phase 4/R2 work. |
-| Phase 6 — Specs + Tests             | [todo]        | Spec file `.specs/model-experiments.md` not yet created.                                                                                |
+| Phase                               | Status           | Notes                                                                                                                                                                                |
+| ----------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Phase 1 — Schema + Migration        | [done]           | Migration `0134_black_union_jack.sql` in main. PR #3299.                                                                                                                             |
+| Phase 2 — Gateway Header Capture    | [merged-pending] | Branch `mark/experimental-models-gateway`, PR #3325 (draft).                                                                                                                         |
+| Phase 3 — Variant Picker + Routing  | [merged-pending] | Branch `mark/experimental-models-gateway`, PR #3325 (draft).                                                                                                                         |
+| Phase 4 — Usage, Metrics, Reporting | [in-progress]    | 4a (R2 helper) + 4b (capture/persist) + 4c (after-hook wiring) on PR #3325. 4d (`model_experiment_request_stats` view) intentionally deferred until a real report consumer needs it. |
+| Phase 5 — Admin tRPC + UI           | [in-progress]    | tRPC router + UI tab landed in `#3302`; `getLiveStats` and `getPromptByHash` deferred to follow-up alongside admin UI to inflate prompts.                                            |
+| Phase 6 — Specs + Tests             | [todo]           | Spec file `.specs/model-experiments.md` not yet created.                                                                                                                             |
 
 **Phase 1 — concrete output (landed in `packages/db/src/schema.ts` + `0134_black_union_jack.sql`):**
 
@@ -30,7 +30,34 @@
 **Not yet done in Phase 1 (still owed by future PRs):**
 
 - ~~`ExperimentUpstreamSchema` zod schema (lives in app code, not in `packages/db`).~~ Landed with Phase 5 admin work in `apps/web/src/lib/ai-gateway/experiments/upstream-schema.ts`.
-- The `model_experiment_request_stats` reporting view (Phase 4).
+- The `model_experiment_request_stats` reporting view — explicitly deferred. See Phase 4d note below.
+
+**Phase 2 — concrete output (in PR #3325):**
+
+- `apps/web/src/app/api/openrouter/[...path]/route.ts` — extracts `x-kilo-request` into `clientRequestId` and `x-kilo-session` as fallback for `session_id` when `x-kilocode-taskid` is absent. Captures `x-kilocode-machineid` once into `machineIdHeader` and threads it (plus the resolved client IP) into `getProvider`.
+- `apps/web/src/lib/ai-gateway/processUsage.types.ts` — extends `MicrodollarUsageContext` with optional `clientRequestId`, `modelExperimentVariantVersionId`, `modelExperimentAllocationSubject`, and `experimentPromptCapture`. Optional so the dozens of construction sites in routes/tests/helpers don't need touching. Adds `ExperimentPromptCapture` type.
+
+**Phase 3 — concrete output (in PR #3325):**
+
+- `apps/web/src/lib/ai-gateway/experiments/build-direct-provider.ts` — `buildDirectProvider(input)` + `inferSupportedChatApis(...)`. Used by both the new experiment branch and the existing `kilo-internal/...` (custom_llm2) path so direct-to-upstream traffic shares one implementation. Custom_llm passes `extra_headers`; experiments deliberately don't (excluded from `ExperimentUpstreamSchema`).
+- `apps/web/src/lib/ai-gateway/experiments/pick-variant.ts` — `isPublicIdExperimented(publicId)` (Redis membership pre-check with Postgres fallback; returns `unavailable` when both fail), `getRoutingExperimentForPublicId(publicId)` (Redis-cached resolved experiment with a single `SELECT DISTINCT ON (variant_id)` to pick each variant's current version, decrypts `encrypted_api_key` once at cache-build time, returns `none` / `experiment` / `unavailable`), and `pickModelExperimentVariant(input)` (deterministic `getRandomNumber` cumulative-weight walk in id-asc order, allocation subject precedence user → machine → ip; missing all subjects returns `unavailable`).
+- `apps/web/src/lib/ai-gateway/experiments/index.ts` — public exports.
+- `apps/web/src/lib/ai-gateway/providers/get-provider.ts` — refactored to return discriminated `GetProviderResult` (`provider` / `not-found` / `unavailable`). Adds the experiment branch after BYOK and before `kilo-internal/...` and the `kiloExclusiveModels` lookup. Active selections set new flags `skipBalanceCheck`, `skipProviderPin`, `skipKiloExclusiveModelSettings` on the result and attach `experiment` metadata. Custom_llm path refactored to use `buildDirectProvider`.
+- `apps/web/src/app/api/openrouter/[...path]/route.ts` — calls the new `getProvider({...})` signature with `clientIp` + `machineId`, handles `not-found` (local model-unavailable) and `unavailable` (503 temporarily-unavailable) before reading `provider.supportedChatApis`. Honors `skipBalanceCheck` and `skipProviderPin` while still running organization model/data-collection policy. Sets `usageContext.modelExperimentVariantVersionId` + `modelExperimentAllocationSubject` from the result and calls `buildExperimentPromptCapture` after provider transforms for experimented requests only.
+- `apps/web/src/lib/ai-gateway/providers/apply-provider-specific-logic.ts` — accepts an optional options bag with `skipKiloExclusiveModelSettings` so the registry's `internal_id`/provider rewrite doesn't override the variant's upstream. Generic provider-specific request fixes and `provider.transformRequest` still run.
+- `apps/web/src/lib/ai-gateway/auto-model/resolution.ts` — filters experimented public ids out of `kilo-auto/free` candidate sets via `filterOutExperimentedPublicIds`. Dedicated preview ids are never silently selected by auto-routing.
+
+**Phase 4a–c — concrete output (in PR #3325):**
+
+- `apps/web/src/lib/r2/experiment-prompts.ts` — `putPromptIfAbsent(content)` (HEAD-then-PUT under sha256 hex key for automatic dedup), `getPromptByHash(sha)` (admin out-of-band reads with strict 64-char hex validation), and `sha256Hex(content)`. Throws on R2 errors; callers translate to `__failed__` sentinel.
+- `apps/web/src/lib/r2/client.ts` — adds `R2_EXPERIMENT_PROMPTS_BUCKET_NAME` env var and `r2ExperimentPromptsBucketName` export. Per-environment buckets `kilo-experiment-prompts-dev` / `kilo-experiment-prompts-prod`.
+- `apps/web/src/lib/ai-gateway/experiments/persist.ts` — `buildExperimentPromptCapture(request)` (chat_completions: extracts leading `role: 'system'` message; messages/responses: folds whole body into the body side; both sides tail-truncated at 4 MB with Sentry breadcrumb on truncation). `persistExperimentAttribution(input)` (parallel `Promise.allSettled` R2 puts via `putPromptSafely`, single-row insert into `model_experiment_request` with `__absent__`/`__failed__` sentinels per side; Sentry-reports failures and swallows — best-effort analytics, must not roll back the billing write).
+- `apps/web/src/lib/ai-gateway/processUsage.ts` — `logMicrodollarUsage` and `processTokenData` now return `{ usageId, createdAt }` so the experiment attribution row keys onto the same usage row. Existing callers ignoring the return value are unaffected.
+- `apps/web/src/lib/ai-gateway/llm-proxy-helpers.ts` — `accountForMicrodollarUsage` chains `persistExperimentAttribution` after the microdollar write inside the same `after()` hook, only for experimented requests.
+
+**Phase 4d — explicitly deferred:**
+
+The `model_experiment_request_stats` reporting view was implemented and reverted out of PR #3325 because there is no consumer yet. The two real arguments for the view are (a) centralizing the 4-table join + JSON extraction and (b) physically excluding `upstream->>'api_key'` at the column level so any consumer of the view cannot leak the key. (a) is also achievable inline with Drizzle queries, and (b) can be enforced with a code-review rule + grep test until a real consumer materializes. Re-add when `getLiveStats` (Phase 5 deferred) or another report needs it; by then the right column set will be obvious.
 
 **Phase 5 — concrete output (in PR — see status table for branch/PR):**
 

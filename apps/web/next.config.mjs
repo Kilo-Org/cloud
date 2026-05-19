@@ -70,31 +70,8 @@ const nextConfig = {
           ]
         : [];
 
-    // Wasteland legacy URL bridge.
-    //
-    // The owner/repo-keyed routes (M2.2) live at /wasteland/[owner]/[repo]/...
-    // and the legacy UUID-keyed tree lives at /wasteland/by-id/[wastelandId]/...
-    // Two sibling dynamic segments at the same depth can't disambiguate by
-    // shape in Next.js routing, so we rewrite UUID-shaped first segments
-    // here, before the filesystem routes are matched. The browser URL stays
-    // as /wasteland/<uuid>/... — only the internal handler path changes —
-    // so existing links throughout the app (and bookmarks/share links) keep
-    // working unmodified until the M2.8 redirect cutover.
-    const wastelandLegacyRewrites = [
-      {
-        source:
-          '/wasteland/:wastelandId([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/:path*',
-        destination: '/wasteland/by-id/:wastelandId/:path*',
-      },
-      {
-        source:
-          '/wasteland/:wastelandId([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})',
-        destination: '/wasteland/by-id/:wastelandId',
-      },
-    ];
-
     return {
-      beforeFiles: [...globalApiRewrites, ...wastelandLegacyRewrites],
+      beforeFiles: globalApiRewrites,
       afterFiles: [
         // /config.json is handled by src/app/config.json/route.ts which merges
         // Kilo-specific schema additions on top of the upstream opencode schema.

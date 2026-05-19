@@ -18,14 +18,16 @@
     "prepack": "npm run build",
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --external:openclaw --external:openclaw/* --outfile=dist/index.js",
     "clean": "rm -rf dist",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit"
   },
   "peerDependencies": {
-    "openclaw": ">=2026.3.24-beta.2"
+    "openclaw": "2026.4.23"
   },
   "devDependencies": {
     "@sinclair/typebox": "0.34.41",
     "esbuild": "0.25.12",
+    "openclaw": "2026.4.23",
     "vitest": "catalog:"
   }
 }

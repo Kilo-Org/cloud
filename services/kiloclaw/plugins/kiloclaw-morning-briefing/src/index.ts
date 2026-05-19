@@ -1,7 +1,15 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Type } from '@sinclair/typebox';
+import type { OpenClawConfig, OpenClawPluginApi } from 'openclaw/plugin-sdk';
 import { definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
+
+// Reused inside the narrow function-parameter shapes below so the local
+// type stays a strict subset of the real plugin API. Without this the
+// hand-written `listProviders: (params?: { config?: unknown }) => ...`
+// signature is actually broader than the SDK's typed `ListWebSearchProvidersParams`,
+// and passing the real api into a narrow-typed function fails.
+type SdkWebSearchRuntime = OpenClawPluginApi['runtime']['webSearch'];
 import { buildBriefingMarkdown, offsetDateKey, resolveBriefingPath } from './briefing-utils';
 import {
   type BriefingDeliveryResult,
@@ -615,11 +623,9 @@ async function resolveGithubReady(api: {
 
 async function resolveWebSearchReady(api: {
   runtime: {
-    webSearch: {
-      listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-    };
+    webSearch: Pick<SdkWebSearchRuntime, 'listProviders'>;
   };
-  config: unknown;
+  config: OpenClawConfig;
 }): Promise<{ configured: boolean; summary: string }> {
   const providers = api.runtime.webSearch.listProviders({ config: api.config });
   if (!Array.isArray(providers) || providers.length === 0) {
@@ -769,8 +775,14 @@ async function gatherGithubEmptyResultContext(
   // fine-grained context we never confirmed.
   const authFailedClassicOrFineGrained =
     (tokenType === 'classic' || tokenType === 'fine-grained') && login === null;
+  // After the earlier early-returns + the degrade-on-auth-failure above, the
+  // tokenType reaching this return is always one of the third union variant's
+  // literals. TS can't narrow GithubTokenType down to that subset on its own.
+  const narrowedTokenType: 'app' | 'oauth' | 'unknown' = authFailedClassicOrFineGrained
+    ? 'unknown'
+    : (tokenType as 'app' | 'oauth' | 'unknown');
   return {
-    tokenType: authFailedClassicOrFineGrained ? 'unknown' : tokenType,
+    tokenType: narrowedTokenType,
     login,
   };
 }
@@ -989,15 +1001,9 @@ async function collectWebSearch(
 
 type WebSearchRuntime = {
   runtime: {
-    webSearch: {
-      listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-      search: (params: { args: Record<string, unknown>; config?: unknown }) => Promise<{
-        provider: string;
-        result: Record<string, unknown>;
-      }>;
-    };
+    webSearch: SdkWebSearchRuntime;
   };
-  config: unknown;
+  config: OpenClawConfig;
   logger: { info?: (message: string) => void; warn?: (message: string) => void };
 };
 
@@ -1311,13 +1317,7 @@ async function generateBriefing(
           options: { timeoutMs: number; cwd?: string }
         ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
       };
-      webSearch: {
-        listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-        search: (params: { args: Record<string, unknown>; config?: unknown }) => Promise<{
-          provider: string;
-          result: Record<string, unknown>;
-        }>;
-      };
+      webSearch: SdkWebSearchRuntime;
     };
     config: {
       agents?: { defaults?: { userTimezone?: string } };
@@ -1531,9 +1531,7 @@ async function getStatusSnapshot(api: {
         options: { timeoutMs: number; cwd?: string }
       ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
     };
-    webSearch: {
-      listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-    };
+    webSearch: Pick<SdkWebSearchRuntime, 'listProviders'>;
   };
   config: {
     agents?: {
@@ -1622,7 +1620,7 @@ export default definePluginEntry({
         // between our read and our final write (the `ensureCronJob` call
         // below is slow). `patchStoredStatus` uses a separate queue, so
         // no deadlock from nesting.
-        return await queueConfigWrite(paths.configPath, async () => {
+        return await queueConfigWrite<'succeeded' | 'failed'>(paths.configPath, async () => {
           const config = await readStoredConfig(api, paths);
 
           if (config.enabled) {
@@ -1931,6 +1929,7 @@ export default definePluginEntry({
 
     api.registerTool({
       name: 'morning_briefing_handle_command',
+      label: 'Morning briefing /briefing command',
       description:
         'Deterministically handles /briefing commands from raw inbound text when slash routing fails.',
       parameters: Type.Object(
@@ -1944,7 +1943,8 @@ export default definePluginEntry({
         { additionalProperties: false }
       ),
       async execute(_toolCallId, params) {
-        const commandArgs = extractBriefingArgsFromText(params.message);
+        const { message } = params as { message: string };
+        const commandArgs = extractBriefingArgsFromText(message);
         if (commandArgs === null) {
           return {
             content: [
@@ -1953,6 +1953,7 @@ export default definePluginEntry({
                 text: 'No /briefing command found in the provided message.',
               },
             ],
+            details: undefined,
           };
         }
 
@@ -1964,12 +1965,14 @@ export default definePluginEntry({
               text: resultText,
             },
           ],
+          details: undefined,
         };
       },
     });
 
     api.registerTool({
       name: 'morning_briefing_generate',
+      label: 'Generate morning briefing',
       description:
         "Generate today's morning briefing from configured sources and persist it as Markdown.",
       parameters: Type.Object(
@@ -1984,7 +1987,8 @@ export default definePluginEntry({
         { additionalProperties: false }
       ),
       async execute(_toolCallId, params) {
-        const dateValue = typeof params.date === 'string' ? params.date : undefined;
+        const typed = params as { date?: string };
+        const dateValue = typeof typed.date === 'string' ? typed.date : undefined;
         const targetDateKey = dateValue ?? (await resolveDateKeyForOffset(api, 0));
         const result = await generateBriefing(api, targetDateKey);
         return {
@@ -1999,12 +2003,14 @@ export default definePluginEntry({
               ].join('\n'),
             },
           ],
+          details: undefined,
         };
       },
     });
 
     api.registerTool({
       name: 'morning_briefing_read',
+      label: 'Read morning briefing',
       description: 'Read a saved morning briefing Markdown file for a specific date.',
       parameters: Type.Object(
         {
@@ -2019,7 +2025,8 @@ export default definePluginEntry({
         { additionalProperties: false }
       ),
       async execute(_toolCallId, params) {
-        const rawDay = typeof params.day === 'string' ? params.day : 'today';
+        const typed = params as { day?: string };
+        const rawDay = typeof typed.day === 'string' ? typed.day : 'today';
         const dateKey =
           rawDay === 'yesterday'
             ? await resolveDateKeyForOffset(api, -1)
@@ -2035,6 +2042,7 @@ export default definePluginEntry({
                 text: `No briefing exists for ${briefing.dateKey}.`,
               },
             ],
+            details: undefined,
           };
         }
         return {
@@ -2044,6 +2052,7 @@ export default definePluginEntry({
               text: briefing.markdown,
             },
           ],
+          details: undefined,
         };
       },
     });

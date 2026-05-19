@@ -2245,6 +2245,9 @@ importers:
       esbuild:
         specifier: '>=0.25.0'
         version: 0.27.4
+      openclaw:
+        specifier: 2026.4.23
+        version: 2026.4.23(@napi-rs/canvas@0.1.100)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       vitest:
         specifier: 'catalog:'
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)

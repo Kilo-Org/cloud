@@ -14,6 +14,7 @@ describe('mintPutUrl', () => {
       ...cfg,
       key: 'attachments/c/u/a',
       contentType: 'image/png',
+      contentLength: 1024,
       expiresSeconds: 900,
     });
     expect(url).toContain(
@@ -23,16 +24,31 @@ describe('mintPutUrl', () => {
     expect(url).toContain('X-Amz-Signature=');
     expect(url).toContain('X-Amz-Algorithm=AWS4-HMAC-SHA256');
     expect(headers['Content-Type']).toBe('image/png');
+    expect(headers['Content-Length']).toBe('1024');
   });
 
-  it('signs Content-Type into the signed headers', async () => {
+  it('signs Content-Type and Content-Length into the signed headers', async () => {
     const { url } = await mintPutUrl({
       ...cfg,
       key: 'k',
       contentType: 'image/jpeg',
+      contentLength: 42,
       expiresSeconds: 60,
     });
-    expect(decodeURIComponent(url)).toContain('content-type');
+    const decoded = decodeURIComponent(url);
+    expect(decoded).toContain('content-type');
+    expect(decoded).toContain('content-length');
+  });
+
+  it('signs zero-byte uploads (content-length 0)', async () => {
+    const { headers } = await mintPutUrl({
+      ...cfg,
+      key: 'empty',
+      contentType: 'application/octet-stream',
+      contentLength: 0,
+      expiresSeconds: 60,
+    });
+    expect(headers['Content-Length']).toBe('0');
   });
 });
 

@@ -24,22 +24,23 @@ export async function mintPutUrl(
   params: Cfg & {
     key: string;
     contentType: string;
+    contentLength: number;
     expiresSeconds: number;
   }
 ): Promise<{ url: string; headers: Record<string, string> }> {
   const url = new URL(`${r2Origin(params.accountId)}/${params.bucket}/${params.key}`);
   url.searchParams.set('X-Amz-Expires', String(params.expiresSeconds));
-  const signed = await makeClient(params).sign(
-    new Request(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': params.contentType },
-    }),
-    { aws: { signQuery: true, allHeaders: true } }
-  );
-  return {
-    url: signed.url,
-    headers: { 'Content-Type': params.contentType },
+  // Sign Content-Type and Content-Length into the URL so R2 rejects mismatched
+  // uploads — without this, a caller that declared size N can PUT arbitrary
+  // bytes and the row's `size` no longer reflects reality.
+  const headers = {
+    'Content-Type': params.contentType,
+    'Content-Length': String(params.contentLength),
   };
+  const signed = await makeClient(params).sign(new Request(url, { method: 'PUT', headers }), {
+    aws: { signQuery: true, allHeaders: true },
+  });
+  return { url: signed.url, headers };
 }
 
 export async function mintGetUrl(

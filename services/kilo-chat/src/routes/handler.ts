@@ -626,6 +626,7 @@ export async function handleAttachmentInit(c: HonoCtx) {
     secretAccessKey,
     key: init.r2Key,
     contentType: mimeType,
+    contentLength: size,
     expiresSeconds: PUT_URL_TTL_SECONDS,
   });
 

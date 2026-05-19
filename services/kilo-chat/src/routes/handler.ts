@@ -29,7 +29,7 @@ import { notifyMessageDeliveryFailed } from '../webhook/deliver';
 import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
 import { setTypingFor, stopTypingFor } from '../services/typing';
 import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
-import { attachmentContentDisposition } from '../util/content-disposition';
+import contentDisposition from 'content-disposition';
 import { mintGetUrl, mintPutUrl } from '../util/presigner';
 import type {
   CreateMessageResponse,
@@ -683,7 +683,7 @@ export async function handleAttachmentGetUrl(c: HonoCtx) {
 
   const responseContentDisposition = row.mimeType.startsWith('image/')
     ? undefined
-    : attachmentContentDisposition(row.filename);
+    : contentDisposition(row.filename, { type: 'attachment' });
 
   const { url } = await mintGetUrl({
     accountId: c.env.R2_ACCOUNT_ID,

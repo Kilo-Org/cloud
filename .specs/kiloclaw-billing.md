@@ -29,6 +29,7 @@ Updated 2026-03-27 -- subscription reassignment on re-provision.
 Updated 2026-04-16 -- successor subscription rows on personal reprovision.
 Updated 2026-05-10 -- price-versioned legacy and current pricing.
 Updated 2026-05-12 -- retired current Standard first-month discount.
+Updated 2026-05-18 -- organization hard-expiry suspension and recovery contract.
 
 ## Conventions
 
@@ -117,7 +118,10 @@ between plans at any time.
 
 Each subscription is scoped to a specific instance. A user MAY have
 multiple instances, each with its own subscription and renewal cycle.
-All subscriptions deduct from the same user credit balance.
+All personal subscriptions deduct from the same user credit balance.
+Current organization-managed bootstrap rows remain a temporary
+managed-active funding carveout, but their compute lifecycle is still
+subordinate to organization trial and seat entitlement.
 
 New users who provision an instance without subscribing first
 automatically receive a free trial whose duration is determined by the
@@ -125,10 +129,13 @@ subscription row's price version. Legacy
 `kiloclaw_earlybird_purchases` rows without canonical subscription rows
 MUST NOT mint fresh trial access and instead require manual
 remediation. Canonical earlybird subscription rows continue to grant
-access until their recorded expiry.
-A periodic background job enforces expiry, credit renewal, suspension,
-and eventual instance destruction when access lapses, with email
-notifications at each stage.
+access until their recorded expiry. Organization-managed instances whose
+parent organization reaches the hard-expired trial stage without a paid
+or exempt entitlement are suspended with a fresh seven-day destruction
+grace; restored entitlement before destruction cancels that deletion and
+auto-resumes stopped compute. A periodic background job enforces expiry,
+credit renewal, suspension, and eventual instance destruction when access
+lapses, with email notifications at each stage.
 
 ## Rules
 
@@ -254,8 +261,9 @@ subscription rows. Trial rows are temporary bootstrap rows and are
 exempt from the paid funding invariants in rules 2 and 3. Current
 organizational bootstrap rows that grant temporary `managed-active`
 access before org billing launches are also outside these funding
-invariants; they remain a temporary carveout until org billing
-integration ships.
+invariants. This funding carveout does not exempt them from the
+organization hard-expiry suspension, warning, recovery, or destruction
+requirements defined below.
 
 1. The system MUST record a payment source for each subscription. The
    value MUST be either `stripe` or `credits`.
@@ -1063,6 +1071,30 @@ rows renew.
 5. If the instance stop operation fails (e.g., no instance exists), the
    system MUST still proceed with the status transition.
 
+### Organization Trial Hard-Expiry Enforcement
+
+1. Organization-managed KiloClaw instances MUST enter trial-expiry
+   enforcement only when the parent organization is in the hard-expired
+   trial stage and lacks every qualifying entitlement defined by the Team
+   and Enterprise Seat Billing spec: an active subscription purchase,
+   disabled require-seats enforcement, OSS sponsorship, or suppressed
+   trial messaging.
+2. The system MUST NOT suspend organization-managed KiloClaw instances at
+   the first organization trial-end timestamp or during the soft-expired
+   trial stage while rule 1 is not satisfied.
+3. When rule 1 applies to an unsuspended live organization-managed row,
+   the system MUST stop the associated instance, transition the
+   subscription to canceled status, set a suspension timestamp, and set a
+   fresh destruction deadline 7 days in the future.
+4. Existing organization-managed instances already past hard expiry when
+   this enforcement first runs MUST receive a fresh 7-day destruction
+   deadline from suspension time; the system MUST NOT backdate the
+   deadline to a historical organization trial date.
+5. The system MUST send an organization-trial-suspended notification using
+   the organization notification rules below.
+6. If the instance stop operation fails (e.g., no instance exists), the
+   system MUST still proceed with the status transition.
+
 ### Subscription Period Expiry Enforcement
 
 1. When a canceled subscription's billing period has ended and the
@@ -1076,23 +1108,33 @@ rows renew.
 
 1. When a suspended subscription's destruction deadline is 2 or fewer
    days away, the system MUST send a destruction-warning notification.
+2. Before sending a destruction-warning notification for an
+   organization-managed subscription suspended by organization trial
+   hard-expiry enforcement, the system MUST re-evaluate parent
+   organization entitlement. If entitlement has returned, the system MUST
+   run Organization Entitlement Recovery instead of sending the warning.
 
 ### Instance Destruction
 
 1. When a suspended subscription's destruction deadline has passed, the
    system MUST destroy the subscription's associated instance.
-2. The system MUST mark the instance record as destroyed.
-3. The system MUST clear the destruction deadline after destruction.
-4. The system MUST send an instance-destroyed notification.
-5. If the destroy operation fails (e.g., no instance exists), the system
+2. Before destroying an organization-managed subscription suspended by
+   organization trial hard-expiry enforcement, the system MUST re-evaluate
+   parent organization entitlement. If entitlement has returned, the
+   system MUST run Organization Entitlement Recovery instead of destroying
+   the instance.
+3. The system MUST mark the instance record as destroyed.
+4. The system MUST clear the destruction deadline after destruction.
+5. The system MUST send an instance-destroyed notification.
+6. If the destroy operation fails (e.g., no instance exists), the system
    MUST still proceed with the state transition.
-6. Destroy request acceptance and provider cleanup finalization are
+7. Destroy request acceptance and provider cleanup finalization are
    distinct. The lifecycle sweep MAY proceed with the local instance and
    subscription state transition once the provider lifecycle owner has
    accepted the destroy request or the sweep has logged the failed
    attempt, provided any unfinalized provider cleanup remains durably
    tracked by the provider lifecycle owner.
-7. When provider cleanup is not finalized immediately, the provider
+8. When provider cleanup is not finalized immediately, the provider
    lifecycle owner MUST retain enough durable state to retry cleanup and
    MUST emit telemetry identifying pending provider resources and the
    latest provider error, if any. A provider 404 for a resource counts as
@@ -1117,17 +1159,30 @@ rows renew.
 
 ### Email Notifications
 
-1. Each notification type MUST be sent at most once per user per
+1. Each notification type MUST be sent at most once per recipient per
    lifecycle event.
 2. If a notification send fails, the system MUST allow the notification
    to be retried on the next background job run.
 3. The system MUST prevent concurrent duplicate sends of the same
-   notification to the same user.
+   notification to the same recipient.
 4. The system MUST support a credit-renewal-failed notification type
    for credit-funded subscriptions. This notification MUST be sent
    when the credit renewal sweep enters the insufficient-balance path
    and MUST be subject to the same idempotency rules as other
    notification types.
+5. Organization trial hard-expiry suspension, destruction-warning, and
+   instance-destroyed notifications MUST use organization-specific copy,
+   MUST NOT reuse misleading personal-trial wording, and MUST route users
+   to organization KiloClaw or organization billing surfaces rather than a
+   personal KiloClaw destination.
+6. The system MUST send those organization trial hard-expiry lifecycle
+   notifications to the associated instance user and to organization
+   owners and billing managers, deduplicating recipients who occupy more
+   than one role.
+7. Organization trial hard-expiry notification copy and calls to action
+   MUST be role-aware: associated users without billing authority receive
+   contact-admin guidance, while owners and billing managers receive
+   restore-entitlement guidance.
 
 ### Auto-Resume on Payment Recovery
 
@@ -1156,6 +1211,24 @@ rows renew.
    future suspension cycle.
 5. The system MUST NOT clear email log entries for trial or earlybird
    warning notifications, as those are one-time events.
+
+### Organization Entitlement Recovery
+
+1. When an organization-managed subscription suspended by organization
+   trial hard-expiry enforcement regains parent organization entitlement
+   before destruction, the system MUST recover it instead of warning or
+   destroying it.
+2. Recovery MUST restore the subscription to an access-granting
+   organization-managed state, clear the suspension timestamp and
+   destruction deadline, clear organization trial suspension and
+   destruction lifecycle email log entries, and record auditable recovery
+   history.
+3. Recovery MUST asynchronously attempt to start stopped compute so a
+   restored organization regains a usable instance without support
+   intervention.
+4. If the compute start attempt fails, the failure MUST remain retryable,
+   and the recovered organization MUST NOT be destroyed under the stale
+   destruction deadline that recovery canceled.
 
 ### Payment Provider Status Mapping
 
@@ -1251,6 +1324,15 @@ rows renew.
    requirements on credit transaction records.
 
 ### Changelog
+
+#### 2026-05-18 -- Organization hard-expiry suspension contract
+
+- Defined hard-expired organization trial state as the organization-managed
+  KiloClaw destructive enforcement boundary while retaining managed-active
+  funding carveout language.
+- Added fresh seven-day suspension grace, warning/destruction entitlement
+  revalidation, full entitlement recovery with automatic compute resume, and
+  organization-specific role-aware notification fanout.
 
 #### 2026-05-12 -- Retired current Standard first-month discount
 

@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import {
   CURRENT_KILOCLAW_PRICE_VERSION,
   LEGACY_KILOCLAW_PRICE_VERSION,
@@ -7,16 +7,30 @@ import {
   kiloclaw_earlybird_purchases,
   kiloclaw_instances,
   kiloclaw_subscriptions,
+  organization_seats_purchases,
   organizations,
   type KiloClawPriceVersion,
   type KiloClawPricingCatalogEntry,
   type KiloClawSubscription,
   type KiloClawSubscriptionChangeActor,
   type NewKiloClawSubscription,
+  type Organization,
+  type OrganizationSeatsPurchase,
   type WorkerDb,
 } from '@kilocode/db';
+import { classifyOrganizationEntitlement } from '@kilocode/organization-entitlement';
 
 const ORGANIZATION_TRIAL_DURATION_DAYS = 14;
+
+export class OrganizationKiloClawProvisionEntitlementError extends Error {
+  readonly status = 403;
+  readonly code = 'organization_kiloclaw_entitlement_expired';
+
+  constructor() {
+    super('Organization KiloClaw entitlement has expired.');
+    this.name = 'OrganizationKiloClawProvisionEntitlementError';
+  }
+}
 
 export type BootstrapProvisionInput = {
   userId: string;
@@ -139,6 +153,69 @@ function assertExpectedPriceVersion(params: {
       `KiloClaw price-version drift during ${params.context}: expected ${params.expected}, got ${params.actual}`
     );
   }
+}
+
+type OrganizationEntitlementReader = Pick<WorkerDb, 'select'>;
+
+type OrganizationProvisionEntitlementContext = {
+  organization: Pick<
+    Organization,
+    'created_at' | 'free_trial_end_at' | 'require_seats' | 'settings'
+  >;
+  latestSeatPurchaseStatus: OrganizationSeatsPurchase['subscription_status'] | null;
+};
+
+async function loadOrganizationProvisionEntitlementContext(params: {
+  executor: OrganizationEntitlementReader;
+  missingOrganizationMessage: string;
+  orgId: string;
+}): Promise<OrganizationProvisionEntitlementContext> {
+  const [organization] = await params.executor
+    .select({
+      created_at: organizations.created_at,
+      free_trial_end_at: organizations.free_trial_end_at,
+      require_seats: organizations.require_seats,
+      settings: organizations.settings,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, params.orgId))
+    .limit(1);
+
+  if (!organization) {
+    throw new Error(params.missingOrganizationMessage);
+  }
+
+  const [latestSeatPurchase] = await params.executor
+    .select({ subscriptionStatus: organization_seats_purchases.subscription_status })
+    .from(organization_seats_purchases)
+    .where(eq(organization_seats_purchases.organization_id, params.orgId))
+    .orderBy(desc(organization_seats_purchases.created_at))
+    .limit(1);
+
+  return {
+    organization,
+    latestSeatPurchaseStatus: latestSeatPurchase?.subscriptionStatus ?? null,
+  };
+}
+
+async function requireOrganizationProvisionEntitlement(params: {
+  executor: OrganizationEntitlementReader;
+  missingOrganizationMessage: string;
+  now: Date;
+  orgId: string;
+}): Promise<OrganizationProvisionEntitlementContext> {
+  const context = await loadOrganizationProvisionEntitlementContext(params);
+  const classification = classifyOrganizationEntitlement({
+    organization: context.organization,
+    latestSeatPurchaseStatus: context.latestSeatPurchaseStatus,
+    now: params.now,
+  });
+
+  if (!classification.hasEntitlement) {
+    throw new OrganizationKiloClawProvisionEntitlementError();
+  }
+
+  return context;
 }
 
 type OrgBootstrapWriter = Pick<WorkerDb, 'insert' | 'select' | 'update'>;
@@ -343,24 +420,18 @@ async function bootstrapOrganizationSubscription(params: BootstrapProvisionWithD
       throw new Error('Cannot bootstrap organization subscription on destroyed instance');
     }
 
-    const [organization] = await tx
-      .select({
-        createdAt: organizations.created_at,
-        freeTrialEndAt: organizations.free_trial_end_at,
-      })
-      .from(organizations)
-      .where(eq(organizations.id, orgId))
-      .limit(1);
-
-    if (!organization) {
-      throw new Error('Organization not found during subscription bootstrap');
-    }
+    const { organization } = await requireOrganizationProvisionEntitlement({
+      executor: tx,
+      missingOrganizationMessage: 'Organization not found during subscription bootstrap',
+      now,
+      orgId,
+    });
 
     const hasManagedActiveAccess = true;
     const trialEndsAt =
-      organization.freeTrialEndAt ??
+      organization.free_trial_end_at ??
       new Date(
-        new Date(organization.createdAt).getTime() +
+        new Date(organization.created_at).getTime() +
           ORGANIZATION_TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
       ).toISOString();
 
@@ -385,7 +456,7 @@ async function bootstrapOrganizationSubscription(params: BootstrapProvisionWithD
             access_origin: null,
             payment_source: null,
             cancel_at_period_end: false,
-            trial_started_at: organization.createdAt,
+            trial_started_at: organization.created_at,
             trial_ends_at: trialEndsAt,
           }
     );
@@ -778,6 +849,12 @@ export async function resolveProvisionEntitlementWithDb(params: {
   input: { userId: string; orgId: string | null };
 }): Promise<ProvisionEntitlement> {
   if (params.input.orgId) {
+    await requireOrganizationProvisionEntitlement({
+      executor: params.db,
+      missingOrganizationMessage: 'Organization not found during provision entitlement resolution',
+      now: new Date(),
+      orgId: params.input.orgId,
+    });
     return getProvisionEntitlementForPriceVersion(LEGACY_KILOCLAW_PRICE_VERSION);
   }
 

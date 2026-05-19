@@ -321,6 +321,44 @@ describe('platform provision bootstrap quarantine', () => {
     expect(typeof eventCall?.[1]?.instanceId).toBe('string');
     expect(eventCall?.[1]?.instanceId?.length).toBeGreaterThan(0);
   });
+
+  it('surfaces bootstrap-time organization entitlement loss and tears down new infrastructure', async () => {
+    const { env, destroy } = makeEnv();
+    const workerDb = createWorkerDb();
+    mockGetWorkerDb.mockReturnValue(workerDb);
+    mockBootstrapProvisionedSubscriptionWithFallback.mockRejectedValueOnce(
+      new BootstrapProvisionFallbackError({
+        rpcError: new Error('rpc saw stale organization state'),
+        fallbackError: Object.assign(new Error('Organization KiloClaw entitlement has expired.'), {
+          status: 403,
+        }),
+      })
+    );
+
+    const response = await platform.request(
+      '/provision',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          orgId: '22222222-2222-4222-8222-222222222222',
+          provider: 'fly',
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Organization KiloClaw entitlement has expired.',
+    });
+    expect(destroy).toHaveBeenCalledWith({ reason: 'bootstrap_cleanup_failure' });
+    const destroyUpdate = workerDb.updateSets.find(
+      update => typeof update.destroyed_at === 'string'
+    );
+    expect(destroyUpdate?.destroyed_at).toBeDefined();
+  });
 });
 
 describe('platform /provision: instanceType defaulting', () => {
@@ -475,6 +513,36 @@ describe('platform /provision: instanceType defaulting', () => {
       });
     }
 
+    expect(provision).not.toHaveBeenCalled();
+    expect(mockBootstrapProvisionedSubscriptionWithFallback).not.toHaveBeenCalled();
+  });
+
+  it('surfaces organization entitlement denial before provisioning infrastructure', async () => {
+    const { env, provision } = makeEnv();
+    mockGetWorkerDb.mockReturnValue(createWorkerDb());
+    mockResolveProvisionEntitlementWithFallback.mockRejectedValueOnce(
+      Object.assign(new Error('Organization KiloClaw entitlement has expired.'), { status: 403 })
+    );
+    mockBootstrapProvisionedSubscriptionWithFallback.mockResolvedValue({ mode: 'rpc' });
+
+    const response = await platform.request(
+      '/provision',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          orgId: '22222222-2222-4222-8222-222222222222',
+          provider: 'fly',
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Organization KiloClaw entitlement has expired.',
+    });
     expect(provision).not.toHaveBeenCalled();
     expect(mockBootstrapProvisionedSubscriptionWithFallback).not.toHaveBeenCalled();
   });

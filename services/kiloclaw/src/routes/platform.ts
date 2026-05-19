@@ -950,6 +950,7 @@ const SAFE_ERROR_PREFIXES = [
   'Cannot destroy: ', // destroy while restoring
   'Cannot resize: ', // resize during destroying/restoring/recovering
   'Cannot retry recovery', // force-retry-recovery guard messages
+  'Organization KiloClaw entitlement ', // org provision fail-closed entitlement gate
   'Stream Chat sendMessage failed', // sendMessage HTTP errors
   'Stream Chat is not set up', // no Stream Chat on this instance
   'Provider ', // explicit not-implemented provider errors

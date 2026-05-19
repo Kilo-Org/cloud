@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@jest/globals';
+import { beforeAll, describe, test, expect } from '@jest/globals';
 import {
   isEmailBlacklistedByDomain,
   isBlockedTLD,
@@ -6,8 +6,14 @@ import {
   getUserUUID,
   uuidSchema,
   parseSignInRedirectContext,
+  getProfileRedirectPath,
 } from './user.server';
-import type { User } from '@kilocode/db/schema';
+import { db } from '@/lib/drizzle';
+import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
+import type { Organization, User } from '@kilocode/db/schema';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@/tests/helpers/user.helper';
+import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
 
 // Same namespace UUID used in user.server.ts
@@ -456,5 +462,68 @@ describe('parseSignInRedirectContext', () => {
     expect(parseSignInRedirectContext(cookie)).toEqual({
       callbackPath: '/device-auth?code=xyz',
     });
+  });
+});
+
+describe('getProfileRedirectPath', () => {
+  let hardExpiredUser: User;
+  let hardExpiredOrganization: Organization;
+  let pastDueUser: User;
+  let pastDueOrganization: Organization;
+
+  beforeAll(async () => {
+    hardExpiredUser = await insertTestUser({
+      google_user_name: 'Hard Expired Redirect User',
+    });
+    hardExpiredOrganization = await createTestOrganization(
+      'Hard Expired Redirect Org',
+      hardExpiredUser.id,
+      100_000,
+      undefined,
+      true
+    );
+    await db
+      .update(organizations)
+      .set({
+        free_trial_end_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .where(eq(organizations.id, hardExpiredOrganization.id));
+
+    pastDueUser = await insertTestUser({
+      google_user_name: 'Past Due Redirect User',
+    });
+    pastDueOrganization = await createTestOrganization(
+      'Past Due Redirect Org',
+      pastDueUser.id,
+      100_000,
+      undefined,
+      true
+    );
+    await db
+      .update(organizations)
+      .set({
+        free_trial_end_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .where(eq(organizations.id, pastDueOrganization.id));
+    await db.insert(organization_seats_purchases).values({
+      organization_id: pastDueOrganization.id,
+      subscription_stripe_id: 'sub_profile_redirect_past_due',
+      subscription_status: 'past_due',
+      seat_count: 2,
+      amount_usd: 42,
+      starts_at: '2026-04-01T00:00:00.000Z',
+      expires_at: '2027-04-01T00:00:00.000Z',
+      billing_cycle: 'yearly',
+    });
+  });
+
+  test('redirects hard-expired single-organization users to profile without entitlement', async () => {
+    await expect(getProfileRedirectPath(hardExpiredUser)).resolves.toBe('/profile');
+  });
+
+  test('keeps past-due seat purchase organizations on their organization page', async () => {
+    await expect(getProfileRedirectPath(pastDueUser)).resolves.toBe(
+      `/organizations/${pastDueOrganization.id}`
+    );
   });
 });

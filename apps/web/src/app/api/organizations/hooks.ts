@@ -2,10 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { Organization } from '@kilocode/db/schema';
 import type { OrgTrialStatus, TimePeriod } from '@/lib/organizations/organization-types';
-import {
-  getDaysRemainingInTrial,
-  getOrgTrialStatusFromDays,
-} from '@/lib/organizations/trial-utils';
+import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';
 import { z } from 'zod';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 
@@ -364,6 +361,23 @@ export function useOrganizationSubscription(organizationId: string) {
   );
 }
 
+export function useOrganizationLatestSeatPurchaseStatus(organizationId: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.subscription.getLatestSeatPurchaseStatus.queryOptions(
+      { organizationId },
+      {
+        enabled: !!organizationId,
+        trpc: {
+          context: {
+            skipBatch: true,
+          },
+        },
+      }
+    )
+  );
+}
+
 export function useResubscribeDefaults(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(
@@ -573,7 +587,7 @@ export function useOrganizationAIAdoptionTimeseries(
 export function useOrganizationTrialStatus(
   organizationId: string
 ): OrgTrialStatus | 'loading' | 'error' {
-  const sub = useOrganizationSubscription(organizationId);
+  const sub = useOrganizationLatestSeatPurchaseStatus(organizationId);
   const org = useOrganizationWithMembers(organizationId);
 
   if (sub.error || org.error) {
@@ -585,48 +599,13 @@ export function useOrganizationTrialStatus(
     return 'loading';
   }
 
-  const organization = org.data;
-  const subscription = sub.data.subscription;
+  const classification = classifyOrganizationEntitlement({
+    organization: org.data,
+    latestSeatPurchaseStatus: sub.data.latestSeatPurchaseStatus,
+    now: new Date(),
+  });
 
-  // If trial messaging is suppressed, treat as subscribed (hide all trial UI)
-  // This is for special cases like OSS program participants who get free Kilo Enterprise
-  if (organization.settings.suppress_trial_messaging) {
-    return 'subscribed';
-  }
-
-  // Special accounts with require_seats = false bypass subscription requirements entirely.
-  // This is ONLY set manually by admins (not during signup) for:
-  // - Design partners with special agreements
-  // - Internal testing accounts
-  // - Special enterprise contracts
-  //
-  // NOTE: All new signups (including enterprise trials) start with require_seats = true
-  // and go through normal trial expiration logic. This check is for exceptions only.
-  if (!organization.require_seats) {
-    return 'subscribed';
-  }
-
-  // Has paid subscription - organization is in good standing
-  // We check for any non-ended subscription status, not just 'active', because:
-  // - 'active': fully paid and operational
-  // - 'past_due': payment failed but subscription still exists (user needs to fix payment)
-  // - 'incomplete': initial payment pending (user needs to complete payment)
-  // - 'trialing': Stripe trial (not our free trial)
-  // - 'paused': temporarily paused
-  // In all these cases, the user has a subscription and should NOT see trial-expired UI.
-  // The subscription status UI handles showing payment issues separately.
-  const nonEndedStatuses = ['active', 'past_due', 'incomplete', 'trialing', 'paused'];
-  if (subscription && nonEndedStatuses.includes(subscription.status)) {
-    return 'subscribed';
-  }
-
-  // No active subscription: determine trial status based on days remaining
-  // All new organizations start in trial and must subscribe before expiration
-  const daysRemaining = getDaysRemainingInTrial(
-    organization.free_trial_end_at ?? null,
-    organization.created_at
-  );
-  return getOrgTrialStatusFromDays(daysRemaining);
+  return classification.displayStatus;
 }
 
 // Schema for organization defaults response

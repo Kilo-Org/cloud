@@ -46,6 +46,33 @@ import {
   useUpstreamVerification,
   type UpstreamIntent,
 } from '@/components/wasteland/UpstreamIntent';
+import { parseDolthubUpstream } from '@/lib/wasteland/upstream';
+
+/**
+ * Build the canonical post-create URL for a wasteland.
+ *
+ * Personal-scope wastelands route to `/wasteland/{owner}/{repo}` (the
+ * M2.2 path the rest of the product uses). The bare `/wasteland/{id}`
+ * URL would otherwise hit the `[owner]/[repo]` route with the id as the
+ * owner segment and 404. When the upstream string can't be parsed we
+ * fall back to `/wasteland/by-id/{wastelandId}`, the redirect page that
+ * resolves the upstream server-side.
+ *
+ * Org-scope wastelands keep their existing `/organizations/{orgId}/...`
+ * URL — the org wasteland routes have their own id-based pages.
+ */
+function postCreateWastelandPath(args: {
+  wastelandId: string;
+  upstream: string;
+  lockedOrgId: string | null | undefined;
+}): string {
+  if (args.lockedOrgId) {
+    return `/organizations/${args.lockedOrgId}/wasteland/${args.wastelandId}`;
+  }
+  const parsed = parseDolthubUpstream(args.upstream);
+  if (parsed) return `/wasteland/${parsed.owner}/${parsed.repo}`;
+  return `/wasteland/by-id/${args.wastelandId}`;
+}
 
 const NAME_MAX_LENGTH = 128;
 
@@ -333,9 +360,11 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
         wastelandId = created.wasteland_id;
         setPendingWastelandId(wastelandId);
       }
-      const wastelandPath = lockedOrgId
-        ? `/organizations/${lockedOrgId}/wasteland/${wastelandId}`
-        : `/wasteland/${wastelandId}`;
+      const wastelandPath = postCreateWastelandPath({
+        wastelandId,
+        upstream,
+        lockedOrgId,
+      });
 
       if (!needsJoinCeremony) {
         // create intent — the user still has to wire DoltHub on the

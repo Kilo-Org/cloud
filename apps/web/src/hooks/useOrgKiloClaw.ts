@@ -304,11 +304,6 @@ export function useOrgKiloClawMutations(
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.getConfig.queryKey({ organizationId }),
         });
-        await queryClient.invalidateQueries({
-          queryKey: trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryKey({
-            organizationId,
-          }),
-        });
       },
     })
   );
@@ -318,6 +313,11 @@ export function useOrgKiloClawMutations(
         await invalidateStatus();
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.getConfig.queryKey({ organizationId }),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryKey({
+            organizationId,
+          }),
         });
       },
     })

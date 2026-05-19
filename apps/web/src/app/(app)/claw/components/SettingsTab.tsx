@@ -2022,6 +2022,8 @@ export function SettingsTab({
 
   const configuredSecrets = config?.configuredSecrets ?? {};
   const composioManagedConfigured = composioOnboardingStatus?.sandboxConfigSource === 'managed';
+  const composioManagedConnected =
+    composioManagedConfigured && composioOnboardingStatus?.status === 'connected';
   const composioManualConfigured = composioOnboardingStatus?.sandboxConfigSource === 'manual';
   const composioConfigured =
     (configuredSecrets['composio'] ?? false) ||
@@ -2480,12 +2482,19 @@ export function SettingsTab({
                     ) : undefined
                   }
                   actionRowExtra={
-                    composioManagedConfigured ? (
+                    composioManagedConnected ? (
                       <p className="text-muted-foreground flex items-start gap-2 text-xs">
                         <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                         Google Calendar is connected through Kilo-managed Composio for this OpenClaw
                         instance. Saving your own Composio credentials here will switch this
                         instance to manual setup.
+                      </p>
+                    ) : composioManagedConfigured ? (
+                      <p className="text-muted-foreground flex items-start gap-2 text-xs">
+                        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        Kilo-managed Composio is configured for this OpenClaw instance. Reconnect
+                        Google Calendar from onboarding, or save your own Composio credentials here
+                        to switch this instance to manual setup.
                       </p>
                     ) : undefined
                   }

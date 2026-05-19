@@ -225,9 +225,6 @@ export function useKiloClawMutations() {
         onSuccess: async () => {
           await invalidateStatus();
           await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
-          await queryClient.invalidateQueries({
-            queryKey: trpc.kiloclaw.getComposioOnboardingStatus.queryKey(),
-          });
         },
       })
     ),
@@ -236,6 +233,9 @@ export function useKiloClawMutations() {
         onSuccess: async () => {
           await invalidateStatus();
           await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getComposioOnboardingStatus.queryKey(),
+          });
         },
       })
     ),

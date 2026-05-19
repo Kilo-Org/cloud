@@ -2,6 +2,7 @@
 
 import { useId, useState } from 'react';
 import { Calendar, Check, ChevronDown, Plug, TriangleAlert } from 'lucide-react';
+import { SECRET_CATALOG_MAP, validateFieldValue } from '@kilocode/kiloclaw-secret-catalog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,10 @@ function statusLabel(status: ConnectToolsStepViewProps['status']): string {
 const brandPrimaryButtonClassName =
   'bg-brand-primary text-primary-foreground hover:bg-brand-primary/90 focus-visible:ring-brand-primary/50';
 
+const composioUserApiKeyPattern = SECRET_CATALOG_MAP.get('composio')?.fields.find(
+  field => field.key === 'composioUserApiKey'
+)?.validationPattern;
+
 export function ConnectToolsStepView({
   currentStep,
   totalSteps,
@@ -52,7 +57,8 @@ export function ConnectToolsStepView({
   const [showManual, setShowManual] = useState(false);
   const [userApiKey, setUserApiKey] = useState('');
   const [org, setOrg] = useState('');
-  const manualReady = userApiKey.trim().startsWith('uak_') && org.trim().length > 0;
+  const manualReady =
+    validateFieldValue(userApiKey.trim(), composioUserApiKeyPattern) && org.trim().length > 0;
   const connectionBlocked = !readyToConnect || loading;
 
   const primaryLabel = (() => {

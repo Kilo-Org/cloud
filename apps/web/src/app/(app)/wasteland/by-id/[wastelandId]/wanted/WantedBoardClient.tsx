@@ -155,6 +155,21 @@ export function WantedBoardClient({
   const search = searchParams?.get('q') ?? '';
   const sortField = parseSortField(searchParams?.get('sort'));
 
+  const [localSearch, setLocalSearch] = useState(search);
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setLocalSearch(search);
+  }, [search]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const updateFilterParams = useCallback(
     (updates: { status?: StatusFilter | 'all'; q?: string; sort?: SortField }) => {
       const next = new URLSearchParams(searchParams?.toString());
@@ -176,6 +191,25 @@ export function WantedBoardClient({
       router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
     },
     [pathname, router, searchParams]
+  );
+
+  const handleSearchChange = useCallback(
+    (val: string) => {
+      setLocalSearch(val);
+
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+
+      if (val === '') {
+        updateFilterParams({ q: '' });
+      } else {
+        debounceTimeoutRef.current = setTimeout(() => {
+          updateFilterParams({ q: val });
+        }, 250);
+      }
+    },
+    [updateFilterParams]
   );
 
   // Dialog state
@@ -410,8 +444,8 @@ export function WantedBoardClient({
             <input
               type="text"
               placeholder="Search wanted items..."
-              value={search}
-              onChange={e => updateFilterParams({ q: e.target.value })}
+              value={localSearch}
+              onChange={e => handleSearchChange(e.target.value)}
               className="w-48 bg-transparent text-xs text-white/80 outline-none placeholder:text-white/25"
             />
           </div>

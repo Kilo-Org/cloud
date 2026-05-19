@@ -330,7 +330,11 @@ describe('executePreparationSteps', () => {
     detectDevContainerMock.mockResolvedValueOnce({
       configPath: '.devcontainer/devcontainer.json',
     });
-    bringUpDevContainerMock.mockResolvedValueOnce(devcontainer);
+    bringUpDevContainerMock.mockImplementationOnce(async (_session, options) => {
+      options.onProgress?.('Building dev container…');
+      options.onProgress?.('Checking dev container runtime…');
+      return devcontainer;
+    });
     const input = {
       sessionId: 'agent_test',
       userId: 'test-user',
@@ -363,6 +367,11 @@ describe('executePreparationSteps', () => {
           KILO_SESSION_INGEST_URL: 'https://ingest.example',
         },
       }
+    );
+    expect(emitProgress).toHaveBeenCalledWith('devcontainer_setup', 'Building dev container…');
+    expect(emitProgress).toHaveBeenCalledWith(
+      'devcontainer_setup',
+      'Checking dev container runtime…'
     );
     expect(emitProgress).toHaveBeenCalledWith('setup_commands', 'Running setup commands…');
   });

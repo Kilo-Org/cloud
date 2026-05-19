@@ -237,7 +237,6 @@ export async function executePreparationSteps(
 
           detected = await detectDevContainer(session, workspacePath);
           if (detected) {
-            emitProgress('devcontainer_setup', `Building dev container (${detected.configPath})…`);
             const existingContainer = await findWrapperContainerForSession(
               sandbox,
               input.sessionId
@@ -251,6 +250,7 @@ export async function executePreparationSteps(
                 wrapperPort,
                 kiloCliVersion: KILO_CLI_VERSION,
                 configPath: detected.configPath,
+                onProgress: message => emitProgress('devcontainer_setup', message),
               });
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error);
@@ -321,8 +321,9 @@ export async function executePreparationSteps(
           });
           if (restoreResult.exitCode !== 0) {
             const stdout = restoreResult.stdout?.trim() ?? '';
+            const stderr = restoreResult.stderr?.trim() ?? '';
             logger
-              .withFields({ exitCode: restoreResult.exitCode, stdout })
+              .withFields({ exitCode: restoreResult.exitCode, stdout, stderr })
               .error('Session import failed');
             emitProgress('failed', `Session import failed (exit ${restoreResult.exitCode})`);
             return undefined;

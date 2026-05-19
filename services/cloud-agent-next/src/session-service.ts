@@ -1866,10 +1866,6 @@ export class SessionService {
 
       let dockerEnv: Record<string, string> | undefined;
       if (metadata.devcontainer) {
-        onProgress?.(
-          'devcontainer_setup',
-          `Building dev container (${metadata.devcontainer.configPath})…`
-        );
         dockerEnv = dockerSocketEnv(await resolveDockerSocketPath(session));
         devContainerHandle = await bringUpDevContainer(session, {
           workspacePath: metadata.devcontainer.workspacePath,
@@ -1878,6 +1874,7 @@ export class SessionService {
           wrapperPort: metadata.devcontainer.wrapperPort,
           kiloCliVersion: KILO_CLI_VERSION,
           configPath: metadata.devcontainer.configPath,
+          onProgress: message => onProgress?.('devcontainer_setup', message),
         });
       }
 

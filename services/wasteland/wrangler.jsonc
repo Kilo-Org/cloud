@@ -76,11 +76,6 @@
   // PRODUCTION Secrets Store (shared Kilo secrets store)
   "secrets_store_secrets": [
     {
-      "binding": "WASTELAND_JWT_SECRET",
-      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-      "secret_name": "WASTELAND_JWT_SECRET_PROD",
-    },
-    {
       "binding": "NEXTAUTH_SECRET",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "NEXTAUTH_SECRET",
@@ -122,11 +117,6 @@
       },
       "analytics_engine_datasets": [{ "binding": "WASTELAND_AE", "dataset": "wasteland_events" }],
       "secrets_store_secrets": [
-        {
-          "binding": "WASTELAND_JWT_SECRET",
-          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "WASTELAND_JWT_SECRET_PROD",
-        },
         {
           "binding": "NEXTAUTH_SECRET",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",

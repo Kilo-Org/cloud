@@ -6,6 +6,7 @@ export type PlatformType =
   | 'gitlab'
   | 'bitbucket'
   | 'slack'
+  | 'teams'
   | 'discord'
   | 'linear'
   | 'dolthub';
@@ -49,6 +50,14 @@ export const PLATFORM_DEFINITIONS: PlatformDefinition[] = [
     enabled: true,
     personalRoute: '/integrations/slack',
     orgRoute: organizationId => `/organizations/${organizationId}/integrations/slack`,
+  },
+  {
+    id: PLATFORM.TEAMS,
+    name: 'Microsoft Teams',
+    description: 'Mention Kilo in Teams to start coding work from chats, channels, and threads',
+    enabled: true,
+    personalRoute: '/integrations/teams',
+    orgRoute: organizationId => `/organizations/${organizationId}/integrations/teams`,
   },
   {
     id: PLATFORM.GITLAB,
@@ -96,6 +105,7 @@ export const PLATFORM_DEFINITIONS: PlatformDefinition[] = [
 type InstallationStatus = {
   github?: { installed: boolean };
   slack?: { installed: boolean };
+  teams?: { installed: boolean };
   gitlab?: { installed: boolean };
   discord?: { installed: boolean };
   linear?: { installed: boolean };

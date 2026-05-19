@@ -1,9 +1,11 @@
 import type { GitHubAdapter } from '@chat-adapter/github';
 import type { LinearAdapter } from '@chat-adapter/linear';
 import type { SlackAdapter } from '@chat-adapter/slack';
+import type { TeamsAdapter } from '@chat-adapter/teams';
 import { createGitHubBotPlatform } from '@/lib/bot/platforms/github';
 import { createLinearBotPlatform } from '@/lib/bot/platforms/linear';
 import { createSlackBotPlatform } from '@/lib/bot/platforms/slack';
+import { createTeamsBotPlatform } from '@/lib/bot/platforms/teams';
 import type { BotPlatform } from '@/lib/bot/platforms/types';
 
 export type BotPlatformRegistry = {
@@ -17,6 +19,7 @@ type BotPlatformRegistryParams = {
   slackAdapter: SlackAdapter;
   githubAdapter: GitHubAdapter;
   linearAdapter: LinearAdapter;
+  teamsAdapter: TeamsAdapter | null;
 };
 
 function createPlatformMap(platforms: BotPlatform[]): Map<string, BotPlatform> {
@@ -24,11 +27,13 @@ function createPlatformMap(platforms: BotPlatform[]): Map<string, BotPlatform> {
 }
 
 export function createBotPlatformRegistry(params: BotPlatformRegistryParams): BotPlatformRegistry {
-  const platformMap = createPlatformMap([
+  const platforms = [
     createGitHubBotPlatform(params.githubAdapter),
     createSlackBotPlatform(params.slackAdapter),
     createLinearBotPlatform(params.linearAdapter),
-  ]);
+    ...(params.teamsAdapter ? [createTeamsBotPlatform(params.teamsAdapter)] : []),
+  ];
+  const platformMap = createPlatformMap(platforms);
 
   return {
     get(platform) {

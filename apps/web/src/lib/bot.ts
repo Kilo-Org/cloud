@@ -2,6 +2,7 @@ import { Chat, type Message, type Thread } from 'chat';
 import type { GitHubAdapter } from '@chat-adapter/github';
 import type { LinearAdapter } from '@chat-adapter/linear';
 import type { SlackAdapter } from '@chat-adapter/slack';
+import type { TeamsAdapter } from '@chat-adapter/teams';
 import { captureException } from '@sentry/nextjs';
 import { resolveKiloUserId, unlinkKiloUser } from '@/lib/bot-identity';
 import {
@@ -14,6 +15,7 @@ import { createChatState } from '@/lib/bot/state';
 import { githubAdapter } from '@/lib/bot/github-adapter';
 import { linearAdapter } from '@/lib/bot/linear-adapter';
 import { slackAdapter } from '@/lib/bot/slack-adapter';
+import { teamsAdapter } from '@/lib/bot/teams-adapter';
 import { botPlatforms } from '@/lib/bot/platforms';
 import { createLinearWebhookHandler } from '@/lib/bot/platforms/linear-webhook';
 import { createSlackWebhookHandler } from '@/lib/bot/platforms/slack-webhook';
@@ -21,15 +23,19 @@ import { createSlackWebhookHandler } from '@/lib/bot/platforms/slack-webhook';
 function createKiloBot(
   slackAdapter: SlackAdapter,
   githubAdapter: GitHubAdapter,
-  linearAdapter: LinearAdapter
+  linearAdapter: LinearAdapter,
+  teamsAdapter: TeamsAdapter | null
 ) {
+  const adapters = {
+    github: githubAdapter,
+    slack: slackAdapter,
+    linear: linearAdapter,
+    ...(teamsAdapter ? { teams: teamsAdapter } : {}),
+  };
+
   const chatBot = new Chat({
     userName: process.env.NODE_ENV === 'production' ? 'Kilo' : 'Henk',
-    adapters: {
-      github: githubAdapter,
-      slack: slackAdapter,
-      linear: linearAdapter,
-    },
+    adapters,
     state: createChatState(),
     logger: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   });
@@ -49,6 +55,16 @@ function createKiloBot(
     ]);
 
     if (!platformIntegration) {
+      if (botPlatform.promptInstallIntegration) {
+        await botPlatform.promptInstallIntegration({
+          thread,
+          message,
+          identity,
+          state: chatBot.getState(),
+        });
+        return;
+      }
+
       captureException(new Error('No active platform integration found'), {
         extra: { platform: identity.platform, teamId: identity.teamId },
       });
@@ -127,7 +143,7 @@ function createKiloBot(
   return chatBot;
 }
 
-export const bot = createKiloBot(slackAdapter, githubAdapter, linearAdapter);
+export const bot = createKiloBot(slackAdapter, githubAdapter, linearAdapter, teamsAdapter);
 
 // registerSingleton is synchronous and idempotent and is required for
 // ThreadImpl.fromJSON deserialization. Doing it once at module load means

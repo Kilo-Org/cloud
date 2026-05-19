@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "UQ_platform_integrations_teams_platform_inst" ON "platform_integrations" USING btree ("platform","platform_installation_id") WHERE "platform_integrations"."platform" = 'teams' AND "platform_integrations"."platform_installation_id" IS NOT NULL;

@@ -147,6 +147,7 @@ export const PLATFORM = {
   GITHUB: 'github',
   GITLAB: 'gitlab',
   SLACK: 'slack',
+  TEAMS: 'teams',
   DISCORD: 'discord',
   LINEAR: 'linear',
   DOLTHUB: 'dolthub',

@@ -25,6 +25,9 @@ export function IntegrationsHub({ organizationId }: IntegrationsHubProps) {
   const { data: slackInstallation, isLoading: slackLoading } = useQuery(
     trpc.slack.getInstallation.queryOptions(input)
   );
+  const { data: teamsInstallation, isLoading: teamsLoading } = useQuery(
+    trpc.teams.getInstallation.queryOptions(input)
+  );
   const { data: discordInstallation, isLoading: discordLoading } = useQuery(
     trpc.discord.getInstallation.queryOptions(input)
   );
@@ -41,6 +44,7 @@ export function IntegrationsHub({ organizationId }: IntegrationsHubProps) {
   const isLoading =
     githubLoading ||
     slackLoading ||
+    teamsLoading ||
     discordLoading ||
     gitlabLoading ||
     linearLoading ||
@@ -67,6 +71,7 @@ export function IntegrationsHub({ organizationId }: IntegrationsHubProps) {
     {
       github: githubInstallation,
       slack: slackInstallation,
+      teams: teamsInstallation,
       discord: discordInstallation,
       gitlab: gitlabInstallation,
       linear: linearInstallation,

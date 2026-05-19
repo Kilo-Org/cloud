@@ -133,6 +133,13 @@ export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
 export const SLACK_CLIENT_SECRET = getEnvVariable('SLACK_CLIENT_SECRET');
 export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
 
+// Microsoft Teams bot integration
+export const TEAMS_APP_ID = getEnvVariable('TEAMS_APP_ID');
+export const TEAMS_APP_PASSWORD = getEnvVariable('TEAMS_APP_PASSWORD');
+export const TEAMS_APP_TENANT_ID = getEnvVariable('TEAMS_APP_TENANT_ID');
+export const TEAMS_APP_TYPE = getEnvVariable('TEAMS_APP_TYPE') || 'MultiTenant';
+export const TEAMS_APP_INSTALL_URL = getEnvVariable('TEAMS_APP_INSTALL_URL') || '';
+
 // Linear (bot integration)
 // @chat-adapter/linear 4.27 does not (yet) support encryption-at-rest via
 // an `encryptionKey` config option the way @chat-adapter/slack does; the

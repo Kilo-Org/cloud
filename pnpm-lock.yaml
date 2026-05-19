@@ -514,6 +514,9 @@ importers:
       '@chat-adapter/state-redis':
         specifier: 4.27.0
         version: 4.27.0
+      '@chat-adapter/teams':
+        specifier: 4.27.0
+        version: 4.27.0
       '@emoji-mart/data':
         specifier: 1.2.1
         version: 1.2.1
@@ -1718,7 +1721,7 @@ importers:
         version: 7.0.0-dev.20260514.1
       jest:
         specifier: 30.3.0
-        version: 30.3.0(@types/node@25.7.0)(esbuild-register@3.6.0(esbuild@0.28.0))
+        version: 30.3.0(@types/node@24.12.4)(esbuild-register@3.6.0(esbuild@0.28.0))
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2824,6 +2827,14 @@ packages:
     resolution: {integrity: sha512-iY8yvjE0y651BixKNPgmv1WrQc+GZ142sb0z4gYnChDDY2YqI4P/jsSopBWrKfAt7LOJAkOXt7rC/hms+WclQQ==}
     engines: {node: '>=18.0.0'}
 
+  '@azure/msal-common@15.17.0':
+    resolution: {integrity: sha512-VQ5/gTLFADkwue+FohVuCqlzFPUq4xSrX8jeZe+iwZuY6moliNC8xt86qPVNYdtbQfELDf2Nu6LI+demFPHGgw==}
+    engines: {node: '>=0.8.0'}
+
+  '@azure/msal-node@3.8.10':
+    resolution: {integrity: sha512-0Hz7Kx4hs70KZWep/Rd7aw/qOLUF92wUOhn7ZsOuB5xNR/06NL1E2RAI9+UKH1FtvN8nD6mFjH7UKSjv6vOWvQ==}
+    engines: {node: '>=16'}
+
   '@babel/code-frame@7.29.0':
     resolution: {integrity: sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw==}
     engines: {node: '>=6.9.0'}
@@ -3568,6 +3579,9 @@ packages:
 
   '@chat-adapter/state-redis@4.27.0':
     resolution: {integrity: sha512-kmfCzNUQOCZ6MxBmd0azdJAmbAbgJ87JkW0/kQWEZ9vmlf8F5VlmRSfvn9jWhh4R90ThpLeflmIaHX8iK4x2dA==}
+
+  '@chat-adapter/teams@4.27.0':
+    resolution: {integrity: sha512-k4+4Mcoa+YAXjOtHi61lIB+CSUaHPFgAr3CSf05u7BZoPtWUAKattToaklF4CIsalsFs6vcS6dgQ+UtMzhNEFg==}
 
   '@chromatic-com/playwright@0.12.8':
     resolution: {integrity: sha512-2oi8ghd+2N+hDI0Y65Ac/aYfsvDTyDHvEZMNS4Ln7VzyZ6SdGLoQLOvP80IGJlekTI68K8gQpzXewRV2chUaZQ==}
@@ -5035,6 +5049,30 @@ packages:
     peerDependencies:
       react: '>= 18 || >= 19'
       react-dom: '>= 18 || >= 19'
+
+  '@microsoft/teams.api@2.0.10':
+    resolution: {integrity: sha512-jaadhzjRUR4ynp9TD9IpOV7voxYIG7piTdck76/kwdmZVPakQxE2NWAGYwLXdGsE6UZcTbTarU5KjfUST6hX4A==}
+    engines: {node: '>=20'}
+
+  '@microsoft/teams.apps@2.0.10':
+    resolution: {integrity: sha512-ZpyO77Lxu2GUQnt8NhRaeYbYqISP5yuTef7kns5ZSwzM4+xGDztCgyxsRpUE4YGKAXj85eGM4hbgq2DTXMMf/w==}
+    engines: {node: '>=20'}
+
+  '@microsoft/teams.cards@2.0.10':
+    resolution: {integrity: sha512-Sbmm9cqH/eiuZq9jGWatpLeLbS8co5AfYCFSejSZ1VEBzRBFSZIo06H5JZ/obJZ/I/M2E/6k2gR2wQwwdIxWtw==}
+    engines: {node: '>=20'}
+
+  '@microsoft/teams.common@2.0.10':
+    resolution: {integrity: sha512-d69rkdSm3b/6T4YxURyoQQshVfCcMXE3Cd30EW4JrnUSUt8GbvVEAQxKjAwNR7MfLpJ7L1OkYoSqfXerTinj/Q==}
+    engines: {node: '>=20'}
+
+  '@microsoft/teams.graph-endpoints@2.0.10':
+    resolution: {integrity: sha512-Y5K2M3oKR1aiVuL4+0eiYsP2ZwWFUcEEEdXyMF6isADH+pJaAa9IW3ybY5t2lsxhGZjzzuPQhVVhet29JbpTXA==}
+    engines: {node: '>=20'}
+
+  '@microsoft/teams.graph@2.0.10':
+    resolution: {integrity: sha512-WzXDmjqdYzKtQyT26He7TdIUzjhX8ZvBfJnBNzqb3d7Z6VzC7E6vifmQ19Bt/QP1VmCB3WLTtHFf/JS+2XA0Ww==}
+    engines: {node: '>=20'}
 
   '@mistralai/mistralai@1.15.1':
     resolution: {integrity: sha512-fb995eiz3r0KsBGtRjFV+/iLbX+UpfalxpF+YitT3R6ukrPD4PN+FGwwmYcRFhNAzVzDUtTVxQYnjQWEnwV5nw==}
@@ -12455,8 +12493,16 @@ packages:
   jwa@2.0.1:
     resolution: {integrity: sha512-hRF04fqJIP8Abbkq5NKGN0Bbr3JxlQ+qhZufXVr0DvujKy93ZCbXZMHDL4EOtodSbCWxOqR8MS1tXA5hwqCXDg==}
 
+  jwks-rsa@3.2.2:
+    resolution: {integrity: sha512-BqTyEDV+lS8F2trk3A+qJnxV5Q9EqKCBJOPti3W97r7qTympCZjb7h2X6f2kc+0K3rsSTY1/6YG2eaXKoj497w==}
+    engines: {node: '>=14'}
+
   jws@4.0.1:
     resolution: {integrity: sha512-EKI/M/yqPncGUUh44xz0PxSidXFr/+r0pA70+gIYhjv+et7yxM+s29Y+VGDkovRofQem0fs7Uvf4+YmAdyRduA==}
+
+  jwt-decode@4.0.0:
+    resolution: {integrity: sha512-+KJGIyHgkGuIq3IEBNftfhW/LfWhXUIY6OmyVWjliu5KH1y0fw7VQ8YndE2O4qZdMSd9SqbnC8GOcZEy0Om7sA==}
+    engines: {node: '>=18'}
 
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
@@ -12577,6 +12623,9 @@ packages:
     resolution: {integrity: sha512-xi6IyHML+c9+Q3W0S4fCQJOym42pyurFiJUHEcEyHS0CeKzia4yZDEsLlqOFykxOdHpNy0NmvVO31vcSqAxJCg==}
     engines: {node: '>= 12.0.0'}
 
+  limiter@1.1.5:
+    resolution: {integrity: sha512-FWWMIEOxz3GwUI4Ts/IvgVy6LPvoMPgjMdQ185nN6psJyBJ4yOpzqm695/h5umdLJg2vW3GR5iG11MAkR2AzJA==}
+
   lines-and-columns@1.2.4:
     resolution: {integrity: sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==}
 
@@ -12618,6 +12667,9 @@ packages:
 
   lodash-es@4.18.1:
     resolution: {integrity: sha512-J8xewKD/Gk22OZbhpOVSwcs60zhd95ESDwezOFuA3/099925PdHJ7OFHNTGtajL3AlZkykD32HykiMo+BIBI8A==}
+
+  lodash.clonedeep@4.5.0:
+    resolution: {integrity: sha512-H5ZhCF25riFd9uB5UCkVKo61m3S/xZk1x4wA6yp/L3RFP6Z/eHH1ymQcGLo7J3GMPfm0V/7m1tryHuGVxpqEBQ==}
 
   lodash.debounce@4.0.8:
     resolution: {integrity: sha512-FT1yDzDYEoYWhnSGnpE/4Kj1fLZkDFyqRb7fNt6FdYOSxlUWAtp42Eh6Wb0rGIv/m9Bgo7x4GhQbm5Ys4SG5ow==}
@@ -12706,6 +12758,9 @@ packages:
   lru-cache@7.18.3:
     resolution: {integrity: sha512-jumlc0BIUrS3qJGgIkWZsyfAM7NCWiBcCDhnd+3NNM5KbBmLTgHVfWBcg6W+rLUsIpzpERPsvwUP7CckAQSOoA==}
     engines: {node: '>=12'}
+
+  lru-memoizer@2.3.0:
+    resolution: {integrity: sha512-GXn7gyHAMhO13WSKrIiNfztwxodVsP8IoZ3XfrJV4yH2x0/OeTO/FIaAHTY5YekdGgW94njfuKmyyt1E0mR6Ug==}
 
   lucide-react-native@1.7.0:
     resolution: {integrity: sha512-wGJY5nosSawh028jg8r1ZKqnGPDIVfIL9xvKOs4wPYFQHeJMHsADYm/lmuFYXMXXatSkHhpsCjeqIRgeFGzf8g==}
@@ -14419,6 +14474,9 @@ packages:
   refa@0.12.1:
     resolution: {integrity: sha512-J8rn6v4DBb2nnFqkqwy6/NnTYMcgLA+sLr0iIO41qpv0n+ngb7ksag2tMRl0inb1bbO/esUwzW1vbJi7K0sI0g==}
     engines: {node: ^12.0.0 || ^14.0.0 || >=16.0.0}
+
+  reflect-metadata@0.2.2:
+    resolution: {integrity: sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q==}
 
   regenerate-unicode-properties@10.2.2:
     resolution: {integrity: sha512-m03P+zhBeQd1RGnYxrGyDAPpWX/epKirLrp8e3qevZdVkKtnCrjjWczIbYc8+xd6vcTStVlqfycTx1KR4LOr0g==}
@@ -16943,6 +17001,14 @@ snapshots:
 
   '@aws/lambda-invoke-store@0.2.4': {}
 
+  '@azure/msal-common@15.17.0': {}
+
+  '@azure/msal-node@3.8.10':
+    dependencies:
+      '@azure/msal-common': 15.17.0
+      jsonwebtoken: 9.0.3
+      uuid: 8.3.2
+
   '@babel/code-frame@7.29.0':
     dependencies:
       '@babel/helper-validator-identifier': 7.28.5
@@ -17911,6 +17977,18 @@ snapshots:
       - '@node-rs/xxhash'
       - supports-color
 
+  '@chat-adapter/teams@4.27.0':
+    dependencies:
+      '@chat-adapter/shared': 4.27.0
+      '@microsoft/teams.api': 2.0.10
+      '@microsoft/teams.apps': 2.0.10
+      '@microsoft/teams.cards': 2.0.10
+      '@microsoft/teams.graph-endpoints': 2.0.10
+      chat: 4.27.0
+    transitivePeerDependencies:
+      - debug
+      - supports-color
+
   '@chromatic-com/playwright@0.12.8(@playwright/test@1.58.2)(@swc/core@1.15.33)(@types/react@19.2.14)(bufferutil@4.1.0)(esbuild@0.28.0)(postcss@8.5.13)(typescript@5.9.3)(utf-8-validate@6.0.6)':
     dependencies:
       '@chromaui/rrweb-snapshot': 2.0.0-alpha.18-noAbsolute
@@ -18077,7 +18155,7 @@ snapshots:
       cjs-module-lexer: 1.4.3
       esbuild: 0.28.0
       miniflare: 4.20260508.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.47.1)(tsx@4.22.2)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.7.0)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.47.1)(tsx@4.22.2)(yaml@2.8.4)
       wrangler: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 3.25.76
     transitivePeerDependencies:
@@ -20104,6 +20182,51 @@ snapshots:
     dependencies:
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
+
+  '@microsoft/teams.api@2.0.10':
+    dependencies:
+      '@microsoft/teams.cards': 2.0.10
+      '@microsoft/teams.common': 2.0.10
+      jwt-decode: 4.0.0
+      qs: 6.15.1
+    transitivePeerDependencies:
+      - debug
+      - supports-color
+
+  '@microsoft/teams.apps@2.0.10':
+    dependencies:
+      '@azure/msal-node': 3.8.10
+      '@microsoft/teams.api': 2.0.10
+      '@microsoft/teams.common': 2.0.10
+      '@microsoft/teams.graph': 2.0.10
+      axios: 1.16.1
+      cors: 2.8.6
+      express: 5.2.1
+      jsonwebtoken: 9.0.3
+      jwks-rsa: 3.2.2
+      reflect-metadata: 0.2.2
+    transitivePeerDependencies:
+      - debug
+      - supports-color
+
+  '@microsoft/teams.cards@2.0.10': {}
+
+  '@microsoft/teams.common@2.0.10':
+    dependencies:
+      axios: 1.16.1
+    transitivePeerDependencies:
+      - debug
+      - supports-color
+
+  '@microsoft/teams.graph-endpoints@2.0.10': {}
+
+  '@microsoft/teams.graph@2.0.10':
+    dependencies:
+      '@microsoft/teams.common': 2.0.10
+      qs: 6.15.1
+    transitivePeerDependencies:
+      - debug
+      - supports-color
 
   '@mistralai/mistralai@1.15.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
@@ -28097,25 +28220,6 @@ snapshots:
       - supports-color
       - ts-node
 
-  jest-cli@30.3.0(@types/node@25.7.0)(esbuild-register@3.6.0(esbuild@0.28.0)):
-    dependencies:
-      '@jest/core': 30.3.0(esbuild-register@3.6.0(esbuild@0.28.0))
-      '@jest/test-result': 30.3.0
-      '@jest/types': 30.3.0
-      chalk: 4.1.2
-      exit-x: 0.2.2
-      import-local: 3.2.0
-      jest-config: 30.3.0(@types/node@25.7.0)(esbuild-register@3.6.0(esbuild@0.28.0))
-      jest-util: 30.3.0
-      jest-validate: 30.3.0
-      yargs: 17.7.2
-    transitivePeerDependencies:
-      - '@types/node'
-      - babel-plugin-macros
-      - esbuild-register
-      - supports-color
-      - ts-node
-
   jest-config@29.7.0(@types/node@20.19.41):
     dependencies:
       '@babel/core': 7.29.0
@@ -28265,38 +28369,6 @@ snapshots:
       strip-json-comments: 3.1.1
     optionalDependencies:
       '@types/node': 24.12.4
-      esbuild-register: 3.6.0(esbuild@0.28.0)
-    transitivePeerDependencies:
-      - babel-plugin-macros
-      - supports-color
-
-  jest-config@30.3.0(@types/node@25.7.0)(esbuild-register@3.6.0(esbuild@0.28.0)):
-    dependencies:
-      '@babel/core': 7.29.0
-      '@jest/get-type': 30.1.0
-      '@jest/pattern': 30.0.1
-      '@jest/test-sequencer': 30.3.0
-      '@jest/types': 30.3.0
-      babel-jest: 30.3.0(@babel/core@7.29.0)
-      chalk: 4.1.2
-      ci-info: 4.4.0
-      deepmerge: 4.3.1
-      glob: 13.0.6
-      graceful-fs: 4.2.11
-      jest-circus: 30.3.0
-      jest-docblock: 30.2.0
-      jest-environment-node: 30.3.0
-      jest-regex-util: 30.0.1
-      jest-resolve: 30.3.0
-      jest-runner: 30.3.0
-      jest-util: 30.3.0
-      jest-validate: 30.3.0
-      parse-json: 5.2.0
-      pretty-format: 30.3.0
-      slash: 3.0.0
-      strip-json-comments: 3.1.1
-    optionalDependencies:
-      '@types/node': 25.7.0
       esbuild-register: 3.6.0(esbuild@0.28.0)
     transitivePeerDependencies:
       - babel-plugin-macros
@@ -28873,19 +28945,6 @@ snapshots:
       - supports-color
       - ts-node
 
-  jest@30.3.0(@types/node@25.7.0)(esbuild-register@3.6.0(esbuild@0.28.0)):
-    dependencies:
-      '@jest/core': 30.3.0(esbuild-register@3.6.0(esbuild@0.28.0))
-      '@jest/types': 30.3.0
-      import-local: 3.2.0
-      jest-cli: 30.3.0(@types/node@25.7.0)(esbuild-register@3.6.0(esbuild@0.28.0))
-    transitivePeerDependencies:
-      - '@types/node'
-      - babel-plugin-macros
-      - esbuild-register
-      - supports-color
-      - ts-node
-
   jimp-compact@0.16.1: {}
 
   jiti@2.7.0: {}
@@ -29010,10 +29069,22 @@ snapshots:
       ecdsa-sig-formatter: 1.0.11
       safe-buffer: 5.2.1
 
+  jwks-rsa@3.2.2:
+    dependencies:
+      '@types/jsonwebtoken': 9.0.10
+      debug: 4.4.3
+      jose: 4.15.9
+      limiter: 1.1.5
+      lru-memoizer: 2.3.0
+    transitivePeerDependencies:
+      - supports-color
+
   jws@4.0.1:
     dependencies:
       jwa: 2.0.1
       safe-buffer: 5.2.1
+
+  jwt-decode@4.0.0: {}
 
   keyv@4.5.4:
     dependencies:
@@ -29136,6 +29207,8 @@ snapshots:
       lightningcss-win32-arm64-msvc: 1.30.1
       lightningcss-win32-x64-msvc: 1.30.1
 
+  limiter@1.1.5: {}
+
   lines-and-columns@1.2.4: {}
 
   linkedom@0.18.12:
@@ -29173,6 +29246,8 @@ snapshots:
       p-locate: 6.0.0
 
   lodash-es@4.18.1: {}
+
+  lodash.clonedeep@4.5.0: {}
 
   lodash.debounce@4.0.8: {}
 
@@ -29240,6 +29315,11 @@ snapshots:
       yallist: 4.0.0
 
   lru-cache@7.18.3: {}
+
+  lru-memoizer@2.3.0:
+    dependencies:
+      lodash.clonedeep: 4.5.0
+      lru-cache: 6.0.0
 
   lucide-react-native@1.7.0(react-native-svg@15.15.3(react-native@0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0))(react-native@0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0):
     dependencies:
@@ -31701,6 +31781,8 @@ snapshots:
   refa@0.12.1:
     dependencies:
       '@eslint-community/regexpp': 4.12.2
+
+  reflect-metadata@0.2.2: {}
 
   regenerate-unicode-properties@10.2.2:
     dependencies:

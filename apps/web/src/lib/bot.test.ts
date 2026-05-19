@@ -28,6 +28,13 @@ function getMockGithubAdapter() {
   };
 }
 
+function getMockTeamsAdapter() {
+  return {
+    name: 'teams',
+    handleWebhook: jest.fn(),
+  };
+}
+
 const mockSlackBotPlatform = {
   platform: 'slack',
   documentationUrl: 'https://kilo.ai/docs/code-with-ai/platforms/slack',
@@ -36,6 +43,7 @@ const mockSlackBotPlatform = {
   isEnabledForBot: jest.fn(() => true),
   canHandleMessage: jest.fn(() => true),
   promptLinkAccount: jest.fn(async () => undefined),
+  promptInstallIntegration: jest.fn(async () => undefined),
   withAuthContext: jest.fn(async ({ fn }: { fn: () => Promise<unknown> }) => await fn()),
   getConversationContext: jest.fn(async () => ''),
   getRequesterInfo: jest.fn(),
@@ -101,6 +109,15 @@ jest.mock(
   { virtual: true }
 );
 
+jest.mock(
+  '@chat-adapter/teams',
+  () => ({
+    createTeamsAdapter: jest.fn(() => getMockTeamsAdapter()),
+    TeamsAdapter: class TeamsAdapter {},
+  }),
+  { virtual: true }
+);
+
 jest.mock('@/lib/config.server', () => ({
   SLACK_CLIENT_ID: 'slack-client-id',
   SLACK_CLIENT_SECRET: 'slack-client-secret',
@@ -108,6 +125,10 @@ jest.mock('@/lib/config.server', () => ({
   LINEAR_CLIENT_ID: 'linear-client-id',
   LINEAR_CLIENT_SECRET: 'linear-client-secret',
   LINEAR_WEBHOOK_SECRET: 'linear-webhook-secret',
+  TEAMS_APP_ID: 'teams-app-id',
+  TEAMS_APP_PASSWORD: 'teams-app-password',
+  TEAMS_APP_TENANT_ID: 'teams-tenant-id',
+  TEAMS_APP_TYPE: 'MultiTenant',
 }));
 
 jest.mock('@/lib/integrations/platforms/github/app-selector', () => ({
@@ -178,6 +199,7 @@ import {
 } from '@/lib/bot/platform-helpers';
 import { findUserById } from '@/lib/user';
 import { processLinkedMessage } from '@/lib/bot/run';
+import { captureException } from '@sentry/nextjs';
 import { bot } from './bot';
 
 const mockedResolveKiloUserId = jest.mocked(resolveKiloUserId);
@@ -188,6 +210,7 @@ const mockedCanKiloUserAccessPlatformIntegration = jest.mocked(
 const mockedGetPlatformIntegration = jest.mocked(getPlatformIntegration);
 const mockedFindUserById = jest.mocked(findUserById);
 const mockedProcessLinkedMessage = jest.mocked(processLinkedMessage);
+const mockedCaptureException = jest.mocked(captureException);
 const mockState = getMockState();
 
 function makeThread() {
@@ -211,6 +234,30 @@ describe('bot mention authorization', () => {
     mockSlackBotPlatform.isEnabledForBot.mockReturnValue(true);
     mockSlackBotPlatform.canHandleMessage.mockReturnValue(true);
     mockSlackBotPlatform.promptLinkAccount.mockResolvedValue(undefined as never);
+    mockSlackBotPlatform.promptInstallIntegration.mockResolvedValue(undefined as never);
+  });
+
+  it('uses a platform missing-integration prompt when one is available', async () => {
+    const thread = makeThread();
+    const message = makeMessage();
+    const identity = { platform: 'teams', teamId: 'tenant-1', userId: '29:user' };
+    mockSlackBotPlatform.getIdentity.mockResolvedValue(identity as never);
+    mockedGetPlatformIntegration.mockResolvedValue(null as never);
+    mockedResolveKiloUserId.mockResolvedValue(null);
+
+    await getMentionHandler()(thread, message);
+
+    expect(mockSlackBotPlatform.promptInstallIntegration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        thread,
+        message,
+        identity,
+        state: mockState,
+      })
+    );
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+    expect(mockSlackBotPlatform.promptLinkAccount).not.toHaveBeenCalled();
+    expect(mockedProcessLinkedMessage).not.toHaveBeenCalled();
   });
 
   it('unlinks and prompts again when the linked user no longer has integration access', async () => {

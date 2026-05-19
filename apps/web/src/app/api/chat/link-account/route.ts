@@ -1,6 +1,4 @@
-import { bot } from '@/lib/bot';
 import { APP_URL } from '@/lib/constants';
-import { captureException } from '@sentry/nextjs';
 import { after } from 'next/server';
 import {
   consumeLinkAccountContext,
@@ -14,9 +12,11 @@ import {
   getPlatformIntegration,
 } from '@/lib/bot/platform-helpers';
 import { botPlatforms } from '@/lib/bot/platforms';
-import { processLinkedMessage } from '@/lib/bot/run';
-import { Message, ThreadImpl, type Thread } from 'chat';
-import type { User } from '@kilocode/db';
+import { Message, ThreadImpl } from 'chat';
+import {
+  initializeBotForLinkReplay,
+  reprocessLinkedMessage,
+} from '@/lib/bot/reprocess-linked-message';
 
 function errorPage(title: string, message: string, status: number): Response {
   return new Response(
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
     return errorPage('Bad Request', 'Missing token parameter.', 400);
   }
 
-  await bot.initialize();
+  const bot = await initializeBotForLinkReplay();
   const linkPayload = await verifyLinkToken(bot.getState(), token);
 
   if (!linkPayload) {
@@ -116,7 +116,13 @@ export async function GET(request: Request) {
 
   if (await consumeLinkAccountContext(bot.getState(), contextKey)) {
     after(() =>
-      reprocessLinkedMessage(identity, ThreadImpl.fromJSON(thread), Message.fromJSON(message), user)
+      reprocessLinkedMessage({
+        identity,
+        thread: ThreadImpl.fromJSON(thread),
+        message: Message.fromJSON(message),
+        user,
+        op: 'link-account-reprocess-message',
+      })
     );
   }
 
@@ -132,38 +138,4 @@ export async function GET(request: Request) {
 </body></html>`,
     { headers: { 'content-type': 'text/html; charset=utf-8' } }
   );
-}
-
-async function reprocessLinkedMessage(
-  identity: PlatformIdentity,
-  thread: Thread,
-  message: Message,
-  user: User
-): Promise<void> {
-  try {
-    const platformIntegration = await getPlatformIntegration(identity);
-    if (!platformIntegration) return;
-
-    await botPlatforms.require(platformIntegration.platform).withAuthContext({
-      platformIntegration,
-      fn: async () => {
-        await processLinkedMessage({
-          thread,
-          message,
-          platformIntegration,
-          user,
-        });
-      },
-    });
-  } catch (error) {
-    console.error('[Bot] Failed to reprocess linked message:', error);
-    captureException(error, {
-      tags: { component: 'kilo-bot', op: 'link-account-reprocess-message' },
-      extra: {
-        threadId: thread.id,
-        messageId: message.id,
-        userId: user.id,
-      },
-    });
-  }
 }

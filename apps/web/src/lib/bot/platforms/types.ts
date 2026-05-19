@@ -41,6 +41,12 @@ export type BotPlatform = {
     platformIntegration: PlatformIntegration;
     state: StateAdapter;
   }): Promise<void>;
+  promptInstallIntegration?(params: {
+    thread: Thread;
+    message: Message;
+    identity: PlatformIdentity;
+    state: StateAdapter;
+  }): Promise<void>;
   withAuthContext<T>(params: {
     platformIntegration: PlatformIntegration;
     fn: () => Promise<T>;

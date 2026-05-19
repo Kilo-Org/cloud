@@ -55,8 +55,8 @@ export function ConnectToolsStepView({
       currentStep={currentStep}
       totalSteps={totalSteps}
       stepLabel={`Step ${currentStep} of ${totalSteps} · Tools`}
-      title="Connect tools."
-      description="Kilo uses Composio to connect tools to this sandbox. Start with Google Calendar, or bring your own Composio account."
+      title="Connect Google Calendar with Composio."
+      description="Kilo uses Composio to connect Google Calendar to this sandbox, or you can bring your own Composio account."
       showProvisioningBanner
     >
       <div className="flex flex-col gap-4">
@@ -113,7 +113,7 @@ export function ConnectToolsStepView({
                 <span>
                   Your own Composio credentials are saved for this sandbox. Google Calendar is not
                   connected through Kilo-managed onboarding; connect tools from the sandbox with{' '}
-                  <code className="font-mono">composio link &lt;toolkit&gt;</code>.
+                  <code className="font-mono">composio link google_calendar</code>.
                 </span>
               </div>
             ) : null}
@@ -170,7 +170,7 @@ export function ConnectToolsStepView({
               <p className="text-muted-foreground text-sm">
                 These credentials override Kilo's managed Composio identity for this sandbox. The
                 CLI will sign into your account; connect tools later with{' '}
-                <code className="font-mono">composio link &lt;toolkit&gt;</code>.
+                <code className="font-mono">composio link google_calendar</code>.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">

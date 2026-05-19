@@ -3,7 +3,7 @@ import 'server-only';
 import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@/lib/encryption';
-import { COMPOSIO_MANAGED_IDENTITY_ENCRYPTION_KEY } from '@/lib/config.server';
+import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { withKiloclawProvisionContextLock } from '@/lib/kiloclaw/provision-lock';
 import {
   getComposioAgentIdentity,
@@ -30,10 +30,10 @@ export type DecryptedComposioIdentity = {
 };
 
 function requireComposioEncryptionKey(): string {
-  if (!COMPOSIO_MANAGED_IDENTITY_ENCRYPTION_KEY) {
-    throw new Error('COMPOSIO_MANAGED_IDENTITY_ENCRYPTION_KEY is not configured');
+  if (!BYOK_ENCRYPTION_KEY) {
+    throw new Error('BYOK_ENCRYPTION_KEY is not configured');
   }
-  return COMPOSIO_MANAGED_IDENTITY_ENCRYPTION_KEY;
+  return BYOK_ENCRYPTION_KEY;
 }
 
 function ownerScopeLockKey(scope: ComposioOwnerScope): string {

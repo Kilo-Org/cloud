@@ -176,7 +176,7 @@ function ClawOnboardingFlowInner({
     !!organizationId
   );
   const composioStatus = organizationId ? orgComposioStatus : personalComposioStatus;
-  const hasToolsStep = composioStatus.data?.enabled === true;
+  const hasToolsStep = hasCalendarStep && composioStatus.data?.enabled !== false;
   const configQuery = useClawConfig();
   const composioManualConfigured = composioStatus.data?.sandboxConfigSource === 'manual';
   const composioConfigPending = configQuery.isPending;

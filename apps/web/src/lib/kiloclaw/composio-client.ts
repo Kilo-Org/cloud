@@ -30,6 +30,10 @@ const LinkCreateResponseSchema = z.object({
   link_token: z.string().optional(),
 });
 
+const SessionCreateResponseSchema = z.object({
+  session_id: z.string(),
+});
+
 const ConnectedAccountSchema = z.object({
   id: z.string(),
   status: z.string(),
@@ -43,6 +47,8 @@ const ConnectedAccountListResponseSchema = z.object({
 
 export type ComposioAgentIdentity = z.infer<typeof AgentSignupReadyResponseSchema>;
 export type ComposioConnectedAccount = z.infer<typeof ConnectedAccountSchema>;
+
+const GOOGLE_CALENDAR_TOOLKIT_SLUG = 'google_calendar';
 
 class ComposioApiError extends Error {
   constructor(
@@ -115,15 +121,15 @@ export async function getComposioAgentIdentity(
   return parsed.data;
 }
 
-export async function createComposioConnectLink(params: {
+export async function createComposioGoogleCalendarConnectLink(params: {
   apiKey: string;
   userId: string;
-  authConfigId: string;
   callbackUrl: string;
   fetchImpl?: typeof fetch;
 }): Promise<{ redirectUrl: string; connectedAccountId: string }> {
-  const response = await (params.fetchImpl ?? fetch)(
-    joinUrl(COMPOSIO_API_BASE_URL, '/api/v3/connected_accounts/link'),
+  const fetchImpl = params.fetchImpl ?? fetch;
+  const sessionResponse = await fetchImpl(
+    joinUrl(COMPOSIO_API_BASE_URL, '/api/v3/tool_router/session'),
     {
       method: 'POST',
       headers: {
@@ -131,13 +137,30 @@ export async function createComposioConnectLink(params: {
         'x-api-key': params.apiKey,
       },
       body: JSON.stringify({
-        auth_config_id: params.authConfigId,
         user_id: params.userId,
+        toolkits: { enable: [GOOGLE_CALENDAR_TOOLKIT_SLUG] },
+        manage_connections: { enable: true },
+      }),
+    }
+  );
+  const sessionJson = await parseJsonResponse(sessionResponse, 'session create');
+  const session = SessionCreateResponseSchema.parse(sessionJson);
+
+  const linkResponse = await fetchImpl(
+    joinUrl(COMPOSIO_API_BASE_URL, `/api/v3/tool_router/session/${session.session_id}/link`),
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': params.apiKey,
+      },
+      body: JSON.stringify({
+        toolkit: GOOGLE_CALENDAR_TOOLKIT_SLUG,
         callback_url: params.callbackUrl,
       }),
     }
   );
-  const json = await parseJsonResponse(response, 'connect link create');
+  const json = await parseJsonResponse(linkResponse, 'connect link create');
   const parsed = LinkCreateResponseSchema.parse(json);
   return {
     redirectUrl: parsed.redirect_url,
@@ -148,13 +171,11 @@ export async function createComposioConnectLink(params: {
 export async function listComposioConnectedAccounts(params: {
   apiKey: string;
   userId: string;
-  authConfigId: string;
   fetchImpl?: typeof fetch;
 }): Promise<ComposioConnectedAccount[]> {
   const url = new URL(joinUrl(COMPOSIO_API_BASE_URL, '/api/v3/connected_accounts'));
   url.searchParams.append('user_ids', params.userId);
-  url.searchParams.append('auth_config_ids', params.authConfigId);
-  url.searchParams.append('toolkit_slugs', 'googlecalendar');
+  url.searchParams.append('toolkit_slugs', GOOGLE_CALENDAR_TOOLKIT_SLUG);
   url.searchParams.append('limit', '25');
 
   const response = await (params.fetchImpl ?? fetch)(url, {

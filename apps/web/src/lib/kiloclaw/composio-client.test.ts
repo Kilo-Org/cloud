@@ -4,7 +4,7 @@ jest.mock('@/lib/config.server', () => ({
 }));
 
 import {
-  createComposioConnectLink,
+  createComposioGoogleCalendarConnectLink,
   listComposioConnectedAccounts,
   signupComposioAgentIdentity,
 } from './composio-client';
@@ -50,20 +50,22 @@ describe('Composio client', () => {
     ]);
   });
 
-  it('creates a Connect Link with the managed identity API key', async () => {
+  it('creates a Google Calendar Connect Link through a Composio session', async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
       requests.push({ url: String(url), init });
+      if (String(url).endsWith('/api/v3/tool_router/session')) {
+        return jsonResponse({ session_id: 'session_123' });
+      }
       return jsonResponse({
         redirect_url: 'https://composio.example.com/connect/link',
         connected_account_id: 'ca_123',
       });
     };
 
-    const result = await createComposioConnectLink({
+    const result = await createComposioGoogleCalendarConnectLink({
       apiKey: 'api-key',
       userId: 'kiloclaw:user:user-1',
-      authConfigId: 'auth-config-1',
       callbackUrl: 'https://app.example.com/api/integrations/composio/callback',
       fetchImpl: fetchImpl as typeof fetch,
     });
@@ -72,19 +74,26 @@ describe('Composio client', () => {
       redirectUrl: 'https://composio.example.com/connect/link',
       connectedAccountId: 'ca_123',
     });
-    expect(requests[0].url).toBe('https://api.example.com/api/v3/connected_accounts/link');
+    expect(requests[0].url).toBe('https://api.example.com/api/v3/tool_router/session');
     expect(requests[0].init?.headers).toEqual({
       'content-type': 'application/json',
       'x-api-key': 'api-key',
     });
     expect(JSON.parse(String(requests[0].init?.body))).toEqual({
-      auth_config_id: 'auth-config-1',
       user_id: 'kiloclaw:user:user-1',
+      toolkits: { enable: ['google_calendar'] },
+      manage_connections: { enable: true },
+    });
+    expect(requests[1].url).toBe(
+      'https://api.example.com/api/v3/tool_router/session/session_123/link'
+    );
+    expect(JSON.parse(String(requests[1].init?.body))).toEqual({
+      toolkit: 'google_calendar',
       callback_url: 'https://app.example.com/api/integrations/composio/callback',
     });
   });
 
-  it('filters connected accounts by consumer user and auth config', async () => {
+  it('filters connected accounts by consumer user and Google Calendar toolkit', async () => {
     const requests: string[] = [];
     const fetchImpl = async (url: string | URL | Request) => {
       requests.push(String(url));
@@ -93,8 +102,7 @@ describe('Composio client', () => {
           {
             id: 'ca_123',
             status: 'ACTIVE',
-            toolkit: { slug: 'googlecalendar' },
-            auth_config: { id: 'auth-config-1' },
+            toolkit: { slug: 'google_calendar' },
           },
         ],
       });
@@ -103,7 +111,6 @@ describe('Composio client', () => {
     const accounts = await listComposioConnectedAccounts({
       apiKey: 'api-key',
       userId: 'kiloclaw:user:user-1',
-      authConfigId: 'auth-config-1',
       fetchImpl: fetchImpl as typeof fetch,
     });
 
@@ -111,7 +118,7 @@ describe('Composio client', () => {
     const url = new URL(requests[0]);
     expect(url.origin + url.pathname).toBe('https://api.example.com/api/v3/connected_accounts');
     expect(url.searchParams.get('user_ids')).toBe('kiloclaw:user:user-1');
-    expect(url.searchParams.get('auth_config_ids')).toBe('auth-config-1');
-    expect(url.searchParams.get('toolkit_slugs')).toBe('googlecalendar');
+    expect(url.searchParams.get('auth_config_ids')).toBeNull();
+    expect(url.searchParams.get('toolkit_slugs')).toBe('google_calendar');
   });
 });

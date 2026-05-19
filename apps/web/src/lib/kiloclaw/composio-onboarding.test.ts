@@ -1,11 +1,9 @@
 jest.mock('@/lib/config.server', () => ({
-  KILOCLAW_COMPOSIO_MANAGED_ONBOARDING_ENABLED: true,
-  COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID: 'auth-config-1',
-  COMPOSIO_MANAGED_IDENTITY_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+  BYOK_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
 }));
 
 jest.mock('@/lib/kiloclaw/composio-client', () => ({
-  createComposioConnectLink: jest.fn(),
+  createComposioGoogleCalendarConnectLink: jest.fn(),
   listComposioConnectedAccounts: jest.fn(),
 }));
 

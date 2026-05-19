@@ -3,15 +3,10 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 import { APP_URL } from '@/lib/constants';
-import {
-  COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID,
-  COMPOSIO_MANAGED_IDENTITY_ENCRYPTION_KEY,
-  KILOCLAW_COMPOSIO_MANAGED_ONBOARDING_ENABLED,
-} from '@/lib/config.server';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
-  createComposioConnectLink,
+  createComposioGoogleCalendarConnectLink,
   listComposioConnectedAccounts,
 } from '@/lib/kiloclaw/composio-client';
 import {
@@ -30,23 +25,6 @@ import type { ActiveKiloClawInstance } from '@/lib/kiloclaw/instance-registry';
 export type ComposioConnectionStatus = 'not_configured' | 'disconnected' | 'connected' | 'error';
 
 export type ComposioSandboxConfigSource = KiloClawComposioInstanceConfigSource | null;
-
-export function composioManagedOnboardingConfigured(): boolean {
-  return (
-    KILOCLAW_COMPOSIO_MANAGED_ONBOARDING_ENABLED &&
-    !!COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID &&
-    !!COMPOSIO_MANAGED_IDENTITY_ENCRYPTION_KEY
-  );
-}
-
-function requireComposioManagedOnboarding(): void {
-  if (!composioManagedOnboardingConfigured()) {
-    throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
-      message: 'Managed Composio onboarding is not configured',
-    });
-  }
-}
 
 export function getComposioConnectCallbackUrl(params: {
   organizationId?: string;
@@ -136,15 +114,12 @@ export async function completeManagedComposioGoogleCalendarConnection(params: {
   scope: ComposioOwnerScope;
   connectedAccountId: string;
 }): Promise<boolean> {
-  if (!composioManagedOnboardingConfigured()) return false;
-
   const identity = await getActiveManagedComposioIdentity(params.scope);
   if (!identity?.apiKey) return false;
 
   const accounts = await listComposioConnectedAccounts({
     apiKey: identity.apiKey,
     userId: identity.consumerUserId,
-    authConfigId: COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID,
   });
   const connected = accounts.some(
     account => account.id === params.connectedAccountId && account.status === 'ACTIVE'
@@ -180,7 +155,6 @@ export async function createManagedComposioGoogleCalendarLink(params: {
   organizationId?: string;
   returnTo: string;
 }): Promise<{ redirectUrl: string; connectedAccountId: string }> {
-  requireComposioManagedOnboarding();
   const identity = await ensureManagedComposioIdentity(params.scope);
   if (!identity.apiKey) {
     throw new TRPCError({
@@ -189,10 +163,9 @@ export async function createManagedComposioGoogleCalendarLink(params: {
     });
   }
 
-  return await createComposioConnectLink({
+  return await createComposioGoogleCalendarConnectLink({
     apiKey: identity.apiKey,
     userId: identity.consumerUserId,
-    authConfigId: COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID,
     callbackUrl: getComposioConnectCallbackUrl({
       organizationId: params.organizationId,
       returnTo: params.returnTo,
@@ -210,15 +183,6 @@ export async function getManagedComposioGoogleCalendarStatus(params: {
   connectedAccountId: string | null;
   sandboxConfigSource: ComposioSandboxConfigSource;
 }> {
-  if (!composioManagedOnboardingConfigured()) {
-    return {
-      enabled: false,
-      status: 'not_configured',
-      connectedAccountId: null,
-      sandboxConfigSource: null,
-    };
-  }
-
   const sandboxConfigSource = params.instance
     ? await getComposioInstanceConfigSource(params.instance.id)
     : null;
@@ -232,7 +196,6 @@ export async function getManagedComposioGoogleCalendarStatus(params: {
     const accounts = await listComposioConnectedAccounts({
       apiKey: identity.apiKey,
       userId: identity.consumerUserId,
-      authConfigId: COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID,
     });
     const active = accounts.find(account => account.status === 'ACTIVE');
     if (active && params.sandboxHasComposioSecrets && sandboxConfigSource === 'managed') {

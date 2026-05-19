@@ -372,13 +372,20 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
-  const { provider, userByok, bypassAccessCheck } = await getProvider(
-    originalModelIdLowerCased,
-    requestBodyParsed,
+  const providerResult = await getProvider({
+    requestedModel: originalModelIdLowerCased,
+    request: requestBodyParsed,
     user,
     organizationId,
-    taskId
-  );
+    taskId,
+  });
+  if (providerResult.kind === 'not-found') {
+    return modelDoesNotExistResponse();
+  }
+  if (providerResult.kind === 'unavailable') {
+    return temporarilyUnavailableResponse();
+  }
+  const { provider, userByok, bypassAccessCheck } = providerResult;
   if (!provider.supportedChatApis.includes(requestBodyParsed.kind)) {
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,

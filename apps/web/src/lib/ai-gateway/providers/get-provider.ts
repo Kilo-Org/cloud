@@ -20,11 +20,34 @@ import {
   inferSupportedChatApis,
 } from '@/lib/ai-gateway/experiments/build-direct-provider';
 
+export type GetProviderProviderResult = {
+  kind: 'provider';
+  provider: Provider;
+  userByok: BYOKResult[] | null;
+  /** Skip balance, paid-auth, and organization policy checks entirely. Used
+   *  by direct-byok and custom_llm2 because both already require explicit
+   *  admin opt-in. */
+  bypassAccessCheck: boolean;
+};
+
+/**
+ * Discriminated routing result. `not-found` maps to the local
+ * model-unavailable response; `unavailable` maps to a 503
+ * temporarily-unavailable response. Today only the `provider` shape is
+ * produced; the other kinds are scaffolding for upcoming model-experiment
+ * routing (PR #3325) where paused/unreachable experiments need to
+ * short-circuit without falling through to default routing.
+ */
+export type GetProviderResult =
+  | GetProviderProviderResult
+  | { kind: 'not-found' }
+  | { kind: 'unavailable' };
+
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
   requestedModel: string,
   organizationId: string | undefined
-) {
+): Promise<GetProviderProviderResult | null> {
   const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
   if (!directByok || !directByokModel) {
     return null;
@@ -36,6 +59,7 @@ async function checkDirectBYOK(
     return null;
   }
   return {
+    kind: 'provider',
     provider: {
       id: 'direct-byok',
       apiUrl: directByok.base_url,
@@ -54,7 +78,7 @@ async function checkDirectBYOK(
 async function checkCustomLlm(
   requestedModel: string,
   organizationId: string
-): Promise<{ provider: Provider; userByok: null; bypassAccessCheck: true } | null> {
+): Promise<GetProviderProviderResult | null> {
   const [row] = await db
     .select()
     .from(custom_llm2)
@@ -68,6 +92,7 @@ async function checkCustomLlm(
     return null;
   }
   return {
+    kind: 'provider',
     provider: buildDirectProvider({
       internal_id: customLlm.internal_id,
       base_url: customLlm.base_url,
@@ -109,13 +134,17 @@ async function checkVercelBYOK(
     : getBYOKforUser(db, user.id, modelProviders);
 }
 
-export async function getProvider(
-  requestedModel: string,
-  request: GatewayRequest,
-  user: User | AnonymousUserContext,
-  organizationId: string | undefined,
-  taskId: string | undefined
-): Promise<{ provider: Provider; userByok: BYOKResult[] | null; bypassAccessCheck: boolean }> {
+export type GetProviderInput = {
+  requestedModel: string;
+  request: GatewayRequest;
+  user: User | AnonymousUserContext;
+  organizationId: string | undefined;
+  taskId: string | undefined;
+};
+
+export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
+  const { requestedModel, request, user, organizationId, taskId } = input;
+
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {
     return directByokByok;
@@ -124,6 +153,7 @@ export async function getProvider(
   const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
   if (vercelByok) {
     return {
+      kind: 'provider',
       provider: PROVIDERS.VERCEL_AI_GATEWAY,
       userByok: vercelByok,
       bypassAccessCheck: false,
@@ -145,10 +175,16 @@ export async function getProvider(
     eligibleForVercelRouting &&
     (await shouldRouteToVercel(requestedModel, request, taskId || user.id))
   ) {
-    return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, bypassAccessCheck: false };
+    return {
+      kind: 'provider',
+      provider: PROVIDERS.VERCEL_AI_GATEWAY,
+      userByok: null,
+      bypassAccessCheck: false,
+    };
   }
 
   return {
+    kind: 'provider',
     provider:
       Object.values(PROVIDERS).find(p => p.id === kiloExclusiveModel?.gateway) ??
       PROVIDERS.OPENROUTER,

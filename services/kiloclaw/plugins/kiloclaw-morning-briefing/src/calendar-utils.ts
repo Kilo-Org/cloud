@@ -248,3 +248,9 @@ export function buildCalendarSectionLines(
 export function buildCalendarNoConnectionLines(): string[] {
   return ["Connect your Google account in Settings to see today's events."];
 }
+
+export function buildCalendarMissingScopeLines(): string[] {
+  return [
+    "Your Google account is connected, but it's missing calendar permission. Reconnect from Settings and include calendar access to see today's events.",
+  ];
+}

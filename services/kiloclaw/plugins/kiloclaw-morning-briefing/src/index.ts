@@ -59,6 +59,7 @@ import {
 import { resolveNextReconcileAction } from './reconcile-queue-utils';
 import { normalizeWebResults } from './web-utils';
 import {
+  buildCalendarMissingScopeLines,
   buildCalendarNoConnectionLines,
   buildCalendarSectionLines,
   buildCalendarSectionTitle,
@@ -1272,13 +1273,23 @@ async function collectCalendar(now: Date, userTimezone: string): Promise<SourceC
     };
   }
 
-  if (!readiness.connected || !readiness.hasCalendarCapability) {
+  if (!readiness.connected) {
     return {
       source: 'calendar',
       configured: false,
       ok: true,
       summary: readiness.reason,
       sectionLines: buildCalendarNoConnectionLines(),
+    };
+  }
+
+  if (!readiness.hasCalendarCapability) {
+    return {
+      source: 'calendar',
+      configured: false,
+      ok: true,
+      summary: readiness.reason,
+      sectionLines: buildCalendarMissingScopeLines(),
     };
   }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildCalendarMissingScopeLines,
   buildCalendarNoConnectionLines,
   buildCalendarSectionLines,
   buildCalendarSectionTitle,
@@ -289,6 +290,14 @@ describe('buildCalendarNoConnectionLines', () => {
   it('emits the connect-your-google nudge', () => {
     expect(buildCalendarNoConnectionLines()).toEqual([
       "Connect your Google account in Settings to see today's events.",
+    ]);
+  });
+});
+
+describe('buildCalendarMissingScopeLines', () => {
+  it('emits the reconnect-with-calendar-scope nudge', () => {
+    expect(buildCalendarMissingScopeLines()).toEqual([
+      "Your Google account is connected, but it's missing calendar permission. Reconnect from Settings and include calendar access to see today's events.",
     ]);
   });
 });

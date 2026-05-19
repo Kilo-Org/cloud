@@ -51,17 +51,17 @@ function normalizeBaseUrl(input: string | undefined): string {
   return raw.endsWith('/') ? raw.slice(0, -1) : raw;
 }
 
-function parseObject(value: unknown): Record<string, unknown> {
+function asObject(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
 }
 
 function parseConversationsResponse(value: unknown): ConversationsResponse {
-  const obj = parseObject(value);
+  const obj = asObject(value);
   const conversationsRaw = Array.isArray(obj.conversations) ? obj.conversations : [];
   const conversations = conversationsRaw.flatMap(item => {
-    const row = parseObject(item);
+    const row = asObject(item);
     return typeof row.conversationId === 'string'
       ? [
           {
@@ -80,10 +80,10 @@ function parseConversationsResponse(value: unknown): ConversationsResponse {
 }
 
 function parseMessagesResponse(value: unknown): MessagesResponse {
-  const obj = parseObject(value);
+  const obj = asObject(value);
   const messagesRaw = Array.isArray(obj.messages) ? obj.messages : [];
   const messages = messagesRaw.flatMap(item => {
-    const row = parseObject(item);
+    const row = asObject(item);
     return typeof row.id === 'string' && typeof row.senderId === 'string'
       ? [
           {
@@ -141,6 +141,15 @@ function shouldStopConversationScan(
   conversations: KiloChatConversationListItem[],
   window: ChatSummaryWindow
 ): boolean {
+  let previousActivityAt: number | null = null;
+  for (const conversation of conversations) {
+    if (conversation.lastActivityAt === null) continue;
+    if (previousActivityAt !== null && conversation.lastActivityAt > previousActivityAt) {
+      return false;
+    }
+    previousActivityAt = conversation.lastActivityAt;
+  }
+
   return conversations.some(
     conversation =>
       conversation.lastActivityAt !== null && conversation.lastActivityAt < window.startMs

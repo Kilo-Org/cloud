@@ -151,6 +151,75 @@ describe('chat summary client', () => {
     ]);
   });
 
+  it('keeps paginating when a page is not sorted by descending activity', async () => {
+    const requests: string[] = [];
+    const fetchImpl = mockFetch(async input => {
+      const url = fetchInputUrl(input);
+      requests.push(url);
+      if (url === 'http://controller/_kilo/kilo-chat/conversations?limit=100') {
+        return jsonResponse({
+          conversations: [
+            {
+              conversationId: 'conv-old-first',
+              title: 'Old first',
+              lastActivityAt: Date.parse('2026-05-17T17:00:00.000Z'),
+            },
+            {
+              conversationId: 'conv-yesterday-later',
+              title: 'Yesterday later',
+              lastActivityAt: Date.parse('2026-05-18T17:00:00.000Z'),
+            },
+          ],
+          hasMore: true,
+          nextCursor: 'next-page',
+        });
+      }
+      if (url === 'http://controller/_kilo/kilo-chat/conversations?limit=100&cursor=next-page') {
+        return jsonResponse({
+          conversations: [
+            {
+              conversationId: 'conv-yesterday-next-page',
+              title: 'Yesterday next page',
+              lastActivityAt: Date.parse('2026-05-18T12:00:00.000Z'),
+            },
+          ],
+          hasMore: false,
+          nextCursor: null,
+        });
+      }
+      if (
+        url ===
+          'http://controller/_kilo/kilo-chat/conversations/conv-yesterday-later/messages?limit=100' ||
+        url ===
+          'http://controller/_kilo/kilo-chat/conversations/conv-yesterday-next-page/messages?limit=100'
+      ) {
+        return jsonResponse({
+          messages: [{ id: '01JVPPRVG00000000000000000', senderId: 'user:1', deleted: false }],
+          hasMore: false,
+          nextCursor: null,
+        });
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    });
+
+    const client = createKiloChatSummaryClient({
+      baseUrl: 'http://controller',
+      token: 'token',
+      fetchImpl,
+    });
+    const conversations = await client.listConversationsForWindow(
+      buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
+    );
+
+    expect(conversations.map(conversation => conversation.conversationId)).toEqual([
+      'conv-yesterday-later',
+      'conv-yesterday-next-page',
+    ]);
+    expect(requests).toContain(
+      'http://controller/_kilo/kilo-chat/conversations?limit=100&cursor=next-page'
+    );
+  });
+
   it('throws on non-ok controller responses', async () => {
     const fetchImpl = mockFetch(async () => new Response('no route', { status: 404 }));
     const client = createKiloChatSummaryClient({

@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import KiloLogo from '@/components/KiloLogo';
 import { getPlatform, type PlatformId, type PlatformOption } from '../../_components/platforms';
-import type { WorkspaceContext } from '../page';
 
 type ProgressListProps = {
   count: number;
@@ -17,7 +16,6 @@ type ProgressListProps = {
 
 type AuthorizeFlowProps = {
   serviceIds: PlatformId[];
-  workspace: WorkspaceContext;
 };
 
 export function AuthorizeFlow(props: AuthorizeFlowProps) {

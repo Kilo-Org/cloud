@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { PrefetchedOrganizations } from '@/app/(app)/components/PrefetchedOrganizations';
 import { KiloCardLayout } from '@/components/KiloCardLayout';
 import { BotWizard } from './_components/BotWizard';
 
@@ -10,7 +11,9 @@ export const metadata: Metadata = {
 export default function BotSetupPage() {
   return (
     <KiloCardLayout bare className="max-w-2xl" contentClassName="">
-      <BotWizard />
+      <PrefetchedOrganizations>
+        <BotWizard />
+      </PrefetchedOrganizations>
     </KiloCardLayout>
   );
 }

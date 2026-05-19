@@ -33,25 +33,13 @@ function parseServices(raw: string | string[] | undefined): PlatformId[] {
   return Array.from(seen);
 }
 
-export type WorkspaceContext = { type: 'org'; id: string } | { type: 'personal' };
-
-function parseWorkspace(raw: string | string[] | undefined): WorkspaceContext {
-  if (!raw) return { type: 'personal' };
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  if (value.startsWith('org:')) {
-    return { type: 'org', id: value.slice(4) };
-  }
-  return { type: 'personal' };
-}
-
 export default async function BotAuthorizePage({ searchParams }: AppPageProps) {
   const params = await searchParams;
   const services = parseServices(params?.services);
-  const workspace = parseWorkspace(params?.workspace);
 
   return (
     <KiloCardLayout bare className="max-w-xl" contentClassName="">
-      <AuthorizeFlow serviceIds={services} workspace={workspace} />
+      <AuthorizeFlow serviceIds={services} />
     </KiloCardLayout>
   );
 }

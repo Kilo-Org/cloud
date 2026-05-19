@@ -53,10 +53,7 @@ export function BotWizard() {
   const proceedToAuthorize = () => {
     setMissingPlatformWarning(null);
     const services = Array.from(selected).join(',');
-    const workspaceParam = workspace?.type === 'org' ? `org:${workspace.id}` : 'personal';
-    router.push(
-      `/bot/authorize?services=${encodeURIComponent(services)}&workspace=${encodeURIComponent(workspaceParam)}`
-    );
+    router.push(`/bot/authorize?services=${encodeURIComponent(services)}`);
   };
 
   const handleContinueWithoutRecommendedPlatform = () => {

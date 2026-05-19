@@ -476,8 +476,8 @@ grants billing access without consuming a seat.
    sponsorship program (see Definitions) from trial expiration
    (never hard-locked).
 10. The system MUST exempt organizations with suppressed trial
-     messaging (see Definitions) from trial expiration (treated as
-     subscribed).
+    messaging (see Definitions) from trial expiration (treated as
+    subscribed).
 11. Organization-managed KiloClaw trial-expiry enforcement MUST begin
     only when the organization is hard-expired and lacks every qualifying
     non-trial entitlement: an active subscription purchase, disabled

@@ -41,9 +41,13 @@ function getTimezoneOffset(date: Date, timezone: string): string {
     const parts = formatter.formatToParts(date);
     const offsetPart = parts.find(part => part.type === 'timeZoneName');
     if (!offsetPart) return 'Z';
-    // longOffset renders as "GMT-07:00" or just "GMT" for UTC.
+    // longOffset normally renders as "GMT-07:00". For UTC, some ICU
+    // implementations emit bare "GMT" (macOS), others emit "GMT+00:00"
+    // (Linux). Normalize both to the bare "Z" suffix so the produced
+    // ISO string round-trips identically across platforms.
     const match = offsetPart.value.match(/GMT([+-]\d{2}:\d{2})/);
-    return match ? match[1] : 'Z';
+    if (!match) return 'Z';
+    return match[1] === '+00:00' || match[1] === '-00:00' ? 'Z' : match[1];
   } catch {
     return 'Z';
   }

@@ -28,6 +28,7 @@ import { bot } from '@/lib/bot';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { botPlatforms } from '@/lib/bot/platforms';
+import { APP_URL } from '@/lib/constants';
 
 const appendQueryParam = (path: string, queryParam: string): string =>
   `${path}${path.includes('?') ? '&' : '?'}${queryParam}`;
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
     if (authFailedResponse) {
       // If user is not authenticated (e.g., GitHub admin approving installation),
       // redirect to homepage instead of showing "Unauthorized"
-      return NextResponse.redirect(new URL('/', request.url));
+      return NextResponse.redirect(new URL('/', APP_URL));
     }
 
     // 2. Extract parameters
@@ -158,7 +159,7 @@ export async function GET(request: NextRequest) {
         tags: { endpoint: 'github/callback', source: 'github_app_installation' },
         extra: { installationId, rawState, allParams: Object.fromEntries(searchParams.entries()) },
       });
-      return NextResponse.redirect(new URL('/', request.url));
+      return NextResponse.redirect(new URL('/', APP_URL));
     }
 
     // 4. Verify user has access to the owner
@@ -167,7 +168,7 @@ export async function GET(request: NextRequest) {
     } else {
       // For user-owned integrations, verify it's the same user
       if (user.id !== owner.id) {
-        return NextResponse.redirect(new URL('/', request.url));
+        return NextResponse.redirect(new URL('/', APP_URL));
       }
     }
 
@@ -185,7 +186,7 @@ export async function GET(request: NextRequest) {
           ? `/organizations/${owner.id}/integrations/github?action=${setupAction}`
           : `/integrations/github?action=${setupAction}`;
 
-      return NextResponse.redirect(new URL(redirectPath, request.url));
+      return NextResponse.redirect(new URL(redirectPath, APP_URL));
     }
 
     // Handle pending approval - store requester info for webhook matching
@@ -234,7 +235,7 @@ export async function GET(request: NextRequest) {
                 ? `/organizations/${owner.id}/integrations/github?error=pending_installation_exists&org=${existingOwnerId}`
                 : `/integrations/github?error=pending_installation_exists`;
 
-            return NextResponse.redirect(new URL(redirectPath, request.url));
+            return NextResponse.redirect(new URL(redirectPath, APP_URL));
           }
         }
 
@@ -259,7 +260,7 @@ export async function GET(request: NextRequest) {
             ? `/organizations/${owner.id}/integrations/github?pending_approval=true`
             : `/integrations/github?pending_approval=true`;
 
-        return NextResponse.redirect(new URL(redirectPath, request.url));
+        return NextResponse.redirect(new URL(redirectPath, APP_URL));
       } catch (error) {
         console.error('Error creating pending installation:', error);
         captureException(error);
@@ -270,7 +271,7 @@ export async function GET(request: NextRequest) {
             ? `/organizations/${owner.id}/integrations/github?error=pending_setup_failed`
             : `/integrations/github?error=pending_setup_failed`;
 
-        return NextResponse.redirect(new URL(redirectPath, request.url));
+        return NextResponse.redirect(new URL(redirectPath, APP_URL));
       }
     }
 
@@ -288,7 +289,7 @@ export async function GET(request: NextRequest) {
           ? `/organizations/${owner.id}/integrations/github?error=missing_installation_id`
           : `/integrations/github?error=missing_installation_id`;
 
-      return NextResponse.redirect(new URL(redirectPath, request.url));
+      return NextResponse.redirect(new URL(redirectPath, APP_URL));
     }
 
     // 6. Fetch installation details from GitHub
@@ -340,7 +341,7 @@ export async function GET(request: NextRequest) {
             ? `/organizations/${owner.id}/integrations/github?error=installation_not_found&id=${installationId}`
             : `/integrations/github?error=installation_not_found&id=${installationId}`;
 
-        return NextResponse.redirect(new URL(redirectPath, request.url));
+        return NextResponse.redirect(new URL(redirectPath, APP_URL));
       }
 
       throw error;
@@ -406,7 +407,7 @@ export async function GET(request: NextRequest) {
         ? `/organizations/${owner.id}/integrations/github?success=installed`
         : `/integrations/github?success=installed`;
 
-    return NextResponse.redirect(new URL(successPath, request.url));
+    return NextResponse.redirect(new URL(successPath, APP_URL));
   } catch (error) {
     console.error('Error handling GitHub App callback:', error);
 
@@ -439,6 +440,6 @@ export async function GET(request: NextRequest) {
       redirectPath = `/integrations/github?error=installation_failed`;
     }
 
-    return NextResponse.redirect(new URL(redirectPath, request.url));
+    return NextResponse.redirect(new URL(redirectPath, APP_URL));
   }
 }

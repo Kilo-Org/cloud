@@ -88,6 +88,10 @@ export function MessageInput({
   const [text, setText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  // dragenter/dragleave bubble from inner elements, so a plain boolean
+  // flickers as the cursor moves between the textarea, plus button, etc.
+  // Counter pattern: increment on enter, decrement on leave, hide when zero.
+  const dragDepthRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const latestStateRef = useRef<MessageInputSubmissionState>({ text: '', replyingTo: null });
@@ -205,21 +209,30 @@ export function MessageInput({
     e.target.value = '';
   }
 
+  function handleDragEnter(e: React.DragEvent) {
+    if (!showPlus) return;
+    if (!Array.from(e.dataTransfer.types).includes('Files')) return;
+    dragDepthRef.current += 1;
+    setIsDragOver(true);
+  }
+
   function handleDragOver(e: React.DragEvent) {
     if (!showPlus) return;
     if (!Array.from(e.dataTransfer.types).includes('Files')) return;
     e.preventDefault();
-    setIsDragOver(true);
   }
 
-  function handleDragLeave(e: React.DragEvent) {
-    if (e.currentTarget === e.target) setIsDragOver(false);
+  function handleDragLeave() {
+    if (dragDepthRef.current === 0) return;
+    dragDepthRef.current -= 1;
+    if (dragDepthRef.current === 0) setIsDragOver(false);
   }
 
   function handleDrop(e: React.DragEvent) {
     if (!showPlus) return;
     if (!Array.from(e.dataTransfer.types).includes('Files')) return;
     e.preventDefault();
+    dragDepthRef.current = 0;
     setIsDragOver(false);
     if (e.dataTransfer.files.length > 0) addFilesFromList(e.dataTransfer.files);
   }
@@ -245,6 +258,7 @@ export function MessageInput({
   return (
     <div
       className="border-border relative border-t"
+      onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

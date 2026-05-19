@@ -815,7 +815,7 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
     }
   });
 
-  it('rejects org provisioning entitlement for a hard-expired unenitled org', async () => {
+  it('rejects org provisioning entitlement for a hard-expired unentitled org', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-18T12:00:00.000Z'));
     const { db } = createFreshInsertDb({

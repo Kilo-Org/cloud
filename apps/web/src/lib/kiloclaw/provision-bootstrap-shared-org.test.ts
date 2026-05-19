@@ -23,7 +23,7 @@ describe('bootstrapProvisionSubscriptionWithDb organization replacement', () => 
     await cleanupDbForTest();
   });
 
-  it('rejects managed bootstrap for hard-expired unenitled organizations without writing billing rows', async () => {
+  it('rejects managed bootstrap for hard-expired unentitled organizations without writing billing rows', async () => {
     const user = await insertTestUser({
       google_user_email: 'org-bootstrap-hard-expired@example.com',
     });

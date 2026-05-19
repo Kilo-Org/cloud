@@ -2051,7 +2051,7 @@ describe('organization trial expiry sweep', () => {
     );
   });
 
-  it('suspends expired unenitled organization instances with fresh grace and organization notifications', async () => {
+  it('suspends expired unentitled organization instances with fresh grace and organization notifications', async () => {
     const row = organizationTrialExpiryRow();
     const { db, updates, inserts } = createMockDb(
       [

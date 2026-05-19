@@ -5,7 +5,7 @@ import { isStatusReadOnly } from './trial-utils';
 
 /**
  * Hook to determine if organization is in read-only mode.
- * Soft expiry is UI-only; hard-expired unenitled mutations are enforced server-side.
+ * Soft expiry is UI-only; hard-expired unentitled mutations are enforced server-side.
  */
 export function useOrganizationReadOnly(organizationId: string): boolean {
   const status = useOrganizationTrialStatus(organizationId);

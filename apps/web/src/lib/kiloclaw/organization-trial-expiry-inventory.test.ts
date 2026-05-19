@@ -32,7 +32,7 @@ function candidateRow(
 }
 
 describe('organization KiloClaw trial expiry inventory', () => {
-  it('groups hard-expired unenitled rows, entitled exclusions, and rows before hard expiry', () => {
+  it('groups hard-expired unentitled rows, entitled exclusions, and rows before hard expiry', () => {
     const result = evaluateOrganizationTrialExpiryInventory({
       generatedAtIso,
       rows: [

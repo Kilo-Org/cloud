@@ -116,7 +116,7 @@ describe('classifyOrganizationEntitlement', () => {
     });
   }
 
-  it('marks hard-expired unenitled organizations as expired for enforcement', () => {
+  it('marks hard-expired unentitled organizations as expired for enforcement', () => {
     expect(classify()).toMatchObject({
       bypassReason: null,
       displayStatus: 'trial_expired_hard',

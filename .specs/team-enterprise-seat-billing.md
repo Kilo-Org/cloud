@@ -493,7 +493,7 @@ grants billing access without consuming a seat.
     restore access state, and trigger automatic compute resume instead of
     warning or destroying the instance.
 14. If the destruction deadline passes while the organization is still
-    hard-expired and unenitled, the KiloClaw billing lifecycle MUST destroy the
+    hard-expired and unentitled, the KiloClaw billing lifecycle MUST destroy the
     affected instance according to the KiloClaw billing spec.
 15. These KiloClaw-specific lifecycle rules do not change the general
     organization UI and mutation behavior for active, soft-expired, or

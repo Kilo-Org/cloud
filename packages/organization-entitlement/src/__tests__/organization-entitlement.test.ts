@@ -75,7 +75,7 @@ describe('classifyOrganizationEntitlement', () => {
     });
   }
 
-  it('enforces hard-expired unenitled organizations but not soft-expired ones', () => {
+  it('enforces hard-expired unentitled organizations but not soft-expired ones', () => {
     expect(classify()).toMatchObject({
       bypassReason: null,
       displayStatus: 'trial_expired_hard',

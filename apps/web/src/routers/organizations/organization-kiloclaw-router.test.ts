@@ -244,7 +244,7 @@ describe('organizations.kiloclaw.provision trial entitlement gate', () => {
     await cleanupDbForTest();
   });
 
-  it('rejects hard-expired unenitled organizations before provisioning', async () => {
+  it('rejects hard-expired unentitled organizations before provisioning', async () => {
     const user = await insertTestUser({
       google_user_email: `org-kiloclaw-provision-expired-${crypto.randomUUID()}@example.com`,
     });
@@ -370,7 +370,7 @@ describe('organizations.kiloclaw compute entitlement gates', () => {
     });
   });
 
-  it('keeps manual stop available for hard-expired unenitled organizations', async () => {
+  it('keeps manual stop available for hard-expired unentitled organizations', async () => {
     const user = await insertTestUser({
       google_user_email: `org-kiloclaw-stop-expired-${crypto.randomUUID()}@example.com`,
     });
@@ -387,7 +387,7 @@ describe('organizations.kiloclaw compute entitlement gates', () => {
     });
   });
 
-  it('keeps manual destroy available for hard-expired unenitled organizations', async () => {
+  it('keeps manual destroy available for hard-expired unentitled organizations', async () => {
     const user = await insertTestUser({
       google_user_email: `org-kiloclaw-destroy-expired-${crypto.randomUUID()}@example.com`,
     });

@@ -144,6 +144,36 @@ export type MicrodollarUsageContext = {
   auto_model: string | null;
   /** Time to first byte from the upstream provider, in milliseconds. Set after the upstream request returns. */
   ttfb_ms: number | null;
+  /**
+   * Client-supplied per-message id from the `x-kilo-request` header. Persisted to
+   * `model_experiment_request.client_request_id` only when an experiment is applied.
+   * Joinable to PostHog `Feedback Submitted.parentMessageID`.
+   */
+  clientRequestId?: string | null;
+  /**
+   * The exact `model_experiment_variant_version` row that served this request.
+   * Set only when an experiment was applied.
+   */
+  modelExperimentVariantVersionId?: string;
+  /** 'user' | 'machine' | 'ip' — recorded for reporting filters when an experiment was applied. */
+  modelExperimentAllocationSubject?: 'user' | 'machine' | 'ip';
+  /**
+   * Bounded (size-capped) capture of the canonical post-`transformRequest`
+   * upstream request body, split into the leading system message and the
+   * remainder. Set only for experimented requests. Consumed by
+   * `persistExperimentAttribution` after the microdollar write.
+   */
+  experimentPromptCapture?: ExperimentPromptCapture;
+};
+
+/**
+ * Bounded prompt capture used by the experiment attribution path. Each side
+ * is either a string (already truncated to fit the cap) or null when absent.
+ */
+export type ExperimentPromptCapture = {
+  systemPromptContent: string | null;
+  requestBodyContent: string;
+  wasTruncated: boolean;
 };
 
 export type CoreUsageWithMetaData = {

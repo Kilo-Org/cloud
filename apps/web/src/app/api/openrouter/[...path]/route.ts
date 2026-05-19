@@ -223,6 +223,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
+  // Per-message id from the kilocode client. Used as the join key for
+  // PostHog feedback (`Feedback Submitted.parentMessageID`) and persisted to
+  // `model_experiment_request.client_request_id` when an experiment is applied.
+  const clientRequestId = extractHeaderAndLimitLength(request, 'x-kilo-request');
+  // Fallback session id used when `x-kilocode-taskid` is absent (e.g.
+  // non-kilocode clients). `taskId` still wins when both are present.
+  const sessionHeader = extractHeaderAndLimitLength(request, 'x-kilo-session');
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
@@ -442,10 +449,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     botId,
     tokenSource,
     feature,
-    session_id: taskId ?? null,
+    session_id: taskId ?? sessionHeader ?? null,
     mode: modeHeader,
     auto_model: autoModel,
     ttfb_ms: null,
+    clientRequestId,
   };
 
   setTag('ui.ai_model', requestBodyParsed.body.model);

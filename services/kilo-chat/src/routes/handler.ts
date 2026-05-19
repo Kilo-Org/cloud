@@ -706,7 +706,7 @@ export async function handleAttachmentGetUrl(c: HonoCtx) {
     mimeType: row.mimeType,
     size: row.size,
     filename: row.filename,
-    expiresAt: Date.now() + GET_URL_TTL_SECONDS * 1000,
+    expiresAt: Math.floor(Date.now() / 1000) + GET_URL_TTL_SECONDS,
   });
 }
 

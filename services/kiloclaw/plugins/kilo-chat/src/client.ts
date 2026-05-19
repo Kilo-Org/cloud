@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   actionDeliveryFailedRequestSchema,
   addReactionResponseSchema,
+  attachmentGetUrlResponseSchema,
   attachmentInitRequestSchema,
   attachmentInitResponseSchema,
   botGetMembersResponseSchema,
@@ -27,17 +28,6 @@ import {
   type enrichedConversationMemberSchema,
   type messageSchema,
 } from './synced/schemas.js';
-
-// Response shape for GET /_kilo/kilo-chat/attachments/:id/url. The controller
-// proxies kilo-chat's bot endpoint verbatim; this is the contract returned by
-// the kilo-chat backend (see services/kilo-chat handleAttachmentGetUrl).
-export const attachmentGetUrlResponseSchema = z.object({
-  url: z.string().min(1),
-  mimeType: z.string().min(1),
-  size: z.number().int().nonnegative(),
-  filename: z.string(),
-  expiresAt: z.number().int().nonnegative(),
-});
 
 export type ContentBlock = z.infer<typeof contentBlockSchema>;
 export type Message = z.infer<typeof messageSchema>;

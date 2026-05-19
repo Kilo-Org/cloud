@@ -390,6 +390,14 @@ export const attachmentInitResponseSchema = z.object({
   putHeaders: z.record(z.string(), z.string()),
 });
 
+export const attachmentGetUrlResponseSchema = z.object({
+  url: z.string().min(1),
+  mimeType: z.string().min(1),
+  size: z.number().int().nonnegative(),
+  filename: z.string(),
+  expiresAt: z.number().int().nonnegative(),
+});
+
 // ── Plugin client response schemas (controller-proxied bot endpoints) ───────
 
 export const botGetMembersResponseSchema = z.object({

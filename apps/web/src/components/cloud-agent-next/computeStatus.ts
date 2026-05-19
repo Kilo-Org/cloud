@@ -15,6 +15,7 @@ const toolStatusMap: Record<string, string> = {
   todoread: 'Planning next steps',
   task: 'Delegating work',
   question: 'Asking a question',
+  skill: 'Loading skill',
 };
 
 export function computeStatus(part: Part): string {

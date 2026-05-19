@@ -29,6 +29,7 @@ import { notifyMessageDeliveryFailed } from '../webhook/deliver';
 import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
 import { setTypingFor, stopTypingFor } from '../services/typing';
 import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
+import { attachmentContentDisposition } from '../util/content-disposition';
 import { mintGetUrl, mintPutUrl } from '../util/presigner';
 import type {
   CreateMessageResponse,
@@ -639,21 +640,6 @@ export async function handleAttachmentInit(c: HonoCtx) {
 
 // ─── attachmentGetUrl ───────────────────────────────────────────────────────
 
-/**
- * Sanitize a filename for embedding into an RFC 6266 quoted Content-Disposition
- * value. Strips characters that would break out of the quoted string and
- * collapses path separators. Falls back to a generic name if the result is
- * empty.
- */
-function safeQuotedFilename(filename: string): string {
-  const cleaned = filename
-    // eslint-disable-next-line no-control-regex -- intentionally strip control chars from header value
-    .replace(/[\\"\r\n\x00-\x1f]/g, '')
-    .replace(/[/\\]/g, '_')
-    .trim();
-  return cleaned.length > 0 ? cleaned : 'download';
-}
-
 const PUT_URL_TTL_SECONDS = 900;
 const GET_URL_TTL_SECONDS = 3600;
 
@@ -697,7 +683,7 @@ export async function handleAttachmentGetUrl(c: HonoCtx) {
 
   const responseContentDisposition = row.mimeType.startsWith('image/')
     ? undefined
-    : `attachment; filename="${safeQuotedFilename(row.filename)}"`;
+    : attachmentContentDisposition(row.filename);
 
   const { url } = await mintGetUrl({
     accountId: c.env.R2_ACCOUNT_ID,

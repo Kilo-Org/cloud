@@ -97,6 +97,7 @@ describe('downloadInboundAttachments', () => {
 
     expect(result.mediaPaths).toEqual(['/tmp/media/inbound/saved-1', '/tmp/media/inbound/saved-2']);
     expect(result.mediaTypes).toEqual(['image/png', 'image/jpeg']);
+    expect(result.failedCount).toBe(0);
   });
 
   it('skips attachments whose presigned URL fetch fails (non-2xx)', async () => {
@@ -133,6 +134,7 @@ describe('downloadInboundAttachments', () => {
     expect(saveMediaBuffer).toHaveBeenCalledTimes(1);
     expect(result.mediaPaths).toEqual(['/tmp/media/inbound/a']);
     expect(result.mediaTypes).toEqual(['image/png']);
+    expect(result.failedCount).toBe(1);
   });
 
   it('skips attachments whose getAttachmentUrl throws', async () => {
@@ -162,6 +164,7 @@ describe('downloadInboundAttachments', () => {
     expect(saveMediaBuffer).not.toHaveBeenCalled();
     expect(result.mediaPaths).toEqual([]);
     expect(result.mediaTypes).toEqual([]);
+    expect(result.failedCount).toBe(1);
   });
 
   it('returns empty arrays when there are no attachments', async () => {
@@ -179,6 +182,7 @@ describe('downloadInboundAttachments', () => {
 
     expect(result.mediaPaths).toEqual([]);
     expect(result.mediaTypes).toEqual([]);
+    expect(result.failedCount).toBe(0);
     expect(saveMediaBuffer).not.toHaveBeenCalled();
   });
 });

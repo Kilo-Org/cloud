@@ -44,6 +44,7 @@ type SaveMediaBuffer = (
 export type DownloadedAttachments = {
   mediaPaths: string[];
   mediaTypes: string[];
+  failedCount: number;
 };
 
 /**
@@ -51,7 +52,9 @@ export type DownloadedAttachments = {
  * download the bytes, and persist them via `saveMediaBuffer` so the agent runner
  * can address them as local `MediaPath` entries. Failures on individual
  * attachments are logged and the rest of the list is still processed — webhook
- * delivery never fails because a single attachment download flaked.
+ * delivery never fails because a single attachment download flaked. `failedCount`
+ * lets callers surface a fallback note to the agent when nothing usable made it
+ * through.
  */
 export async function downloadInboundAttachments(params: {
   client: KiloChatClient;
@@ -62,7 +65,8 @@ export async function downloadInboundAttachments(params: {
 }): Promise<DownloadedAttachments> {
   const mediaPaths: string[] = [];
   const mediaTypes: string[] = [];
-  if (params.attachments.length === 0) return { mediaPaths, mediaTypes };
+  let failedCount = 0;
+  if (params.attachments.length === 0) return { mediaPaths, mediaTypes, failedCount };
   const fetchImpl = params.fetchImpl ?? fetch;
 
   for (const att of params.attachments) {
@@ -77,6 +81,7 @@ export async function downloadInboundAttachments(params: {
           `[kilo-chat] inbound attachment ${att.attachmentId} download responded ${response.status}; skipping`
         );
         void response.body?.cancel();
+        failedCount++;
         continue;
       }
       const arrayBuffer = await response.arrayBuffer();
@@ -92,10 +97,11 @@ export async function downloadInboundAttachments(params: {
       mediaTypes.push(att.mimeType);
     } catch (err) {
       console.warn(`[kilo-chat] inbound attachment ${att.attachmentId} failed:`, err);
+      failedCount++;
     }
   }
 
-  return { mediaPaths, mediaTypes };
+  return { mediaPaths, mediaTypes, failedCount };
 }
 
 export async function handleActionExecuted(
@@ -180,7 +186,7 @@ export async function dispatchInbound(
     gatewayToken: resolveGatewayToken(),
   });
 
-  const { mediaPaths, mediaTypes } = await downloadInboundAttachments({
+  const { mediaPaths, mediaTypes, failedCount } = await downloadInboundAttachments({
     client,
     conversationId: payload.conversationId,
     attachments: payload.attachments ?? [],
@@ -196,9 +202,18 @@ export async function dispatchInbound(
     mediaFields.MediaTypes = mediaTypes;
   }
 
+  // If the message has no text and every attachment download failed, the
+  // agent would otherwise be invoked with an empty body and silently respond
+  // to nothing. Inject a synthetic note so the bot can ask the user to
+  // resend.
+  const bodyForAgent =
+    payload.text.length === 0 && mediaPaths.length === 0 && failedCount > 0
+      ? `[system: ${failedCount} attachment(s) failed to download — ask the user to resend]`
+      : payload.text;
+
   const ctxPayload = channelRuntime.reply.finalizeInboundContext({
     Body: body,
-    BodyForAgent: payload.text,
+    BodyForAgent: bodyForAgent,
     RawBody: payload.text,
     CommandBody: payload.text,
     From: `kilo-chat:${payload.from}`,

@@ -85,6 +85,8 @@ export const ALL_PLATFORMS: PlatformOption[] = [
   },
 ];
 
+export const ALL_PLATFORM_IDS: ReadonlySet<string> = new Set(ALL_PLATFORMS.map(p => p.id));
+
 export function getPlatform(id: PlatformId): PlatformOption | undefined {
   return ALL_PLATFORMS.find(p => p.id === id);
 }

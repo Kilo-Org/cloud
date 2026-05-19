@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { KiloCardLayout } from '@/components/KiloCardLayout';
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
-import { type PlatformId } from '../_components/platforms';
+import { ALL_PLATFORM_IDS, type PlatformId } from '../_components/platforms';
 import { AuthorizeFlow } from './_components/AuthorizeFlow';
 
 export const metadata: Metadata = {
@@ -10,18 +10,8 @@ export const metadata: Metadata = {
   description: 'Connect Kilo to the services your team uses.',
 };
 
-const KNOWN_IDS = new Set<string>([
-  'slack',
-  'discord',
-  'microsoft-teams',
-  'google-chat',
-  'github',
-  'gitlab',
-  'linear',
-]);
-
 function isPlatformId(value: string): value is PlatformId {
-  return KNOWN_IDS.has(value);
+  return ALL_PLATFORM_IDS.has(value);
 }
 
 function parseServices(raw: string | string[] | undefined): PlatformId[] {

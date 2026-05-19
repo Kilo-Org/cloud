@@ -17,3 +17,10 @@ WORKER_ENV=development
 # `wrangler dev` reads from the same Secrets Store binding as production, so do
 # NOT redefine R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY in this file — doing so
 # silently shadows the binding and drifts local from prod behavior.
+
+# Optional dev-only namespace for R2 object keys. wrangler.jsonc pins the prod
+# value to "" so prod is unaffected; setting this here (or in the root
+# .env.local) puts every dev upload under `<prefix>attachments/...` so dev keys
+# never collide with prod keys in the shared bucket. Must end with `/` when set.
+# Example: KEY_PREFIX=dev/igor/
+KEY_PREFIX=

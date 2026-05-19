@@ -272,6 +272,7 @@ describe('consumeOwnerBatch scheduled lifecycle handoff', () => {
         HYPERDRIVE: { connectionString: 'postgres://example' },
         NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
         INTERNAL_API_SECRET: { get: async () => 'internal-api-secret' },
+        CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
         GIT_TOKEN_SERVICE: {
           getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
         },

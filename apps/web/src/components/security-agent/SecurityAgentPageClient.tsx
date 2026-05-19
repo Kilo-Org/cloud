@@ -22,6 +22,7 @@ import {
 } from '@/lib/security-agent/core/schemas';
 import Link from 'next/link';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
+import { manualAnalysisAdmissionCopy } from './manual-analysis-admission-copy';
 
 type SecurityAgentPageClientProps = {
   organizationId?: string;
@@ -332,7 +333,7 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
     trpc.organizations.securityAgent.startAnalysis.mutationOptions({
       onSuccess: async (_data, variables) => {
         setGitHubError(null); // Clear any previous error on success
-        toast.success('Analysis started');
+        toast.success(manualAnalysisAdmissionCopy.successTitle);
         refreshAcceptedQueueMutation();
         setStartingAnalysisIds(prev => {
           const next = new Set(prev);
@@ -349,7 +350,7 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
               'The GitHub App may have been uninstalled. Please check your integrations.',
           });
         } else {
-          toast.error('Failed to start analysis', {
+          toast.error(manualAnalysisAdmissionCopy.failureTitle, {
             description: message,
             duration: 8000,
           });
@@ -371,7 +372,7 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
       trpc.securityAgent.startAnalysis.mutationOptions({
         onSuccess: async (_data, variables) => {
           setGitHubError(null); // Clear any previous error on success
-          toast.success('Analysis started');
+          toast.success(manualAnalysisAdmissionCopy.successTitle);
           refreshAcceptedQueueMutation();
           setStartingAnalysisIds(prev => {
             const next = new Set(prev);
@@ -388,7 +389,7 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
                 'The GitHub App may have been uninstalled. Please check your integrations.',
             });
           } else {
-            toast.error('Failed to start analysis', {
+            toast.error(manualAnalysisAdmissionCopy.failureTitle, {
               description: message,
               duration: 8000,
             });

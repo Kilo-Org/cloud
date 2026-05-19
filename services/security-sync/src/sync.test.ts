@@ -1,9 +1,74 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  fetchAllDependabotAlerts,
   isFindingEligibleForAutoAnalysis,
   selectRepositoriesForSync,
   syncAutoAnalysisQueueForFinding,
+  syncOwner,
 } from './sync.js';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+type FakeDbOptions = {
+  authInvalidAt?: string | null;
+  repositories?: string[];
+};
+
+function createFakeDb(options: FakeDbOptions = {}) {
+  const repositories = options.repositories ?? ['acme/widgets'];
+  const sets: Array<Record<string, unknown>> = [];
+  let selectCount = 0;
+
+  const db = {
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => {
+            selectCount++;
+            if (selectCount === 1) {
+              return [{ id: 'agent-config', config: {}, is_enabled: true }];
+            }
+            if (selectCount === 2) {
+              return [
+                {
+                  id: 'integration-1',
+                  platform_installation_id: 'installation-1',
+                  permissions: { vulnerability_alerts: 'read' },
+                  repositories: repositories.map((full_name, index) => ({ id: index + 1, full_name })),
+                  authInvalidAt: options.authInvalidAt ?? null,
+                },
+              ];
+            }
+            return [];
+          },
+        }),
+      }),
+    }),
+    update: () => ({
+      set: (values: Record<string, unknown>) => {
+        sets.push(values);
+        return { where: async () => undefined };
+      },
+    }),
+    insert: () => ({ values: async () => undefined }),
+    execute: async () => ({ rows: [] }),
+  };
+
+  return { db, sets };
+}
+
+function createGitTokenService() {
+  return { getToken: vi.fn(async () => 'github-token') };
+}
+
+function stubFetch(response: Response | (() => Response)) {
+  const fetchStub = vi.fn(async () => (typeof response === 'function' ? response() : response));
+  vi.stubGlobal('fetch', fetchStub);
+  return fetchStub;
+}
 
 describe('selectRepositoriesForSync', () => {
   it('allows a manual repository command to target an accessible repo outside configured sync selection', () => {
@@ -19,6 +84,149 @@ describe('selectRepositoriesForSync', () => {
     );
 
     expect(repositories).toEqual(['kilo/requested']);
+  });
+});
+
+describe('Worker GitHub auth-invalid sync', () => {
+  it('classifies a direct GitHub 401 as auth_invalid', async () => {
+    stubFetch(new Response('Bad credentials', { status: 401 }));
+
+    await expect(fetchAllDependabotAlerts('github-token', 'acme', 'widgets')).resolves.toEqual({
+      status: 'auth_invalid',
+    });
+  });
+
+  it('persists the first GitHub 401 and stops syncing remaining repos', async () => {
+    const { db, sets } = createFakeDb({ repositories: ['acme/widgets', 'acme/api'] });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response('Bad credentials', { status: 401 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-1',
+      })
+    ).resolves.toMatchObject({
+      authInvalid: 1,
+      authInvalidRepos: ['acme/widgets'],
+      reauthRequired: true,
+      errors: 0,
+    });
+
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+    expect(gitTokenService.getToken).toHaveBeenCalledTimes(1);
+    expect(sets).toContainEqual(
+      expect.objectContaining({ auth_invalid_reason: 'github_dependabot_401' })
+    );
+    expect(sets).not.toContainEqual(expect.objectContaining({ runtime_state: expect.anything() }));
+  });
+
+  it('short-circuits a recent invalid marker before token minting or GitHub fetch', async () => {
+    const { db } = createFakeDb({
+      authInvalidAt: new Date().toISOString(),
+      repositories: ['acme/widgets', 'acme/api'],
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response('unexpected'));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-1',
+      })
+    ).resolves.toMatchObject({
+      authInvalid: 2,
+      authInvalidRepos: ['acme/widgets', 'acme/api'],
+      reauthRequired: true,
+    });
+
+    expect(gitTokenService.getToken).not.toHaveBeenCalled();
+    expect(fetchStub).not.toHaveBeenCalled();
+  });
+
+  it('refreshes an expired marker after GitHub still returns 401', async () => {
+    const { db, sets } = createFakeDb({
+      authInvalidAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response('Bad credentials', { status: 401 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-1',
+      })
+    ).resolves.toMatchObject({ authInvalid: 1, reauthRequired: true });
+
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+    expect(sets).toContainEqual(
+      expect.objectContaining({ auth_invalid_reason: 'github_dependabot_401' })
+    );
+  });
+
+  it('clears invalid state after success and advances full-sync freshness', async () => {
+    const { db, sets } = createFakeDb({
+      authInvalidAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    });
+    const gitTokenService = createGitTokenService();
+    stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-1',
+      })
+    ).resolves.toMatchObject({ authInvalid: 0, reauthRequired: false });
+
+    expect(sets).toContainEqual(
+      expect.objectContaining({ auth_invalid_at: null, auth_invalid_reason: null })
+    );
+    expect(sets).toContainEqual(expect.objectContaining({ runtime_state: expect.anything() }));
+  });
+
+  it('does not advance freshness after mixed success then GitHub 401', async () => {
+    const { db, sets } = createFakeDb({ repositories: ['acme/widgets', 'acme/api'] });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
+      .mockResolvedValueOnce(new Response('Bad credentials', { status: 401 }));
+    vi.stubGlobal('fetch', fetchStub);
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-1',
+      })
+    ).resolves.toMatchObject({ authInvalid: 1, reauthRequired: true });
+
+    expect(fetchStub).toHaveBeenCalledTimes(2);
+    expect(sets).not.toContainEqual(expect.objectContaining({ runtime_state: expect.anything() }));
+  });
+
+  it('throws non-401 GitHub errors', async () => {
+    const { db } = createFakeDb();
+    const gitTokenService = createGitTokenService();
+    stubFetch(new Response('Service unavailable', { status: 500 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-1',
+      })
+    ).rejects.toThrow('GitHub API error 500 for acme/widgets: Service unavailable');
   });
 });
 

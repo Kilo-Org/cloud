@@ -332,7 +332,7 @@ export default {
 
     return app.fetch(request, env, ctx);
   },
-  async queue(batch: MessageBatch<unknown>): Promise<void> {
+  async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
     if (batch.queue.startsWith('cloud-agent-next-callback-queue')) {
       const consumer = createCallbackQueueConsumer();
       return consumer(batch as MessageBatch<CallbackJob>);

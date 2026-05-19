@@ -13,7 +13,7 @@ describe('submitManualAnalysisStart', () => {
     mockFetch.mockReset();
   });
 
-  it('submits a durable manual analysis command and returns accepted state', async () => {
+  it('submits a durable manual analysis command and returns queued state', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 202,
@@ -28,7 +28,7 @@ describe('submitManualAnalysisStart', () => {
         requestedModels: { analysisModel: 'analysis/model' },
         retrySandboxOnly: true,
       })
-    ).resolves.toEqual({ accepted: true });
+    ).resolves.toEqual({ queued: true });
 
     expect(mockFetch).toHaveBeenCalledWith(
       'https://security-auto-analysis.test/internal/manual-analysis-start',

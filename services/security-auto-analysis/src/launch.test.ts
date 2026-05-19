@@ -207,8 +207,8 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     } as never);
     vi.mocked(setFindingCompleted).mockResolvedValue(true);
     vi.mocked(setFindingFailed).mockResolvedValue(true);
-    vi.mocked(setFindingPending).mockResolvedValue(true);
-    vi.mocked(setFindingRunning).mockResolvedValue(true);
+    vi.mocked(setFindingPending).mockResolvedValue(undefined);
+    vi.mocked(setFindingRunning).mockResolvedValue(undefined);
     vi.mocked(clearAnalysisStatus).mockResolvedValue(undefined);
     vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValue({ transitioned: true });
   });

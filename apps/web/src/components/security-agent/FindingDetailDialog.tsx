@@ -29,6 +29,8 @@ import type { SecurityFinding } from '@kilocode/db/schema';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { toast } from 'sonner';
+import { manualAnalysisAdmissionCopy } from './manual-analysis-admission-copy';
 
 type Severity = 'critical' | 'high' | 'medium' | 'low';
 
@@ -106,6 +108,7 @@ export function FindingDetailDialog({
   const startOrgAnalysisMutation = useMutation(
     trpc.organizations.securityAgent.startAnalysis.mutationOptions({
       onSuccess: async () => {
+        toast.success(manualAnalysisAdmissionCopy.successTitle);
         await queryClient.invalidateQueries();
       },
     })
@@ -115,6 +118,7 @@ export function FindingDetailDialog({
   const startUserAnalysisMutation = useMutation(
     trpc.securityAgent.startAnalysis.mutationOptions({
       onSuccess: async () => {
+        toast.success(manualAnalysisAdmissionCopy.successTitle);
         await queryClient.invalidateQueries();
       },
     })

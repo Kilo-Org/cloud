@@ -8,6 +8,7 @@ import type { SecurityFinding } from '@kilocode/db/schema';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 import type { DismissReason } from './DismissFindingDialog';
 import type { SlaConfig } from './SecurityConfigForm';
+import { manualAnalysisAdmissionCopy } from './manual-analysis-admission-copy';
 
 type SecurityAgentContextValue = {
   organizationId: string | undefined;
@@ -254,7 +255,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     trpc.organizations.securityAgent.startAnalysis.mutationOptions({
       onSuccess: async (_data, variables) => {
         setGitHubError(null);
-        toast.success('Analysis started');
+        toast.success(manualAnalysisAdmissionCopy.successTitle);
         refreshAcceptedQueueMutation();
         setStartingAnalysisIds(prev => {
           const next = new Set(prev);
@@ -271,7 +272,10 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
               'The GitHub App may have been uninstalled. Please check your integrations.',
           });
         } else {
-          toast.error('Failed to start analysis', { description: message, duration: 8000 });
+          toast.error(manualAnalysisAdmissionCopy.failureTitle, {
+            description: message,
+            duration: 8000,
+          });
         }
         void queryClient.invalidateQueries();
         setStartingAnalysisIds(prev => {
@@ -370,7 +374,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     trpc.securityAgent.startAnalysis.mutationOptions({
       onSuccess: async (_data, variables) => {
         setGitHubError(null);
-        toast.success('Analysis started');
+        toast.success(manualAnalysisAdmissionCopy.successTitle);
         refreshAcceptedQueueMutation();
         setStartingAnalysisIds(prev => {
           const next = new Set(prev);
@@ -387,7 +391,10 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
               'The GitHub App may have been uninstalled. Please check your integrations.',
           });
         } else {
-          toast.error('Failed to start analysis', { description: message, duration: 8000 });
+          toast.error(manualAnalysisAdmissionCopy.failureTitle, {
+            description: message,
+            duration: 8000,
+          });
         }
         void queryClient.invalidateQueries();
         setStartingAnalysisIds(prev => {

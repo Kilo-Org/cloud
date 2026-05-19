@@ -13,8 +13,6 @@ const mockSubmitManualFindingDismissal = jest.fn() as jest.MockedFunction<
 const mockSubmitManualAnalysisStart = jest.fn() as jest.MockedFunction<
   typeof manualAnalysisClientModule.submitManualAnalysisStart
 >;
-const mockSyncDependabotAlertsForRepo = jest.fn();
-const mockSyncAllReposForOwner = jest.fn();
 const mockGetSecurityFindingById = jest.fn();
 const mockCanStartAnalysis = jest.fn();
 const mockTrackSecurityAgentSync = jest.fn();
@@ -30,11 +28,6 @@ jest.mock('../services/manual-dismiss-client', () => ({
 
 jest.mock('../services/manual-analysis-client', () => ({
   submitManualAnalysisStart: mockSubmitManualAnalysisStart,
-}));
-
-jest.mock('../services/sync-service', () => ({
-  syncDependabotAlertsForRepo: mockSyncDependabotAlertsForRepo,
-  syncAllReposForOwner: mockSyncAllReposForOwner,
 }));
 
 jest.mock('../github/permissions', () => ({
@@ -165,7 +158,6 @@ describe('setEnabled', () => {
       owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
       actor: { id: 'user-123', email: 'owner@example.com', name: 'Owner Example' },
     });
-    expect(mockSyncAllReposForOwner).not.toHaveBeenCalled();
   });
 });
 
@@ -182,10 +174,10 @@ describe('startAnalysis', () => {
       currentCount: 0,
       limit: 3,
     } as never);
-    mockSubmitManualAnalysisStart.mockResolvedValue({ accepted: true });
+    mockSubmitManualAnalysisStart.mockResolvedValue({ queued: true });
   });
 
-  it('returns accepted Worker orchestration instead of launching Cloud Agent inline', async () => {
+  it('returns queued Worker orchestration instead of claiming analysis started inline', async () => {
     const handlers = createHandlers();
     const result = await handlers.startAnalysis.handler({
       ctx: {
@@ -201,7 +193,7 @@ describe('startAnalysis', () => {
       },
     });
 
-    expect(result).toEqual({ success: true, accepted: true });
+    expect(result).toEqual({ success: true, queued: true });
     expect(mockSubmitManualAnalysisStart).toHaveBeenCalledWith({
       findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
@@ -251,7 +243,6 @@ describe('triggerSync', () => {
       actor: { id: 'user-123', email: 'owner@example.com', name: 'Owner Example' },
       repoFullName: 'kilo/repo',
     });
-    expect(mockSyncDependabotAlertsForRepo).not.toHaveBeenCalled();
   });
 });
 

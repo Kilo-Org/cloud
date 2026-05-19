@@ -24,6 +24,9 @@ import {
 
 const SecurityFindingSource = { DEPENDABOT: 'dependabot' } as const;
 
+const AUTH_INVALID_SHORT_CIRCUIT_MS = 60 * 60 * 1000;
+const AUTH_INVALID_WRITE_THROTTLE_MS = AUTH_INVALID_SHORT_CIRCUIT_MS;
+
 const SecurityFindingStatus = {
   OPEN: 'open',
   FIXED: 'fixed',
@@ -141,6 +144,10 @@ type SyncResult = {
   errors: number;
   /** Repos where Dependabot alerts are permanently disabled (safe to skip) */
   skipped: number;
+  /** Repos where the GitHub installation requires reauthorization */
+  authInvalid: number;
+  authInvalidRepos: string[];
+  reauthRequired: boolean;
   /** Repos that returned 404 or are access-blocked (deleted/transferred/inaccessible) */
   staleRepos: string[];
 };
@@ -149,7 +156,29 @@ type FetchAlertsResult =
   | { status: 'success'; alerts: DependabotAlertRaw[] }
   | { status: 'repo_not_found' }
   | { status: 'alerts_disabled' }
-  | { status: 'access_blocked' };
+  | { status: 'access_blocked' }
+  | { status: 'auth_invalid' };
+
+function createEmptySyncResult(): SyncResult {
+  return {
+    synced: 0,
+    errors: 0,
+    skipped: 0,
+    authInvalid: 0,
+    authInvalidRepos: [],
+    reauthRequired: false,
+    staleRepos: [],
+  };
+}
+
+function createAuthInvalidSyncResult(repositories: string[]): SyncResult {
+  return {
+    ...createEmptySyncResult(),
+    authInvalid: repositories.length,
+    authInvalidRepos: [...repositories],
+    reauthRequired: true,
+  };
+}
 
 function isOrgOwner(
   owner: SecurityReviewOwner
@@ -186,6 +215,7 @@ type EnabledOwnerConfig = {
   repoNameToId: Map<string, number>;
   slaConfig: SecurityAgentConfig;
   autoAnalysisEnabledAt: string | null;
+  authInvalidAt: string | null;
   /** Number of selected_repository_ids that are no longer accessible via the installation.
    *  Non-zero means the app lost access to a configured repo — freshness must not advance. */
   missingSelectedRepoCount: number;
@@ -223,6 +253,7 @@ export async function getOwnerConfig(
       platform_installation_id: platform_integrations.platform_installation_id,
       permissions: platform_integrations.permissions,
       repositories: platform_integrations.repositories,
+      authInvalidAt: platform_integrations.auth_invalid_at,
     })
     .from(platform_integrations)
     .where(
@@ -298,11 +329,69 @@ export async function getOwnerConfig(
     repoNameToId,
     slaConfig: { ...DEFAULT_SLA_CONFIG, ...securityConfig },
     autoAnalysisEnabledAt: ownerStates[0]?.autoAnalysisEnabledAt ?? null,
+    authInvalidAt: integration.authInvalidAt,
     missingSelectedRepoCount,
   };
 }
 
-async function fetchAllDependabotAlerts(
+function isRecentTimestamp(value: string | null | undefined, windowMs: number): boolean {
+  if (!value) return false;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) && Date.now() - timestamp < windowMs;
+}
+
+async function markIntegrationAuthInvalid(
+  db: WorkerDb,
+  platformIntegrationId: string
+): Promise<void> {
+  try {
+    const now = new Date().toISOString();
+    await db
+      .update(platform_integrations)
+      .set({
+        auth_invalid_at: now,
+        auth_invalid_reason: 'github_dependabot_401',
+        updated_at: now,
+      })
+      .where(
+        and(
+          eq(platform_integrations.id, platformIntegrationId),
+          sql`(${platform_integrations.auth_invalid_at} IS NULL OR ${platform_integrations.auth_invalid_at} < now() - ${AUTH_INVALID_WRITE_THROTTLE_MS} * interval '1 millisecond')`
+        )
+      );
+  } catch (error) {
+    console.error('Failed to mark GitHub integration auth invalid', {
+      error: error instanceof Error ? error.message : String(error),
+      platformIntegrationId,
+    });
+  }
+}
+
+async function clearIntegrationAuthInvalid(db: WorkerDb, platformIntegrationId: string): Promise<void> {
+  try {
+    const now = new Date().toISOString();
+    await db
+      .update(platform_integrations)
+      .set({
+        auth_invalid_at: null,
+        auth_invalid_reason: null,
+        updated_at: now,
+      })
+      .where(
+        and(
+          eq(platform_integrations.id, platformIntegrationId),
+          isNotNull(platform_integrations.auth_invalid_at)
+        )
+      );
+  } catch (error) {
+    console.error('Failed to clear GitHub integration auth invalid state', {
+      error: error instanceof Error ? error.message : String(error),
+      platformIntegrationId,
+    });
+  }
+}
+
+export async function fetchAllDependabotAlerts(
   token: string,
   repoOwner: string,
   repoName: string
@@ -320,6 +409,10 @@ async function fetchAllDependabotAlerts(
         'User-Agent': 'cloudflare-security-sync',
       },
     });
+
+    if (response.status === 401) {
+      return { status: 'auth_invalid' };
+    }
 
     if (response.status === 404) {
       return { status: 'repo_not_found' };
@@ -1053,7 +1146,7 @@ export async function syncOwner(params: {
   const config = await getOwnerConfig(database, owner);
   if (!config) {
     console.info(`No enabled config for owner, skipping`, { runId, owner });
-    return { synced: 0, errors: 0, skipped: 0, staleRepos: [] };
+    return createEmptySyncResult();
   }
 
   const repositories = selectRepositoriesForSync(config, repoFullName);
@@ -1063,10 +1156,20 @@ export async function syncOwner(params: {
       owner,
       repoFullName,
     });
-    return { synced: 0, errors: 0, skipped: 0, staleRepos: [] };
+    return createEmptySyncResult();
   }
 
-  const totalResult: SyncResult = { synced: 0, errors: 0, skipped: 0, staleRepos: [] };
+  if (isRecentTimestamp(config.authInvalidAt, AUTH_INVALID_SHORT_CIRCUIT_MS)) {
+    console.warn('Skipping security sync because GitHub installation needs reauthorization', {
+      runId,
+      owner,
+      repositoryCount: repositories.length,
+      authInvalidAt: config.authInvalidAt,
+    });
+    return createAuthInvalidSyncResult(repositories);
+  }
+
+  const totalResult = createEmptySyncResult();
   let firstError: Error | null = null;
   let successfulRepos = 0;
 
@@ -1085,8 +1188,15 @@ export async function syncOwner(params: {
       totalResult.synced += repoResult.synced;
       totalResult.errors += repoResult.errors;
       totalResult.skipped += repoResult.skipped;
+      totalResult.authInvalid += repoResult.authInvalid;
+      totalResult.authInvalidRepos.push(...repoResult.authInvalidRepos);
+      totalResult.reauthRequired = totalResult.reauthRequired || repoResult.reauthRequired;
       totalResult.staleRepos.push(...repoResult.staleRepos);
       successfulRepos++;
+
+      if (repoResult.reauthRequired) {
+        break;
+      }
     } catch (error) {
       totalResult.errors++;
       console.error(`Failed to sync ${repoFullName}`, {
@@ -1144,6 +1254,8 @@ export async function syncOwner(params: {
         repoFullName,
         synced: totalResult.synced,
         errors: totalResult.errors,
+        authInvalidRepos: totalResult.authInvalidRepos,
+        reauthRequired: totalResult.reauthRequired,
         repoCount: repositories.length,
       },
     });
@@ -1163,6 +1275,7 @@ export async function syncOwner(params: {
   if (
     !repoFullName &&
     totalResult.errors === 0 &&
+    totalResult.authInvalid === 0 &&
     totalResult.staleRepos.length === 0 &&
     config.missingSelectedRepoCount === 0
   ) {
@@ -1197,12 +1310,19 @@ export async function syncOwner(params: {
     findingsSynced: totalResult.synced,
     errors: totalResult.errors,
     skippedRepos: totalResult.skipped,
+    authInvalidRepos: totalResult.authInvalidRepos,
+    reauthRequired: totalResult.reauthRequired,
     staleRepos: totalResult.staleRepos,
     missingSelectedRepos: config.missingSelectedRepoCount,
     durationMs: Date.now() - startTime,
   };
 
-  if (totalResult.synced === 0 && totalResult.errors === 0 && totalResult.skipped === 0) {
+  if (
+    totalResult.synced === 0 &&
+    totalResult.errors === 0 &&
+    totalResult.skipped === 0 &&
+    totalResult.authInvalid === 0
+  ) {
     console.warn('Sync completed with zero findings processed across all repos', syncSummary);
   } else {
     console.info('Sync cycle summary', syncSummary);
@@ -1231,7 +1351,7 @@ async function syncRepo(params: {
     slaConfig,
   } = params;
   const token = await gitTokenService.getToken(installationId);
-  const result: SyncResult = { synced: 0, errors: 0, skipped: 0, staleRepos: [] };
+  const result = createEmptySyncResult();
 
   const [repoOwner, repoName] = repoFullName.split('/');
   if (!repoOwner || !repoName) {
@@ -1239,6 +1359,16 @@ async function syncRepo(params: {
   }
 
   const fetchResult = await fetchAllDependabotAlerts(token, repoOwner, repoName);
+
+  if (fetchResult.status === 'auth_invalid') {
+    console.warn('GitHub installation needs reauthorization; skipping repo sync', {
+      platformIntegrationId,
+      installationId,
+      repoFullName,
+    });
+    await markIntegrationAuthInvalid(database, platformIntegrationId);
+    return createAuthInvalidSyncResult([repoFullName]);
+  }
 
   if (fetchResult.status === 'repo_not_found') {
     console.warn(`Repository ${repoFullName} no longer exists, marking as stale`);
@@ -1257,6 +1387,8 @@ async function syncRepo(params: {
     result.staleRepos.push(repoFullName);
     return result;
   }
+
+  await clearIntegrationAuthInvalid(database, platformIntegrationId);
 
   const findings = fetchResult.alerts.map(alert => parseDependabotAlert(alert));
   console.info(`Fetched ${fetchResult.alerts.length} alerts, parsed ${findings.length} findings`, {

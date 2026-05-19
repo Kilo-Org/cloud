@@ -925,7 +925,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        await submitManualAnalysisStart({
+        const queued = await submitManualAnalysisStart({
           findingId: input.findingId,
           owner: securityOwner,
           actorUserId: ctx.user.id,
@@ -937,7 +937,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           retrySandboxOnly: input.retrySandboxOnly,
         });
 
-        return { success: true, accepted: true };
+        return { success: true, ...queued };
       },
     },
 

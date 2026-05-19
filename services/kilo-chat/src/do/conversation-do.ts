@@ -61,6 +61,8 @@ type StoredAttachmentRow = typeof attachments.$inferSelect;
 const INIT_DEDUPE_WINDOW_MS = 30_000;
 const MAX_ATTACHMENTS_PER_MESSAGE = 10;
 
+class AttachmentAlreadyLinkedError extends Error {}
+
 // Validates the RPC input for initAttachment. Reuses the size/mimeType/filename
 // rules from the public request schema so the DO and the HTTP route stay in
 // lockstep — only swapping conversationId for the trusted uploaderId.
@@ -704,6 +706,12 @@ export class ConversationDO extends DurableObject<Env> {
 
     const messageId = this.nextUlid();
 
+    // The pending-status check above is necessary but not sufficient: the
+    // R2 HEAD await in validateUploadedAttachmentObjects releases the DO
+    // input gate, so a concurrent createMessage can race past the same
+    // check before we get here. The UPDATE below guards against that by
+    // requiring status='pending' and aborting the transaction if the row
+    // has already been claimed.
     try {
       this.db.transaction(tx => {
         tx.insert(messages)
@@ -718,13 +726,21 @@ export class ConversationDO extends DurableObject<Env> {
           .run();
 
         for (const row of attachmentRows) {
-          tx.update(attachments)
+          const linked = tx
+            .update(attachments)
             .set({ status: 'linked', message_id: messageId })
-            .where(eq(attachments.id, row.id))
-            .run();
+            .where(and(eq(attachments.id, row.id), eq(attachments.status, 'pending')))
+            .returning({ id: attachments.id })
+            .all();
+          if (linked.length === 0) {
+            throw new AttachmentAlreadyLinkedError();
+          }
         }
       });
     } catch (err) {
+      if (err instanceof AttachmentAlreadyLinkedError) {
+        return { ok: false, code: 'conflict', error: 'Attachment is already linked' };
+      }
       if (err instanceof Error && /constraint/i.test(err.message)) {
         return { ok: false, code: 'internal', error: err.message };
       }

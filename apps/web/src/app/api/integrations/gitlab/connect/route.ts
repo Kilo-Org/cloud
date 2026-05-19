@@ -45,8 +45,7 @@ export async function GET(request: NextRequest) {
     }
 
     const customCredentials = clientId && clientSecret ? { clientId, clientSecret } : undefined;
-    const usesCustomInstance =
-      !!instanceUrl && instanceUrl !== DEFAULT_GITLAB_OAUTH_INSTANCE_URL;
+    const usesCustomInstance = !!instanceUrl && instanceUrl !== DEFAULT_GITLAB_OAUTH_INSTANCE_URL;
 
     if (usesCustomInstance && !customCredentials) {
       throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');

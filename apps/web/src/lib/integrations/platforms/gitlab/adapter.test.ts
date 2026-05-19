@@ -85,9 +85,9 @@ describe('GitLab OAuth endpoint safety', () => {
   });
 
   it('refuses to build self-hosted authorization URLs without custom credentials', () => {
-    expect(() =>
-      buildGitLabOAuthUrl('signed-state', 'https://attacker.example')
-    ).toThrow('Custom GitLab OAuth credentials are required for self-hosted instances');
+    expect(() => buildGitLabOAuthUrl('signed-state', 'https://attacker.example')).toThrow(
+      'Custom GitLab OAuth credentials are required for self-hosted instances'
+    );
   });
 
   it('refuses to send default OAuth credentials to self-hosted token endpoints', async () => {

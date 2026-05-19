@@ -70,9 +70,7 @@ describe('GET /api/integrations/gitlab/connect', () => {
   test('does not initialize a self-hosted flow without custom OAuth credentials', async () => {
     const { GET } = await import('./route');
     const response = await GET(
-      makeRequest(
-        '/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fattacker.example'
-      )
+      makeRequest('/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fattacker.example')
     );
 
     expectRedirectLocation(response, '/integrations/gitlab?error=oauth_init_failed');

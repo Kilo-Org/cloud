@@ -37,17 +37,12 @@ export type VerifiedGitLabOAuthState = Omit<GitLabOAuthStatePayload, 'instanceUr
   userId: string;
 };
 
-export function createGitLabOAuthState(
-  payload: GitLabOAuthStatePayload,
-  userId: string
-): string {
+export function createGitLabOAuthState(payload: GitLabOAuthStatePayload, userId: string): string {
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
   return createOAuthState(`${GITLAB_OAUTH_STATE_PREFIX}${encodedPayload}`, userId);
 }
 
-export function verifyGitLabOAuthState(
-  state: string | null
-): VerifiedGitLabOAuthState | null {
+export function verifyGitLabOAuthState(state: string | null): VerifiedGitLabOAuthState | null {
   const verified = verifyOAuthState(state);
   if (!verified?.owner.startsWith(GITLAB_OAUTH_STATE_PREFIX)) return null;
 

@@ -115,28 +115,34 @@ function ExperimentList({ onSelect }: { onSelect: (id: string) => void }) {
               <TableHead>Public model id</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {(data?.items.length ?? 0) === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground text-center">
+                <TableCell colSpan={4} className="text-muted-foreground text-center">
                   No experiments yet.
                 </TableCell>
               </TableRow>
             )}
             {data?.items.map(item => (
-              <TableRow key={item.id}>
+              <TableRow
+                key={item.id}
+                tabIndex={0}
+                role="button"
+                aria-label={`Open experiment ${item.name}`}
+                onClick={() => onSelect(item.id)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelect(item.id);
+                  }
+                }}
+                className="hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-ring cursor-pointer focus-visible:outline-2"
+              >
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      className="hover:underline"
-                      onClick={() => onSelect(item.id)}
-                    >
-                      {item.name}
-                    </button>
+                    {item.name}
                     {item.is_archived && (
                       <Badge variant="outline" className="text-muted-foreground">
                         archived
@@ -150,11 +156,6 @@ function ExperimentList({ onSelect }: { onSelect: (id: string) => void }) {
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {new Date(item.created_at).toLocaleDateString()}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button variant="outline" size="sm" onClick={() => onSelect(item.id)}>
-                    Open
-                  </Button>
                 </TableCell>
               </TableRow>
             ))}

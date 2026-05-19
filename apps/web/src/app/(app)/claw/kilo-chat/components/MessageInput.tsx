@@ -131,13 +131,18 @@ export function MessageInput({
   const overLimit = text.length > MESSAGE_TEXT_MAX_CHARS;
   const showCounter = text.length >= COUNTER_SHOW_AT;
   const inputEnabled = currentUserId !== null && canSend;
-  const effectiveDisabledReason =
-    currentUserId === null ? 'Loading user...' : (disabledReason ?? 'Sending is disabled');
   const showPlus = hasAttachmentsCapability && inputEnabled;
 
   const isUploading = selectIsUploading(queue.rows);
   const hasFailedAttachments = selectHasFailed(queue.rows);
   const readyAttachmentCount = queue.readyBlocks.length;
+
+  let effectiveDisabledReason: string;
+  if (currentUserId === null) effectiveDisabledReason = 'Loading user...';
+  else if (hasFailedAttachments)
+    effectiveDisabledReason = 'Resolve failed attachments before sending';
+  else if (isUploading) effectiveDisabledReason = 'Waiting for attachment upload to finish';
+  else effectiveDisabledReason = disabledReason ?? 'Sending is disabled';
 
   const canSubmit = canSubmitMessageInput({
     currentUserId,

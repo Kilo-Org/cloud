@@ -606,11 +606,11 @@ export async function handleAttachmentInit(c: HonoCtx) {
   if (!body.ok) return body.response;
 
   const callerId = c.get('callerId');
-  const { conversationId, mimeType, size, filename } = body.data;
+  const { conversationId, mimeType, size, filename, idempotencyKey } = body.data;
 
   const init = await withDORetry<DurableObjectStub<ConversationDO>, InitAttachmentResult>(
     () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId)),
-    stub => stub.initAttachment({ uploaderId: callerId, mimeType, size, filename }),
+    stub => stub.initAttachment({ uploaderId: callerId, mimeType, size, filename, idempotencyKey }),
     'ConversationDO.initAttachment'
   );
   if (!init.ok) {

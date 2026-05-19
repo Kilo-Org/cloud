@@ -14,6 +14,7 @@ describe('ConversationDO attachments table', () => {
       'created_at',
       'filename',
       'id',
+      'idempotency_key',
       'message_id',
       'mime_type',
       'r2_key',

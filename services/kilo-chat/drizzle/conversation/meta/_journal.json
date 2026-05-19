@@ -22,6 +22,13 @@
       "when": 1779121643631,
       "tag": "0002_luxuriant_shen",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1779197125344,
+      "tag": "0003_furry_living_lightning",
+      "breakpoints": true
     }
   ]
 }

@@ -388,6 +388,14 @@ export const attachmentInitRequestSchema = z.object({
   mimeType: z.string().min(1).max(255),
   size: z.number().int().nonnegative().max(ATTACHMENT_MAX_BYTES),
   filename: z.string().min(1).max(512),
+  /**
+   * Optional client-supplied idempotency key. When present, repeated inits
+   * from the same uploader with the same key (within the server's dedupe
+   * window) return the same attachment id. When absent, every init mints a
+   * fresh attachment — distinct files with identical metadata will not
+   * collide.
+   */
+  idempotencyKey: z.string().min(1).max(128).optional(),
 });
 
 export const attachmentInitResponseSchema = z.object({

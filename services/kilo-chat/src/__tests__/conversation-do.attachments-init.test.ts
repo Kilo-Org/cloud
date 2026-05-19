@@ -94,7 +94,31 @@ describe('ConversationDO.initAttachment', () => {
     expect(result.code).toBe('forbidden');
   });
 
-  it('returns same attachmentId for duplicate init within 30s', async () => {
+  it('returns same attachmentId for duplicate init with matching idempotencyKey', async () => {
+    const conversationId = ulid();
+    const stub = getDO(conversationId);
+    await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
+    const r1 = await stub.initAttachment({
+      uploaderId: 'user-A',
+      mimeType: 'image/png',
+      size: 7,
+      filename: 'dup.png',
+      idempotencyKey: 'retry-key-1',
+    });
+    const r2 = await stub.initAttachment({
+      uploaderId: 'user-A',
+      mimeType: 'image/png',
+      size: 7,
+      filename: 'dup.png',
+      idempotencyKey: 'retry-key-1',
+    });
+    expect(r1.ok).toBe(true);
+    expect(r2.ok).toBe(true);
+    if (!r1.ok || !r2.ok) return;
+    expect(r2.attachmentId).toBe(r1.attachmentId);
+  });
+
+  it('returns distinct attachmentIds when same metadata is uploaded without idempotencyKey', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
     await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
@@ -113,10 +137,10 @@ describe('ConversationDO.initAttachment', () => {
     expect(r1.ok).toBe(true);
     expect(r2.ok).toBe(true);
     if (!r1.ok || !r2.ok) return;
-    expect(r2.attachmentId).toBe(r1.attachmentId);
+    expect(r2.attachmentId).not.toBe(r1.attachmentId);
   });
 
-  it('returns distinct attachmentIds when mimeType differs', async () => {
+  it('returns distinct attachmentIds for the same uploader with different idempotencyKeys', async () => {
     const conversationId = ulid();
     const stub = getDO(conversationId);
     await bootstrapConversationForTest(stub, { conversationId, creatorId: 'user-A' });
@@ -125,12 +149,14 @@ describe('ConversationDO.initAttachment', () => {
       mimeType: 'image/png',
       size: 7,
       filename: 'photo.bin',
+      idempotencyKey: 'key-a',
     });
     const r2 = await stub.initAttachment({
       uploaderId: 'user-A',
-      mimeType: 'image/jpeg',
+      mimeType: 'image/png',
       size: 7,
       filename: 'photo.bin',
+      idempotencyKey: 'key-b',
     });
     expect(r1.ok).toBe(true);
     expect(r2.ok).toBe(true);

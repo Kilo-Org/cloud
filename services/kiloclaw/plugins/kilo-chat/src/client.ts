@@ -540,6 +540,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
       mimeType: params.mimeType,
       size: params.size,
       filename: params.filename,
+      idempotencyKey: params.idempotencyKey,
     } satisfies z.input<typeof attachmentInitRequestSchema>;
 
     const response = await fetchImpl(`${base}/_kilo/kilo-chat/attachments/init`, {

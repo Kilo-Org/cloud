@@ -259,6 +259,7 @@ export type InitAttachmentParams = {
   mimeType: string;
   size: number;
   filename: string;
+  idempotencyKey?: string;
 };
 
 export type InitAttachmentOk = {
@@ -1400,30 +1401,34 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     const now = Date.now();
-    const dedupeCutoff = now - INIT_DEDUPE_WINDOW_MS;
-    const existing = this.db
-      .select()
-      .from(attachments)
-      .where(
-        and(
-          eq(attachments.uploader_id, params.uploaderId),
-          eq(attachments.filename, params.filename),
-          eq(attachments.size, params.size),
-          eq(attachments.mime_type, params.mimeType),
-          eq(attachments.status, 'pending'),
-          gte(attachments.created_at, dedupeCutoff)
-        )
-      )
-      .orderBy(desc(attachments.created_at))
-      .limit(1)
-      .get();
 
-    if (existing) {
-      return {
-        ok: true,
-        attachmentId: existing.id,
-        r2Key: existing.r2_key,
-      };
+    // Dedupe is opt-in via idempotencyKey. Without it, every init mints a
+    // fresh attachment id — two genuinely distinct files with identical
+    // metadata uploaded back-to-back will not collide. Clients that want
+    // retry-safety pass a key; we bound replay reuse to INIT_DEDUPE_WINDOW_MS.
+    if (params.idempotencyKey !== undefined) {
+      const dedupeCutoff = now - INIT_DEDUPE_WINDOW_MS;
+      const existing = this.db
+        .select()
+        .from(attachments)
+        .where(
+          and(
+            eq(attachments.uploader_id, params.uploaderId),
+            eq(attachments.idempotency_key, params.idempotencyKey),
+            eq(attachments.status, 'pending'),
+            gte(attachments.created_at, dedupeCutoff)
+          )
+        )
+        .orderBy(desc(attachments.created_at))
+        .limit(1)
+        .get();
+      if (existing) {
+        return {
+          ok: true,
+          attachmentId: existing.id,
+          r2Key: existing.r2_key,
+        };
+      }
     }
 
     const conversationId = this.getConversationId();
@@ -1446,6 +1451,7 @@ export class ConversationDO extends DurableObject<Env> {
         filename: params.filename,
         status: 'pending',
         message_id: null,
+        idempotency_key: params.idempotencyKey ?? null,
         created_at: now,
       })
       .run();

@@ -118,6 +118,7 @@ export const attachments = sqliteTable(
     filename: text('filename').notNull(),
     status: text('status').notNull(),
     message_id: text('message_id'),
+    idempotency_key: text('idempotency_key'),
     created_at: integer('created_at').notNull(),
   },
   table => ({
@@ -132,6 +133,11 @@ export const attachments = sqliteTable(
     statusCheck: check('attachments_status_check', sql`${table.status} IN ('pending', 'linked')`),
     statusCreatedIdx: index('attachments_status_created').on(table.status, table.created_at),
     messageIdIdx: index('attachments_message_id').on(table.message_id),
+    uploaderIdempotencyIdx: index('attachments_uploader_idempotency').on(
+      table.uploader_id,
+      table.idempotency_key,
+      table.created_at
+    ),
   })
 );
 

@@ -100,6 +100,13 @@ export const botMessageNotifications = sqliteTable(
   })
 );
 
+// NOTE: this table intentionally has no `conversation_id` column. The
+// ConversationDO *is* the conversation — each DO has its own SQLite — so
+// attachment rows are scoped by the DO that owns them. Callers route by
+// conversationId via `CONVERSATION_DO.idFromName(...)`; cross-conversation
+// isolation falls out for free. Don't add a column to "tidy this up": it
+// would break that invariant and let one conversation's attachment ids
+// appear in another's lookups.
 export const attachments = sqliteTable(
   'attachments',
   {

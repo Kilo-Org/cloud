@@ -37,4 +37,4 @@ export const botIdentityRedisKey = (platform: string, teamId: string, userId: st
   redisKey(`identity:${platform}:${teamId}:${userId}`);
 
 export const gitLabOAuthCredentialsRedisKey = (credentialRef: string) =>
-  redisKey(`gitlab-oauth-credentials:${credentialRef}`);
+  redisKey(`auth-credentials:gitlab:${credentialRef}`);

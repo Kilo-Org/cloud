@@ -16,7 +16,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
   KiloClawInternalClient: jest.fn(),
 }));
 
-const selectedConfigRows: Array<{ source: 'managed' | 'manual' } | undefined> = [];
+const selectedRows: unknown[][] = [];
 
 jest.mock('@/lib/drizzle', () => ({
   db: {
@@ -24,8 +24,7 @@ jest.mock('@/lib/drizzle', () => ({
       from: jest.fn(() => ({
         where: jest.fn(() => ({
           limit: jest.fn(async () => {
-            const next = selectedConfigRows.shift();
-            return next ? [next] : [];
+            return selectedRows.shift() ?? [];
           }),
         })),
       })),
@@ -39,6 +38,7 @@ import { listComposioConnectedAccounts } from '@/lib/kiloclaw/composio-client';
 import { getActiveManagedComposioIdentity } from '@/lib/kiloclaw/composio-identities';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
+  buildComposioProvisionSecrets,
   completeManagedComposioGoogleCalendarConnection,
   getManagedComposioGoogleCalendarStatus,
 } from './composio-onboarding';
@@ -70,7 +70,7 @@ function mockManagedIdentity() {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  selectedConfigRows.length = 0;
+  selectedRows.length = 0;
   mockManagedIdentity();
   mockedListComposioConnectedAccounts.mockResolvedValue([
     { id: 'ca_123', status: 'ACTIVE' },
@@ -79,7 +79,7 @@ beforeEach(() => {
 
 describe('getManagedComposioGoogleCalendarStatus', () => {
   it('does not report connected when the Composio account exists but sandbox secrets are missing', async () => {
-    selectedConfigRows.push({ source: 'managed' });
+    selectedRows.push([{ source: 'managed' }]);
 
     const status = await getManagedComposioGoogleCalendarStatus({
       scope,
@@ -96,7 +96,7 @@ describe('getManagedComposioGoogleCalendarStatus', () => {
   });
 
   it('reports connected only when the account is active and the current sandbox has managed secrets', async () => {
-    selectedConfigRows.push({ source: 'managed' });
+    selectedRows.push([{ source: 'managed' }]);
 
     const status = await getManagedComposioGoogleCalendarStatus({
       scope,
@@ -113,7 +113,7 @@ describe('getManagedComposioGoogleCalendarStatus', () => {
   });
 
   it('keeps manual sandbox configuration separate from managed connected-account status', async () => {
-    selectedConfigRows.push({ source: 'manual' });
+    selectedRows.push([{ source: 'manual' }]);
 
     const status = await getManagedComposioGoogleCalendarStatus({
       scope,
@@ -132,7 +132,7 @@ describe('getManagedComposioGoogleCalendarStatus', () => {
 
 describe('completeManagedComposioGoogleCalendarConnection', () => {
   it('does not overwrite manual credentials saved after a managed link was created', async () => {
-    selectedConfigRows.push({ source: 'manual' });
+    selectedRows.push([{ source: 'manual' }]);
 
     const result = await completeManagedComposioGoogleCalendarConnection({
       userId: 'user-1',
@@ -143,5 +143,74 @@ describe('completeManagedComposioGoogleCalendarConnection', () => {
 
     expect(result).toBe(false);
     expect(mockedKiloClawInternalClient).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildComposioProvisionSecrets', () => {
+  it('preserves manual Composio credentials instead of injecting managed credentials', async () => {
+    const result = await buildComposioProvisionSecrets({
+      scope,
+      secrets: {
+        composioUserApiKey: 'uak_manual',
+        composioOrg: 'manual-org',
+        otherSecret: 'kept',
+      },
+    });
+
+    expect(result).toEqual({
+      secrets: {
+        composioUserApiKey: 'uak_manual',
+        composioOrg: 'manual-org',
+        otherSecret: 'kept',
+      },
+      configToMark: { source: 'manual' },
+    });
+    expect(mockedGetActiveManagedComposioIdentity).not.toHaveBeenCalled();
+  });
+
+  it('rehydrates previously applied managed credentials for a recreated sandbox', async () => {
+    selectedRows.push([{ instanceId: 'old-instance-id' }]);
+
+    const result = await buildComposioProvisionSecrets({
+      scope,
+      secrets: { otherSecret: 'kept' },
+    });
+
+    expect(result).toEqual({
+      secrets: {
+        otherSecret: 'kept',
+        composioUserApiKey: 'uak_123',
+        composioOrg: 'org-1',
+      },
+      configToMark: { source: 'managed', composioIdentityId: 'identity-1' },
+    });
+  });
+
+  it('does not inject managed credentials into a current manual sandbox', async () => {
+    selectedRows.push([{ source: 'manual' }]);
+
+    const result = await buildComposioProvisionSecrets({
+      scope,
+      instanceId: instance.id,
+    });
+
+    expect(result).toEqual({ secrets: undefined, configToMark: null });
+  });
+
+  it('rehydrates managed credentials when reprovisioning an already managed sandbox', async () => {
+    selectedRows.push([{ source: 'managed' }]);
+
+    const result = await buildComposioProvisionSecrets({
+      scope,
+      instanceId: instance.id,
+    });
+
+    expect(result).toEqual({
+      secrets: {
+        composioUserApiKey: 'uak_123',
+        composioOrg: 'org-1',
+      },
+      configToMark: { source: 'managed', composioIdentityId: 'identity-1' },
+    });
   });
 });

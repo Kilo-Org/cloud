@@ -75,6 +75,7 @@ import {
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
 import {
+  buildComposioProvisionSecrets,
   createManagedComposioGoogleCalendarLink,
   clearComposioInstanceConfig,
   getManagedComposioGoogleCalendarStatus,
@@ -1104,9 +1105,15 @@ async function provisionInstance(
   params: { instanceId: string | null; bootstrapSubscription: boolean },
   executor: typeof db | DrizzleTransaction = db
 ) {
-  const encryptedSecrets = input.secrets
+  const composioProvision = await buildComposioProvisionSecrets({
+    scope: { ownerType: 'user', userId: user.id },
+    instanceId: params.instanceId,
+    secrets: input.secrets,
+  });
+
+  const encryptedSecrets = composioProvision.secrets
     ? Object.fromEntries(
-        Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
+        Object.entries(composioProvision.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
       )
     : undefined;
 
@@ -1127,7 +1134,7 @@ async function provisionInstance(
     : undefined;
 
   const client = new KiloClawInternalClient();
-  return client.provision(
+  const result = await client.provision(
     user.id,
     {
       envVars: input.envVars,
@@ -1147,6 +1154,18 @@ async function provisionInstance(
         }
       : undefined
   );
+
+  if (composioProvision.configToMark?.source === 'manual') {
+    await markComposioInstanceConfig({ instanceId: result.instanceId, source: 'manual' });
+  } else if (composioProvision.configToMark?.source === 'managed') {
+    await markComposioInstanceConfig({
+      instanceId: result.instanceId,
+      source: 'managed',
+      composioIdentityId: composioProvision.configToMark.composioIdentityId,
+    });
+  }
+
+  return result;
 }
 
 async function emitProvisionTrialStartSideEffects(params: {

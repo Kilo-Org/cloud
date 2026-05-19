@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { TRPCError } from '@trpc/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { APP_URL } from '@/lib/constants';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
@@ -25,6 +25,11 @@ import type { ActiveKiloClawInstance } from '@/lib/kiloclaw/instance-registry';
 export type ComposioConnectionStatus = 'not_configured' | 'disconnected' | 'connected' | 'error';
 
 export type ComposioSandboxConfigSource = KiloClawComposioInstanceConfigSource | null;
+
+export type ProvisionComposioConfigToMark =
+  | { source: 'manual' }
+  | { source: 'managed'; composioIdentityId: string }
+  | null;
 
 export function getComposioConnectCallbackUrl(params: {
   organizationId?: string;
@@ -106,6 +111,68 @@ export async function getComposioInstanceConfigSource(
     .where(eq(kiloclaw_composio_instance_configs.instance_id, instanceId))
     .limit(1);
   return row?.source ?? null;
+}
+
+async function hasManagedComposioInstanceConfig(composioIdentityId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ instanceId: kiloclaw_composio_instance_configs.instance_id })
+    .from(kiloclaw_composio_instance_configs)
+    .where(
+      and(
+        eq(kiloclaw_composio_instance_configs.source, 'managed'),
+        eq(kiloclaw_composio_instance_configs.composio_identity_id, composioIdentityId)
+      )
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+function hasComposioProvisionSecrets(secrets: Record<string, string> | undefined): boolean {
+  return secrets?.composioUserApiKey !== undefined || secrets?.composioOrg !== undefined;
+}
+
+async function getReusableManagedComposioIdentityForProvision(params: {
+  scope: ComposioOwnerScope;
+  instanceId?: string | null;
+}): Promise<Awaited<ReturnType<typeof getActiveManagedComposioIdentity>>> {
+  const identity = await getActiveManagedComposioIdentity(params.scope);
+  if (!identity) return null;
+
+  if (params.instanceId) {
+    const currentSource = await getComposioInstanceConfigSource(params.instanceId);
+    if (currentSource === 'managed') return identity;
+    return null;
+  }
+
+  return (await hasManagedComposioInstanceConfig(identity.row.id)) ? identity : null;
+}
+
+export async function buildComposioProvisionSecrets(params: {
+  scope: ComposioOwnerScope;
+  instanceId?: string | null;
+  secrets?: Record<string, string>;
+}): Promise<{
+  secrets?: Record<string, string>;
+  configToMark: ProvisionComposioConfigToMark;
+}> {
+  if (hasComposioProvisionSecrets(params.secrets)) {
+    return { secrets: params.secrets, configToMark: { source: 'manual' } };
+  }
+
+  const identity = await getReusableManagedComposioIdentityForProvision({
+    scope: params.scope,
+    instanceId: params.instanceId,
+  });
+  if (!identity) return { secrets: params.secrets, configToMark: null };
+
+  return {
+    secrets: {
+      ...(params.secrets ?? {}),
+      composioUserApiKey: identity.userApiKey,
+      composioOrg: identity.org,
+    },
+    configToMark: { source: 'managed', composioIdentityId: identity.row.id },
+  };
 }
 
 export async function completeManagedComposioGoogleCalendarConnection(params: {

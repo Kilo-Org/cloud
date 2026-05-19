@@ -18,3 +18,6 @@ export const botStatusKey = (sandboxId: string | null) =>
 
 export const botStatusRequestKey = (sandboxId: string | null) =>
   ['kilo-chat', 'bot-status-request', sandboxId] as const;
+
+export const attachmentUrlKey = (attachmentId: string | null) =>
+  ['kilo-chat', 'attachment-url', attachmentId] as const;

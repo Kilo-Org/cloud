@@ -9,7 +9,7 @@
 import { createKilo, type KiloClient } from '@kilocode/sdk';
 import { z } from 'zod';
 import * as fs from 'node:fs/promises';
-import type { ManagedAgent, StartAgentRequest } from './types';
+import { type ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
 import {
   buildKiloConfigContent,
@@ -29,6 +29,15 @@ const MANAGER_LOG = '[process-manager]';
 // Validates the shape returned by client.session.create() so we fail fast
 // if the SDK changes its return type.
 const SessionResponse = z.object({ id: z.string().min(1) }).passthrough();
+
+const ContainerRegistryResponse = z.object({ data: z.unknown() }).passthrough();
+const ContainerRegistryEntry = z.object({
+  agentId: z.string().min(1),
+  request: StartAgentRequest,
+  workdir: z.string().min(1),
+  env: z.record(z.string(), z.string()),
+});
+type ContainerRegistryEntry = z.infer<typeof ContainerRegistryEntry>;
 
 type SDKInstance = {
   client: KiloClient;
@@ -2918,8 +2927,7 @@ async function bootHydrationImpl(LOG: string): Promise<void> {
       console.warn(`${LOG} Failed to fetch registry: ${resp.status}`);
       return;
     }
-    const json = (await resp.json()) as { data: unknown };
-    registry = json.data;
+    registry = ContainerRegistryResponse.parse(await resp.json()).data;
   } catch (err) {
     const registryFetchMs = Date.now() - registryFetchStart;
     log.warn('bootHydration.registry_fetch_ms', {
@@ -2935,21 +2943,14 @@ async function bootHydrationImpl(LOG: string): Promise<void> {
     return;
   }
 
-  const registryEntries = Array.isArray(registry) ? registry : [];
+  const registryEntries = parseRegistryEntries(LOG, registry);
   if (registryEntries.length === 0) {
     console.log(`${LOG} No agents in registry — nothing to hydrate`);
   } else {
     console.log(`${LOG} Resuming ${registryEntries.length} agent(s) from registry`);
   }
 
-  const mayorEntries = registryEntries.filter(
-    (e: unknown) =>
-      typeof e === 'object' &&
-      e !== null &&
-      'request' in e &&
-      typeof (e as { request?: { role?: string } }).request?.role === 'string' &&
-      (e as { request: { role: string } }).request.role === 'mayor'
-  );
+  const mayorEntries = registryEntries.filter(entry => entry.request.role === 'mayor');
   const nonMayorEntries = registryEntries.filter(entry => !mayorEntries.includes(entry));
 
   if (mayorEntries.length > 0) {
@@ -2993,38 +2994,37 @@ async function bootHydrationImpl(LOG: string): Promise<void> {
 
 async function resumeRegistryEntries(
   LOG: string,
-  entries: unknown[],
+  entries: ContainerRegistryEntry[],
   token: string
 ): Promise<void> {
   for (const entry of entries) {
-    if (typeof entry !== 'object' || entry === null) {
-      console.warn(`${LOG} Skipping malformed registry entry:`, entry);
-      continue;
-    }
-
-    const record = entry as Record<string, unknown>;
-    const agentId = typeof record.agentId === 'string' ? record.agentId : undefined;
-    const agentRequest = record.request as StartAgentRequest | undefined;
-    const workdir = typeof record.workdir === 'string' ? record.workdir : undefined;
-    const env = record.env as Record<string, string> | undefined;
-
-    if (!agentId || !agentRequest || !workdir || !env) {
-      console.warn(`${LOG} Skipping malformed registry entry:`, entry);
-      continue;
-    }
-
     // Registry entries were written with the token snapshot at dispatch
     // time. If we just refreshed, overlay the fresh value so the hydrated
     // kilo serve child inherits the current token.
-    const hydratedEnv = { ...env, GASTOWN_CONTAINER_TOKEN: token };
+    const hydratedEnv = { ...entry.env, GASTOWN_CONTAINER_TOKEN: token };
 
-    console.log(`${LOG} Resuming agent ${agentId} in ${workdir}`);
+    console.log(`${LOG} Resuming agent ${entry.agentId} in ${entry.workdir}`);
     try {
-      await startAgent(agentRequest, workdir, hydratedEnv);
-      console.log(`${LOG} Agent ${agentId} resumed`);
+      await startAgent(entry.request, entry.workdir, hydratedEnv);
+      console.log(`${LOG} Agent ${entry.agentId} resumed`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`${LOG} Failed to resume agent ${agentId}:`, msg);
+      console.error(`${LOG} Failed to resume agent ${entry.agentId}:`, msg);
     }
   }
+}
+
+function parseRegistryEntries(LOG: string, registry: unknown): ContainerRegistryEntry[] {
+  if (!Array.isArray(registry)) return [];
+
+  const entries: ContainerRegistryEntry[] = [];
+  for (const entry of registry) {
+    const parsed = ContainerRegistryEntry.safeParse(entry);
+    if (!parsed.success) {
+      console.warn(`${LOG} Skipping malformed registry entry:`, parsed.error.issues);
+      continue;
+    }
+    entries.push(parsed.data);
+  }
+  return entries;
 }

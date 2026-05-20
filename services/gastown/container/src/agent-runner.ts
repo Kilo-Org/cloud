@@ -661,15 +661,4 @@ async function setupMayorBrowseWorktrees(
     rigCount: request.rigs.length,
     failureCount: failures.length,
   });
-
-  if (request.systemPrompt) {
-    const writeAgentsStart = Date.now();
-    await writeMayorSystemPromptToAgentsMd(workdir, request.systemPrompt);
-    log.info('mayor.write_agents_md_ms', {
-      agentId: request.agentId,
-      townId: request.townId,
-      durationMs: Date.now() - writeAgentsStart,
-      label: 'after_browse_setup',
-    });
-  }
 }

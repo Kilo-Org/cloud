@@ -398,7 +398,11 @@ export async function startAgentInContainer(
   try {
     // Mint a container-scoped JWT (8h expiry, refreshed by TownDO alarm).
     // One token per container — shared by all agents in the town.
-    // Carries { townId, userId, scope: 'container' }.
+    // Carries { townId, userId, scope: 'container' }. Fresh dispatches
+    // pass the token in /agents/start instead of first pushing
+    // /refresh-token, keeping cold starts off the extra live request path.
+    // Already-running agents receive token rotation from the alarm or
+    // explicit refresh paths rather than this user-visible startup path.
     const tokenMintStart = Date.now();
     const containerToken = await mintContainerToken(env, {
       townId: params.townId,
@@ -472,6 +476,9 @@ export async function startAgentInContainer(
     }
 
     // Container token is preferred (shared by all agents, refreshed by alarm).
+    // This freshly minted token is for the agent being started; it is not
+    // pushed to existing SDK children here so mayor cold starts avoid a
+    // pre-start /refresh-token request.
     // Legacy per-agent JWT kept as fallback during rollout.
     if (containerToken) envVars.GASTOWN_CONTAINER_TOKEN = containerToken;
     if (agentToken) envVars.GASTOWN_SESSION_TOKEN = agentToken;

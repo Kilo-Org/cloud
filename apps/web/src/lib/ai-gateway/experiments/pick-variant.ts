@@ -420,8 +420,8 @@ export async function pickModelExperimentVariant(
     return { status: 'not-found' };
   }
 
-  const subjectPick = pickAllocationSubject(input);
-  if (!subjectPick) {
+  const allocationSubject = pickAllocationSubject(input);
+  if (!allocationSubject) {
     captureMessage('Experiment request missing all allocation subjects', {
       level: 'error',
       tags: { source: 'model-experiments' },
@@ -440,7 +440,7 @@ export async function pickModelExperimentVariant(
     return { status: 'unavailable' };
   }
 
-  const seed = `model_exp_${exp.experimentId}_${subjectPick.subject}_${subjectPick.value}`;
+  const seed = `model_exp_${exp.experimentId}_${allocationSubject.subject}_${allocationSubject.value}`;
   const bucket = getRandomNumber(seed, totalWeight);
 
   // Walk variants in id-asc order (cache layer already sorted them) and
@@ -480,12 +480,17 @@ export async function pickModelExperimentVariant(
         variantId: v.variantId,
         variantVersionId: v.variantVersionId,
         upstream: { ...v.upstream, api_key: apiKey },
-        allocationSubject: subjectPick.subject,
+        allocationSubject: allocationSubject.subject,
       };
     }
   }
 
-  // Unreachable: getRandomNumber returns [0, totalWeight). Fail closed.
+  // Defensive fail-closed: `getRandomNumber` is contractually expected to
+  // return a finite value in `[0, totalWeight)`, so the loop above should
+  // always select a variant. We still handle the no-selection case rather
+  // than silently routing as unexperimented if that contract ever breaks
+  // (NaN, negative, weight rounding) — billing-touching code shouldn't
+  // depend on a math invariant we can't statically prove.
   captureMessage('Experiment bucket walk did not select a variant', {
     level: 'error',
     tags: { source: 'model-experiments' },

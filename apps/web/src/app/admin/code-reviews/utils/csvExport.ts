@@ -60,12 +60,16 @@ function escapeCsvValue(value: string | number | null | undefined): string {
   return str;
 }
 
+function toDownloadFilenameToken(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]+/g, '-');
+}
+
 /**
  * Exports code review data to a CSV file and triggers download.
  *
  * @param data - Array of code review records
- * @param startDate - Start date for filename
- * @param endDate - End date for filename
+ * @param startDate - Start ISO datetime for filename
+ * @param endDate - End ISO datetime for filename
  */
 export function exportCodeReviewsToCSV(
   data: CodeReviewExportRow[],
@@ -149,9 +153,11 @@ export function exportCodeReviewsToCSV(
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
+  const startDateToken = toDownloadFilenameToken(startDate);
+  const endDateToken = toDownloadFilenameToken(endDate);
 
   link.setAttribute('href', url);
-  link.setAttribute('download', `code-reviews-${startDate}-to-${endDate}.csv`);
+  link.setAttribute('download', `code-reviews-${startDateToken}-to-${endDateToken}.csv`);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();

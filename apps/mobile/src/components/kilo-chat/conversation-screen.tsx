@@ -259,7 +259,7 @@ export function ConversationScreen({
       sendMutation.mutate(
         buildSendMessageVariables({
           conversationId,
-          text,
+          content: [{ type: 'text', text }],
           clientId: createSendMessageClientId(),
           inReplyToMessageId,
         }),

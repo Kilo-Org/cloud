@@ -1,6 +1,7 @@
 import {
   type ConversationDetailResponse,
   type CreateMessageRequest,
+  type InputContentBlock,
   type Message,
   type ReplyToMessageSnapshot,
 } from '@kilocode/kilo-chat';
@@ -13,23 +14,19 @@ export type MessageAuthorMember = ConversationDetailResponse['members'][number];
 
 type BuildSendMessageVariablesInput = {
   conversationId: string;
-  text: string;
+  content: InputContentBlock[];
   clientId: string;
   inReplyToMessageId?: string;
 };
 
-export function buildSendMessageVariables({
-  conversationId,
-  text,
-  clientId,
-  inReplyToMessageId,
-}: BuildSendMessageVariablesInput): SendMessageVariables {
-  const content: CreateMessageRequest['content'] = [{ type: 'text', text }];
+export function buildSendMessageVariables(
+  input: BuildSendMessageVariablesInput
+): SendMessageVariables {
   return {
-    conversationId,
-    content,
-    clientId,
-    ...(inReplyToMessageId ? { inReplyToMessageId } : {}),
+    conversationId: input.conversationId,
+    content: input.content,
+    clientId: input.clientId,
+    ...(input.inReplyToMessageId ? { inReplyToMessageId: input.inReplyToMessageId } : {}),
   };
 }
 

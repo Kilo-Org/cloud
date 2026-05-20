@@ -51,6 +51,30 @@ function hasSuccessfulCallback(params: NextAppSearchParams | undefined): boolean
   );
 }
 
+function getCallbackError(params: NextAppSearchParams | undefined): string | undefined {
+  const error = Array.isArray(params?.error) ? params.error[0] : params?.error;
+  if (!error) return undefined;
+
+  const messages: Record<string, string> = {
+    access_denied: 'Authorization was canceled. You can try again or skip this service for now.',
+    connection_failed: 'Authorization failed. You can try again or skip this service for now.',
+    installation_failed: 'Installation failed. You can try again or skip this service for now.',
+    invalid_state: 'This authorization session expired. Start authorization again to continue.',
+    missing_code: 'The service did not return an authorization code. Try authorizing again.',
+    missing_installation_id: 'GitHub did not return an installation ID. Try authorizing again.',
+    oauth_init_failed:
+      'Authorization could not be started. Try again or skip this service for now.',
+    pending_installation_exists:
+      'You already have a pending GitHub installation. Complete or cancel it before trying again.',
+    pending_setup_failed: 'The pending GitHub installation could not be saved. Try again.',
+    unauthorized: 'This authorization was started by another user. Start authorization again.',
+    workspace_already_connected:
+      'That workspace is already connected elsewhere. Choose another workspace or skip this service.',
+  };
+
+  return messages[error] ?? 'Authorization failed. You can try again or skip this service for now.';
+}
+
 export default async function CollabAuthorizePage({ searchParams }: AppPageProps) {
   const user = await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/collab');
   if (user.is_admin !== true) notFound();
@@ -61,7 +85,9 @@ export default async function CollabAuthorizePage({ searchParams }: AppPageProps
     ? params.organizationId[0]
     : params?.organizationId;
   const step = parseStep(params?.step, services.length);
-  const initialIndex = hasSuccessfulCallback(params) ? Math.min(step + 1, services.length) : step;
+  const successfulCallback = hasSuccessfulCallback(params);
+  const initialIndex = successfulCallback ? Math.min(step + 1, services.length) : step;
+  const initialError = successfulCallback ? undefined : getCallbackError(params);
 
   return (
     <KiloCardLayout bare className="max-w-xl" contentClassName="">
@@ -69,6 +95,7 @@ export default async function CollabAuthorizePage({ searchParams }: AppPageProps
         serviceIds={services}
         organizationId={organizationId}
         initialIndex={initialIndex}
+        initialError={initialError}
       />
     </KiloCardLayout>
   );

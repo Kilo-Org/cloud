@@ -21,16 +21,17 @@ type AuthorizeFlowProps = {
   serviceIds: PlatformId[];
   organizationId?: string;
   initialIndex: number;
+  initialError?: string;
 };
 
 export function AuthorizeFlow(props: AuthorizeFlowProps) {
-  const { serviceIds, organizationId, initialIndex } = props;
+  const { serviceIds, organizationId, initialIndex, initialError } = props;
   const router = useRouter();
   const trpc = useTRPC();
   const { data: user } = useUser();
   const [index, setIndex] = useState(initialIndex);
   const [done, setDone] = useState(initialIndex >= serviceIds.length);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(initialError ?? null);
 
   const services = serviceIds.map(id => getPlatform(id)).filter(p => p !== undefined);
   const current = services[index];

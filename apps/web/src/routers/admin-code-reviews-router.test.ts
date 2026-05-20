@@ -11,8 +11,8 @@ import {
 import { eq } from 'drizzle-orm';
 
 const REPO = `test-org/admin-code-review-wait-${Date.now()}`;
-const START_DATE = '2035-01-01';
-const END_DATE = '2035-01-20';
+const START_DATE = '2035-01-01T00:00:00.000Z';
+const END_DATE = '2035-01-20T00:00:00.000Z';
 
 type ReviewOwner = { type: 'user'; id: string } | { type: 'org'; id: string };
 type FilterInput = {
@@ -162,6 +162,53 @@ describe('adminCodeReviewsRouter', () => {
     expect(result.p99WaitSeconds).toBeCloseTo(592.8);
     expect(result.maxWaitSeconds).toBeCloseTo(600);
     expect(result.waitWithinFiveMinuteRate).toBeCloseTo(66.67, 1);
+  });
+
+  it('filters sub-day intervals with an inclusive start and exclusive end', async () => {
+    const personalOwner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
+
+    await db
+      .insert(cloud_agent_code_reviews)
+      .values([
+        reviewValues({ owner: personalOwner, status: 'pending', createdAt: timestamp(720) }),
+        reviewValues({ owner: personalOwner, status: 'pending', createdAt: timestamp(750) }),
+        reviewValues({ owner: personalOwner, status: 'pending', createdAt: timestamp(780) }),
+      ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.codeReviews.getOverviewStats(
+      filterInput({ startDate: timestamp(720), endDate: timestamp(780) })
+    );
+
+    expect(result.totalReviews).toBe(2);
+  });
+
+  it('rejects empty telemetry date intervals', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(
+      caller.admin.codeReviews.getOverviewStats(
+        filterInput({ startDate: timestamp(780), endDate: timestamp(780) })
+      )
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('rejects telemetry date intervals longer than 90 days', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const longInterval = filterInput({
+      startDate: '2035-01-01T00:00:00.000Z',
+      endDate: '2035-04-02T00:00:00.000Z',
+    });
+
+    await expect(caller.admin.codeReviews.getOverviewStats(longInterval)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    await expect(
+      caller.admin.codeReviews.getErrorSessions({
+        ...longInterval,
+        errorMessage: 'Container shutdown: SIGTERM',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
   it('counts recovered retries as final outcomes by default and separate attempts in all-attempts mode', async () => {

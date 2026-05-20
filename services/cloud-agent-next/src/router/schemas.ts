@@ -614,10 +614,13 @@ export const GetSessionOutput = z.object({
   preparedAt: z.number().optional().describe('Timestamp when session was prepared'),
   initiatedAt: z.number().optional().describe('Timestamp when session was initiated'),
 
-  // Callback configuration (debug-friendly, URL + headers)
-  callbackTarget: CallbackTargetSchema.optional().describe(
-    'Callback target configuration for execution completion notifications'
-  ),
+  // Callback configuration is intentionally NOT exposed here. The stored
+  // `callbackTarget` may carry service-to-service auth headers (e.g. an
+  // X-Internal-Secret used by downstream Worker callback ingresses), and
+  // `getSession` is reachable by the session's owning user via the web tRPC
+  // surface. Returning headers — even for "debug" — would leak that secret
+  // to any user who can run a flow that creates a session on their behalf.
+  // Use service-internal logs/storage if you need to inspect the target.
 
   // Initial message ID for correlation
   initialMessageId: z.string().startsWith('msg_').length(30).optional(),

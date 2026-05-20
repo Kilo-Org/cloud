@@ -13,7 +13,7 @@
  * The reviewId is passed in the URL path.
  *
  * URL: POST /api/internal/code-review-status/{reviewId}
- * Protected by internal API secret
+ * Protected by scoped callback token
  */
 
 import type { NextRequest } from 'next/server';
@@ -55,7 +55,7 @@ import {
   getStoredProjectAccessToken,
 } from '@/lib/integrations/gitlab-service';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { CALLBACK_TOKEN_SECRET, INTERNAL_API_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendReviewSummaryFooter } from '@/lib/code-reviews/summary/usage-footer';
@@ -71,7 +71,6 @@ import {
  * Payload from the orchestrator DO (legacy format).
  */
 type OrchestratorPayload = {
-  attemptId?: string;
   sessionId?: string;
   cliSessionId?: string;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
@@ -84,7 +83,6 @@ type OrchestratorPayload = {
  * Payload from cloud-agent-next callback (ExecutionCallbackPayload).
  */
 type CloudAgentNextCallbackPayload = {
-  attemptId?: string;
   sessionId?: string;
   cloudAgentSessionId?: string;
   executionId?: string;
@@ -513,16 +511,12 @@ export async function POST(
         scope: 'code-review-status-callback',
         resourceParts: [reviewId, callbackAttemptId],
       }));
-    const legacySecret = req.headers.get('X-Internal-Secret');
-    const validLegacySecret = !!INTERNAL_API_SECRET && legacySecret === INTERNAL_API_SECRET;
-    if (!validCallbackToken && !validLegacySecret) {
+    if (!validCallbackToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const rawPayload: StatusUpdatePayload = await req.json();
-    const attemptId = validCallbackToken
-      ? callbackAttemptId || undefined
-      : (req.nextUrl.searchParams.get('attemptId') ?? rawPayload.attemptId);
+    const attemptId = callbackAttemptId || undefined;
     const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult } =
       normalizePayload(rawPayload);
     const executionId = 'executionId' in rawPayload ? rawPayload.executionId : undefined;

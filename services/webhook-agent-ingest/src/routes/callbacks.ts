@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { HonoContext } from '../index';
-import { INTERNAL_API_KEY_HEADER, validateInternalApiKey } from '../util/auth';
 import { logger } from '../util/logger';
 import { resError, resSuccess, verifyCallbackToken } from '@kilocode/worker-utils';
 import { withDORetry } from '../util/do-retry';
@@ -32,29 +31,20 @@ callbacks.post('/execution', async c => {
     return c.json(resError('Missing webhook identification headers'), 400);
   }
 
-  const [callbackTokenSecret, internalApiSecret] = await Promise.all([
-    c.env.CALLBACK_TOKEN_SECRET.get(),
-    c.env.INTERNAL_API_SECRET.get(),
-  ]);
-  if (!callbackTokenSecret && !internalApiSecret) {
-    logger.error('Callback authentication secrets not configured');
+  const callbackTokenSecret = await c.env.CALLBACK_TOKEN_SECRET.get();
+  if (!callbackTokenSecret) {
+    logger.error('Callback authentication secret not configured');
     return c.json(resError('Internal server error'), 500);
   }
 
   const callbackToken = c.req.header('X-Callback-Token');
-  const validCallbackToken =
-    !!callbackTokenSecret &&
-    (await verifyCallbackToken({
-      token: callbackToken,
-      secret: callbackTokenSecret,
-      scope: 'webhook-execution-callback',
-      resourceParts: [namespace, triggerId, requestId],
-    }));
-  const validLegacySecret =
-    !!internalApiSecret &&
-    validateInternalApiKey(c.req.header(INTERNAL_API_KEY_HEADER) ?? null, internalApiSecret)
-      .success;
-  if (!validCallbackToken && !validLegacySecret) {
+  const validCallbackToken = await verifyCallbackToken({
+    token: callbackToken,
+    secret: callbackTokenSecret,
+    scope: 'webhook-execution-callback',
+    resourceParts: [namespace, triggerId, requestId],
+  });
+  if (!validCallbackToken) {
     logger.warn('Callback authentication failed', { requestId, namespace, triggerId });
     return c.json(resError('Unauthorized'), 401);
   }

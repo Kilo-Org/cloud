@@ -1103,6 +1103,7 @@ export class SessionService {
         },
       },
       autoupdate: false,
+      snapshot: false,
     };
     // Decrypt each env/header envelope into its plaintext value and emit the
     // CLI-native shape the runtime consumes under `KILO_CONFIG_CONTENT.mcp`.

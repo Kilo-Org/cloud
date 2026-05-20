@@ -51,6 +51,15 @@ import {
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
 import {
+  buildComposioProvisionSecrets,
+  composioSecretsPatchSource,
+  createManagedComposioGoogleCalendarLink,
+  clearComposioInstanceConfig,
+  getComposioInstanceConfigSource,
+  getManagedComposioGoogleCalendarStatus,
+  markComposioInstanceConfig,
+} from '@/lib/kiloclaw/composio-onboarding';
+import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
 } from '@/routers/organizations/utils';
@@ -212,6 +221,19 @@ const patchBotIdentitySchema = z.object({
   botNature: z.string().trim().min(1).max(120).nullable().optional(),
   botVibe: z.string().trim().min(1).max(120).nullable().optional(),
   botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
+});
+
+const composioConnectLinkSchema = z.object({
+  organizationId: z.uuid(),
+  returnTo: z
+    .string()
+    .min(1)
+    .max(500)
+    .refine(value => value.startsWith('/'), {
+      message: 'returnTo must be a relative path',
+    }),
+  popup: z.boolean().optional(),
+  attemptId: z.string().min(1).max(100).optional(),
 });
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -454,9 +476,21 @@ export const organizationKiloclawRouter = createTRPCRouter({
             });
           }
 
-          const encryptedSecrets = input.secrets
+          const composioProvision = await buildComposioProvisionSecrets({
+            scope: {
+              ownerType: 'organization_user',
+              userId: ctx.user.id,
+              organizationId: input.organizationId,
+            },
+            secrets: input.secrets,
+          });
+
+          const encryptedSecrets = composioProvision.secrets
             ? Object.fromEntries(
-                Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
+                Object.entries(composioProvision.secrets).map(([k, v]) => [
+                  k,
+                  encryptKiloClawSecret(v),
+                ])
               )
             : undefined;
 
@@ -484,6 +518,15 @@ export const organizationKiloclawRouter = createTRPCRouter({
             { orgId: input.organizationId }
           );
 
+          if (composioProvision.configToMark?.source === 'manual') {
+            await markComposioInstanceConfig({ instanceId: result.instanceId, source: 'manual' });
+          } else if (composioProvision.configToMark?.source === 'managed') {
+            await markComposioInstanceConfig({
+              instanceId: result.instanceId,
+              source: 'managed',
+            });
+          }
+
           PostHogClient().capture({
             distinctId: ctx.user.google_user_email,
             event: 'claw_org_instance_provisioned',
@@ -505,9 +548,19 @@ export const organizationKiloclawRouter = createTRPCRouter({
       // Re-provision: same as provision but expects existing instance
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
 
-      const encryptedSecrets = input.secrets
+      const composioProvision = await buildComposioProvisionSecrets({
+        scope: {
+          ownerType: 'organization_user',
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+        },
+        instanceId: instance.id,
+        secrets: input.secrets,
+      });
+
+      const encryptedSecrets = composioProvision.secrets
         ? Object.fromEntries(
-            Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
+            Object.entries(composioProvision.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
           )
         : undefined;
 
@@ -524,7 +577,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
         .limit(1);
 
       const client = new KiloClawInternalClient();
-      return client.provision(
+      const result = await client.provision(
         ctx.user.id,
         {
           envVars: input.envVars,
@@ -539,6 +592,17 @@ export const organizationKiloclawRouter = createTRPCRouter({
         },
         { instanceId: instance.id, orgId: input.organizationId }
       );
+
+      if (composioProvision.configToMark?.source === 'manual') {
+        await markComposioInstanceConfig({ instanceId: result.instanceId, source: 'manual' });
+      } else if (composioProvision.configToMark?.source === 'managed') {
+        await markComposioInstanceConfig({
+          instanceId: result.instanceId,
+          source: 'managed',
+        });
+      }
+
+      return result;
     }),
 
   start: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
@@ -740,11 +804,18 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
       try {
-        return await client.patchSecrets(
+        const result = await client.patchSecrets(
           ctx.user.id,
           { secrets: encryptedPatch, meta: input.meta },
           workerInstanceId(instance)
         );
+        const sourceAction = composioSecretsPatchSource(input.secrets);
+        if (sourceAction === 'upsert_manual') {
+          await markComposioInstanceConfig({ instanceId: instance.id, source: 'manual' });
+        } else if (sourceAction === 'clear') {
+          await clearComposioInstanceConfig(instance.id);
+        }
+        return result;
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           let message = `Secret patch failed (${err.statusCode})`;
@@ -767,6 +838,56 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const client = new KiloClawUserClient(token);
     return client.getConfig({ userId: ctx.user.id, instanceId: workerInstanceId(instance) });
   }),
+
+  getComposioOnboardingStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
+    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+    let sandboxHasComposioSecrets = false;
+    if (instance) {
+      const token = generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
+      const client = new KiloClawUserClient(token);
+      const config = await client.getConfig({
+        userId: ctx.user.id,
+        instanceId: workerInstanceId(instance),
+      });
+      sandboxHasComposioSecrets = config.configuredSecrets.composio === true;
+    }
+    return await getManagedComposioGoogleCalendarStatus({
+      scope: {
+        ownerType: 'organization_user',
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+      },
+      instance,
+      sandboxHasComposioSecrets,
+    });
+  }),
+
+  createComposioGoogleCalendarLink: organizationMemberMutationProcedure
+    .input(composioConnectLinkSchema)
+    .mutation(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const sandboxConfigSource = await getComposioInstanceConfigSource(instance.id);
+      if (sandboxConfigSource === 'manual') {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This sandbox already uses your own Composio credentials.',
+        });
+      }
+
+      return await createManagedComposioGoogleCalendarLink({
+        userId: ctx.user.id,
+        instance,
+        scope: {
+          ownerType: 'organization_user',
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+        },
+        organizationId: input.organizationId,
+        returnTo: input.returnTo,
+        popup: input.popup,
+        attemptId: input.attemptId,
+      });
+    }),
 
   getChannelCatalog: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);

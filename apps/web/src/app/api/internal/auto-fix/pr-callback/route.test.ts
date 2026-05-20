@@ -18,7 +18,6 @@ const mockHandleCommentReply = jest.fn();
 const mockHandleCreateIssuePR = jest.fn();
 
 jest.mock('@/lib/config.server', () => ({
-  INTERNAL_API_SECRET: 'test-internal-secret',
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
@@ -66,7 +65,6 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
-const INTERNAL_SECRET = 'test-internal-secret';
 const CALLBACK_SECRET = 'test-callback-token-secret';
 const TICKET_ID = 'ticket-1';
 const SESSION_ID = 'cloud-agent-session-1';
@@ -78,7 +76,6 @@ const COMPLETED_PAYLOAD = {
 type RequestOptions = {
   ticketId?: string;
   callbackToken?: string | null;
-  secret?: string | null;
 };
 
 function makeRequest(body: Record<string, unknown>, options: RequestOptions = {}): NextRequest {
@@ -92,9 +89,6 @@ function makeRequest(body: Record<string, unknown>, options: RequestOptions = {}
     headers: {
       get: (name: string) => {
         if (name === 'X-Callback-Token') return options.callbackToken ?? null;
-        if (name === 'X-Internal-Secret') {
-          return options.secret === undefined ? null : options.secret;
-        }
         return null;
       },
     },
@@ -182,17 +176,5 @@ describe('POST /api/internal/auto-fix/pr-callback', () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ error: 'Ticket ID mismatch' });
-  });
-
-  it('keeps raw internal-secret callbacks without ticketId working during rollout', async () => {
-    mockGetFixTicketBySessionId.mockResolvedValue(terminalTicket());
-
-    const response = await POST(makeRequest(COMPLETED_PAYLOAD, { secret: INTERNAL_SECRET }));
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      success: true,
-      message: 'Ticket already terminal',
-    });
   });
 });

@@ -16,6 +16,7 @@ import { BotIdentityStep } from './BotIdentityStep';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
 import { CalendarConnectStepView } from './CalendarConnectStep';
+import { ConnectToolsStepView } from './ConnectToolsStep';
 import { InboundEmailStepView } from './InboundEmailStep';
 import { InterestsStepView } from './InterestsStep';
 import { ClawSetupCompleteStep, ClawSetupErrorStep } from './ClawOnboardingFlow';
@@ -23,6 +24,7 @@ import { ProvisioningStepView } from './ProvisioningStep';
 
 const FAKE_STEP_LABELS: Record<ClawOnboardingRenderStep, string> = {
   identity: 'Identity',
+  tools: 'Tools',
   calendar: 'Calendar',
   email: 'Inbound Email',
   interests: 'Interests',
@@ -171,12 +173,13 @@ type RenderFakeStepInput = {
 };
 
 function getFakeStepProgress(step: ClawOnboardingRenderStep): StepProgress {
-  return getClawOnboardingStepProgress(getFakeOnboardingStep(step));
+  return getClawOnboardingStepProgress(getFakeOnboardingStep(step), true, true, step === 'tools');
 }
 
 function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
   switch (step) {
     case 'identity':
+    case 'tools':
     case 'calendar':
     case 'email':
     case 'interests':
@@ -191,7 +194,25 @@ function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
 function renderFakeStep({ step, setStep, stepProgress, basePath }: RenderFakeStepInput) {
   switch (step) {
     case 'identity': {
-      return <BotIdentityStep {...stepProgress} onContinue={() => setStep('calendar')} />;
+      return <BotIdentityStep {...stepProgress} onContinue={() => setStep('tools')} />;
+    }
+    case 'tools': {
+      return (
+        <ConnectToolsStepView
+          {...stepProgress}
+          status="disconnected"
+          loading={false}
+          connecting={false}
+          savingManual={false}
+          readyToConnect={true}
+          manualConfigured={false}
+          organizationContext={false}
+          onConnect={() => setStep('email')}
+          onSkip={() => setStep('email')}
+          onContinue={() => setStep('email')}
+          onSaveManualCredentials={() => setStep('email')}
+        />
+      );
     }
     case 'calendar': {
       return (

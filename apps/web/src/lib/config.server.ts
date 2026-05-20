@@ -237,6 +237,10 @@ export const KILOCLAW_API_URL = getEnvVariable('KILOCLAW_API_URL') || '';
 export const KILOCLAW_INTERNAL_API_SECRET = getEnvVariable('KILOCLAW_INTERNAL_API_SECRET') || '';
 export const KILOCLAW_INBOUND_EMAIL_DOMAIN =
   getEnvVariable('KILOCLAW_INBOUND_EMAIL_DOMAIN') || 'kiloclaw.ai';
+export const COMPOSIO_AGENTS_API_BASE_URL =
+  getEnvVariable('COMPOSIO_AGENTS_API_BASE_URL') || 'https://agents.composio.dev';
+export const COMPOSIO_API_BASE_URL =
+  getEnvVariable('COMPOSIO_API_BASE_URL') || 'https://backend.composio.dev';
 
 /**
  * Per-instance worker URL template.

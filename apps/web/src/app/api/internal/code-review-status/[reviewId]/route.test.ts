@@ -75,7 +75,6 @@ const mockRetryReviewFresh = jest.fn<any>();
 // --- Module mocks ---
 
 jest.mock('@/lib/config.server', () => ({
-  INTERNAL_API_SECRET: 'test-internal-secret',
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
@@ -149,14 +148,13 @@ jest.mock('@/lib/integrations/core/constants', () => ({
 
 // --- Helpers ---
 
-const VALID_SECRET = 'test-internal-secret';
 const CALLBACK_SECRET = 'test-callback-token-secret';
 const REVIEW_ID = '00000000-0000-0000-0000-000000000001';
+let defaultCallbackToken: string;
 
 function makeRequest(
   body: Record<string, unknown>,
   options: {
-    secret?: string | null;
     callbackToken?: string | null;
     attemptId?: string;
   } = {}
@@ -170,10 +168,9 @@ function makeRequest(
     nextUrl: url,
     headers: {
       get: (name: string) => {
-        if (name === 'X-Internal-Secret') {
-          return options.secret === undefined ? VALID_SECRET : options.secret;
+        if (name === 'X-Callback-Token') {
+          return options.callbackToken === undefined ? defaultCallbackToken : options.callbackToken;
         }
-        if (name === 'X-Callback-Token') return options.callbackToken ?? null;
         return null;
       },
     },
@@ -285,6 +282,11 @@ let POST: typeof POSTType;
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  defaultCallbackToken = await deriveCallbackToken({
+    secret: CALLBACK_SECRET,
+    scope: 'code-review-status-callback',
+    resourceParts: [REVIEW_ID, ''],
+  });
   mockUpdateCodeReviewStatus.mockResolvedValue(undefined);
   mockUpdateCodeReviewAttemptForCallback.mockImplementation(async params =>
     makeAttempt({
@@ -328,9 +330,9 @@ beforeEach(async () => {
 
 describe('POST /api/internal/code-review-status/[reviewId]', () => {
   describe('authentication', () => {
-    it('returns 401 without callback token or legacy internal secret', async () => {
+    it('returns 401 without callback token', async () => {
       const response = await POST(
-        makeRequest({ status: 'completed' }, { secret: null }),
+        makeRequest({ status: 'completed' }, { callbackToken: null }),
         makeParams(REVIEW_ID)
       );
 
@@ -345,10 +347,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         resourceParts: [REVIEW_ID, 'attempt-1'],
       });
       const response = await POST(
-        makeRequest(
-          { status: 'completed', attemptId: 'body-attempt-ignored' },
-          { secret: null, callbackToken, attemptId: 'attempt-1' }
-        ),
+        makeRequest({ status: 'completed' }, { callbackToken, attemptId: 'attempt-1' }),
         makeParams(REVIEW_ID)
       );
 
@@ -362,10 +361,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         resourceParts: ['different-review', 'attempt-1'],
       });
       const response = await POST(
-        makeRequest(
-          { status: 'completed' },
-          { secret: null, callbackToken, attemptId: 'attempt-1' }
-        ),
+        makeRequest({ status: 'completed' }, { callbackToken, attemptId: 'attempt-1' }),
         makeParams(REVIEW_ID)
       );
 
@@ -379,21 +375,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         resourceParts: [REVIEW_ID, 'attempt-2'],
       });
       const response = await POST(
-        makeRequest(
-          { status: 'completed' },
-          { secret: null, callbackToken, attemptId: 'attempt-1' }
-        ),
+        makeRequest({ status: 'completed' }, { callbackToken, attemptId: 'attempt-1' }),
         makeParams(REVIEW_ID)
       );
 
       expect(response.status).toBe(401);
-    });
-
-    it('keeps direct legacy internal-secret writes working', async () => {
-      mockGetCodeReviewById.mockResolvedValue(null);
-      const response = await POST(makeRequest({ status: 'running' }), makeParams(REVIEW_ID));
-
-      expect(response.status).toBe(404);
     });
   });
 

@@ -212,6 +212,10 @@ describe('CodeReviewOrchestrator recovery', () => {
       scope: 'code-review-status-callback',
       resourceParts: [reviewId, attemptId],
     });
+    const statusUpdateCall = getFetchCall(fetchMock, '/api/internal/code-review-status/');
+    const statusUpdateInit = statusUpdateCall?.[1] as RequestInit | undefined;
+    expect(statusUpdateInit?.headers).toMatchObject({ 'X-Callback-Token': expectedCallbackToken });
+    expect(statusUpdateInit?.headers).not.toHaveProperty('X-Internal-Secret');
     expect(prepareBody.callbackTarget).toMatchObject({
       url: expect.stringContaining(`attemptId=${attemptId}`),
       headers: { 'X-Callback-Token': expectedCallbackToken },

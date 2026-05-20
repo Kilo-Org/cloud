@@ -127,20 +127,18 @@ jest.mock('drizzle-orm', () => ({
 
 // --- Helpers ---
 
-const VALID_SECRET = 'test-internal-secret';
 const CALLBACK_SECRET = 'test-callback-token-secret';
 const FINDING_ID = 'finding-abc-123';
+let defaultCallbackToken: string;
 
 function makeRequest(
   findingId: string,
   body: Record<string, unknown>,
-  secret: string | null = VALID_SECRET,
-  callbackToken: string | null = null
+  callbackToken: string | null = defaultCallbackToken
 ): NextRequest {
   return {
     headers: {
       get: (name: string) => {
-        if (name === 'X-Internal-Secret') return secret;
         if (name === 'X-Callback-Token') return callbackToken;
         return null;
       },
@@ -247,6 +245,11 @@ beforeEach(async () => {
   jest.clearAllMocks();
   jest.useFakeTimers();
   afterPromises = [];
+  defaultCallbackToken = await deriveCallbackToken({
+    secret: CALLBACK_SECRET,
+    scope: 'security-analysis-callback',
+    resourceParts: [FINDING_ID],
+  });
   mockUpdateAnalysisStatus.mockResolvedValue(true);
   mockTransitionAutoAnalysisQueueFromCallback.mockResolvedValue(undefined);
   mockFinalizeAnalysis.mockResolvedValue(undefined);
@@ -259,8 +262,8 @@ afterEach(() => {
 
 describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
   describe('authentication', () => {
-    it('returns 401 when X-Internal-Secret header is missing', async () => {
-      const req = makeRequest(FINDING_ID, completedPayload, '');
+    it('returns 401 when callback token header is missing', async () => {
+      const req = makeRequest(FINDING_ID, completedPayload, null);
       const response = await POST(req, makeParams(FINDING_ID));
 
       expect(response.status).toBe(401);
@@ -268,8 +271,8 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       expect(body.error).toBe('Unauthorized');
     });
 
-    it('returns 401 when X-Internal-Secret header is wrong', async () => {
-      const req = makeRequest(FINDING_ID, completedPayload, 'wrong-secret');
+    it('returns 401 when callback token header is wrong', async () => {
+      const req = makeRequest(FINDING_ID, completedPayload, 'wrong-token');
       const response = await POST(req, makeParams(FINDING_ID));
 
       expect(response.status).toBe(401);
@@ -277,13 +280,10 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
 
     it('accepts token scoped to the finding', async () => {
       mockGetSecurityFindingById.mockResolvedValue(null);
-      const callbackToken = await deriveCallbackToken({
-        secret: CALLBACK_SECRET,
-        scope: 'security-analysis-callback',
-        resourceParts: [FINDING_ID],
-      });
-      const req = makeRequest(FINDING_ID, completedPayload, null, callbackToken);
-      const response = await POST(req, makeParams(FINDING_ID));
+      const response = await POST(
+        makeRequest(FINDING_ID, completedPayload, defaultCallbackToken),
+        makeParams(FINDING_ID)
+      );
 
       expect(response.status).toBe(404);
     });
@@ -294,19 +294,11 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
         scope: 'security-analysis-callback',
         resourceParts: ['different-finding'],
       });
-      const req = makeRequest(FINDING_ID, completedPayload, null, callbackToken);
+      const req = makeRequest(FINDING_ID, completedPayload, callbackToken);
       const response = await POST(req, makeParams(FINDING_ID));
 
       expect(response.status).toBe(401);
       expect(mockGetSecurityFindingById).not.toHaveBeenCalled();
-    });
-
-    it('keeps legacy internal-secret callbacks working during rollout', async () => {
-      mockGetSecurityFindingById.mockResolvedValue(null);
-      const req = makeRequest(FINDING_ID, completedPayload, VALID_SECRET, null);
-      const response = await POST(req, makeParams(FINDING_ID));
-
-      expect(response.status).toBe(404);
     });
   });
 
@@ -553,12 +545,12 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       mockGenerateApiToken.mockReturnValue('fresh-token');
 
       const req = makeRequest(FINDING_ID, completedPayload);
-      const responsePromise = POST(req, makeParams(FINDING_ID));
+      const response = await POST(req, makeParams(FINDING_ID));
 
       // Advance past the retry delay
       await jest.advanceTimersByTimeAsync(5000);
+      await flushAfterCallbacks();
 
-      const response = await responsePromise;
       expect(response.status).toBe(200);
       expect(mockFetchSessionSnapshot).toHaveBeenCalledTimes(2);
       expect(mockFinalizeAnalysis).toHaveBeenCalled();
@@ -588,11 +580,11 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       mockGenerateApiToken.mockReturnValue('fresh-token');
 
       const req = makeRequest(FINDING_ID, completedPayload);
-      const responsePromise = POST(req, makeParams(FINDING_ID));
+      const response = await POST(req, makeParams(FINDING_ID));
 
       await jest.advanceTimersByTimeAsync(5000);
+      await flushAfterCallbacks();
 
-      const response = await responsePromise;
       expect(response.status).toBe(200);
       expect(mockFetchSessionSnapshot).toHaveBeenCalledTimes(2);
       expect(mockFinalizeAnalysis).toHaveBeenCalled();
@@ -606,12 +598,12 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       mockExtractLastAssistantMessage.mockReturnValue(null);
 
       const req = makeRequest(FINDING_ID, completedPayload);
-      const responsePromise = POST(req, makeParams(FINDING_ID));
+      const response = await POST(req, makeParams(FINDING_ID));
 
       // Advance past all retry delays (2 retries × 5s)
       await jest.advanceTimersByTimeAsync(10000);
+      await flushAfterCallbacks();
 
-      const response = await responsePromise;
       expect(response.status).toBe(200);
       expect(mockFetchSessionSnapshot).toHaveBeenCalledTimes(3);
       expect(mockUpdateAnalysisStatus).toHaveBeenCalledWith(FINDING_ID, 'failed', {

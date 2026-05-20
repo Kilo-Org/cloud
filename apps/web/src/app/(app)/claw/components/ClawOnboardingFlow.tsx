@@ -9,18 +9,31 @@ import { Loader2, TriangleAlert, X } from 'lucide-react';
 import { KILO_AUTO_BALANCED_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { controllerVersionOk, gatewayStatusOk } from '@/lib/kiloclaw/types';
-import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
-import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
+import {
+  useKiloClawComposioOnboardingStatus,
+  useKiloClawGatewayStatus,
+  useKiloClawMutations,
+} from '@/hooks/useKiloClaw';
+import {
+  useOrgKiloClawComposioOnboardingStatus,
+  useOrgKiloClawGatewayStatus,
+  useOrgKiloClawMutations,
+} from '@/hooks/useOrgKiloClaw';
 import { useUser } from '@/hooks/useUser';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useClawControllerVersion, useClawServiceDegraded } from '../hooks/useClawHooks';
+import {
+  useClawConfig,
+  useClawControllerVersion,
+  useClawServiceDegraded,
+} from '../hooks/useClawHooks';
 import { useOnboardingSaves } from '../hooks/useOnboardingSaves';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { BotIdentityStep } from './BotIdentityStep';
 import { CalendarConnectStepView } from './CalendarConnectStep';
+import { ConnectToolsStepView } from './ConnectToolsStep';
 import { InboundEmailStepView } from './InboundEmailStep';
 import { InterestsStepView } from './InterestsStep';
 import {
@@ -64,6 +77,99 @@ function getBrowserTimeZone(): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function writeComposioPopupLoadingPage(popup: Window) {
+  popup.document.write(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Preparing Google Calendar connection</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: oklch(0.145 0 0);
+        color: oklch(0.985 0 0);
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      main {
+        width: min(360px, calc(100vw - 48px));
+        border: 1px solid oklch(1 0 0 / 0.1);
+        border-radius: 14px;
+        background: oklch(0.205 0 0);
+        padding: 24px;
+      }
+      .eyebrow {
+        color: oklch(0.95 0.15 108);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 10px 0 8px;
+        font-size: 20px;
+        line-height: 1.25;
+      }
+      p {
+        margin: 0;
+        color: oklch(0.708 0 0);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        margin-top: 18px;
+        border-radius: 999px;
+        background: oklch(0.95 0.15 108);
+        animation: pulse 1s ease-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.35; transform: scale(0.85); }
+        50% { opacity: 1; transform: scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .dot { animation: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">KiloClaw</div>
+      <h1>Preparing Google Calendar connection</h1>
+      <p>Keep this window open. Google approval will load here, then Kilo will return you to onboarding.</p>
+      <div class="dot" aria-hidden="true"></div>
+    </main>
+  </body>
+</html>`);
+  popup.document.close();
+}
+
+function isComposioPopupMessage(value: unknown): value is {
+  type: 'kiloclaw:composio-connect';
+  result: 'success' | 'failed' | 'unknown';
+  attemptId: string;
+} {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.type === 'kiloclaw:composio-connect' &&
+    (candidate.result === 'success' ||
+      candidate.result === 'failed' ||
+      candidate.result === 'unknown') &&
+    typeof candidate.attemptId === 'string' &&
+    candidate.attemptId.length > 0
+  );
+}
+
+function createComposioConnectAttemptId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 export type { ClawOnboardingMode };
@@ -157,9 +263,6 @@ function ClawOnboardingFlowInner({
       MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION
     );
   const hasInterestsStep = isAdminForInterests && controllerSupportsInterests;
-
-  const gatewayUrl = useGatewayUrl(status);
-
   // Lazy-init onboardingStep from `?step=` in the URL so first render already
   // reflects a calendar resume. Without this the state machine would resolve
   // to 'complete' (post-provisioning + ready) on first render and the auto-
@@ -168,8 +271,28 @@ function ClawOnboardingFlowInner({
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>(() => {
     if (typeof window === 'undefined') return 'identity';
     const initialStep = new URLSearchParams(window.location.search).get('step');
+    if (initialStep === 'tools') return 'tools';
     return initialStep === 'calendar' ? 'calendar' : 'identity';
   });
+  const [composioPopupPending, setComposioPopupPending] = useState(false);
+  const composioStatusPolling = onboardingStep === 'tools' || composioPopupPending;
+  const personalComposioStatus = useKiloClawComposioOnboardingStatus(
+    !organizationId,
+    composioStatusPolling
+  );
+  const orgComposioStatus = useOrgKiloClawComposioOnboardingStatus(
+    organizationId ?? '',
+    !!organizationId,
+    composioStatusPolling
+  );
+  const composioStatus = organizationId ? orgComposioStatus : personalComposioStatus;
+  const hasToolsStep = hasCalendarStep && composioStatus.data?.enabled !== false;
+  const configQuery = useClawConfig();
+  const composioManualConfigured = composioStatus.data?.sandboxConfigSource === 'manual';
+  const composioConfigPending = configQuery.isPending;
+
+  const gatewayUrl = useGatewayUrl(status);
+
   const selectedPreset: ExecPreset = DEFAULT_ONBOARDING_EXEC_PRESET;
   const [botIdentity, setBotIdentity] = useState<BotIdentity | null>(null);
   // Interest topics chosen on the Interests step are deferred until the
@@ -182,10 +305,15 @@ function ClawOnboardingFlowInner({
   const [localCreateSetupStarted, setLocalCreateSetupStarted] = useState(false);
   const [onboardingSaveSession, setOnboardingSaveSession] = useState(0);
   const hasCapturedIdentityView = useRef(false);
+  const hasCapturedToolsView = useRef(false);
   const hasCapturedCalendarView = useRef(false);
   const hasCapturedEmailView = useRef(false);
   const hasCapturedInterestsView = useRef(false);
   const hasCapturedDoneView = useRef(false);
+  const composioPopupRef = useRef<Window | null>(null);
+  const composioPopupPendingRef = useRef(false);
+  const composioPopupResultHandledRef = useRef(false);
+  const composioPopupAttemptIdRef = useRef<string | null>(null);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
 
   const stateInput = {
@@ -195,6 +323,7 @@ function ClawOnboardingFlowInner({
     setupFailed,
     onboardingStep,
     hasBotIdentity: botIdentity !== null,
+    hasToolsStep,
     hasCalendarStep,
     hasInterestsStep,
   };
@@ -243,6 +372,122 @@ function ClawOnboardingFlowInner({
     mutations,
   });
 
+  const setComposioPopupPendingState = useCallback((pending: boolean) => {
+    composioPopupPendingRef.current = pending;
+    if (pending) composioPopupResultHandledRef.current = false;
+    setComposioPopupPending(pending);
+  }, []);
+
+  const handleComposioPopupResult = useCallback(
+    (message: { result: 'success' | 'failed' | 'unknown'; attemptId: string }) => {
+      if (!composioPopupPendingRef.current || composioPopupResultHandledRef.current) return;
+      if (message.attemptId !== composioPopupAttemptIdRef.current) return;
+      composioPopupResultHandledRef.current = true;
+      composioPopupRef.current?.close();
+      composioPopupRef.current = null;
+      composioPopupAttemptIdRef.current = null;
+      setComposioPopupPendingState(false);
+      setOnboardingStep('tools');
+      void composioStatus.refetch();
+
+      if (message.result === 'success') {
+        posthog?.capture('claw_setup_tools_composio_completed');
+        toast.success('Google Calendar connected');
+        return;
+      }
+
+      posthog?.capture('claw_setup_tools_connect_failed', {
+        toolkit: 'googlecalendar',
+      });
+      toast.error('Could not connect Google Calendar. Try again or skip for now.');
+    },
+    [composioStatus, posthog, setComposioPopupPendingState]
+  );
+
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (!isComposioPopupMessage(event.data)) return;
+      handleComposioPopupResult(event.data);
+    }
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [handleComposioPopupResult]);
+
+  useEffect(() => {
+    function handleStorage(event: StorageEvent) {
+      if (event.key !== 'kiloclaw:composio-connect-result' || !event.newValue) return;
+      try {
+        const parsed: unknown = JSON.parse(event.newValue);
+        if (!isComposioPopupMessage(parsed)) return;
+        handleComposioPopupResult(parsed);
+      } catch {
+        return;
+      }
+    }
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [handleComposioPopupResult]);
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const channel = new BroadcastChannel('kiloclaw:composio-connect');
+    channel.onmessage = event => {
+      if (!isComposioPopupMessage(event.data)) return;
+      handleComposioPopupResult(event.data);
+    };
+    return () => channel.close();
+  }, [handleComposioPopupResult]);
+
+  useEffect(() => {
+    if (!composioPopupPending) return;
+
+    const intervalId = window.setInterval(() => {
+      const popup = composioPopupRef.current;
+      if (!popup || !popup.closed) return;
+
+      composioPopupRef.current = null;
+      composioPopupAttemptIdRef.current = null;
+      setComposioPopupPendingState(false);
+      void composioStatus.refetch();
+      posthog?.capture('claw_setup_tools_connect_failed', {
+        toolkit: 'googlecalendar',
+        reason: 'popup_closed',
+      });
+      toast.message('Connection window closed. Checking Google Calendar status.');
+    }, 700);
+
+    return () => window.clearInterval(intervalId);
+  }, [composioPopupPending, composioStatus, posthog, setComposioPopupPendingState]);
+
+  useEffect(() => {
+    if (!composioPopupPending || composioStatus.data?.status !== 'connected') return;
+
+    composioPopupRef.current?.close();
+    composioPopupRef.current = null;
+    composioPopupAttemptIdRef.current = null;
+    setComposioPopupPendingState(false);
+    posthog?.capture('claw_setup_tools_composio_completed', { source: 'status_refetch' });
+    toast.success('Google Calendar connected');
+  }, [composioPopupPending, composioStatus.data?.status, posthog, setComposioPopupPendingState]);
+
+  useEffect(() => {
+    if (!composioPopupPending) return;
+
+    function refetchComposioStatus() {
+      void composioStatus.refetch();
+    }
+
+    window.addEventListener('focus', refetchComposioStatus);
+    document.addEventListener('visibilitychange', refetchComposioStatus);
+    return () => {
+      window.removeEventListener('focus', refetchComposioStatus);
+      document.removeEventListener('visibilitychange', refetchComposioStatus);
+    };
+  }, [composioPopupPending, composioStatus]);
+
   useEffect(() => {
     if (flowState.renderStep !== 'identity' || hasCapturedIdentityView.current) return;
     hasCapturedIdentityView.current = true;
@@ -258,6 +503,12 @@ function ClawOnboardingFlowInner({
     if (flowState.renderStep !== 'calendar' || hasCapturedCalendarView.current) return;
     hasCapturedCalendarView.current = true;
     posthog?.capture('claw_setup_calendar_viewed');
+  }, [flowState.renderStep, posthog]);
+
+  useEffect(() => {
+    if (flowState.renderStep !== 'tools' || hasCapturedToolsView.current) return;
+    hasCapturedToolsView.current = true;
+    posthog?.capture('claw_setup_tools_viewed');
   }, [flowState.renderStep, posthog]);
 
   // Same pattern for the inbound email step.
@@ -357,7 +608,7 @@ function ClawOnboardingFlowInner({
   useEffect(() => {
     if (hasResumedFromQuery.current) return;
     const stepParam = searchParams?.get('step');
-    if (stepParam !== 'calendar') return;
+    if (stepParam !== 'calendar' && stepParam !== 'tools') return;
     // The OAuth round-trip is a full-page reload, so `useUser` starts fresh
     // and the query is in-flight on the first render(s). Gate on `isPending`
     // (not `currentUser === undefined`) so that a `/api/user` fetch that
@@ -370,7 +621,7 @@ function ClawOnboardingFlowInner({
     // trigger calendar-specific toasts or set onboardingStep to 'calendar'.
     // Strip the params and move on. An admin who just completed OAuth but
     // had /api/user error can re-verify the connection in settings.
-    if (!hasCalendarStep) {
+    if (stepParam === 'calendar' && !hasCalendarStep) {
       hasResumedFromQuery.current = true;
       cleanupResumeQueryParams();
       return;
@@ -384,17 +635,28 @@ function ClawOnboardingFlowInner({
         : 'unknown'
       : null;
     hasResumedFromQuery.current = true;
-    setOnboardingStep('calendar');
-    posthog?.capture('claw_setup_calendar_resumed', {
-      outcome:
-        successParam === 'google_connected' ? 'connected' : errorParamRaw ? 'error' : 'unknown',
-    });
-    if (successParam === 'google_connected') {
-      posthog?.capture('claw_setup_calendar_oauth_completed');
-      toast.success('Calendar connected');
+    setOnboardingStep(stepParam);
+    posthog?.capture(
+      stepParam === 'tools' ? 'claw_setup_tools_resumed' : 'claw_setup_calendar_resumed',
+      {
+        outcome: successParam ? 'connected' : errorParamRaw ? 'error' : 'unknown',
+      }
+    );
+    if (successParam === 'google_connected' || successParam === 'composio_connected') {
+      posthog?.capture(
+        stepParam === 'tools'
+          ? 'claw_setup_tools_composio_completed'
+          : 'claw_setup_calendar_oauth_completed'
+      );
+      toast.success(stepParam === 'tools' ? 'Google Calendar connected' : 'Calendar connected');
     } else if (errorParamRaw) {
-      posthog?.capture('claw_setup_calendar_oauth_failed', { reason: errorReason });
-      toast.error('Could not connect calendar — please try again or skip for now.');
+      posthog?.capture(
+        stepParam === 'tools'
+          ? 'claw_setup_tools_connect_failed'
+          : 'claw_setup_calendar_oauth_failed',
+        { reason: errorReason }
+      );
+      toast.error('Could not connect calendar. Try again or skip for now.');
     }
     cleanupResumeQueryParams();
   }, [
@@ -413,7 +675,8 @@ function ClawOnboardingFlowInner({
   // grace period, clean the URL and surface a soft warning.
   useEffect(() => {
     if (hasResumedFromQuery.current) return;
-    if (searchParams?.get('step') !== 'calendar') return;
+    const stepParam = searchParams?.get('step');
+    if (stepParam !== 'calendar' && stepParam !== 'tools') return;
     const timeoutId = window.setTimeout(() => {
       if (hasResumedFromQuery.current) return;
       if (botIdentity !== null) return;
@@ -503,7 +766,9 @@ function ClawOnboardingFlowInner({
             defaulted: true,
           });
           setBotIdentity(identity);
-          if (hasCalendarStep) {
+          if (hasToolsStep) {
+            setOnboardingStep('tools');
+          } else if (hasCalendarStep) {
             setOnboardingStep('calendar');
           } else {
             setOnboardingStep('email');
@@ -545,6 +810,88 @@ function ClawOnboardingFlowInner({
         onContinue={() => {
           posthog?.capture('claw_setup_calendar_completed', { connected: true, skipped: false });
           advanceToEmail();
+        }}
+      />
+    );
+  }
+
+  function renderToolsStep() {
+    function advanceToEmail() {
+      setOnboardingStep('email');
+    }
+
+    return (
+      <ConnectToolsStepView
+        currentStep={flowState.currentStep}
+        totalSteps={flowState.totalSteps}
+        status={composioStatus.data?.status ?? 'disconnected'}
+        loading={composioStatus.isPending || composioConfigPending}
+        connecting={mutations.createComposioGoogleCalendarLink.isPending || composioPopupPending}
+        savingManual={mutations.patchSecrets.isPending}
+        readyToConnect={
+          flowState.instanceStatus !== null && onboardingSaves.ready && !composioConfigPending
+        }
+        manualConfigured={composioManualConfigured}
+        organizationContext={!!organizationId}
+        onConnect={() => {
+          const returnTo = `${basePath}/new?step=tools`;
+          posthog?.capture('claw_setup_tools_connect_clicked', { toolkit: 'googlecalendar' });
+          const popup = window.open(
+            'about:blank',
+            'kiloclaw-composio-connect',
+            'popup,width=520,height=720'
+          );
+          composioPopupRef.current = popup;
+          const attemptId = popup ? createComposioConnectAttemptId() : undefined;
+          composioPopupAttemptIdRef.current = attemptId ?? null;
+          if (popup) {
+            setComposioPopupPendingState(true);
+            writeComposioPopupLoadingPage(popup);
+          }
+          mutations.createComposioGoogleCalendarLink.mutate(
+            { returnTo, popup: popup !== null, attemptId },
+            {
+              onSuccess: result => {
+                if (popup) {
+                  popup.location.href = result.redirectUrl;
+                } else {
+                  window.location.href = result.redirectUrl;
+                }
+              },
+              onError: err => {
+                popup?.close();
+                composioPopupRef.current = null;
+                composioPopupAttemptIdRef.current = null;
+                setComposioPopupPendingState(false);
+                posthog?.capture('claw_setup_tools_connect_failed', {
+                  toolkit: 'googlecalendar',
+                });
+                toast.error(err.message);
+              },
+            }
+          );
+        }}
+        onSkip={() => {
+          posthog?.capture('claw_setup_tools_completed', { connected: false, skipped: true });
+          advanceToEmail();
+        }}
+        onContinue={() => {
+          posthog?.capture('claw_setup_tools_completed', { connected: true, skipped: false });
+          advanceToEmail();
+        }}
+        onSaveManualCredentials={credentials => {
+          posthog?.capture('claw_setup_tools_manual_credentials_save_clicked');
+          mutations.patchSecrets.mutate(
+            { secrets: credentials },
+            {
+              onSuccess: () => {
+                toast.success('Composio credentials saved');
+                posthog?.capture('claw_setup_tools_manual_credentials_saved');
+                advanceToEmail();
+              },
+              onError: err => toast.error(err.message),
+            }
+          );
         }}
       />
     );
@@ -699,6 +1046,8 @@ function ClawOnboardingFlowInner({
     switch (renderStep) {
       case 'identity':
         return renderIdentityStep();
+      case 'tools':
+        return renderToolsStep();
       case 'calendar':
         return renderCalendarStep();
       case 'email':

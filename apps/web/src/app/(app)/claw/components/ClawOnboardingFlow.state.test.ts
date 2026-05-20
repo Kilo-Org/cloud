@@ -120,6 +120,16 @@ describe('ClawOnboardingFlow state machine', () => {
       getClawOnboardingFlowState(
         createInput({
           createSetupStarted: true,
+          onboardingStep: 'tools',
+          hasBotIdentity: true,
+          hasToolsStep: true,
+        })
+      ).renderStep
+    ).toBe('tools');
+    expect(
+      getClawOnboardingFlowState(
+        createInput({
+          createSetupStarted: true,
           onboardingStep: 'calendar',
           hasBotIdentity: true,
         })
@@ -185,6 +195,28 @@ describe('ClawOnboardingFlow state machine', () => {
       totalSteps: 5,
     });
     expect(getClawOnboardingStepProgress('done')).toEqual({ currentStep: 5, totalSteps: 5 });
+  });
+
+  test('managed tools step replaces calendar in the active wizard', () => {
+    const state = getClawOnboardingFlowState(
+      createInput({
+        createSetupStarted: true,
+        onboardingStep: 'calendar',
+        hasBotIdentity: true,
+        hasToolsStep: true,
+      })
+    );
+
+    expect(state.renderStep).toBe('tools');
+    expect(state.totalSteps).toBe(5);
+    expect(getClawOnboardingStepProgress('tools', true, true, true)).toEqual({
+      currentStep: 2,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('calendar', true, true, true)).toEqual({
+      currentStep: 2,
+      totalSteps: 5,
+    });
   });
 
   test.each(CLAW_ONBOARDING_PROVISIONING_STATUSES)(
@@ -398,6 +430,21 @@ describe('ClawOnboardingFlow state machine', () => {
     );
 
     expect(state.renderStep).toBe('calendar');
+  });
+
+  test('renders tools in post-provisioning mode when explicit Composio resume is requested', () => {
+    const state = getClawOnboardingFlowState(
+      createInput({
+        mode: 'post-provisioning',
+        status: createStatus('running'),
+        onboardingStep: 'tools',
+        hasBotIdentity: true,
+        hasToolsStep: true,
+        gatewayState: 'running',
+      })
+    );
+
+    expect(state.renderStep).toBe('tools');
   });
 
   test('renders calendar in post-provisioning mode even before the gateway is ready', () => {

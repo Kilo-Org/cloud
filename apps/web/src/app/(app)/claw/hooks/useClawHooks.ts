@@ -33,6 +33,28 @@ export function useClawConfig() {
   return organizationId ? org : personal;
 }
 
+export function useClawComposioOnboardingStatus(enabled = true) {
+  const trpc = useTRPC();
+  const { organizationId } = useClawContext();
+
+  const personal = useQuery({
+    ...trpc.kiloclaw.getComposioOnboardingStatus.queryOptions(undefined, {
+      refetchOnWindowFocus: true,
+    }),
+    enabled: enabled && !organizationId,
+  });
+
+  const org = useQuery({
+    ...trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryOptions(
+      { organizationId: organizationId ?? '' },
+      { refetchOnWindowFocus: true }
+    ),
+    enabled: enabled && !!organizationId,
+  });
+
+  return organizationId ? org : personal;
+}
+
 // Disk usage
 
 export function getClawDiskUsageQueryOptions(

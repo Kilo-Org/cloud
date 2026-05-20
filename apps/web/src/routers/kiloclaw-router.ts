@@ -75,6 +75,15 @@ import {
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
 import {
+  buildComposioProvisionSecrets,
+  composioSecretsPatchSource,
+  createManagedComposioGoogleCalendarLink,
+  clearComposioInstanceConfig,
+  getManagedComposioGoogleCalendarStatus,
+  getComposioInstanceConfigSource,
+  markComposioInstanceConfig,
+} from '@/lib/kiloclaw/composio-onboarding';
+import {
   clearSubscriptionLifecycleAfterInstanceDestroy,
   clearTrialInactivityStopAfterStart,
 } from '@/lib/kiloclaw/instance-lifecycle';
@@ -849,6 +858,18 @@ const patchBotIdentitySchema = z.object({
   botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
 });
 
+const composioConnectLinkSchema = z.object({
+  returnTo: z
+    .string()
+    .min(1)
+    .max(500)
+    .refine(value => value.startsWith('/'), {
+      message: 'returnTo must be a relative path',
+    }),
+  popup: z.boolean().optional(),
+  attemptId: z.string().min(1).max(100).optional(),
+});
+
 /**
  * Build the worker provision payload from plaintext channel tokens.
  * The worker expects the flat encrypted envelope shape for channels.
@@ -1073,9 +1094,15 @@ async function provisionInstance(
   params: { instanceId: string | null; bootstrapSubscription: boolean },
   executor: typeof db | DrizzleTransaction = db
 ) {
-  const encryptedSecrets = input.secrets
+  const composioProvision = await buildComposioProvisionSecrets({
+    scope: { ownerType: 'user', userId: user.id },
+    instanceId: params.instanceId,
+    secrets: input.secrets,
+  });
+
+  const encryptedSecrets = composioProvision.secrets
     ? Object.fromEntries(
-        Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
+        Object.entries(composioProvision.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
       )
     : undefined;
 
@@ -1096,7 +1123,7 @@ async function provisionInstance(
     : undefined;
 
   const client = new KiloClawInternalClient();
-  return client.provision(
+  const result = await client.provision(
     user.id,
     {
       envVars: input.envVars,
@@ -1116,6 +1143,17 @@ async function provisionInstance(
         }
       : undefined
   );
+
+  if (composioProvision.configToMark?.source === 'manual') {
+    await markComposioInstanceConfig({ instanceId: result.instanceId, source: 'manual' });
+  } else if (composioProvision.configToMark?.source === 'managed') {
+    await markComposioInstanceConfig({
+      instanceId: result.instanceId,
+      source: 'managed',
+    });
+  }
+
+  return result;
 }
 
 async function emitProvisionTrialStartSideEffects(params: {
@@ -3402,11 +3440,18 @@ export const kiloclawRouter = createTRPCRouter({
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       try {
-        return await client.patchSecrets(
+        const result = await client.patchSecrets(
           ctx.user.id,
           { secrets: encryptedPatch, meta: input.meta },
           workerInstanceId(instance)
         );
+        const sourceAction = instance ? composioSecretsPatchSource(secrets) : 'none';
+        if (instance && sourceAction === 'upsert_manual') {
+          await markComposioInstanceConfig({ instanceId: instance.id, source: 'manual' });
+        } else if (instance && sourceAction === 'clear') {
+          await clearComposioInstanceConfig(instance.id);
+        }
+        return result;
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           // Extract message from worker response body (JSON or plain text)
@@ -3432,6 +3477,58 @@ export const kiloclawRouter = createTRPCRouter({
     );
     return client.getConfig({ userId: ctx.user.id, instanceId: workerInstanceId(instance) });
   }),
+
+  getComposioOnboardingStatus: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    let sandboxHasComposioSecrets = false;
+    if (instance) {
+      const client = new KiloClawUserClient(
+        generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
+      );
+      const config = await client.getConfig({
+        userId: ctx.user.id,
+        instanceId: workerInstanceId(instance),
+      });
+      sandboxHasComposioSecrets = config.configuredSecrets.composio === true;
+    }
+    return await getManagedComposioGoogleCalendarStatus({
+      scope: {
+        ownerType: 'user',
+        userId: ctx.user.id,
+      },
+      instance,
+      sandboxHasComposioSecrets,
+    });
+  }),
+
+  createComposioGoogleCalendarLink: baseProcedure
+    .input(composioConnectLinkSchema)
+    .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      if (!instance) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'No active KiloClaw instance found',
+        });
+      }
+
+      const sandboxConfigSource = await getComposioInstanceConfigSource(instance.id);
+      if (sandboxConfigSource === 'manual') {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This sandbox already uses your own Composio credentials.',
+        });
+      }
+
+      return await createManagedComposioGoogleCalendarLink({
+        userId: ctx.user.id,
+        instance,
+        scope: { ownerType: 'user', userId: ctx.user.id },
+        returnTo: input.returnTo,
+        popup: input.popup,
+        attemptId: input.attemptId,
+      });
+    }),
 
   getChannelCatalog: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);

@@ -1,6 +1,4 @@
-import { ATTACHMENT_MAX_BYTES } from '@kilocode/kilo-chat';
-
-import { formatFileSize } from './format-file-size';
+import { ATTACHMENT_MAX_BYTES, formatFileSize } from '@kilocode/kilo-chat';
 
 export const MESSAGE_ATTACHMENT_MAX_COUNT = 10;
 
@@ -9,7 +7,7 @@ const DEFAULT_ATTACHMENT_MIME_TYPE = 'application/octet-stream';
 
 const ATTACHMENT_ACTION_SHEET_OPTIONS = ['Take photo', 'Photo library', 'Files', 'Cancel'] as const;
 
-export type AttachmentActionSheetConfig = {
+type AttachmentActionSheetConfig = {
   options: readonly string[];
   cancelButtonIndex: number;
 };
@@ -23,7 +21,7 @@ export type NativeAttachmentSelection = {
   fileSize?: number | null;
 };
 
-export type MessageAttachment = {
+type MessageAttachment = {
   uri: string;
   filename: string;
   mimeType: string;
@@ -31,13 +29,13 @@ export type MessageAttachment = {
   isImage: boolean;
 };
 
-export type RejectedMessageAttachment = {
+type RejectedMessageAttachment = {
   attachment: MessageAttachment;
   reason: 'too-large';
   toast: string;
 };
 
-export type AttachmentSelectionResult = {
+type AttachmentSelectionResult = {
   accepted: MessageAttachment[];
   rejected: RejectedMessageAttachment[];
   truncatedCount: number;

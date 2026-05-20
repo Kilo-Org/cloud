@@ -1,5 +1,5 @@
 import { useAttachmentUrl } from '@kilocode/kilo-chat-hooks';
-import { type AttachmentBlock, type KiloChatClient } from '@kilocode/kilo-chat';
+import { type AttachmentBlock, formatFileSize, type KiloChatClient } from '@kilocode/kilo-chat';
 import { AlertCircle, File as FileIcon } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
@@ -9,7 +9,6 @@ import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
-import { formatFileSize } from './format-file-size';
 import {
   getAttachmentImageRenderState,
   getAttachmentOpenErrorMessage,

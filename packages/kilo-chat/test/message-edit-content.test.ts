@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { type AttachmentBlock } from '@kilocode/kilo-chat';
 
 import {
-  buildMobileEditContent,
+  buildMessageEditContent,
   remainingEditableAttachments,
-} from './message-edit-attachments-state';
+  type AttachmentBlock,
+} from '../src';
 
 const firstAttachment = {
   type: 'attachment',
@@ -22,7 +22,7 @@ const secondAttachment = {
   filename: 'brief.pdf',
 } satisfies AttachmentBlock;
 
-describe('message edit attachment state helpers', () => {
+describe('message edit content helpers', () => {
   it('keeps original attachments not marked removed', () => {
     expect(
       remainingEditableAttachments(
@@ -34,7 +34,7 @@ describe('message edit attachment state helpers', () => {
 
   it('builds edit content from trimmed text and remaining attachments', () => {
     expect(
-      buildMobileEditContent({
+      buildMessageEditContent({
         text: '  updated message  ',
         originalAttachments: [firstAttachment, secondAttachment],
         removedAttachmentIds: [firstAttachment.attachmentId],
@@ -42,9 +42,19 @@ describe('message edit attachment state helpers', () => {
     ).toEqual([{ type: 'text', text: 'updated message' }, secondAttachment]);
   });
 
+  it('accepts a Set of removed attachment ids', () => {
+    expect(
+      buildMessageEditContent({
+        text: 'hi',
+        originalAttachments: [firstAttachment, secondAttachment],
+        removedAttachmentIds: new Set([firstAttachment.attachmentId]),
+      })
+    ).toEqual([{ type: 'text', text: 'hi' }, secondAttachment]);
+  });
+
   it('allows attachment-only edit content', () => {
     expect(
-      buildMobileEditContent({
+      buildMessageEditContent({
         text: '   ',
         originalAttachments: [firstAttachment, secondAttachment],
         removedAttachmentIds: [secondAttachment.attachmentId],

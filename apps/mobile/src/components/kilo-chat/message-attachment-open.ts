@@ -1,4 +1,4 @@
-export type AttachmentImageRenderState = 'loading' | 'ready' | 'error';
+type AttachmentImageRenderState = 'loading' | 'ready' | 'error';
 
 const ATTACHMENT_OPEN_ERROR_MESSAGE =
   "Couldn't open attachment. Check your connection and try again.";
@@ -33,7 +33,7 @@ export function getFreshAttachmentPreviewUrl(
   return data?.url ?? null;
 }
 
-export async function materializeRemoteAttachment({
+async function materializeRemoteAttachment({
   url,
   attachmentId,
   filename,
@@ -51,7 +51,7 @@ export async function materializeRemoteAttachment({
   return downloaded.uri;
 }
 
-export async function shareLocalFile(localUri: string): Promise<void> {
+async function shareLocalFile(localUri: string): Promise<void> {
   const Sharing = await import('expo-sharing');
   const available = await Sharing.isAvailableAsync();
   if (!available) {

@@ -2,11 +2,10 @@
 
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { File as FileIcon, Download, AlertCircle, ImageOff, X } from 'lucide-react';
-import type { AttachmentBlock } from '@kilocode/kilo-chat';
+import { formatFileSize, type AttachmentBlock } from '@kilocode/kilo-chat';
 import { isAttachmentUrlValid, useAttachmentUrl } from '@kilocode/kilo-chat-hooks';
 
 import { useKiloChatContext } from './kiloChatContext';
-import { formatFileSize } from '../lib/format-file-size';
 
 type MessageAttachmentProps = {
   block: AttachmentBlock;

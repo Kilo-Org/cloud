@@ -20,6 +20,7 @@ import {
 } from '@kilocode/kilo-chat-hooks';
 import {
   buildMessageActionAvailability,
+  buildMessageEditContent,
   contentBlocksToText,
   type ConversationDetailResponse,
   type ExecApprovalDecision,
@@ -52,7 +53,6 @@ import {
   getEditableAttachmentBlocks,
   getVisibleEditableAttachmentBlocks,
 } from './message-presentation';
-import { buildMobileEditContent } from './message-edit-attachments-state';
 import {
   getMessageHistoryContentState,
   shouldMarkLatestMessageRead,
@@ -254,7 +254,7 @@ export function ConversationScreen({
         return;
       }
       if (editingMessage) {
-        const editContent = buildMobileEditContent({
+        const editContent = buildMessageEditContent({
           text: contentBlocksToText(content),
           originalAttachments: editingAttachments,
           removedAttachmentIds: removedEditAttachmentIds,

@@ -1,12 +1,12 @@
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { AlertCircle, File as FileIcon, RotateCcw, X } from 'lucide-react-native';
 import { type QueuedAttachment } from '@kilocode/kilo-chat-hooks';
+import { formatFileSize } from '@kilocode/kilo-chat';
 
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
-import { formatFileSize } from './format-file-size';
 import { isImageMimeType } from './message-attachment-state';
 
 type Props = {

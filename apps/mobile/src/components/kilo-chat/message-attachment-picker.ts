@@ -8,14 +8,14 @@ import {
   normalizeAttachmentSelection,
 } from './message-attachment-state';
 
-export type LocalAttachmentAsset = NativeAttachmentSelection;
+type LocalAttachmentAsset = NativeAttachmentSelection;
 
 const IMAGE_PICKER_OPTIONS = {
   mediaTypes: ['images'],
   quality: 1,
 } satisfies ImagePicker.ImagePickerOptions;
 
-export function assetToAddFileInput(asset: LocalAttachmentAsset): AddFileInput {
+function assetToAddFileInput(asset: LocalAttachmentAsset): AddFileInput {
   const file = new File(asset.uri);
   const attachment = normalizeAttachmentSelection({
     uri: asset.uri,

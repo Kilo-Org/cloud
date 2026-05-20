@@ -1,7 +1,6 @@
 import { ATTACHMENT_MAX_BYTES } from '@kilocode/kilo-chat';
 import { describe, expect, it } from 'vitest';
 
-import { formatFileSize } from './format-file-size';
 import {
   buildAttachmentLimitToast,
   buildAttachmentSizeRejectionToast,
@@ -10,17 +9,6 @@ import {
   normalizeAttachmentSelection,
   selectAllowedAttachments,
 } from './message-attachment-state';
-
-describe('formatFileSize', () => {
-  it('formats byte, KB, and MB values for attachment labels', () => {
-    expect(formatFileSize(0)).toBe('0 B');
-    expect(formatFileSize(512)).toBe('512 B');
-    expect(formatFileSize(1024)).toBe('1 KB');
-    expect(formatFileSize(1536)).toBe('1.5 KB');
-    expect(formatFileSize(5.25 * 1024 * 1024)).toBe('5.25 MB');
-    expect(formatFileSize(1024 * 1024 + 7777)).toBe('1.01 MB');
-  });
-});
 
 describe('message attachment state helpers', () => {
   it('builds native action sheet options with cancel metadata', () => {

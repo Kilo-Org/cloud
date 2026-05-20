@@ -110,6 +110,40 @@ describe('GET /api/integrations/gitlab/callback', () => {
     expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
   });
 
+  test('redirects oauth errors to returnTo when signed state carries one', async () => {
+    const state = createGitLabOAuthState(
+      {
+        owner: { type: 'user', id: USER_ID },
+        returnTo: '/claw/new?step=gitlab',
+      },
+      USER_ID
+    );
+    const response = await callGitLabCallback(
+      makeRequest(
+        `/api/integrations/gitlab/callback?error=access_denied&state=${encodeURIComponent(state)}`
+      )
+    );
+
+    expectRedirectLocation(response, '/claw/new?step=gitlab&error=access_denied');
+    expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
+  });
+
+  test('uses returnTo for missing-code redirects when signed state carries one', async () => {
+    const state = createGitLabOAuthState(
+      {
+        owner: { type: 'user', id: USER_ID },
+        returnTo: '/claw/new?step=gitlab',
+      },
+      USER_ID
+    );
+    const response = await callGitLabCallback(
+      makeRequest(`/api/integrations/gitlab/callback?state=${encodeURIComponent(state)}`)
+    );
+
+    expectRedirectLocation(response, '/claw/new?step=gitlab&error=missing_code');
+    expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
+  });
+
   test('rejects callback exchange when cached custom OAuth credentials have expired', async () => {
     const state = createGitLabOAuthState(
       {

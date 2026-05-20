@@ -28,6 +28,7 @@ import {
 } from '@/lib/bot/platform-helpers';
 import { botPlatforms } from '@/lib/bot/platforms';
 import {
+  appendIntegrationOAuthRedirectQuery,
   buildIntegrationOAuthRedirectPath,
   buildIntegrationOAuthRedirectPathFromOwner,
   parseOAuthStateOwner,
@@ -250,7 +251,8 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
           buildIntegrationOAuthRedirectPathFromOwner(
             PLATFORM.LINEAR,
             verifiedOwner,
-            `error=${encodeURIComponent(error)}`
+            `error=${encodeURIComponent(error)}`,
+            verified?.returnTo
           ),
           APP_URL
         )
@@ -268,7 +270,8 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
           buildIntegrationOAuthRedirectPathFromOwner(
             PLATFORM.LINEAR,
             verifiedOwner,
-            'error=missing_code'
+            'error=missing_code',
+            verified?.returnTo
           ),
           APP_URL
         )
@@ -349,7 +352,8 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
             buildIntegrationOAuthRedirectPathFromOwner(
               PLATFORM.LINEAR,
               verifiedOwner,
-              'error=workspace_already_connected'
+              'error=workspace_already_connected',
+              verified?.returnTo
             ),
             APP_URL
           )
@@ -358,17 +362,15 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       throw error;
     }
 
-    const successPath = buildIntegrationOAuthRedirectPath(
-      PLATFORM.LINEAR,
-      owner,
-      'success=installed'
-    );
+    const successPath = verified.returnTo
+      ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=linear_installed')
+      : buildIntegrationOAuthRedirectPath(PLATFORM.LINEAR, owner, 'success=installed');
 
     return NextResponse.redirect(new URL(successPath, APP_URL));
   } catch (error) {
     const searchParams = request.nextUrl.searchParams;
     const state = searchParams.get('state');
-    const verifiedOwner = state ? (verifyOAuthState(state)?.owner ?? null) : null;
+    const verified = state ? verifyOAuthState(state) : null;
 
     captureException(error, {
       tags: {
@@ -385,8 +387,9 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       new URL(
         buildIntegrationOAuthRedirectPathFromOwner(
           PLATFORM.LINEAR,
-          verifiedOwner,
-          'error=installation_failed'
+          verified?.owner,
+          'error=installation_failed',
+          verified?.returnTo
         ),
         APP_URL
       )

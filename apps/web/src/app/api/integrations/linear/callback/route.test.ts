@@ -158,6 +158,15 @@ describe('GET /api/integrations/linear/callback', () => {
     expectRedirectLocation(response, '/integrations/linear?error=access_denied');
   });
 
+  test('redirects oauth errors to returnTo when signed state carries one', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, '/claw/new?step=linear');
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?error=access_denied&state=${state}`)
+    );
+
+    expectRedirectLocation(response, '/claw/new?step=linear&error=access_denied');
+  });
+
   test('encodes oauth error values before redirecting', async () => {
     const state = createOAuthState(`user_${USER_ID}`, USER_ID);
     const response = await callLinearCallback(
@@ -220,6 +229,16 @@ describe('GET /api/integrations/linear/callback', () => {
       })
     );
     expectRedirectLocation(response, '/integrations/linear?success=installed');
+  });
+
+  test('redirects successful installs to returnTo when signed state carries one', async () => {
+    mockedUpsertLinearInstallation.mockResolvedValue({} as never);
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, '/claw/new?step=linear');
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
+
+    expectRedirectLocation(response, '/claw/new?step=linear&success=linear_installed');
   });
 
   test('falls back to organizationId when the Linear GraphQL query fails', async () => {

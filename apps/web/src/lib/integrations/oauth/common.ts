@@ -7,6 +7,7 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { createOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { StandardOAuthPlatform } from '@/lib/integrations/oauth/paths';
 
@@ -27,6 +28,10 @@ function ownerToOAuthStateOwner(owner: Owner): string {
   return owner.type === 'org' ? `org_${owner.id}` : `user_${owner.id}`;
 }
 
+export function appendIntegrationOAuthRedirectQuery(path: string, queryParam: string): string {
+  return `${path}${path.includes('?') ? '&' : '?'}${queryParam}`;
+}
+
 export function parseOAuthStateOwner(owner: string): Owner | null {
   if (owner.startsWith('org_') && owner.length > 'org_'.length) {
     return { type: 'org', id: owner.slice('org_'.length) };
@@ -42,8 +47,13 @@ export function parseOAuthStateOwner(owner: string): Owner | null {
 export function buildIntegrationOAuthRedirectPath(
   platform: StandardOAuthPlatform,
   owner: Owner | null | undefined,
-  queryParam: string
+  queryParam: string,
+  returnTo?: string
 ): string {
+  if (returnTo) {
+    return appendIntegrationOAuthRedirectQuery(returnTo, queryParam);
+  }
+
   if (owner?.type === 'org') {
     return `/organizations/${owner.id}/integrations/${platform}?${queryParam}`;
   }
@@ -58,12 +68,14 @@ export function buildIntegrationOAuthRedirectPath(
 export function buildIntegrationOAuthRedirectPathFromOwner(
   platform: StandardOAuthPlatform,
   owner: string | null | undefined,
-  queryParam: string
+  queryParam: string,
+  returnTo?: string
 ): string {
   return buildIntegrationOAuthRedirectPath(
     platform,
     owner ? parseOAuthStateOwner(owner) : null,
-    queryParam
+    queryParam,
+    returnTo
   );
 }
 
@@ -74,7 +86,12 @@ export function buildIntegrationOAuthRedirectPathFromState(
 ): string {
   const verified = state ? verifyOAuthState(state) : null;
 
-  return buildIntegrationOAuthRedirectPathFromOwner(platform, verified?.owner, queryParam);
+  return buildIntegrationOAuthRedirectPathFromOwner(
+    platform,
+    verified?.owner,
+    queryParam,
+    verified?.returnTo
+  );
 }
 
 export function buildIntegrationOAuthConnectErrorPath(
@@ -148,7 +165,9 @@ export async function handleStatefulPlatformOAuthConnect(
       organizationRoles,
       requireActiveOrganizationSubscription,
     });
-    const state = createOAuthState(ownerToOAuthStateOwner(owner), user.id);
+    const returnToParam = request.nextUrl.searchParams.get('returnTo');
+    const returnTo = returnToParam ? validateReturnPath(returnToParam) : null;
+    const state = createOAuthState(ownerToOAuthStateOwner(owner), user.id, returnTo ?? undefined);
 
     return NextResponse.redirect(buildOAuthUrl(state));
   } catch (error) {

@@ -12,15 +12,22 @@ export type StandardOAuthPlatform = (typeof STANDARD_OAUTH_PLATFORMS)[number];
 
 export function getPlatformOAuthConnectPath(
   platform: StandardOAuthPlatform,
-  organizationId?: string
+  organizationId?: string,
+  returnTo?: string
 ): string {
   const path = `/api/integrations/${platform}/connect`;
 
-  if (!organizationId) {
+  if (!organizationId && !returnTo) {
     return path;
   }
 
-  const params = new URLSearchParams({ organizationId });
+  const params = new URLSearchParams();
+  if (organizationId) {
+    params.set('organizationId', organizationId);
+  }
+  if (returnTo) {
+    params.set('returnTo', returnTo);
+  }
   return `${path}?${params.toString()}`;
 }
 

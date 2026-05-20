@@ -140,6 +140,33 @@ describe('GET /api/integrations/gitlab/connect', () => {
     );
   });
 
+  test('preserves a valid returnTo in signed OAuth state', async () => {
+    await callGitLabConnect(
+      makeRequest('/api/integrations/gitlab/connect?returnTo=%2Fclaw%2Fnew%3Fstep%3Dgitlab')
+    );
+
+    expect(mockedCreateGitLabOAuthState).toHaveBeenCalledWith(
+      {
+        owner: { type: 'user', id: USER_ID },
+        returnTo: '/claw/new?step=gitlab',
+      },
+      USER_ID
+    );
+  });
+
+  test('drops invalid returnTo values from signed OAuth state', async () => {
+    await callGitLabConnect(
+      makeRequest('/api/integrations/gitlab/connect?returnTo=https%3A%2F%2Fevil.example.com%2Fpath')
+    );
+
+    expect(mockedCreateGitLabOAuthState).toHaveBeenCalledWith(
+      {
+        owner: { type: 'user', id: USER_ID },
+      },
+      USER_ID
+    );
+  });
+
   test('does not create OAuth state when credential caching is unavailable', async () => {
     mockedStoreGitLabOAuthCredentials.mockResolvedValue(null);
 

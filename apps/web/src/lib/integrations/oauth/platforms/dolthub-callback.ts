@@ -11,6 +11,7 @@ import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
+  appendIntegrationOAuthRedirectQuery,
   buildIntegrationOAuthRedirectPath,
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
@@ -118,11 +119,9 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
       tokens,
     });
 
-    const successPath = buildIntegrationOAuthRedirectPath(
-      PLATFORM.DOLTHUB,
-      owner,
-      'success=installed'
-    );
+    const successPath = verified.returnTo
+      ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=installed')
+      : buildIntegrationOAuthRedirectPath(PLATFORM.DOLTHUB, owner, 'success=installed');
 
     return NextResponse.redirect(new URL(successPath, APP_URL));
   } catch (error) {

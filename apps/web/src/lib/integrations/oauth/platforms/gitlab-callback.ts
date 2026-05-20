@@ -23,6 +23,7 @@ import {
   verifyGitLabOAuthState,
 } from '@/lib/integrations/platforms/gitlab/oauth-state';
 import { getGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
+import { appendIntegrationOAuthRedirectQuery } from '@/lib/integrations/oauth/common';
 
 /**
  * Generates a secure random webhook secret for GitLab webhook verification
@@ -32,9 +33,13 @@ function generateWebhookSecret(): string {
 }
 
 function buildGitLabRedirectPath(
-  state: Pick<VerifiedGitLabOAuthState, 'owner'> | null | undefined,
+  state: Pick<VerifiedGitLabOAuthState, 'owner' | 'returnTo'> | null | undefined,
   queryParams: string
 ): string {
+  if (state?.returnTo) {
+    return appendIntegrationOAuthRedirectQuery(state.returnTo, queryParams);
+  }
+
   if (state?.owner.type === 'org') {
     return `/organizations/${state.owner.id}/integrations/gitlab?${queryParams}`;
   }
@@ -240,8 +245,9 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
       });
     }
 
-    const successPath =
-      owner.type === 'org'
+    const successPath = verifiedState.returnTo
+      ? appendIntegrationOAuthRedirectQuery(verifiedState.returnTo, 'success=gitlab_connected')
+      : owner.type === 'org'
         ? `/organizations/${owner.id}/integrations/gitlab?success=connected`
         : `/integrations/gitlab?success=connected`;
 

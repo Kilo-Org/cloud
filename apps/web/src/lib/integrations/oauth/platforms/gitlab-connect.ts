@@ -9,6 +9,7 @@ import {
 } from '@/lib/integrations/platforms/gitlab/oauth-state';
 import { storeGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import {
   buildIntegrationOAuthConnectErrorPath,
   redirectToSignInForOAuthConnect,
@@ -40,6 +41,8 @@ export async function handleGitLabOAuthConnect(request: NextRequest) {
     const instanceUrl = searchParams.get('instanceUrl') || undefined;
     const clientId = searchParams.get('clientId') || undefined;
     const clientSecret = searchParams.get('clientSecret') || undefined;
+    const returnToParam = searchParams.get('returnTo') || undefined;
+    const returnTo = returnToParam ? validateReturnPath(returnToParam) : null;
 
     const { owner } = await resolveOAuthConnectOwner(request, user);
 
@@ -63,6 +66,7 @@ export async function handleGitLabOAuthConnect(request: NextRequest) {
         owner,
         ...(usesCustomInstance ? { instanceUrl } : {}),
         ...(customCredentialsRef ? { customCredentialsRef } : {}),
+        ...(returnTo ? { returnTo } : {}),
       },
       user.id
     );

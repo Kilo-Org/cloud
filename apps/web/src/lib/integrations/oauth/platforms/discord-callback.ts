@@ -8,6 +8,7 @@ import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
+  appendIntegrationOAuthRedirectQuery,
   buildIntegrationOAuthRedirectPath,
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
@@ -118,11 +119,9 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     await upsertDiscordInstallation(owner, oauthData);
 
     // 9. Redirect to success page
-    const successPath = buildIntegrationOAuthRedirectPath(
-      PLATFORM.DISCORD,
-      owner,
-      'success=installed'
-    );
+    const successPath = verified.returnTo
+      ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=discord_installed')
+      : buildIntegrationOAuthRedirectPath(PLATFORM.DISCORD, owner, 'success=installed');
 
     return NextResponse.redirect(new URL(successPath, APP_URL));
   } catch (error) {

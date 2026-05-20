@@ -13,6 +13,7 @@ import { bot } from '@/lib/bot';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackPath } from '@/lib/integrations/oauth/paths';
 import {
+  appendIntegrationOAuthRedirectQuery,
   buildIntegrationOAuthRedirectPath,
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
@@ -147,11 +148,9 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     }
 
     // 9. Redirect to success page
-    const successPath = buildIntegrationOAuthRedirectPath(
-      PLATFORM.SLACK,
-      owner,
-      'success=installed'
-    );
+    const successPath = verified.returnTo
+      ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=slack_installed')
+      : buildIntegrationOAuthRedirectPath(PLATFORM.SLACK, owner, 'success=installed');
 
     return NextResponse.redirect(new URL(successPath, APP_URL));
   } catch (error) {

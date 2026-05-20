@@ -1,6 +1,7 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 
 /**
  * HMAC-signed OAuth state parameter.
@@ -46,12 +47,19 @@ function sign(data: string): string {
  * @param owner  – owner string, e.g. `user_abc123` or `org_xyz789`
  * @param userId – the ID of the currently-authenticated user initiating the flow
  */
-export function createOAuthState(owner: string, userId: string): string {
+export function createOAuthState(owner: string, userId: string, returnTo?: string): string {
   const iat = Math.floor(Date.now() / 1000);
   const nonce = crypto.randomBytes(NONCE_BYTES).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({ owner, uid: userId, iat, nonce })).toString(
-    'base64url'
-  );
+  const safeReturnTo = returnTo ? validateReturnPath(returnTo) : null;
+  const payload = Buffer.from(
+    JSON.stringify({
+      owner,
+      uid: userId,
+      iat,
+      nonce,
+      ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
+    })
+  ).toString('base64url');
   const signature = sign(payload);
   return `${payload}.${signature}`;
 }
@@ -61,6 +69,8 @@ export type VerifiedOAuthState = {
   owner: string;
   /** The user ID that initiated the OAuth flow */
   userId: string;
+  /** Optional relative path to return to after the OAuth callback. */
+  returnTo?: string;
 };
 
 /**
@@ -95,6 +105,7 @@ export function verifyOAuthState(state: string | null): VerifiedOAuthState | nul
       uid?: string;
       iat?: number;
       nonce?: string;
+      returnTo?: string;
     };
     if (typeof data.owner !== 'string' || typeof data.uid !== 'string') return null;
 
@@ -106,7 +117,9 @@ export function verifyOAuthState(state: string | null): VerifiedOAuthState | nul
     // Require nonce to be present (guards against old-format tokens)
     if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;
 
-    return { owner: data.owner, userId: data.uid };
+    const returnTo = typeof data.returnTo === 'string' ? validateReturnPath(data.returnTo) : null;
+
+    return { owner: data.owner, userId: data.uid, ...(returnTo ? { returnTo } : {}) };
   } catch {
     return null;
   }

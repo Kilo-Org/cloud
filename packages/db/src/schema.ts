@@ -6253,11 +6253,12 @@ export type ModelExperimentVariantVersion = typeof model_experiment_variant_vers
 export type NewModelExperimentVariantVersion = typeof model_experiment_variant_version.$inferInsert;
 
 // One row per experimented request, keyed on usage_id (1:1 with microdollar_usage).
-// Stores attribution + R2 prompt hashes. The two sha256 columns hold either
-// a 64-char lowercase hex digest pointing at an R2 object, or one of the
-// reserved sentinels: `__absent__` (system only, no leading system message),
-// `__failed__` (R2 storage failed), `__deleted__` (prompt content wiped
-// while retaining attribution).
+// Stores attribution + a single R2 prompt hash for the post-`transformRequest`
+// upstream body. `request_body_sha256` holds either a 64-char lowercase hex
+// digest pointing at an R2 object, or one of the reserved sentinels:
+// `__failed__` (R2 storage failed) or `__deleted__` (prompt content wiped
+// while retaining attribution). `request_kind` records which upstream API
+// shape the body was serialized for.
 export const model_experiment_request = pgTable(
   'model_experiment_request',
   {
@@ -6271,8 +6272,8 @@ export const model_experiment_request = pgTable(
     // 'user' | 'machine' | 'ip'
     allocation_subject: text().notNull(),
     client_request_id: text(),
-    // 64-char lowercase hex sha256, or '__absent__' | '__failed__' | '__deleted__'.
-    system_prompt_sha256: text().notNull(),
+    // 'chat_completions' | 'messages' | 'responses'
+    request_kind: text().notNull(),
     // 64-char lowercase hex sha256, or '__failed__' | '__deleted__'.
     request_body_sha256: text().notNull(),
     was_truncated: boolean().notNull().default(false),
@@ -6291,8 +6292,8 @@ export const model_experiment_request = pgTable(
       sql`${table.allocation_subject} IN ('user', 'machine', 'ip')`
     ),
     check(
-      'model_experiment_request_system_prompt_sha256_format',
-      sql`${table.system_prompt_sha256} ~ '^[0-9a-f]{64}$' OR ${table.system_prompt_sha256} IN ('__absent__', '__failed__', '__deleted__')`
+      'model_experiment_request_request_kind_valid',
+      sql`${table.request_kind} IN ('chat_completions', 'messages', 'responses')`
     ),
     check(
       'model_experiment_request_request_body_sha256_format',

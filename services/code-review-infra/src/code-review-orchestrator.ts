@@ -11,6 +11,7 @@ import {
   createCloudAgentNextFetchClient,
   CloudAgentNextBillingError,
   CloudAgentNextError,
+  deriveCallbackToken,
   type CloudAgentNextFetchClient,
   type CloudAgentSessionHealthOutput,
   type CloudAgentTerminalReason,
@@ -33,6 +34,24 @@ function callbackUrlForAttempt(apiUrl: string, reviewId: string, attemptId?: str
     url.searchParams.set('attemptId', attemptId);
   }
   return url.toString();
+}
+
+async function callbackTargetForAttempt(
+  apiUrl: string,
+  reviewId: string,
+  attemptId: string | undefined,
+  callbackTokenSecret: string
+): Promise<{ url: string; headers: { 'X-Callback-Token': string } }> {
+  return {
+    url: callbackUrlForAttempt(apiUrl, reviewId, attemptId),
+    headers: {
+      'X-Callback-Token': await deriveCallbackToken({
+        secret: callbackTokenSecret,
+        scope: 'code-review-status-callback',
+        resourceParts: [reviewId, attemptId ?? ''],
+      }),
+    },
+  };
 }
 
 type UpdateStatusResult = 'updated' | 'db-terminal';
@@ -1109,12 +1128,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       }
 
       // Step 1: Prepare session with callback target
-      const callbackTarget = {
-        url: callbackUrlForAttempt(this.env.API_URL, this.state.reviewId, this.state.attemptId),
-        headers: {
-          'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
-        },
-      };
+      const callbackTarget = await callbackTargetForAttempt(
+        this.env.API_URL,
+        this.state.reviewId,
+        this.state.attemptId,
+        this.env.CALLBACK_TOKEN_SECRET
+      );
 
       const prepareInput = {
         ...this.state.sessionInput,
@@ -1319,12 +1338,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       // Step 1: Update callback target via updateSession (internal-only endpoint).
       // callbackTarget must be set through an internal procedure, not the
       // user-facing sendMessageV2, to prevent SSRF via arbitrary callback URLs.
-      const callbackTarget = {
-        url: callbackUrlForAttempt(this.env.API_URL, this.state.reviewId, this.state.attemptId),
-        headers: {
-          'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
-        },
-      };
+      const callbackTarget = await callbackTargetForAttempt(
+        this.env.API_URL,
+        this.state.reviewId,
+        this.state.attemptId,
+        this.env.CALLBACK_TOKEN_SECRET
+      );
 
       await client.updateSession(internalHeaders, {
         cloudAgentSessionId: previousSessionId,

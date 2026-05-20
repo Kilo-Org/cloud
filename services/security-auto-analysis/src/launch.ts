@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
+import { deriveCallbackToken } from '@kilocode/worker-utils';
 import {
   clearAnalysisStatus,
   getSecurityFindingById,
@@ -109,6 +110,7 @@ type StartSecurityAnalysisParams = {
   organizationId?: string;
   nextAuthSecret: string;
   internalApiSecret: string;
+  callbackTokenSecret: string;
 };
 
 export async function startSecurityAnalysis(
@@ -178,6 +180,11 @@ export async function startSecurityAnalysis(
     await setFindingPending(params.db, params.findingId, partialAnalysis);
 
     const callbackUrl = `${params.env.KILOCODE_BACKEND_BASE_URL}/api/internal/security-analysis-callback/${params.findingId}`;
+    const callbackToken = await deriveCallbackToken({
+      secret: params.callbackTokenSecret,
+      scope: 'security-analysis-callback',
+      resourceParts: [params.findingId],
+    });
 
     const prepareInput = {
       prompt: buildAnalysisPrompt(finding),
@@ -190,7 +197,7 @@ export async function startSecurityAnalysis(
       callbackTarget: {
         url: callbackUrl,
         headers: {
-          'X-Internal-Secret': params.internalApiSecret,
+          'X-Callback-Token': callbackToken,
         },
       },
     };

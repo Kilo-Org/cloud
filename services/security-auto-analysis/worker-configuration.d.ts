@@ -70,6 +70,7 @@ declare type CloudflareEnv = {
   GIT_TOKEN_SERVICE: GitTokenService;
   NEXTAUTH_SECRET: SecretBinding;
   INTERNAL_API_SECRET: SecretBinding;
+  CALLBACK_TOKEN_SECRET: SecretBinding;
   KILOCODE_BACKEND_BASE_URL: string;
   ENVIRONMENT: string;
   BETTERSTACK_HEARTBEAT_URL: string | undefined;

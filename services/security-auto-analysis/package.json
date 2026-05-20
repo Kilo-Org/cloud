@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"

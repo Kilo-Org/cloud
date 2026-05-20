@@ -302,9 +302,10 @@ async function processOwnerMessage(params: {
     return counters;
   }
 
-  const [nextAuthSecret, internalApiSecret] = await Promise.all([
+  const [nextAuthSecret, internalApiSecret, callbackTokenSecret] = await Promise.all([
     params.env.NEXTAUTH_SECRET.get(),
     params.env.INTERNAL_API_SECRET.get(),
+    params.env.CALLBACK_TOKEN_SECRET.get(),
   ]);
 
   ownerLoop: for (const [rowIndex, row] of claim.rows.entries()) {
@@ -489,6 +490,7 @@ async function processOwnerMessage(params: {
         organizationId: launchOwner.type === 'org' ? launchOwner.id : undefined,
         nextAuthSecret,
         internalApiSecret,
+        callbackTokenSecret,
       });
 
       if (startResult.started) {

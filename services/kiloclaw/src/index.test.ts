@@ -79,7 +79,7 @@ describe('platform route env validation', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  it('rejects platform routes when KILOCLAW_INTERNAL_API_SECRET is missing', async () => {
+  it('rejects platform routes when INTERNAL_API_SECRET is missing', async () => {
     const response = await app.fetch(
       new Request('https://example.com/api/platform/provision', {
         method: 'POST',
@@ -90,7 +90,6 @@ describe('platform route env validation', () => {
         body: JSON.stringify({ userId: 'user-1' }),
       }),
       {
-        INTERNAL_API_SECRET: 'next-internal-api-secret',
         HYPERDRIVE: { connectionString: 'postgresql://fake' },
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
@@ -106,7 +105,7 @@ describe('platform route env validation', () => {
     await expect(response.json()).resolves.toEqual({ error: 'Configuration error' });
     expect(console.error).toHaveBeenCalledWith(
       '[CONFIG] Platform route missing bindings:',
-      'KILOCLAW_INTERNAL_API_SECRET'
+      'INTERNAL_API_SECRET'
     );
   });
 
@@ -121,8 +120,7 @@ describe('platform route env validation', () => {
         body: JSON.stringify({ userId: 'user-1' }),
       }),
       {
-        INTERNAL_API_SECRET: 'next-internal-api-secret',
-        KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
+        INTERNAL_API_SECRET: 'claw-secret',
         HYPERDRIVE: { connectionString: 'postgresql://fake' },
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
         KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',

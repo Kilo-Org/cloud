@@ -16,7 +16,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { KILOCLAW_INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { send as sendEmail, RawHtml, type TemplateName } from '@/lib/email';
 
 // Constant-time comparison so a public attacker can't probe the
@@ -140,7 +140,7 @@ function versionChangeSection(body: Body): string {
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('X-Internal-Secret');
-  if (!KILOCLAW_INTERNAL_API_SECRET || !secretMatches(secret, KILOCLAW_INTERNAL_API_SECRET)) {
+  if (!INTERNAL_API_SECRET || !secretMatches(secret, INTERNAL_API_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

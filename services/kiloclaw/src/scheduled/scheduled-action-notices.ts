@@ -255,7 +255,7 @@ export async function runScheduledActionNoticesSweep(env: KiloClawEnv): Promise<
     console.warn('[notices-sweep] HYPERDRIVE not bound; skipping');
     return { processed: 0, sent: 0, failed: 0, recovered: 0, voidedStale: 0 };
   }
-  if (!env.BACKEND_API_URL || !env.KILOCLAW_INTERNAL_API_SECRET) {
+  if (!env.BACKEND_API_URL || !env.INTERNAL_API_SECRET) {
     console.warn('[notices-sweep] BACKEND_API_URL or internal secret missing; skipping');
     return { processed: 0, sent: 0, failed: 0, recovered: 0, voidedStale: 0 };
   }
@@ -429,7 +429,7 @@ async function dispatchEmail(
   // silently send an empty 'X-Internal-Secret' header (which the
   // backend would 401, marking every row failed with an opaque
   // 'dispatcher 401' instead of skipping the sweep loudly).
-  if (!env.BACKEND_API_URL || !env.KILOCLAW_INTERNAL_API_SECRET) {
+  if (!env.BACKEND_API_URL || !env.INTERNAL_API_SECRET) {
     return { ok: false, error: 'BACKEND_API_URL or internal secret not bound' };
   }
   try {
@@ -440,7 +440,7 @@ async function dispatchEmail(
         signal: AbortSignal.timeout(DISPATCH_TIMEOUT_MS),
         headers: {
           'Content-Type': 'application/json',
-          'X-Internal-Secret': env.KILOCLAW_INTERNAL_API_SECRET,
+          'X-Internal-Secret': env.INTERNAL_API_SECRET,
         },
         body: JSON.stringify({
           notificationId: row.notification_id,

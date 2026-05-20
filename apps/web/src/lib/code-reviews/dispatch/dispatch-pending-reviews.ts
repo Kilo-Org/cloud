@@ -107,10 +107,7 @@ async function reservePendingReviewsForDispatch(owner: Owner): Promise<ReviewRes
       .select({ count: count() })
       .from(cloud_agent_code_reviews)
       .where(
-        and(
-          ownerCondition,
-          activeCodeReviewWorkCondition(staleQueuedCutoff, staleRunningCutoff)
-        )
+        and(ownerCondition, activeCodeReviewWorkCondition(staleQueuedCutoff, staleRunningCutoff))
       );
 
     const activeCount = Number(activeCountResult[0]?.count) || 0;
@@ -131,12 +128,7 @@ async function reservePendingReviewsForDispatch(owner: Owner): Promise<ReviewRes
     const candidates = await tx
       .select()
       .from(cloud_agent_code_reviews)
-      .where(
-        and(
-          ownerCondition,
-          reconsiderableCodeReviewWorkCondition(staleQueuedCutoff)
-        )
-      )
+      .where(and(ownerCondition, reconsiderableCodeReviewWorkCondition(staleQueuedCutoff)))
       .orderBy(
         sql`CASE WHEN ${cloud_agent_code_reviews.status} = 'pending' THEN 0 ELSE 1 END`,
         cloud_agent_code_reviews.created_at

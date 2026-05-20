@@ -396,7 +396,11 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockPrepareReviewPayload).toHaveBeenCalledTimes(1);
 
     releasePreparation.resolve(undefined);
-    await expect(firstDispatch).resolves.toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
+    await expect(firstDispatch).resolves.toEqual({
+      dispatched: 1,
+      notDispatched: 0,
+      activeCount: 1,
+    });
   });
 
   it('recovers stale queued reviews before payload metadata updates refresh updated_at', async () => {

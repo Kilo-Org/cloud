@@ -5,6 +5,7 @@ import { format, subDays } from 'date-fns';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { CodeReviewStats } from '@/app/admin/components/CodeReviewStats';
+import { CodeReviewQueueHealthSummary } from '@/app/admin/components/CodeReviewQueueHealthSummary';
 import { CodeReviewDailyChart } from '@/app/admin/components/CodeReviewDailyChart';
 import { CodeReviewCancellationAnalysis } from '@/app/admin/components/CodeReviewCancellationAnalysis';
 import { CodeReviewErrorAnalysis } from '@/app/admin/components/CodeReviewErrorAnalysis';
@@ -17,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { RefreshCw, Download, X, Search, User, Building2 } from 'lucide-react';
 import {
+  useCodeReviewQueueHealthStats,
   useCodeReviewOverviewStats,
   useCodeReviewDailyStats,
   useCodeReviewPerformanceStats,
@@ -109,6 +111,7 @@ export default function CodeReviewsPage() {
   );
 
   // Queries
+  const queueHealthQuery = useCodeReviewQueueHealthStats(filterParams);
   const overviewQuery = useCodeReviewOverviewStats(filterParams);
   const dailyQuery = useCodeReviewDailyStats(filterParams);
   const performanceQuery = useCodeReviewPerformanceStats(filterParams);
@@ -118,6 +121,7 @@ export default function CodeReviewsPage() {
   const segmentationQuery = useCodeReviewUserSegmentation(filterParams);
 
   const handleRefresh = useCallback(() => {
+    void queueHealthQuery.refetch();
     void overviewQuery.refetch();
     void dailyQuery.refetch();
     void performanceQuery.refetch();
@@ -126,6 +130,7 @@ export default function CodeReviewsPage() {
     void errorQuery.refetch();
     void segmentationQuery.refetch();
   }, [
+    queueHealthQuery,
     overviewQuery,
     dailyQuery,
     performanceQuery,
@@ -208,11 +213,13 @@ export default function CodeReviewsPage() {
   }, [trpcClient, filterParams, startDate, endDate, isExporting]);
 
   const isLoading =
+    queueHealthQuery.isLoading ||
     overviewQuery.isLoading ||
     dailyQuery.isLoading ||
     performanceQuery.isLoading ||
     waitTimeQuery.isLoading;
   const isRefreshing =
+    queueHealthQuery.isFetching ||
     overviewQuery.isFetching ||
     dailyQuery.isFetching ||
     performanceQuery.isFetching ||
@@ -467,6 +474,9 @@ export default function CodeReviewsPage() {
           </div>
         ) : (
           <>
+            {/* Live Queue Health */}
+            {queueHealthQuery.data && <CodeReviewQueueHealthSummary data={queueHealthQuery.data} />}
+
             {/* KPI Cards */}
             {overviewQuery.data && <CodeReviewStats data={overviewQuery.data} />}
 
@@ -515,7 +525,8 @@ export default function CodeReviewsPage() {
         )}
 
         {/* Error State */}
-        {(overviewQuery.error ||
+        {(queueHealthQuery.error ||
+          overviewQuery.error ||
           dailyQuery.error ||
           performanceQuery.error ||
           waitTimeQuery.error ||
@@ -525,7 +536,8 @@ export default function CodeReviewsPage() {
           <div className="rounded-lg border border-red-200 bg-red-50 p-4">
             <p className="text-sm text-red-800">
               Error loading data:{' '}
-              {overviewQuery.error?.message ||
+              {queueHealthQuery.error?.message ||
+                overviewQuery.error?.message ||
                 dailyQuery.error?.message ||
                 performanceQuery.error?.message ||
                 waitTimeQuery.error?.message ||

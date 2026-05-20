@@ -27,10 +27,19 @@ const startAsyncMock = jest.fn();
 
 function createSelectResult<T>(rows: T[]) {
   const promise = Promise.resolve(rows);
-  return {
+  const result: {
+    limit: jest.Mock;
+    for: jest.Mock;
+    then: typeof promise.then;
+  } = {
     limit: jest.fn().mockResolvedValue(rows),
+    // Drizzle's `.for('update')` row-locks and returns the same shape as
+    // the parent select. Tests just need the rows; the lock semantics are
+    // exercised by the transaction integration test fixtures.
+    for: jest.fn(() => result),
     then: promise.then.bind(promise),
   };
+  return result;
 }
 
 function createWhereResult<T>(rows: T[]) {
@@ -282,6 +291,46 @@ describe('instance lifecycle async resume', () => {
     expect(mockDb.transaction).not.toHaveBeenCalled();
     expect(txUpdateSetCalls).toHaveLength(0);
     expect(deleteWhereCalls).toHaveLength(0);
+    expect(txInsertValues).toHaveLength(0);
+  });
+
+  it('aborts the transactional clear if the subscription flips out of active before the row lock acquires', async () => {
+    // Regression for the TOCTOU race between the precondition status read
+    // in completeAutoResumeIfReady and the transaction inside
+    // clearAutoResumeState: if the subscription transitions to past_due or
+    // canceled in that window, the in-transaction SELECT FOR UPDATE with
+    // status='active' returns empty rows and the entire mutation is
+    // skipped. Without this guard the email-log dedupe row and
+    // suspended_at would still be wiped on a stale ready callback,
+    // reopening the duplicate-suspension-email loop.
+    const instanceId = '11111111-1111-4111-8111-111111111111';
+    const sandboxId = 'ki_11111111111141118111111111111111';
+    selectResultsQueue.push(
+      [{ id: instanceId, sandbox_id: sandboxId }],
+      // Precondition select: subscription was active with pending markers
+      // when first read.
+      [
+        {
+          status: 'active',
+          suspended_at: '2026-04-07T20:00:00.000Z',
+          auto_resume_requested_at: '2026-04-07T20:05:00.000Z',
+          auto_resume_retry_after: '2026-04-07T22:05:00.000Z',
+          auto_resume_attempt_count: 2,
+        },
+      ],
+      // Transactional SELECT FOR UPDATE with status='active' filter: a
+      // concurrent transition committed before our lock, so no rows match.
+      []
+    );
+
+    const result = await completeAutoResumeIfReady('user-1', sandboxId, instanceId);
+
+    expect(result).toEqual({ instanceId, resumeCompleted: true });
+    expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+    // No email_log delete, no row update, no change-log insert when the
+    // active gate fails inside the transaction.
+    expect(deleteWhereCalls).toHaveLength(0);
+    expect(txUpdateSetCalls).toHaveLength(0);
     expect(txInsertValues).toHaveLength(0);
   });
 

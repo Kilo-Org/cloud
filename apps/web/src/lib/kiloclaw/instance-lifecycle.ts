@@ -132,12 +132,50 @@ async function clearAutoResumeState(
     logMessage: string;
     changeLogReason: string;
     logFields?: Record<string, unknown>;
+    /**
+     * When set, the transactional clear is gated on the subscription still
+     * being in `status='active'` at lock time. Used by the genuine
+     * auto-resume completion path to close a TOCTOU window: the
+     * subscription status read in `completeAutoResumeIfReady` happens
+     * outside this transaction, and a concurrent transition (credit-renewal
+     * sweep flipping back to past_due, user cancellation, subscription
+     * expiry) between the precondition and this transaction would
+     * otherwise still wipe the email-log dedupe state and suspension
+     * fields. Skipping the entire mutation when no active row is locked
+     * keeps the once-per-lifecycle email-notification guarantee
+     * (.specs/kiloclaw-billing.md §1118.1).
+     */
+    requireActiveSubscription?: boolean;
   }
 ): Promise<void> {
   const subscriptionFilter = subscriptionFilterForUser(kiloUserId, options.instanceId);
+  const activeSubscriptionFilter = and(
+    subscriptionFilter,
+    eq(kiloclaw_subscriptions.status, 'active')
+  );
+  let skippedNoActiveSubscription = false;
 
   await db.transaction(async tx => {
-    const subscriptions = await tx.select().from(kiloclaw_subscriptions).where(subscriptionFilter);
+    // FOR UPDATE row-locks the candidate subscriptions for the duration of
+    // the transaction. When `requireActiveSubscription` is set, any
+    // concurrent writer that flips status away from 'active' has either
+    // already committed (we won't see/lock the row) or will block on our
+    // lock until we commit. Either way the subsequent email-log delete and
+    // subscription update operate on a snapshot we know was 'active' at
+    // lock time.
+    const subscriptions = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(options.requireActiveSubscription ? activeSubscriptionFilter : subscriptionFilter)
+      .for('update');
+
+    if (options.requireActiveSubscription && subscriptions.length === 0) {
+      // The precondition saw status='active' but a concurrent transition
+      // committed before our lock acquired. Bail without touching any
+      // dedupe state. The next ready callback (or sweep) will re-evaluate.
+      skippedNoActiveSubscription = true;
+      return;
+    }
 
     await tx
       .delete(kiloclaw_email_log)
@@ -154,7 +192,7 @@ async function clearAutoResumeState(
         auto_resume_retry_after: null,
         auto_resume_attempt_count: 0,
       })
-      .where(subscriptionFilter);
+      .where(options.requireActiveSubscription ? activeSubscriptionFilter : subscriptionFilter);
 
     for (const subscription of subscriptions) {
       const clearedSuspension =
@@ -180,6 +218,16 @@ async function clearAutoResumeState(
       });
     }
   });
+
+  if (skippedNoActiveSubscription) {
+    logInfo('Auto-resume completion skipped: subscription not active at lock time', {
+      user_id: kiloUserId,
+      instance_id: options.instanceId ?? null,
+      ...(options.sandboxId ? { sandbox_id: options.sandboxId } : {}),
+      ...(options.logFields ?? {}),
+    });
+    return;
+  }
 
   logInfo(options.logMessage, {
     user_id: kiloUserId,
@@ -388,6 +436,12 @@ export async function completeAutoResumeIfReady(
     sandboxId,
     logMessage: 'Async auto-resume completed',
     changeLogReason: 'auto_resume_completed',
+    // Gate the transactional clear on the subscription still being active
+    // at lock time. The precondition above is racy by itself: a concurrent
+    // transition to past_due/canceled between the read and the transaction
+    // would otherwise still wipe the email-log dedupe row and reopen the
+    // duplicate-suspension-email loop.
+    requireActiveSubscription: true,
   });
   return { instanceId: targetInstance.id, resumeCompleted: true };
 }

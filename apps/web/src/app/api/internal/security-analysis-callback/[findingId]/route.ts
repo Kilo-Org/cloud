@@ -19,6 +19,7 @@ import { generateApiToken } from '@/lib/tokens';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
 import type { SecurityFindingAnalysis, SecurityReviewOwner } from '@/lib/security-agent/core/types';
@@ -35,15 +36,17 @@ const log = sentryLogger('security-agent:callback', 'info');
 const warn = sentryLogger('security-agent:callback', 'warning');
 const logError = sentryLogger('security-agent:callback', 'error');
 
-type ExecutionCallbackPayload = {
-  sessionId: string;
-  cloudAgentSessionId: string;
-  executionId: string;
-  status: 'completed' | 'failed' | 'interrupted';
-  errorMessage?: string;
-  kiloSessionId?: string;
-  lastSeenBranch?: string;
-};
+const ExecutionCallbackPayloadSchema = z.object({
+  sessionId: z.string(),
+  cloudAgentSessionId: z.string(),
+  executionId: z.string(),
+  status: z.enum(['completed', 'failed', 'interrupted']),
+  errorMessage: z.string().optional(),
+  kiloSessionId: z.string().optional(),
+  lastSeenBranch: z.string().optional(),
+});
+
+type ExecutionCallbackPayload = z.infer<typeof ExecutionCallbackPayloadSchema>;
 
 function mapCallbackFailure(params: { status: 'failed' | 'interrupted'; errorMessage?: string }): {
   errorMessage: string;
@@ -94,11 +97,12 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const payload: ExecutionCallbackPayload = await req.json();
-
-    if (!payload.status) {
-      return NextResponse.json({ error: 'Missing required field: status' }, { status: 400 });
+    const rawPayload: unknown = await req.json();
+    const parsedPayload = ExecutionCallbackPayloadSchema.safeParse(rawPayload);
+    if (!parsedPayload.success) {
+      return NextResponse.json({ error: 'Invalid callback payload' }, { status: 400 });
     }
+    const payload = parsedPayload.data;
 
     log('Received callback', {
       findingId,

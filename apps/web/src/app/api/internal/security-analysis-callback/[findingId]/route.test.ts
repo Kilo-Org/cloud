@@ -311,7 +311,7 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
   });
 
   describe('request validation', () => {
-    it('returns 400 when status field is missing', async () => {
+    it('returns 400 when callback payload is invalid', async () => {
       const req = makeRequest(FINDING_ID, { sessionId: 'x', cloudAgentSessionId: 'y' });
       mockGetSecurityFindingById.mockResolvedValue(createMockFinding());
 
@@ -319,7 +319,7 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
 
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body.error).toBe('Missing required field: status');
+      expect(body.error).toBe('Invalid callback payload');
     });
 
     it('returns 404 when finding does not exist', async () => {

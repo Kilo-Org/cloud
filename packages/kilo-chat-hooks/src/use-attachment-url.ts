@@ -37,7 +37,6 @@ export function attachmentUrlQueryOptions(
       const ms = computeAttachmentUrlStaleMs(data.expiresAt, Date.now());
       return ms > 0 ? ms : false;
     },
-    refetchOnWindowFocus: false,
   };
 }
 

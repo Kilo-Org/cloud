@@ -108,6 +108,52 @@ describe('attachmentUrlQueryOptions', () => {
     expect(getAttachmentUrl).toHaveBeenCalledTimes(1);
   });
 
+  it('refetches stale signed URLs when window focus returns', async () => {
+    const now = 1_000_000_000_000;
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    const { client, getAttachmentUrl } = makeClient({
+      url: 'https://r2/fresh',
+      mimeType: 'image/png',
+      size: 10,
+      filename: 'a.png',
+      expiresAt: Math.floor(now / 1000) + 3600,
+    });
+    getAttachmentUrl
+      .mockResolvedValueOnce({
+        url: 'https://r2/initial',
+        mimeType: 'image/png',
+        size: 10,
+        filename: 'a.png',
+        expiresAt: Math.floor((now + 6 * 60 * 1000) / 1000),
+      })
+      .mockResolvedValueOnce({
+        url: 'https://r2/refreshed',
+        mimeType: 'image/png',
+        size: 10,
+        filename: 'a.png',
+        expiresAt: Math.floor((now + 3600 * 1000) / 1000),
+      });
+
+    const queryClient = makeQueryClient();
+    const options = attachmentUrlQueryOptions(client, conversationId, attachmentId);
+    const obs = new QueryObserver(queryClient, options);
+    const unsub = obs.subscribe(() => {});
+
+    await queryClient.getQueryCache().find({ queryKey: options.queryKey })?.fetch();
+    expect(getAttachmentUrl).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(now + 2 * 60 * 1000);
+    queryClient.getQueryCache().onFocus();
+
+    await Promise.resolve();
+    unsub();
+    vi.useRealTimers();
+
+    expect(getAttachmentUrl).toHaveBeenCalledTimes(2);
+  });
+
   it('does not call queryFn when ids are null', async () => {
     const { client, getAttachmentUrl } = makeClient({
       url: 'https://r2/x',

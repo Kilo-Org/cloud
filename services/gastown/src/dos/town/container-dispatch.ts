@@ -138,14 +138,14 @@ export async function mintAgentToken(
 }
 
 /**
- * Mint a container-scoped JWT and push it to the TownContainerDO.
+ * Mint a container-scoped JWT and push it to the town container.
  * One JWT per container — shared by all agents in the town. Carries
  * { townId, userId, scope: 'container' } with 8h expiry.
  *
- * Pushes via both setEnvVar() (for next container boot) and
- * POST /refresh-token (for the running process). This ensures that
- * all code paths — existing agents, heartbeat, event persistence —
- * pick up the fresh token immediately.
+ * Pushes via POST /refresh-token when a container is running. New
+ * dispatches also include the fresh token in their request env. This
+ * ensures active code paths — existing agents, heartbeat, event
+ * persistence — pick up the fresh token immediately.
  *
  * Returns the token so callers can also pass it as a per-agent env var.
  */
@@ -163,17 +163,6 @@ export async function ensureContainerToken(
   const token = signContainerJWT({ townId, userId }, jwtSecret);
   const container = getTownContainerStub(env, townId);
 
-  // Store for next boot
-  try {
-    await container.setEnvVar('GASTOWN_CONTAINER_TOKEN', token);
-    await container.setEnvVar('GASTOWN_TOWN_ID', townId);
-  } catch (err) {
-    console.warn(
-      `${TOWN_LOG} ensureContainerToken: setEnvVar failed (container may not be running):`,
-      err instanceof Error ? err.message : err
-    );
-  }
-
   // Push to running process so existing agents pick up the fresh token.
   // Throw on non-2xx so the alarm's throttle doesn't advance on failure.
   try {
@@ -187,9 +176,9 @@ export async function ensureContainerToken(
       throw new Error(`container returned ${resp.status}`);
     }
   } catch (err) {
-    // If the container isn't running yet, the token will be in envVars
-    // when it boots. But if it IS running and rejected the refresh,
-    // propagate the error so the alarm retries on the next tick.
+    // If the container isn't running yet, the next dispatch will include
+    // the token in request env. But if it IS running and rejected the
+    // refresh, propagate the error so the alarm retries on the next tick.
     const isContainerDown =
       err instanceof TypeError || (err instanceof Error && err.message.includes('fetch'));
     if (!isContainerDown) throw err;
@@ -209,12 +198,11 @@ export const refreshContainerToken = ensureContainerToken;
 /**
  * Force-refresh variant for manual user-triggered refreshes.
  *
- * Unlike ensureContainerToken (which tolerates a downed container
- * because the token is persisted in envVars for next boot), this
- * function throws on ANY failure to push the token to the running
- * container — including network errors. This ensures the UI reports
- * a real failure instead of a false success when the container
- * never actually received the fresh JWT.
+ * Unlike ensureContainerToken (which tolerates a downed container because
+ * the next dispatch passes fresh request env), this function throws on ANY
+ * failure to push the token to the running container — including network
+ * errors. This ensures the UI reports a real failure instead of a false
+ * success when the container never actually received the fresh JWT.
  */
 export async function forceRefreshContainerToken(
   env: Env,
@@ -228,17 +216,6 @@ export async function forceRefreshContainerToken(
 
   const token = signContainerJWT({ townId, userId }, jwtSecret);
   const container = getTownContainerStub(env, townId);
-
-  // Store for next boot (best-effort — the critical step is the live push below)
-  try {
-    await container.setEnvVar('GASTOWN_CONTAINER_TOKEN', token);
-    await container.setEnvVar('GASTOWN_TOWN_ID', townId);
-  } catch (err) {
-    console.warn(
-      `${TOWN_LOG} forceRefreshContainerToken: setEnvVar failed:`,
-      err instanceof Error ? err.message : err
-    );
-  }
 
   // Push to running container — propagate ALL errors so the caller
   // (and ultimately the UI) knows the refresh didn't land.

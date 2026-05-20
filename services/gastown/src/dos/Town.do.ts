@@ -954,105 +954,17 @@ export class TownDO extends DurableObject<Env> {
   /**
    * Push config-derived env vars to the running container. Called after
    * updateTownConfig so that settings changes take effect without a
-   * container restart. New agent processes inherit the updated values.
-   *
-   * Two-phase push:
-   *  1. setEnvVar — persists to DO storage for next boot
-   *  2. POST /sync-config — hot-swaps process.env on the running container
+   * container restart. New agent processes receive current env through
+   * their start requests.
    */
   async syncConfigToContainer(): Promise<void> {
     const townId = this.townId;
     if (!townId) return;
-    const townConfig = await this.getTownConfig();
     const container = getTownContainerStub(this.env, townId);
 
-    // Resolve a fresh GitHub token here too — this method runs both at
-    // initial config push and on every config change, so the persisted
-    // GIT_TOKEN must be live rather than the stale value stored in
-    // git_auth.github_token from rig creation. The container's
-    // syncTownConfigToProcessEnv path reads `git_auth.github_token`
-    // from the X-Town-Config header on every request, so the in-process
-    // GIT_TOKEN follows the same source-of-truth as the persisted one.
-    const githubToken = await scm.resolveGitHubTokenString({
-      env: this.env,
-      townId,
-      getTownConfig: () => Promise.resolve(townConfig),
-    });
-
-    // Phase 1: Persist to DO storage for next boot.
-    const envMapping: Array<[string, string | undefined]> = [
-      ['GIT_TOKEN', githubToken ?? undefined],
-      ['GITLAB_TOKEN', townConfig.git_auth?.gitlab_token],
-      ['GITLAB_INSTANCE_URL', townConfig.git_auth?.gitlab_instance_url],
-      ['GITHUB_CLI_PAT', townConfig.github_cli_pat],
-      ['GASTOWN_GIT_AUTHOR_NAME', townConfig.git_author_name],
-      ['GASTOWN_GIT_AUTHOR_EMAIL', townConfig.git_author_email],
-      ['GASTOWN_DISABLE_AI_COAUTHOR', townConfig.disable_ai_coauthor ? '1' : undefined],
-      ['KILOCODE_TOKEN', townConfig.kilocode_token],
-    ];
-
-    for (const [key, value] of envMapping) {
-      try {
-        if (value) {
-          await container.setEnvVar(key, value);
-        } else {
-          await container.deleteEnvVar(key);
-        }
-      } catch (err) {
-        console.warn(`[Town.do] syncConfigToContainer: ${key} sync failed:`, err);
-      }
-    }
-
-    // Persist custom env_vars to DO storage so they survive container restarts.
-    // Compare against the previously-persisted set of keys to clear removed ones.
-    // Reserved infra keys are never overwritten or deleted — infra values always win.
-    const RESERVED_ENV_KEYS = new Set([
-      'KILOCODE_TOKEN',
-      'GIT_TOKEN',
-      'GITHUB_TOKEN',
-      'GITLAB_TOKEN',
-      'GITLAB_INSTANCE_URL',
-      'GITHUB_CLI_PAT',
-      'GH_TOKEN',
-      'GASTOWN_GIT_AUTHOR_NAME',
-      'GASTOWN_GIT_AUTHOR_EMAIL',
-      'GASTOWN_DISABLE_AI_COAUTHOR',
-      'GASTOWN_ORGANIZATION_ID',
-      'GASTOWN_CONTAINER_TOKEN',
-      'GASTOWN_SESSION_TOKEN',
-      'GASTOWN_API_URL',
-    ]);
-    const CUSTOM_ENV_KEYS_STORAGE_KEY = 'container:custom_env_var_keys';
-    const prevCustomKeys: string[] =
-      (await this.ctx.storage.get<string[]>(CUSTOM_ENV_KEYS_STORAGE_KEY)) ?? [];
-    const newCustomKeys = Object.keys(townConfig.env_vars).filter(
-      key => !RESERVED_ENV_KEYS.has(key)
-    );
-    const newCustomKeySet = new Set(newCustomKeys);
-
-    for (const key of prevCustomKeys) {
-      if (RESERVED_ENV_KEYS.has(key)) continue;
-      if (!newCustomKeySet.has(key)) {
-        try {
-          await container.deleteEnvVar(key);
-        } catch (err) {
-          console.warn(`[Town.do] syncConfigToContainer: delete custom ${key} failed:`, err);
-        }
-      }
-    }
-    for (const [key, value] of Object.entries(townConfig.env_vars)) {
-      if (RESERVED_ENV_KEYS.has(key)) continue;
-      try {
-        await container.setEnvVar(key, value);
-      } catch (err) {
-        console.warn(`[Town.do] syncConfigToContainer: set custom ${key} failed:`, err);
-      }
-    }
-    await this.ctx.storage.put(CUSTOM_ENV_KEYS_STORAGE_KEY, newCustomKeys);
-
-    // Phase 2: Push to the running container's process.env via the
-    // /sync-config endpoint. The X-Town-Config header delivers the
-    // full config; the endpoint applies CONFIG_ENV_MAP to process.env.
+    // Push to the running container's process.env via the /sync-config
+    // endpoint. The X-Town-Config header delivers the full config; the
+    // endpoint applies CONFIG_ENV_MAP to process.env.
     try {
       const containerConfig = await config.buildContainerConfig(
         this.ctx.storage,
@@ -1158,19 +1070,6 @@ export class TownDO extends DurableObject<Env> {
         logger.info('configureRig: propagating kilocodeToken to town config');
         await this.updateTownConfig({
           kilocode_token: rigConfig.kilocodeToken,
-        });
-      }
-    }
-
-    const token = rigConfig.kilocodeToken ?? (await this.resolveKilocodeToken());
-    if (token) {
-      try {
-        const container = getTownContainerStub(this.env, this.townId);
-        await container.setEnvVar('KILOCODE_TOKEN', token);
-        logger.info('configureRig: stored KILOCODE_TOKEN on TownContainerDO');
-      } catch (err) {
-        logger.warn('configureRig: failed to store token on container DO', {
-          error: err instanceof Error ? err.message : String(err),
         });
       }
     }
@@ -2841,15 +2740,6 @@ export class TownDO extends DurableObject<Env> {
         orgId: townConfig.organization_id,
       });
 
-      if (kilocodeToken) {
-        try {
-          const containerStub = getTownContainerStub(this.env, townId);
-          await containerStub.setEnvVar('KILOCODE_TOKEN', kilocodeToken);
-        } catch {
-          // Best effort
-        }
-      }
-
       const { started: mayorStarted } = await dispatch.startAgentInContainer(
         this.env,
         this.ctx.storage,
@@ -3050,13 +2940,6 @@ export class TownDO extends DurableObject<Env> {
       role: 'mayor',
       label: 'fresh_dispatch',
     });
-
-    try {
-      const containerStub = getTownContainerStub(this.env, townId);
-      await containerStub.setEnvVar('KILOCODE_TOKEN', kilocodeToken);
-    } catch {
-      // Best effort
-    }
 
     // Start with an empty prompt — the mayor will be idle but its container
     // and SDK server will be running, ready for PTY connections.
@@ -4498,10 +4381,9 @@ export class TownDO extends DurableObject<Env> {
   }
 
   /**
-   * Push a fresh container-scoped JWT to the TownContainerDO. Called
+   * Push a fresh container-scoped JWT to the running control server. Called
    * from the alarm handler, throttled to once per hour (tokens have
-   * 8h expiry). The TownContainerDO stores it as an env var so it's
-   * available to all agents in the container.
+   * 8h expiry). New dispatches also pass fresh tokens in their request env.
    *
    * The throttle timestamp is persisted in ctx.storage so it survives
    * DO eviction. Without persistence, eviction resets the throttle to 0

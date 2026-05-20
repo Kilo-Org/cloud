@@ -142,6 +142,9 @@ describe('getSignInCallbackUrl', () => {
         expect(isValidCallbackPath('/api/integrations/linear/callback')).toBe(false);
         expect(isValidCallbackPath('/api/integrations/github/connect')).toBe(false);
         expect(isValidCallbackPath('/api/integrations/linear/connect/extra')).toBe(false);
+        expect(isValidCallbackPath('/api/integrations/gitlab/connect?clientSecret=secret')).toBe(
+          false
+        );
         expect(isValidCallbackPath('/api/v1/users')).toBe(false);
       });
 

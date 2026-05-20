@@ -241,6 +241,21 @@ describe('GET /api/integrations/linear/callback', () => {
     expectRedirectLocation(response, '/claw/new?step=linear&success=linear_installed');
   });
 
+  test('inserts returnTo success query before a fragment', async () => {
+    mockedUpsertLinearInstallation.mockResolvedValue({} as never);
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID, '/claw/new#calendar');
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
+
+    const location = response.headers.get('location');
+    expect(location).toBeTruthy();
+    const url = new URL(location ?? '');
+    expect(`${url.pathname}${url.search}${url.hash}`).toBe(
+      '/claw/new?success=linear_installed#calendar'
+    );
+  });
+
   test('falls back to organizationId when the Linear GraphQL query fails', async () => {
     mockLinearOrganization.mockRejectedValue(new Error('Unauthorized'));
     mockedUpsertLinearInstallation.mockResolvedValue({} as never);

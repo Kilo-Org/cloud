@@ -29,7 +29,11 @@ function ownerToOAuthStateOwner(owner: Owner): string {
 }
 
 export function appendIntegrationOAuthRedirectQuery(path: string, queryParam: string): string {
-  return `${path}${path.includes('?') ? '&' : '?'}${queryParam}`;
+  const hashIndex = path.indexOf('#');
+  const pathWithoutHash = hashIndex === -1 ? path : path.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? '' : path.slice(hashIndex);
+
+  return `${pathWithoutHash}${pathWithoutHash.includes('?') ? '&' : '?'}${queryParam}${hash}`;
 }
 
 export function parseOAuthStateOwner(owner: string): Owner | null {
@@ -108,12 +112,12 @@ export function buildIntegrationOAuthConnectErrorPath(
   return `/integrations/${platform}?${queryParam}`;
 }
 
-export function redirectToSignInForOAuthConnect(request: NextRequest): Response {
+export function redirectToSignInForOAuthConnect(
+  request: NextRequest,
+  callbackPath = `${request.nextUrl.pathname}${request.nextUrl.search}`
+): Response {
   const signInUrl = new URL('/users/sign_in', request.url);
-  signInUrl.searchParams.set(
-    'callbackPath',
-    `${request.nextUrl.pathname}${request.nextUrl.search}`
-  );
+  signInUrl.searchParams.set('callbackPath', callbackPath);
   return NextResponse.redirect(signInUrl);
 }
 

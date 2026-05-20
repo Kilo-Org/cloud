@@ -34,7 +34,12 @@ export async function handleGitLabOAuthConnect(request: NextRequest) {
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
-      return redirectToSignInForOAuthConnect(request);
+      return redirectToSignInForOAuthConnect(
+        request,
+        request.nextUrl.searchParams.has('clientSecret')
+          ? buildGitLabDetailCallbackPath(organizationId)
+          : undefined
+      );
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -90,4 +95,12 @@ export async function handleGitLabOAuthConnect(request: NextRequest) {
       )
     );
   }
+}
+
+function buildGitLabDetailCallbackPath(organizationId: string | null): string {
+  if (organizationId) {
+    return `/organizations/${organizationId}/integrations/gitlab`;
+  }
+
+  return '/integrations/gitlab';
 }

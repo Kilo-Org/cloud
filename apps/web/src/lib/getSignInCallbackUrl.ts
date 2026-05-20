@@ -54,6 +54,10 @@ function isValidIntegrationOAuthConnectCallbackPath(path: string): boolean {
     return false;
   }
 
+  if (url.searchParams.has('clientSecret')) {
+    return false;
+  }
+
   const [, api, integrations, platform, action, ...rest] = url.pathname.split('/');
   return (
     api === 'api' &&

@@ -286,7 +286,13 @@ describe('awaitHydration', () => {
       });
       expect(env?.KILO_CONFIG_CONTENT).toBeTruthy();
       expect(env?.KILO_PLATFORM).toBe('gastown');
+<<<<<<< HEAD
       expect(env?.KILO_AUTH_CONTENT).toBe(JSON.stringify({ kilo: { type: 'api', key: 'kc-tok' } }));
+=======
+      expect(env?.KILO_AUTH_CONTENT).toBe(
+        JSON.stringify({ kilo: { type: 'api', key: 'kc-tok' } })
+      );
+>>>>>>> 8553c88b8 (fix(gastown): bump @kilocode/cli to 7.3.1 + plumb auth env into prewarm (#3372))
       expect(env?.KILO_ORG_ID).toBeUndefined();
     } finally {
       globalThis.fetch = originalFetch;

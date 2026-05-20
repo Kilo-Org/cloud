@@ -2239,15 +2239,6 @@ export function SettingsTab({
                 <Link href="/byok" target="_blank" className="underline">
                   Kilo BYOK settings
                 </Link>
-                .{' '}
-                <a
-                  href="https://kilo.ai/docs/getting-started/byok"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline"
-                >
-                  View the BYOK setup guide
-                </a>
                 .
               </p>
             </div>

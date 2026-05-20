@@ -124,7 +124,7 @@ export async function processTopUp(
     return false;
   }
 
-  if (!dbOrTx) {
+  const emitCreditPurchasedEvent = () => {
     void reportEvents({
       events: [
         {
@@ -136,6 +136,12 @@ export async function processTopUp(
         },
       ],
     });
+  };
+
+  if (dbOrTx) {
+    after(emitCreditPurchasedEvent);
+  } else {
+    emitCreditPurchasedEvent();
   }
 
   if (skipPostTopUpFreeStuff) return true;

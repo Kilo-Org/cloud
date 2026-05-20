@@ -494,34 +494,38 @@ export const adminRouter = createTRPCRouter({
       .input(UpdateUserBlockStatusSchema)
       .mutation(async ({ input, ctx }) => {
         const isBlocking = Boolean(input.blocked_reason);
+        let didTransition = false;
 
-        const [current] = await db
-          .select({ blocked_reason: kilocode_users.blocked_reason })
-          .from(kilocode_users)
-          .where(eq(kilocode_users.id, input.userId))
-          .limit(1);
+        await db.transaction(async (tx) => {
+          const [current] = await tx
+            .select({ blocked_reason: kilocode_users.blocked_reason })
+            .from(kilocode_users)
+            .where(eq(kilocode_users.id, input.userId))
+            .for('update')
+            .limit(1);
 
-        const wasBlocked = Boolean(current?.blocked_reason);
-        const isTransition = isBlocking !== wasBlocked;
+          const wasBlocked = Boolean(current?.blocked_reason);
+          didTransition = isBlocking !== wasBlocked;
 
-        const blockMetadata = isBlocking
-          ? {
-              blocked_reason: input.blocked_reason,
-              blocked_at: new Date().toISOString(),
-              blocked_by_kilo_user_id: ctx.user.id,
-            }
-          : {
-              blocked_reason: null,
-              blocked_at: null,
-              blocked_by_kilo_user_id: null,
-            };
+          const blockMetadata = isBlocking
+            ? {
+                blocked_reason: input.blocked_reason,
+                blocked_at: new Date().toISOString(),
+                blocked_by_kilo_user_id: ctx.user.id,
+              }
+            : {
+                blocked_reason: null,
+                blocked_at: null,
+                blocked_by_kilo_user_id: null,
+              };
 
-        await db
-          .update(kilocode_users)
-          .set(blockMetadata)
-          .where(eq(kilocode_users.id, input.userId));
+          await tx
+            .update(kilocode_users)
+            .set(blockMetadata)
+            .where(eq(kilocode_users.id, input.userId));
+        });
 
-        if (isTransition) {
+        if (didTransition) {
           void reportEvents({
             events: [
               {

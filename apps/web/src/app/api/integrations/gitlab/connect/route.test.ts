@@ -34,6 +34,14 @@ function makeRequest(pathWithQuery: string) {
   return new NextRequest(`http://localhost:3000${pathWithQuery}`);
 }
 
+function makeJsonRequest(pathWithQuery: string, body: unknown) {
+  return new NextRequest(`http://localhost:3000${pathWithQuery}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 function expectRedirectLocation(response: Response, expectedPathWithQuery: string) {
   const location = response.headers.get('location');
   expect(location).toBeTruthy();
@@ -44,6 +52,11 @@ function expectRedirectLocation(response: Response, expectedPathWithQuery: strin
 async function callGitLabConnect(request: NextRequest) {
   const { GET } = await import('../../[platform]/connect/route');
   return GET(request, { params: Promise.resolve({ platform: 'gitlab' }) });
+}
+
+async function callGitLabConnectPost(request: NextRequest) {
+  const { POST } = await import('../../[platform]/connect/route');
+  return POST(request, { params: Promise.resolve({ platform: 'gitlab' }) });
 }
 
 describe('GET /api/integrations/gitlab/connect', () => {
@@ -136,11 +149,14 @@ describe('GET /api/integrations/gitlab/connect', () => {
   });
 
   test('stores self-hosted credentials and binds only their Redis reference into signed state', async () => {
-    await callGitLabConnect(
-      makeRequest(
-        '/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fgitlab.example.com&clientId=client-id&clientSecret=client-secret'
-      )
+    const response = await callGitLabConnectPost(
+      makeJsonRequest('/api/integrations/gitlab/connect', {
+        instanceUrl: 'https://gitlab.example.com',
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+      })
     );
+    const responseBody = (await response.json()) as { url?: string };
 
     expect(mockedStoreGitLabOAuthCredentials).toHaveBeenCalledWith({
       clientId: 'client-id',
@@ -162,6 +178,20 @@ describe('GET /api/integrations/gitlab/connect', () => {
         clientSecret: 'client-secret',
       }
     );
+    expect(responseBody.url).toBe('https://gitlab.com/oauth/authorize?state=signed');
+  });
+
+  test('does not accept self-hosted client secrets from GET query params', async () => {
+    const response = await callGitLabConnect(
+      makeRequest(
+        '/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fgitlab.example.com&clientId=client-id&clientSecret=client-secret'
+      )
+    );
+
+    expectRedirectLocation(response, '/integrations/gitlab?error=oauth_init_failed');
+    expect(mockedStoreGitLabOAuthCredentials).not.toHaveBeenCalled();
+    expect(mockedCreateGitLabOAuthState).not.toHaveBeenCalled();
+    expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
   });
 
   test('preserves a valid returnTo in signed OAuth state', async () => {
@@ -194,13 +224,15 @@ describe('GET /api/integrations/gitlab/connect', () => {
   test('does not create OAuth state when credential caching is unavailable', async () => {
     mockedStoreGitLabOAuthCredentials.mockResolvedValue(null);
 
-    const response = await callGitLabConnect(
-      makeRequest(
-        '/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fgitlab.example.com&clientId=client-id&clientSecret=client-secret'
-      )
+    const response = await callGitLabConnectPost(
+      makeJsonRequest('/api/integrations/gitlab/connect', {
+        instanceUrl: 'https://gitlab.example.com',
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+      })
     );
 
-    expectRedirectLocation(response, '/integrations/gitlab?error=oauth_init_failed');
+    expect(response.status).toBe(500);
     expect(mockedCreateGitLabOAuthState).not.toHaveBeenCalled();
     expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
   });

@@ -40,6 +40,20 @@ export async function handlePlatformOAuthConnect(
   }
 }
 
+export async function handlePlatformOAuthConnectPost(
+  request: NextRequest,
+  platform: string
+): Promise<Response> {
+  switch (platform) {
+    case PLATFORM.GITLAB:
+      return (
+        await import('@/lib/integrations/oauth/platforms/gitlab-connect')
+      ).handleGitLabOAuthConnectPost(request);
+    default:
+      return unsupportedOAuthRoute(platform, 'connect');
+  }
+}
+
 export async function handlePlatformOAuthCallback(
   request: NextRequest,
   platform: string

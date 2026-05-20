@@ -203,6 +203,24 @@ export function buildChatSummarySectionLines(
   return lines;
 }
 
+/**
+ * Italic empty-state lines for the chat-activity sections. Wrapped in
+ * `_..._` so they render italic and survive the channel flattener.
+ */
+export const CHAT_EMPTY_YESTERDAY = '_No Kilo Chat activity yesterday._';
+export const CHAT_EMPTY_TODAY = '_No Kilo Chat activity so far today._';
+
+/**
+ * Short TL;DR fragment built from yesterday's chat stats. Returns an
+ * empty string when there was no activity so the caller can drop it.
+ */
+export function formatChatTldr(stats: ChatSummaryStats): string {
+  if (stats.messageCount <= 0) return '';
+  return stats.messageCount === 1
+    ? '1 chat message yesterday'
+    : `${stats.messageCount} chat messages yesterday`;
+}
+
 export function buildChatSummaryStatus(stats: ChatSummaryStats, periodLabel: string): string {
   if (stats.messageCount === 0) return `0 Kilo Chat messages ${periodLabel}`;
   return `${pluralize(stats.messageCount, 'Kilo Chat message')} across ${pluralize(

@@ -48,15 +48,45 @@ export function resolveBriefingPath(briefingsDir: string, dateKey: string): stri
   return path.join(briefingsDir, `${dateKey}.md`);
 }
 
+/**
+ * Display names for the consolidated `## ⚙️ Connect more` nudge. Only
+ * sources the user can actually set up appear here. `kilo-chat` is
+ * intentionally absent — its readiness is a deploy concern, not a user
+ * setting — so an unconfigured kilo-chat source is dropped silently
+ * rather than nudged.
+ */
+const CONNECT_MORE_DISPLAY_NAMES: Partial<Record<BriefingSourceStatus['source'], string>> = {
+  calendar: 'Google Calendar',
+  github: 'GitHub',
+  linear: 'Linear',
+  'local-news': 'Local News',
+  web: 'Web news',
+};
+
 export function buildBriefingMarkdown(params: {
   dateKey: string;
   generatedAt: Date;
   statuses: BriefingSourceStatus[];
   sections: BriefingDocumentSection[];
   failures: string[];
+  /** Joined TL;DR fragments (` · `-separated). Omitted when empty. */
+  tldr?: string;
+  /**
+   * When true, append the `## Source Status` per-source diagnostic
+   * footer. Off by default — it is operator-facing noise, not something
+   * a user wants every morning. `generateBriefing` sets this from the
+   * `BRIEFING_DEBUG` env var.
+   */
+  debug?: boolean;
 }): string {
   const lines: string[] = [];
   lines.push(`# Morning Briefing - ${params.dateKey}`);
+
+  const tldr = params.tldr?.trim();
+  if (tldr) {
+    lines.push('');
+    lines.push(`**TL;DR:** ${tldr}`);
+  }
 
   for (const section of params.sections) {
     if (section.lines.length === 0) {
@@ -67,6 +97,23 @@ export function buildBriefingMarkdown(params: {
     lines.push(...section.lines);
   }
 
+  // One consolidated nudge for every source the user hasn't connected
+  // yet, in place of the per-source inline nudges sources used to
+  // render in their own section body.
+  const connectMore = params.statuses
+    .filter(status => !status.configured)
+    .map(status => CONNECT_MORE_DISPLAY_NAMES[status.source])
+    .filter((name): name is string => name !== undefined);
+  if (connectMore.length > 0) {
+    lines.push('');
+    lines.push('## ⚙️ Connect more');
+    for (const name of connectMore) {
+      lines.push(`- ${name}`);
+    }
+    lines.push('');
+    lines.push("Set these up in KiloClaw Settings to enrich tomorrow's briefing.");
+  }
+
   if (params.failures.length > 0) {
     lines.push('');
     lines.push('## Failures');
@@ -75,11 +122,13 @@ export function buildBriefingMarkdown(params: {
     }
   }
 
-  lines.push('');
-  lines.push('## Source Status');
-  for (const status of params.statuses) {
-    const marker = status.ok ? '[ok]' : status.configured ? '[error]' : '[skipped]';
-    lines.push(`- ${status.source}: ${marker} ${status.summary}`);
+  if (params.debug) {
+    lines.push('');
+    lines.push('## Source Status');
+    for (const status of params.statuses) {
+      const marker = status.ok ? '[ok]' : status.configured ? '[error]' : '[skipped]';
+      lines.push(`- ${status.source}: ${marker} ${status.summary}`);
+    }
   }
 
   lines.push('');

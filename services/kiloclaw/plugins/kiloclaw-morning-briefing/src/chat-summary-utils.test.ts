@@ -4,6 +4,9 @@ import {
   buildChatSummaryStatus,
   buildTodaySoFarChatWindow,
   buildYesterdayChatWindow,
+  CHAT_EMPTY_TODAY,
+  CHAT_EMPTY_YESTERDAY,
+  formatChatTldr,
   summarizeChatActivity,
   ulidToTimestampMs,
   type ChatSummaryConversation,
@@ -130,5 +133,49 @@ describe('chat summary utils', () => {
     expect(buildChatSummarySectionLines(stats, 'No Kilo Chat messages so far today.')).toEqual([
       'No Kilo Chat messages so far today.',
     ]);
+  });
+});
+
+describe('formatChatTldr', () => {
+  it("pluralizes yesterday's message count", () => {
+    expect(
+      formatChatTldr({
+        activeConversationCount: 2,
+        messageCount: 12,
+        userMessageCount: 7,
+        botMessageCount: 5,
+        deletedMessageCount: 0,
+      })
+    ).toBe('12 chat messages yesterday');
+    expect(
+      formatChatTldr({
+        activeConversationCount: 1,
+        messageCount: 1,
+        userMessageCount: 1,
+        botMessageCount: 0,
+        deletedMessageCount: 0,
+      })
+    ).toBe('1 chat message yesterday');
+  });
+
+  it('returns an empty string when there was no activity', () => {
+    expect(
+      formatChatTldr({
+        activeConversationCount: 0,
+        messageCount: 0,
+        userMessageCount: 0,
+        botMessageCount: 0,
+        deletedMessageCount: 0,
+      })
+    ).toBe('');
+  });
+});
+
+describe('chat empty-state constants', () => {
+  it('are italic-wrapped one-liners', () => {
+    for (const line of [CHAT_EMPTY_YESTERDAY, CHAT_EMPTY_TODAY]) {
+      expect(line.startsWith('_')).toBe(true);
+      expect(line.endsWith('_')).toBe(true);
+    }
   });
 });

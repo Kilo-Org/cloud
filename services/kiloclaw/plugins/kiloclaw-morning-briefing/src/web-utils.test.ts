@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeWebResults } from './web-utils';
+import { formatWebTldr, normalizeWebResults, WEB_EMPTY_LINE } from './web-utils';
 
 describe('web-utils', () => {
   it('strips external wrapper markers and truncates noisy summaries', () => {
@@ -31,5 +31,23 @@ describe('web-utils', () => {
     });
 
     expect(results[0].title).toBe('example.com');
+  });
+});
+
+describe('formatWebTldr', () => {
+  it('pluralizes the item count', () => {
+    expect(formatWebTldr(5)).toBe('5 web news items');
+    expect(formatWebTldr(1)).toBe('1 web news item');
+  });
+
+  it('returns an empty string when there is nothing to count', () => {
+    expect(formatWebTldr(0)).toBe('');
+  });
+});
+
+describe('WEB_EMPTY_LINE', () => {
+  it('is an italic-wrapped one-liner', () => {
+    expect(WEB_EMPTY_LINE.startsWith('_')).toBe(true);
+    expect(WEB_EMPTY_LINE.endsWith('_')).toBe(true);
   });
 });

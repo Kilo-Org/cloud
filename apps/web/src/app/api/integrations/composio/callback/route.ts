@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { APP_URL } from '@/lib/constants';
 import { getUserFromAuth } from '@/lib/user.server';
 import { isSafeGoogleOAuthReturnTo } from '@/lib/integrations/google/oauth-state';
@@ -42,6 +43,12 @@ function appendError(path: string, error: string): string {
   next.set('error', error);
   next.delete('success');
   return `${parsedPath.pathname}?${next.toString()}`;
+}
+
+function callbackFailureError(error: unknown): 'unauthorized' | 'internal_error' {
+  return error instanceof TRPCError && error.code === 'UNAUTHORIZED'
+    ? 'unauthorized'
+    : 'internal_error';
 }
 
 function serializeInlineJson(value: unknown): string {
@@ -197,8 +204,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(
       new URL(appendResult(returnTo, verified ? 'success' : 'failed'), APP_URL)
     );
-  } catch {
-    if (popup) return popupResultResponse('failed', 'unauthorized', attemptId);
-    return NextResponse.redirect(new URL(appendError(returnTo, 'unauthorized'), APP_URL));
+  } catch (error) {
+    const failureError = callbackFailureError(error);
+    if (popup) return popupResultResponse('failed', failureError, attemptId);
+    return NextResponse.redirect(new URL(appendError(returnTo, failureError), APP_URL));
   }
 }

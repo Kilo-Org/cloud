@@ -191,6 +191,21 @@ describe('GET /api/integrations/composio/callback', () => {
     expect(body).toContain('attempt-2');
   });
 
+  test('reports internal callback failures separately from authorization failures', async () => {
+    mockedCompleteManagedComposioGoogleCalendarConnection.mockRejectedValue(
+      new Error('db unavailable')
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        '/api/integrations/composio/callback?returnTo=%2Fclaw%2Fnew%3Fstep%3Dtools&status=success&connected_account_id=ca_123'
+      ) as never
+    );
+
+    expect(redirectPath(response)).toBe('/claw/new?step=tools&error=internal_error');
+  });
+
   test('escapes popup attempt id before embedding it in inline scripts', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,

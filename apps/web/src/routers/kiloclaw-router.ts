@@ -1163,7 +1163,6 @@ async function provisionInstance(
     await markComposioInstanceConfig({
       instanceId: result.instanceId,
       source: 'managed',
-      composioIdentityId: composioProvision.configToMark.composioIdentityId,
     });
   }
 

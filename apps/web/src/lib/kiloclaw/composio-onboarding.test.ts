@@ -222,7 +222,7 @@ describe('buildComposioProvisionSecrets', () => {
         composioUserApiKey: 'uak_123',
         composioOrg: 'org-1',
       },
-      configToMark: { source: 'managed', composioIdentityId: 'identity-1' },
+      configToMark: { source: 'managed' },
     });
   });
 
@@ -250,7 +250,7 @@ describe('buildComposioProvisionSecrets', () => {
         composioUserApiKey: 'uak_123',
         composioOrg: 'org-1',
       },
-      configToMark: { source: 'managed', composioIdentityId: 'identity-1' },
+      configToMark: { source: 'managed' },
     });
   });
 });

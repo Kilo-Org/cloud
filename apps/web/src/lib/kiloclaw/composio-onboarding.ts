@@ -28,10 +28,7 @@ export type ComposioConnectionStatus = 'not_configured' | 'disconnected' | 'conn
 
 export type ComposioSandboxConfigSource = KiloClawComposioInstanceConfigSource | null;
 
-export type ProvisionComposioConfigToMark =
-  | { source: 'manual' }
-  | { source: 'managed'; composioIdentityId: string }
-  | null;
+export type ProvisionComposioConfigToMark = { source: 'manual' | 'managed' } | null;
 
 function composioUserContextAuth(
   identity: DecryptedComposioIdentity
@@ -78,23 +75,12 @@ export async function applyManagedComposioCredentials(params: {
   await markComposioInstanceConfig({
     instanceId: params.instance.id,
     source: 'managed',
-    composioIdentityId: identity.row.id,
   });
 }
 
 export async function markComposioInstanceConfig(params: {
   instanceId: string;
-  source: 'manual';
-}): Promise<void>;
-export async function markComposioInstanceConfig(params: {
-  instanceId: string;
-  source: 'managed';
-  composioIdentityId: string;
-}): Promise<void>;
-export async function markComposioInstanceConfig(params: {
-  instanceId: string;
   source: KiloClawComposioInstanceConfigSource;
-  composioIdentityId?: string;
 }): Promise<void> {
   await db
     .update(kiloclaw_instances)
@@ -164,7 +150,7 @@ export async function buildComposioProvisionSecrets(params: {
       composioUserApiKey: identity.userApiKey,
       composioOrg: identity.org,
     },
-    configToMark: { source: 'managed', composioIdentityId: identity.row.id },
+    configToMark: { source: 'managed' },
   };
 }
 
@@ -202,15 +188,14 @@ export async function completeManagedComposioGoogleCalendarConnection(params: {
     },
     workerInstanceId(params.instance)
   );
-  await markComposioInstanceConfig({
-    instanceId: params.instance.id,
-    source: 'managed',
-    composioIdentityId: identity.row.id,
-  });
   await db
     .update(kiloclaw_composio_identities)
     .set({ google_calendar_connected_account_id: params.connectedAccountId })
     .where(eq(kiloclaw_composio_identities.id, identity.row.id));
+  await markComposioInstanceConfig({
+    instanceId: params.instance.id,
+    source: 'managed',
+  });
   return true;
 }
 

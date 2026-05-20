@@ -537,7 +537,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
             await markComposioInstanceConfig({
               instanceId: result.instanceId,
               source: 'managed',
-              composioIdentityId: composioProvision.configToMark.composioIdentityId,
             });
           }
 
@@ -613,7 +612,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
         await markComposioInstanceConfig({
           instanceId: result.instanceId,
           source: 'managed',
-          composioIdentityId: composioProvision.configToMark.composioIdentityId,
         });
       }
 

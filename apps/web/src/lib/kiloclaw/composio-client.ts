@@ -203,6 +203,7 @@ export async function resolveComposioConsumerProject(
         'content-type': 'application/json',
         ...userOrgAuthHeaders(params),
       },
+      body: '{}',
     }
   );
   const json = await parseJsonResponse(response, 'consumer project resolve');

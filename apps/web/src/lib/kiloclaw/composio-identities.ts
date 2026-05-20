@@ -230,6 +230,9 @@ export async function ensureManagedComposioIdentity(
         .set(await encryptComposioIdentity(scope, refreshed))
         .where(eq(kiloclaw_composio_identities.id, existing.id))
         .returning();
+      if (!updated) {
+        throw new Error('Failed to refresh managed Composio identity context');
+      }
       return decryptComposioIdentity(updated);
     }
 

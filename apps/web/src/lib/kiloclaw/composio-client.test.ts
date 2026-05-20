@@ -160,6 +160,7 @@ describe('Composio client', () => {
             'x-user-api-key': 'uak_123',
             'x-org-id': 'org-1',
           },
+          body: '{}',
         },
       },
     ]);

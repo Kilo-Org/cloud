@@ -80,8 +80,11 @@ describe('calverAtLeast', () => {
 });
 
 describe('controllerCalverSupports', () => {
-  // Fails OPEN — unknown / unparseable input is treated as supported.
-  it('returns true for null', () => expect(controllerCalverSupports(null, '2026.5.12')).toBe(true));
+  // Explicit `null` is the worker's positive old-controller signal — gate OFF.
+  it('returns false for null (worker old-controller signal)', () =>
+    expect(controllerCalverSupports(null, '2026.5.12')).toBe(false));
+
+  // Fails OPEN — genuinely unknown / unparseable input is treated as supported.
   it('returns true for undefined', () =>
     expect(controllerCalverSupports(undefined, '2026.5.12')).toBe(true));
   it('returns true for empty string', () =>

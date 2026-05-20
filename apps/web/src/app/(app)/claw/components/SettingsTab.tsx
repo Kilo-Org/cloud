@@ -2006,13 +2006,15 @@ export function SettingsTab({
     cleanVersion(controllerVersion?.version),
     OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION
   );
-  // Fail OPEN: only hide the interests editor when the controller
-  // version is positively parsed as too old. A missing / still-loading /
-  // errored / unparseable version keeps the editor visible — the
-  // worker's `controller_route_unavailable` 404 on save is the real
-  // backstop, and a false "Upgrade required" on a current instance is a
-  // worse UX. Also keeps hook count stable (the editor early-returns on
-  // false) since unknown states no longer flip the gate.
+  // Fail OPEN: hide the interests editor only when the controller
+  // version is positively parsed as too old, OR the worker reports an
+  // explicit `version: null` (its positive old-controller signal for a
+  // missing `/_kilo/version` route). A still-loading / errored /
+  // unparseable version keeps the editor visible — the worker's
+  // `controller_route_unavailable` 404 on save is the backstop for those,
+  // and a false "Upgrade required" on a current instance is a worse UX.
+  // Hook count stays stable (the editor early-returns on false) since
+  // genuinely-unknown states no longer flip the gate.
   const supportsBriefingInterests = controllerCalverSupports(
     controllerVersion?.version,
     MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION

@@ -254,9 +254,11 @@ function ClawOnboardingFlowInner({
   // Narrow off the instance-not-running sentinel so `.version` is safe.
   const controllerVersion = controllerVersionOk(controllerVersionQuery.data);
   // Fail OPEN: keep the interests step unless the controller version is
-  // positively parsed as too old. Missing / still-loading / unparseable
-  // versions are treated as supported; the worker's
-  // `controller_route_unavailable` 404 on save is the real backstop.
+  // positively parsed as too old, OR the worker reports an explicit
+  // `version: null` (its positive old-controller signal for a missing
+  // `/_kilo/version` route). Still-loading / errored / unparseable
+  // versions stay optimistic; the worker's `controller_route_unavailable`
+  // 404 on save is the backstop for those.
   const controllerSupportsInterests = controllerCalverSupports(
     controllerVersion?.version,
     MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION

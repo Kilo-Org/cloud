@@ -375,6 +375,7 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
       sendMedia: async params => {
         const client = makeClient();
         const conversationId = stripPrefix(params.to);
+        const localLoadMediaImpl = __pluginInternals.loadMediaImpl;
         const { messageId } = await sendKiloChatMediaMessage({
           client,
           conversationId,
@@ -385,8 +386,8 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
           mediaLocalRoots: params.mediaLocalRoots,
           mediaReadFile: params.mediaReadFile,
           fetchImpl: __pluginInternals.fetchImpl,
-          loadMediaImpl: __pluginInternals.loadMediaImpl
-            ? mediaUrl => __pluginInternals.loadMediaImpl!(mediaUrl)
+          loadMediaImpl: localLoadMediaImpl
+            ? mediaUrl => localLoadMediaImpl(mediaUrl)
             : loadOutboundMedia,
         });
         return { messageId };

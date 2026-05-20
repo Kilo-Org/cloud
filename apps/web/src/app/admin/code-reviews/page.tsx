@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { format, subDays } from 'date-fns';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
@@ -37,7 +37,7 @@ const breadcrumbs = (
   </BreadcrumbItem>
 );
 
-type RangeType = '7d' | '30d' | '90d';
+type RangeType = '7d' | 'interval';
 type OwnershipType = 'all' | 'personal' | 'organization';
 type RetryAccountingModeType = 'final_outcome' | 'all_attempts';
 
@@ -53,10 +53,97 @@ type SelectedOrg = {
   plan: string | null;
 };
 
+type ActiveDateInterval = {
+  startDate: string;
+  endDate: string;
+};
+
+type DateIntervalDraft = {
+  startInput: string;
+  endInput: string;
+};
+
+type DateIntervalState = {
+  activeInterval: ActiveDateInterval;
+  intervalDraft: DateIntervalDraft;
+};
+
+type DateIntervalValidation = {
+  interval: ActiveDateInterval | null;
+  error: string | null;
+};
+
+const dateRangeOptions = [
+  { value: '7d', label: 'Last 7 days' },
+  { value: 'interval', label: 'Date interval' },
+] satisfies { value: RangeType; label: string }[];
+
+function toDatetimeLocalInput(date: Date): string {
+  return format(date, "yyyy-MM-dd'T'HH:mm");
+}
+
+function roundUpToDatetimeLocalMinute(date: Date): Date {
+  const minuteDate = new Date(date);
+  if (minuteDate.getSeconds() > 0 || minuteDate.getMilliseconds() > 0) {
+    minuteDate.setMinutes(minuteDate.getMinutes() + 1);
+  }
+  minuteDate.setSeconds(0, 0);
+  return minuteDate;
+}
+
+function createTrailingSevenDayIntervalState(): DateIntervalState {
+  const end = roundUpToDatetimeLocalMinute(new Date());
+  const start = subDays(end, 7);
+
+  return {
+    activeInterval: {
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+    },
+    intervalDraft: {
+      startInput: toDatetimeLocalInput(start),
+      endInput: toDatetimeLocalInput(end),
+    },
+  };
+}
+
+function parseDatetimeLocal(value: string): Date | null {
+  if (!value) return null;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function validateDateIntervalDraft(draft: DateIntervalDraft): DateIntervalValidation {
+  const start = parseDatetimeLocal(draft.startInput);
+  const end = parseDatetimeLocal(draft.endInput);
+
+  if (!start || !end) {
+    return { interval: null, error: 'Choose valid start and end times.' };
+  }
+
+  if (start.getTime() >= end.getTime()) {
+    return { interval: null, error: 'Start time must be before end time.' };
+  }
+
+  return {
+    interval: {
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+    },
+    error: null,
+  };
+}
+
+function formatDateIntervalLabel(value: string): string {
+  return format(new Date(value), 'yyyy-MM-dd HH:mm');
+}
+
 export default function CodeReviewsPage() {
   const [rangeType, setRangeType] = useState<RangeType>('7d');
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [dateIntervalState, setDateIntervalState] = useState<DateIntervalState>(
+    createTrailingSevenDayIntervalState
+  );
   const [isExporting, setIsExporting] = useState(false);
 
   const trpcClient = useRawTRPCClient();
@@ -78,22 +165,42 @@ export default function CodeReviewsPage() {
   const userSearchResults = useSearchUsers(userSearchQuery, showUserDropdown);
   const orgSearchResults = useSearchOrganizations(orgSearchQuery, showOrgDropdown);
 
-  // Calculate dates based on range type
-  useEffect(() => {
-    const now = new Date();
-    // End date is tomorrow to include today's data
-    const end = format(subDays(now, -1), 'yyyy-MM-dd');
+  const intervalValidation = useMemo(
+    () => validateDateIntervalDraft(dateIntervalState.intervalDraft),
+    [dateIntervalState.intervalDraft]
+  );
+  const isIntervalDraftInvalid = rangeType === 'interval' && intervalValidation.interval === null;
+  const { activeInterval, intervalDraft } = dateIntervalState;
+  const { startDate, endDate } = activeInterval;
+  const hasPendingIntervalDraft =
+    rangeType === 'interval' &&
+    intervalValidation.interval !== null &&
+    (intervalValidation.interval.startDate !== startDate ||
+      intervalValidation.interval.endDate !== endDate);
 
-    const daysMap: Record<RangeType, number> = {
-      '7d': 7,
-      '30d': 30,
-      '90d': 90,
-    };
+  const handleApplyInterval = () => {
+    const nextInterval = intervalValidation.interval;
+    if (!nextInterval) return;
 
-    const start = format(subDays(now, daysMap[rangeType]), 'yyyy-MM-dd');
-    setStartDate(start);
-    setEndDate(end);
-  }, [rangeType]);
+    setDateIntervalState(current => ({ ...current, activeInterval: nextInterval }));
+  };
+
+  const handleRangeTypeChange = (nextRangeType: RangeType) => {
+    setRangeType(nextRangeType);
+    if (nextRangeType !== '7d') return;
+
+    setDateIntervalState(createTrailingSevenDayIntervalState());
+  };
+
+  const handleIntervalDraftChange = (field: keyof DateIntervalDraft, value: string) => {
+    setDateIntervalState(current => ({
+      ...current,
+      intervalDraft: {
+        ...current.intervalDraft,
+        [field]: value,
+      },
+    }));
+  };
 
   // Build filter params
   const filterParams: FilterParams = useMemo(
@@ -118,6 +225,19 @@ export default function CodeReviewsPage() {
   const segmentationQuery = useCodeReviewUserSegmentation(filterParams);
 
   const handleRefresh = useCallback(() => {
+    if (isIntervalDraftInvalid) return;
+
+    if (rangeType === '7d') {
+      const nextPresetState = createTrailingSevenDayIntervalState();
+      if (
+        nextPresetState.activeInterval.startDate !== startDate ||
+        nextPresetState.activeInterval.endDate !== endDate
+      ) {
+        setDateIntervalState(nextPresetState);
+        return;
+      }
+    }
+
     void overviewQuery.refetch();
     void dailyQuery.refetch();
     void performanceQuery.refetch();
@@ -126,6 +246,10 @@ export default function CodeReviewsPage() {
     void errorQuery.refetch();
     void segmentationQuery.refetch();
   }, [
+    isIntervalDraftInvalid,
+    rangeType,
+    startDate,
+    endDate,
     overviewQuery,
     dailyQuery,
     performanceQuery,
@@ -192,7 +316,7 @@ export default function CodeReviewsPage() {
 
   // Handle CSV export
   const handleExport = useCallback(async () => {
-    if (isExporting || !startDate || !endDate) return;
+    if (isExporting || isIntervalDraftInvalid) return;
 
     setIsExporting(true);
     try {
@@ -205,7 +329,7 @@ export default function CodeReviewsPage() {
     } finally {
       setIsExporting(false);
     }
-  }, [trpcClient, filterParams, startDate, endDate, isExporting]);
+  }, [trpcClient, filterParams, startDate, endDate, isExporting, isIntervalDraftInvalid]);
 
   const isLoading =
     overviewQuery.isLoading ||
@@ -226,11 +350,21 @@ export default function CodeReviewsPage() {
       breadcrumbs={breadcrumbs}
       buttons={
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing || isIntervalDraftInvalid}
+          >
             <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={isExporting || isIntervalDraftInvalid}
+          >
             <Download className="mr-2 h-4 w-4" />
             {isExporting ? 'Exporting...' : 'Export CSV'}
           </Button>
@@ -251,23 +385,79 @@ export default function CodeReviewsPage() {
           {/* Date Range Row */}
           <div className="flex flex-wrap items-center gap-4">
             <span className="text-sm font-medium">Date Range:</span>
-            {(['7d', '30d', '90d'] as RangeType[]).map(range => (
-              <label key={range} className="flex cursor-pointer items-center gap-2 text-sm">
+            {dateRangeOptions.map(option => (
+              <label key={option.value} className="flex cursor-pointer items-center gap-2 text-sm">
                 <input
                   type="radio"
                   name="rangeType"
-                  value={range}
-                  checked={rangeType === range}
-                  onChange={() => setRangeType(range)}
+                  value={option.value}
+                  checked={rangeType === option.value}
+                  onChange={() => handleRangeTypeChange(option.value)}
                   className="h-4 w-4"
                 />
-                Last {range.replace('d', ' days')}
+                {option.label}
               </label>
             ))}
-            <span className="text-muted-foreground ml-4 text-xs">
-              {startDate} to {endDate}
+            <span className="text-muted-foreground text-xs sm:ml-4">
+              {formatDateIntervalLabel(startDate)} to {formatDateIntervalLabel(endDate)}
             </span>
           </div>
+
+          {rangeType === 'interval' && (
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="flex w-full flex-col gap-2 sm:w-[220px]">
+                  <label htmlFor="code-review-start-time" className="text-sm font-medium">
+                    Start datetime
+                  </label>
+                  <Input
+                    id="code-review-start-time"
+                    type="datetime-local"
+                    value={intervalDraft.startInput}
+                    onChange={event => handleIntervalDraftChange('startInput', event.target.value)}
+                    aria-describedby="code-review-date-interval-feedback"
+                    aria-invalid={isIntervalDraftInvalid}
+                  />
+                </div>
+                <div className="flex w-full flex-col gap-2 sm:w-[220px]">
+                  <label htmlFor="code-review-end-time" className="text-sm font-medium">
+                    End datetime
+                  </label>
+                  <Input
+                    id="code-review-end-time"
+                    type="datetime-local"
+                    value={intervalDraft.endInput}
+                    onChange={event => handleIntervalDraftChange('endInput', event.target.value)}
+                    aria-describedby="code-review-date-interval-feedback"
+                    aria-invalid={isIntervalDraftInvalid}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleApplyInterval}
+                  disabled={!hasPendingIntervalDraft}
+                >
+                  Apply interval
+                </Button>
+              </div>
+              <p
+                id="code-review-date-interval-feedback"
+                aria-live="polite"
+                className={
+                  isIntervalDraftInvalid
+                    ? 'text-destructive text-xs'
+                    : 'text-muted-foreground text-xs'
+                }
+              >
+                {isIntervalDraftInvalid
+                  ? intervalValidation.error
+                  : hasPendingIntervalDraft
+                    ? "Apply the interval to update telemetry. Times use this browser's local timezone."
+                    : "Times use this browser's local timezone."}
+              </p>
+            </div>
+          )}
 
           {/* Ownership Type Filter */}
           <div className="flex flex-wrap items-center gap-4">

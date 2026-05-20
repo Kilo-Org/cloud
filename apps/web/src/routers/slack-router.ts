@@ -13,6 +13,11 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
+import { validateReturnPath } from '@/lib/integrations/validate-return-path';
+
+const oauthUrlInput = z
+  .object({ organizationId: z.string().uuid().optional(), returnTo: z.string().optional() })
+  .optional();
 
 async function getInitializedBot() {
   const { bot } = await import('@/lib/bot');
@@ -66,14 +71,15 @@ export const slackRouter = createTRPCRouter({
   }),
 
   // Get OAuth URL for initiating Slack OAuth flow
-  getOAuthUrl: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
+  getOAuthUrl: baseProcedure.input(oauthUrlInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
     }
     const statePrefix = input?.organizationId
       ? `org_${input.organizationId}`
       : `user_${ctx.user.id}`;
-    const state = createOAuthState(statePrefix, ctx.user.id);
+    const returnTo = input?.returnTo ? validateReturnPath(input.returnTo) : undefined;
+    const state = createOAuthState(statePrefix, ctx.user.id, returnTo ?? undefined);
     return {
       url: slackService.getSlackOAuthUrl(state),
     };

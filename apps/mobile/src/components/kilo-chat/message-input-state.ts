@@ -71,6 +71,20 @@ export function shouldClearSubmittedDraft({
   );
 }
 
+export function clearSubmittedMessageInputDraft({
+  controls,
+  submittedAttachmentTempIds,
+  clearSubmittedFiles,
+}: {
+  controls?: MessageInputSubmitControls;
+  submittedAttachmentTempIds: string[];
+  clearSubmittedFiles: (tempIds: string[]) => void;
+}): boolean {
+  const cleared = controls?.clearDraft() ?? false;
+  clearSubmittedFiles(submittedAttachmentTempIds);
+  return cleared;
+}
+
 export function applyMessageInputTextChange({
   text,
   valueRef,

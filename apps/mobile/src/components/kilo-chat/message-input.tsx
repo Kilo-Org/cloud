@@ -40,6 +40,7 @@ import {
 import {
   applyMessageInputTextChange,
   canSubmitMessageInputContent,
+  clearSubmittedMessageInputDraft,
   isMessageInputOverLimit,
   type MessageInputSubmitControls,
   shouldShowMessageInputCounter,
@@ -407,13 +408,12 @@ function MessageInputContent({
           ? undefined
           : (content, inReplyToMessageId, controls) => {
               onSendContentBlocks?.(content, inReplyToMessageId, {
-                clearDraft: () => {
-                  const cleared = controls?.clearDraft() ?? false;
-                  if (cleared) {
-                    attachmentQueue.clearSubmittedFiles(submittedAttachmentTempIds);
-                  }
-                  return cleared;
-                },
+                clearDraft: () =>
+                  clearSubmittedMessageInputDraft({
+                    controls,
+                    submittedAttachmentTempIds,
+                    clearSubmittedFiles: attachmentQueue.clearSubmittedFiles,
+                  }),
               });
             },
       clearInput: () => {

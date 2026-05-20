@@ -5,6 +5,7 @@ import {
   applyMessageInputTextChange,
   buildMessageInputContentBlocks,
   canSubmitMessageInputContent,
+  clearSubmittedMessageInputDraft,
   shouldClearSubmittedDraft,
   shouldShowMessageInputCounter,
   submitMessageInputDraft,
@@ -301,5 +302,22 @@ describe('message input typing behavior', () => {
         submitted,
       })
     ).toBe(false);
+  });
+
+  it('clears submitted attachment temp ids even when the visible draft changed before success', () => {
+    const clearedAttachmentTempIds: string[][] = [];
+
+    const clearedDraft = clearSubmittedMessageInputDraft({
+      controls: {
+        clearDraft: () => false,
+      },
+      submittedAttachmentTempIds: ['temp-ready-1'],
+      clearSubmittedFiles: tempIds => {
+        clearedAttachmentTempIds.push(tempIds);
+      },
+    });
+
+    expect(clearedDraft).toBe(false);
+    expect(clearedAttachmentTempIds).toEqual([['temp-ready-1']]);
   });
 });

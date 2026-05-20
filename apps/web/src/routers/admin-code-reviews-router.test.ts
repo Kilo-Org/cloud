@@ -193,6 +193,24 @@ describe('adminCodeReviewsRouter', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
+  it('rejects telemetry date intervals longer than 90 days', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const longInterval = filterInput({
+      startDate: '2035-01-01T00:00:00.000Z',
+      endDate: '2035-04-02T00:00:00.000Z',
+    });
+
+    await expect(caller.admin.codeReviews.getOverviewStats(longInterval)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    await expect(
+      caller.admin.codeReviews.getErrorSessions({
+        ...longInterval,
+        errorMessage: 'Container shutdown: SIGTERM',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
   it('counts recovered retries as final outcomes by default and separate attempts in all-attempts mode', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)

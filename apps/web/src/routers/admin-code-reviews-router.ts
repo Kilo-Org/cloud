@@ -94,21 +94,36 @@ type DateIntervalInput = {
   endDate: string;
 };
 
+const MAX_TELEMETRY_INTERVAL_MS = 90 * 24 * 60 * 60 * 1000;
+
 function hasAscendingDateInterval(input: DateIntervalInput): boolean {
   return new Date(input.startDate).getTime() < new Date(input.endDate).getTime();
+}
+
+function hasBoundedDateInterval(input: DateIntervalInput): boolean {
+  return (
+    new Date(input.endDate).getTime() - new Date(input.startDate).getTime() <=
+    MAX_TELEMETRY_INTERVAL_MS
+  );
 }
 
 const intervalOrderValidation = {
   message: 'Start date must be before end date',
   path: ['endDate'],
 };
+const intervalLengthValidation = {
+  message: 'Date interval cannot exceed 90 days',
+  path: ['endDate'],
+};
 
 const FilterSchema = z
   .object(FilterSchemaShape)
-  .refine(hasAscendingDateInterval, intervalOrderValidation);
+  .refine(hasAscendingDateInterval, intervalOrderValidation)
+  .refine(hasBoundedDateInterval, intervalLengthValidation);
 const ErrorSessionsFilterSchema = z
   .object({ ...FilterSchemaShape, errorMessage: z.string().min(1) })
-  .refine(hasAscendingDateInterval, intervalOrderValidation);
+  .refine(hasAscendingDateInterval, intervalOrderValidation)
+  .refine(hasBoundedDateInterval, intervalLengthValidation);
 
 type FilterInput = z.infer<typeof FilterSchema>;
 

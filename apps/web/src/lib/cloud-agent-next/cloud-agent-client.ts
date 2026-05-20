@@ -75,6 +75,11 @@ export type CallbackTarget = {
   headers?: Record<string, string>;
 };
 
+/** Callback endpoint surfaced by getSession responses. */
+export type GetSessionCallbackTarget = {
+  url: string;
+};
+
 /**
  * Agent slug selected for a session. Built-in slugs plus `custom` plus any
  * custom slug defined in the session's `runtimeAgents`.
@@ -272,8 +277,8 @@ export type GetSessionOutput = {
   preparedAt?: number;
   initiatedAt?: number;
 
-  // Callback configuration (debug-friendly, URL + headers)
-  callbackTarget?: CallbackTarget;
+  // Callback endpoint only; auth headers remain worker-private.
+  callbackTarget?: GetSessionCallbackTarget;
 
   // Initial message ID for correlation
   initialMessageId?: string;

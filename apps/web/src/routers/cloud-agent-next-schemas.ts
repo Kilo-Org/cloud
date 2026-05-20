@@ -362,10 +362,9 @@ export const executionStatusNextSchema = z
   })
   .nullable();
 
-// Callback target configuration
+// Browser-safe callback target configuration
 export const callbackTargetNextSchema = z.object({
   url: z.string().url(),
-  headers: z.record(z.string(), z.string()).optional(),
 });
 
 // Output schema for getSession (sanitized, no secrets)

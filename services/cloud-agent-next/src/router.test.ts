@@ -725,6 +725,12 @@ describe('router sessionId validation', () => {
             mcpServers: {
               puppeteer: { type: 'local', command: ['npx', '-y', '@mcp/puppeteer'] },
             },
+            callbackTarget: {
+              url: 'https://callback.example.com/complete',
+              headers: {
+                'X-Internal-Secret': 'secret-callback-header',
+              },
+            },
             preparedAt: 1700000000000,
             initiatedAt: 1700000001000,
           };
@@ -755,6 +761,10 @@ describe('router sessionId validation', () => {
           expect(result).not.toHaveProperty('envVars');
           expect(result).not.toHaveProperty('setupCommands');
           expect(result).not.toHaveProperty('mcpServers');
+          expect(result.callbackTarget).toEqual({
+            url: 'https://callback.example.com/complete',
+          });
+          expect(result.callbackTarget).not.toHaveProperty('headers');
 
           // Verify DO was accessed with correct key
           expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);

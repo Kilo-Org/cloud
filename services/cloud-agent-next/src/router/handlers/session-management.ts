@@ -462,7 +462,9 @@ export function createSessionManagementHandlers() {
             preparedAt: metadata.preparedAt,
             initiatedAt: metadata.initiatedAt,
 
-            callbackTarget: metadata.callbackTarget,
+            callbackTarget: metadata.callbackTarget
+              ? { url: metadata.callbackTarget.url }
+              : undefined,
 
             initialMessageId: metadata.initialMessageId,
 

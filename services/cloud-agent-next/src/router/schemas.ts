@@ -567,6 +567,10 @@ export const ExecutionStatusSchema = z
   .nullable()
   .describe('Current execution status (null if no active execution)');
 
+export const GetSessionCallbackTargetSchema = z.object({
+  url: z.string().url(),
+});
+
 export const GetSessionOutput = z.object({
   // Session identifiers
   sessionId: z.string().describe('Cloud-agent session ID'),
@@ -614,9 +618,9 @@ export const GetSessionOutput = z.object({
   preparedAt: z.number().optional().describe('Timestamp when session was prepared'),
   initiatedAt: z.number().optional().describe('Timestamp when session was initiated'),
 
-  // Callback configuration (debug-friendly, URL + headers)
-  callbackTarget: CallbackTargetSchema.optional().describe(
-    'Callback target configuration for execution completion notifications'
+  // Stored callback headers can contain auth material; only expose endpoint location.
+  callbackTarget: GetSessionCallbackTargetSchema.optional().describe(
+    'Callback endpoint for execution completion notifications'
   ),
 
   // Initial message ID for correlation

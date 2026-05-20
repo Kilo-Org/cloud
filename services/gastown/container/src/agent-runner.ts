@@ -530,7 +530,7 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
     // them in the background so mayor readiness does not wait on clone/fetch
     // work across every rig. AGENTS.md is rewritten when setup completes.
     if (request.rigs?.length) {
-      void setupMayorBrowseWorktrees(request, workdir).catch(err => {
+      void setupMayorBrowseWorktrees(request).catch(err => {
         console.error('[runAgent] background mayor browse worktree setup failed:', err);
       });
     }
@@ -602,10 +602,7 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
   return startAgent(startRequest, workdir, env);
 }
 
-async function setupMayorBrowseWorktrees(
-  request: StartAgentRequest,
-  workdir: string
-): Promise<void> {
+async function setupMayorBrowseWorktrees(request: StartAgentRequest): Promise<void> {
   if (!request.rigs?.length) return;
 
   const setupStart = Date.now();

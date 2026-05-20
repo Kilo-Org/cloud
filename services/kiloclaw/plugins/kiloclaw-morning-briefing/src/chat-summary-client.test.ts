@@ -31,6 +31,16 @@ function ulidFromTimestamp(timestamp: number, suffix = '0000000000000000'): stri
   return `${encoded}${suffix}`;
 }
 
+function createConfiguredClient(
+  options: Parameters<typeof createKiloChatSummaryClient>[0]
+): ReturnType<typeof createKiloChatSummaryClient> {
+  return createKiloChatSummaryClient({
+    sandboxId: 'sandbox-1',
+    kiloChatBaseUrl: 'https://chat.example.com',
+    ...options,
+  });
+}
+
 describe('chat summary client', () => {
   it('reports unconfigured when the gateway token is missing', async () => {
     const client = createKiloChatSummaryClient({ token: '' });
@@ -42,6 +52,25 @@ describe('chat summary client', () => {
         buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
       )
     ).resolves.toEqual({ conversations: [], truncated: false });
+  });
+
+  it('reports unconfigured when controller chat route prerequisites are missing', () => {
+    expect(
+      createKiloChatSummaryClient({
+        token: 'token',
+        sandboxId: '',
+        kiloChatBaseUrl: 'https://chat.example.com',
+      })
+    ).toMatchObject({
+      configured: false,
+      reason: 'KILOCLAW_SANDBOX_ID is not configured',
+    });
+    expect(
+      createKiloChatSummaryClient({ token: 'token', sandboxId: 'sandbox-1', kiloChatBaseUrl: '' })
+    ).toMatchObject({
+      configured: false,
+      reason: 'KILOCHAT_BASE_URL is not configured',
+    });
   });
 
   it('lists active conversations and messages through the controller proxy', async () => {
@@ -80,7 +109,7 @@ describe('chat summary client', () => {
       throw new Error(`Unexpected URL ${url}`);
     });
 
-    const client = createKiloChatSummaryClient({
+    const client = createConfiguredClient({
       baseUrl: 'http://controller/',
       token: 'token',
       fetchImpl,
@@ -157,7 +186,7 @@ describe('chat summary client', () => {
       throw new Error(`Unexpected URL ${url}`);
     });
 
-    const client = createKiloChatSummaryClient({
+    const client = createConfiguredClient({
       baseUrl: 'http://controller',
       token: 'token',
       fetchImpl,
@@ -232,7 +261,7 @@ describe('chat summary client', () => {
       throw new Error(`Unexpected URL ${url}`);
     });
 
-    const client = createKiloChatSummaryClient({
+    const client = createConfiguredClient({
       baseUrl: 'http://controller',
       token: 'token',
       fetchImpl,
@@ -318,7 +347,7 @@ describe('chat summary client', () => {
       throw new Error(`Unexpected URL ${url}`);
     });
 
-    const client = createKiloChatSummaryClient({
+    const client = createConfiguredClient({
       baseUrl: 'http://controller',
       token: 'token',
       fetchImpl,
@@ -370,7 +399,7 @@ describe('chat summary client', () => {
       });
     });
 
-    const client = createKiloChatSummaryClient({
+    const client = createConfiguredClient({
       baseUrl: 'http://controller',
       token: 'token',
       fetchImpl,
@@ -384,7 +413,7 @@ describe('chat summary client', () => {
 
   it('throws on non-ok controller responses', async () => {
     const fetchImpl = mockFetch(async () => new Response('no route', { status: 404 }));
-    const client = createKiloChatSummaryClient({
+    const client = createConfiguredClient({
       baseUrl: 'http://controller',
       token: 'token',
       fetchImpl,

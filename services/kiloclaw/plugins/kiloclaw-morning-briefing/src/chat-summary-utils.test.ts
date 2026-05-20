@@ -39,6 +39,17 @@ describe('chat summary utils', () => {
     expect(new Date(window.endMs).toISOString()).toBe('2026-05-19T07:00:00.000Z');
   });
 
+  it('builds a DST transition day window using local midnight boundaries', () => {
+    const window = buildYesterdayChatWindow(
+      new Date('2026-04-06T00:00:00.000Z'),
+      'Pacific/Auckland'
+    );
+
+    expect(window.dateKey).toBe('2026-04-05');
+    expect(new Date(window.startMs).toISOString()).toBe('2026-04-04T11:00:00.000Z');
+    expect(new Date(window.endMs).toISOString()).toBe('2026-04-05T12:00:00.000Z');
+  });
+
   it('builds today-so-far window in the user timezone', () => {
     const now = new Date('2026-05-19T14:00:00.000Z');
     const window = buildTodaySoFarChatWindow(now, 'America/Los_Angeles');

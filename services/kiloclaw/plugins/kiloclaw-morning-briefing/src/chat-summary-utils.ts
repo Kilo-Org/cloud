@@ -54,24 +54,41 @@ function addDays(dateKey: string, days: number): string {
   ).padStart(2, '0')}`;
 }
 
-function getTimezoneOffset(date: Date, timezone: string): string {
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone || DEFAULT_TIMEZONE,
-      timeZoneName: 'longOffset',
-    }).formatToParts(date);
-    const offset = parts.find(part => part.type === 'timeZoneName')?.value ?? '';
-    const match = offset.match(/GMT([+-]\d{2}:\d{2})/);
-    if (!match) return 'Z';
-    return match[1] === '+00:00' || match[1] === '-00:00' ? 'Z' : match[1];
-  } catch {
-    return 'Z';
-  }
-}
-
 function utcMillisForWallTime(dateKey: string, time: string, timezone: string): number {
-  const offset = getTimezoneOffset(new Date(`${dateKey}T${time}Z`), timezone || DEFAULT_TIMEZONE);
-  return Date.parse(`${dateKey}T${time}${offset}`);
+  const tz = timezone || DEFAULT_TIMEZONE;
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const [hour, minute, second] = time.split(':').map(Number);
+  const targetWallMs = Date.UTC(year, month - 1, day, hour, minute, second);
+  let utcMs = targetWallMs;
+
+  // Iterate from a UTC guess until formatting that instant in the target zone
+  // produces the requested local wall time. This keeps midnight boundaries
+  // correct on days where the offset changes between local and UTC midnight.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).formatToParts(new Date(utcMs));
+    const renderedWallMs = Date.UTC(
+      Number(readDatePart(parts, 'year')),
+      Number(readDatePart(parts, 'month')) - 1,
+      Number(readDatePart(parts, 'day')),
+      Number(parts.find(part => part.type === 'hour')?.value ?? '0'),
+      Number(parts.find(part => part.type === 'minute')?.value ?? '0'),
+      Number(parts.find(part => part.type === 'second')?.value ?? '0')
+    );
+    const delta = targetWallMs - renderedWallMs;
+    if (delta === 0) return utcMs;
+    utcMs += delta;
+  }
+
+  return utcMs;
 }
 
 export function buildYesterdayChatWindow(now: Date, timezone: string): ChatSummaryWindow {

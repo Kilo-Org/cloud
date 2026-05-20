@@ -35,6 +35,8 @@ type MessagesResponse = {
 export type KiloChatSummaryClientOptions = {
   baseUrl?: string;
   token?: string;
+  sandboxId?: string;
+  kiloChatBaseUrl?: string;
   timeoutMs?: number;
   fetchImpl?: FetchImpl;
 };
@@ -193,6 +195,24 @@ export function createKiloChatSummaryClient(
     return {
       configured: false,
       reason: 'OPENCLAW_GATEWAY_TOKEN is not configured',
+      listConversationsForWindow: async () => ({ conversations: [], truncated: false }),
+    };
+  }
+
+  const sandboxId = options.sandboxId ?? process.env.KILOCLAW_SANDBOX_ID;
+  if (!sandboxId) {
+    return {
+      configured: false,
+      reason: 'KILOCLAW_SANDBOX_ID is not configured',
+      listConversationsForWindow: async () => ({ conversations: [], truncated: false }),
+    };
+  }
+
+  const kiloChatBaseUrl = options.kiloChatBaseUrl ?? process.env.KILOCHAT_BASE_URL;
+  if (!kiloChatBaseUrl) {
+    return {
+      configured: false,
+      reason: 'KILOCHAT_BASE_URL is not configured',
       listConversationsForWindow: async () => ({ conversations: [], truncated: false }),
     };
   }

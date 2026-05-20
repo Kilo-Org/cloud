@@ -1,47 +1,44 @@
 import { test, expect } from '@chromatic-com/playwright';
 import { randomUUID } from 'crypto';
 
-function isSignedInDestination(url: URL) {
-  return url.pathname === '/profile' || url.pathname.startsWith('/organizations/');
-}
-
-test.describe('/get-started auth-aware router', () => {
+test.describe('/get-started dashboard escape hatch', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('redirects signed-out users to the landing install page', async ({ request }) => {
-    const response = await request.get('/get-started', { maxRedirects: 0 });
+  test('hides the dashboard link for signed-out users', async ({ page }) => {
+    await page.goto('/get-started');
 
-    expect([307, 308]).toContain(response.status());
-    const location = response.headers().location;
-    if (!location) throw new Error('Expected /get-started to return a redirect location');
+    const skipLink = page.getByRole('link', { name: /skip to dashboard/i });
+    await expect(skipLink).toHaveCount(0);
 
-    expect(new URL(location, 'http://localhost').pathname).toBe('/install');
+    const signInLink = page.getByRole('link', { name: /sign in/i });
+    await expect(signInLink).toBeVisible();
+    await expect(signInLink).toHaveAttribute('href', '/users/sign_in?callbackPath=/get-started');
   });
 
-  test('keeps signed-in users in the app', async ({ page }) => {
+  test('shows the dashboard link after fake login and survey skip', async ({ page }) => {
     const uniqueId = randomUUID().slice(0, 8);
     const testEmail = `test-get-started-${uniqueId}+stytchpass@example.com`;
 
     await page.goto(`/users/sign_in?fakeUser=${encodeURIComponent(testEmail)}`);
     await page.waitForURL(
-      url => url.pathname === '/customer-source-survey' || isSignedInDestination(url),
+      url =>
+        url.pathname === '/customer-source-survey' ||
+        url.pathname === '/get-started' ||
+        url.pathname === '/profile',
       { timeout: 30000, waitUntil: 'networkidle' }
     );
 
     if (new URL(page.url()).pathname === '/customer-source-survey') {
       await page.getByRole('button', { name: 'Skip' }).click();
-      await page.waitForURL(url => isSignedInDestination(url), {
+      await page.waitForURL(url => url.pathname === '/get-started' || url.pathname === '/profile', {
         timeout: 15000,
         waitUntil: 'networkidle',
       });
     }
 
     await page.goto('/get-started');
-    await page.waitForURL(url => isSignedInDestination(url), {
-      timeout: 15000,
-      waitUntil: 'networkidle',
-    });
-
-    expect(isSignedInDestination(new URL(page.url()))).toBe(true);
+    const skipLink = page.getByRole('link', { name: /skip to dashboard/i });
+    await expect(skipLink).toBeVisible();
+    await expect(skipLink).toHaveAttribute('href', '/profile');
   });
 });

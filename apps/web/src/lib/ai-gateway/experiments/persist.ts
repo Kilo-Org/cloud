@@ -105,12 +105,11 @@ export async function persistExperimentAttribution(
 ): Promise<void> {
   const requestKind = input.capture?.requestKind ?? 'chat_completions';
   const wasTruncated = input.capture?.wasTruncated ?? false;
-  const bodyHash = input.capture
-    ? ((await putPromptOrNull(input.capture.requestBodyContent)) ?? PROMPT_HASH_FAILED)
-    : PROMPT_HASH_FAILED;
+  const storedPromptHash =
+    input.capture && (await putPromptOrNull(input.capture.requestBodyContent));
 
   try {
-    await insertRow(input, requestKind, bodyHash, wasTruncated);
+    await insertRow(input, requestKind, storedPromptHash ?? PROMPT_HASH_FAILED, wasTruncated);
   } catch (err) {
     captureException(err, {
       tags: { source: 'model-experiments', operation: 'persistExperimentAttribution' },

@@ -116,24 +116,44 @@ export async function isPublicIdExperimented(
     // captureException already invoked by the redis helper
   }
 
+  // Cache miss / corrupt / Redis error: rebuild the full set from DB and
+  // backfill the cache so the next request hits Redis. We deliberately
+  // query the full set rather than just `publicId` — the cache contract
+  // is "the complete list of routing-eligible public ids", and a single-id
+  // lookup can't satisfy it. Falling through without a backfill (the
+  // previous behavior) sent every miss straight to Postgres.
   try {
-    const rows = await db
-      .select({ id: model_experiment.id })
-      .from(model_experiment)
-      .where(
-        and(
-          eq(model_experiment.public_model_id, publicId),
-          inArray(model_experiment.status, ['active', 'paused'])
-        )
-      )
-      .limit(1);
-    return rows.length > 0;
+    const ids = await loadExperimentedPublicIdsFromDb();
+    // Best-effort backfill; if Redis is genuinely down the helper has
+    // already reported it and we still return the right answer below.
+    void backfillExperimentedPublicIdsCache(ids);
+    return ids.includes(publicId);
   } catch (err) {
     captureException(err, {
       tags: { source: 'model-experiments', operation: 'isPublicIdExperimented' },
       extra: { publicId },
     });
     return 'unavailable';
+  }
+}
+
+async function loadExperimentedPublicIdsFromDb(): Promise<string[]> {
+  const rows = await db
+    .select({ public_model_id: model_experiment.public_model_id })
+    .from(model_experiment)
+    .where(inArray(model_experiment.status, ['active', 'paused']));
+  return Array.from(new Set(rows.map(r => r.public_model_id))).sort();
+}
+
+async function backfillExperimentedPublicIdsCache(ids: string[]): Promise<void> {
+  try {
+    await redisSet(
+      EXPERIMENTED_PUBLIC_IDS_REDIS_KEY,
+      JSON.stringify(ids),
+      PER_PUBLIC_ID_CACHE_TTL_SECONDS
+    );
+  } catch {
+    // captureException already invoked by the redis helper
   }
 }
 

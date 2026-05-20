@@ -109,29 +109,20 @@ export async function persistExperimentAttribution(
     input.capture && (await putPromptOrNull(input.capture.requestBodyContent));
 
   try {
-    await insertRow(input, requestKind, storedPromptHash ?? PROMPT_HASH_FAILED, wasTruncated);
+    await db.insert(model_experiment_request).values({
+      usage_id: input.usageId,
+      variant_version_id: input.variantVersionId,
+      allocation_subject: input.allocationSubject,
+      client_request_id: input.clientRequestId,
+      request_kind: requestKind,
+      request_body_sha256: storedPromptHash ?? PROMPT_HASH_FAILED,
+      was_truncated: wasTruncated,
+      created_at: input.createdAt,
+    });
   } catch (err) {
     captureException(err, {
       tags: { source: 'model-experiments', operation: 'persistExperimentAttribution' },
       extra: { usageId: input.usageId, variantVersionId: input.variantVersionId },
     });
   }
-}
-
-async function insertRow(
-  input: PersistExperimentAttributionInput,
-  requestKind: 'chat_completions' | 'messages' | 'responses',
-  bodyHash: string,
-  wasTruncated: boolean
-): Promise<void> {
-  await db.insert(model_experiment_request).values({
-    usage_id: input.usageId,
-    variant_version_id: input.variantVersionId,
-    allocation_subject: input.allocationSubject,
-    client_request_id: input.clientRequestId,
-    request_kind: requestKind,
-    request_body_sha256: bodyHash,
-    was_truncated: wasTruncated,
-    created_at: input.createdAt,
-  });
 }

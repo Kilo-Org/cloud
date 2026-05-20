@@ -11,6 +11,7 @@ import { storeGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   buildIntegrationOAuthConnectErrorPath,
+  redirectToSignInForOAuthConnect,
   resolveOAuthConnectOwner,
 } from '@/lib/integrations/oauth/common';
 
@@ -32,7 +33,7 @@ export async function handleGitLabOAuthConnect(request: NextRequest) {
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
-      return authFailedResponse;
+      return redirectToSignInForOAuthConnect(request);
     }
 
     const searchParams = request.nextUrl.searchParams;

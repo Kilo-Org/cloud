@@ -91,6 +91,15 @@ export function buildIntegrationOAuthConnectErrorPath(
   return `/integrations/${platform}?${queryParam}`;
 }
 
+export function redirectToSignInForOAuthConnect(request: NextRequest): Response {
+  const signInUrl = new URL('/users/sign_in', request.url);
+  signInUrl.searchParams.set(
+    'callbackPath',
+    `${request.nextUrl.pathname}${request.nextUrl.search}`
+  );
+  return NextResponse.redirect(signInUrl);
+}
+
 export async function resolveOAuthConnectOwner(
   request: NextRequest,
   user: AuthenticatedOAuthUser,
@@ -132,7 +141,7 @@ export async function handleStatefulPlatformOAuthConnect(
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
-      return authFailedResponse;
+      return redirectToSignInForOAuthConnect(request);
     }
 
     const { owner } = await resolveOAuthConnectOwner(request, user, {

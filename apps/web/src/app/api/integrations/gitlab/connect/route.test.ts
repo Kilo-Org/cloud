@@ -77,6 +77,30 @@ describe('GET /api/integrations/gitlab/connect', () => {
     );
   });
 
+  test('redirects unauthenticated users to sign in with the connect URL as the callback', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response(null, { status: 401 }),
+    } as never);
+
+    const response = await callGitLabConnect(
+      makeRequest(
+        '/api/integrations/gitlab/connect?organizationId=org-gitlab-123&instanceUrl=https%3A%2F%2Fgitlab.example.com&clientId=client-id&clientSecret=client-secret'
+      )
+    );
+
+    const location = response.headers.get('location');
+    expect(location).toBeTruthy();
+    const url = new URL(location ?? '');
+    expect(url.pathname).toBe('/users/sign_in');
+    expect(url.searchParams.get('callbackPath')).toBe(
+      '/api/integrations/gitlab/connect?organizationId=org-gitlab-123&instanceUrl=https%3A%2F%2Fgitlab.example.com&clientId=client-id&clientSecret=client-secret'
+    );
+    expect(mockedCreateGitLabOAuthState).not.toHaveBeenCalled();
+    expect(mockedStoreGitLabOAuthCredentials).not.toHaveBeenCalled();
+    expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
+  });
+
   test('does not initialize a self-hosted flow without custom OAuth credentials', async () => {
     const response = await callGitLabConnect(
       makeRequest('/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fattacker.example')

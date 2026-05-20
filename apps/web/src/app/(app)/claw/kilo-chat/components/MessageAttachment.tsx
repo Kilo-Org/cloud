@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { File as FileIcon, Download, AlertCircle, ImageOff, X } from 'lucide-react';
 import type { AttachmentBlock } from '@kilocode/kilo-chat';
 import { useAttachmentUrl } from '@kilocode/kilo-chat-hooks';
@@ -40,12 +40,58 @@ export function MessageAttachment({
   onRemove,
 }: MessageAttachmentProps) {
   const { kiloChatClient } = useKiloChatContext();
-  const { data, isLoading, isError } = useAttachmentUrl(
+  const isImage = block.mimeType.startsWith('image/');
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const { data, isLoading, isError, refetch } = useAttachmentUrl(
     kiloChatClient,
     conversationId,
-    block.attachmentId
+    block.attachmentId,
+    { enabled: isImage && !imageLoaded }
   );
-  const isImage = block.mimeType.startsWith('image/');
+  const [downloadPending, setDownloadPending] = useState(false);
+
+  async function loadDownloadUrl() {
+    const result = await refetch();
+    if (!result.data) {
+      throw new Error('Attachment URL unavailable');
+    }
+    return result.data.url;
+  }
+
+  async function handleFileDownload() {
+    setDownloadPending(true);
+    try {
+      const url = await loadDownloadUrl();
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = block.filename;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+    } catch {
+      // React Query stores the error state for the chip; no extra toast needed here.
+    } finally {
+      setDownloadPending(false);
+    }
+  }
+
+  async function handleImageOpen(event: MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    const openedWindow = window.open('about:blank', '_blank');
+    if (openedWindow) {
+      openedWindow.opener = null;
+    }
+    try {
+      const url = await loadDownloadUrl();
+      if (openedWindow) {
+        openedWindow.location.href = url;
+      } else {
+        window.location.assign(url);
+      }
+    } catch {
+      openedWindow?.close();
+    }
+  }
 
   if (isImage) {
     const imageState = getImageAttachmentRenderState({
@@ -70,6 +116,8 @@ export function MessageAttachment({
             filename={block.filename}
             size={block.size}
             interactive={!onRemove}
+            onLoadComplete={() => setImageLoaded(true)}
+            onOpen={handleImageOpen}
           />
         )}
         {onRemove && (
@@ -90,11 +138,11 @@ export function MessageAttachment({
   return (
     <div className={isOwn ? 'self-end' : ''}>
       <FileChip
-        url={data?.url}
         filename={block.filename}
         size={block.size}
-        loading={isLoading}
+        loading={downloadPending}
         error={isError}
+        onDownload={handleFileDownload}
         onRemove={onRemove}
       />
     </div>
@@ -124,16 +172,17 @@ function ImageAttachment({
   filename,
   size: _size,
   interactive,
+  onLoadComplete,
+  onOpen,
 }: {
   url: string;
   filename: string;
   size: number;
   interactive: boolean;
+  onLoadComplete: () => void;
+  onOpen: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
   const [errored, setErrored] = useState(false);
-  // Signed URLs are refreshed periodically by useAttachmentUrl; reset the
-  // error state on each new URL so a transient failure doesn't pin the
-  // placeholder fallback forever.
   useEffect(() => setErrored(false), [url]);
   if (errored) {
     return (
@@ -147,6 +196,7 @@ function ImageAttachment({
       src={url}
       alt={filename}
       loading="lazy"
+      onLoad={onLoadComplete}
       onError={() => setErrored(true)}
       className={`max-h-[240px] max-w-[320px] rounded-md object-contain ${
         interactive ? 'cursor-zoom-in' : ''
@@ -157,50 +207,56 @@ function ImageAttachment({
     return <ImageSlot>{img}</ImageSlot>;
   }
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+    <a href={url} target="_blank" rel="noopener noreferrer" onClick={onOpen} className="block">
       <ImageSlot>{img}</ImageSlot>
     </a>
   );
 }
 
 type FileChipProps = {
-  url?: string;
   filename: string;
   size: number;
   loading: boolean;
   error: boolean;
+  onDownload: () => void;
   onRemove?: () => void;
 };
 
-function FileChip({ url, filename, size, loading, error, onRemove }: FileChipProps) {
+function FileChip({ filename, size, loading, error, onDownload, onRemove }: FileChipProps) {
   const content = (
     <>
-      <FileIcon className="h-4 w-4 shrink-0" />
-      <span className="min-w-0 truncate text-sm">{filename}</span>
-      {size > 0 && (
-        <span className="text-muted-foreground shrink-0 text-xs">{formatFileSize(size)}</span>
+      {error ? (
+        <>
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0 truncate text-sm">{filename} (unavailable)</span>
+        </>
+      ) : (
+        <>
+          <FileIcon className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 truncate text-sm">{filename}</span>
+          {size > 0 && (
+            <span className="text-muted-foreground shrink-0 text-xs">{formatFileSize(size)}</span>
+          )}
+          <Download className="h-3.5 w-3.5 shrink-0 opacity-70" />
+        </>
       )}
-      <Download className="h-3.5 w-3.5 shrink-0 opacity-70" />
     </>
   );
   const baseClass =
     'inline-flex items-center gap-2 rounded-md border border-border px-2 py-1 max-w-[280px]';
-  if (error) {
-    return (
-      <span className={`${baseClass} text-muted-foreground italic opacity-70`}>
-        <AlertCircle className="h-3.5 w-3.5" />
-        <span className="text-sm">{filename} (unavailable)</span>
-      </span>
-    );
-  }
-  if (loading || !url) {
-    return <span className={`${baseClass} opacity-50`}>{content}</span>;
-  }
   return (
     <span className="relative inline-flex">
-      <a href={url} download className={`${baseClass} hover:bg-muted/40 cursor-pointer`}>
+      <button
+        type="button"
+        onClick={onDownload}
+        disabled={loading}
+        aria-label={`Download ${filename}`}
+        className={`${baseClass} hover:bg-muted/40 cursor-pointer disabled:cursor-wait disabled:opacity-50 ${
+          error ? 'text-muted-foreground italic opacity-70' : ''
+        }`}
+      >
         {content}
-      </a>
+      </button>
       {onRemove && (
         <button
           type="button"

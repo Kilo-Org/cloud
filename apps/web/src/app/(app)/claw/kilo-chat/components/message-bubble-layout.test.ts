@@ -34,3 +34,16 @@ describe('message attachment remove buttons', () => {
     expect(messageAttachmentSource).not.toContain(`>${multiplicationSign}</button>`);
   });
 });
+
+describe('message attachment download URLs', () => {
+  it('does not fetch file attachment URLs before click', () => {
+    expect(messageAttachmentSource).toContain('{ enabled: isImage && !imageLoaded }');
+    expect(messageAttachmentSource).not.toContain('url={data?.url}');
+  });
+
+  it('opens and downloads attachments through explicit refetches', () => {
+    expect(messageAttachmentSource).toContain('const result = await refetch();');
+    expect(messageAttachmentSource).toContain('onOpen={handleImageOpen}');
+    expect(messageAttachmentSource).toContain('onDownload={handleFileDownload}');
+  });
+});

@@ -108,6 +108,48 @@ describe('attachmentUrlQueryOptions', () => {
     expect(getAttachmentUrl).toHaveBeenCalledTimes(1);
   });
 
+  it('does not fetch when explicitly disabled', async () => {
+    const { client, getAttachmentUrl } = makeClient({
+      url: 'https://r2/x',
+      mimeType: 'application/pdf',
+      size: 10,
+      filename: 'a.pdf',
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const queryClient = makeQueryClient();
+    const options = attachmentUrlQueryOptions(client, conversationId, attachmentId, {
+      enabled: false,
+    });
+
+    const obs = new QueryObserver(queryClient, options);
+    const unsub = obs.subscribe(() => {});
+    await new Promise(r => setTimeout(r, 0));
+    unsub();
+
+    expect(getAttachmentUrl).not.toHaveBeenCalled();
+  });
+
+  it('allows disabled queries to fetch on explicit refetch', async () => {
+    const { client, getAttachmentUrl } = makeClient({
+      url: 'https://r2/x',
+      mimeType: 'application/pdf',
+      size: 10,
+      filename: 'a.pdf',
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const queryClient = makeQueryClient();
+    const options = attachmentUrlQueryOptions(client, conversationId, attachmentId, {
+      enabled: false,
+    });
+
+    const obs = new QueryObserver(queryClient, options);
+    const unsub = obs.subscribe(() => {});
+    await obs.refetch();
+    unsub();
+
+    expect(getAttachmentUrl).toHaveBeenCalledTimes(1);
+  });
+
   it('refetches stale signed URLs when window focus returns', async () => {
     const now = 1_000_000_000_000;
     vi.useFakeTimers();

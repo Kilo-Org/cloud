@@ -14,8 +14,10 @@ export function computeAttachmentUrlStaleMs(expiresAtSeconds: number, nowMs: num
 export function attachmentUrlQueryOptions(
   client: KiloChatClient,
   conversationId: string | null,
-  attachmentId: string | null
+  attachmentId: string | null,
+  options: { enabled?: boolean } = {}
 ): UseQueryOptions<AttachmentGetUrlResponse> {
+  const enabled = options.enabled ?? true;
   return {
     queryKey: attachmentUrlKey(conversationId, attachmentId),
     queryFn: async () => {
@@ -24,7 +26,7 @@ export function attachmentUrlQueryOptions(
       }
       return client.getAttachmentUrl({ attachmentId, conversationId });
     },
-    enabled: conversationId !== null && attachmentId !== null,
+    enabled: enabled && conversationId !== null && attachmentId !== null,
     staleTime: query => {
       const data = query.state.data;
       return data ? computeAttachmentUrlStaleMs(data.expiresAt, Date.now()) : 0;
@@ -43,7 +45,8 @@ export function attachmentUrlQueryOptions(
 export function useAttachmentUrl(
   client: KiloChatClient,
   conversationId: string | null,
-  attachmentId: string | null
+  attachmentId: string | null,
+  options?: { enabled?: boolean }
 ): UseQueryResult<AttachmentGetUrlResponse> {
-  return useQuery(attachmentUrlQueryOptions(client, conversationId, attachmentId));
+  return useQuery(attachmentUrlQueryOptions(client, conversationId, attachmentId, options));
 }

@@ -94,7 +94,7 @@ void (async () => {
     log.error('container.boot_hydration_failed', {
       message: err instanceof Error ? err.message : String(err),
       stack: err instanceof Error ? err.stack : undefined,
-      townId: TOWN_ID,
+      townId: townIdForLogs(),
     });
   }
 })();

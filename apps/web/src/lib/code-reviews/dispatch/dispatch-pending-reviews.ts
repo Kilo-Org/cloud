@@ -16,7 +16,7 @@ import {
   kilocode_users,
   type CloudAgentCodeReview,
 } from '@kilocode/db/schema';
-import { eq, and, or, count, lt, sql, inArray } from 'drizzle-orm';
+import { eq, and, count, sql, inArray } from 'drizzle-orm';
 import type { Owner } from '../core';
 import { prepareReviewPayload } from '../triggers/prepare-review-payload';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -36,6 +36,7 @@ import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import type { CodeReviewPlatform } from '../core/schemas';
 import {
   activeCodeReviewWorkCondition,
+  reconsiderableCodeReviewWorkCondition,
   FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS,
   MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER,
@@ -133,13 +134,7 @@ async function reservePendingReviewsForDispatch(owner: Owner): Promise<ReviewRes
       .where(
         and(
           ownerCondition,
-          or(
-            eq(cloud_agent_code_reviews.status, 'pending'),
-            and(
-              eq(cloud_agent_code_reviews.status, 'queued'),
-              lt(cloud_agent_code_reviews.updated_at, staleQueuedCutoff)
-            )
-          )
+          reconsiderableCodeReviewWorkCondition(staleQueuedCutoff)
         )
       )
       .orderBy(
@@ -172,13 +167,7 @@ async function reservePendingReviewsForDispatch(owner: Owner): Promise<ReviewRes
             cloud_agent_code_reviews.id,
             candidates.map(candidate => candidate.id)
           ),
-          or(
-            eq(cloud_agent_code_reviews.status, 'pending'),
-            and(
-              eq(cloud_agent_code_reviews.status, 'queued'),
-              lt(cloud_agent_code_reviews.updated_at, staleQueuedCutoff)
-            )
-          )
+          reconsiderableCodeReviewWorkCondition(staleQueuedCutoff)
         )
       )
       .returning();

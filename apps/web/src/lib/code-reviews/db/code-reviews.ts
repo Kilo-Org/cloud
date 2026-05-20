@@ -20,6 +20,7 @@ import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocod
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
 import {
   activeCodeReviewWorkCondition,
+  reconsiderableCodeReviewWorkCondition,
   FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS,
   MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER,
@@ -203,11 +204,7 @@ export async function listDispatchableCodeReviewOwnerCandidates(
           ) AS owner_id,
           MIN(${cloud_agent_code_reviews.created_at}) AS oldest_reconsiderable_at
         FROM ${cloud_agent_code_reviews}
-        WHERE ${cloud_agent_code_reviews.status} = 'pending'
-          OR (
-            ${cloud_agent_code_reviews.status} = 'queued'
-            AND ${cloud_agent_code_reviews.updated_at} < ${staleQueuedCutoff}
-          )
+        WHERE ${reconsiderableCodeReviewWorkCondition(staleQueuedCutoff)}
         GROUP BY owner_type, owner_id
       ), active_work AS (
         SELECT

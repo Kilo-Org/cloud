@@ -9,6 +9,7 @@ import {
 import * as z from 'zod';
 import { sql, and, gte, lt, eq, isNotNull, desc, ilike, or, inArray, type SQL } from 'drizzle-orm';
 import {
+  reconsiderableCodeReviewWorkCondition,
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
 } from '@/lib/code-reviews/dispatch/dispatch-constants';
@@ -168,13 +169,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     );
     const staleQueuedCutoff = staleQueuedCodeReviewCutoffSql();
     const staleRunningCutoff = staleRunningCodeReviewCutoffSql();
-    const waitingOwnerCondition = sql`(
-      ${cloud_agent_code_reviews.status} = 'pending'
-      OR (
-        ${cloud_agent_code_reviews.status} = 'queued'
-        AND ${cloud_agent_code_reviews.updated_at} < ${staleQueuedCutoff}
-      )
-    )`;
+    const waitingOwnerCondition = reconsiderableCodeReviewWorkCondition(staleQueuedCutoff);
     const liveQueueCondition = sql`(
       ${waitingOwnerCondition}
       OR (

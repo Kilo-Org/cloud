@@ -17,6 +17,18 @@ export function staleRunningCodeReviewCutoffSql() {
   return sql`now() - interval '${sql.raw(String(STALE_RUNNING_CODE_REVIEW_MINUTES))} minutes'`;
 }
 
+export function reconsiderableCodeReviewWorkCondition(
+  staleQueuedCutoff = staleQueuedCodeReviewCutoffSql()
+) {
+  return sql`(
+    ${cloud_agent_code_reviews.status} = 'pending'
+    OR (
+      ${cloud_agent_code_reviews.status} = 'queued'
+      AND ${cloud_agent_code_reviews.updated_at} < ${staleQueuedCutoff}
+    )
+  )`;
+}
+
 export function activeCodeReviewWorkCondition(
   staleQueuedCutoff = staleQueuedCodeReviewCutoffSql(),
   staleRunningCutoff = staleRunningCodeReviewCutoffSql()

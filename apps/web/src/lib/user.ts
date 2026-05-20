@@ -347,7 +347,12 @@ async function fireAuthEvent(
       })
       .from(organization_memberships)
       .innerJoin(organizations, eq(organization_memberships.organization_id, organizations.id))
-      .where(eq(organization_memberships.kilo_user_id, user.id)),
+      .where(
+        and(
+          eq(organization_memberships.kilo_user_id, user.id),
+          isNull(organizations.deleted_at)
+        )
+      ),
   ]).catch(() => null);
 
   // DB enrichment failures must not abort auth telemetry; fall through with empty arrays

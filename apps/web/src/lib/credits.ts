@@ -124,17 +124,19 @@ export async function processTopUp(
     return false;
   }
 
-  void reportEvents({
-    events: [
-      {
-        type: 'billing.credit_purchased',
-        data: {
-          kilo_user_id: user.id,
-          microdollars_acquired: creditAmountInMicrodollars,
+  if (!dbOrTx) {
+    void reportEvents({
+      events: [
+        {
+          type: 'billing.credit_purchased',
+          data: {
+            kilo_user_id: user.id,
+            microdollars_acquired: creditAmountInMicrodollars,
+          },
         },
-      },
-    ],
-  });
+      ],
+    });
+  }
 
   if (skipPostTopUpFreeStuff) return true;
 

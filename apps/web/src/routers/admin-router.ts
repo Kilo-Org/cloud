@@ -494,6 +494,16 @@ export const adminRouter = createTRPCRouter({
       .input(UpdateUserBlockStatusSchema)
       .mutation(async ({ input, ctx }) => {
         const isBlocking = Boolean(input.blocked_reason);
+
+        const [current] = await db
+          .select({ blocked_reason: kilocode_users.blocked_reason })
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, input.userId))
+          .limit(1);
+
+        const wasBlocked = Boolean(current?.blocked_reason);
+        const isTransition = isBlocking !== wasBlocked;
+
         const blockMetadata = isBlocking
           ? {
               blocked_reason: input.blocked_reason,
@@ -506,13 +516,12 @@ export const adminRouter = createTRPCRouter({
               blocked_by_kilo_user_id: null,
             };
 
-        const updated = await db
+        await db
           .update(kilocode_users)
           .set(blockMetadata)
-          .where(eq(kilocode_users.id, input.userId))
-          .returning({ id: kilocode_users.id });
+          .where(eq(kilocode_users.id, input.userId));
 
-        if (updated.length > 0) {
+        if (isTransition) {
           void reportEvents({
             events: [
               {

@@ -297,7 +297,7 @@ fi
 # INTERNAL_API_SECRET → INTERNAL_API_SECRET
 INTERNAL_SECRET_VAL="$(env_local_val INTERNAL_API_SECRET)"
 if [ -n "$INTERNAL_SECRET_VAL" ]; then
-  set_env_var INTERNAL_API_SECRET "$INTERNAL_SECRET_VAL" false
+  set_or_append_dev_var INTERNAL_API_SECRET "$INTERNAL_SECRET_VAL" false
   sed '/^KILOCLAW_INTERNAL_API_SECRET=/d' \
     "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
   mv "$KILOCLAW_DIR/.dev.vars.tmp" "$KILOCLAW_DIR/.dev.vars"

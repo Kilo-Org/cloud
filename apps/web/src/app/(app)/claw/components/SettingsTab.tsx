@@ -2243,6 +2243,7 @@ export function SettingsTab({
                 <a
                   href="https://kilo.ai/docs/getting-started/byok"
                   target="_blank"
+                  rel="noopener noreferrer"
                   className="underline"
                 >
                   View the BYOK setup guide

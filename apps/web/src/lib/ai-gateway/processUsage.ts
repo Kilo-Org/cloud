@@ -266,7 +266,12 @@ export async function logMicrodollarUsage(
   // `insertUsageRecord` swallows DB errors and returns null; surface that
   // failure to callers so dependent FK writes don't dangle on a row that
   // was never persisted.
-  return inserted ? { usageId: inserted.usageId, createdAt: inserted.createdAt } : null;
+  // Use the JS-side identity values we constructed in toInsertableDbUsageRecord
+  // rather than the DB-returned ones. The DB round-trip for created_at returns a
+  // Postgres timestamp string (e.g. "2026-04-29 01:16:12.945+00") which is not
+  // strict ISO 8601 and will fail downstream datetime validators. core.created_at
+  // is always new Date().toISOString() so the format is guaranteed.
+  return inserted ? { usageId: core.id, createdAt: core.created_at } : null;
 }
 
 async function saveUsageRelatedData(

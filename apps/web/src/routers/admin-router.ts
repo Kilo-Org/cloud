@@ -496,7 +496,7 @@ export const adminRouter = createTRPCRouter({
         const isBlocking = Boolean(input.blocked_reason);
         let didTransition = false;
 
-        await db.transaction(async (tx) => {
+        await db.transaction(async tx => {
           const [current] = await tx
             .select({ blocked_reason: kilocode_users.blocked_reason })
             .from(kilocode_users)

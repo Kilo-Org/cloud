@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { format, subDays } from 'date-fns';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
@@ -169,22 +169,17 @@ export default function CodeReviewsPage() {
   const isIntervalDraftInvalid = rangeType === 'interval' && intervalValidation.interval === null;
   const { activeInterval, intervalDraft } = dateIntervalState;
   const { startDate, endDate } = activeInterval;
+  const hasPendingIntervalDraft =
+    rangeType === 'interval' &&
+    intervalValidation.interval !== null &&
+    (intervalValidation.interval.startDate !== startDate || intervalValidation.interval.endDate !== endDate);
 
-  useEffect(() => {
-    if (rangeType !== 'interval' || !intervalValidation.interval) return;
-
+  const handleApplyInterval = () => {
     const nextInterval = intervalValidation.interval;
-    setDateIntervalState(current => {
-      if (
-        current.activeInterval.startDate === nextInterval.startDate &&
-        current.activeInterval.endDate === nextInterval.endDate
-      ) {
-        return current;
-      }
+    if (!nextInterval) return;
 
-      return { ...current, activeInterval: nextInterval };
-    });
-  }, [intervalValidation.interval, rangeType]);
+    setDateIntervalState(current => ({ ...current, activeInterval: nextInterval }));
+  };
 
   const handleRangeTypeChange = (nextRangeType: RangeType) => {
     setRangeType(nextRangeType);
@@ -420,6 +415,14 @@ export default function CodeReviewsPage() {
                     aria-invalid={isIntervalDraftInvalid}
                   />
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleApplyInterval}
+                  disabled={!hasPendingIntervalDraft}
+                >
+                  Apply interval
+                </Button>
               </div>
               <p
                 id="code-review-date-interval-feedback"
@@ -432,7 +435,9 @@ export default function CodeReviewsPage() {
               >
                 {isIntervalDraftInvalid
                   ? intervalValidation.error
-                  : "Times use this browser's local timezone."}
+                  : hasPendingIntervalDraft
+                    ? "Apply the interval to update telemetry. Times use this browser's local timezone."
+                    : "Times use this browser's local timezone."}
               </p>
             </div>
           )}

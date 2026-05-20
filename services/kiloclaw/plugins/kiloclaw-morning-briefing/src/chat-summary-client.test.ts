@@ -110,7 +110,18 @@ describe('chat summary client', () => {
     });
   });
 
-  it('skips current-day conversations while still fetching yesterday conversations', async () => {
+  it('inspects conversations whose latest activity is after the window', async () => {
+    // A thread that started yesterday and continued today reports a
+    // lastActivityAt of today, but still holds yesterday-window messages.
+    // It must be scanned or yesterday stats undercount spanning threads.
+    const yesterdayMessage = ulidFromTimestamp(
+      Date.parse('2026-05-18T22:00:00.000Z'),
+      '0000000000000001'
+    );
+    const todayMessage = ulidFromTimestamp(
+      Date.parse('2026-05-19T08:00:00.000Z'),
+      '0000000000000002'
+    );
     const requests: string[] = [];
     const fetchImpl = mockFetch(async input => {
       const url = fetchInputUrl(input);
@@ -119,14 +130,12 @@ describe('chat summary client', () => {
         return jsonResponse({
           conversations: [
             {
-              conversationId: 'conv-today',
-              title: 'Today only',
-              lastActivityAt: Date.parse('2026-05-19T10:00:00.000Z'),
+              conversationId: 'conv-spanning',
+              lastActivityAt: Date.parse('2026-05-19T08:00:00.000Z'),
             },
             {
-              conversationId: 'conv-yesterday',
-              title: 'Yesterday thread',
-              lastActivityAt: Date.parse('2026-05-18T17:00:00.000Z'),
+              conversationId: 'conv-before-window',
+              lastActivityAt: Date.parse('2026-05-17T09:00:00.000Z'),
             },
           ],
           hasMore: false,
@@ -134,10 +143,13 @@ describe('chat summary client', () => {
         });
       }
       if (
-        url === 'http://controller/_kilo/kilo-chat/conversations/conv-yesterday/messages?limit=100'
+        url === 'http://controller/_kilo/kilo-chat/conversations/conv-spanning/messages?limit=100'
       ) {
         return jsonResponse({
-          messages: [{ id: '01JVPPRVG00000000000000000', senderId: 'user:1', deleted: false }],
+          messages: [
+            { id: todayMessage, senderId: 'user:1', deleted: false },
+            { id: yesterdayMessage, senderId: 'user:1', deleted: false },
+          ],
           hasMore: false,
           nextCursor: null,
         });
@@ -154,12 +166,18 @@ describe('chat summary client', () => {
       buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
     );
 
+    // conv-spanning is scanned even though its latest activity is today;
+    // conv-before-window is skipped because it cannot hold yesterday messages.
     expect(result.conversations.map(conversation => conversation.conversationId)).toEqual([
-      'conv-yesterday',
+      'conv-spanning',
+    ]);
+    expect(result.conversations[0]?.messages.map(message => message.id)).toEqual([
+      todayMessage,
+      yesterdayMessage,
     ]);
     expect(requests).toEqual([
       'http://controller/_kilo/kilo-chat/conversations?limit=100',
-      'http://controller/_kilo/kilo-chat/conversations/conv-yesterday/messages?limit=100',
+      'http://controller/_kilo/kilo-chat/conversations/conv-spanning/messages?limit=100',
     ]);
   });
 

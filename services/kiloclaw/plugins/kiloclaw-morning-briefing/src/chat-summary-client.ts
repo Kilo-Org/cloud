@@ -130,15 +130,19 @@ async function fetchJson(
   }
 }
 
+/**
+ * A conversation is worth scanning when its most recent activity is at or
+ * after the window start. The upper bound is deliberately omitted: a thread
+ * that continued past the window (for example one spanning midnight) still
+ * holds in-window messages, and `summarizeChatActivity` filters per message
+ * by timestamp. Conversations last active before the window start cannot
+ * contribute any in-window messages, so they are skipped.
+ */
 function shouldInspectConversation(
   conversation: KiloChatConversationListItem,
   window: ChatSummaryWindow
 ): boolean {
-  return (
-    conversation.lastActivityAt !== null &&
-    conversation.lastActivityAt >= window.startMs &&
-    conversation.lastActivityAt < window.endMs
-  );
+  return conversation.lastActivityAt !== null && conversation.lastActivityAt >= window.startMs;
 }
 
 function shouldStopConversationScan(

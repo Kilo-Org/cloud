@@ -1,4 +1,6 @@
-import { Suspense, type ReactNode } from 'react';
+import 'server-only';
+
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -9,12 +11,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { PageLayout } from '@/components/PageLayout';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { GitHubIntegrationDetails } from '@/components/integrations/GitHubIntegrationDetails';
-import { GitLabIntegrationDetails } from '@/components/integrations/GitLabIntegrationDetails';
-import { SlackIntegrationDetails } from '@/components/integrations/SlackIntegrationDetails';
-import { DiscordIntegrationDetails } from '@/components/integrations/DiscordIntegrationDetails';
-import { LinearIntegrationDetails } from '@/components/integrations/LinearIntegrationDetails';
-import { DoltHubIntegrationDetails } from '@/components/integrations/DoltHubIntegrationDetails';
 
 export type IntegrationDetailSearchParams = Promise<{
   success?: string;
@@ -44,7 +40,6 @@ type IntegrationDetailConfig = {
   title: string;
   userSubtitle: string;
   organizationSubtitle: (organizationName: string) => string;
-  renderDetails: (props: DetailRenderProps) => ReactNode;
 };
 
 const integrationDetailPlatformSet: ReadonlySet<string> = new Set(INTEGRATION_DETAIL_PLATFORMS);
@@ -55,78 +50,32 @@ const integrationDetailConfigs: Record<IntegrationDetailPlatform, IntegrationDet
     userSubtitle: 'Manage your personal GitHub App installation',
     organizationSubtitle: organizationName =>
       `Manage GitHub App installation for ${organizationName}`,
-    renderDetails: ({ organizationId, organizationName, search }) => (
-      <GitHubIntegrationDetails
-        organizationId={organizationId}
-        organizationName={organizationName}
-        success={search.success === 'installed'}
-        error={search.error}
-        pendingApproval={search.pending_approval === 'true'}
-        existingPendingOrg={search.org}
-      />
-    ),
   },
   [PLATFORM.GITLAB]: {
     title: 'GitLab Integration',
     userSubtitle: 'Manage your personal GitLab integration',
     organizationSubtitle: organizationName =>
       `Manage GitLab OAuth integration for ${organizationName}`,
-    renderDetails: ({ organizationId, organizationName, search }) => (
-      <GitLabIntegrationDetails
-        organizationId={organizationId}
-        organizationName={organizationName}
-        success={search.success === 'connected'}
-        error={search.error}
-      />
-    ),
   },
   [PLATFORM.SLACK]: {
     title: 'Slack Integration',
     userSubtitle: 'Connect your Slack workspace to receive notifications',
     organizationSubtitle: organizationName => `Manage Slack integration for ${organizationName}`,
-    renderDetails: ({ organizationId, search }) => (
-      <SlackIntegrationDetails
-        organizationId={organizationId}
-        success={search.success === 'installed'}
-        error={search.error}
-      />
-    ),
   },
   [PLATFORM.DISCORD]: {
     title: 'Discord Integration',
     userSubtitle: 'Connect your Discord server to interact with Kilo',
     organizationSubtitle: organizationName => `Manage Discord integration for ${organizationName}`,
-    renderDetails: ({ organizationId, search }) => (
-      <DiscordIntegrationDetails
-        organizationId={organizationId}
-        success={search.success === 'installed'}
-        error={search.error}
-      />
-    ),
   },
   [PLATFORM.LINEAR]: {
     title: 'Linear Integration',
     userSubtitle: 'Connect your Linear workspace so Kilo can respond to @-mentions on issues',
     organizationSubtitle: organizationName => `Manage Linear integration for ${organizationName}`,
-    renderDetails: ({ organizationId, search }) => (
-      <LinearIntegrationDetails
-        organizationId={organizationId}
-        success={search.success === 'installed'}
-        error={search.error}
-      />
-    ),
   },
   [PLATFORM.DOLTHUB]: {
     title: 'DoltHub Integration',
     userSubtitle: 'Connect your DoltHub account to query versioned data',
     organizationSubtitle: organizationName => `Manage DoltHub integration for ${organizationName}`,
-    renderDetails: ({ organizationId, search }) => (
-      <DoltHubIntegrationDetails
-        organizationId={organizationId}
-        success={search.success === 'installed'}
-        error={search.error}
-      />
-    ),
   },
 };
 
@@ -134,11 +83,15 @@ function isIntegrationDetailPlatform(platform: string): platform is IntegrationD
   return integrationDetailPlatformSet.has(platform);
 }
 
-function getIntegrationDetailConfig(platform: string): IntegrationDetailConfig {
+function getIntegrationDetailPlatform(platform: string): IntegrationDetailPlatform {
   if (!isIntegrationDetailPlatform(platform)) {
     notFound();
   }
 
+  return platform;
+}
+
+function getIntegrationDetailConfig(platform: IntegrationDetailPlatform): IntegrationDetailConfig {
   return integrationDetailConfigs[platform];
 }
 
@@ -166,19 +119,92 @@ function IntegrationDetailsFallback() {
   );
 }
 
-function SuspendedIntegrationDetails(props: {
-  config: IntegrationDetailConfig;
-  search: Awaited<IntegrationDetailSearchParams>;
-  organizationId?: string;
-  organizationName?: string;
-}) {
+async function PlatformIntegrationDetails({
+  platform,
+  organizationId,
+  organizationName,
+  search,
+}: DetailRenderProps & { platform: IntegrationDetailPlatform }) {
+  switch (platform) {
+    case PLATFORM.GITHUB: {
+      const { GitHubIntegrationDetails } =
+        await import('@/components/integrations/GitHubIntegrationDetails');
+      return (
+        <GitHubIntegrationDetails
+          organizationId={organizationId}
+          organizationName={organizationName}
+          success={search.success === 'installed'}
+          error={search.error}
+          pendingApproval={search.pending_approval === 'true'}
+          existingPendingOrg={search.org}
+        />
+      );
+    }
+    case PLATFORM.GITLAB: {
+      const { GitLabIntegrationDetails } =
+        await import('@/components/integrations/GitLabIntegrationDetails');
+      return (
+        <GitLabIntegrationDetails
+          organizationId={organizationId}
+          organizationName={organizationName}
+          success={search.success === 'connected'}
+          error={search.error}
+        />
+      );
+    }
+    case PLATFORM.SLACK: {
+      const { SlackIntegrationDetails } =
+        await import('@/components/integrations/SlackIntegrationDetails');
+      return (
+        <SlackIntegrationDetails
+          organizationId={organizationId}
+          success={search.success === 'installed'}
+          error={search.error}
+        />
+      );
+    }
+    case PLATFORM.DISCORD: {
+      const { DiscordIntegrationDetails } =
+        await import('@/components/integrations/DiscordIntegrationDetails');
+      return (
+        <DiscordIntegrationDetails
+          organizationId={organizationId}
+          success={search.success === 'installed'}
+          error={search.error}
+        />
+      );
+    }
+    case PLATFORM.LINEAR: {
+      const { LinearIntegrationDetails } =
+        await import('@/components/integrations/LinearIntegrationDetails');
+      return (
+        <LinearIntegrationDetails
+          organizationId={organizationId}
+          success={search.success === 'installed'}
+          error={search.error}
+        />
+      );
+    }
+    case PLATFORM.DOLTHUB: {
+      const { DoltHubIntegrationDetails } =
+        await import('@/components/integrations/DoltHubIntegrationDetails');
+      return (
+        <DoltHubIntegrationDetails
+          organizationId={organizationId}
+          success={search.success === 'installed'}
+          error={search.error}
+        />
+      );
+    }
+  }
+}
+
+function SuspendedIntegrationDetails(
+  props: DetailRenderProps & { platform: IntegrationDetailPlatform }
+) {
   return (
     <Suspense fallback={<IntegrationDetailsFallback />}>
-      {props.config.renderDetails({
-        organizationId: props.organizationId,
-        organizationName: props.organizationName,
-        search: props.search,
-      })}
+      <PlatformIntegrationDetails {...props} />
     </Suspense>
   );
 }
@@ -190,7 +216,8 @@ export async function UserIntegrationDetailPage({
   platform: string;
   searchParams: IntegrationDetailSearchParams;
 }) {
-  const config = getIntegrationDetailConfig(platform);
+  const detailPlatform = getIntegrationDetailPlatform(platform);
+  const config = getIntegrationDetailConfig(detailPlatform);
   await getUserFromAuthOrRedirect('/users/sign_in');
   const search = await searchParams;
 
@@ -200,7 +227,7 @@ export async function UserIntegrationDetailPage({
       subtitle={config.userSubtitle}
       headerActions={<BackToIntegrationsLink href="/integrations" />}
     >
-      <SuspendedIntegrationDetails config={config} search={search} />
+      <SuspendedIntegrationDetails platform={detailPlatform} search={search} />
     </PageLayout>
   );
 }
@@ -214,7 +241,8 @@ export async function OrganizationIntegrationDetailPage({
   platform: string;
   searchParams: IntegrationDetailSearchParams;
 }) {
-  const config = getIntegrationDetailConfig(platform);
+  const detailPlatform = getIntegrationDetailPlatform(platform);
+  const config = getIntegrationDetailConfig(detailPlatform);
   const search = await searchParams;
 
   return (
@@ -231,7 +259,7 @@ export async function OrganizationIntegrationDetailPage({
           </div>
 
           <SuspendedIntegrationDetails
-            config={config}
+            platform={detailPlatform}
             organizationId={organization.id}
             organizationName={organization.name}
             search={search}

@@ -292,6 +292,7 @@ export function MessageInput({
               onClick={handlePickClick}
               className="hover:bg-muted rounded-lg p-2 cursor-pointer transition-colors"
               title="Attach files"
+              aria-label="Attach files"
               type="button"
             >
               <Plus className="h-4 w-4" />

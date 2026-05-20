@@ -22,8 +22,8 @@ export class TownContainerDO extends Container<Env> {
   defaultPort = 8080;
   sleepAfter = '10m';
 
-  // Container env vars. Includes infra URLs and any tokens stored via setEnvVar().
-  // The Container base class reads this when booting the container.
+  // Static boot-time container env vars. Runtime town, rig, and agent
+  // configuration is sent through the control server request protocol.
   envVars: Record<string, string> = {
     ...(this.env.GASTOWN_API_URL ? { GASTOWN_API_URL: this.env.GASTOWN_API_URL } : {}),
     ...(this.env.KILO_API_URL
@@ -33,39 +33,6 @@ export class TownContainerDO extends Container<Env> {
         }
       : {}),
   };
-
-  constructor(ctx: DurableObjectState<Env>, env: Env) {
-    super(ctx, env);
-    // Load persisted env vars (like KILOCODE_TOKEN) into envVars
-    // so they're available when the container boots.
-    void ctx.blockConcurrencyWhile(async () => {
-      const stored = await ctx.storage.get<Record<string, string>>('container:envVars');
-      if (stored) {
-        Object.assign(this.envVars, stored);
-      }
-    });
-  }
-
-  /**
-   * Store an env var that will be injected into the container OS environment.
-   * Takes effect on the next container boot (or immediately if the container
-   * hasn't started yet). Call this from the TownDO during configureRig.
-   */
-  async setEnvVar(key: string, value: string): Promise<void> {
-    const stored = (await this.ctx.storage.get<Record<string, string>>('container:envVars')) ?? {};
-    stored[key] = value;
-    await this.ctx.storage.put('container:envVars', stored);
-    this.envVars[key] = value;
-    console.log(`${TC_LOG} setEnvVar: ${key} stored (${value.length} chars)`);
-  }
-
-  async deleteEnvVar(key: string): Promise<void> {
-    const stored = (await this.ctx.storage.get<Record<string, string>>('container:envVars')) ?? {};
-    delete stored[key];
-    await this.ctx.storage.put('container:envVars', stored);
-    delete this.envVars[key];
-    console.log(`${TC_LOG} deleteEnvVar: ${key} removed`);
-  }
 
   async updateRegistry(registry: unknown): Promise<void> {
     await this.ctx.storage.put('container:registry', registry);

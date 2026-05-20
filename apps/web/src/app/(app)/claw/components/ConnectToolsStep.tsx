@@ -6,6 +6,7 @@ import { SECRET_CATALOG_MAP, validateFieldValue } from '@kilocode/kiloclaw-secre
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { ChannelTokenInput } from './ChannelTokenInput';
 import { OnboardingStepView } from './OnboardingStepView';
 
 type ConnectToolsStepViewProps = {
@@ -186,7 +187,7 @@ export function ConnectToolsStepView({
           <button
             type="button"
             onClick={() => setShowManual(value => !value)}
-            disabled={connecting}
+            disabled={connecting || savingManual}
             aria-expanded={showManual}
             aria-controls={manualPanelId}
             className="border-border bg-secondary/40 text-muted-foreground hover:bg-muted hover:text-foreground inline-flex h-9 w-fit items-center gap-2 rounded-md border px-3 text-left text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
@@ -204,7 +205,7 @@ export function ConnectToolsStepView({
             <button
               type="button"
               onClick={() => onSkip()}
-              disabled={connecting}
+              disabled={connecting || savingManual}
               className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
             >
               Skip for now
@@ -212,7 +213,8 @@ export function ConnectToolsStepView({
             <Button
               variant="primary"
               disabled={
-                status !== 'connected' && !manualConfigured && (connectionBlocked || connecting)
+                savingManual ||
+                (status !== 'connected' && !manualConfigured && (connectionBlocked || connecting))
               }
               onClick={handlePrimaryAction}
               className={brandPrimaryButtonClassName}
@@ -238,11 +240,12 @@ export function ConnectToolsStepView({
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex flex-col gap-1.5 text-sm font-medium">
                 User API key
-                <Input
+                <ChannelTokenInput
+                  id="composio-user-api-key"
                   value={userApiKey}
-                  onChange={event => setUserApiKey(event.target.value)}
+                  onChange={setUserApiKey}
                   placeholder="uak_..."
-                  autoComplete="off"
+                  disabled={savingManual}
                 />
               </label>
               <label className="flex flex-col gap-1.5 text-sm font-medium">
@@ -252,6 +255,7 @@ export function ConnectToolsStepView({
                   onChange={event => setOrg(event.target.value)}
                   placeholder="org or workspace name"
                   autoComplete="off"
+                  disabled={savingManual}
                 />
               </label>
             </div>

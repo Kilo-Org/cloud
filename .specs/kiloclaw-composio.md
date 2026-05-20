@@ -4,9 +4,9 @@
 
 This spec defines the business rules and invariants for integrating
 Composio with KiloClaw. It is the source of truth for what the system
-must guarantee about Composio credential ownership, sandbox injection,
-manual configuration, managed provisioning, organization sharing, and
-connection onboarding.
+must guarantee about Composio credential ownership, OpenClaw instance
+injection, manual configuration, managed provisioning, organization
+sharing, and connection onboarding.
 
 It deliberately does not prescribe how to implement those guarantees:
 column layouts, endpoint names, controller helper names, and UI component
@@ -14,8 +14,7 @@ structure belong in plan documents and code, not here.
 
 ## Status
 
-Draft -- created 2026-05-15. Updated 2026-05-18 to scope managed
-organization-context identities per Kilo user and organization pair.
+Draft -- proposed for PR #3348. Not yet shipped.
 
 ## Conventions
 
@@ -31,8 +30,8 @@ capitals, as shown here.
   organization identifier required to sign the `composio` CLI into a
   Composio account or organization.
 - **Manual Composio configuration**: User-provided Composio CLI
-  credentials entered through KiloClaw settings and injected into a
-  KiloClaw sandbox.
+  credentials entered through KiloClaw and injected into an OpenClaw
+  instance.
 - **Managed Composio identity**: A Composio identity provisioned by Kilo
   on behalf of a Kilo user or a Kilo user's organization context, with
   credentials stored by Kilo and reused across KiloClaw instance
@@ -46,36 +45,37 @@ capitals, as shown here.
   GitHub, or Slack within a personal or organization context.
 - **Connect Link**: A Composio-hosted authentication URL used to connect
   an external toolkit account to a Composio user/context.
-- **Sandbox**: The Fly Machine-backed KiloClaw environment where
-  OpenClaw and the `composio` CLI run.
+- **OpenClaw instance**: The Fly Machine-backed KiloClaw environment
+  where OpenClaw and the `composio` CLI run.
 - **Kilo central Composio credential**: Any Composio credential owned by
   Kilo as an operator/developer rather than by a specific Kilo user or
   Kilo organization-user owner scope.
 
 ## Overview
 
-KiloClaw can expose Composio to sandbox agents in two phases. First,
-users may manually provide Composio CLI credentials in KiloClaw settings;
-KiloClaw injects those credentials into the sandbox and signs the local
-`composio` CLI in during controller bootstrap. This makes Composio
-available without Kilo provisioning or owning a Composio identity.
+KiloClaw can expose Composio to OpenClaw instances in two ways. First,
+users may manually provide Composio CLI credentials; KiloClaw injects
+those credentials into the instance and signs the local `composio` CLI in
+during controller bootstrap. This makes Composio available without Kilo
+provisioning or owning a Composio identity.
 
-Later, Kilo may provision managed Composio identities during onboarding.
+Kilo may also provision managed Composio identities during onboarding.
 Managed personal identities are reused across new personal KiloClaw
-instances created after a prior instance is destroyed. Managed organization-context identities are scoped per
-organization user, not shared across the whole organization: the same Kilo
-user receives a distinct Composio identity for each organization context
-where they use KiloClaw. Kilo may create Connect Links during onboarding
-so external toolkit connections can be completed before the sandbox is
-fully provisioned.
+instances created after a prior instance is destroyed. Managed
+organization-context identities are scoped per organization user, not
+shared across the whole organization: the same Kilo user receives a
+distinct Composio identity for each organization context where they use
+KiloClaw. Kilo may create Connect Links during onboarding so external
+toolkit connections can be completed before the OpenClaw instance is fully
+provisioned.
 
 ## Rules
 
 ### Manual Configuration
 
-1. Manual Composio configuration MUST be opt-in. A sandbox without both
-   a Composio user API key and Composio organization value MUST continue
-   to boot without Composio CLI sign-in.
+1. Manual Composio configuration MUST be opt-in. An OpenClaw instance
+   without both a Composio user API key and Composio organization value
+   MUST continue to boot without Composio CLI sign-in.
 2. Manual Composio credentials MUST be treated as user-provided secrets.
    The Composio user API key MUST be encrypted at rest before it reaches
    the KiloClaw worker and MUST be delivered to the machine through the
@@ -88,15 +88,16 @@ fully provisioned.
    commands containing those keys, Connect Links containing secret
    material, OAuth tokens, or raw Composio credentials.
 5. When manual Composio credentials are removed from KiloClaw settings,
-   the next sandbox bootstrap SHOULD leave the CLI unsigned-in or clean
-   up prior Composio CLI auth state so stale credentials are not reused.
+   the next OpenClaw instance bootstrap SHOULD leave the CLI unsigned-in
+   or clean up prior Composio CLI auth state so stale credentials are not
+   reused.
 6. Kilo MUST NOT rotate, revoke, claim, or otherwise manage manually
    entered Composio credentials unless the user explicitly requests that
    action through a supported product flow.
 
-### Sandbox CLI Sign-In
+### Instance CLI Sign-In
 
-7. The sandbox MAY contain the Composio CLI even when no Composio
+7. The OpenClaw instance MAY contain the Composio CLI even when no Composio
    credentials are configured.
 8. When valid Composio CLI credentials are available, the controller
    SHOULD sign the CLI in during bootstrap so `composio` commands work
@@ -109,21 +110,21 @@ fully provisioned.
     that would include credentials.
 11. If sign-in writes Composio CLI state files directly, those files MUST
     be written with owner-only permissions and MUST be placed in the
-    sandbox user's Composio config directory.
+    OpenClaw instance user's Composio config directory.
 12. Composio credentials injected for CLI sign-in MUST NOT be left in the
     gateway child process environment when they are no longer needed by
     the running gateway.
 13. Configuring Composio through KiloClaw settings or managed
-    provisioning is an explicit request for Kilo to manage the sandbox's
-    Composio CLI sign-in. When valid Kilo-provided Composio credentials
-    are available, the controller MAY overwrite existing on-disk
-    Composio CLI configuration during bootstrap.
-14. If a user signs into Composio manually inside the sandbox after
-    configuring Composio through KiloClaw, a later controller bootstrap
-    MAY overwrite that manual sign-in with the Kilo-provided
+    provisioning is an explicit request for Kilo to manage the OpenClaw
+    instance's Composio CLI sign-in. When valid Kilo-provided Composio
+    credentials are available, the controller MAY overwrite existing
+    on-disk Composio CLI configuration during bootstrap.
+14. If a user signs into Composio manually inside the OpenClaw instance
+    after configuring Composio through KiloClaw, a later controller
+    bootstrap MAY overwrite that manual sign-in with the Kilo-provided
     credentials. This is accepted behavior; users who want to preserve a
-    fully custom Composio CLI configuration SHOULD not configure
-    Composio through KiloClaw for that sandbox.
+    fully custom Composio CLI configuration SHOULD not configure Composio
+    through KiloClaw for that OpenClaw instance.
 15. When Composio credentials are removed from Kilo settings or managed
     provisioning, the controller MAY leave any existing on-disk Composio
     CLI configuration untouched. Kilo is not required to determine
@@ -132,16 +133,16 @@ fully provisioned.
 ### Credential Boundary
 
 16. Kilo central Composio credentials MUST NOT be injected into a user or
-    organization sandbox.
-17. A sandbox MUST receive only credentials for its own owner scope: the
-    user's manual credentials, the user's managed personal Composio
-    identity, or the user's managed Composio identity for the active Kilo
-    organization context.
+    organization OpenClaw instance.
+17. An OpenClaw instance MUST receive only credentials for its own owner
+    scope: the user's manual credentials, the user's managed personal
+    Composio identity, or the user's managed Composio identity for the
+    active Kilo organization context.
 18. The system MUST NOT fall back from a missing owner-scoped Composio
     identity to any shared global Composio identity.
 19. Manual personal Composio credentials MUST NOT be reused for an
-    organization sandbox unless the user explicitly configures those
-    credentials in that organization context.
+    organization OpenClaw instance unless the user explicitly configures
+    those credentials in that organization context.
 20. Managed personal Composio credentials MUST NOT be reused for a Kilo
     organization context. Managed organization-context credentials MUST
     NOT be reused for a different user, a different organization, or a
@@ -184,7 +185,7 @@ fully provisioned.
     members through a shared Composio workspace.
 31. When a user loses access to a Kilo organization, the system MUST
     prevent that user from receiving that organization-context Composio
-    identity's credentials in any future sandbox config.
+    identity's credentials in any future OpenClaw instance config.
 32. Organization member removal SHOULD NOT delete other members'
     organization-context Composio identities or connected accounts.
 33. Organization deletion MUST define whether organization-context
@@ -194,7 +195,7 @@ fully provisioned.
 ### Connect Link Onboarding
 
 34. Kilo MAY create Composio Connect Links during onboarding before the
-    sandbox machine exists.
+    OpenClaw instance machine exists.
 35. A Connect Link created by Kilo MUST be scoped to the correct managed
     owner identity and to the intended Composio user/context for that
     owner.
@@ -213,9 +214,9 @@ fully provisioned.
     not for a shared organization-wide Composio workspace.
 40. Managed Connect Link onboarding UI MUST disclose that Composio powers
     the toolkit connection. When manual Composio configuration is
-    available for the sandbox, the onboarding UI MUST provide a path for
-    the user to use their own Composio credentials instead of the managed
-    Composio identity.
+    available for the OpenClaw instance, the onboarding UI MUST provide a
+    path for the user to use their own Composio credentials instead of
+    the managed Composio identity.
 
 ### Data Protection and Logging
 
@@ -246,15 +247,7 @@ fully provisioned.
    before a Connect Link callback completes, Kilo MUST reject the
    callback result for that user's session.
 
-## Not Yet Implemented
+## Implementation Status
 
-The following rules use SHOULD and reflect intended behavior that is not
-necessarily enforced in the current codebase:
-
-1. Kilo SHOULD provision managed personal Composio identities during
-   onboarding. (Currently not implemented.)
-2. Kilo SHOULD provision or reuse managed organization-context Composio
-   identities per Kilo user and organization pair. (Currently not
-   implemented.)
-3. Kilo SHOULD support pre-provision Connect Link onboarding for selected
-   toolkits such as Google Calendar. (Currently not implemented.)
+This spec describes the intended first shipped behavior for PR #3348.
+None of the managed Composio onboarding behavior has reached production.

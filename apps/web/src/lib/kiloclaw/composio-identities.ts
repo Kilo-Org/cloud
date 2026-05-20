@@ -15,6 +15,7 @@ import {
   kiloclaw_composio_identities,
   type KiloClawComposioIdentity,
   type KiloClawComposioIdentityOwnerType,
+  type NewKiloClawComposioIdentity,
 } from '@kilocode/db/schema';
 
 export type ComposioOwnerScope =
@@ -108,12 +109,11 @@ function scopeFromRow(row: KiloClawComposioIdentity): ComposioOwnerScope {
   };
 }
 
-async function encryptComposioIdentity(scope: ComposioOwnerScope, identity: ComposioAgentIdentity) {
+function encryptComposioIdentityCredentials(
+  scope: ComposioOwnerScope,
+  identity: ComposioAgentIdentity
+): NewKiloClawComposioIdentity {
   const encryptionKey = requireComposioEncryptionKey();
-  const consumerProject = await resolveComposioConsumerProject({
-    userApiKey: identity.composio.user_api_key,
-    orgId: identity.composio.org_id,
-  });
   return {
     owner_type: scope.ownerType,
     user_id: scope.userId,
@@ -128,9 +128,28 @@ async function encryptComposioIdentity(scope: ComposioOwnerScope, identity: Comp
       : null,
     composio_org_id: identity.composio.org_id,
     composio_org_name: identity.slug,
+    composio_agent_email: identity.email,
+  };
+}
+
+async function resolveComposioIdentityContext(identity: ComposioAgentIdentity) {
+  const consumerProject = await resolveComposioConsumerProject({
+    userApiKey: identity.composio.user_api_key,
+    orgId: identity.composio.org_id,
+  });
+  return {
     composio_project_id: consumerProject.project_nano_id,
     composio_consumer_user_id: consumerProject.consumer_user_id,
-    composio_agent_email: identity.email,
+  };
+}
+
+async function encryptComposioIdentity(
+  scope: ComposioOwnerScope,
+  identity: ComposioAgentIdentity
+): Promise<NewKiloClawComposioIdentity> {
+  return {
+    ...encryptComposioIdentityCredentials(scope, identity),
+    ...(await resolveComposioIdentityContext(identity)),
   };
 }
 
@@ -140,6 +159,24 @@ function needsComposioIdentityRefresh(row: KiloClawComposioIdentity): boolean {
     !row.composio_consumer_user_id ||
     row.composio_consumer_user_id.startsWith('kiloclaw:')
   );
+}
+
+async function insertPendingComposioIdentity(
+  values: NewKiloClawComposioIdentity
+): Promise<KiloClawComposioIdentity> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const [inserted] = await db.insert(kiloclaw_composio_identities).values(values).returning();
+      if (inserted) return inserted;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Failed to store managed Composio identity');
 }
 
 export async function getActiveManagedComposioIdentity(
@@ -167,11 +204,19 @@ export async function ensureManagedComposioIdentity(
       return decryptComposioIdentity(updated);
     }
 
+    requireComposioEncryptionKey();
     const identity = await signupComposioAgentIdentity();
-    const [inserted] = await db
-      .insert(kiloclaw_composio_identities)
-      .values(await encryptComposioIdentity(scope, identity))
+    const insertedPending = await insertPendingComposioIdentity(
+      encryptComposioIdentityCredentials(scope, identity)
+    );
+    const [updated] = await db
+      .update(kiloclaw_composio_identities)
+      .set(await resolveComposioIdentityContext(identity))
+      .where(eq(kiloclaw_composio_identities.id, insertedPending.id))
       .returning();
-    return decryptComposioIdentity(inserted);
+    if (!updated) {
+      throw new Error('Failed to resolve managed Composio identity context');
+    }
+    return decryptComposioIdentity(updated);
   });
 }

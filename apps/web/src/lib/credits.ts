@@ -139,7 +139,11 @@ export async function processTopUp(
   };
 
   if (dbOrTx) {
-    after(emitCreditPurchasedEvent);
+    if (IS_IN_AUTOMATED_TEST) {
+      emitCreditPurchasedEvent();
+    } else {
+      after(emitCreditPurchasedEvent);
+    }
   } else {
     emitCreditPurchasedEvent();
   }

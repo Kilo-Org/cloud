@@ -6,23 +6,19 @@ import type { ExperimentPromptCapture } from '@/lib/ai-gateway/processUsage.type
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 /**
- * Sentinel values written to `model_experiment_request.system_prompt_sha256` /
- * `request_body_sha256` instead of a real 64-char hex digest. The schema
- * CHECK constraints accept either a 64-char lowercase hex digest or one
- * of these sentinels.
+ * Sentinel values written to `model_experiment_request.request_body_sha256`
+ * instead of a real 64-char hex digest. The schema CHECK constraint accepts
+ * either a 64-char lowercase hex digest or one of these sentinels.
  *
- * - `__absent__` (system only): the request had no leading system message.
  * - `__failed__`: R2 storage failed; the attribution row still lands.
  * - `__deleted__`: prompt content intentionally wiped while retaining
  *   experiment attribution.
  */
-export const PROMPT_HASH_ABSENT = '__absent__';
 export const PROMPT_HASH_FAILED = '__failed__';
 export const PROMPT_HASH_DELETED = '__deleted__';
 
 /** 4 MB measured as UTF-8 bytes (matching what `putPromptIfAbsent` actually
  *  uploads). Comfortably above any current 1M-token-context request. */
-export const SYSTEM_PROMPT_CAP_BYTES = 4 * 1024 * 1024;
 export const REQUEST_BODY_CAP_BYTES = 4 * 1024 * 1024;
 
 /**
@@ -48,64 +44,25 @@ export function truncateToUtf8Bytes(s: string, maxBytes: number): string {
 
 /**
  * Build a bounded capture of the canonical post-`transformRequest` upstream
- * request body, split into the leading system message and the remainder.
+ * request body. The full serialized body is content-addressed as a single
+ * blob; the upstream API shape (`chat_completions` / `messages` /
+ * `responses`) is recorded on `requestKind` so downstream reporting can
+ * tell what was sent without re-parsing.
  *
- * - chat_completions: extracts a single leading `role === 'system'` message
- *   into `systemPromptContent` and serializes the remainder
- *   (`{...body, messages: nonSystem}`) into `requestBodyContent`.
- * - messages / responses: leaves the full body in `requestBodyContent` and
- *   leaves `systemPromptContent` null. The provider-specific system field
- *   (e.g. anthropic `body.system`) is captured as part of the body blob.
- *
- * The 4 MB caps ensure we never retain unbounded data through the async
- * `after()` path. If either side exceeds its cap, it is tail-truncated
+ * The 4 MB cap ensures we never retain unbounded data through the async
+ * `after()` path. If the body exceeds the cap it is tail-truncated
  * deterministically and `wasTruncated` is set to true.
  */
 export function buildExperimentPromptCapture(request: GatewayRequest): ExperimentPromptCapture {
-  let wasTruncated = false;
-
-  if (request.kind === 'chat_completions') {
-    const messages = Array.isArray(request.body.messages) ? request.body.messages : [];
-    let systemContent: string | null = null;
-    let nonSystemMessages = messages;
-    if (messages.length > 0 && messages[0]?.role === 'system') {
-      systemContent = serialize(messages[0].content ?? '');
-      nonSystemMessages = messages.slice(1);
-    }
-    const remainder = { ...request.body, messages: nonSystemMessages };
-    let bodyContent = serialize(remainder);
-    if (
-      systemContent !== null &&
-      Buffer.byteLength(systemContent, 'utf8') > SYSTEM_PROMPT_CAP_BYTES
-    ) {
-      systemContent = truncateToUtf8Bytes(systemContent, SYSTEM_PROMPT_CAP_BYTES);
-      wasTruncated = true;
-    }
-    if (Buffer.byteLength(bodyContent, 'utf8') > REQUEST_BODY_CAP_BYTES) {
-      bodyContent = truncateToUtf8Bytes(bodyContent, REQUEST_BODY_CAP_BYTES);
-      wasTruncated = true;
-    }
-    if (wasTruncated) {
-      noteTruncation(request.body.model);
-    }
-    return {
-      systemPromptContent: systemContent,
-      requestBodyContent: bodyContent,
-      wasTruncated,
-    };
-  }
-
-  // messages / responses: fold the entire serialized body into the body
-  // side; system extraction for those API kinds is left for later if it
-  // turns out to dedup meaningfully.
   let bodyContent = serialize(request.body);
+  let wasTruncated = false;
   if (Buffer.byteLength(bodyContent, 'utf8') > REQUEST_BODY_CAP_BYTES) {
     bodyContent = truncateToUtf8Bytes(bodyContent, REQUEST_BODY_CAP_BYTES);
     wasTruncated = true;
     noteTruncation(request.body.model);
   }
   return {
-    systemPromptContent: null,
+    requestKind: request.kind,
     requestBodyContent: bodyContent,
     wasTruncated,
   };
@@ -137,8 +94,8 @@ export type PersistExperimentAttributionInput = {
 
 /**
  * Insert one row into `model_experiment_request` for an experimented
- * request. Best-effort R2 puts run in parallel; only the failed side
- * gets `__failed__`.
+ * request. The R2 put is best-effort; on failure we still write the
+ * attribution row with `__failed__` as the body hash.
  *
  * Failures here MUST NOT roll back the microdollar usage write. Errors
  * are reported to Sentry and swallowed.
@@ -147,17 +104,15 @@ export async function persistExperimentAttribution(
   input: PersistExperimentAttributionInput
 ): Promise<void> {
   try {
-    const { systemHash, bodyHash } = await storePrompts(input.capture);
-    await db.insert(model_experiment_request).values({
-      usage_id: input.usageId,
-      variant_version_id: input.variantVersionId,
-      allocation_subject: input.allocationSubject,
-      client_request_id: input.clientRequestId,
-      system_prompt_sha256: systemHash,
-      request_body_sha256: bodyHash,
-      was_truncated: input.capture?.wasTruncated ?? false,
-      created_at: input.createdAt,
-    });
+    if (!input.capture) {
+      // Should not happen in production: an experimented request always
+      // builds a capture in the route handler. Record `__failed__` so the
+      // attribution row still lands and the gap is observable.
+      await insertRow(input, 'chat_completions', PROMPT_HASH_FAILED, false);
+      return;
+    }
+    const bodyHash = await putPromptSafely(input.capture.requestBodyContent);
+    await insertRow(input, input.capture.requestKind, bodyHash, input.capture.wasTruncated);
   } catch (err) {
     captureException(err, {
       tags: { source: 'model-experiments', operation: 'persistExperimentAttribution' },
@@ -166,49 +121,31 @@ export async function persistExperimentAttribution(
   }
 }
 
-async function storePrompts(
-  capture: ExperimentPromptCapture | null
-): Promise<{ systemHash: string; bodyHash: string }> {
-  if (!capture) {
-    return { systemHash: PROMPT_HASH_ABSENT, bodyHash: PROMPT_HASH_FAILED };
-  }
-  const systemPromise =
-    capture.systemPromptContent === null
-      ? Promise.resolve<PromptSlotResult>({ kind: 'absent' })
-      : putPromptSafely(capture.systemPromptContent);
-  const bodyPromise = putPromptSafely(capture.requestBodyContent);
-  const [systemResult, bodyResult] = await Promise.allSettled([systemPromise, bodyPromise]);
-  return {
-    systemHash: resolveHash(systemResult, 'system'),
-    bodyHash: resolveHash(bodyResult, 'body'),
-  };
+async function insertRow(
+  input: PersistExperimentAttributionInput,
+  requestKind: 'chat_completions' | 'messages' | 'responses',
+  bodyHash: string,
+  wasTruncated: boolean
+): Promise<void> {
+  await db.insert(model_experiment_request).values({
+    usage_id: input.usageId,
+    variant_version_id: input.variantVersionId,
+    allocation_subject: input.allocationSubject,
+    client_request_id: input.clientRequestId,
+    request_kind: requestKind,
+    request_body_sha256: bodyHash,
+    was_truncated: wasTruncated,
+    created_at: input.createdAt,
+  });
 }
 
-type PromptSlotResult = { kind: 'absent' } | { kind: 'sha'; sha: string } | { kind: 'failed' };
-
-async function putPromptSafely(content: string): Promise<PromptSlotResult> {
+async function putPromptSafely(content: string): Promise<string> {
   try {
-    return { kind: 'sha', sha: await putPromptIfAbsent(content) };
+    return await putPromptIfAbsent(content);
   } catch (err) {
     captureException(err, {
       tags: { source: 'model-experiments', operation: 'putPromptIfAbsent' },
     });
-    return { kind: 'failed' };
-  }
-}
-
-function resolveHash(
-  settled: PromiseSettledResult<PromptSlotResult>,
-  side: 'system' | 'body'
-): string {
-  if (settled.status === 'rejected') {
-    captureException(settled.reason, {
-      tags: { source: 'model-experiments', operation: 'storePrompts', side },
-    });
     return PROMPT_HASH_FAILED;
   }
-  const result = settled.value;
-  if (result.kind === 'absent') return PROMPT_HASH_ABSENT;
-  if (result.kind === 'sha') return result.sha;
-  return PROMPT_HASH_FAILED;
 }

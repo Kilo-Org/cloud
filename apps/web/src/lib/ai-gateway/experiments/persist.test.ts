@@ -2,7 +2,6 @@ import { describe, expect, it } from '@jest/globals';
 import {
   buildExperimentPromptCapture,
   REQUEST_BODY_CAP_BYTES,
-  SYSTEM_PROMPT_CAP_BYTES,
   truncateToUtf8Bytes,
 } from './persist';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
@@ -66,7 +65,7 @@ describe('buildExperimentPromptCapture', () => {
     return { kind: 'chat_completions', body } as unknown as GatewayRequest;
   }
 
-  it('extracts a leading system message into systemPromptContent', () => {
+  it('captures the full serialized body and records the request kind', () => {
     const cap = buildExperimentPromptCapture(
       chatRequest({
         model: 'kilo/preview-foo',
@@ -76,57 +75,35 @@ describe('buildExperimentPromptCapture', () => {
         ],
       })
     );
-    expect(cap.systemPromptContent).toBe('you are a helpful assistant');
+    expect(cap.requestKind).toBe('chat_completions');
+    expect(cap.requestBodyContent).toContain('"role":"system"');
     expect(cap.requestBodyContent).toContain('"role":"user"');
-    expect(cap.requestBodyContent).not.toContain('"role":"system"');
     expect(cap.wasTruncated).toBe(false);
   });
 
-  it('leaves systemPromptContent null when there is no leading system message', () => {
-    const cap = buildExperimentPromptCapture(
-      chatRequest({
+  it('records `messages` for an Anthropic-shape request', () => {
+    const cap = buildExperimentPromptCapture({
+      kind: 'messages',
+      body: {
         model: 'kilo/preview-foo',
+        system: 'you are a helpful assistant',
         messages: [{ role: 'user', content: 'hi' }],
-      })
-    );
-    expect(cap.systemPromptContent).toBeNull();
-    expect(cap.requestBodyContent).toContain('"role":"user"');
+      },
+    } as unknown as GatewayRequest);
+    expect(cap.requestKind).toBe('messages');
+    expect(cap.requestBodyContent).toContain('"system":"you are a helpful assistant"');
   });
 
-  it('does not extract a system message if it is not the first', () => {
-    // Mid-conversation system messages are kept in the body.
-    const cap = buildExperimentPromptCapture(
-      chatRequest({
-        model: 'kilo/preview-foo',
-        messages: [
-          { role: 'user', content: 'hi' },
-          { role: 'system', content: 'note' },
-        ],
-      })
-    );
-    expect(cap.systemPromptContent).toBeNull();
-    expect(cap.requestBodyContent).toContain('"role":"system"');
+  it('records `responses` for a Responses-API request', () => {
+    const cap = buildExperimentPromptCapture({
+      kind: 'responses',
+      body: { model: 'kilo/preview-foo', input: 'hi' },
+    } as unknown as GatewayRequest);
+    expect(cap.requestKind).toBe('responses');
+    expect(cap.requestBodyContent).toContain('"input":"hi"');
   });
 
-  it('truncates the system prompt by UTF-8 bytes and marks wasTruncated', () => {
-    const huge = 'a'.repeat(SYSTEM_PROMPT_CAP_BYTES + 1024);
-    const cap = buildExperimentPromptCapture(
-      chatRequest({
-        model: 'kilo/preview-foo',
-        messages: [
-          { role: 'system', content: huge },
-          { role: 'user', content: 'hi' },
-        ],
-      })
-    );
-    expect(cap.wasTruncated).toBe(true);
-    expect(cap.systemPromptContent).not.toBeNull();
-    expect(Buffer.byteLength(cap.systemPromptContent ?? '', 'utf8')).toBeLessThanOrEqual(
-      SYSTEM_PROMPT_CAP_BYTES
-    );
-  });
-
-  it('truncates the request body remainder by UTF-8 bytes', () => {
+  it('truncates the body by UTF-8 bytes and marks wasTruncated', () => {
     const huge = 'a'.repeat(REQUEST_BODY_CAP_BYTES + 1024);
     const cap = buildExperimentPromptCapture(
       chatRequest({
@@ -140,41 +117,16 @@ describe('buildExperimentPromptCapture', () => {
     );
   });
 
-  it('counts UTF-8 bytes (not UTF-16 units) when checking the cap', () => {
-    // Build a string whose UTF-16 length is well under the cap but whose
-    // UTF-8 byte length exceeds it. CJK chars are 1 UTF-16 unit but 3
-    // UTF-8 bytes; with cap=10 bytes, 5 CJK chars (5 units, 15 bytes)
-    // must trigger truncation.
-    const cap = buildExperimentPromptCapture({
-      kind: 'chat_completions',
-      body: {
-        model: 'kilo/preview-foo',
-        messages: [
-          { role: 'system', content: '日'.repeat(5) },
-          { role: 'user', content: 'x' },
-        ],
-      },
-    } as unknown as GatewayRequest);
-    // We can't trigger this against the real 4 MB cap in a unit test, but
-    // we can assert the UTF-8 byte count of the captured content directly.
-    expect(cap.systemPromptContent).toBe('日'.repeat(5));
-    expect(Buffer.byteLength(cap.systemPromptContent ?? '', 'utf8')).toBe(15);
-    expect(cap.systemPromptContent?.length).toBe(5); // UTF-16 unit count for sanity.
-  });
-
-  it('serializes non-string system content', () => {
-    const cap = buildExperimentPromptCapture(
-      chatRequest({
-        model: 'kilo/preview-foo',
-        messages: [
-          {
-            role: 'system',
-            content: [{ type: 'text', text: 'hello' }],
-          },
-          { role: 'user', content: 'hi' },
-        ],
-      })
-    );
-    expect(cap.systemPromptContent).toContain('"text":"hello"');
+  it('produces deterministic output for identical inputs', () => {
+    // Content addressing on top of this capture relies on byte-for-byte
+    // determinism; a JSON.stringify implementation that reordered keys
+    // would silently break dedup.
+    const body = {
+      model: 'kilo/preview-foo',
+      messages: [{ role: 'user', content: 'hi' }],
+    };
+    const a = buildExperimentPromptCapture(chatRequest({ ...body }));
+    const b = buildExperimentPromptCapture(chatRequest({ ...body }));
+    expect(a.requestBodyContent).toBe(b.requestBodyContent);
   });
 });

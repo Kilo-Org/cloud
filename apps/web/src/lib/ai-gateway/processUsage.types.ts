@@ -166,19 +166,19 @@ export type MicrodollarUsageContext = {
   modelExperimentAllocationSubject?: 'user' | 'machine' | 'ip';
   /**
    * Bounded (size-capped) capture of the canonical post-`transformRequest`
-   * upstream request body, split into the leading system message and the
-   * remainder. Set only for experimented requests. Consumed by
-   * `persistExperimentAttribution` after the microdollar write.
+   * upstream request body. Set only for experimented requests. Consumed
+   * by `persistExperimentAttribution` after the microdollar write.
    */
   experimentPromptCapture?: ExperimentPromptCapture;
 };
 
 /**
- * Bounded prompt capture used by the experiment attribution path. Each side
- * is either a string (already truncated to fit the cap) or null when absent.
+ * Bounded prompt capture used by the experiment attribution path. The
+ * full serialized body is stored as a single content-addressed blob.
+ * `requestKind` records which upstream API shape it was serialized for.
  */
 export type ExperimentPromptCapture = {
-  systemPromptContent: string | null;
+  requestKind: 'chat_completions' | 'messages' | 'responses';
   requestBodyContent: string;
   wasTruncated: boolean;
 };

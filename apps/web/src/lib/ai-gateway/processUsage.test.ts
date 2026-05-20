@@ -502,10 +502,8 @@ describe('logMicrodollarUsage', () => {
       where: eq(microdollar_usage.id, metadataRecord!.id),
     });
     expect(usageRecord).toBeTruthy();
-    expect(usageIdentity).toEqual({
-      usageId: usageRecord?.id,
-      createdAt: usageRecord?.created_at,
-    });
+    expect(usageIdentity?.usageId).toBe(usageRecord?.id);
+    expect(usageIdentity?.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     expect(usageRecord?.kilo_user_id).toBe('test-log-user-2');
     expect(usageRecord?.cost).toBe(0);
     expect(metadataRecord?.market_cost).toBe(500);

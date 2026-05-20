@@ -15,6 +15,24 @@ type MessageAttachmentProps = {
   onRemove?: () => void;
 };
 
+type ImageAttachmentRenderStateInput = {
+  hasData: boolean;
+  isError: boolean;
+  isLoading: boolean;
+};
+
+type ImageAttachmentRenderState = 'error' | 'loading' | 'ready';
+
+export function getImageAttachmentRenderState({
+  hasData,
+  isError,
+  isLoading,
+}: ImageAttachmentRenderStateInput): ImageAttachmentRenderState {
+  if (isError) return 'error';
+  if (isLoading || !hasData) return 'loading';
+  return 'ready';
+}
+
 export function MessageAttachment({
   block,
   conversationId,
@@ -30,15 +48,21 @@ export function MessageAttachment({
   const isImage = block.mimeType.startsWith('image/');
 
   if (isImage) {
+    const imageState = getImageAttachmentRenderState({
+      hasData: Boolean(data),
+      isError,
+      isLoading,
+    });
+
     return (
       <div className="relative inline-block max-w-full">
-        {isLoading || !data ? (
-          <ImageSlot>
-            <div className="bg-muted/40 h-[160px] w-[200px] max-w-full animate-pulse rounded-md" />
-          </ImageSlot>
-        ) : isError ? (
+        {imageState === 'error' ? (
           <ImageSlot>
             <ImagePlaceholder filename={block.filename} reason="error" />
+          </ImageSlot>
+        ) : imageState === 'loading' || !data ? (
+          <ImageSlot>
+            <div className="bg-muted/40 h-[160px] w-[200px] max-w-full animate-pulse rounded-md" />
           </ImageSlot>
         ) : (
           <ImageAttachment

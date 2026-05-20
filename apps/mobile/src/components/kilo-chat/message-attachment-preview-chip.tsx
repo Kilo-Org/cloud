@@ -30,7 +30,12 @@ export function MessageAttachmentPreviewChip({ row, localUri, onRemove, onRetry 
       accessibilityLabel={`${row.filename}, ${row.status}`}
     >
       {isImage && localUri ? (
-        <Image source={{ uri: localUri }} className="h-full w-full" contentFit="cover" />
+        <Image
+          source={{ uri: localUri }}
+          className="h-full w-full"
+          contentFit="cover"
+          transition={0}
+        />
       ) : (
         <View className="min-w-0 flex-1 flex-row items-center gap-2">
           {failed ? (
@@ -62,6 +67,7 @@ export function MessageAttachmentPreviewChip({ row, localUri, onRemove, onRetry 
         <Pressable
           onPress={onRetry}
           className="absolute bottom-1 left-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
+          accessibilityRole="button"
           accessibilityLabel={`Retry upload for ${row.filename}`}
         >
           <RotateCcw size={14} color={colors.foreground} />
@@ -71,6 +77,7 @@ export function MessageAttachmentPreviewChip({ row, localUri, onRemove, onRetry 
       <Pressable
         onPress={onRemove}
         className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
+        accessibilityRole="button"
         accessibilityLabel={`Remove ${row.filename}`}
       >
         <X size={14} color={colors.foreground} />

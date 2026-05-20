@@ -473,6 +473,9 @@ function MessageInputContent({
               'h-8 w-8 items-center justify-center rounded-md bg-secondary',
               controlsDisabled && 'opacity-50'
             )}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel reply"
+            accessibilityState={{ disabled: controlsDisabled }}
           >
             <X size={16} color={colors.foreground} />
           </Pressable>
@@ -509,7 +512,9 @@ function MessageInputContent({
                 'h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70',
                 controlsDisabled && 'opacity-50'
               )}
+              accessibilityRole="button"
               accessibilityLabel="Attach file"
+              accessibilityState={{ disabled: controlsDisabled }}
             >
               <Paperclip size={18} color={colors.foreground} />
             </Pressable>
@@ -559,6 +564,9 @@ function MessageInputContent({
                 'h-10 w-10 items-center justify-center rounded-md bg-secondary',
                 controlsDisabled && 'opacity-50'
               )}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel edit"
+              accessibilityState={{ disabled: controlsDisabled }}
             >
               <X size={18} color={colors.foreground} />
             </Pressable>
@@ -570,6 +578,9 @@ function MessageInputContent({
               'h-10 w-10 items-center justify-center rounded-md bg-primary',
               sendDisabled && 'opacity-50'
             )}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            accessibilityState={{ disabled: sendDisabled }}
           >
             <Send size={18} color={colors.primaryForeground} />
           </Pressable>

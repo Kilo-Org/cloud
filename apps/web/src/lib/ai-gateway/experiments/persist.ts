@@ -54,7 +54,7 @@ export function truncateToUtf8Bytes(s: string, maxBytes: number): string {
  * deterministically and `wasTruncated` is set to true.
  */
 export function buildExperimentPromptCapture(request: GatewayRequest): ExperimentPromptCapture {
-  let bodyContent = serialize(request.body);
+  let bodyContent = typeof request.body === 'string' ? request.body : JSON.stringify(request.body);
   let wasTruncated = false;
   if (Buffer.byteLength(bodyContent, 'utf8') > REQUEST_BODY_CAP_BYTES) {
     bodyContent = truncateToUtf8Bytes(bodyContent, REQUEST_BODY_CAP_BYTES);
@@ -65,11 +65,6 @@ export function buildExperimentPromptCapture(request: GatewayRequest): Experimen
     requestBodyContent: bodyContent,
     wasTruncated,
   };
-}
-
-function serialize(value: unknown): string {
-  if (typeof value === 'string') return value;
-  return JSON.stringify(value);
 }
 
 export type PersistExperimentAttributionInput = {

@@ -2901,11 +2901,19 @@ async function bootHydrationImpl(LOG: string): Promise<void> {
 
   console.log(`${LOG} Fetching container registry for town=${townId}`);
   let registry: unknown;
+  const registryFetchStart = Date.now();
   try {
     const resp = await fetch(`${apiUrl}/api/towns/${townId}/container-registry`, {
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(10_000),
     });
+    const registryFetchMs = Date.now() - registryFetchStart;
+    log.info('bootHydration.registry_fetch_ms', {
+      townId,
+      durationMs: registryFetchMs,
+      statusCode: resp.status,
+    });
+    postEventToWorker('bootHydration.registry_fetch_ms', { durationMs: registryFetchMs });
     if (!resp.ok) {
       console.warn(`${LOG} Failed to fetch registry: ${resp.status}`);
       return;
@@ -2913,43 +2921,28 @@ async function bootHydrationImpl(LOG: string): Promise<void> {
     const json = (await resp.json()) as { data: unknown };
     registry = json.data;
   } catch (err) {
+    const registryFetchMs = Date.now() - registryFetchStart;
+    log.warn('bootHydration.registry_fetch_ms', {
+      townId,
+      durationMs: registryFetchMs,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    postEventToWorker('bootHydration.registry_fetch_ms', {
+      durationMs: registryFetchMs,
+      error: err instanceof Error ? err.message : String(err),
+    });
     console.warn(`${LOG} Registry fetch failed:`, err);
     return;
   }
 
-  if (!Array.isArray(registry) || registry.length === 0) {
+  const registryEntries = Array.isArray(registry) ? registry : [];
+  if (registryEntries.length === 0) {
     console.log(`${LOG} No agents in registry — nothing to hydrate`);
   } else {
-    console.log(`${LOG} Resuming ${registry.length} agent(s) from registry`);
-
-    for (const entry of registry as Record<string, unknown>[]) {
-      const agentId = entry.agentId as string | undefined;
-      const agentRequest = entry.request as StartAgentRequest | undefined;
-      const workdir = entry.workdir as string | undefined;
-      const env = entry.env as Record<string, string> | undefined;
-
-      if (!agentId || !agentRequest || !workdir || !env) {
-        console.warn(`${LOG} Skipping malformed registry entry:`, entry);
-        continue;
-      }
-
-      // Registry entries were written with the token snapshot at dispatch
-      // time. If we just refreshed, overlay the fresh value so the hydrated
-      // kilo serve child inherits the current token.
-      const hydratedEnv = { ...env, GASTOWN_CONTAINER_TOKEN: token };
-
-      console.log(`${LOG} Resuming agent ${agentId} in ${workdir}`);
-      try {
-        await startAgent(agentRequest, workdir, hydratedEnv);
-        console.log(`${LOG} Agent ${agentId} resumed`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`${LOG} Failed to resume agent ${agentId}:`, msg);
-      }
-    }
+    console.log(`${LOG} Resuming ${registryEntries.length} agent(s) from registry`);
   }
 
-  const mayorAlreadyResumed = (Array.isArray(registry) ? registry : []).some(
+  const mayorEntries = registryEntries.filter(
     (e: unknown) =>
       typeof e === 'object' &&
       e !== null &&
@@ -2957,11 +2950,81 @@ async function bootHydrationImpl(LOG: string): Promise<void> {
       typeof (e as { request?: { role?: string } }).request?.role === 'string' &&
       (e as { request: { role: string } }).request.role === 'mayor'
   );
-  if (!mayorAlreadyResumed) {
+  const nonMayorEntries = registryEntries.filter(entry => !mayorEntries.includes(entry));
+
+  if (mayorEntries.length > 0) {
+    const mayorResumeStart = Date.now();
+    await resumeRegistryEntries(LOG, mayorEntries, token);
+    const mayorResumeMs = Date.now() - mayorResumeStart;
+    log.info('bootHydration.mayor_resume_ms', { townId, durationMs: mayorResumeMs });
+    postEventToWorker('bootHydration.mayor_resume_ms', { durationMs: mayorResumeMs });
+  } else {
+    const mayorPrewarmStart = Date.now();
     try {
       await prewarmMayorSDK(townId, apiUrl, token);
     } catch (err) {
       console.warn(`${LOG} Mayor SDK prewarm failed:`, err);
+    } finally {
+      const mayorPrewarmMs = Date.now() - mayorPrewarmStart;
+      log.info('bootHydration.mayor_prewarm_ms', { townId, durationMs: mayorPrewarmMs });
+      postEventToWorker('bootHydration.mayor_prewarm_ms', { durationMs: mayorPrewarmMs });
+    }
+  }
+
+  if (nonMayorEntries.length > 0) {
+    setTimeout(() => {
+      void (async () => {
+        const nonMayorResumeStart = Date.now();
+        await resumeRegistryEntries(LOG, nonMayorEntries, token);
+        const nonMayorResumeMs = Date.now() - nonMayorResumeStart;
+        log.info('bootHydration.non_mayor_resume_ms', {
+          townId,
+          durationMs: nonMayorResumeMs,
+          count: nonMayorEntries.length,
+        });
+        postEventToWorker('bootHydration.non_mayor_resume_ms', {
+          durationMs: nonMayorResumeMs,
+          count: nonMayorEntries.length,
+        });
+      })();
+    }, 0);
+  }
+}
+
+async function resumeRegistryEntries(
+  LOG: string,
+  entries: unknown[],
+  token: string
+): Promise<void> {
+  for (const entry of entries) {
+    if (typeof entry !== 'object' || entry === null) {
+      console.warn(`${LOG} Skipping malformed registry entry:`, entry);
+      continue;
+    }
+
+    const record = entry as Record<string, unknown>;
+    const agentId = typeof record.agentId === 'string' ? record.agentId : undefined;
+    const agentRequest = record.request as StartAgentRequest | undefined;
+    const workdir = typeof record.workdir === 'string' ? record.workdir : undefined;
+    const env = record.env as Record<string, string> | undefined;
+
+    if (!agentId || !agentRequest || !workdir || !env) {
+      console.warn(`${LOG} Skipping malformed registry entry:`, entry);
+      continue;
+    }
+
+    // Registry entries were written with the token snapshot at dispatch
+    // time. If we just refreshed, overlay the fresh value so the hydrated
+    // kilo serve child inherits the current token.
+    const hydratedEnv = { ...env, GASTOWN_CONTAINER_TOKEN: token };
+
+    console.log(`${LOG} Resuming agent ${agentId} in ${workdir}`);
+    try {
+      await startAgent(agentRequest, workdir, hydratedEnv);
+      console.log(`${LOG} Agent ${agentId} resumed`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`${LOG} Failed to resume agent ${agentId}:`, msg);
     }
   }
 }

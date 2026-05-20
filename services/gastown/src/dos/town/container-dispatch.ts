@@ -138,7 +138,14 @@ export async function ensureContainerToken(
   townId: string,
   userId: string
 ): Promise<string | null> {
+  const mintStart = Date.now();
   const token = await mintContainerToken(env, { townId, userId });
+  writeEvent(env, {
+    event: 'startAgentInContainer.token_mint_ms',
+    townId,
+    userId,
+    durationMs: Date.now() - mintStart,
+  });
   if (!token) {
     return null;
   }
@@ -147,6 +154,7 @@ export async function ensureContainerToken(
 
   // Push to running process so existing agents pick up the fresh token.
   // Throw on non-2xx so the alarm's throttle doesn't advance on failure.
+  const refreshStart = Date.now();
   try {
     const resp = await container.fetch('http://container/refresh-token', {
       method: 'POST',
@@ -157,12 +165,27 @@ export async function ensureContainerToken(
     if (!resp.ok) {
       throw new Error(`container returned ${resp.status}`);
     }
+    writeEvent(env, {
+      event: 'startAgentInContainer.refresh_token_ms',
+      townId,
+      userId,
+      durationMs: Date.now() - refreshStart,
+      statusCode: resp.status,
+    });
   } catch (err) {
     // If the container isn't running yet, the next dispatch will include
     // the token in request env. But if it IS running and rejected the
     // refresh, propagate the error so the alarm retries on the next tick.
     const isContainerDown =
       err instanceof TypeError || (err instanceof Error && err.message.includes('fetch'));
+    writeEvent(env, {
+      event: 'startAgentInContainer.refresh_token_ms',
+      townId,
+      userId,
+      durationMs: Date.now() - refreshStart,
+      error: err instanceof Error ? err.message : String(err),
+      label: isContainerDown ? 'container_down' : 'failed',
+    });
     if (!isContainerDown) throw err;
   }
 
@@ -376,7 +399,19 @@ export async function startAgentInContainer(
     // Mint a container-scoped JWT (8h expiry, refreshed by TownDO alarm).
     // One token per container — shared by all agents in the town.
     // Carries { townId, userId, scope: 'container' }.
-    const containerToken = await ensureContainerToken(env, params.townId, params.userId);
+    const tokenMintStart = Date.now();
+    const containerToken = await mintContainerToken(env, {
+      townId: params.townId,
+      userId: params.userId,
+    });
+    writeEvent(env, {
+      event: 'startAgentInContainer.token_mint_ms',
+      townId: params.townId,
+      userId: params.userId,
+      agentId: params.agentId,
+      role: params.role,
+      durationMs: Date.now() - tokenMintStart,
+    });
 
     // Also mint a per-agent JWT as fallback during rollout.
     const agentToken = await mintAgentToken(env, {

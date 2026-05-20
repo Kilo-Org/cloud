@@ -175,6 +175,17 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         AND ${cloud_agent_code_reviews.updated_at} < ${staleQueuedCutoff}
       )
     )`;
+    const liveQueueCondition = sql`(
+      ${waitingOwnerCondition}
+      OR (
+        ${cloud_agent_code_reviews.status} = 'running'
+        AND COALESCE(
+          ${cloud_agent_code_reviews.started_at},
+          ${cloud_agent_code_reviews.updated_at},
+          ${cloud_agent_code_reviews.created_at}
+        ) < ${staleRunningCutoff}
+      )
+    )`;
 
     const query = db
       .select({
@@ -209,7 +220,10 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       })
       .from(cloud_agent_code_reviews);
 
-    const result = ownershipFilter ? await query.where(ownershipFilter) : await query;
+    const queueHealthCondition = ownershipFilter
+      ? and(liveQueueCondition, ownershipFilter)
+      : liveQueueCondition;
+    const result = await query.where(queueHealthCondition);
     const stats = result[0];
 
     return {

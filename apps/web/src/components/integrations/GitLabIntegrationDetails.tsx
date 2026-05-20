@@ -23,11 +23,13 @@ import { useEffect, useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
+import {
+  getPlatformOAuthCallbackPath,
+  getPlatformOAuthConnectPath,
+} from '@/lib/integrations/oauth/paths';
 
 type GitLabIntegrationDetailsProps = {
   organizationId?: string;
-  organizationName?: string;
   success?: boolean;
   error?: string;
 };
@@ -86,6 +88,7 @@ export function GitLabIntegrationDetails({
   const queryClient = useQueryClient();
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const patValidationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const gitLabOAuthCallbackPath = getPlatformOAuthCallbackPath(PLATFORM.GITLAB);
 
   const isSelfHostedInput = Boolean(
     showSelfHosted && instanceUrl && instanceUrl !== 'https://gitlab.com' && instanceUrl !== ''
@@ -652,8 +655,8 @@ export function GitLabIntegrationDetails({
                                     Redirect URI:{' '}
                                     <code className="bg-muted rounded px-1">
                                       {typeof window !== 'undefined'
-                                        ? `${window.location.origin}/api/integrations/gitlab/callback`
-                                        : 'https://app.kilo.ai/api/integrations/gitlab/callback'}
+                                        ? `${window.location.origin}${gitLabOAuthCallbackPath}`
+                                        : `https://app.kilo.ai${gitLabOAuthCallbackPath}`}
                                     </code>
                                   </li>
                                   <li>

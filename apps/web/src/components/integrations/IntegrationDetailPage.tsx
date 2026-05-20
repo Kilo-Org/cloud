@@ -32,7 +32,6 @@ type IntegrationDetailPlatform = (typeof INTEGRATION_DETAIL_PLATFORMS)[number];
 
 type DetailRenderProps = {
   organizationId?: string;
-  organizationName?: string;
   search: Awaited<IntegrationDetailSearchParams>;
 };
 
@@ -122,7 +121,6 @@ function IntegrationDetailsFallback() {
 async function PlatformIntegrationDetails({
   platform,
   organizationId,
-  organizationName,
   search,
 }: DetailRenderProps & { platform: IntegrationDetailPlatform }) {
   switch (platform) {
@@ -132,7 +130,6 @@ async function PlatformIntegrationDetails({
       return (
         <GitHubIntegrationDetails
           organizationId={organizationId}
-          organizationName={organizationName}
           success={search.success === 'installed'}
           error={search.error}
           pendingApproval={search.pending_approval === 'true'}
@@ -146,7 +143,6 @@ async function PlatformIntegrationDetails({
       return (
         <GitLabIntegrationDetails
           organizationId={organizationId}
-          organizationName={organizationName}
           success={search.success === 'connected'}
           error={search.error}
         />
@@ -261,7 +257,6 @@ export async function OrganizationIntegrationDetailPage({
           <SuspendedIntegrationDetails
             platform={detailPlatform}
             organizationId={organization.id}
-            organizationName={organization.name}
             search={search}
           />
         </>

@@ -210,16 +210,19 @@ export async function listDispatchableCodeReviewOwnerCandidates(
         GROUP BY owner_type, owner_id
       ), active_work AS (
         SELECT
-          CASE
-            WHEN ${cloud_agent_code_reviews.owned_by_organization_id} IS NOT NULL THEN 'org'
-            ELSE 'user'
-          END AS owner_type,
-          COALESCE(
-            ${cloud_agent_code_reviews.owned_by_organization_id}::text,
-            ${cloud_agent_code_reviews.owned_by_user_id}
-          ) AS owner_id,
+          reconsiderable_work.owner_type,
+          reconsiderable_work.owner_id,
           COUNT(*) AS active_count
         FROM ${cloud_agent_code_reviews}
+        INNER JOIN reconsiderable_work
+          ON reconsiderable_work.owner_type = CASE
+            WHEN ${cloud_agent_code_reviews.owned_by_organization_id} IS NOT NULL THEN 'org'
+            ELSE 'user'
+          END
+          AND reconsiderable_work.owner_id = COALESCE(
+            ${cloud_agent_code_reviews.owned_by_organization_id}::text,
+            ${cloud_agent_code_reviews.owned_by_user_id}
+          )
         WHERE (
             ${cloud_agent_code_reviews.status} = 'running'
             AND COALESCE(
@@ -232,7 +235,7 @@ export async function listDispatchableCodeReviewOwnerCandidates(
             ${cloud_agent_code_reviews.status} = 'queued'
             AND ${cloud_agent_code_reviews.updated_at} >= ${staleQueuedCutoff}
           )
-        GROUP BY owner_type, owner_id
+        GROUP BY reconsiderable_work.owner_type, reconsiderable_work.owner_id
       ), capacity_candidates AS (
         SELECT
           reconsiderable_work.owner_type,

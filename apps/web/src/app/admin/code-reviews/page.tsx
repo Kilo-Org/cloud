@@ -185,8 +185,7 @@ export default function CodeReviewsPage() {
     setRangeType(nextRangeType);
     if (nextRangeType !== '7d') return;
 
-    const nextPresetInterval = createTrailingSevenDayIntervalState().activeInterval;
-    setDateIntervalState(current => ({ ...current, activeInterval: nextPresetInterval }));
+    setDateIntervalState(createTrailingSevenDayIntervalState());
   };
 
   const handleIntervalDraftChange = (field: keyof DateIntervalDraft, value: string) => {

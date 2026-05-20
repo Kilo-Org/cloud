@@ -5,13 +5,14 @@ import {
   model_experiment_variant,
   model_experiment_variant_version,
 } from '@kilocode/db/schema';
-import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
+import { encryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { ExperimentUpstreamSchema } from '@/lib/ai-gateway/experiments/upstream-schema';
 import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, modelExperimentRedisKey } from '@/lib/redis-keys';
 import { redisDel, redisSet } from '@/lib/redis';
 import { TRPCError } from '@trpc/server';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { captureException } from '@sentry/nextjs';
+import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 type TrpcErrorCode = ConstructorParameters<typeof TRPCError>[0]['code'];
@@ -29,6 +30,24 @@ type Status = (typeof AllStatuses)[number];
 // Routing-relevant statuses. Drizzle's `inArray` types its second arg as
 // a mutable array, so this is a plain `Status[]`, not `readonly`.
 const ROUTING_STATUSES: Status[] = ['active', 'paused'];
+
+type RoutingCacheVariant = {
+  variantId: string;
+  weight: number;
+  variantVersionId: string;
+  upstream: z.infer<typeof ExperimentUpstreamSchema>;
+  encryptedApiKey: EncryptedData;
+};
+
+type RoutingCacheEntry =
+  | { kind: 'none' }
+  | {
+      kind: 'experiment';
+      experimentId: string;
+      publicModelId: string;
+      status: 'active' | 'paused';
+      variants: RoutingCacheVariant[];
+    };
 
 const idSchema = z.object({ id: z.string().uuid() });
 const variantIdSchema = z.object({ variantId: z.string().uuid() });
@@ -59,6 +78,79 @@ async function recomputeExperimentedPublicIds() {
     .where(inArray(model_experiment.status, ROUTING_STATUSES));
   const ids = Array.from(new Set(rows.map(r => r.public_model_id))).sort();
   await redisSet(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, JSON.stringify(ids));
+}
+
+async function buildExperimentRoutingCacheEntry(publicModelId: string): Promise<RoutingCacheEntry> {
+  const [experiment] = await db
+    .select({
+      id: model_experiment.id,
+      public_model_id: model_experiment.public_model_id,
+      status: model_experiment.status,
+    })
+    .from(model_experiment)
+    .where(
+      and(
+        eq(model_experiment.public_model_id, publicModelId),
+        inArray(model_experiment.status, ROUTING_STATUSES)
+      )
+    )
+    .limit(1);
+
+  if (!experiment) return { kind: 'none' };
+  if (experiment.status !== 'active' && experiment.status !== 'paused') return { kind: 'none' };
+
+  const variants = await db
+    .select({
+      id: model_experiment_variant.id,
+      weight: model_experiment_variant.weight,
+    })
+    .from(model_experiment_variant)
+    .where(eq(model_experiment_variant.experiment_id, experiment.id))
+    .orderBy(asc(model_experiment_variant.id));
+
+  const routingVariants: RoutingCacheVariant[] = [];
+  for (const variant of variants) {
+    const [version] = await db
+      .select({
+        id: model_experiment_variant_version.id,
+        upstream: model_experiment_variant_version.upstream,
+        encryptedApiKey: model_experiment_variant_version.encrypted_api_key,
+      })
+      .from(model_experiment_variant_version)
+      .where(
+        and(
+          eq(model_experiment_variant_version.variant_id, variant.id),
+          lte(model_experiment_variant_version.effective_at, sql`now()`)
+        )
+      )
+      .orderBy(
+        desc(model_experiment_variant_version.effective_at),
+        desc(model_experiment_variant_version.id)
+      )
+      .limit(1);
+
+    if (!version) throw new Error('Routing-relevant experiment variant missing current version');
+    const upstream = ExperimentUpstreamSchema.parse(version.upstream);
+    routingVariants.push({
+      variantId: variant.id,
+      weight: variant.weight,
+      variantVersionId: version.id,
+      upstream,
+      encryptedApiKey: version.encryptedApiKey,
+    });
+  }
+
+  if (routingVariants.length === 0) {
+    throw new Error('Routing-relevant experiment has no variants');
+  }
+
+  return {
+    kind: 'experiment',
+    experimentId: experiment.id,
+    publicModelId: experiment.public_model_id,
+    status: experiment.status,
+    variants: routingVariants,
+  };
 }
 
 /**
@@ -109,7 +201,7 @@ async function applyExperimentTransition(opts: {
       .where(eq(model_experiment.id, opts.id))
       .returning();
     if (!updated) notFound('Experiment');
-    await invalidateExperimentCaches(updated.public_model_id);
+    await refreshExperimentCaches(updated.public_model_id);
     return updated;
   } catch (err) {
     if (isUniqueViolation(err)) {
@@ -122,19 +214,47 @@ async function applyExperimentTransition(opts: {
   }
 }
 
-async function invalidateExperimentCaches(publicModelId: string) {
-  // Per-public-id cache and the membership set are both touched by every
-  // routing-affecting mutation. Best-effort — Redis being down does not block
-  // admin writes.
+async function refreshExperimentCaches(publicModelId: string) {
+  // Per-public-id payload and membership keys are both admin-owned. Best-effort:
+  // Redis being down does not block admin writes.
   try {
     await redisDel(modelExperimentRedisKey(publicModelId));
   } catch {
     // already captured by redis helper
   }
+
+  let entry: RoutingCacheEntry;
+  try {
+    entry = await buildExperimentRoutingCacheEntry(publicModelId);
+  } catch (err) {
+    captureException(err, {
+      tags: { source: 'model-experiments', operation: 'buildExperimentRoutingCacheEntry' },
+      extra: { publicModelId },
+    });
+    return;
+  }
+
+  if (entry.kind === 'experiment') {
+    try {
+      await redisSet(modelExperimentRedisKey(publicModelId), JSON.stringify(entry));
+    } catch {
+      // already captured by redis helper
+      return;
+    }
+  }
+
   try {
     await recomputeExperimentedPublicIds();
   } catch {
     // already captured by redis helper
+  }
+
+  if (entry.kind === 'none') {
+    try {
+      await redisSet(modelExperimentRedisKey(publicModelId), JSON.stringify(entry));
+    } catch {
+      // already captured by redis helper
+    }
   }
 }
 
@@ -325,8 +445,8 @@ export const adminModelExperimentsRouter = createTRPCRouter({
     // Only routing-relevant edits touch the per-public-id cache; cosmetic
     // name/description-only changes don't invalidate.
     if (existing.public_model_id !== updated.public_model_id) {
-      await invalidateExperimentCaches(updated.public_model_id);
-      await invalidateExperimentCaches(existing.public_model_id);
+      await refreshExperimentCaches(updated.public_model_id);
+      await refreshExperimentCaches(existing.public_model_id);
     }
     return updated;
   }),
@@ -470,7 +590,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
           created_by: ctx.user.id,
         })
         .returning(variantVersionPublicColumns);
-      await invalidateExperimentCaches(experiment.public_model_id);
+      await refreshExperimentCaches(experiment.public_model_id);
       return inserted;
     }),
 
@@ -511,7 +631,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
         created_by: ctx.user.id,
       })
       .returning(variantVersionPublicColumns);
-    await invalidateExperimentCaches(experiment.public_model_id);
+    await refreshExperimentCaches(experiment.public_model_id);
     return inserted;
   }),
 });

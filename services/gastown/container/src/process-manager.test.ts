@@ -14,6 +14,18 @@ vi.mock('./agent-runner', () => ({
     (kilocodeToken: string, model: string, smallModel: string, organizationId?: string) =>
       JSON.stringify({ kilocodeToken, model, smallModel, organizationId })
   ),
+  buildKiloAuthEnv: vi.fn(
+    (kilocodeToken?: string, organizationId?: string | null) => {
+      const authEnv: Record<string, string> = { KILO_PLATFORM: 'gastown' };
+      if (kilocodeToken) {
+        authEnv.KILO_AUTH_CONTENT = JSON.stringify({ kilo: { type: 'api', key: kilocodeToken } });
+      }
+      if (organizationId) {
+        authEnv.KILO_ORG_ID = organizationId;
+      }
+      return authEnv;
+    }
+  ),
   resolveGitCredentials: vi.fn(),
   writeMayorSystemPromptToAgentsMd: vi.fn(),
   ensureMayorWorkspaceForTown: vi.fn(async (_townId: string) => TEST_WORKSPACE),
@@ -214,10 +226,12 @@ describe('awaitHydration', () => {
       apiUrl: process.env.GASTOWN_API_URL,
       townId: process.env.GASTOWN_TOWN_ID,
       token: process.env.GASTOWN_CONTAINER_TOKEN,
+      kiloOrgId: process.env.KILO_ORG_ID,
     };
     process.env.GASTOWN_API_URL = 'http://test.invalid';
     process.env.GASTOWN_TOWN_ID = 'town-prewarm';
     process.env.GASTOWN_CONTAINER_TOKEN = 'tok-prewarm';
+    delete process.env.KILO_ORG_ID;
 
     let capturedEnv: Record<string, string | undefined> | null = null;
     createKilo.mockImplementationOnce(() => {
@@ -229,6 +243,9 @@ describe('awaitHydration', () => {
         GASTOWN_API_URL: process.env.GASTOWN_API_URL,
         GASTOWN_CONTAINER_TOKEN: process.env.GASTOWN_CONTAINER_TOKEN,
         KILO_CONFIG_CONTENT: process.env.KILO_CONFIG_CONTENT,
+        KILO_AUTH_CONTENT: process.env.KILO_AUTH_CONTENT,
+        KILO_PLATFORM: process.env.KILO_PLATFORM,
+        KILO_ORG_ID: process.env.KILO_ORG_ID,
       };
       return Promise.resolve({
         client: {} as unknown,
@@ -270,6 +287,11 @@ describe('awaitHydration', () => {
         GASTOWN_CONTAINER_TOKEN: 'tok-prewarm',
       });
       expect(env?.KILO_CONFIG_CONTENT).toBeTruthy();
+      expect(env?.KILO_PLATFORM).toBe('gastown');
+      expect(env?.KILO_AUTH_CONTENT).toBe(
+        JSON.stringify({ kilo: { type: 'api', key: 'kc-tok' } })
+      );
+      expect(env?.KILO_ORG_ID).toBeUndefined();
     } finally {
       globalThis.fetch = originalFetch;
       if (prev.apiUrl !== undefined) process.env.GASTOWN_API_URL = prev.apiUrl;
@@ -278,6 +300,8 @@ describe('awaitHydration', () => {
       else delete process.env.GASTOWN_TOWN_ID;
       if (prev.token !== undefined) process.env.GASTOWN_CONTAINER_TOKEN = prev.token;
       else delete process.env.GASTOWN_CONTAINER_TOKEN;
+      if (prev.kiloOrgId !== undefined) process.env.KILO_ORG_ID = prev.kiloOrgId;
+      else delete process.env.KILO_ORG_ID;
     }
   });
 

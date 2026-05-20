@@ -2232,8 +2232,8 @@ importers:
         specifier: 7.2.52
         version: 7.2.52
       '@kilocode/sdk':
-        specifier: 7.2.14
-        version: 7.2.14
+        specifier: 7.3.1
+        version: 7.3.1
       hono:
         specifier: 4.12.25
         version: 4.12.25
@@ -4477,11 +4477,11 @@ packages:
 
   '@esbuild-kit/core-utils@3.3.2':
     resolution: {integrity: sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==}
-    deprecated: 'Merged into tsx: https://tsx.hirok.io'
+    deprecated: 'Merged into tsx: https://tsx.is'
 
   '@esbuild-kit/esm-loader@2.6.5':
     resolution: {integrity: sha512-FxEMIkJKnodyA1OaCUoEvbYRkoZlLZ4d/eXFu9Fh8CbBBgP5EmZxrfTRyN0qpXZ4vOvqnE5YdRdcrmUUXuU+dA==}
-    deprecated: 'Merged into tsx: https://tsx.hirok.io'
+    deprecated: 'Merged into tsx: https://tsx.is'
 
   '@esbuild/aix-ppc64@0.27.4':
     resolution: {integrity: sha512-cQPwL2mp2nSmHHJlCyoXgHGhbEPMrEEU5xhkcy3Hs/O7nGZqEpZ2sUtLaL9MORLtDfRvVl2/3PAuEkYZH0Ty8Q==}
@@ -5346,11 +5346,11 @@ packages:
       '@opentui/solid':
         optional: true
 
-  '@kilocode/sdk@7.2.14':
-    resolution: {integrity: sha512-Naz83lFrsbavuDp6UwxRuglOaSNvRBsZfcRNvb7RpWYAwbuJP0dBdhpXj6uO3ta5qxeQ2JzxKNC9Ffz+LCLLDg==}
-
   '@kilocode/sdk@7.2.52':
     resolution: {integrity: sha512-j8w6ewvo7dyu/qxjJAg0bcjHGUGGvIZ4F2f5tJnpMwLzPTAu26DJoO/08aoxf1BhfuZLzNS9tA2q+ZPdzPT8Jg==}
+
+  '@kilocode/sdk@7.3.1':
+    resolution: {integrity: sha512-UFsCx+Nman7J0jBTr1mZxt6IQkpxkxt3Lqa+gb7/1lSjo0psRgO61H9sUfgLDvAFeaJsQy7k7KMq1eigsbd4rQ==}
 
   '@kilocode/sdk@7.3.54':
     resolution: {integrity: sha512-A+g744DVuAHXSU3pu6BLe2AoxEh4fq7NdrYvlET3+waXSS0tG41Blr3ItCKSMLJH5M6C4rK2ZXi7plzkPNbdmA==}
@@ -21355,11 +21355,11 @@ snapshots:
       effect: 4.0.0-beta.57
       zod: 4.1.8
 
-  '@kilocode/sdk@7.2.14':
+  '@kilocode/sdk@7.2.52':
     dependencies:
       cross-spawn: 7.0.6
 
-  '@kilocode/sdk@7.2.52':
+  '@kilocode/sdk@7.3.1':
     dependencies:
       cross-spawn: 7.0.6
 

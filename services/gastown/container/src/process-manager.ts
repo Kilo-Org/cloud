@@ -13,6 +13,7 @@ import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
 import {
   buildKiloConfigContent,
+  buildKiloAuthEnv,
   ensureMayorWorkspaceForTown,
   mayorWorkdirForTown,
 } from './agent-runner';
@@ -2771,6 +2772,8 @@ function buildPrewarmEnv(ctx: MayorPrewarmContext, townId: string): Record<strin
   if (ghToken) {
     env.GH_TOKEN = ghToken;
   }
+
+  Object.assign(env, buildKiloAuthEnv(kilocodeToken, organizationId));
 
   // Without the worker-resolved model, skip prewarm: any guess we make
   // here will almost certainly differ from /agents/start's resolved

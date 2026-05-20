@@ -77,7 +77,7 @@ RUN apt-get update && \
 # Install both glibc and musl variants — the CLI's binary resolver may
 # pick either depending on the detected libc.
 # Also install pnpm — many projects use it as their package manager.
-RUN npm install -g @kilocode/cli@7.2.14 @kilocode/cli-linux-x64@7.2.14 @kilocode/cli-linux-x64-musl@7.2.14 @kilocode/plugin@7.2.14 pnpm && \
+RUN npm install -g @kilocode/cli@7.3.1 @kilocode/cli-linux-x64@7.3.1 @kilocode/cli-linux-x64-musl@7.3.1 @kilocode/plugin@7.3.1 pnpm && \
     ln -s "$(which kilo)" /usr/local/bin/opencode
 
 # Create non-root user for defense-in-depth

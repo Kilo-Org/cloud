@@ -82,14 +82,17 @@ function toDatetimeLocalInput(date: Date): string {
   return format(date, "yyyy-MM-dd'T'HH:mm");
 }
 
-function roundToDatetimeLocalMinute(date: Date): Date {
+function roundUpToDatetimeLocalMinute(date: Date): Date {
   const minuteDate = new Date(date);
+  if (minuteDate.getSeconds() > 0 || minuteDate.getMilliseconds() > 0) {
+    minuteDate.setMinutes(minuteDate.getMinutes() + 1);
+  }
   minuteDate.setSeconds(0, 0);
   return minuteDate;
 }
 
 function createTrailingSevenDayIntervalState(): DateIntervalState {
-  const end = roundToDatetimeLocalMinute(new Date());
+  const end = roundUpToDatetimeLocalMinute(new Date());
   const start = subDays(end, 7);
 
   return {

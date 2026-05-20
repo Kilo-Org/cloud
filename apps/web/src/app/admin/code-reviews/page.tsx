@@ -175,7 +175,8 @@ export default function CodeReviewsPage() {
   const hasPendingIntervalDraft =
     rangeType === 'interval' &&
     intervalValidation.interval !== null &&
-    (intervalValidation.interval.startDate !== startDate || intervalValidation.interval.endDate !== endDate);
+    (intervalValidation.interval.startDate !== startDate ||
+      intervalValidation.interval.endDate !== endDate);
 
   const handleApplyInterval = () => {
     const nextInterval = intervalValidation.interval;

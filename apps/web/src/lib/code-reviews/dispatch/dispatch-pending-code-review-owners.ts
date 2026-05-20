@@ -1,6 +1,6 @@
 import pLimit from 'p-limit';
-import { captureException, captureMessage } from '@sentry/nextjs';
-import { getBotUserId } from '@/lib/bot-users/bot-user-service';
+import { captureException } from '@sentry/nextjs';
+import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import {
   listDispatchableCodeReviewOwnerCandidates,
   type DispatchableCodeReviewOwnerCandidate,
@@ -34,20 +34,8 @@ async function resolveDispatchOwner(
     return { type: 'user', id: candidate.id, userId: candidate.id };
   }
 
-  const botUserId = await getBotUserId(candidate.id, 'code-review');
-  if (!botUserId) {
-    errorExceptInTest('[dispatchPendingCodeReviewOwners] Code-review bot user not found', {
-      organizationId: candidate.id,
-    });
-    captureMessage('Bot user missing for organization code review drain', {
-      level: 'error',
-      tags: { source: 'dispatch-pending-code-review-owners' },
-      extra: { organizationId: candidate.id },
-    });
-    return null;
-  }
-
-  return { type: 'org', id: candidate.id, userId: botUserId };
+  const botUser = await ensureBotUserForOrg(candidate.id, 'code-review');
+  return { type: 'org', id: candidate.id, userId: botUser.id };
 }
 
 async function drainOwner(

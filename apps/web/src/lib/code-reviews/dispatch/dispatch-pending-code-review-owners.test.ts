@@ -1,12 +1,12 @@
 const mockTryDispatchPendingReviews = jest.fn();
-const mockGetBotUserId = jest.fn();
+const mockEnsureBotUserForOrg = jest.fn();
 
 jest.mock('./dispatch-pending-reviews', () => ({
   tryDispatchPendingReviews: (...args: unknown[]) => mockTryDispatchPendingReviews(...args),
 }));
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
-  getBotUserId: (...args: unknown[]) => mockGetBotUserId(...args),
+  ensureBotUserForOrg: (...args: unknown[]) => mockEnsureBotUserForOrg(...args),
 }));
 
 jest.mock('@sentry/nextjs', () => ({
@@ -62,7 +62,7 @@ describe('dispatch pending code review owners', () => {
 
   beforeEach(() => {
     mockTryDispatchPendingReviews.mockReset();
-    mockGetBotUserId.mockReset();
+    mockEnsureBotUserForOrg.mockReset();
   });
 
   afterEach(async () => {
@@ -169,7 +169,7 @@ describe('dispatch pending code review owners', () => {
     });
   });
 
-  it('summarizes dispatch, missing bot skips, no-op owners, and isolated owner failures', async () => {
+  it('summarizes dispatch, recovered bot owners, no-op owners, and isolated owner failures', async () => {
     const waitingTimestamp = minutesAgo(10);
     await db.insert(cloud_agent_code_reviews).values([
       reviewValues({
@@ -194,9 +194,7 @@ describe('dispatch pending code review owners', () => {
       }),
     ]);
 
-    mockGetBotUserId.mockImplementation(async (organizationId: string) =>
-      organizationId === firstOrganizationId ? null : 'code-review-bot-user'
-    );
+    mockEnsureBotUserForOrg.mockResolvedValue({ id: 'code-review-bot-user' });
     mockTryDispatchPendingReviews.mockImplementation(async (owner: { id: string }) => {
       if (owner.id === secondUser.id) {
         throw new Error('owner dispatch failed');
@@ -212,15 +210,15 @@ describe('dispatch pending code review owners', () => {
 
     expect(summary).toEqual({
       ownersConsidered: 4,
-      ownersProcessed: 2,
-      ownersWithNoNewDispatch: 1,
-      ownersSkippedMissingBotUsers: 1,
+      ownersProcessed: 3,
+      ownersWithNoNewDispatch: 2,
+      ownersSkippedMissingBotUsers: 0,
       coordinatorFailures: 1,
       reviewsDispatched: 2,
       hasMoreCandidateOwners: false,
     });
-    expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(3);
-    expect(mockGetBotUserId).toHaveBeenCalledWith(firstOrganizationId, 'code-review');
-    expect(mockGetBotUserId).toHaveBeenCalledWith(secondOrganizationId, 'code-review');
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(4);
+    expect(mockEnsureBotUserForOrg).toHaveBeenCalledWith(firstOrganizationId, 'code-review');
+    expect(mockEnsureBotUserForOrg).toHaveBeenCalledWith(secondOrganizationId, 'code-review');
   });
 });

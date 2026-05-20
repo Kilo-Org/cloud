@@ -4,7 +4,6 @@ import {
   model_experiment,
   model_experiment_variant,
   model_experiment_variant_version,
-  type ModelExperiment,
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { redisGet, redisSet } from '@/lib/redis';
@@ -12,11 +11,18 @@ import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, modelExperimentRedisKey } from '@/li
 import { decryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
-import {
-  ExperimentUpstreamSchema,
-  type ExperimentUpstream,
-} from '@/lib/ai-gateway/experiments/upstream-schema';
-import type { ResolvedExperimentUpstream } from '@/lib/ai-gateway/experiments/build-direct-provider';
+import { ExperimentUpstreamSchema } from '@/lib/ai-gateway/experiments/upstream-schema';
+import type {
+  AllocationSubject,
+  CachedExperiment,
+  CachedVariant,
+  ExperimentStatus,
+  PickVariantInput,
+  PickVariantResult,
+  ResolveResult,
+  SerializedCacheEntry,
+  SerializedCachedExperiment,
+} from '@/lib/ai-gateway/experiments/pick-variant.types';
 
 /** TTL for the per-public-id experiment cache. The cache holds CIPHERTEXT
  *  (encrypted api keys + the upstream blob); decryption happens per-pick
@@ -24,58 +30,6 @@ import type { ResolvedExperimentUpstream } from '@/lib/ai-gateway/experiments/bu
  *  the variant set / current-version-per-variant resolution can be, not
  *  how long plaintext keys can live in Redis. */
 const PER_PUBLIC_ID_CACHE_TTL_SECONDS = 600;
-
-type ExperimentStatus = 'active' | 'paused';
-
-/**
- * Per-variant payload cached in Redis.
- *
- * The api key is stored ENCRYPTED — the cache never holds plaintext.
- * Decryption happens once per request, only on the chosen variant, inside
- * `pickModelExperimentVariant`. This keeps `BYOK_ENCRYPTION_KEY` rotation
- * effective immediately (no 10-minute "plaintext lives in Redis" window)
- * and limits the blast radius of a Redis dump.
- */
-type CachedVariant = {
-  variantId: string;
-  weight: number;
-  variantVersionId: string;
-  upstream: ExperimentUpstream;
-  encryptedApiKey: EncryptedData;
-};
-
-type CachedExperiment = {
-  experimentId: string;
-  publicModelId: string;
-  status: ExperimentStatus;
-  variants: CachedVariant[];
-};
-
-type ResolveResult =
-  | { kind: 'experiment'; experiment: CachedExperiment }
-  | { kind: 'none' }
-  | { kind: 'unavailable' };
-
-export type AllocationSubject = 'user' | 'machine' | 'ip';
-
-export type PickVariantInput = {
-  publicModelId: string;
-  userId: string | null;
-  machineId: string | null;
-  clientIp: string | null;
-};
-
-export type PickVariantResult =
-  | {
-      status: 'active';
-      experimentId: string;
-      variantId: string;
-      variantVersionId: string;
-      upstream: ResolvedExperimentUpstream;
-      allocationSubject: AllocationSubject;
-    }
-  | { status: 'not-found' }
-  | { status: 'unavailable' };
 
 let warnedMissingEncryptionKey = false;
 
@@ -224,16 +178,6 @@ export async function getRoutingExperimentForPublicId(publicId: string): Promise
 
   return resolved;
 }
-
-type SerializedCachedExperiment = {
-  kind: 'experiment';
-  experimentId: string;
-  publicModelId: string;
-  status: ExperimentStatus;
-  variants: CachedVariant[];
-};
-
-type SerializedCacheEntry = SerializedCachedExperiment | { kind: 'none' };
 
 function serializeCachedExperiment(exp: CachedExperiment): SerializedCachedExperiment {
   return { kind: 'experiment', ...exp };
@@ -508,5 +452,9 @@ function pickAllocationSubject(
   return null;
 }
 
-// Re-export for callers that need the raw experiment row type.
-export type { ModelExperiment };
+export type {
+  AllocationSubject,
+  ModelExperiment,
+  PickVariantInput,
+  PickVariantResult,
+} from '@/lib/ai-gateway/experiments/pick-variant.types';

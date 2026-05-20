@@ -1,7 +1,15 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Type } from '@sinclair/typebox';
+import type { OpenClawConfig, OpenClawPluginApi } from 'openclaw/plugin-sdk';
 import { definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
+
+// Reused inside the narrow function-parameter shapes below so the local
+// type stays a strict subset of the real plugin API. Without this the
+// hand-written `listProviders: (params?: { config?: unknown }) => ...`
+// signature is actually broader than the SDK's typed `ListWebSearchProvidersParams`,
+// and passing the real api into a narrow-typed function fails.
+type SdkWebSearchRuntime = OpenClawPluginApi['runtime']['webSearch'];
 import { buildBriefingMarkdown, offsetDateKey, resolveBriefingPath } from './briefing-utils';
 import {
   type BriefingDeliveryResult,
@@ -50,6 +58,18 @@ import {
 } from './local-news-utils';
 import { resolveNextReconcileAction } from './reconcile-queue-utils';
 import { normalizeWebResults } from './web-utils';
+import {
+  buildCalendarMissingScopeLines,
+  buildCalendarNoConnectionLines,
+  buildCalendarSectionLines,
+  buildCalendarSectionTitle,
+  buildCalendarTimeWindow,
+} from './calendar-utils';
+import {
+  fetchCalendarAccessToken,
+  fetchCalendarEvents,
+  resolveCalendarReady,
+} from './calendar-client';
 
 const PLUGIN_ID = 'kiloclaw-morning-briefing';
 const CRON_JOB_NAME = 'KiloClaw Morning Briefing';
@@ -119,7 +139,7 @@ type StoredStatus = {
 };
 
 type SourceCollectionResult = {
-  source: 'github' | 'linear' | 'local-news' | 'web';
+  source: 'calendar' | 'github' | 'linear' | 'local-news' | 'web';
   configured: boolean;
   ok: boolean;
   summary: string;
@@ -127,9 +147,10 @@ type SourceCollectionResult = {
   /**
    * Optional per-source section title override. Most sources use a
    * fixed title (`GitHub`, `Linear`, `Web Search`), but `local-news`
-   * adds the resolved user location in parens when one is set. Bare
-   * `Local News` heading when no location is configured. Set by
-   * `collectLocalNews`; unset for sources with a static title.
+   * adds the resolved user location in parens when one is set, and
+   * `calendar` uses the connected Google account's email (e.g.
+   * `astorms@kilocode.ai daily calendar`). Set by the collector;
+   * unset for sources with a static title.
    */
   sectionTitle?: string;
 };
@@ -603,11 +624,9 @@ async function resolveGithubReady(api: {
 
 async function resolveWebSearchReady(api: {
   runtime: {
-    webSearch: {
-      listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-    };
+    webSearch: Pick<SdkWebSearchRuntime, 'listProviders'>;
   };
-  config: unknown;
+  config: OpenClawConfig;
 }): Promise<{ configured: boolean; summary: string }> {
   const providers = api.runtime.webSearch.listProviders({ config: api.config });
   if (!Array.isArray(providers) || providers.length === 0) {
@@ -757,8 +776,14 @@ async function gatherGithubEmptyResultContext(
   // fine-grained context we never confirmed.
   const authFailedClassicOrFineGrained =
     (tokenType === 'classic' || tokenType === 'fine-grained') && login === null;
+  // After the earlier early-returns + the degrade-on-auth-failure above, the
+  // tokenType reaching this return is always one of the third union variant's
+  // literals. TS can't narrow GithubTokenType down to that subset on its own.
+  const narrowedTokenType: 'app' | 'oauth' | 'unknown' = authFailedClassicOrFineGrained
+    ? 'unknown'
+    : (tokenType as 'app' | 'oauth' | 'unknown');
   return {
-    tokenType: authFailedClassicOrFineGrained ? 'unknown' : tokenType,
+    tokenType: narrowedTokenType,
     login,
   };
 }
@@ -977,15 +1002,9 @@ async function collectWebSearch(
 
 type WebSearchRuntime = {
   runtime: {
-    webSearch: {
-      listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-      search: (params: { args: Record<string, unknown>; config?: unknown }) => Promise<{
-        provider: string;
-        result: Record<string, unknown>;
-      }>;
-    };
+    webSearch: SdkWebSearchRuntime;
   };
-  config: unknown;
+  config: OpenClawConfig;
   logger: { info?: (message: string) => void; warn?: (message: string) => void };
 };
 
@@ -1225,6 +1244,90 @@ async function collectLinear(api: {
   };
 }
 
+/**
+ * Pulls today + tomorrow-morning events from the user's primary Google
+ * calendar via the controller's OAuth broker. Both Settings UI cards
+ * (simple "Calendar Connect" and the full Google Account flow) write
+ * to the same per-instance connection row, so this collector is path-
+ * agnostic: ask the broker for status, then for a token, then hit
+ * Google.
+ *
+ * Returns:
+ *   - `ok:true, configured:false` + nudge body when no Google
+ *     connection or no calendar capability is present
+ *   - `ok:true, configured:true` + rendered section when calendar
+ *     fetch succeeds (including the empty-calendar case)
+ *   - `ok:false, configured:true` when the broker has a connection
+ *     but the token fetch or Google API call fails — the source
+ *     surfaces in the `## Failures` list and the source-status footer
+ */
+async function collectCalendar(now: Date, userTimezone: string): Promise<SourceCollectionResult> {
+  const readiness = await resolveCalendarReady();
+  if (!readiness.statusOk) {
+    return {
+      source: 'calendar',
+      configured: true,
+      ok: false,
+      summary: readiness.reason,
+      sectionLines: [],
+    };
+  }
+
+  if (!readiness.connected) {
+    return {
+      source: 'calendar',
+      configured: false,
+      ok: true,
+      summary: readiness.reason,
+      sectionLines: buildCalendarNoConnectionLines(),
+    };
+  }
+
+  if (!readiness.hasCalendarCapability) {
+    return {
+      source: 'calendar',
+      configured: false,
+      ok: true,
+      summary: readiness.reason,
+      sectionLines: buildCalendarMissingScopeLines(),
+    };
+  }
+
+  let token: Awaited<ReturnType<typeof fetchCalendarAccessToken>>;
+  try {
+    token = await fetchCalendarAccessToken();
+  } catch (error) {
+    return {
+      source: 'calendar',
+      configured: true,
+      ok: false,
+      summary: `Could not retrieve Google access token: ${error instanceof Error ? error.message : String(error)}`,
+      sectionLines: [],
+    };
+  }
+
+  const { timeMin, timeMax } = buildCalendarTimeWindow(now, userTimezone);
+  try {
+    const events = await fetchCalendarEvents(token.accessToken, timeMin, timeMax);
+    return {
+      source: 'calendar',
+      configured: true,
+      ok: true,
+      summary: `Fetched ${events.length} events for ${token.accountEmail}`,
+      sectionLines: buildCalendarSectionLines(events, now, userTimezone),
+      sectionTitle: buildCalendarSectionTitle(token.accountEmail),
+    };
+  } catch (error) {
+    return {
+      source: 'calendar',
+      configured: true,
+      ok: false,
+      summary: `Google Calendar fetch failed: ${error instanceof Error ? error.message : String(error)}`,
+      sectionLines: [],
+    };
+  }
+}
+
 async function generateBriefing(
   api: {
     runtime: {
@@ -1235,15 +1338,11 @@ async function generateBriefing(
           options: { timeoutMs: number; cwd?: string }
         ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
       };
-      webSearch: {
-        listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-        search: (params: { args: Record<string, unknown>; config?: unknown }) => Promise<{
-          provider: string;
-          result: Record<string, unknown>;
-        }>;
-      };
+      webSearch: SdkWebSearchRuntime;
     };
-    config: unknown;
+    config: {
+      agents?: { defaults?: { userTimezone?: string } };
+    };
     logger: { info?: (message: string) => void; warn?: (message: string) => void };
   },
   dateKey: string
@@ -1258,12 +1357,11 @@ async function generateBriefing(
   const paths = getStatePaths(api);
   await ensureStorage(paths);
 
-  // Read interest topics + userLocation directly from config.json — we
-  // only need these two narrow fields here, and the surrounding `api`
-  // shape doesn't have the `pluginConfig` / `agents.defaults.userTimezone`
-  // context that `readStoredConfig` uses to default cron/timezone.
-  // Missing or malformed file => empty topics + null location (env-var
-  // fallback path in resolveLocationContextWithOverride).
+  // Read interest topics + userLocation directly from config.json. The
+  // `api.config.agents.defaults.userTimezone` field above gives us the
+  // brief's effective timezone for the Calendar source's time window.
+  // Missing or malformed config.json => empty topics + null location
+  // (env-var fallback path in resolveLocationContextWithOverride).
   const storedConfig = await readJsonFile<StoredConfig>(paths.configPath);
   const interestTopics = Array.isArray(storedConfig?.interestTopics)
     ? storedConfig.interestTopics.filter((value): value is string => typeof value === 'string')
@@ -1286,12 +1384,26 @@ async function generateBriefing(
   const webSearchTopics = interestTopics.filter(
     topic => topic.trim().toLowerCase() !== localNewsLabelLower
   );
+  // Calendar uses the user's IANA timezone for time window + formatting.
+  // Falls back to UTC when not configured (the brief plugin already
+  // accepts that fallback elsewhere via `resolveEffectiveTimezone`).
+  const storedTimezone =
+    typeof storedConfig?.timezone === 'string' && storedConfig.timezone.trim().length > 0
+      ? storedConfig.timezone.trim()
+      : null;
+  const configuredTimezone = storedTimezone ?? api.config.agents?.defaults?.userTimezone;
+  const briefingTimezone =
+    configuredTimezone && isValidTimezone(configuredTimezone)
+      ? configuredTimezone
+      : DEFAULT_TIMEZONE;
+
   const corePromises = [
+    collectCalendar(new Date(), briefingTimezone),
     collectGithub(api),
     collectLinear(api),
     collectWebSearch(api, webSearchTopics),
   ];
-  const [github, linear, web] = await Promise.all(corePromises);
+  const [calendar, github, linear, web] = await Promise.all(corePromises);
   // Local News slots between Linear and Web Search — interest-gated so
   // users who haven't opted in pay no search cost and see no
   // local-news entry in the source-status footer.
@@ -1300,6 +1412,7 @@ async function generateBriefing(
     : null;
 
   const sources: SourceCollectionResult[] = [
+    calendar,
     github,
     linear,
     ...(localNews ? [localNews] : []),
@@ -1309,7 +1422,7 @@ async function generateBriefing(
 
   if (successes.length === 0) {
     throw new Error(
-      'No usable briefing sources are available. Configure at least one of GitHub, Linear, Local News, or web search.'
+      'No usable briefing sources are available. Configure at least one of Calendar, GitHub, Linear, Local News, or web search.'
     );
   }
 
@@ -1320,6 +1433,7 @@ async function generateBriefing(
   // `SourceCollectionResult.sectionTitle` (used by Local News to surface
   // the resolved location in the parens).
   const DEFAULT_SECTION_TITLE: Record<SourceCollectionResult['source'], string> = {
+    calendar: 'Calendar',
     github: 'GitHub',
     linear: 'Linear',
     'local-news': 'Local News',
@@ -1438,9 +1552,7 @@ async function getStatusSnapshot(api: {
         options: { timeoutMs: number; cwd?: string }
       ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
     };
-    webSearch: {
-      listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-    };
+    webSearch: Pick<SdkWebSearchRuntime, 'listProviders'>;
   };
   config: {
     agents?: {
@@ -1529,7 +1641,7 @@ export default definePluginEntry({
         // between our read and our final write (the `ensureCronJob` call
         // below is slow). `patchStoredStatus` uses a separate queue, so
         // no deadlock from nesting.
-        return await queueConfigWrite(paths.configPath, async () => {
+        return await queueConfigWrite<'succeeded' | 'failed'>(paths.configPath, async () => {
           const config = await readStoredConfig(api, paths);
 
           if (config.enabled) {
@@ -1838,6 +1950,7 @@ export default definePluginEntry({
 
     api.registerTool({
       name: 'morning_briefing_handle_command',
+      label: 'Morning briefing /briefing command',
       description:
         'Deterministically handles /briefing commands from raw inbound text when slash routing fails.',
       parameters: Type.Object(
@@ -1851,7 +1964,8 @@ export default definePluginEntry({
         { additionalProperties: false }
       ),
       async execute(_toolCallId, params) {
-        const commandArgs = extractBriefingArgsFromText(params.message);
+        const { message } = params as { message: string };
+        const commandArgs = extractBriefingArgsFromText(message);
         if (commandArgs === null) {
           return {
             content: [
@@ -1860,6 +1974,7 @@ export default definePluginEntry({
                 text: 'No /briefing command found in the provided message.',
               },
             ],
+            details: undefined,
           };
         }
 
@@ -1871,12 +1986,14 @@ export default definePluginEntry({
               text: resultText,
             },
           ],
+          details: undefined,
         };
       },
     });
 
     api.registerTool({
       name: 'morning_briefing_generate',
+      label: 'Generate morning briefing',
       description:
         "Generate today's morning briefing from configured sources and persist it as Markdown.",
       parameters: Type.Object(
@@ -1891,7 +2008,8 @@ export default definePluginEntry({
         { additionalProperties: false }
       ),
       async execute(_toolCallId, params) {
-        const dateValue = typeof params.date === 'string' ? params.date : undefined;
+        const typed = params as { date?: string };
+        const dateValue = typeof typed.date === 'string' ? typed.date : undefined;
         const targetDateKey = dateValue ?? (await resolveDateKeyForOffset(api, 0));
         const result = await generateBriefing(api, targetDateKey);
         return {
@@ -1906,12 +2024,14 @@ export default definePluginEntry({
               ].join('\n'),
             },
           ],
+          details: undefined,
         };
       },
     });
 
     api.registerTool({
       name: 'morning_briefing_read',
+      label: 'Read morning briefing',
       description: 'Read a saved morning briefing Markdown file for a specific date.',
       parameters: Type.Object(
         {
@@ -1926,7 +2046,8 @@ export default definePluginEntry({
         { additionalProperties: false }
       ),
       async execute(_toolCallId, params) {
-        const rawDay = typeof params.day === 'string' ? params.day : 'today';
+        const typed = params as { day?: string };
+        const rawDay = typeof typed.day === 'string' ? typed.day : 'today';
         const dateKey =
           rawDay === 'yesterday'
             ? await resolveDateKeyForOffset(api, -1)
@@ -1942,6 +2063,7 @@ export default definePluginEntry({
                 text: `No briefing exists for ${briefing.dateKey}.`,
               },
             ],
+            details: undefined,
           };
         }
         return {
@@ -1951,6 +2073,7 @@ export default definePluginEntry({
               text: briefing.markdown,
             },
           ],
+          details: undefined,
         };
       },
     });

@@ -92,6 +92,7 @@ export type AgentMode = string;
 /** Input for prepareSession procedure */
 export type PrepareSessionInput = {
   prompt: string;
+  initialPayload?: SendMessagePayload;
   mode: AgentMode;
   model: string;
   variant?: string;
@@ -168,6 +169,46 @@ export type SendMessageInput = {
   messageId?: string;
 };
 
+export type TerminalPty = {
+  id: string;
+  title: string;
+  command: string;
+  args: string[];
+  cwd: string;
+  status: 'running' | 'exited';
+  pid: number;
+};
+
+export type CreateTerminalInput = {
+  cloudAgentSessionId: string;
+  cols?: number;
+  rows?: number;
+};
+
+export type CreateTerminalOutput = {
+  pty: TerminalPty;
+};
+
+export type ResizeTerminalInput = {
+  cloudAgentSessionId: string;
+  ptyId: string;
+  cols: number;
+  rows: number;
+};
+
+export type ResizeTerminalOutput = {
+  pty: TerminalPty;
+};
+
+export type CloseTerminalInput = {
+  cloudAgentSessionId: string;
+  ptyId: string;
+};
+
+export type CloseTerminalOutput = {
+  success: boolean;
+};
+
 /** Output from V2 mutation procedures (WebSocket-based) */
 export type InitiateSessionOutput = {
   cloudAgentSessionId: string;
@@ -231,8 +272,10 @@ export type GetSessionOutput = {
   preparedAt?: number;
   initiatedAt?: number;
 
-  // Callback configuration (debug-friendly, URL + headers)
-  callbackTarget?: CallbackTarget;
+  // Callback configuration is intentionally NOT exposed: the stored target
+  // may carry service-to-service auth headers (e.g. X-Internal-Secret used
+  // by Worker callback ingresses), and getSession is reachable by the
+  // session's owning user.
 
   // Initial message ID for correlation
   initialMessageId?: string;
@@ -394,6 +437,15 @@ type CloudAgentNextTRPCClient = {
   };
   sendMessageV2: {
     mutate: (input: SendMessageInput) => Promise<InitiateSessionOutput>;
+  };
+  createTerminal: {
+    mutate: (input: CreateTerminalInput) => Promise<CreateTerminalOutput>;
+  };
+  resizeTerminal: {
+    mutate: (input: ResizeTerminalInput) => Promise<ResizeTerminalOutput>;
+  };
+  closeTerminal: {
+    mutate: (input: CloseTerminalInput) => Promise<CloseTerminalOutput>;
   };
   answerQuestion: {
     mutate: (input: AnswerQuestionInput) => Promise<{ success: boolean }>;
@@ -634,6 +686,42 @@ export class CloudAgentNextClient {
         extra: { input },
       });
       throw normalizedError;
+    }
+  }
+
+  async createTerminal(input: CreateTerminalInput): Promise<CreateTerminalOutput> {
+    try {
+      return await this.client.createTerminal.mutate(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'createTerminal' },
+        extra: { cloudAgentSessionId: input.cloudAgentSessionId },
+      });
+      throw error;
+    }
+  }
+
+  async resizeTerminal(input: ResizeTerminalInput): Promise<ResizeTerminalOutput> {
+    try {
+      return await this.client.resizeTerminal.mutate(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'resizeTerminal' },
+        extra: { cloudAgentSessionId: input.cloudAgentSessionId, ptyId: input.ptyId },
+      });
+      throw error;
+    }
+  }
+
+  async closeTerminal(input: CloseTerminalInput): Promise<CloseTerminalOutput> {
+    try {
+      return await this.client.closeTerminal.mutate(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'closeTerminal' },
+        extra: { cloudAgentSessionId: input.cloudAgentSessionId, ptyId: input.ptyId },
+      });
+      throw error;
     }
   }
 

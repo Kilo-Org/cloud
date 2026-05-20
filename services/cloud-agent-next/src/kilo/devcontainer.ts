@@ -67,6 +67,8 @@ export type BringUpOptions = {
   wrapperPort: number;
   /** Pinned `@kilocode/cli` version installed inside the dev container. */
   kiloCliVersion: string;
+  /** Optional milestone callback surfaced to preparation status streams. */
+  onProgress?: (message: string) => void;
   /**
    * Path (relative to workspace root) of the detected devcontainer config,
    * as returned by `detectDevContainer`. Passed through so `readDevContainerConfig`
@@ -120,6 +122,9 @@ export const KILO_WRAPPER_PORT_LABEL = 'kilo.wrapperPort';
  * matches the one we use on the outer sandbox.
  */
 export const KILO_CLI_VERSION = '7.2.52';
+
+const DEVCONTAINER_RUNTIME_BUN_VERSION = '1.3.14';
+const DEVCONTAINER_RUNTIME_BOOTSTRAP_TIMEOUT_MS = 10 * 60 * 1000;
 
 /** `devcontainer up` prints multiple JSON lines on stdout — we look for this final line. */
 const UP_OUTCOME_SUCCESS = 'success';
@@ -211,6 +216,86 @@ export async function detectDevContainer(
 // Bring up
 // ---------------------------------------------------------------------------
 
+type DevContainerRuntimeCommandOptions = {
+  workspacePath: string;
+  overridePath: string;
+  agentSessionId: string;
+};
+
+type BootstrapDevContainerRuntimeOptions = DevContainerRuntimeCommandOptions & {
+  kiloCliVersion: string;
+};
+
+function buildDevContainerRuntimeExecCommand(
+  opts: DevContainerRuntimeCommandOptions,
+  shellCommand: string,
+  shell: 'sh -c' | 'bash -lc'
+): string {
+  return [
+    'devcontainer exec',
+    `--workspace-folder ${shellQuote(opts.workspacePath)}`,
+    `--config ${shellQuote(opts.overridePath)}`,
+    `--id-label ${shellQuote(`${KILO_AGENT_SESSION_LABEL}=${opts.agentSessionId}`)}`,
+    '--',
+    shell,
+    shellQuote(shellCommand),
+  ].join(' ');
+}
+
+async function runDevContainerRuntimePreflight(
+  session: ExecutionSession,
+  opts: DevContainerRuntimeCommandOptions,
+  dockerEnv: Record<string, string>
+) {
+  const command = buildDevContainerRuntimeExecCommand(
+    opts,
+    'command -v bun >/dev/null && bun --version >/dev/null 2>&1 && command -v kilo >/dev/null || echo MISSING',
+    'sh -c'
+  );
+  return session.exec(command, { env: dockerEnv });
+}
+
+function devContainerRuntimeToolsMissing(
+  result: Awaited<ReturnType<ExecutionSession['exec']>>
+): boolean {
+  return (result.stdout ?? '').includes('MISSING') || result.exitCode !== 0;
+}
+
+async function bootstrapDevContainerRuntimeTools(
+  session: ExecutionSession,
+  opts: BootstrapDevContainerRuntimeOptions,
+  dockerEnv: Record<string, string>
+): Promise<void> {
+  const installCommand = [
+    'set -euo pipefail',
+    'export NVM_DIR=/usr/local/share/nvm',
+    'mkdir -p "$NVM_DIR" /usr/local/bin',
+    'if [ ! -s "$NVM_DIR/nvm.sh" ]; then curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | PROFILE=/dev/null NVM_DIR="$NVM_DIR" bash; fi',
+    '. "$NVM_DIR/nvm.sh"',
+    'nvm install --lts',
+    "nvm alias default 'lts/*'",
+    'ln -sf "$(command -v node)" /usr/local/bin/node',
+    'ln -sf "$(command -v npm)" /usr/local/bin/npm',
+    'ln -sf "$(command -v npx)" /usr/local/bin/npx',
+    `curl -fsSL https://bun.sh/install | bash -s "bun-v${DEVCONTAINER_RUNTIME_BUN_VERSION}"`,
+    'ln -sf "$HOME/.bun/bin/bun" /usr/local/bin/bun',
+    `npm install -g ${shellQuote(`@kilocode/cli@${opts.kiloCliVersion}`)}`,
+    'ln -sf "$(command -v kilo)" /usr/local/bin/kilo',
+  ].join(' && ');
+  const command = buildDevContainerRuntimeExecCommand(opts, installCommand, 'bash -lc');
+  const result = await session.exec(command, {
+    env: dockerEnv,
+    timeout: DEVCONTAINER_RUNTIME_BOOTSTRAP_TIMEOUT_MS,
+  } satisfies ExecOptions);
+  if (result.exitCode !== 0) {
+    throw new DevContainerUpError(
+      `Failed to bootstrap dev container runtime tools (exit ${result.exitCode})`,
+      result.stdout ?? '',
+      result.stderr ?? ''
+    );
+  }
+}
+
 /**
  * Run `devcontainer up` for the cloned workspace and install kilo inside.
  *
@@ -222,8 +307,15 @@ export async function bringUpDevContainer(
   session: ExecutionSession,
   opts: BringUpOptions
 ): Promise<DevContainerHandle> {
-  const { workspacePath, sessionHome, agentSessionId, wrapperPort, kiloCliVersion, configPath } =
-    opts;
+  const {
+    workspacePath,
+    sessionHome,
+    agentSessionId,
+    wrapperPort,
+    kiloCliVersion,
+    configPath,
+    onProgress,
+  } = opts;
 
   // devcontainer/docker CLIs need DOCKER_HOST pointing at the sandbox dockerd
   // socket, which may differ between local smoke images and Cloudflare runtime.
@@ -245,6 +337,8 @@ export async function bringUpDevContainer(
     `mkdir -p "${sessionHome}/.cache" "${sessionHome}/.local/share/kilo" "${sessionHome}/tmp"`,
     { timeout: 10_000 }
   );
+
+  onProgress?.('Preparing dev container configuration…');
 
   // 1. Build merged config. `@devcontainers/cli` treats an override file as the
   // complete config unless the base config is passed explicitly via `--config`.
@@ -278,6 +372,7 @@ export async function bringUpDevContainer(
   // `.devcontainer/devcontainer.json` and resets `remoteUser` to whatever
   // the user declared (typically `vscode`), breaking writes into the
   // bind-mounted sessionHome. See `getDevContainerOverridePath`.
+  onProgress?.('Building dev container…');
   logger.withFields({ agentSessionId, workspacePath }).info('Running devcontainer up');
   const upCmd = [
     'devcontainer up',
@@ -326,29 +421,26 @@ export async function bringUpDevContainer(
     // `.devcontainer/devcontainer.json`. Cleanup happens in
     // `teardownDevContainer`.
 
-    // Verify the dev container has bun and kilo. Fail early with a clear
-    // message so users know what to add to their devcontainer.json.
-    const preflightCmd = [
-      'devcontainer exec',
-      `--workspace-folder ${shellQuote(workspacePath)}`,
-      `--config ${shellQuote(overridePath)}`,
-      `--id-label ${shellQuote(`${KILO_AGENT_SESSION_LABEL}=${agentSessionId}`)}`,
-      `--`,
-      `sh -c ${shellQuote('command -v bun >/dev/null && command -v kilo >/dev/null || echo MISSING')}`,
-    ].join(' ');
-    const preflight = await session.exec(preflightCmd, { env: dockerEnv });
-    const missing = (preflight.stdout ?? '').includes('MISSING') || preflight.exitCode !== 0;
-    if (missing) {
+    const preflightOptions = {
+      workspacePath,
+      overridePath,
+      agentSessionId,
+    };
+    onProgress?.('Checking dev container runtime…');
+    let preflight = await runDevContainerRuntimePreflight(session, preflightOptions, dockerEnv);
+    if (devContainerRuntimeToolsMissing(preflight)) {
+      onProgress?.('Installing runtime tools in dev container…');
+      await bootstrapDevContainerRuntimeTools(
+        session,
+        { ...preflightOptions, kiloCliVersion },
+        dockerEnv
+      );
+      onProgress?.('Checking dev container runtime…');
+      preflight = await runDevContainerRuntimePreflight(session, preflightOptions, dockerEnv);
+    }
+    if (devContainerRuntimeToolsMissing(preflight)) {
       throw new DevContainerUpError(
-        'Dev container is missing required tools (bun and/or kilo). Add to your devcontainer.json:\n\n' +
-          '  "features": {\n' +
-          '    "ghcr.io/devcontainers/features/node:1": {}\n' +
-          '  },\n' +
-          '  "postCreateCommand": "curl -fsSL https://bun.sh/install | bash && ' +
-          'npm install -g @kilocode/cli@' +
-          kiloCliVersion +
-          '"\n\n' +
-          'Or install bun and kilo manually so both are on PATH.',
+        'Dev container runtime bootstrap completed, but bun and/or kilo are still missing.',
         preflight.stdout ?? '',
         preflight.stderr ?? ''
       );

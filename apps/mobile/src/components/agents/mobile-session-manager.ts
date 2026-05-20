@@ -9,6 +9,7 @@ import {
   type ResolvedSession,
   type SessionManager,
   type SessionSnapshot,
+  type TransportSendPayload,
 } from 'cloud-agent-sdk';
 import { normalizeAgentMode } from '@/components/agents/mode-options';
 import {
@@ -33,6 +34,28 @@ type CreateMobileAgentSessionManagerOptions = {
 type AgentMode = 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
 
 const skipBatchOptions = { context: { skipBatch: true } };
+
+function normalizeTransportPayload(payload: TransportSendPayload): SendMessagePayload {
+  if (payload.type === 'prompt') {
+    if (!payload.model) {
+      throw new Error('Model is required');
+    }
+
+    return {
+      type: 'prompt',
+      prompt: payload.prompt,
+      mode: normalizeAgentMode(payload.mode),
+      model: payload.model,
+      variant: payload.variant,
+    };
+  }
+
+  return {
+    type: 'command',
+    command: payload.command,
+    arguments: payload.arguments,
+  };
+}
 
 export function createMobileAgentSessionManager({
   store,
@@ -117,25 +140,7 @@ export function createMobileAgentSessionManager({
     api: {
       send: async input => {
         await withCloudAgentDiagnostics('send', organizationId, async () => {
-          const payload: SendMessagePayload = (() => {
-            if (input.payload.type === 'prompt') {
-              if (!input.payload.model) {
-                throw new Error('Model is required');
-              }
-              return {
-                type: 'prompt' as const,
-                prompt: input.payload.prompt,
-                mode: normalizeAgentMode(input.payload.mode),
-                model: input.payload.model,
-                variant: input.payload.variant,
-              };
-            }
-            return {
-              type: 'command' as const,
-              command: input.payload.command,
-              arguments: input.payload.arguments,
-            };
-          })();
+          const payload = normalizeTransportPayload(input.payload);
           const baseInput = {
             cloudAgentSessionId: input.sessionId as string,
             payload,
@@ -222,6 +227,9 @@ export function createMobileAgentSessionManager({
       const prepared = await withCloudAgentDiagnostics('prepare', organizationId, async () => {
         const castInput = {
           ...input,
+          initialPayload: input.initialPayload
+            ? normalizeTransportPayload(input.initialPayload)
+            : undefined,
           mode: input.mode as AgentMode,
         };
         const result = organizationId

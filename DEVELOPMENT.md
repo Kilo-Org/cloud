@@ -140,7 +140,7 @@ Copy `.env.local.example` to `.env.local`, then update the following variables i
 - `INTERNAL_API_SECRET`: Generate a random secret with `openssl rand -base64 32`
 - `STRIPE_SECRET_KEY` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`: These must be set to create a fake account. You can use an existing Stripe account or create a new one, and use the keys from Sandbox Mode (formerly Test Mode) here.
 
-Then copy `.env.development.local.example` to `.env.development.local`.
+Then run `pnpm dev:env`. It derives `apps/web/.env.development.local` and Worker `.dev.vars` files from `.env.local` plus each `.example` template. Re-run it after pulling changes that add local service URLs or Worker env vars.
 
 These changes will allow you to do local testing with a fake account.
 

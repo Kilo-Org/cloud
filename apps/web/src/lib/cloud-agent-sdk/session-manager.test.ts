@@ -9,7 +9,7 @@ import {
 import { createCloudAgentSession } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import type { AssistantMessage, UserMessage } from '@/types/opencode.gen';
-import { kiloId, cloudAgentId, stubUserMessage, stubTextPart } from './test-helpers';
+import { kiloId, cloudAgentId, stubUserMessage, stubTextPart, makeSnapshot } from './test-helpers';
 import type { CloudStatus, ResolvedSession, SessionActivity } from './types';
 
 // ---------------------------------------------------------------------------
@@ -919,6 +919,181 @@ describe('createSessionManager', () => {
       );
 
       expect(childMessages('child-1')).toEqual([childOneFirst, childOneSecond]);
+    });
+  });
+
+  describe('child session hydration', () => {
+    it('hydrates child snapshots while preserving root transcript filtering', async () => {
+      const rootMessage = createStoredMessage('msg-root', 'ses-root', 'assistant');
+      const childMessage = createStoredMessage('msg-child-history', 'child-1', 'assistant');
+      const childPart = stubTextPart({
+        id: 'part-child-history',
+        sessionID: 'child-1',
+        messageID: childMessage.info.id,
+        text: 'Historical child message',
+      });
+      const config = createMockConfig({
+        fetchSnapshot: jest
+          .fn()
+          .mockResolvedValue(
+            makeSnapshot({ id: 'child-1', parentID: 'ses-root' }, [
+              { info: childMessage.info, parts: [childPart] },
+            ])
+          ),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(rootMessage.info);
+
+      await mgr.hydrateChildSession(kiloId('child-1'));
+
+      expect(config.fetchSnapshot).toHaveBeenCalledWith(kiloId('child-1'));
+      const childMessages = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(childMessages('child-1')).toEqual([{ info: childMessage.info, parts: [childPart] }]);
+      expect(atomValue(config.store, mgr.atoms.messagesList)).toEqual([rootMessage]);
+      const childHydrationState = atomValue<(childSessionId: string) => { status: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      expect(childHydrationState('child-1')).toEqual({ status: 'ready' });
+    });
+
+    it('merges fetched history into live child messages without duplicating them', async () => {
+      const childMessage = createStoredMessage('msg-child-live', 'child-live', 'assistant');
+      const livePart = stubTextPart({
+        id: 'part-child-live',
+        sessionID: 'child-live',
+        messageID: childMessage.info.id,
+        text: 'Partial live text',
+      });
+      const historicalPart = stubTextPart({
+        ...livePart,
+        text: 'Complete historical text',
+      });
+      const config = createMockConfig({
+        fetchSnapshot: jest
+          .fn()
+          .mockResolvedValue(
+            makeSnapshot({ id: 'child-live', parentID: 'ses-root' }, [
+              { info: childMessage.info, parts: [historicalPart] },
+            ])
+          ),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(childMessage.info);
+      latestStorage.upsertPart(childMessage.info.id, livePart);
+
+      await mgr.hydrateChildSession(kiloId('child-live'));
+
+      const childMessages = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(childMessages('child-live')).toEqual([
+        { info: childMessage.info, parts: [historicalPart] },
+      ]);
+    });
+
+    it('deduplicates concurrent child snapshot hydration requests', async () => {
+      let resolveSnapshot: ((snapshot: ReturnType<typeof makeSnapshot>) => void) | undefined;
+      const childSnapshot = new Promise<ReturnType<typeof makeSnapshot>>(resolve => {
+        resolveSnapshot = resolve;
+      });
+      const config = createMockConfig({
+        fetchSnapshot: jest.fn().mockReturnValue(childSnapshot),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+
+      const firstHydration = mgr.hydrateChildSession(kiloId('child-deduped'));
+      const secondHydration = mgr.hydrateChildSession(kiloId('child-deduped'));
+
+      expect(config.fetchSnapshot).toHaveBeenCalledTimes(1);
+      const childHydrationState = atomValue<(childSessionId: string) => { status: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      expect(childHydrationState('child-deduped')).toEqual({ status: 'loading' });
+
+      resolveSnapshot?.(makeSnapshot({ id: 'child-deduped', parentID: 'ses-root' }));
+      await Promise.all([firstHydration, secondHydration]);
+
+      const updatedChildHydrationState = atomValue<(childSessionId: string) => { status: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      expect(updatedChildHydrationState('child-deduped')).toEqual({ status: 'ready' });
+    });
+
+    it('ignores stale child snapshots after the active root session changes', async () => {
+      let resolveSnapshot: ((snapshot: ReturnType<typeof makeSnapshot>) => void) | undefined;
+      const childSnapshot = new Promise<ReturnType<typeof makeSnapshot>>(resolve => {
+        resolveSnapshot = resolve;
+      });
+      const staleMessage = createStoredMessage('msg-child-stale', 'child-stale', 'assistant');
+      const config = createMockConfig({
+        fetchSnapshot: jest.fn().mockReturnValue(childSnapshot),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root-a'));
+      const staleHydration = mgr.hydrateChildSession(kiloId('child-stale'));
+
+      await mgr.switchSession(kiloId('ses-root-b'));
+      resolveSnapshot?.(
+        makeSnapshot({ id: 'child-stale', parentID: 'ses-root-a' }, [
+          { info: staleMessage.info, parts: [] },
+        ])
+      );
+      await staleHydration;
+
+      const childMessages = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(childMessages('child-stale')).toEqual([]);
+      const childHydrationState = atomValue<(childSessionId: string) => { status: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      expect(childHydrationState('child-stale')).toEqual({ status: 'idle' });
+    });
+
+    it('allows retrying child history hydration after a snapshot fetch fails', async () => {
+      const config = createMockConfig({
+        fetchSnapshot: jest
+          .fn()
+          .mockRejectedValueOnce(new Error('fetch failed'))
+          .mockResolvedValueOnce(makeSnapshot({ id: 'child-retry', parentID: 'ses-root' })),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-retry'));
+
+      const childHydrationState = atomValue<
+        (childSessionId: string) => { status: string; message?: string }
+      >(config.store, mgr.atoms.childSessionHydrationState);
+      expect(childHydrationState('child-retry')).toEqual(
+        expect.objectContaining({ status: 'error' })
+      );
+
+      await mgr.hydrateChildSession(kiloId('child-retry'));
+
+      expect(config.fetchSnapshot).toHaveBeenCalledTimes(2);
+      const retriedChildHydrationState = atomValue<
+        (childSessionId: string) => { status: string; message?: string }
+      >(config.store, mgr.atoms.childSessionHydrationState);
+      expect(retriedChildHydrationState('child-retry')).toEqual({ status: 'ready' });
     });
   });
 

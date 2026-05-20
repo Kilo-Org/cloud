@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
+    "@types/content-disposition": "0.5.9",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
@@ -31,6 +32,8 @@
     "@kilocode/kilo-chat": "workspace:*",
     "@kilocode/notifications": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
+    "aws4fetch": "catalog:",
+    "content-disposition": "0.5.4",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "lru-cache": "11.2.7",

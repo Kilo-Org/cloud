@@ -4,6 +4,7 @@ import {
   createCloudAgentNextClient,
   rethrowAsPaymentRequired,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { generateCloudAgentToken } from '@/lib/tokens';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import {
@@ -23,12 +24,77 @@ import {
   baseAnswerQuestionNextSchema,
   baseRejectQuestionNextSchema,
   baseAnswerPermissionNextSchema,
+  baseCreateTerminalNextSchema,
+  baseCreateTerminalNextOutputSchema,
+  baseRefreshTerminalTicketNextSchema,
+  baseRefreshTerminalTicketNextOutputSchema,
+  baseResizeTerminalNextSchema,
+  baseResizeTerminalNextOutputSchema,
+  baseCloseTerminalNextSchema,
+  baseCloseTerminalNextOutputSchema,
   cloudAgentGetImageUploadUrlSchema,
 } from './cloud-agent-next-schemas';
 import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
+import { db } from '@/lib/drizzle';
+import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
+
+function buildTerminalUrl(params: {
+  cloudAgentSessionId: string;
+  ptyId: string;
+  ticket: string;
+}): string {
+  const search = new URLSearchParams({
+    cloudAgentSessionId: params.cloudAgentSessionId,
+    ptyId: params.ptyId,
+    ticket: params.ticket,
+  });
+  return `/terminal?${search.toString()}`;
+}
+
+function createTerminalTicket(params: {
+  userId: string;
+  cloudAgentSessionId: string;
+  ptyId: string;
+}) {
+  const signed = signStreamTicket({
+    purpose: 'terminal',
+    userId: params.userId,
+    cloudAgentSessionId: params.cloudAgentSessionId,
+    ptyId: params.ptyId,
+  });
+
+  return {
+    wsUrl: buildTerminalUrl({
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      ptyId: params.ptyId,
+      ticket: signed.ticket,
+    }),
+    ticket: signed.ticket,
+    expiresAt: signed.expiresAt,
+  };
+}
+
+async function assertUserOwnsTerminalSession(
+  userId: string,
+  cloudAgentSessionId: string
+): Promise<void> {
+  const sessionOwnership = await verifyUserOwnsSessionV2ByCloudAgentId(
+    db,
+    userId,
+    cloudAgentSessionId
+  );
+
+  if (!sessionOwnership) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Session not found or access denied',
+    });
+  }
+}
 
 /**
  * Cloud Agent Next Router (Personal Context)
@@ -142,6 +208,75 @@ export const cloudAgentNextRouter = createTRPCRouter({
       } catch (error) {
         rethrowAsPaymentRequired(error);
         throw error;
+      }
+    }),
+
+  createTerminal: baseProcedure
+    .input(baseCreateTerminalNextSchema)
+    .output(baseCreateTerminalNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsTerminalSession(ctx.user.id, input.cloudAgentSessionId);
+
+      try {
+        const authToken = generateCloudAgentToken(ctx.user);
+        const client = createCloudAgentNextClient(authToken);
+        const result = await client.createTerminal(input);
+        const terminalTicket = createTerminalTicket({
+          userId: ctx.user.id,
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          ptyId: result.pty.id,
+        });
+
+        return {
+          pty: result.pty,
+          ptyId: result.pty.id,
+          ...terminalTicket,
+        };
+      } catch (error) {
+        rethrowAsTerminalError(error);
+      }
+    }),
+
+  refreshTerminalTicket: baseProcedure
+    .input(baseRefreshTerminalTicketNextSchema)
+    .output(baseRefreshTerminalTicketNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsTerminalSession(ctx.user.id, input.cloudAgentSessionId);
+
+      return createTerminalTicket({
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        ptyId: input.ptyId,
+      });
+    }),
+
+  resizeTerminal: baseProcedure
+    .input(baseResizeTerminalNextSchema)
+    .output(baseResizeTerminalNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsTerminalSession(ctx.user.id, input.cloudAgentSessionId);
+
+      try {
+        const authToken = generateCloudAgentToken(ctx.user);
+        const client = createCloudAgentNextClient(authToken);
+        return await client.resizeTerminal(input);
+      } catch (error) {
+        rethrowAsTerminalError(error);
+      }
+    }),
+
+  closeTerminal: baseProcedure
+    .input(baseCloseTerminalNextSchema)
+    .output(baseCloseTerminalNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsTerminalSession(ctx.user.id, input.cloudAgentSessionId);
+
+      try {
+        const authToken = generateCloudAgentToken(ctx.user);
+        const client = createCloudAgentNextClient(authToken);
+        return await client.closeTerminal(input);
+      } catch (error) {
+        rethrowAsTerminalError(error);
       }
     }),
 

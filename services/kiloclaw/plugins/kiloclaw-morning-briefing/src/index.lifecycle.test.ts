@@ -289,19 +289,17 @@ async function createHarness(options?: {
       if (channel && target && message) {
         sentMessages.push({ channel, target, accountId, message });
       }
-      const configuredFailure =
-        channel === 'telegram' || channel === 'discord' || channel === 'slack'
-          ? options?.messageSendFailures?.[channel]
-          : undefined;
-      const configuredFailureCount =
-        channel === 'telegram' || channel === 'discord' || channel === 'slack'
-          ? options?.messageSendFailureCounts?.[channel]
-          : undefined;
-      if (configuredFailure && configuredFailureCount && configuredFailureCount > 0) {
+      const channelKey: 'telegram' | 'discord' | 'slack' | null =
+        channel === 'telegram' || channel === 'discord' || channel === 'slack' ? channel : null;
+      const configuredFailure = channelKey ? options?.messageSendFailures?.[channelKey] : undefined;
+      const configuredFailureCount = channelKey
+        ? options?.messageSendFailureCounts?.[channelKey]
+        : undefined;
+      if (channelKey && configuredFailure && configuredFailureCount && configuredFailureCount > 0) {
         if (!options?.messageSendFailureCounts) {
           return { stdout: '', stderr: configuredFailure, code: 1 };
         }
-        options.messageSendFailureCounts[channel] = configuredFailureCount - 1;
+        options.messageSendFailureCounts[channelKey] = configuredFailureCount - 1;
         return { stdout: '', stderr: configuredFailure, code: 1 };
       }
       if (configuredFailure && configuredFailureCount === undefined) {

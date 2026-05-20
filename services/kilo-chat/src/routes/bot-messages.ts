@@ -1,6 +1,8 @@
 import type { Hono } from 'hono';
 import type { AuthContext } from '../auth';
 import {
+  handleAttachmentGetUrl,
+  handleAttachmentInit,
   handleCreateMessage,
   handleEditMessage,
   handleDeleteMessage,
@@ -51,4 +53,6 @@ export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthCont
     '/bot/v1/sandboxes/:sandboxId/conversations/:conversationId/actions/:groupId/delivery-failed',
     handleActionDeliveryFailed
   );
+  app.post('/bot/v1/sandboxes/:sandboxId/attachments/init', handleAttachmentInit);
+  app.get('/bot/v1/sandboxes/:sandboxId/attachments/:id/url', handleAttachmentGetUrl);
 }

@@ -112,6 +112,16 @@ export type WrapperHealthResponse = {
   sessionId: string;
 };
 
+export type WrapperPty = {
+  id: string;
+  title: string;
+  command: string;
+  args: string[];
+  cwd: string;
+  status: 'running' | 'exited';
+  pid: number;
+};
+
 export type JobStatus = {
   state: 'idle' | 'active';
   executionId?: string;
@@ -125,6 +135,11 @@ export type JobStatus = {
 };
 
 export type WrapperSessionCommandResponse = unknown;
+
+export type WrapperContainerClientOptions = {
+  sandbox: SandboxInstance;
+  port: number;
+};
 
 // ---------------------------------------------------------------------------
 // Error Classes
@@ -811,5 +826,80 @@ export class WrapperClient {
    */
   async status(): Promise<JobStatus> {
     return this.request<JobStatus>('GET', '/job/status');
+  }
+}
+
+/**
+ * Wrapper client that talks to the already-running wrapper over containerFetch.
+ * Used for terminal support so WebSocket/HTTP proxying goes through the wrapper
+ * without starting a new wrapper process or using sandbox terminal primitives.
+ */
+export class WrapperContainerClient {
+  private readonly sandbox: SandboxInstance;
+  private readonly port: number;
+
+  constructor(options: WrapperContainerClientOptions) {
+    this.sandbox = options.sandbox;
+    this.port = options.port;
+  }
+
+  private async request<T extends object>(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    path: string,
+    body?: unknown
+  ): Promise<T> {
+    const response = await this.sandbox.containerFetch(
+      `http://container${path}`,
+      {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      },
+      this.port
+    );
+
+    const text = await response.text();
+    const data = text ? (JSON.parse(text) as T & { error?: string; message?: string }) : ({} as T);
+
+    const errorPayload = data as { error?: string; message?: string };
+    if (!response.ok || errorPayload.error) {
+      const errorCode = errorPayload.error ?? 'REQUEST_FAILED';
+      const message =
+        typeof errorPayload.message === 'string'
+          ? errorPayload.message
+          : `Wrapper request failed with status ${response.status}`;
+      throw new WrapperError(message, errorCode, response.status);
+    }
+
+    return data;
+  }
+
+  async health(): Promise<WrapperHealthResponse> {
+    return this.request<WrapperHealthResponse>('GET', '/health');
+  }
+
+  async createTerminal(size?: { cols: number; rows: number }): Promise<WrapperPty> {
+    return this.request<WrapperPty>('POST', '/pty', size);
+  }
+
+  async resizeTerminal(
+    ptyId: string,
+    size: {
+      cols: number;
+      rows: number;
+    }
+  ): Promise<WrapperPty> {
+    return this.request<WrapperPty>('PUT', `/pty/${encodeURIComponent(ptyId)}`, size);
+  }
+
+  async closeTerminal(ptyId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>('DELETE', `/pty/${encodeURIComponent(ptyId)}`);
+  }
+
+  async connectTerminal(ptyId: string, request: Request): Promise<Response> {
+    return this.sandbox.wsConnect(
+      new Request(`http://container/pty/${encodeURIComponent(ptyId)}/connect`, request),
+      this.port
+    );
   }
 }

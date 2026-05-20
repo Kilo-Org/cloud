@@ -80,7 +80,7 @@ export type CreateMessageParams = {
 export type CreateMessageOk = { ok: true; messageId: string; message: Message; clientId?: string };
 export type CreateMessageErr = {
   ok: false;
-  code: 'forbidden' | 'internal';
+  code: 'forbidden' | 'invalid' | 'conflict' | 'internal';
   error: string;
 };
 export type CreateMessageResult = CreateMessageOk | CreateMessageErr;
@@ -100,8 +100,12 @@ export async function createMessageFor(
     inReplyToMessageId,
   });
   if (!result.ok) {
-    if (result.code === 'forbidden')
+    if (result.code === 'forbidden') {
       return { ok: false, code: 'forbidden' as const, error: 'Forbidden' };
+    }
+    if (result.code === 'invalid' || result.code === 'conflict') {
+      return { ok: false, code: result.code, error: result.error };
+    }
     return { ok: false, code: 'internal' as const, error: result.error };
   }
 
@@ -113,7 +117,7 @@ export async function createMessageFor(
     callerId,
     conversationId,
     messageId,
-    content,
+    message.content,
     inReplyToMessageId,
     clientId
   );
@@ -371,7 +375,7 @@ export type EditMessageStale = {
 };
 export type EditMessageErr = {
   ok: false;
-  code: 'forbidden' | 'not_found' | 'internal';
+  code: 'forbidden' | 'not_found' | 'conflict' | 'internal';
   error: string;
 };
 export type EditMessageResult = EditMessageOk | EditMessageStale | EditMessageErr;
@@ -394,6 +398,7 @@ export async function editMessageFor(
   if (!result.ok) {
     if (result.code === 'forbidden') return { ok: false, code: 'forbidden', error: 'Forbidden' };
     if (result.code === 'not_found') return { ok: false, code: 'not_found', error: 'Not found' };
+    if (result.code === 'conflict') return { ok: false, code: 'conflict', error: result.error };
     return { ok: false, code: 'internal', error: result.error };
   }
   if (result.stale) {
@@ -407,7 +412,7 @@ export async function editMessageFor(
       result.memberContext.sandboxId,
       result.memberContext.humanMemberIds,
       'message.updated',
-      { messageId: result.messageId, content, clientUpdatedAt: timestamp }
+      { messageId: result.messageId, content: result.content, clientUpdatedAt: timestamp }
     );
     ctx.waitUntil(pushPromise);
   }

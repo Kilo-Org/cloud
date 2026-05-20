@@ -11,6 +11,11 @@ import type { Context } from 'hono';
 import { type ZodSchema } from 'zod';
 import type { AuthContext } from '../auth';
 import { withDORetry } from '@kilocode/worker-utils';
+import type {
+  ConversationDO,
+  GetAttachmentForReadResult,
+  InitAttachmentResult,
+} from '../do/conversation-do';
 import { createBotConversationFor, renameConversationFor } from '../services/conversations';
 import type { DeferCtx } from '../services/messages';
 import {
@@ -24,6 +29,8 @@ import { notifyMessageDeliveryFailed } from '../webhook/deliver';
 import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
 import { setTypingFor, stopTypingFor } from '../services/typing';
 import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
+import contentDisposition from 'content-disposition';
+import { mintGetUrl, mintPutUrl } from '../util/presigner';
 import type {
   CreateMessageResponse,
   EditMessageResponse,
@@ -39,6 +46,8 @@ import type {
 import {
   ulidSchema,
   sandboxIdSchema,
+  attachmentGetUrlRequestSchema,
+  attachmentInitRequestSchema,
   createMessageRequestSchema,
   createBotConversationRequestSchema,
   editMessageRequestSchema,
@@ -130,6 +139,8 @@ export async function handleCreateMessage(c: HonoCtx) {
   const result = await createMessageFor(c.env, callerId, body.data, makeSchedule(c));
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+    if (result.code === 'invalid') return c.json({ error: result.error }, 400);
+    if (result.code === 'conflict') return c.json({ error: result.error }, 409);
     return c.json({ error: result.error }, 500);
   }
   return c.json(
@@ -164,6 +175,7 @@ export async function handleEditMessage(c: HonoCtx) {
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
+    if (result.code === 'conflict') return c.json({ error: result.error }, 409);
     return c.json({ error: result.error }, 500);
   }
   if (result.stale) {
@@ -585,6 +597,116 @@ export async function handleCreateBotConversation(c: HonoCtx) {
     } satisfies CreateConversationResponse,
     201
   );
+}
+
+// ─── attachmentInit ─────────────────────────────────────────────────────────
+
+export async function handleAttachmentInit(c: HonoCtx) {
+  const body = await parseBody(c, attachmentInitRequestSchema);
+  if (!body.ok) return body.response;
+
+  const callerId = c.get('callerId');
+  const { conversationId, mimeType, size, filename, idempotencyKey } = body.data;
+
+  const init = await withDORetry<DurableObjectStub<ConversationDO>, InitAttachmentResult>(
+    () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId)),
+    stub => stub.initAttachment({ uploaderId: callerId, mimeType, size, filename, idempotencyKey }),
+    'ConversationDO.initAttachment'
+  );
+  if (!init.ok) {
+    if (init.code === 'forbidden') return c.json({ error: init.error }, 403);
+    return c.json({ error: init.error }, 400);
+  }
+
+  const accessKeyId = await c.env.R2_ACCESS_KEY_ID.get();
+  const secretAccessKey = await c.env.R2_SECRET_ACCESS_KEY.get();
+  if (!accessKeyId || !secretAccessKey) {
+    return c.json({ error: 'R2 credentials unavailable' }, 503);
+  }
+
+  const { url, headers } = await mintPutUrl({
+    accountId: c.env.R2_ACCOUNT_ID,
+    bucket: c.env.R2_BUCKET_NAME,
+    accessKeyId,
+    secretAccessKey,
+    key: init.r2Key,
+    contentType: mimeType,
+    contentLength: size,
+    expiresSeconds: PUT_URL_TTL_SECONDS,
+  });
+
+  return c.json({
+    attachmentId: init.attachmentId,
+    putUrl: url,
+    putHeaders: headers,
+  });
+}
+
+// ─── attachmentGetUrl ───────────────────────────────────────────────────────
+
+const PUT_URL_TTL_SECONDS = 900;
+const GET_URL_TTL_SECONDS = 3600;
+
+export async function handleAttachmentGetUrl(c: HonoCtx) {
+  const conversationIdRaw = c.req.query('conversationId');
+  const request = attachmentGetUrlRequestSchema.safeParse({
+    attachmentId: c.req.param('id'),
+    conversationId: conversationIdRaw,
+  });
+  if (!request.success) {
+    const firstPath = request.error.issues[0]?.path[0];
+    if (firstPath === 'attachmentId') {
+      return c.json({ error: 'Invalid attachment ID' }, 400);
+    }
+    if (!conversationIdRaw) {
+      return c.json({ error: 'Missing conversationId query parameter' }, 400);
+    }
+    return c.json({ error: 'Invalid conversationId' }, 400);
+  }
+  const { attachmentId, conversationId } = request.data;
+
+  const callerId = c.get('callerId');
+
+  const lookup = await withDORetry<DurableObjectStub<ConversationDO>, GetAttachmentForReadResult>(
+    () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId)),
+    stub => stub.getAttachmentForRead({ requesterId: callerId, attachmentId }),
+    'ConversationDO.getAttachmentForRead'
+  );
+  if (!lookup.ok) {
+    return c.json({ error: lookup.error }, 403);
+  }
+  const row = lookup.row;
+  if (!row) {
+    return c.json({ error: 'Attachment not found' }, 404);
+  }
+
+  const accessKeyId = await c.env.R2_ACCESS_KEY_ID.get();
+  const secretAccessKey = await c.env.R2_SECRET_ACCESS_KEY.get();
+  if (!accessKeyId || !secretAccessKey) {
+    return c.json({ error: 'R2 credentials unavailable' }, 503);
+  }
+
+  const responseContentDisposition = row.mimeType.startsWith('image/')
+    ? undefined
+    : contentDisposition(row.filename, { type: 'attachment' });
+
+  const { url } = await mintGetUrl({
+    accountId: c.env.R2_ACCOUNT_ID,
+    bucket: c.env.R2_BUCKET_NAME,
+    accessKeyId,
+    secretAccessKey,
+    key: row.r2Key,
+    expiresSeconds: GET_URL_TTL_SECONDS,
+    responseContentDisposition,
+  });
+
+  return c.json({
+    url,
+    mimeType: row.mimeType,
+    size: row.size,
+    filename: row.filename,
+    expiresAt: Date.now() + GET_URL_TTL_SECONDS * 1000,
+  });
 }
 
 // ─── renameConversation ─────────────────────────────────────────────────────

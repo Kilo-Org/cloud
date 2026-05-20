@@ -223,6 +223,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
+  // Per-message id from the kilocode client. Joinable to PostHog
+  // `Feedback Submitted.parentMessageID`.
+  const clientRequestId = extractHeaderAndLimitLength(request, 'x-kilo-request');
+  // Fallback session id used when `x-kilocode-taskid` is absent (e.g.
+  // non-kilocode clients). `taskId` still wins when both are present.
+  const sessionHeader = extractHeaderAndLimitLength(request, 'x-kilo-session');
+  const machineIdHeader = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
@@ -372,13 +379,20 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
-  const { provider, userByok, bypassAccessCheck } = await getProvider(
-    originalModelIdLowerCased,
-    requestBodyParsed,
+  const providerResult = await getProvider({
+    requestedModel: originalModelIdLowerCased,
+    request: requestBodyParsed,
     user,
     organizationId,
-    taskId
-  );
+    taskId,
+  });
+  if (providerResult.kind === 'not-found') {
+    return modelDoesNotExistResponse();
+  }
+  if (providerResult.kind === 'unavailable') {
+    return temporarilyUnavailableResponse();
+  }
+  const { provider, userByok, bypassAccessCheck } = providerResult;
   if (!provider.supportedChatApis.includes(requestBodyParsed.kind)) {
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,
@@ -436,16 +450,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     project_id: projectId,
     status_code: null,
     editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
+    machine_id: machineIdHeader,
     user_byok: !!userByok,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
     botId,
     tokenSource,
     feature,
-    session_id: taskId ?? null,
+    session_id: taskId ?? sessionHeader ?? null,
     mode: modeHeader,
     auto_model: autoModel,
     ttfb_ms: null,
+    clientRequestId,
   };
 
   setTag('ui.ai_model', requestBodyParsed.body.model);

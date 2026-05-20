@@ -11,8 +11,98 @@ import { createCallbackQueueConsumer } from './callbacks/index.js';
 import type { CallbackJob } from './callbacks/index.js';
 import { authMiddleware } from './middleware/auth.js';
 import { balanceMiddleware } from './middleware/balance.js';
+import { resolveTerminalWrapperClient } from './terminal/access.js';
 
 const app = new Hono<HonoContext>();
+
+function isAllowedWebSocketOrigin(env: Env, origin: string | undefined): boolean {
+  const allowedOrigins = (env.WS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean);
+  const isRealOrigin = origin !== undefined && origin !== 'null';
+  return allowedOrigins.length === 0 || !isRealOrigin || allowedOrigins.includes(origin);
+}
+
+async function handleTerminalWebSocket(request: Request, env: Env): Promise<Response> {
+  const upgradeHeader = request.headers.get('Upgrade');
+  if (upgradeHeader?.toLowerCase() !== 'websocket') {
+    return new Response('Expected WebSocket upgrade', { status: 426 });
+  }
+
+  const url = new URL(request.url);
+  const cloudAgentSessionId = url.searchParams.get('cloudAgentSessionId');
+  if (!cloudAgentSessionId) {
+    logger.warn('/terminal: Missing cloudAgentSessionId parameter');
+    return new Response('Missing cloudAgentSessionId parameter', { status: 400 });
+  }
+
+  const ptyId = url.searchParams.get('ptyId');
+  if (!ptyId) {
+    logger.withFields({ cloudAgentSessionId }).warn('/terminal: Missing ptyId parameter');
+    return new Response('Missing ptyId parameter', { status: 400 });
+  }
+
+  if (!isAllowedWebSocketOrigin(env, request.headers.get('Origin') ?? undefined)) {
+    logger.withFields({ cloudAgentSessionId, ptyId }).warn('/terminal: Origin not allowed');
+    return new Response('Origin not allowed', { status: 403 });
+  }
+
+  const ticket = url.searchParams.get('ticket');
+  if (!ticket) {
+    logger.withFields({ cloudAgentSessionId }).warn('/terminal: Missing ticket');
+    return new Response('Missing ticket', { status: 401 });
+  }
+
+  const ticketResult = validateStreamTicket(ticket, env.NEXTAUTH_SECRET);
+  if (!ticketResult.success) {
+    logger
+      .withFields({ cloudAgentSessionId, error: ticketResult.error })
+      .warn('/terminal: Ticket validation failed');
+    return new Response(ticketResult.error, { status: 401 });
+  }
+
+  const userId = ticketResult.payload.userId;
+  if (!userId) {
+    logger.withFields({ cloudAgentSessionId }).warn('/terminal: Invalid ticket - missing userId');
+    return new Response('Invalid ticket: missing userId', { status: 401 });
+  }
+
+  if (ticketResult.payload.purpose !== 'terminal') {
+    logger.withFields({ cloudAgentSessionId, userId }).warn('/terminal: Invalid ticket purpose');
+    return new Response('Invalid ticket purpose', { status: 403 });
+  }
+
+  const ticketCloudAgentSessionId =
+    ticketResult.payload.cloudAgentSessionId ?? ticketResult.payload.sessionId;
+  if (ticketCloudAgentSessionId !== cloudAgentSessionId) {
+    logger
+      .withFields({ cloudAgentSessionId, ticketCloudAgentSessionId })
+      .warn('/terminal: Session mismatch between URL and ticket');
+    return new Response('Session mismatch', { status: 403 });
+  }
+
+  if (ticketResult.payload.ptyId !== ptyId) {
+    logger.withFields({ cloudAgentSessionId, userId, ptyId }).warn('/terminal: PTY mismatch');
+    return new Response('PTY mismatch', { status: 403 });
+  }
+
+  logger.withFields({ cloudAgentSessionId, userId, ptyId }).info('/terminal: WebSocket authorized');
+
+  const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`);
+  const stub = env.CLOUD_AGENT_SESSION.get(doId);
+  const metadata = await stub.getMetadata();
+  const terminal = await resolveTerminalWrapperClient({
+    env,
+    metadata,
+    sessionId: cloudAgentSessionId,
+  });
+  if (!terminal.success || !terminal.data) {
+    return new Response(terminal.error ?? 'Terminal unavailable', { status: 503 });
+  }
+
+  return terminal.data.client.connectTerminal(ptyId, request);
+}
 
 app.use('*', async (c: Context<HonoContext>, next: Next) => {
   await withLogTags({ source: 'worker-entry' }, async () => {
@@ -63,6 +153,11 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     return c.text('Invalid ticket: missing userId', 401);
   }
 
+  if (ticketResult.payload.purpose && ticketResult.payload.purpose !== 'stream') {
+    logger.withFields({ cloudAgentSessionId, userId }).warn('/stream: Invalid ticket purpose');
+    return c.text('Invalid ticket purpose', 403);
+  }
+
   const ticketCloudAgentSessionId =
     ticketResult.payload.cloudAgentSessionId ?? ticketResult.payload.sessionId;
   if (ticketCloudAgentSessionId !== cloudAgentSessionId) {
@@ -77,6 +172,10 @@ app.get('/stream', async (c: Context<HonoContext>) => {
   const doId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`);
   const stub = c.env.CLOUD_AGENT_SESSION.get(doId);
   return stub.fetch(c.req.raw);
+});
+
+app.get('/terminal', async (c: Context<HonoContext>) => {
+  return handleTerminalWebSocket(c.req.raw, c.env);
 });
 
 app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) => {
@@ -215,7 +314,17 @@ app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler(logger, { includeMessage: false }));
 
 export default {
-  fetch: app.fetch,
+  fetch(request: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
+    const url = new URL(request.url);
+    if (
+      url.pathname === '/terminal' &&
+      request.headers.get('Upgrade')?.toLowerCase() === 'websocket'
+    ) {
+      return handleTerminalWebSocket(request, env);
+    }
+
+    return app.fetch(request, env, ctx);
+  },
   async queue(batch: MessageBatch<unknown>, _env: Env): Promise<void> {
     if (batch.queue.startsWith('cloud-agent-next-callback-queue')) {
       const consumer = createCallbackQueueConsumer();

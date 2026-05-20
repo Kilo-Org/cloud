@@ -10,6 +10,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   WrapperClient,
+  WrapperContainerClient,
   WrapperError,
   WrapperNotReadyError,
   WrapperNoJobError,
@@ -1521,5 +1522,65 @@ describe('WrapperClient', () => {
       expect(new WrapperNoJobError('test')).toBeInstanceOf(WrapperError);
       expect(new WrapperJobConflictError('test')).toBeInstanceOf(WrapperError);
     });
+  });
+});
+
+describe('WrapperContainerClient', () => {
+  it('creates terminal PTYs through sandbox containerFetch', async () => {
+    const containerFetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'pty_123',
+          title: 'Workspace terminal',
+          command: '',
+          args: [],
+          cwd: '/workspace/repo',
+          status: 'running',
+          pid: 42,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    const sandbox = { containerFetch } as unknown as SandboxInstance;
+    const client = new WrapperContainerClient({ sandbox, port: 5000 });
+
+    const pty = await client.createTerminal({ cols: 100, rows: 30 });
+
+    expect(pty.id).toBe('pty_123');
+    expect(containerFetch).toHaveBeenCalledWith(
+      'http://container/pty',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ cols: 100, rows: 30 }),
+      }),
+      5000
+    );
+  });
+
+  it('connects terminal PTYs through the websocket-capable sandbox path', async () => {
+    const terminalResponse = new Response('proxied', { status: 200 });
+    const containerFetch = vi.fn();
+    const wsConnect = vi.fn().mockResolvedValueOnce(terminalResponse);
+    const sandbox = { containerFetch, wsConnect } as unknown as SandboxInstance;
+    const client = new WrapperContainerClient({ sandbox, port: 5000 });
+    const request = new Request('http://worker.test/terminal?cloudAgentSessionId=session-1', {
+      headers: {
+        Connection: 'Upgrade',
+        Upgrade: 'websocket',
+        'X-Test': 'preserved',
+      },
+    });
+
+    const response = await client.connectTerminal('pty_123', request);
+
+    expect(response).toBe(terminalResponse);
+    expect(containerFetch).not.toHaveBeenCalled();
+    expect(wsConnect).toHaveBeenCalledTimes(1);
+    const connectRequest = wsConnect.mock.calls[0]?.[0];
+    expect(connectRequest).toBeInstanceOf(Request);
+    expect(new URL((connectRequest as Request).url).pathname).toBe('/pty/pty_123/connect');
+    expect((connectRequest as Request).headers.get('Upgrade')).toBe('websocket');
+    expect((connectRequest as Request).headers.get('X-Test')).toBe('preserved');
+    expect(wsConnect.mock.calls[0]?.[1]).toBe(5000);
   });
 });

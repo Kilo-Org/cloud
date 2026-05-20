@@ -1,5 +1,5 @@
 {
-  "id": "ea9a2623-c7be-42d0-a928-5575636d4a9f",
+  "id": "e60aab72-f1aa-49cf-a335-ac32fe05df8f",
   "prevId": "818fdde6-960b-41ff-a3b2-8d194d667437",
   "version": "7",
   "dialect": "postgresql",
@@ -4639,12 +4639,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'pending'"
-        },
-        "dispatch_reservation_id": {
-          "name": "dispatch_reservation_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "error_message": {
           "name": "error_message",
@@ -16058,6 +16052,239 @@
           "nullsNotDistinct": false,
           "columns": [
             "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.model_eval_ingestions": {
+      "name": "model_eval_ingestions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "bench_eval_name": {
+          "name": "bench_eval_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bench_eval_url": {
+          "name": "bench_eval_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model_stats_id": {
+          "name": "model_stats_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "variant": {
+          "name": "variant",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "task_source": {
+          "name": "task_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n_total_trials": {
+          "name": "n_total_trials",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_score": {
+          "name": "total_score",
+          "type": "numeric(14, 6)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "overall_score": {
+          "name": "overall_score",
+          "type": "numeric(12, 8)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "n_errored": {
+          "name": "n_errored",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "avg_cost_microdollars": {
+          "name": "avg_cost_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avg_input_tokens": {
+          "name": "avg_input_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avg_output_tokens": {
+          "name": "avg_output_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avg_cache_read_tokens": {
+          "name": "avg_cache_read_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avg_execution_ms": {
+          "name": "avg_execution_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "promoted_at": {
+          "name": "promoted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "promoted_by_email": {
+          "name": "promoted_by_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "promotion_note": {
+          "name": "promotion_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_model_eval_ingestions_lookup": {
+          "name": "IDX_model_eval_ingestions_lookup",
+          "columns": [
+            {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "model",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "variant",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "task_source",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "promoted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_model_eval_ingestions_model_stats": {
+          "name": "IDX_model_eval_ingestions_model_stats",
+          "columns": [
+            {
+              "expression": "model_stats_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_model_eval_ingestions_promoted_by_email_lower": {
+          "name": "IDX_model_eval_ingestions_promoted_by_email_lower",
+          "columns": [
+            {
+              "expression": "LOWER(\"promoted_by_email\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "model_eval_ingestions_model_stats_id_model_stats_id_fk": {
+          "name": "model_eval_ingestions_model_stats_id_model_stats_id_fk",
+          "tableFrom": "model_eval_ingestions",
+          "tableTo": "model_stats",
+          "columnsFrom": [
+            "model_stats_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "model_eval_ingestions_bench_eval_name_unique": {
+          "name": "model_eval_ingestions_bench_eval_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "bench_eval_name"
           ]
         }
       },

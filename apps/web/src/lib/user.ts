@@ -75,6 +75,7 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  model_eval_ingestions,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from './constants';
@@ -724,6 +725,7 @@ export class SoftDeletePreconditionError extends Error {
  * - organization_user_limits/usage
  * - organization_audit_logs (actor PII nulled)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
+ * - model_eval_ingestions (promoter email anonymized)
  * - credit_campaigns (created_by_kilo_user_id anonymized)
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
  * - App Store account token and retained Kilo Pass store purchase/event token fields
@@ -1080,6 +1082,11 @@ export async function softDeleteUser(userId: string) {
       .update(kiloclaw_admin_audit_logs)
       .set({ target_user_id: 'deleted-user' })
       .where(eq(kiloclaw_admin_audit_logs.target_user_id, userId));
+
+    await tx
+      .update(model_eval_ingestions)
+      .set({ promoted_by_email: `deleted+${userId}@deleted.invalid` })
+      .where(sql`lower(${model_eval_ingestions.promoted_by_email}) = lower(${originalEmail})`);
 
     // Credit campaigns: strip the creator-admin reference. The campaigns
     // themselves are retained (they represent ongoing marketing relationships

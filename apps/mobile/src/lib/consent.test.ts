@@ -33,14 +33,25 @@ describe('consent storage', () => {
       await import('./consent');
 
     await acceptConsent('user-1');
-    expect(store.get('consent-accepted-user-1')).toBe(String(CURRENT_CONSENT_VERSION));
+    expect(store.get('consent-accepted-user1')).toBe(String(CURRENT_CONSENT_VERSION));
     expect(await hasAcceptedConsent('user-1')).toBe(true);
+  });
+
+  it('strips characters that are invalid in SecureStore keys', async () => {
+    const { CURRENT_CONSENT_VERSION, acceptConsent, hasAcceptedConsent } =
+      await import('./consent');
+
+    await acceptConsent('oauth/google:103283381342696699340');
+    expect(store.get('consent-accepted-oauthgoogle103283381342696699340')).toBe(
+      String(CURRENT_CONSENT_VERSION)
+    );
+    expect(await hasAcceptedConsent('oauth/google:103283381342696699340')).toBe(true);
   });
 
   it('returns false when the stored consent version is old', async () => {
     const { hasAcceptedConsent } = await import('./consent');
 
-    store.set('consent-accepted-user-1', '0');
+    store.set('consent-accepted-user1', '0');
 
     expect(await hasAcceptedConsent('user-1')).toBe(false);
   });
@@ -48,7 +59,7 @@ describe('consent storage', () => {
   it('returns false for old unversioned consent records', async () => {
     const { hasAcceptedConsent } = await import('./consent');
 
-    store.set('consent-accepted-user-1', 'true');
+    store.set('consent-accepted-user1', 'true');
 
     expect(await hasAcceptedConsent('user-1')).toBe(false);
   });

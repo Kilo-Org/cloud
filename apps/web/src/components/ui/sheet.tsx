@@ -42,13 +42,33 @@ function SheetContent({
   className,
   children,
   side = 'right',
+  portalContainer,
+  showOverlay = true,
+  overlayClassName,
+  dismissibleOverlay = false,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: 'top' | 'right' | 'bottom' | 'left';
+  portalContainer?: React.ComponentProps<typeof SheetPrimitive.Portal>['container'];
+  showOverlay?: boolean;
+  overlayClassName?: string;
+  dismissibleOverlay?: boolean;
 }) {
   return (
-    <SheetPortal>
-      <SheetOverlay />
+    <SheetPortal container={portalContainer}>
+      {showOverlay &&
+        (dismissibleOverlay ? (
+          <SheetPrimitive.Close asChild>
+            <button
+              type="button"
+              aria-label="Close sheet"
+              data-slot="sheet-overlay"
+              className={cn('absolute inset-0 z-50 cursor-default bg-black/50', overlayClassName)}
+            />
+          </SheetPrimitive.Close>
+        ) : (
+          <SheetOverlay className={overlayClassName} />
+        ))}
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(

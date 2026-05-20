@@ -183,6 +183,62 @@ export const SendMessageV2Input = z
 
 export type SendMessageV2InputPayload = z.infer<typeof SendMessageV2Payload>;
 
+export const PtyIdSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[a-zA-Z0-9_-]+$/, 'Invalid PTY ID format');
+
+export const TerminalSizeSchema = z.object({
+  cols: z.number().int().min(2).max(500),
+  rows: z.number().int().min(2).max(200),
+});
+
+export const TerminalPtySchema = z.object({
+  id: PtyIdSchema,
+  title: z.string(),
+  command: z.string(),
+  args: z.array(z.string()),
+  cwd: z.string(),
+  status: z.enum(['running', 'exited']),
+  pid: z.number().int(),
+});
+
+export const CreateTerminalInput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to open a terminal for'),
+  })
+  .extend(TerminalSizeSchema.partial().shape)
+  .refine(data => (data.cols === undefined) === (data.rows === undefined), {
+    message: 'cols and rows must be provided together',
+  });
+
+export const CreateTerminalOutput = z.object({
+  pty: TerminalPtySchema,
+});
+
+export const ResizeTerminalInput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema.describe(
+      'Cloud-agent session ID to resize a terminal for'
+    ),
+    ptyId: PtyIdSchema,
+  })
+  .extend(TerminalSizeSchema.shape);
+
+export const ResizeTerminalOutput = z.object({
+  pty: TerminalPtySchema,
+});
+
+export const CloseTerminalInput = z.object({
+  cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to close a terminal for'),
+  ptyId: PtyIdSchema,
+});
+
+export const CloseTerminalOutput = z.object({
+  success: z.boolean(),
+});
+
 /**
  * Input schema for prepareSession endpoint.
  * Creates a session in "prepared" state for later initiation.
@@ -558,10 +614,13 @@ export const GetSessionOutput = z.object({
   preparedAt: z.number().optional().describe('Timestamp when session was prepared'),
   initiatedAt: z.number().optional().describe('Timestamp when session was initiated'),
 
-  // Callback configuration (debug-friendly, URL + headers)
-  callbackTarget: CallbackTargetSchema.optional().describe(
-    'Callback target configuration for execution completion notifications'
-  ),
+  // Callback configuration is intentionally NOT exposed here. The stored
+  // `callbackTarget` may carry service-to-service auth headers (e.g. an
+  // X-Internal-Secret used by downstream Worker callback ingresses), and
+  // `getSession` is reachable by the session's owning user via the web tRPC
+  // surface. Returning headers — even for "debug" — would leak that secret
+  // to any user who can run a flow that creates a session on their behalf.
+  // Use service-internal logs/storage if you need to inspect the target.
 
   // Initial message ID for correlation
   initialMessageId: z.string().startsWith('msg_').length(30).optional(),

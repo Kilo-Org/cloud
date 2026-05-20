@@ -182,7 +182,7 @@ async function main() {
   }
 
   // Create wrapper kilo client (adapter over SDK client + raw fetch)
-  const kiloClient = createWrapperKiloClient(sdkClient, kiloServer.url);
+  const kiloClient = createWrapperKiloClient(sdkClient, kiloServer.url, workspacePath);
 
   // ---------------------------------------------------------------------------
   // Create or verify kilo session

@@ -37,6 +37,8 @@ import {
   registerKiloChatConversationStatusRoute,
   registerKiloChatMessageDeliveryFailedRoute,
   registerKiloChatActionDeliveryFailedRoute,
+  registerKiloChatAttachmentInitRoute,
+  registerKiloChatAttachmentUrlRoute,
 } from './routes/kilo-chat';
 import { registerInboundEmailRoute } from './routes/inbound-email';
 import { registerFileRoutes } from './routes/files';
@@ -443,6 +445,8 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     registerKiloChatConversationStatusRoute(honoApp, kiloChatOpts);
     registerKiloChatMessageDeliveryFailedRoute(honoApp, kiloChatOpts);
     registerKiloChatActionDeliveryFailedRoute(honoApp, kiloChatOpts);
+    registerKiloChatAttachmentInitRoute(honoApp, kiloChatOpts);
+    registerKiloChatAttachmentUrlRoute(honoApp, kiloChatOpts);
   } else {
     console.warn(
       '[kilo-chat] Routes not registered:',

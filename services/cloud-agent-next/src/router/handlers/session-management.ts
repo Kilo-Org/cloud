@@ -462,7 +462,9 @@ export function createSessionManagementHandlers() {
             preparedAt: metadata.preparedAt,
             initiatedAt: metadata.initiatedAt,
 
-            callbackTarget: metadata.callbackTarget,
+            // callbackTarget is intentionally NOT returned: it may carry
+            // service-to-service auth headers and is reachable by the
+            // session's owning user via the web tRPC surface.
 
             initialMessageId: metadata.initialMessageId,
 

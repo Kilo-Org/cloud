@@ -378,6 +378,7 @@ function ClawOnboardingFlowInner({
   const composioPopupPendingRef = useRef(false);
   const composioPopupResultHandledRef = useRef(false);
   const composioPopupAwaitingConfirmationRef = useRef(false);
+  const composioPopupConfirmationTimeoutRef = useRef<number | null>(null);
   const composioPopupAttemptIdRef = useRef<string | null>(null);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
 
@@ -448,14 +449,28 @@ function ClawOnboardingFlowInner({
     mutations,
   });
 
-  const setComposioPopupPendingState = useCallback((pending: boolean) => {
-    composioPopupPendingRef.current = pending;
-    if (pending) {
-      composioPopupResultHandledRef.current = false;
-      composioPopupAwaitingConfirmationRef.current = false;
-    }
-    setComposioPopupPending(pending);
+  const clearComposioPopupConfirmationTimeout = useCallback(() => {
+    if (composioPopupConfirmationTimeoutRef.current === null) return;
+    window.clearTimeout(composioPopupConfirmationTimeoutRef.current);
+    composioPopupConfirmationTimeoutRef.current = null;
   }, []);
+
+  const setComposioPopupPendingState = useCallback(
+    (pending: boolean) => {
+      composioPopupPendingRef.current = pending;
+      if (pending) {
+        composioPopupResultHandledRef.current = false;
+        composioPopupAwaitingConfirmationRef.current = false;
+        clearComposioPopupConfirmationTimeout();
+      }
+      setComposioPopupPending(pending);
+    },
+    [clearComposioPopupConfirmationTimeout]
+  );
+
+  useEffect(() => {
+    return () => clearComposioPopupConfirmationTimeout();
+  }, [clearComposioPopupConfirmationTimeout]);
 
   const handleComposioPopupResult = useCallback(
     (message: { result: 'success' | 'failed' | 'unknown'; attemptId: string }) => {
@@ -470,16 +485,29 @@ function ClawOnboardingFlowInner({
 
       if (message.result === 'success') {
         composioPopupAwaitingConfirmationRef.current = true;
+        clearComposioPopupConfirmationTimeout();
+        composioPopupConfirmationTimeoutRef.current = window.setTimeout(() => {
+          if (!composioPopupAwaitingConfirmationRef.current) return;
+          composioPopupAwaitingConfirmationRef.current = false;
+          composioPopupConfirmationTimeoutRef.current = null;
+          setComposioPopupPendingState(false);
+          posthog?.capture('claw_setup_tools_connect_failed', {
+            toolkit: 'googlecalendar',
+            reason: 'status_confirmation_timeout',
+          });
+          toast.error('Could not confirm Google Calendar. Try again or skip for now.');
+        }, 45_000);
         return;
       }
 
+      clearComposioPopupConfirmationTimeout();
       setComposioPopupPendingState(false);
       posthog?.capture('claw_setup_tools_connect_failed', {
         toolkit: 'googlecalendar',
       });
       toast.error('Could not connect Google Calendar. Try again or skip for now.');
     },
-    [composioStatus, posthog, setComposioPopupPendingState]
+    [clearComposioPopupConfirmationTimeout, composioStatus, posthog, setComposioPopupPendingState]
   );
 
   useEffect(() => {
@@ -538,6 +566,7 @@ function ClawOnboardingFlowInner({
 
       composioPopupRef.current = null;
       composioPopupAttemptIdRef.current = null;
+      clearComposioPopupConfirmationTimeout();
       setComposioPopupPendingState(false);
       void composioStatus.refetch();
       posthog?.capture('claw_setup_tools_connect_failed', {
@@ -547,7 +576,13 @@ function ClawOnboardingFlowInner({
     }, 700);
 
     return () => window.clearInterval(intervalId);
-  }, [composioPopupPending, composioStatus, posthog, setComposioPopupPendingState]);
+  }, [
+    clearComposioPopupConfirmationTimeout,
+    composioPopupPending,
+    composioStatus,
+    posthog,
+    setComposioPopupPendingState,
+  ]);
 
   useEffect(() => {
     if (!composioPopupPending || composioStatus.data?.status !== 'connected') return;
@@ -556,10 +591,17 @@ function ClawOnboardingFlowInner({
     composioPopupRef.current = null;
     composioPopupAttemptIdRef.current = null;
     composioPopupAwaitingConfirmationRef.current = false;
+    clearComposioPopupConfirmationTimeout();
     setComposioPopupPendingState(false);
     posthog?.capture('claw_setup_tools_composio_completed', { source: 'status_refetch' });
     toast.success('Google Calendar connected');
-  }, [composioPopupPending, composioStatus.data?.status, posthog, setComposioPopupPendingState]);
+  }, [
+    clearComposioPopupConfirmationTimeout,
+    composioPopupPending,
+    composioStatus.data?.status,
+    posthog,
+    setComposioPopupPendingState,
+  ]);
 
   useEffect(() => {
     if (!composioPopupPending) return;

@@ -31,20 +31,6 @@ import type {
  *  how long plaintext keys can live in Redis. */
 const PER_PUBLIC_ID_CACHE_TTL_SECONDS = 600;
 
-let warnedMissingEncryptionKey = false;
-
-function warnMissingEncryptionKeyOnce() {
-  if (warnedMissingEncryptionKey) return;
-  warnedMissingEncryptionKey = true;
-  captureMessage('BYOK_ENCRYPTION_KEY is unset; model experiment routing returning unavailable', {
-    level: 'error',
-    tags: { source: 'model-experiments' },
-  });
-  console.error(
-    '[model-experiments] BYOK_ENCRYPTION_KEY is unset; experiment routing will return unavailable'
-  );
-}
-
 /**
  * Fast pre-check: does any active|paused experiment target this public id?
  *
@@ -292,11 +278,9 @@ async function loadExperimentFromDb(publicId: string): Promise<ResolveResult> {
     }
   }
 
-  // We deliberately DO NOT call decryptApiKey here, even when
-  // BYOK_ENCRYPTION_KEY is missing. The encrypted blob is harmless on its
-  // own; decryption + the missing-key check happen per-pick in
-  // `pickModelExperimentVariant` so a warm cache cannot serve plaintext
-  // keys after key rotation/removal.
+  // We deliberately DO NOT call decryptApiKey here. The cache should only
+  // hold encrypted blobs; decryption happens per-pick so key rotation takes
+  // effect on the next request.
   const variants: CachedVariant[] = [];
   for (const v of variantRows) {
     const ver = versionByVariantId.get(v.id);
@@ -396,14 +380,9 @@ export async function pickModelExperimentVariant(
       // Decrypt only the chosen variant's key, here and now. This is the
       // ONLY decryption point for experiment routing — the cache holds
       // ciphertext exclusively. Doing it per-pick (a) keeps the
-      // BYOK_ENCRYPTION_KEY missing-key fail-closed effective on warm
-      // caches, (b) lets key rotation invalidate access immediately
-      // (next request after the key flips fails closed), and (c) means
-      // we never decrypt N-1 keys we won't use.
-      if (!BYOK_ENCRYPTION_KEY) {
-        warnMissingEncryptionKeyOnce();
-        return { status: 'unavailable' };
-      }
+      // key rotation effective immediately (next request after the key
+      // flips fails closed), and (b) means we never decrypt N-1 keys we
+      // won't use.
       let apiKey: string;
       try {
         apiKey = decryptApiKey(v.encryptedApiKey, BYOK_ENCRYPTION_KEY);

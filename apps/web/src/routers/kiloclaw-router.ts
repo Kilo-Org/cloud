@@ -827,7 +827,7 @@ const channelsSchema = z
 
 const updateConfigSchema = z.object({
   envVars: z.record(z.string(), z.string()).optional(),
-  secrets: z.record(z.string(), z.string()).optional(),
+  secrets: z.record(z.string(), z.string().max(MAX_CUSTOM_SECRET_VALUE_LENGTH)).optional(),
   channels: channelsSchema,
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
   userTimezone: userTimezoneSchema.nullable().optional(),

@@ -845,6 +845,9 @@ function ClawOnboardingFlowInner({
     composioManualCredentials?: { composioUserApiKey: string; composioOrg: string },
     skipIncompleteManagedComposioConnection?: boolean
   ) {
+    posthog?.capture('claw_create_instance_clicked', {
+      selected_model: KILO_AUTO_BALANCED_MODEL.id,
+    });
     handleCreateFlowStarted();
 
     mutations.provision.mutate(
@@ -876,9 +879,6 @@ function ClawOnboardingFlowInner({
     skipIncompleteManagedComposioConnection?: boolean
   ) {
     if (mode !== 'create-first' || flowState.instanceStatus !== null || createSetupStarted) return;
-    posthog?.capture('claw_create_instance_clicked', {
-      selected_model: KILO_AUTO_BALANCED_MODEL.id,
-    });
     provisionInstance(
       pendingUserLocation ?? undefined,
       composioManualCredentials,

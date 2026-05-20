@@ -267,7 +267,7 @@ describe('buildComposioProvisionSecrets', () => {
     const result = await buildComposioProvisionSecrets({
       scope,
       secrets: {
-        composioUserApiKey: 'uak_manual',
+        composioUserApiKey: 'uak_manual_credential_123',
         composioOrg: 'manual-org',
         otherSecret: 'kept',
       },
@@ -275,13 +275,25 @@ describe('buildComposioProvisionSecrets', () => {
 
     expect(result).toEqual({
       secrets: {
-        composioUserApiKey: 'uak_manual',
+        composioUserApiKey: 'uak_manual_credential_123',
         composioOrg: 'manual-org',
         otherSecret: 'kept',
       },
       configToMark: { source: 'manual' },
     });
     expect(mockedGetActiveManagedComposioIdentity).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid pre-provision manual Composio credentials', async () => {
+    await expect(
+      buildComposioProvisionSecrets({
+        scope,
+        secrets: {
+          composioUserApiKey: 'uak_short',
+          composioOrg: 'manual-org',
+        },
+      })
+    ).rejects.toThrow('Composio user API keys start with uak_');
   });
 
   it('rehydrates previously applied managed credentials for a recreated sandbox', async () => {

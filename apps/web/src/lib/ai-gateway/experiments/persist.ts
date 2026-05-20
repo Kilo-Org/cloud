@@ -1,4 +1,4 @@
-import { captureException, captureMessage } from '@sentry/nextjs';
+import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { model_experiment_request } from '@kilocode/db/schema';
 import { putPromptOrNull } from '@/lib/r2/experiment-prompts';
@@ -59,7 +59,6 @@ export function buildExperimentPromptCapture(request: GatewayRequest): Experimen
   if (Buffer.byteLength(bodyContent, 'utf8') > REQUEST_BODY_CAP_BYTES) {
     bodyContent = truncateToUtf8Bytes(bodyContent, REQUEST_BODY_CAP_BYTES);
     wasTruncated = true;
-    noteTruncation(request.body.model);
   }
   return {
     requestKind: request.kind,
@@ -71,16 +70,6 @@ export function buildExperimentPromptCapture(request: GatewayRequest): Experimen
 function serialize(value: unknown): string {
   if (typeof value === 'string') return value;
   return JSON.stringify(value);
-}
-
-function noteTruncation(model: string | undefined) {
-  // Sentry breadcrumb only (no payload content) — we want to know if this
-  // ever fires at non-trivial rates so we can re-evaluate caps.
-  captureMessage('Experiment prompt capture truncated', {
-    level: 'info',
-    tags: { source: 'model-experiments', operation: 'buildExperimentPromptCapture' },
-    extra: { model: model ?? null },
-  });
 }
 
 export type PersistExperimentAttributionInput = {

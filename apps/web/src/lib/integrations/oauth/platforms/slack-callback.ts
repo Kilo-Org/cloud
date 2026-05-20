@@ -49,7 +49,11 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
 
       return NextResponse.redirect(
         new URL(
-          buildIntegrationOAuthRedirectPathFromState(PLATFORM.SLACK, state, `error=${error}`),
+          buildIntegrationOAuthRedirectPathFromState(
+            PLATFORM.SLACK,
+            state,
+            `error=${encodeURIComponent(error)}`
+          ),
           APP_URL
         )
       );

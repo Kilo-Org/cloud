@@ -158,6 +158,22 @@ describe('GET /api/integrations/linear/callback', () => {
     expectRedirectLocation(response, '/integrations/linear?error=access_denied');
   });
 
+  test('encodes oauth error values before redirecting', async () => {
+    const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+    const response = await callLinearCallback(
+      makeRequest(
+        `/api/integrations/linear/callback?error=${encodeURIComponent(
+          'access_denied&success=installed'
+        )}&state=${state}`
+      )
+    );
+
+    expectRedirectLocation(
+      response,
+      '/integrations/linear?error=access_denied%26success%3Dinstalled'
+    );
+  });
+
   test('redirects with missing_code when no code is present', async () => {
     const state = createOAuthState(`user_${USER_ID}`, USER_ID);
     const response = await callLinearCallback(

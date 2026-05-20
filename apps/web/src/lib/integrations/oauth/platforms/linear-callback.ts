@@ -250,7 +250,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
           buildIntegrationOAuthRedirectPathFromOwner(
             PLATFORM.LINEAR,
             verifiedOwner,
-            `error=${error}`
+            `error=${encodeURIComponent(error)}`
           ),
           APP_URL
         )

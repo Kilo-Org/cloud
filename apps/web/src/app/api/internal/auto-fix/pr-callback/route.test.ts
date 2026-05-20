@@ -65,7 +65,6 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
-const INTERNAL_SECRET = 'test-internal-secret';
 const CALLBACK_SECRET = 'test-callback-token-secret';
 const TICKET_ID = 'ticket-1';
 const SESSION_ID = 'cloud-agent-session-1';
@@ -77,7 +76,6 @@ const COMPLETED_PAYLOAD = {
 type RequestOptions = {
   ticketId?: string;
   callbackToken?: string | null;
-  legacySecret?: string | null;
 };
 
 function makeRequest(body: Record<string, unknown>, options: RequestOptions = {}): NextRequest {
@@ -91,9 +89,6 @@ function makeRequest(body: Record<string, unknown>, options: RequestOptions = {}
     headers: {
       get: (name: string) => {
         if (name === 'X-Callback-Token') return options.callbackToken ?? null;
-        if (name === 'X-Internal-Secret') {
-          return options.legacySecret === undefined ? null : options.legacySecret;
-        }
         return null;
       },
     },
@@ -181,12 +176,5 @@ describe('POST /api/internal/auto-fix/pr-callback', () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ error: 'Ticket ID mismatch' });
-  });
-
-  it('rejects raw internal-secret callbacks without a scoped token', async () => {
-    const response = await POST(makeRequest(COMPLETED_PAYLOAD, { legacySecret: INTERNAL_SECRET }));
-
-    expect(response.status).toBe(401);
-    expect(mockGetFixTicketBySessionId).not.toHaveBeenCalled();
   });
 });

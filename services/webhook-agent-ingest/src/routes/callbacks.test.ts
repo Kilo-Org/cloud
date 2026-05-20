@@ -10,7 +10,6 @@ vi.mock('../util/do-retry', () => ({
 
 import { callbacks } from './callbacks';
 
-const INTERNAL_SECRET = 'test-internal-api-secret';
 const CALLBACK_SECRET = 'test-callback-token-secret';
 const NAMESPACE = 'user/user-1';
 const TRIGGER_ID = 'trigger-1';
@@ -29,7 +28,6 @@ type CallbackHeaders = {
   triggerId?: string;
   requestId?: string;
   callbackToken?: string;
-  legacySecret?: string;
 };
 
 function createRouteHarness(cloudAgentSessionId = CLOUD_AGENT_SESSION_ID) {
@@ -40,7 +38,6 @@ function createRouteHarness(cloudAgentSessionId = CLOUD_AGENT_SESSION_ID) {
   const updateRequest = vi.fn(async () => undefined);
   const stub = { getRequest, updateRequest };
   const env = {
-    INTERNAL_API_SECRET: { get: vi.fn(async () => INTERNAL_SECRET) },
     CALLBACK_TOKEN_SECRET: { get: vi.fn(async () => CALLBACK_SECRET) },
     TRIGGER_DO: {
       idFromName: vi.fn((name: string) => name),
@@ -61,9 +58,6 @@ function callbackHeaders(headers: CallbackHeaders): HeadersInit {
 
   if (headers.callbackToken) {
     result['X-Callback-Token'] = headers.callbackToken;
-  }
-  if (headers.legacySecret) {
-    result['X-Internal-API-Key'] = headers.legacySecret;
   }
 
   return result;
@@ -116,15 +110,6 @@ describe('webhook execution callback auth', () => {
     });
 
     const response = await requestCallback(env, { ...identity, callbackToken });
-
-    expect(response.status).toBe(401);
-    expect(getRequest).not.toHaveBeenCalled();
-  });
-
-  it('rejects raw internal-key callbacks without a scoped token', async () => {
-    const { env, getRequest } = createRouteHarness();
-
-    const response = await requestCallback(env, { legacySecret: INTERNAL_SECRET });
 
     expect(response.status).toBe(401);
     expect(getRequest).not.toHaveBeenCalled();

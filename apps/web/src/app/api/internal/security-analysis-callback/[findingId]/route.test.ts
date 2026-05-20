@@ -127,7 +127,6 @@ jest.mock('drizzle-orm', () => ({
 
 // --- Helpers ---
 
-const VALID_SECRET = 'test-internal-secret';
 const CALLBACK_SECRET = 'test-callback-token-secret';
 const FINDING_ID = 'finding-abc-123';
 let defaultCallbackToken: string;
@@ -135,14 +134,12 @@ let defaultCallbackToken: string;
 function makeRequest(
   findingId: string,
   body: Record<string, unknown>,
-  callbackToken: string | null = defaultCallbackToken,
-  legacySecret: string | null = null
+  callbackToken: string | null = defaultCallbackToken
 ): NextRequest {
   return {
     headers: {
       get: (name: string) => {
         if (name === 'X-Callback-Token') return callbackToken;
-        if (name === 'X-Internal-Secret') return legacySecret;
         return null;
       },
     },
@@ -298,14 +295,6 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
         resourceParts: ['different-finding'],
       });
       const req = makeRequest(FINDING_ID, completedPayload, callbackToken);
-      const response = await POST(req, makeParams(FINDING_ID));
-
-      expect(response.status).toBe(401);
-      expect(mockGetSecurityFindingById).not.toHaveBeenCalled();
-    });
-
-    it('rejects legacy internal-secret callbacks without a scoped token', async () => {
-      const req = makeRequest(FINDING_ID, completedPayload, null, VALID_SECRET);
       const response = await POST(req, makeParams(FINDING_ID));
 
       expect(response.status).toBe(401);

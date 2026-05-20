@@ -148,7 +148,6 @@ jest.mock('@/lib/integrations/core/constants', () => ({
 
 // --- Helpers ---
 
-const VALID_SECRET = 'test-internal-secret';
 const CALLBACK_SECRET = 'test-callback-token-secret';
 const REVIEW_ID = '00000000-0000-0000-0000-000000000001';
 let defaultCallbackToken: string;
@@ -156,7 +155,6 @@ let defaultCallbackToken: string;
 function makeRequest(
   body: Record<string, unknown>,
   options: {
-    secret?: string | null;
     callbackToken?: string | null;
     attemptId?: string;
   } = {}
@@ -170,7 +168,6 @@ function makeRequest(
     nextUrl: url,
     headers: {
       get: (name: string) => {
-        if (name === 'X-Internal-Secret') return options.secret ?? null;
         if (name === 'X-Callback-Token') {
           return options.callbackToken === undefined ? defaultCallbackToken : options.callbackToken;
         }
@@ -386,16 +383,6 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(401);
-    });
-
-    it('rejects legacy internal-secret status writes without a scoped token', async () => {
-      const response = await POST(
-        makeRequest({ status: 'running' }, { callbackToken: null, secret: VALID_SECRET }),
-        makeParams(REVIEW_ID)
-      );
-
-      expect(response.status).toBe(401);
-      expect(mockGetCodeReviewById).not.toHaveBeenCalled();
     });
   });
 

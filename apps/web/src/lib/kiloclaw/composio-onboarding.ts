@@ -30,6 +30,18 @@ export type ComposioSandboxConfigSource = KiloClawComposioInstanceConfigSource |
 
 export type ProvisionComposioConfigToMark = { source: 'manual' | 'managed' } | null;
 
+export function composioSecretsPatchSource(
+  secrets: Record<string, string | null>
+): 'upsert_manual' | 'clear' | 'none' {
+  const touchedEntries = Object.entries(secrets).filter(
+    ([key]) => key === 'composioUserApiKey' || key === 'composioOrg'
+  );
+  if (touchedEntries.length === 0) return 'none';
+  if (touchedEntries.every(([, value]) => value === null)) return 'clear';
+  if (touchedEntries.some(([, value]) => value !== null)) return 'upsert_manual';
+  return 'none';
+}
+
 function composioUserContextAuth(
   identity: DecryptedComposioIdentity
 ): ComposioUserContextAuth | null {
@@ -53,29 +65,6 @@ export function getComposioConnectCallbackUrl(params: {
   if (params.popup) url.searchParams.set('popup', '1');
   if (params.attemptId) url.searchParams.set('attemptId', params.attemptId);
   return url.toString();
-}
-
-export async function applyManagedComposioCredentials(params: {
-  userId: string;
-  instance: ActiveKiloClawInstance;
-  scope: ComposioOwnerScope;
-}): Promise<void> {
-  const identity = await ensureManagedComposioIdentity(params.scope);
-  const client = new KiloClawInternalClient();
-  await client.patchSecrets(
-    params.userId,
-    {
-      secrets: {
-        composioUserApiKey: encryptKiloClawSecret(identity.userApiKey),
-        composioOrg: encryptKiloClawSecret(identity.org),
-      },
-    },
-    workerInstanceId(params.instance)
-  );
-  await markComposioInstanceConfig({
-    instanceId: params.instance.id,
-    source: 'managed',
-  });
 }
 
 export async function markComposioInstanceConfig(params: {
@@ -174,6 +163,9 @@ export async function completeManagedComposioGoogleCalendarConnection(params: {
   );
   if (!connected) return false;
 
+  // Blocks callbacks after manual mode is recorded. The worker secret write
+  // below is cross-service, so a manual save starting concurrently still races
+  // until these writes share a common lock or transaction boundary.
   const sandboxConfigSource = await getComposioInstanceConfigSource(params.instance.id);
   if (sandboxConfigSource === 'manual') return false;
 

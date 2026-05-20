@@ -52,6 +52,7 @@ import {
 } from '@/lib/kiloclaw/provision-lock';
 import {
   buildComposioProvisionSecrets,
+  composioSecretsPatchSource,
   createManagedComposioGoogleCalendarLink,
   clearComposioInstanceConfig,
   getComposioInstanceConfigSource,
@@ -234,20 +235,6 @@ const composioConnectLinkSchema = z.object({
   popup: z.boolean().optional(),
   attemptId: z.string().min(1).max(100).optional(),
 });
-
-function composioSecretsPatchSource(
-  secrets: Record<string, string | null>
-): 'upsert_manual' | 'clear' | 'none' {
-  const touchedEntries = Object.entries(secrets).filter(
-    ([key]) => key === 'composioUserApiKey' || key === 'composioOrg'
-  );
-  if (touchedEntries.length === 0) return 'none';
-  if (touchedEntries.length === 2 && touchedEntries.every(([, value]) => value === null)) {
-    return 'clear';
-  }
-  if (touchedEntries.some(([, value]) => value !== null)) return 'upsert_manual';
-  return 'none';
-}
 
 // ── Helpers ────────────────────────────────────────────────────────
 

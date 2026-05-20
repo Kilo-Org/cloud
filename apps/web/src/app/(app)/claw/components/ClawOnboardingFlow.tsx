@@ -263,19 +263,6 @@ function ClawOnboardingFlowInner({
       MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION
     );
   const hasInterestsStep = isAdminForInterests && controllerSupportsInterests;
-  const personalComposioStatus = useKiloClawComposioOnboardingStatus(!organizationId);
-  const orgComposioStatus = useOrgKiloClawComposioOnboardingStatus(
-    organizationId ?? '',
-    !!organizationId
-  );
-  const composioStatus = organizationId ? orgComposioStatus : personalComposioStatus;
-  const hasToolsStep = hasCalendarStep && composioStatus.data?.enabled !== false;
-  const configQuery = useClawConfig();
-  const composioManualConfigured = composioStatus.data?.sandboxConfigSource === 'manual';
-  const composioConfigPending = configQuery.isPending;
-
-  const gatewayUrl = useGatewayUrl(status);
-
   // Lazy-init onboardingStep from `?step=` in the URL so first render already
   // reflects a calendar resume. Without this the state machine would resolve
   // to 'complete' (post-provisioning + ready) on first render and the auto-
@@ -287,6 +274,25 @@ function ClawOnboardingFlowInner({
     if (initialStep === 'tools') return 'tools';
     return initialStep === 'calendar' ? 'calendar' : 'identity';
   });
+  const [composioPopupPending, setComposioPopupPending] = useState(false);
+  const composioStatusPolling = onboardingStep === 'tools' || composioPopupPending;
+  const personalComposioStatus = useKiloClawComposioOnboardingStatus(
+    !organizationId,
+    composioStatusPolling
+  );
+  const orgComposioStatus = useOrgKiloClawComposioOnboardingStatus(
+    organizationId ?? '',
+    !!organizationId,
+    composioStatusPolling
+  );
+  const composioStatus = organizationId ? orgComposioStatus : personalComposioStatus;
+  const hasToolsStep = hasCalendarStep && composioStatus.data?.enabled !== false;
+  const configQuery = useClawConfig();
+  const composioManualConfigured = composioStatus.data?.sandboxConfigSource === 'manual';
+  const composioConfigPending = configQuery.isPending;
+
+  const gatewayUrl = useGatewayUrl(status);
+
   const selectedPreset: ExecPreset = DEFAULT_ONBOARDING_EXEC_PRESET;
   const [botIdentity, setBotIdentity] = useState<BotIdentity | null>(null);
   // Interest topics chosen on the Interests step are deferred until the
@@ -297,7 +303,6 @@ function ClawOnboardingFlowInner({
   // only runs after the instance is fully ready.
   const [pendingInterests, setPendingInterests] = useState<string[] | null>(null);
   const [localCreateSetupStarted, setLocalCreateSetupStarted] = useState(false);
-  const [composioPopupPending, setComposioPopupPending] = useState(false);
   const [onboardingSaveSession, setOnboardingSaveSession] = useState(0);
   const hasCapturedIdentityView = useRef(false);
   const hasCapturedToolsView = useRef(false);

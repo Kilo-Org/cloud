@@ -22,12 +22,16 @@ export function useOrgKiloClawConfig(organizationId: string) {
   return useQuery(trpc.organizations.kiloclaw.getConfig.queryOptions({ organizationId }));
 }
 
-export function useOrgKiloClawComposioOnboardingStatus(organizationId: string, enabled = true) {
+export function useOrgKiloClawComposioOnboardingStatus(
+  organizationId: string,
+  enabled = true,
+  pollingEnabled = enabled
+) {
   const trpc = useTRPC();
   return useQuery(
     trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryOptions(
       { organizationId },
-      { enabled, refetchInterval: enabled ? 15_000 : false }
+      { enabled, refetchInterval: enabled && pollingEnabled ? 15_000 : false }
     )
   );
 }

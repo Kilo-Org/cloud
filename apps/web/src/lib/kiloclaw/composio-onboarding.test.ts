@@ -53,6 +53,7 @@ import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client'
 import {
   buildComposioProvisionSecrets,
   completeManagedComposioGoogleCalendarConnection,
+  composioSecretsPatchSource,
   getManagedComposioGoogleCalendarStatus,
 } from './composio-onboarding';
 
@@ -183,6 +184,13 @@ describe('completeManagedComposioGoogleCalendarConnection', () => {
       { secrets: expect.objectContaining({ composioUserApiKey: expect.any(String) }) },
       undefined
     );
+  });
+});
+
+describe('composioSecretsPatchSource', () => {
+  it('clears manual source when either manual Composio secret is removed', () => {
+    expect(composioSecretsPatchSource({ composioUserApiKey: null })).toBe('clear');
+    expect(composioSecretsPatchSource({ composioOrg: null })).toBe('clear');
   });
 });
 

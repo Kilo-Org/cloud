@@ -515,58 +515,21 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
     workdir = await createLightweightWorkspace('triage', request.rigId);
   } else if (request.role === 'mayor') {
     // Mayor doesn't need a repo clone — just a git-initialized directory
+    const workspaceStart = Date.now();
     workdir = await createMayorWorkspace(request.rigId);
+    log.info('mayor.workspace_created_ms', {
+      agentId: request.agentId,
+      townId: request.townId,
+      durationMs: Date.now() - workspaceStart,
+    });
 
-    // On fresh containers the browse worktrees won't exist yet. Set them
-    // up for all known rigs before writing AGENTS.md so the mayor (and its
-    // sub-agents) can immediately browse codebases.
+    // On fresh containers the browse worktrees won't exist yet. Refresh
+    // them in the background so mayor readiness does not wait on clone/fetch
+    // work across every rig.
     if (request.rigs?.length) {
-      // Resolve credentials per-rig since each may use a different
-      // GitHub App installation (platformIntegrationId).
-      const baseEnvVars = request.envVars ?? {};
-      const rigSetupResults = await Promise.allSettled(
-        request.rigs.map(async rig => {
-          const envVars = await resolveGitCredentials({
-            envVars: baseEnvVars,
-            platformIntegrationId: rig.platformIntegrationId,
-          });
-          const hasGitToken = !!(envVars.GIT_TOKEN || envVars.GITHUB_TOKEN || envVars.GITLAB_TOKEN);
-          console.log(
-            `[runAgent] setting up browse worktree: rig=${rig.rigId} gitUrl=${rig.gitUrl} hasGitToken=${hasGitToken}`
-          );
-          await setupRigBrowseWorktree({
-            rigId: rig.rigId,
-            gitUrl: rig.gitUrl,
-            defaultBranch: rig.defaultBranch,
-            envVars,
-          });
-          return rig.rigId;
-        })
-      );
-
-      const failures: Array<{ rigId: string; error: unknown }> = [];
-      for (let i = 0; i < rigSetupResults.length; i++) {
-        const r = rigSetupResults[i];
-        if (r.status === 'rejected') {
-          const reason: unknown = r.reason;
-          failures.push({ rigId: request.rigs[i].rigId, error: reason });
-        }
-      }
-
-      if (failures.length > 0) {
-        for (const f of failures) {
-          const msg = f.error instanceof Error ? f.error.message : String(f.error);
-          const stack = f.error instanceof Error ? f.error.stack : undefined;
-          console.error(
-            `[runAgent] browse worktree setup FAILED for rig=${f.rigId}: ${msg}`,
-            stack ? `\n${stack}` : ''
-          );
-        }
-        console.error(
-          `[runAgent] mayor rig setup: ${failures.length}/${request.rigs.length} rigs failed. ` +
-            `Mayor will start but may not be able to browse these codebases.`
-        );
-      }
+      void setupMayorBrowseWorktrees(request).catch(err => {
+        console.error('[runAgent] background mayor browse worktree setup failed:', err);
+      });
     }
 
     // Write the system prompt to AGENTS.md so the mayor AND its built-in
@@ -574,7 +537,13 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
     // The system prompt is NOT passed via the session.prompt API — AGENTS.md
     // is the sole source of truth for the mayor's instructions.
     if (request.systemPrompt) {
+      const writeAgentsStart = Date.now();
       await writeMayorSystemPromptToAgentsMd(workdir, request.systemPrompt);
+      log.info('mayor.write_agents_md_ms', {
+        agentId: request.agentId,
+        townId: request.townId,
+        durationMs: Date.now() - writeAgentsStart,
+      });
     }
   } else {
     // Resolve git credentials if missing. When the town config doesn't have
@@ -628,4 +597,62 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
   const startRequest = request.role === 'mayor' ? { ...request, systemPrompt: undefined } : request;
 
   return startAgent(startRequest, workdir, env);
+}
+
+async function setupMayorBrowseWorktrees(request: StartAgentRequest): Promise<void> {
+  if (!request.rigs?.length) return;
+
+  const setupStart = Date.now();
+  const baseEnvVars = request.envVars ?? {};
+  const rigSetupResults = await Promise.allSettled(
+    request.rigs.map(async rig => {
+      const envVars = await resolveGitCredentials({
+        envVars: baseEnvVars,
+        platformIntegrationId: rig.platformIntegrationId,
+      });
+      const hasGitToken = !!(envVars.GIT_TOKEN || envVars.GITHUB_TOKEN || envVars.GITLAB_TOKEN);
+      console.log(
+        `[runAgent] setting up browse worktree: rig=${rig.rigId} gitUrl=${rig.gitUrl} hasGitToken=${hasGitToken}`
+      );
+      await setupRigBrowseWorktree({
+        rigId: rig.rigId,
+        gitUrl: rig.gitUrl,
+        defaultBranch: rig.defaultBranch,
+        envVars,
+      });
+      return rig.rigId;
+    })
+  );
+
+  const failures: Array<{ rigId: string; error: unknown }> = [];
+  for (let i = 0; i < rigSetupResults.length; i++) {
+    const result = rigSetupResults[i];
+    if (result.status === 'rejected') {
+      failures.push({ rigId: request.rigs[i].rigId, error: result.reason });
+    }
+  }
+
+  if (failures.length > 0) {
+    for (const failure of failures) {
+      const msg = failure.error instanceof Error ? failure.error.message : String(failure.error);
+      const stack = failure.error instanceof Error ? failure.error.stack : undefined;
+      console.error(
+        `[runAgent] browse worktree setup FAILED for rig=${failure.rigId}: ${msg}`,
+        stack ? `\n${stack}` : ''
+      );
+    }
+    console.error(
+      `[runAgent] mayor rig setup: ${failures.length}/${request.rigs.length} rigs failed. ` +
+        `Mayor will start but may not be able to browse these codebases.`
+    );
+  }
+
+  const setupDurationMs = Date.now() - setupStart;
+  log.info('mayor.browse_worktree_setup_ms', {
+    agentId: request.agentId,
+    townId: request.townId,
+    durationMs: setupDurationMs,
+    rigCount: request.rigs.length,
+    failureCount: failures.length,
+  });
 }

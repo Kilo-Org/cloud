@@ -325,7 +325,11 @@ describe('instance lifecycle async resume', () => {
 
     const result = await completeAutoResumeIfReady('user-1', sandboxId, instanceId);
 
-    expect(result).toEqual({ instanceId, resumeCompleted: true });
+    // Race-aborted clear must not be reported as a completion: the caller
+    // (instance-ready route) keys its "Completed async auto-resume" log
+    // line on resumeCompleted, and conflating skipped-due-to-race with
+    // genuine completion would mask the race in operator metrics.
+    expect(result).toEqual({ instanceId, resumeCompleted: false });
     expect(mockDb.transaction).toHaveBeenCalledTimes(1);
     // No email_log delete, no row update, no change-log insert when the
     // active gate fails inside the transaction.

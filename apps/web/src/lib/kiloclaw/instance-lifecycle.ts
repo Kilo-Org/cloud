@@ -147,7 +147,7 @@ async function clearAutoResumeState(
      */
     requireActiveSubscription?: boolean;
   }
-): Promise<void> {
+): Promise<{ skippedNoActiveSubscription: boolean }> {
   const subscriptionFilter = subscriptionFilterForUser(kiloUserId, options.instanceId);
   const activeSubscriptionFilter = and(
     subscriptionFilter,
@@ -226,7 +226,7 @@ async function clearAutoResumeState(
       ...(options.sandboxId ? { sandbox_id: options.sandboxId } : {}),
       ...(options.logFields ?? {}),
     });
-    return;
+    return { skippedNoActiveSubscription: true };
   }
 
   logInfo(options.logMessage, {
@@ -235,6 +235,7 @@ async function clearAutoResumeState(
     ...(options.sandboxId ? { sandbox_id: options.sandboxId } : {}),
     ...(options.logFields ?? {}),
   });
+  return { skippedNoActiveSubscription: false };
 }
 
 async function resolveActiveInstance(
@@ -431,7 +432,7 @@ export async function completeAutoResumeIfReady(
     return { instanceId: targetInstance.id, resumeCompleted: false };
   }
 
-  await clearAutoResumeState(kiloUserId, {
+  const { skippedNoActiveSubscription } = await clearAutoResumeState(kiloUserId, {
     instanceId: targetInstance.id,
     sandboxId,
     logMessage: 'Async auto-resume completed',
@@ -443,7 +444,14 @@ export async function completeAutoResumeIfReady(
     // duplicate-suspension-email loop.
     requireActiveSubscription: true,
   });
-  return { instanceId: targetInstance.id, resumeCompleted: true };
+  // When the in-transaction lock found no active subscription, no clear
+  // happened. Surface that to the caller so the instance-ready endpoint's
+  // "Completed async auto-resume" log line doesn't claim a non-completion
+  // and operators get accurate signal on race frequency.
+  return {
+    instanceId: targetInstance.id,
+    resumeCompleted: !skippedNoActiveSubscription,
+  };
 }
 
 async function clearInactiveTrialStopMarkerForPersonalInstance(params: {

@@ -495,6 +495,18 @@ app.all('/i/:instanceId/*', async c => {
   if (status.status === 'recovering') {
     return c.json({ error: 'Instance is recovering from an unexpected stop' }, 409);
   }
+  // Transient lifecycle states the platform is actively driving. Tell the
+  // client to retry rather than surfacing a misleading "start it from the
+  // dashboard" 409 — the instance IS being started.
+  if (status.status === 'starting' || status.status === 'restarting') {
+    return c.json(
+      {
+        error: 'Instance is starting up',
+        hint: 'The instance is starting. Please retry shortly.',
+      },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
   // Refuse to forward to anything that isn't strictly running. A stopped
   // machine still has runtimeId set (Fly machine IDs persist across stop),
   // and proxying to it triggers Fly Proxy's autostart — which would silently
@@ -774,6 +786,17 @@ async function handleHostBasedRoute(c: Context<AppEnv>): Promise<Response | null
   if (status.status === 'recovering') {
     return c.json({ error: 'Instance is recovering from an unexpected stop' }, 409);
   }
+  // Transient lifecycle states: tell the client to retry rather than
+  // returning a misleading "not running" 409.
+  if (status.status === 'starting' || status.status === 'restarting') {
+    return c.json(
+      {
+        error: 'Instance is starting up',
+        hint: 'The instance is starting. Please retry shortly.',
+      },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
   // See comment on the /i/:instanceId branch above: never forward to a non-
   // running instance, otherwise Fly Proxy autostarts machines we deliberately
   // stopped (billing suspension, manual stop, etc.).
@@ -891,6 +914,16 @@ app.all('*', async c => {
             409
           );
         }
+        // Transient lifecycle states: tell the client to retry.
+        if (instanceStatus.status === 'starting' || instanceStatus.status === 'restarting') {
+          return c.json(
+            {
+              error: 'Instance is starting up',
+              hint: 'The instance is starting. Please retry shortly.',
+            },
+            { status: 503, headers: { 'Retry-After': '5' } }
+          );
+        }
         // Never proxy to a non-running instance: forwarding to a stopped
         // machine triggers Fly Proxy autostart and silently restarts
         // instances suspended for billing/lifecycle reasons.
@@ -978,6 +1011,17 @@ app.all('*', async c => {
         hint: 'Your instance is being recovered after an unexpected stop. Please wait.',
       },
       409
+    );
+  }
+  // Transient lifecycle states: tell the client to retry rather than
+  // surfacing a misleading "not running" 409 while we're actively starting.
+  if (status === 'starting' || status === 'restarting') {
+    return c.json(
+      {
+        error: 'Instance is starting up',
+        hint: 'Your instance is starting. Please retry shortly.',
+      },
+      { status: 503, headers: { 'Retry-After': '5' } }
     );
   }
   // Never proxy to a non-running instance: forwarding to a stopped machine
@@ -1154,6 +1198,16 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
     );
     if (!status.sandboxId) {
       throw new Error(`Instance for ${label} has no sandboxId`);
+    }
+    // Refuse to deliver chat webhooks to a non-running instance. Issuing
+    // fetch() to {flyAppName}.fly.dev with fly-force-instance-id triggers
+    // Fly Proxy's autostart and silently wakes instances we deliberately
+    // suspended for billing/lifecycle reasons. The chat dispatcher should
+    // surface "recipient unavailable" rather than driving a wake-loop.
+    if (status.status !== 'running') {
+      throw new Error(
+        `Instance for ${label} is not running (status=${status.status ?? 'unknown'})`
+      );
     }
 
     const routingTarget = await withDORetry(

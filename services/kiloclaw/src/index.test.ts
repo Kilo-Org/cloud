@@ -414,6 +414,152 @@ describe('proxy refuses to wake stopped instances', () => {
   });
 });
 
+// `starting` and `restarting` are platform-driven transient states. The
+// previous proxyThroughTarget 502 → 503 retry path was strictly better UX
+// than a flat 409 "Instance not running, start from dashboard" — the user
+// already initiated start, the platform is actively working on it, and the
+// right thing to tell the client is "retry shortly". The `stopped` gate
+// above remains 409 because there it really IS the user's job to start.
+describe('proxy returns 503 retry for transient starting states', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const baseEnv = () => ({
+    NEXTAUTH_SECRET: 'nextauth-secret',
+    GATEWAY_TOKEN_SECRET: 'gateway-secret',
+    KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+    KILOCLAW_INSTANCE_URL_SCHEME: 'https',
+    FLY_API_TOKEN: 'fly-token',
+    FLY_APP_NAME: 'test-app',
+  });
+
+  const transientStatusBase = {
+    userId: 'user-1',
+    sandboxId: 'ki_550e8400e29b41d4a716446655440000',
+    provider: 'fly' as const,
+    runtimeId: 'machine-1',
+    flyMachineId: 'machine-1',
+    flyAppName: 'test-app',
+    controllerCapabilitiesVersion: 2,
+  };
+
+  for (const transientStatus of ['starting', 'restarting'] as const) {
+    it(`returns 503 with Retry-After for the /i/:instanceId branch when status='${transientStatus}'`, async () => {
+      const instanceStub = {
+        getStatus: vi.fn().mockResolvedValue({
+          ...transientStatusBase,
+          status: transientStatus,
+        }),
+        getRoutingTarget: vi.fn(),
+      };
+      const fetchMock = vi.mocked(fetch) as FetchMock;
+
+      const response = await app.fetch(
+        new Request('https://example.com/i/550e8400-e29b-41d4-a716-446655440000/api/foo'),
+        {
+          ...baseEnv(),
+          KILOCLAW_INSTANCE: {
+            idFromName: vi.fn().mockReturnValue('instance-id'),
+            get: vi.fn().mockReturnValue(instanceStub),
+          },
+        } as never,
+        { waitUntil: vi.fn() } as never
+      );
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Retry-After')).toBe('5');
+      await expect(response.json()).resolves.toEqual({
+        error: 'Instance is starting up',
+        hint: 'The instance is starting. Please retry shortly.',
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(instanceStub.getRoutingTarget).not.toHaveBeenCalled();
+    });
+
+    it(`returns 503 with Retry-After for the host-based branch when status='${transientStatus}'`, async () => {
+      const instanceStub = {
+        getStatus: vi.fn().mockResolvedValue({
+          ...transientStatusBase,
+          status: transientStatus,
+        }),
+        getRoutingTarget: vi.fn(),
+      };
+      const fetchMock = vi.mocked(fetch) as FetchMock;
+
+      const response = await app.fetch(
+        new Request('https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai/api/foo'),
+        {
+          ...baseEnv(),
+          KILOCLAW_INSTANCE: {
+            idFromName: vi.fn().mockReturnValue('instance-id'),
+            get: vi.fn().mockReturnValue(instanceStub),
+          },
+        } as never,
+        { waitUntil: vi.fn() } as never
+      );
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Retry-After')).toBe('5');
+      await expect(response.json()).resolves.toEqual({
+        error: 'Instance is starting up',
+        hint: 'The instance is starting. Please retry shortly.',
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it(`returns 503 with Retry-After for the default catch-all branch when status='${transientStatus}'`, async () => {
+      const registryStub = {
+        listInstances: vi.fn().mockResolvedValue([
+          {
+            doKey: 'user-1',
+            instanceId: '',
+            assignedUserId: 'user-1',
+            createdAt: new Date().toISOString(),
+            destroyedAt: null,
+          },
+        ]),
+      };
+      const instanceStub = {
+        getStatus: vi.fn().mockResolvedValue({
+          ...transientStatusBase,
+          status: transientStatus,
+        }),
+        getRoutingTarget: vi.fn(),
+      };
+      const fetchMock = vi.mocked(fetch) as FetchMock;
+
+      const response = await app.fetch(
+        new Request('https://example.com/'),
+        {
+          ...baseEnv(),
+          KILOCLAW_REGISTRY: {
+            idFromName: vi.fn().mockReturnValue('registry-id'),
+            get: vi.fn().mockReturnValue(registryStub),
+          },
+          KILOCLAW_INSTANCE: {
+            idFromName: vi.fn().mockReturnValue('instance-id'),
+            get: vi.fn().mockReturnValue(instanceStub),
+          },
+        } as never,
+        { waitUntil: vi.fn() } as never
+      );
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Retry-After')).toBe('5');
+      await expect(response.json()).resolves.toEqual({
+        error: 'Instance is starting up',
+        hint: 'Your instance is starting. Please retry shortly.',
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  }
+});
+
 describe('kilo-chat webhook delivery', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
@@ -426,7 +572,7 @@ describe('kilo-chat webhook delivery', () => {
   it('routes service-binding webhook payloads to the target instance gateway', async () => {
     const sandboxId = 'ki_550e8400e29b41d4a716446655440000';
     const instanceStub = {
-      getStatus: vi.fn().mockResolvedValue({ sandboxId }),
+      getStatus: vi.fn().mockResolvedValue({ sandboxId, status: 'running' }),
       getRoutingTarget: vi.fn().mockResolvedValue({
         origin: 'https://test-app.fly.dev',
         headers: { 'fly-force-instance-id': 'machine-1' },
@@ -519,6 +665,52 @@ describe('kilo-chat webhook delivery', () => {
       expect(registryNamespace.idFromName).not.toHaveBeenCalled();
       expect(instanceNamespace.idFromName).not.toHaveBeenCalled();
     }
+  });
+
+  // Regression: chat dispatchers (Slack/Discord/Telegram) call this RPC for
+  // every inbound message. When the target instance is suspended for billing
+  // or manually stopped, we must NOT issue fetch() against the Fly app —
+  // doing so triggers Fly Proxy's autostart and silently wakes the machine,
+  // creating churn and (before the TOCTOU defense in instance-lifecycle.ts)
+  // feeding the duplicate-suspension-email loop.
+  it('refuses to deliver chat webhooks to a non-running instance', async () => {
+    const sandboxId = 'ki_550e8400e29b41d4a716446655440000';
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({ sandboxId, status: 'stopped' }),
+      getRoutingTarget: vi.fn(),
+    };
+    const instanceNamespace = {
+      idFromName: vi.fn().mockReturnValue('instance-id'),
+      get: vi.fn().mockReturnValue(instanceStub),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+
+    const worker = new WorkerEntrypoint(
+      {
+        KILOCLAW_INSTANCE: instanceNamespace,
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
+      } as never,
+      {} as never
+    );
+
+    await expect(
+      worker.deliverChatWebhook({
+        type: 'message.created',
+        targetBotId: `bot:kiloclaw:${sandboxId}`,
+        conversationId: '01KP8R0VX4HK4ZSVQR5ZBVKHQH',
+        messageId: '01KP8R0VX4HK4ZSVQR5ZBVKHQJ',
+        from: 'user-1',
+        text: 'Hello',
+        sentAt: '2026-04-21T12:00:00.000Z',
+      })
+    ).rejects.toThrow(/is not running \(status=stopped\)/);
+
+    // Critically: the routing target was never resolved and no fetch was
+    // issued, so Fly Proxy autostart cannot be triggered.
+    expect(instanceStub.getRoutingTarget).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

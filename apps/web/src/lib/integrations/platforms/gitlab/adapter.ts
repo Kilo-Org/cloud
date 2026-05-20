@@ -7,13 +7,15 @@
 
 import { APP_URL } from '@/lib/constants';
 import { getEnvVariable } from '@/lib/dotenvx';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { PlatformRepository } from '@/lib/integrations/core/types';
+import { getPlatformOAuthCallbackPath } from '@/lib/integrations/oauth/paths';
 import { logExceptInTest } from '@/lib/utils.server';
 import crypto from 'crypto';
 
 const GITLAB_CLIENT_ID = process.env.GITLAB_CLIENT_ID;
 const GITLAB_CLIENT_SECRET = getEnvVariable('GITLAB_CLIENT_SECRET');
-const GITLAB_REDIRECT_URI = `${APP_URL}/api/integrations/gitlab/callback`;
+const GITLAB_REDIRECT_URI = `${APP_URL}${getPlatformOAuthCallbackPath(PLATFORM.GITLAB)}`;
 
 const DEFAULT_GITLAB_URL = 'https://gitlab.com';
 

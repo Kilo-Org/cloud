@@ -6,6 +6,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthCallbackPath } from '@/lib/integrations/oauth/paths';
 import { SLACK_CLIENT_ID } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
 import { WebClient } from '@slack/web-api';
@@ -57,7 +58,7 @@ export function getMissingSlackScopes(installedScopes: string[] | null): string[
   return SLACK_SCOPES.filter(scope => !installedScopeSet.has(scope));
 }
 
-const SLACK_REDIRECT_URI = `${APP_URL}/api/integrations/slack/callback`;
+const SLACK_REDIRECT_URI = `${APP_URL}${getPlatformOAuthCallbackPath(PLATFORM.SLACK)}`;
 
 type SlackUninstallOptions = {
   deleteChatSdkInstallation?: (teamId: string) => Promise<void>;

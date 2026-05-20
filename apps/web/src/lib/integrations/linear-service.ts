@@ -8,6 +8,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthCallbackPath } from '@/lib/integrations/oauth/paths';
 import { LINEAR_CLIENT_ID, LINEAR_CLIENT_SECRET } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
 import { getOrganizationById } from '@/lib/organizations/organizations';
@@ -36,7 +37,7 @@ export const LINEAR_SCOPES = [
   'app:mentionable',
 ];
 
-export const LINEAR_REDIRECT_URI = `${APP_URL}/api/integrations/linear/callback`;
+export const LINEAR_REDIRECT_URI = `${APP_URL}${getPlatformOAuthCallbackPath(PLATFORM.LINEAR)}`;
 
 const LINEAR_REVOKE_URL = 'https://api.linear.app/oauth/revoke';
 const LINEAR_TOKEN_URL = 'https://api.linear.app/oauth/token';

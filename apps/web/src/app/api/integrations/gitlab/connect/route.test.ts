@@ -41,6 +41,11 @@ function expectRedirectLocation(response: Response, expectedPathWithQuery: strin
   expect(`${url.pathname}${url.search}`).toBe(expectedPathWithQuery);
 }
 
+async function callGitLabConnect(request: NextRequest) {
+  const { GET } = await import('../../[platform]/connect/route');
+  return GET(request, { params: Promise.resolve({ platform: 'gitlab' }) });
+}
+
 describe('GET /api/integrations/gitlab/connect', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -54,8 +59,7 @@ describe('GET /api/integrations/gitlab/connect', () => {
   });
 
   test('creates signed personal OAuth state before redirecting to GitLab', async () => {
-    const { GET } = await import('./route');
-    const response = await GET(makeRequest('/api/integrations/gitlab/connect'));
+    const response = await callGitLabConnect(makeRequest('/api/integrations/gitlab/connect'));
 
     expect(response.headers.get('location')).toBe(
       'https://gitlab.com/oauth/authorize?state=signed'
@@ -74,8 +78,7 @@ describe('GET /api/integrations/gitlab/connect', () => {
   });
 
   test('does not initialize a self-hosted flow without custom OAuth credentials', async () => {
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callGitLabConnect(
       makeRequest('/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fattacker.example')
     );
 
@@ -85,8 +88,7 @@ describe('GET /api/integrations/gitlab/connect', () => {
   });
 
   test('stores self-hosted credentials and binds only their Redis reference into signed state', async () => {
-    const { GET } = await import('./route');
-    await GET(
+    await callGitLabConnect(
       makeRequest(
         '/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fgitlab.example.com&clientId=client-id&clientSecret=client-secret'
       )
@@ -117,8 +119,7 @@ describe('GET /api/integrations/gitlab/connect', () => {
   test('does not create OAuth state when credential caching is unavailable', async () => {
     mockedStoreGitLabOAuthCredentials.mockResolvedValue(null);
 
-    const { GET } = await import('./route');
-    const response = await GET(
+    const response = await callGitLabConnect(
       makeRequest(
         '/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fgitlab.example.com&clientId=client-id&clientSecret=client-secret'
       )

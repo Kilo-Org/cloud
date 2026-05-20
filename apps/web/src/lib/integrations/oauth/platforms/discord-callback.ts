@@ -2,33 +2,23 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import type { Owner } from '@/lib/integrations/core/types';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { exchangeDiscordCode, upsertDiscordInstallation } from '@/lib/integrations/discord-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
-
-const buildDiscordRedirectPath = (state: string | null, queryParam: string): string => {
-  // Try to extract the owner from a signed state for best-effort redirects on error paths.
-  // We use verifyOAuthState so we don't trust unsigned/tampered values for routing.
-  const verified = state ? verifyOAuthState(state) : null;
-  const owner = verified?.owner;
-
-  if (owner?.startsWith('org_')) {
-    return `/organizations/${owner.replace('org_', '')}/integrations/discord?${queryParam}`;
-  }
-  if (owner?.startsWith('user_')) {
-    return `/integrations/discord?${queryParam}`;
-  }
-  return `/integrations?${queryParam}`;
-};
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import {
+  buildIntegrationOAuthRedirectPath,
+  buildIntegrationOAuthRedirectPathFromState,
+  parseOAuthStateOwner,
+} from '@/lib/integrations/oauth/common';
 
 /**
  * Discord OAuth Callback
  *
  * Called when user completes the Discord OAuth flow
  */
-export async function GET(request: NextRequest) {
+export async function handleDiscordOAuthCallback(request: NextRequest) {
   try {
     // 1. Verify user authentication
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
@@ -51,7 +41,14 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.redirect(
-        new URL(buildDiscordRedirectPath(state, `error=${encodeURIComponent(error)}`), APP_URL)
+        new URL(
+          buildIntegrationOAuthRedirectPathFromState(
+            PLATFORM.DISCORD,
+            state,
+            `error=${encodeURIComponent(error)}`
+          ),
+          APP_URL
+        )
       );
     }
 
@@ -64,7 +61,10 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.redirect(
-        new URL(buildDiscordRedirectPath(state, 'error=missing_code'), APP_URL)
+        new URL(
+          buildIntegrationOAuthRedirectPathFromState(PLATFORM.DISCORD, state, 'error=missing_code'),
+          APP_URL
+        )
       );
     }
 
@@ -90,16 +90,9 @@ export async function GET(request: NextRequest) {
     }
 
     // 5. Parse owner from verified state payload
-    let owner: Owner;
     const ownerStr = verified.owner;
-
-    if (ownerStr.startsWith('org_')) {
-      const ownerId = ownerStr.replace('org_', '');
-      owner = { type: 'org', id: ownerId };
-    } else if (ownerStr.startsWith('user_')) {
-      const ownerId = ownerStr.replace('user_', '');
-      owner = { type: 'user', id: ownerId };
-    } else {
+    const owner = parseOAuthStateOwner(ownerStr);
+    if (!owner) {
       captureMessage('Discord callback missing or invalid owner in state', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
@@ -125,10 +118,11 @@ export async function GET(request: NextRequest) {
     await upsertDiscordInstallation(owner, oauthData);
 
     // 9. Redirect to success page
-    const successPath =
-      owner.type === 'org'
-        ? `/organizations/${owner.id}/integrations/discord?success=installed`
-        : `/integrations/discord?success=installed`;
+    const successPath = buildIntegrationOAuthRedirectPath(
+      PLATFORM.DISCORD,
+      owner,
+      'success=installed'
+    );
 
     return NextResponse.redirect(new URL(successPath, APP_URL));
   } catch (error) {
@@ -150,7 +144,14 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.redirect(
-      new URL(buildDiscordRedirectPath(state, 'error=installation_failed'), APP_URL)
+      new URL(
+        buildIntegrationOAuthRedirectPathFromState(
+          PLATFORM.DISCORD,
+          state,
+          'error=installation_failed'
+        ),
+        APP_URL
+      )
     );
   }
 }

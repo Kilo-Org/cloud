@@ -1,15 +1,18 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException } from '@sentry/nextjs';
 import { buildGitLabOAuthUrl } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   createGitLabOAuthState,
   DEFAULT_GITLAB_OAUTH_INSTANCE_URL,
 } from '@/lib/integrations/platforms/gitlab/oauth-state';
-import type { Owner } from '@/lib/integrations/core/types';
 import { storeGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import {
+  buildIntegrationOAuthConnectErrorPath,
+  resolveOAuthConnectOwner,
+} from '@/lib/integrations/oauth/common';
 
 /**
  * GitLab OAuth Connect
@@ -23,7 +26,9 @@ import { storeGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab
  * - clientId: (optional) Custom OAuth client ID for self-hosted instances
  * - clientSecret: (optional) Custom OAuth client secret for self-hosted instances
  */
-export async function GET(request: NextRequest) {
+export async function handleGitLabOAuthConnect(request: NextRequest) {
+  const organizationId = request.nextUrl.searchParams.get('organizationId');
+
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
@@ -31,19 +36,11 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const organizationId = searchParams.get('organizationId');
     const instanceUrl = searchParams.get('instanceUrl') || undefined;
     const clientId = searchParams.get('clientId') || undefined;
     const clientSecret = searchParams.get('clientSecret') || undefined;
 
-    let owner: Owner;
-
-    if (organizationId) {
-      await ensureOrganizationAccess({ user }, organizationId);
-      owner = { type: 'org', id: organizationId };
-    } else {
-      owner = { type: 'user', id: user.id };
-    }
+    const { owner } = await resolveOAuthConnectOwner(request, user);
 
     const customCredentials = clientId && clientSecret ? { clientId, clientSecret } : undefined;
     const usesCustomInstance = !!instanceUrl && instanceUrl !== DEFAULT_GITLAB_OAUTH_INSTANCE_URL;
@@ -81,13 +78,11 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const searchParams = request.nextUrl.searchParams;
-    const organizationId = searchParams.get('organizationId');
-
-    const errorPath = organizationId
-      ? `/organizations/${organizationId}/integrations/gitlab?error=oauth_init_failed`
-      : '/integrations/gitlab?error=oauth_init_failed';
-
-    return NextResponse.redirect(new URL(errorPath, request.url));
+    return NextResponse.redirect(
+      new URL(
+        buildIntegrationOAuthConnectErrorPath(PLATFORM.GITLAB, organizationId, 'oauth_init_failed'),
+        request.url
+      )
+    );
   }
 }

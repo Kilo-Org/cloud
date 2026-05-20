@@ -69,7 +69,7 @@ function gitLabOAuthSentryContext(searchParams: URLSearchParams): {
  * Called when user completes the GitLab OAuth authorization flow.
  * Exchanges the authorization code for tokens and stores the integration.
  */
-export async function GET(request: NextRequest) {
+export async function handleGitLabOAuthCallback(request: NextRequest) {
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {

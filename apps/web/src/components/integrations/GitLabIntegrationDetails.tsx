@@ -22,6 +22,8 @@ import { toast } from 'sonner';
 import { useEffect, useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 
 type GitLabIntegrationDetailsProps = {
   organizationId?: string;
@@ -291,7 +293,9 @@ export function GitLabIntegrationDetails({
       params.set('clientSecret', clientSecret);
     }
 
-    window.location.href = `/api/integrations/gitlab/connect?${params.toString()}`;
+    const basePath = getPlatformOAuthConnectPath(PLATFORM.GITLAB);
+    const queryString = params.toString();
+    window.location.href = queryString ? `${basePath}?${queryString}` : basePath;
   };
 
   const handleDisconnect = () => {

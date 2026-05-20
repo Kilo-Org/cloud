@@ -2,7 +2,6 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import type { Owner } from '@/lib/integrations/core/types';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
   SlackWorkspaceAlreadyConnectedError,
@@ -11,28 +10,22 @@ import {
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthCallbackPath } from '@/lib/integrations/oauth/paths';
+import {
+  buildIntegrationOAuthRedirectPath,
+  buildIntegrationOAuthRedirectPathFromState,
+  parseOAuthStateOwner,
+} from '@/lib/integrations/oauth/common';
 
-const SLACK_REDIRECT_URI = `${APP_URL}/api/integrations/slack/callback`;
-
-const buildSlackRedirectPath = (state: string | null, queryParam: string): string => {
-  const verified = state ? verifyOAuthState(state) : null;
-  const owner = verified?.owner;
-
-  if (owner?.startsWith('org_')) {
-    return `/organizations/${owner.replace('org_', '')}/integrations/slack?${queryParam}`;
-  }
-  if (owner?.startsWith('user_')) {
-    return `/integrations/slack?${queryParam}`;
-  }
-  return `/integrations?${queryParam}`;
-};
+const SLACK_REDIRECT_URI = `${APP_URL}${getPlatformOAuthCallbackPath(PLATFORM.SLACK)}`;
 
 /**
  * Slack OAuth Callback
  *
  * Called when user completes the Slack OAuth flow
  */
-export async function GET(request: NextRequest) {
+export async function handleSlackOAuthCallback(request: NextRequest) {
   try {
     // 1. Verify user authentication
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
@@ -55,7 +48,10 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.redirect(
-        new URL(buildSlackRedirectPath(state, `error=${error}`), APP_URL)
+        new URL(
+          buildIntegrationOAuthRedirectPathFromState(PLATFORM.SLACK, state, `error=${error}`),
+          APP_URL
+        )
       );
     }
 
@@ -68,7 +64,10 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.redirect(
-        new URL(buildSlackRedirectPath(state, 'error=missing_code'), APP_URL)
+        new URL(
+          buildIntegrationOAuthRedirectPathFromState(PLATFORM.SLACK, state, 'error=missing_code'),
+          APP_URL
+        )
       );
     }
 
@@ -94,16 +93,9 @@ export async function GET(request: NextRequest) {
     }
 
     // 5. Parse owner from verified state payload
-    let owner: Owner;
     const ownerStr = verified.owner;
-
-    if (ownerStr.startsWith('org_')) {
-      const ownerId = ownerStr.replace('org_', '');
-      owner = { type: 'org', id: ownerId };
-    } else if (ownerStr.startsWith('user_')) {
-      const ownerId = ownerStr.replace('user_', '');
-      owner = { type: 'user', id: ownerId };
-    } else {
+    const owner = parseOAuthStateOwner(ownerStr);
+    if (!owner) {
       captureMessage('Slack callback missing or invalid owner in state', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
@@ -136,7 +128,14 @@ export async function GET(request: NextRequest) {
     } catch (error) {
       if (error instanceof SlackWorkspaceAlreadyConnectedError) {
         return NextResponse.redirect(
-          new URL(buildSlackRedirectPath(state, 'error=workspace_already_connected'), APP_URL)
+          new URL(
+            buildIntegrationOAuthRedirectPathFromState(
+              PLATFORM.SLACK,
+              state,
+              'error=workspace_already_connected'
+            ),
+            APP_URL
+          )
         );
       }
 
@@ -144,10 +143,11 @@ export async function GET(request: NextRequest) {
     }
 
     // 9. Redirect to success page
-    const successPath =
-      owner.type === 'org'
-        ? `/organizations/${owner.id}/integrations/slack?success=installed`
-        : `/integrations/slack?success=installed`;
+    const successPath = buildIntegrationOAuthRedirectPath(
+      PLATFORM.SLACK,
+      owner,
+      'success=installed'
+    );
 
     return NextResponse.redirect(new URL(successPath, APP_URL));
   } catch (error) {
@@ -169,7 +169,14 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.redirect(
-      new URL(buildSlackRedirectPath(state, 'error=installation_failed'), APP_URL)
+      new URL(
+        buildIntegrationOAuthRedirectPathFromState(
+          PLATFORM.SLACK,
+          state,
+          'error=installation_failed'
+        ),
+        APP_URL
+      )
     );
   }
 }

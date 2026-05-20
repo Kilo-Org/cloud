@@ -6,6 +6,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthCallbackPath } from '@/lib/integrations/oauth/paths';
 import { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
 import { getOrganizationById } from '@/lib/organizations/organizations';
@@ -29,7 +30,7 @@ const DISCORD_SCOPES = ['bot', 'guilds', 'applications.commands'];
 // Includes: Send Messages, Read Message History, Add Reactions, Use Slash Commands, Embed Links, Attach Files
 const DISCORD_BOT_PERMISSIONS = '277025770560';
 
-const DISCORD_REDIRECT_URI = `${APP_URL}/api/integrations/discord/callback`;
+const DISCORD_REDIRECT_URI = `${APP_URL}${getPlatformOAuthCallbackPath(PLATFORM.DISCORD)}`;
 
 /**
  * Discord OAuth2 token response shape

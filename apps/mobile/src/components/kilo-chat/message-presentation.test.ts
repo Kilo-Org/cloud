@@ -3,6 +3,7 @@ import { createMessageRequestSchema, type Message } from '@kilocode/kilo-chat';
 
 import {
   buildSendMessageVariables,
+  canCopyMessage,
   canShowReactionPills,
   canToggleReaction,
   createSendMessageClientId,
@@ -183,6 +184,26 @@ describe('getDeliveryFailureLabel', () => {
 describe('isMessageTextSelectionEnabled', () => {
   it('disables native text selection for chat messages', () => {
     expect(isMessageTextSelectionEnabled()).toBe(false);
+  });
+});
+
+describe('canCopyMessage', () => {
+  it('hides copy for attachment-only messages', () => {
+    expect(
+      canCopyMessage(
+        message({
+          content: [
+            {
+              type: 'attachment',
+              attachmentId: '01HV0000000000000000000001',
+              mimeType: 'image/png',
+              size: 123,
+              filename: 'photo.png',
+            },
+          ],
+        })
+      )
+    ).toBe(false);
   });
 });
 

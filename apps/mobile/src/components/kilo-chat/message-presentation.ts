@@ -1,5 +1,6 @@
 import {
   type AttachmentBlock,
+  contentBlocksToText,
   type ConversationDetailResponse,
   type CreateMessageRequest,
   type InputContentBlock,
@@ -92,7 +93,7 @@ export function canToggleReaction(message: Message, currentUserId: string | null
 }
 
 export function canCopyMessage(message: Message): boolean {
-  return !message.deleted && contentBlocksToPreviewText(message.content).trim().length > 0;
+  return !message.deleted && contentBlocksToText(message.content).trim().length > 0;
 }
 
 export function isMessageEdited(message: Message): boolean {

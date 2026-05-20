@@ -4,7 +4,9 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 
 export type FilterParams = {
+  /** Inclusive ISO datetime lower bound for telemetry queries. */
   startDate: string;
+  /** Exclusive ISO datetime upper bound for telemetry queries. */
   endDate: string;
   userId?: string;
   organizationId?: string;

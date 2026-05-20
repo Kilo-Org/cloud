@@ -53,7 +53,6 @@ describe('chat summary utils', () => {
     const conversations: ChatSummaryConversation[] = [
       {
         conversationId: 'conv-1',
-        title: 'Launch plan',
         lastActivityAt: Date.parse('2026-05-18T23:00:00.000Z'),
         messages: [
           {
@@ -80,7 +79,6 @@ describe('chat summary utils', () => {
       },
       {
         conversationId: 'conv-2',
-        title: null,
         lastActivityAt: Date.parse('2026-05-18T20:00:00.000Z'),
         messages: [
           {
@@ -102,12 +100,12 @@ describe('chat summary utils', () => {
       deletedMessageCount: 1,
     });
     expect(buildChatSummaryStatus(stats, 'yesterday')).toBe(
-      '4 Kilo Chat message(s) across 2 conversation(s)'
+      '4 Kilo Chat messages across 2 conversations'
     );
     expect(buildChatSummarySectionLines(stats, 'No Kilo Chat messages yesterday.')).toEqual([
       '- 4 messages across 2 conversations.',
       '- 3 messages from you; 1 reply from Kilo.',
-      '- 1 deleted message excluded from content summaries.',
+      '- 1 of those messages was later deleted; its content is excluded from summaries.',
     ]);
   });
 

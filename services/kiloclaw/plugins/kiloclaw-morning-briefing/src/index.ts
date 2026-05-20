@@ -1364,12 +1364,16 @@ async function collectKiloChatSummary(
   const yesterdayWindow = buildYesterdayChatWindow(now, userTimezone);
   const todayWindow = buildTodaySoFarChatWindow(now, userTimezone);
   try {
-    const [yesterdayConversations, todayConversations] = await Promise.all([
+    const [yesterday, today] = await Promise.all([
       client.listConversationsForWindow(yesterdayWindow),
       client.listConversationsForWindow(todayWindow),
     ]);
-    const yesterdayStats = summarizeChatActivity(yesterdayConversations, yesterdayWindow);
-    const todayStats = summarizeChatActivity(todayConversations, todayWindow);
+    const yesterdayStats = summarizeChatActivity(yesterday.conversations, yesterdayWindow);
+    const todayStats = summarizeChatActivity(today.conversations, todayWindow);
+    const truncatedNote =
+      yesterday.truncated || today.truncated
+        ? ' (counts truncated; activity exceeded the scan limit)'
+        : '';
     return {
       source: 'kilo-chat',
       configured: true,
@@ -1377,7 +1381,7 @@ async function collectKiloChatSummary(
       summary: `Yesterday: ${buildChatSummaryStatus(
         yesterdayStats,
         'yesterday'
-      )}; today: ${buildChatSummaryStatus(todayStats, 'so far today')}`,
+      )}; today: ${buildChatSummaryStatus(todayStats, 'so far today')}${truncatedNote}`,
       sectionLines: [],
       sections: [
         {
@@ -1511,7 +1515,9 @@ async function generateBriefing(
   const DEFAULT_SECTION_TITLE: Record<SourceCollectionResult['source'], string> = {
     calendar: 'Calendar',
     github: 'GitHub',
-    'kilo-chat': 'Yesterday in Chat',
+    // `kilo-chat` always supplies its own `sections`, so this entry only
+    // exists to satisfy the exhaustive Record type and is never rendered.
+    'kilo-chat': 'Kilo Chat',
     linear: 'Linear',
     'local-news': 'Local News',
     web: 'Web Search',

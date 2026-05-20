@@ -19,6 +19,18 @@ function fetchInputUrl(input: string | Request | URL): string {
   return input.url;
 }
 
+const CROCKFORD_BASE32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+function ulidFromTimestamp(timestamp: number, suffix = '0000000000000000'): string {
+  let value = timestamp;
+  let encoded = '';
+  for (let i = 0; i < 10; i += 1) {
+    encoded = CROCKFORD_BASE32[value % 32] + encoded;
+    value = Math.floor(value / 32);
+  }
+  return `${encoded}${suffix}`;
+}
+
 describe('chat summary client', () => {
   it('reports unconfigured when the gateway token is missing', async () => {
     const client = createKiloChatSummaryClient({ token: '' });
@@ -29,7 +41,7 @@ describe('chat summary client', () => {
       client.listConversationsForWindow(
         buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
       )
-    ).resolves.toEqual([]);
+    ).resolves.toEqual({ conversations: [], truncated: false });
   });
 
   it('lists active conversations and messages through the controller proxy', async () => {
@@ -73,14 +85,14 @@ describe('chat summary client', () => {
       token: 'token',
       fetchImpl,
     });
-    const conversations = await client.listConversationsForWindow(
+    const result = await client.listConversationsForWindow(
       buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
     );
 
-    expect(conversations).toEqual([
+    expect(result.truncated).toBe(false);
+    expect(result.conversations).toEqual([
       {
         conversationId: 'conv-1',
-        title: 'Launch plan',
         lastActivityAt: Date.parse('2026-05-18T09:00:00.000Z'),
         messages: [
           { id: '01JVNY65G00000000000000000', senderId: 'user:1', deleted: false },
@@ -94,7 +106,7 @@ describe('chat summary client', () => {
     ]);
     expect(requests[0]?.init).toMatchObject({
       method: 'GET',
-      headers: { authorization: 'Bearer token' },
+      headers: { Authorization: 'Bearer token' },
     });
   });
 
@@ -138,11 +150,11 @@ describe('chat summary client', () => {
       token: 'token',
       fetchImpl,
     });
-    const conversations = await client.listConversationsForWindow(
+    const result = await client.listConversationsForWindow(
       buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
     );
 
-    expect(conversations.map(conversation => conversation.conversationId)).toEqual([
+    expect(result.conversations.map(conversation => conversation.conversationId)).toEqual([
       'conv-yesterday',
     ]);
     expect(requests).toEqual([
@@ -207,17 +219,149 @@ describe('chat summary client', () => {
       token: 'token',
       fetchImpl,
     });
-    const conversations = await client.listConversationsForWindow(
+    const result = await client.listConversationsForWindow(
       buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
     );
 
-    expect(conversations.map(conversation => conversation.conversationId)).toEqual([
+    expect(result.conversations.map(conversation => conversation.conversationId)).toEqual([
       'conv-yesterday-later',
       'conv-yesterday-next-page',
     ]);
     expect(requests).toContain(
       'http://controller/_kilo/kilo-chat/conversations?limit=100&cursor=next-page'
     );
+  });
+
+  it('keeps paginating messages when a page is not sorted newest-first', async () => {
+    const inWindowEarly = ulidFromTimestamp(
+      Date.parse('2026-05-18T10:00:00.000Z'),
+      '0000000000000001'
+    );
+    const inWindowLate = ulidFromTimestamp(
+      Date.parse('2026-05-18T08:00:00.000Z'),
+      '0000000000000002'
+    );
+    const beforeWindowOne = ulidFromTimestamp(
+      Date.parse('2026-05-17T05:00:00.000Z'),
+      '0000000000000003'
+    );
+    const beforeWindowTwo = ulidFromTimestamp(
+      Date.parse('2026-05-17T03:00:00.000Z'),
+      '0000000000000004'
+    );
+    const secondPageMessage = ulidFromTimestamp(
+      Date.parse('2026-05-18T06:00:00.000Z'),
+      '0000000000000005'
+    );
+
+    const requests: string[] = [];
+    const fetchImpl = mockFetch(async input => {
+      const url = fetchInputUrl(input);
+      requests.push(url);
+      if (url === 'http://controller/_kilo/kilo-chat/conversations?limit=100') {
+        return jsonResponse({
+          conversations: [
+            {
+              conversationId: 'conv-1',
+              lastActivityAt: Date.parse('2026-05-18T10:00:00.000Z'),
+            },
+          ],
+          hasMore: false,
+          nextCursor: null,
+        });
+      }
+      if (url === 'http://controller/_kilo/kilo-chat/conversations/conv-1/messages?limit=100') {
+        // Out-of-order page: an in-window message sits between two
+        // before-window messages, and the page's last message is old.
+        // The legacy "last message only" check would stop here.
+        return jsonResponse({
+          messages: [
+            { id: beforeWindowOne, senderId: 'user:1', deleted: false },
+            { id: inWindowEarly, senderId: 'user:1', deleted: false },
+            { id: beforeWindowTwo, senderId: 'user:1', deleted: false },
+          ],
+          hasMore: true,
+          nextCursor: 'page-2',
+        });
+      }
+      if (
+        url ===
+        'http://controller/_kilo/kilo-chat/conversations/conv-1/messages?limit=100&before=page-2'
+      ) {
+        return jsonResponse({
+          messages: [
+            { id: inWindowLate, senderId: 'user:1', deleted: false },
+            { id: secondPageMessage, senderId: 'bot:kiloclaw:sbx', deleted: false },
+          ],
+          hasMore: false,
+          nextCursor: null,
+        });
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    });
+
+    const client = createKiloChatSummaryClient({
+      baseUrl: 'http://controller',
+      token: 'token',
+      fetchImpl,
+    });
+    const result = await client.listConversationsForWindow(
+      buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
+    );
+
+    expect(result.truncated).toBe(false);
+    expect(result.conversations[0]?.messages.map(message => message.id)).toEqual([
+      beforeWindowOne,
+      inWindowEarly,
+      beforeWindowTwo,
+      inWindowLate,
+      secondPageMessage,
+    ]);
+    expect(requests).toContain(
+      'http://controller/_kilo/kilo-chat/conversations/conv-1/messages?limit=100&before=page-2'
+    );
+  });
+
+  it('flags truncation when a conversation exceeds the message page cap', async () => {
+    const fetchImpl = mockFetch(async input => {
+      const url = fetchInputUrl(input);
+      if (url === 'http://controller/_kilo/kilo-chat/conversations?limit=100') {
+        return jsonResponse({
+          conversations: [
+            {
+              conversationId: 'conv-1',
+              lastActivityAt: Date.parse('2026-05-18T10:00:00.000Z'),
+            },
+          ],
+          hasMore: false,
+          nextCursor: null,
+        });
+      }
+      // Every message page stays in-window and always reports another page,
+      // so the scan can only end by hitting the page cap.
+      return jsonResponse({
+        messages: [
+          {
+            id: ulidFromTimestamp(Date.parse('2026-05-18T09:00:00.000Z')),
+            senderId: 'user:1',
+            deleted: false,
+          },
+        ],
+        hasMore: true,
+        nextCursor: 'keep-going',
+      });
+    });
+
+    const client = createKiloChatSummaryClient({
+      baseUrl: 'http://controller',
+      token: 'token',
+      fetchImpl,
+    });
+    const result = await client.listConversationsForWindow(
+      buildYesterdayChatWindow(new Date('2026-05-19T12:00:00.000Z'), 'UTC')
+    );
+
+    expect(result.truncated).toBe(true);
   });
 
   it('throws on non-ok controller responses', async () => {

@@ -1,6 +1,7 @@
 const DEFAULT_TIMEZONE = 'UTC';
 const ULID_TIME_LENGTH = 10;
 const CROCKFORD_BASE32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const BOT_SENDER_PREFIX = 'bot:';
 
 export type ChatSummaryMessage = {
   id: string;
@@ -10,7 +11,6 @@ export type ChatSummaryMessage = {
 
 export type ChatSummaryConversation = {
   conversationId: string;
-  title: string | null;
   lastActivityAt: number | null;
   messages: ChatSummaryMessage[];
 };
@@ -107,7 +107,7 @@ export function ulidToTimestampMs(ulid: string): number | null {
 }
 
 function isBotSender(senderId: string): boolean {
-  return senderId.startsWith('bot:');
+  return senderId.startsWith(BOT_SENDER_PREFIX);
 }
 
 export function summarizeChatActivity(
@@ -173,8 +173,13 @@ export function buildChatSummarySectionLines(
   ];
 
   if (stats.deletedMessageCount > 0) {
+    // The deleted count overlaps the user/bot totals above; call that out so
+    // the breakdown does not read as additional messages.
+    const deleted = stats.deletedMessageCount;
     lines.push(
-      `- ${pluralize(stats.deletedMessageCount, 'deleted message')} excluded from content summaries.`
+      deleted === 1
+        ? '- 1 of those messages was later deleted; its content is excluded from summaries.'
+        : `- ${deleted} of those messages were later deleted; their content is excluded from summaries.`
     );
   }
 
@@ -183,5 +188,8 @@ export function buildChatSummarySectionLines(
 
 export function buildChatSummaryStatus(stats: ChatSummaryStats, periodLabel: string): string {
   if (stats.messageCount === 0) return `0 Kilo Chat messages ${periodLabel}`;
-  return `${stats.messageCount} Kilo Chat message(s) across ${stats.activeConversationCount} conversation(s)`;
+  return `${pluralize(stats.messageCount, 'Kilo Chat message')} across ${pluralize(
+    stats.activeConversationCount,
+    'conversation'
+  )}`;
 }

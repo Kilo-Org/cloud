@@ -15,7 +15,6 @@ type FetchImpl = typeof fetch;
 
 type KiloChatConversationListItem = {
   conversationId: string;
-  title: string | null;
   lastActivityAt: number | null;
 };
 
@@ -40,10 +39,16 @@ export type KiloChatSummaryClientOptions = {
   fetchImpl?: FetchImpl;
 };
 
+export type KiloChatWindowResult = {
+  conversations: ChatSummaryConversation[];
+  /** True when a page cap was hit and the result may under-count activity. */
+  truncated: boolean;
+};
+
 export type KiloChatSummaryClient = {
   configured: boolean;
   reason: string;
-  listConversationsForWindow: (window: ChatSummaryWindow) => Promise<ChatSummaryConversation[]>;
+  listConversationsForWindow: (window: ChatSummaryWindow) => Promise<KiloChatWindowResult>;
 };
 
 function normalizeBaseUrl(input: string | undefined): string {
@@ -66,7 +71,6 @@ function parseConversationsResponse(value: unknown): ConversationsResponse {
       ? [
           {
             conversationId: row.conversationId,
-            title: typeof row.title === 'string' ? row.title : null,
             lastActivityAt: typeof row.lastActivityAt === 'number' ? row.lastActivityAt : null,
           },
         ]
@@ -112,7 +116,7 @@ async function fetchJson(
   try {
     const response = await fetchImpl(url, {
       method: 'GET',
-      headers: { authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
       signal: controller.signal,
     });
     if (!response.ok) {
@@ -156,6 +160,27 @@ function shouldStopConversationScan(
   );
 }
 
+/**
+ * Mirrors `shouldStopConversationScan` for message pages. Only stop paging
+ * when the page is genuinely sorted newest-first AND reaches past the window
+ * start. If a page is not strictly descending we cannot trust the early stop,
+ * so we keep paginating rather than silently under-counting messages.
+ */
+function shouldStopMessageScan(messages: ChatSummaryMessage[], window: ChatSummaryWindow): boolean {
+  let previousTimestamp: number | null = null;
+  let reachedBeforeWindow = false;
+  for (const message of messages) {
+    const timestamp = ulidToTimestampMs(message.id);
+    if (timestamp === null) continue;
+    if (previousTimestamp !== null && timestamp > previousTimestamp) {
+      return false;
+    }
+    previousTimestamp = timestamp;
+    if (timestamp < window.startMs) reachedBeforeWindow = true;
+  }
+  return reachedBeforeWindow;
+}
+
 export function createKiloChatSummaryClient(
   options: KiloChatSummaryClientOptions = {}
 ): KiloChatSummaryClient {
@@ -164,7 +189,7 @@ export function createKiloChatSummaryClient(
     return {
       configured: false,
       reason: 'OPENCLAW_GATEWAY_TOKEN is not configured',
-      listConversationsForWindow: async () => [],
+      listConversationsForWindow: async () => ({ conversations: [], truncated: false }),
     };
   }
 
@@ -176,7 +201,7 @@ export function createKiloChatSummaryClient(
   async function listMessagesForConversation(
     conversation: KiloChatConversationListItem,
     window: ChatSummaryWindow
-  ): Promise<ChatSummaryMessage[]> {
+  ): Promise<{ messages: ChatSummaryMessage[]; truncated: boolean }> {
     const messages: ChatSummaryMessage[] = [];
     let cursor: string | null = null;
     for (let page = 0; page < MAX_MESSAGE_PAGES_PER_CONVERSATION; page += 1) {
@@ -192,26 +217,24 @@ export function createKiloChatSummaryClient(
       );
       const parsed = parseMessagesResponse(payload);
       messages.push(...parsed.messages);
-      if (!parsed.hasMore || !parsed.nextCursor || parsed.messages.length === 0) break;
-
-      const oldestTimestamp = ulidToTimestampMs(
-        parsed.messages[parsed.messages.length - 1]?.id ?? ''
-      );
-      if (oldestTimestamp !== null && oldestTimestamp < window.startMs) {
-        // Pagination returns newest first. Once the page's oldest message is
-        // older than yesterday, later pages cannot contribute stats.
-        break;
+      if (!parsed.hasMore || !parsed.nextCursor || parsed.messages.length === 0) {
+        return { messages, truncated: false };
+      }
+      if (shouldStopMessageScan(parsed.messages, window)) {
+        return { messages, truncated: false };
       }
       cursor = parsed.nextCursor;
     }
-    return messages;
+    // Fell out of the loop because the page cap was hit; older messages remain.
+    return { messages, truncated: true };
   }
 
   async function listConversationsForWindow(
     window: ChatSummaryWindow
-  ): Promise<ChatSummaryConversation[]> {
+  ): Promise<KiloChatWindowResult> {
     const conversations: ChatSummaryConversation[] = [];
     let cursor: string | null = null;
+    let truncated = false;
     for (let page = 0; page < MAX_CONVERSATION_PAGES; page += 1) {
       const qs = new URLSearchParams({ limit: String(PAGE_LIMIT) });
       if (cursor) qs.set('cursor', cursor);
@@ -224,21 +247,21 @@ export function createKiloChatSummaryClient(
       const parsed = parseConversationsResponse(payload);
       for (const conversation of parsed.conversations) {
         if (!shouldInspectConversation(conversation, window)) continue;
-        conversations.push({
-          ...conversation,
-          messages: await listMessagesForConversation(conversation, window),
-        });
+        const result = await listMessagesForConversation(conversation, window);
+        if (result.truncated) truncated = true;
+        conversations.push({ ...conversation, messages: result.messages });
       }
       if (
         !parsed.hasMore ||
         !parsed.nextCursor ||
         shouldStopConversationScan(parsed.conversations, window)
       ) {
-        break;
+        return { conversations, truncated };
       }
       cursor = parsed.nextCursor;
     }
-    return conversations;
+    // Fell out of the loop because the page cap was hit; older conversations remain.
+    return { conversations, truncated: true };
   }
 
   return {

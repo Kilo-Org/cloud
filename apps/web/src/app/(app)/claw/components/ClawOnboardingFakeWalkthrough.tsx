@@ -20,6 +20,17 @@ import { InboundEmailStepView } from './InboundEmailStep';
 import { InterestsStepView } from './InterestsStep';
 import { ClawSetupCompleteStep, ClawSetupErrorStep } from './ClawOnboardingFlow';
 import { ProvisioningStepView } from './ProvisioningStep';
+import type { BotIdentity } from './claw.types';
+
+// Realistic-looking identity so the chat preview reads convincingly when
+// the fake walkthrough is loaded directly into a step that bypasses the
+// Identity screen.
+const FAKE_BOT_IDENTITY: BotIdentity = {
+  botName: 'Aria',
+  botNature: 'Operator',
+  botVibe: 'Focused, capable, effective',
+  botEmoji: '🤖',
+};
 
 const FAKE_STEP_LABELS: Record<ClawOnboardingRenderStep, string> = {
   identity: 'Identity',
@@ -197,6 +208,7 @@ function renderFakeStep({ step, setStep, stepProgress, basePath }: RenderFakeSte
       return (
         <CalendarConnectStepView
           {...stepProgress}
+          bot={FAKE_BOT_IDENTITY}
           connectUrl="#"
           isConnected={false}
           connectedAccountEmail={null}
@@ -211,6 +223,7 @@ function renderFakeStep({ step, setStep, stepProgress, basePath }: RenderFakeSte
       return (
         <InboundEmailStepView
           {...stepProgress}
+          bot={FAKE_BOT_IDENTITY}
           address="operator@inbound.example.com"
           enabled={true}
           loading={false}
@@ -222,6 +235,7 @@ function renderFakeStep({ step, setStep, stepProgress, basePath }: RenderFakeSte
       return (
         <InterestsStepView
           {...stepProgress}
+          bot={FAKE_BOT_IDENTITY}
           saving={false}
           onContinue={() => setStep('provisioning')}
           onSkip={() => setStep('provisioning')}

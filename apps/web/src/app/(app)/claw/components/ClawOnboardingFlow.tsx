@@ -531,6 +531,7 @@ function ClawOnboardingFlowInner({
       <CalendarConnectStepView
         currentStep={flowState.currentStep}
         totalSteps={flowState.totalSteps}
+        bot={botIdentity ?? DEFAULT_BOT_IDENTITY}
         connectUrl={connectUrl}
         isConnected={isConnected}
         connectedAccountEmail={connectedEmail}
@@ -564,6 +565,7 @@ function ClawOnboardingFlowInner({
       <InboundEmailStepView
         currentStep={flowState.currentStep}
         totalSteps={flowState.totalSteps}
+        bot={botIdentity ?? DEFAULT_BOT_IDENTITY}
         address={inboundEmailAddress}
         enabled={inboundEmailEnabled}
         loading={loading}
@@ -592,6 +594,7 @@ function ClawOnboardingFlowInner({
       <InterestsStepView
         currentStep={flowState.currentStep}
         totalSteps={flowState.totalSteps}
+        bot={botIdentity ?? DEFAULT_BOT_IDENTITY}
         // Save is deferred to ProvisioningStep.onComplete; the step itself
         // never roundtrips. No "saving" state needed.
         saving={false}
@@ -775,7 +778,11 @@ export function ClawSetupErrorStep({ basePath }: { basePath: string }) {
         </div>
 
         <div className="flex w-full flex-col gap-3">
-          <Button asChild variant="primary" className="w-full min-w-[180px] py-6 text-base">
+          <Button
+            asChild
+            variant="default"
+            className="bg-brand-primary hover:bg-brand-primary/90 w-full min-w-[180px] py-6 text-base"
+          >
             <a href="https://kilo.ai/support" target="_blank" rel="noopener noreferrer">
               Contact Support
             </a>

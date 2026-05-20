@@ -1,14 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { Calendar, Check, X } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { GoogleLogo } from '@/components/auth/GoogleLogo';
 import { OnboardingStepView } from './OnboardingStepView';
+import { BriefingChatPreview } from './BriefingChatPreview';
+import type { BotIdentity } from './claw.types';
 
 type CalendarConnectStepViewProps = {
   currentStep: number;
   totalSteps: number;
+  bot: BotIdentity;
   connectUrl: string;
   isConnected: boolean;
   connectedAccountEmail?: string | null;
@@ -27,27 +30,28 @@ type CalendarConnectStepViewProps = {
   onConnectClick?: () => void;
 };
 
-const FEATURES: Array<{ included: boolean; title: string; detail: string }> = [
+const FEATURES: Array<{ title: string; detail: string }> = [
   {
-    included: true,
-    title: 'Read your calendar events',
+    title: 'Calendar events',
     detail: 'Titles, attendees, locations, descriptions for the next 14 days.',
   },
   {
-    included: true,
-    title: 'Read calendars you own and subscribe to',
+    title: 'Calendars you own and follow',
     detail: 'Including team calendars shared with you.',
   },
-  {
-    included: false,
-    title: 'Create, modify, or delete events',
-    detail: "We don't request write access.",
-  },
+];
+
+const PREVIEW_ITEMS = [
+  '3 meetings on your calendar today',
+  'Standup at 10:00 with the platform team',
+  'Lunch with Reese, 12:30',
+  '1:1 with Devon at 3:00',
 ];
 
 export function CalendarConnectStepView({
   currentStep,
   totalSteps,
+  bot,
   connectUrl,
   isConnected,
   connectedAccountEmail,
@@ -56,6 +60,10 @@ export function CalendarConnectStepView({
   onContinue,
   onConnectClick,
 }: CalendarConnectStepViewProps) {
+  const greetingName =
+    isConnected && connectedAccountEmail ? connectedAccountEmail.split('@')[0] : null;
+  const greeting = greetingName ? `Good morning, ${greetingName}.` : 'Good morning.';
+
   return (
     <OnboardingStepView
       currentStep={currentStep}
@@ -64,86 +72,94 @@ export function CalendarConnectStepView({
       title="Connect a calendar."
       description="This is what day one of your briefing is built from. Read access only, no writes."
       showProvisioningBanner
+      contentClassName="gap-6"
     >
-      <div className="border-border bg-card flex flex-col gap-5 rounded-lg border p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className="border-border flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border">
-              <Calendar className="h-5 w-5" />
+      <div className="grid gap-6 md:grid-cols-[1fr_2fr] md:gap-8">
+        <BriefingChatPreview
+          bot={bot}
+          greeting={greeting}
+          items={PREVIEW_ITEMS}
+          closer="Light afternoon. Coffee at 2 if you can."
+        />
+
+        <div className="flex flex-col gap-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="bg-muted/40 border-border flex h-10 w-10 shrink-0 items-center justify-center rounded-md border">
+                <GoogleLogo />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-foreground text-base font-semibold">Google Calendar</span>
+                <span className="text-muted-foreground text-xs">
+                  {isConnected && connectedAccountEmail
+                    ? `Connected as ${connectedAccountEmail}`
+                    : 'OAuth · Read-only'}
+                </span>
+              </div>
             </div>
-            <div className="flex flex-col gap-0.5">
-              <h3 className="text-foreground text-base font-semibold">Google Calendar</h3>
-              <p className="text-muted-foreground text-xs">
-                {isConnected && connectedAccountEmail
-                  ? `Connected as ${connectedAccountEmail}`
-                  : 'via OAuth · read-only'}
-              </p>
-            </div>
-          </div>
-          <span
-            className={cn(
-              'rounded-full border px-2.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase',
-              isConnected
-                ? 'border-emerald-500/40 text-emerald-500'
-                : 'border-amber-500/40 text-amber-500'
+            {isConnected && (
+              <span className="bg-emerald-500/10 text-emerald-400 ring-emerald-500/20 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ring-1">
+                <Check className="size-4" />
+                Connected
+              </span>
             )}
-          >
-            {isConnected ? 'Connected' : 'Recommended'}
-          </span>
-        </div>
+          </div>
 
-        <div className="flex flex-col gap-3">
-          {FEATURES.map(feature => (
-            <div key={feature.title} className="flex items-start gap-3">
-              <div
-                className={cn(
-                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border',
-                  feature.included
-                    ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-500'
-                    : 'border-border text-muted-foreground/60'
-                )}
-              >
-                {feature.included ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <p
-                  className={cn(
-                    'text-sm font-medium',
-                    feature.included ? 'text-foreground' : 'text-muted-foreground/70'
-                  )}
-                >
-                  {feature.title}
-                </p>
-                <p className="text-muted-foreground text-xs">{feature.detail}</p>
-              </div>
+          <section className="flex flex-col gap-3">
+            <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+              What we'll read
+            </h3>
+            <div className="flex flex-col gap-3">
+              {FEATURES.map(feature => (
+                <div key={feature.title} className="flex items-start gap-3">
+                  <div className="bg-emerald-500/10 text-emerald-400 ring-emerald-500/20 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ring-1">
+                    <Check className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-foreground text-sm font-semibold">{feature.title}</p>
+                    <p className="text-muted-foreground text-sm leading-snug">{feature.detail}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          </section>
         </div>
+      </div>
 
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <button
-            type="button"
-            onClick={() => onSkip()}
-            className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+      <div className="flex items-center justify-end gap-3 pt-2">
+        <Button variant="ghost" size="lg" onClick={() => onSkip()}>
+          Skip for now
+        </Button>
+        {isConnected ? (
+          <Button
+            variant="default"
+            size="lg"
+            className="bg-brand-primary hover:bg-brand-primary/90"
+            onClick={() => onContinue()}
           >
-            Skip for now
-          </button>
-          {isConnected ? (
-            <Button variant="primary" onClick={() => onContinue()}>
-              Continue
-            </Button>
-          ) : readyToConnect ? (
-            <Button asChild variant="primary">
-              <Link href={connectUrl} onClick={() => onConnectClick?.()}>
-                Connect Google Calendar
-              </Link>
-            </Button>
-          ) : (
-            <Button variant="primary" disabled>
-              Setting up your instance…
-            </Button>
-          )}
-        </div>
+            Continue
+          </Button>
+        ) : readyToConnect ? (
+          <Button
+            asChild
+            variant="default"
+            size="lg"
+            className="bg-brand-primary hover:bg-brand-primary/90"
+          >
+            <Link href={connectUrl} onClick={() => onConnectClick?.()}>
+              Connect Google Calendar
+            </Link>
+          </Button>
+        ) : (
+          <Button
+            variant="default"
+            size="lg"
+            className="bg-brand-primary hover:bg-brand-primary/90"
+            disabled
+          >
+            Setting up your instance…
+          </Button>
+        )}
       </div>
     </OnboardingStepView>
   );

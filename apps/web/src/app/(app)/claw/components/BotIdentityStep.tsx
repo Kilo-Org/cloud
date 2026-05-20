@@ -339,7 +339,8 @@ export function BotIdentityStep({
 
       <div className="flex justify-end">
         <Button
-          className="bg-brand-primary hover:bg-brand-primary/90 text-black"
+          variant="default"
+          className="bg-brand-primary hover:bg-brand-primary/90"
           disabled={isContinuing}
           onClick={() => void handleContinue()}
         >

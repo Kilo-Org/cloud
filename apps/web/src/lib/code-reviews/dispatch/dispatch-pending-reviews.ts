@@ -45,7 +45,7 @@ import {
 
 export type DispatchResult = {
   dispatched: number;
-  pending: number;
+  notDispatched: number;
   activeCount: number;
 };
 
@@ -217,7 +217,7 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
 
     if (reservations.length === 0) {
       logExceptInTest('[tryDispatchPendingReviews] No reviews reserved', { owner, activeCount });
-      return { dispatched: 0, pending: 0, activeCount };
+      return { dispatched: 0, notDispatched: 0, activeCount };
     }
 
     const results = await Promise.allSettled(
@@ -266,7 +266,7 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
 
     return {
       dispatched,
-      pending: reservations.length - dispatched,
+      notDispatched: reservations.length - dispatched,
       activeCount: activeCount + dispatched,
     };
   } catch (error) {
@@ -275,7 +275,7 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
       tags: { operation: 'try-dispatch-pending-reviews' },
       extra: { owner },
     });
-    return { dispatched: 0, pending: 0, activeCount: 0 };
+    return { dispatched: 0, notDispatched: 0, activeCount: 0 };
   }
 }
 

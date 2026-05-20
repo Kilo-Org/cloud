@@ -173,7 +173,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 2,
-      pending: 0,
+      notDispatched: 0,
       activeCount: 20,
     });
     expect(mockDispatchReview).toHaveBeenCalledTimes(2);
@@ -204,7 +204,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 3,
-      pending: 0,
+      notDispatched: 0,
       activeCount: 3,
     });
     expect(mockDispatchReview).toHaveBeenCalledTimes(3);
@@ -243,7 +243,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 1,
-      pending: 0,
+      notDispatched: 0,
       activeCount: 3,
     });
     expect(mockDispatchReview).toHaveBeenCalledTimes(1);
@@ -282,7 +282,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 0,
-      pending: 0,
+      notDispatched: 0,
       activeCount: 3,
     });
     expect(mockDispatchReview).not.toHaveBeenCalled();
@@ -312,7 +312,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 1,
-      pending: 0,
+      notDispatched: 0,
       activeCount: 1,
     });
     expect(mockDispatchReview).toHaveBeenCalledTimes(1);
@@ -342,7 +342,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 1,
-      pending: 0,
+      notDispatched: 0,
       activeCount: 1,
     });
     expect(mockDispatchReview).toHaveBeenCalledTimes(1);
@@ -392,11 +392,11 @@ describe('tryDispatchPendingReviews', () => {
       id: testUser.id,
       userId: testUser.id,
     });
-    expect(secondResult).toEqual({ dispatched: 0, pending: 0, activeCount: 1 });
+    expect(secondResult).toEqual({ dispatched: 0, notDispatched: 0, activeCount: 1 });
     expect(mockPrepareReviewPayload).toHaveBeenCalledTimes(1);
 
     releasePreparation.resolve(undefined);
-    await expect(firstDispatch).resolves.toEqual({ dispatched: 1, pending: 0, activeCount: 1 });
+    await expect(firstDispatch).resolves.toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
   });
 
   it('recovers stale queued reviews before payload metadata updates refresh updated_at', async () => {
@@ -438,7 +438,7 @@ describe('tryDispatchPendingReviews', () => {
       where: eq(cloud_agent_code_reviews.id, review.id),
     });
 
-    expect(result).toEqual({ dispatched: 1, pending: 0, activeCount: 1 });
+    expect(result).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
     expect(mockDispatchReview).toHaveBeenCalledTimes(1);
     expect(storedReview?.status).toBe('queued');
     expect(storedReview?.updated_at).not.toBe(staleQueuedTimestamp);
@@ -531,7 +531,7 @@ describe('tryDispatchPendingReviews', () => {
       where: eq(cloud_agent_code_reviews.id, pendingReview.id),
     });
 
-    expect(result).toEqual({ dispatched: 1, pending: 0, activeCount: 1 });
+    expect(result).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
     expect(storedStaleRunningReview?.status).toBe('running');
     expect(storedPendingReview?.status).toBe('queued');
   });
@@ -574,7 +574,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 0,
-      pending: 0,
+      notDispatched: 0,
       activeCount: 20,
     });
     expect(mockDispatchReview).not.toHaveBeenCalled();
@@ -605,7 +605,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 0,
-      pending: 0,
+      notDispatched: 0,
       activeCount: 0,
     });
     expect(mockDispatchReview).not.toHaveBeenCalled();
@@ -665,7 +665,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 0,
-      pending: 1,
+      notDispatched: 1,
       activeCount: 0,
     });
     expect(mockDispatchReview).not.toHaveBeenCalled();
@@ -703,7 +703,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 0,
-      pending: 0,
+      notDispatched: 0,
       activeCount: 20,
     });
     expect(mockDispatchReview).not.toHaveBeenCalled();
@@ -748,7 +748,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 1,
-      pending: 0,
+      notDispatched: 0,
       activeCount: 1,
     });
     expect(mockDispatchReview).toHaveBeenCalledTimes(1);
@@ -798,7 +798,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 1,
-      pending: 0,
+      notDispatched: 0,
       activeCount: 1,
     });
     const [attempt] = await db
@@ -845,7 +845,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 0,
-      pending: 1,
+      notDispatched: 1,
       activeCount: 0,
     });
     const [attempt] = await db
@@ -892,7 +892,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 0,
-      pending: 1,
+      notDispatched: 1,
       activeCount: 0,
     });
     const [attempt] = await db
@@ -974,7 +974,7 @@ describe('tryDispatchPendingReviews', () => {
 
     expect(result).toEqual({
       dispatched: 1,
-      pending: 0,
+      notDispatched: 0,
       activeCount: 1,
     });
     expect(storedReview?.status).toBe('failed');

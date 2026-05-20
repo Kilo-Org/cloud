@@ -203,7 +203,7 @@ describe('dispatch pending code review owners', () => {
       }
       return {
         dispatched: owner.id === firstUser.id ? 2 : 0,
-        pending: 0,
+        notDispatched: 0,
         activeCount: 0,
       };
     });

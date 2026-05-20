@@ -1,5 +1,5 @@
 import { APP_URL } from '@/lib/constants';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable, requireEnv } from '@/lib/dotenvx';
 import 'server-only';
 
 export const IS_IN_AUTOMATED_TEST = !!getEnvVariable('IS_IN_AUTOMATED_TEST');
@@ -103,7 +103,10 @@ export const USER_DEPLOYMENTS_GIT_TOKEN_ENCRYPTION_KEY = getEnvVariable(
  * Must be a base64-encoded 32-byte (256-bit) key.
  * Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
  */
-export const BYOK_ENCRYPTION_KEY = getEnvVariable('BYOK_ENCRYPTION_KEY') || '';
+export const BYOK_ENCRYPTION_KEY = requireEnv(
+  'BYOK_ENCRYPTION_KEY',
+  getEnvVariable('BYOK_ENCRYPTION_KEY')
+);
 
 // Artificial Analysis API
 export const ARTIFICIAL_ANALYSIS_API_KEY = getEnvVariable('ARTIFICIAL_ANALYSIS_API_KEY');

@@ -38,13 +38,6 @@ const weightSchema = z.number().int().positive();
 
 const apiKeySchema = z.string().min(1);
 
-function ensureEncryptionKey(): string {
-  if (!BYOK_ENCRYPTION_KEY) {
-    trpcThrow('INTERNAL_SERVER_ERROR', 'BYOK encryption is not configured');
-  }
-  return BYOK_ENCRYPTION_KEY;
-}
-
 async function loadExperimentOrThrow(id: string) {
   const row = await db.query.model_experiment.findFirst({
     where: eq(model_experiment.id, id),
@@ -451,7 +444,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
       // copy and the key is required.
       let encrypted_api_key;
       if (input.apiKey !== undefined) {
-        encrypted_api_key = encryptApiKey(input.apiKey, ensureEncryptionKey());
+        encrypted_api_key = encryptApiKey(input.apiKey, BYOK_ENCRYPTION_KEY);
       } else {
         const previous = await db
           .select({ encrypted_api_key: model_experiment_variant_version.encrypted_api_key })
@@ -482,7 +475,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
     }),
 
   rotateApiKey: adminProcedure.input(RotateApiKeySchema).mutation(async ({ input, ctx }) => {
-    const key = ensureEncryptionKey();
+    const key = BYOK_ENCRYPTION_KEY;
     const variant = await loadVariantOrThrow(input.variantId);
     const experiment = await loadExperimentOrThrow(variant.experiment_id);
     assertNonTerminal(experiment.status as Status, 'Rotating api key');

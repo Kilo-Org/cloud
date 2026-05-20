@@ -2156,6 +2156,16 @@ export default definePluginEntry({
                 `Saved to ${result.filePath}.`,
                 ...result.failures.map(failure => `Note: ${failure}`),
                 ...formatDeliverySummary(result.delivery).map(line => line.replace(/^- /, '')),
+                '',
+                // Hand the agent the full briefing plus a fidelity rule so
+                // an on-demand "run my briefing" chat reply reproduces
+                // every section instead of paraphrasing the file (which
+                // silently dropped sections like "Connect more" and
+                // individual calendar lines). PR-6 replaces this with
+                // structured multi-bubble injection.
+                'When you share this briefing with the user, reproduce every section and every line of the Markdown below. Light reformatting for readability is fine, but do not drop, merge, or summarize away any section or line.',
+                '',
+                result.markdown,
               ].join('\n'),
             },
           ],
@@ -2489,6 +2499,7 @@ export default definePluginEntry({
         'Use /briefing enable|status|run|today|yesterday|disable for command-driven control.',
         'If inbound text contains /briefing but command routing did not execute, call morning_briefing_handle_command exactly once with the full raw inbound message.',
         'Never emulate /briefing by manually calling generic cron/file tools.',
+        'When you present a morning briefing in chat, reproduce every section and every line of the briefing Markdown — including the "Connect more" section and all calendar entries. Light reformatting for readability is fine, but never drop, merge, or summarize away a section or line.',
       ].join('\n'),
     }));
   },

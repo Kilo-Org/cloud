@@ -282,57 +282,6 @@ describe('POST /v1/messages', () => {
     expect(res.status).toBe(409);
     await expect(res.json()).resolves.toMatchObject({ error: 'Attachment upload is missing' });
   });
-
-  it('creates a message when an attachment upload becomes visible during validation', async () => {
-    const { conversationId, userApp, userId } = await createConversation(
-      'msg-create-delayed-upload'
-    );
-    const convStub = getConvStub(conversationId);
-    const attachment = await unwrap(
-      convStub.initAttachment({
-        uploaderId: userId,
-        mimeType: 'text/plain',
-        size: 5,
-        filename: 'eventual.txt',
-      })
-    );
-
-    const createMessagePromise = userApp.request(
-      '/v1/messages',
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          conversationId,
-          content: [
-            {
-              type: 'attachment',
-              attachmentId: attachment.attachmentId,
-              mimeType: 'text/plain',
-              size: 5,
-              filename: 'eventual.txt',
-            },
-          ],
-        }),
-      },
-      env
-    );
-    const delayedUploadPromise = new Promise<void>((resolve, reject) => {
-      setTimeout(() => {
-        putUploadedAttachmentObject({
-          r2Key: attachment.r2Key,
-          size: 5,
-          mimeType: 'text/plain',
-        }).then(resolve, reject);
-      }, 750);
-    });
-
-    const res = await createMessagePromise;
-    await delayedUploadPromise;
-
-    expect(res.status).toBe(201);
-    await expect(res.json()).resolves.toMatchObject({ messageId: expect.any(String) });
-  });
 });
 
 describe('GET /v1/conversations/:id/messages', () => {

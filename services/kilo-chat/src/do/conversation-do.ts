@@ -57,15 +57,9 @@ import { monotonicFactory } from 'ulid';
 type StoredMessageRow = typeof messages.$inferSelect;
 type BotMessageNotificationReason = 'length' | 'typing_stop' | 'timeout';
 type StoredAttachmentRow = typeof attachments.$inferSelect;
-type AttachmentUploadValidationError = {
-  code: 'conflict';
-  error: string;
-  retryable: boolean;
-};
 
 const INIT_DEDUPE_WINDOW_MS = 30_000;
 const MAX_ATTACHMENTS_PER_MESSAGE = 10;
-const ATTACHMENT_UPLOAD_RETRY_DELAYS_MS = [500, 1000] as const;
 
 class AttachmentAlreadyLinkedError extends Error {}
 
@@ -90,10 +84,6 @@ function buildReplySnapshot(
         }
       : null
   );
-}
-
-async function sleep(ms: number): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function storedMessageRowToMessage(
@@ -363,38 +353,15 @@ export class ConversationDO extends DurableObject<Env> {
   private async validateUploadedAttachmentObjects(
     rows: readonly StoredAttachmentRow[]
   ): Promise<{ code: 'conflict'; error: string } | null> {
-    let missingUploadError: AttachmentUploadValidationError | null = null;
-
-    for (const delayMs of [0, ...ATTACHMENT_UPLOAD_RETRY_DELAYS_MS]) {
-      if (delayMs > 0) await sleep(delayMs);
-      missingUploadError = null;
-
-      const immediateError = await this.validateUploadedAttachmentObjectsOnce(rows);
-      if (!immediateError) return null;
-      if (!immediateError.retryable) {
-        return { code: immediateError.code, error: immediateError.error };
-      }
-      missingUploadError = immediateError;
-    }
-
-    return missingUploadError
-      ? { code: missingUploadError.code, error: missingUploadError.error }
-      : null;
-  }
-
-  private async validateUploadedAttachmentObjectsOnce(
-    rows: readonly StoredAttachmentRow[]
-  ): Promise<AttachmentUploadValidationError | null> {
     for (const row of rows) {
       const object = await this.env.MEDIA_BUCKET.head(row.r2_key);
       if (!object) {
-        return { code: 'conflict', error: 'Attachment upload is missing', retryable: true };
+        return { code: 'conflict', error: 'Attachment upload is missing' };
       }
       if (object.size !== row.size) {
         return {
           code: 'conflict',
           error: `Attachment upload size ${object.size} does not match declared size ${row.size}`,
-          retryable: false,
         };
       }
     }

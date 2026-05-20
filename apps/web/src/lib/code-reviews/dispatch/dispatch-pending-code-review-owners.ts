@@ -78,7 +78,7 @@ export async function dispatchPendingCodeReviewOwners(): Promise<DispatchPending
   const candidates = await listDispatchableCodeReviewOwnerCandidates({ limit: OWNER_SCAN_LIMIT });
   const limit = pLimit(OWNER_DISPATCH_CONCURRENCY);
   const outcomes = await Promise.all(
-    candidates.owners.map(candidate => limit(async () => await drainOwner(candidate)))
+    candidates.owners.map(candidate => limit(() => drainOwner(candidate)))
   );
 
   const summary: DispatchPendingCodeReviewOwnersSummary = {

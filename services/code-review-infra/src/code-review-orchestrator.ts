@@ -692,7 +692,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     // Payload without reviewId (it's in the URL path)
     const payload = {
       status,
-      attemptId: this.state.attemptId,
       sessionId: options?.sessionId,
       cliSessionId: options?.cliSessionId,
       errorMessage: options?.errorMessage,

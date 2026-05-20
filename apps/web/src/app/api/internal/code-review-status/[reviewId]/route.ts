@@ -71,7 +71,6 @@ import {
  * Payload from the orchestrator DO (legacy format).
  */
 type OrchestratorPayload = {
-  attemptId?: string;
   sessionId?: string;
   cliSessionId?: string;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
@@ -84,7 +83,6 @@ type OrchestratorPayload = {
  * Payload from cloud-agent-next callback (ExecutionCallbackPayload).
  */
 type CloudAgentNextCallbackPayload = {
-  attemptId?: string;
   sessionId?: string;
   cloudAgentSessionId?: string;
   executionId?: string;

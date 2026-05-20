@@ -347,10 +347,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         resourceParts: [REVIEW_ID, 'attempt-1'],
       });
       const response = await POST(
-        makeRequest(
-          { status: 'completed', attemptId: 'body-attempt-ignored' },
-          { callbackToken, attemptId: 'attempt-1' }
-        ),
+        makeRequest({ status: 'completed' }, { callbackToken, attemptId: 'attempt-1' }),
         makeParams(REVIEW_ID)
       );
 

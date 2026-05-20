@@ -108,6 +108,19 @@ export async function mintAgentToken(
   );
 }
 
+export async function mintContainerToken(
+  env: Env,
+  params: { townId: string; userId: string }
+): Promise<string | null> {
+  const jwtSecret = await resolveJWTSecret(env);
+  if (!jwtSecret) {
+    console.error(`${TOWN_LOG} mintContainerToken: no JWT secret available`);
+    return null;
+  }
+
+  return signContainerJWT({ townId: params.townId, userId: params.userId }, jwtSecret);
+}
+
 /**
  * Mint a container-scoped JWT and push it to the town container.
  * One JWT per container — shared by all agents in the town. Carries
@@ -125,13 +138,11 @@ export async function ensureContainerToken(
   townId: string,
   userId: string
 ): Promise<string | null> {
-  const jwtSecret = await resolveJWTSecret(env);
-  if (!jwtSecret) {
-    console.error(`${TOWN_LOG} ensureContainerToken: no JWT secret available`);
+  const token = await mintContainerToken(env, { townId, userId });
+  if (!token) {
     return null;
   }
 
-  const token = signContainerJWT({ townId, userId }, jwtSecret);
   const container = getTownContainerStub(env, townId);
 
   // Push to running process so existing agents pick up the fresh token.
@@ -141,7 +152,7 @@ export async function ensureContainerToken(
       method: 'POST',
       signal: AbortSignal.timeout(10_000),
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({ token, townId }),
     });
     if (!resp.ok) {
       throw new Error(`container returned ${resp.status}`);
@@ -180,12 +191,11 @@ export async function forceRefreshContainerToken(
   townId: string,
   userId: string
 ): Promise<string> {
-  const jwtSecret = await resolveJWTSecret(env);
-  if (!jwtSecret) {
+  const token = await mintContainerToken(env, { townId, userId });
+  if (!token) {
     throw new Error('No JWT secret available — cannot mint container token');
   }
 
-  const token = signContainerJWT({ townId, userId }, jwtSecret);
   const container = getTownContainerStub(env, townId);
 
   // Push to running container — propagate ALL errors so the caller
@@ -193,7 +203,7 @@ export async function forceRefreshContainerToken(
   const resp = await container.fetch('http://container/refresh-token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token }),
+    body: JSON.stringify({ token, townId }),
   });
   if (!resp.ok) {
     const body = await resp.text().catch(() => '');

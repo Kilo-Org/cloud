@@ -3,6 +3,7 @@
 // a single evolving preview message via the preview-stream helper.
 
 import type { KiloChatClient } from '../client.js';
+import { sendKiloChatMediaMessage, type MediaLoader } from '../media-delivery.js';
 import { createPreviewStream } from '../preview-stream.js';
 
 /**
@@ -12,7 +13,7 @@ import { createPreviewStream } from '../preview-stream.js';
  */
 const STREAM_THROTTLE_MS = 500;
 
-export type DeliverPayload = { text?: string };
+export type DeliverPayload = { text?: string; mediaUrl?: string; mediaUrls?: string[] };
 
 export type DeliverWiring = {
   deliver: (payload: DeliverPayload) => Promise<void>;
@@ -28,6 +29,8 @@ export function buildDeliverWiring(params: {
   conversationId: string;
   inReplyToMessageId?: string;
   warn: (msg: string, err?: unknown) => void;
+  fetchImpl?: typeof fetch;
+  loadMediaImpl?: MediaLoader;
 }): DeliverWiring {
   const stream = createPreviewStream({
     client: params.client,
@@ -55,6 +58,8 @@ export function buildDeliverWiring(params: {
   const committedMessages: string[] = [];
   let currentText = '';
   let delivered = false;
+  let previewTouched = false;
+  let previewAborted = false;
 
   const BLOCK_JOINER = '\n\n';
   const accumulated = (): string => {
@@ -72,11 +77,47 @@ export function buildDeliverWiring(params: {
           committedMessages.push(currentText);
         }
         currentText = payload.text;
+        previewTouched = true;
         stream.update(accumulated());
       },
     },
     deliver: async payload => {
+      const mediaUrls = Array.from(
+        new Set(
+          [...(payload.mediaUrls ?? []), ...(payload.mediaUrl ? [payload.mediaUrl] : [])]
+            .map(mediaUrl => mediaUrl.trim())
+            .filter(Boolean)
+        )
+      );
+      if (mediaUrls.length > 0) {
+        if (previewTouched && !previewAborted) {
+          await stream.abort();
+          previewAborted = true;
+        }
+        for (let i = 0; i < mediaUrls.length; i += 1) {
+          await sendKiloChatMediaMessage({
+            client: params.client,
+            conversationId: params.conversationId,
+            mediaUrl: mediaUrls[i]!,
+            caption: i === 0 ? (payload.text ?? '') : '',
+            inReplyToMessageId: params.inReplyToMessageId,
+            fetchImpl: params.fetchImpl,
+            loadMediaImpl: params.loadMediaImpl,
+          });
+        }
+        delivered = true;
+        return;
+      }
       if (!payload.text) return;
+      if (previewAborted) {
+        await params.client.createMessage({
+          conversationId: params.conversationId,
+          content: [{ type: 'text', text: payload.text }],
+          inReplyToMessageId: params.inReplyToMessageId,
+        });
+        delivered = true;
+        return;
+      }
       if (!currentText) {
         // No partial for this message yet — the chunk is all we have.
         currentText = payload.text;
@@ -91,9 +132,12 @@ export function buildDeliverWiring(params: {
         currentText = `${currentText}${BLOCK_JOINER}${payload.text}`;
       }
       delivered = true;
+      previewTouched = true;
       stream.update(accumulated());
     },
     finalize: async err => {
+      if (previewAborted) return;
+      if (!previewTouched) return;
       if (err !== undefined || !delivered) {
         await stream.abort(err);
         return;

@@ -329,6 +329,14 @@ function fakeClient(calls: { type: string; args: unknown }[]): KiloChatClient {
       calls.push({ type: 'createConversation', args });
       return { conversationId: 'c1' };
     },
+    initAttachment: async args => {
+      calls.push({ type: 'initAttachment', args });
+      return {
+        attachmentId: 'att-1',
+        putUrl: 'https://upload.example/att-1',
+        putHeaders: { 'content-type': 'text/plain' },
+      };
+    },
   };
 }
 
@@ -429,6 +437,85 @@ describe('buildDeliverWiring', () => {
       expect((creates[0]!.args as { inReplyToMessageId?: string }).inReplyToMessageId).toBe(
         'parent-msg-1'
       );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('delivers inline MEDIA URLs as text messages', async () => {
+    const calls: { type: string; args: unknown }[] = [];
+    const wiring = buildDeliverWiring({
+      client: fakeClient(calls),
+      conversationId: 'c1',
+      inReplyToMessageId: 'parent-msg-1',
+      warn: () => {},
+    });
+
+    await wiring.deliver({
+      mediaUrl: 'https://example.com/report.pdf',
+      mediaUrls: ['https://example.com/report.pdf'],
+    });
+    await wiring.finalize();
+
+    const creates = calls.filter(c => c.type === 'create');
+    expect(creates).toHaveLength(1);
+    expect(creates[0]!.args).toMatchObject({
+      conversationId: 'c1',
+      content: [{ type: 'text', text: 'https://example.com/report.pdf' }],
+      inReplyToMessageId: 'parent-msg-1',
+    });
+    expect(calls.some(c => c.type === 'initAttachment')).toBe(false);
+  });
+
+  it('replaces a streamed preview with a captioned attachment for inline MEDIA paths', async () => {
+    vi.useFakeTimers();
+    try {
+      const calls: { type: string; args: unknown }[] = [];
+      const putFetch = vi.fn(async () => new Response(null, { status: 200 }));
+      const loadMedia = vi.fn(async () => ({
+        buffer: Buffer.from('hello'),
+        contentType: 'text/plain',
+        fileName: 'note.txt',
+      }));
+      const wiring = buildDeliverWiring({
+        client: fakeClient(calls),
+        conversationId: 'c1',
+        inReplyToMessageId: 'parent-msg-1',
+        warn: () => {},
+        fetchImpl: putFetch,
+        loadMediaImpl: loadMedia,
+      });
+
+      await wiring.replyOptions.onPartialReply({ text: 'Here is the file' });
+      await vi.advanceTimersByTimeAsync(0);
+      await wiring.deliver({ text: 'Here is the file', mediaUrls: ['./note.txt'] });
+      await wiring.finalize();
+
+      expect(loadMedia).toHaveBeenCalledWith('./note.txt', expect.any(Object));
+      expect(putFetch).toHaveBeenCalledWith(
+        'https://upload.example/att-1',
+        expect.objectContaining({ method: 'PUT', body: Buffer.from('hello') })
+      );
+
+      const deletes = calls.filter(c => c.type === 'delete');
+      expect(deletes).toHaveLength(1);
+
+      const creates = calls.filter(c => c.type === 'create');
+      expect(creates).toHaveLength(2);
+      expect(creates.at(-1)!.args).toMatchObject({
+        conversationId: 'c1',
+        content: [
+          {
+            type: 'attachment',
+            attachmentId: 'att-1',
+            mimeType: 'text/plain',
+            size: 5,
+            filename: 'note.txt',
+          },
+          { type: 'text', text: 'Here is the file' },
+        ],
+        inReplyToMessageId: 'parent-msg-1',
+      });
     } finally {
       vi.useRealTimers();
     }

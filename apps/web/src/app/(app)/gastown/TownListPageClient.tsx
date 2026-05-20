@@ -7,7 +7,6 @@ import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { Button } from '@/components/Button';
-import { Badge } from '@/components/ui/badge';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -79,9 +78,7 @@ export function TownListPageClient() {
         <div className="flex flex-col gap-3">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <SetPageTitle title="Gas Town">
-                <Badge variant="beta">beta</Badge>
-              </SetPageTitle>
+              <SetPageTitle title="Gas Town" />
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/60">
                 A chat-first orchestration console for towns, rigs, beads, and agents. Built for
                 radical transparency: every object is clickable; every outcome is attributable.

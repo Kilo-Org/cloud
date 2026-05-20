@@ -1,5 +1,4 @@
 import type { MicrodollarUsageView } from '@kilocode/db/schema';
-import type { PaginationMetadata } from '@/types/pagination';
 
 export type ApiResponse = GroupedDataResponse | PaginatedRawDataResponse;
 export type UsageForTableDisplay = MicrodollarUsageView & {
@@ -7,6 +6,10 @@ export type UsageForTableDisplay = MicrodollarUsageView & {
 };
 
 export type GroupByDimension = 'day' | 'week' | 'month' | 'userAgent' | 'model';
+
+export const TIME_WINDOW_OPTIONS = ['7d', '30d', '90d', 'all'] as const;
+export type TimeWindow = (typeof TIME_WINDOW_OPTIONS)[number];
+export const DEFAULT_TIME_WINDOW: TimeWindow = '7d';
 
 export type GroupedData = {
   groupKey: string;
@@ -17,9 +20,15 @@ export type GroupedData = {
   likelyAbuse: boolean | null;
 };
 
+export type RawPaginationMetadata = {
+  page: number;
+  limit: number;
+  hasMore: boolean;
+};
+
 export type PaginatedRawDataResponse = {
   data: UsageForTableDisplay[];
-  pagination: PaginationMetadata;
+  pagination: RawPaginationMetadata;
   classificationPerformed?: boolean;
 };
 

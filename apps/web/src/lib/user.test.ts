@@ -66,6 +66,7 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  model_eval_ingestions,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import {
@@ -126,6 +127,7 @@ describe('User', () => {
     await db.delete(organization_audit_logs);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
+    await db.delete(model_eval_ingestions);
     await db.delete(kiloclaw_scheduled_action_targets);
     await db.delete(kiloclaw_scheduled_action_stages);
     await db.delete(kiloclaw_scheduled_actions);
@@ -1124,6 +1126,58 @@ describe('User', () => {
       expect(logs[0].actor_name).toBeNull();
       expect(logs[0].actor_id).toBe(user.id);
       expect(logs[0].target_user_id).toBe('some-other-user'); // not anonymized (different user)
+    });
+
+    it('should anonymize model eval ingest promoter email', async () => {
+      const promoter = await insertTestUser();
+      const otherPromoter = await insertTestUser();
+
+      await db.insert(model_eval_ingestions).values([
+        {
+          bench_eval_name: 'soft-delete-promoter-eval',
+          bench_eval_url: 'https://bench.example.com/jobs/soft-delete-promoter-eval',
+          provider: 'kilo',
+          model: 'kilo/openai/gpt-5.5',
+          variant: null,
+          task_source: 'terminal-bench',
+          n_total_trials: 4,
+          total_score: 1.5,
+          overall_score: 0.375,
+          n_errored: 0,
+          promoted_at: new Date('2026-05-14T10:00:00.000Z').toISOString(),
+          promoted_by_email: promoter.google_user_email,
+          promotion_note: null,
+        },
+        {
+          bench_eval_name: 'retained-promoter-eval',
+          bench_eval_url: 'https://bench.example.com/jobs/retained-promoter-eval',
+          provider: 'kilo',
+          model: 'kilo/openai/gpt-5.5',
+          variant: null,
+          task_source: 'swebench-verified',
+          n_total_trials: 4,
+          total_score: 2,
+          overall_score: 0.5,
+          n_errored: 0,
+          promoted_at: new Date('2026-05-14T11:00:00.000Z').toISOString(),
+          promoted_by_email: otherPromoter.google_user_email,
+          promotion_note: null,
+        },
+      ]);
+
+      await softDeleteUser(promoter.id);
+
+      const rows = await db
+        .select({
+          benchEvalName: model_eval_ingestions.bench_eval_name,
+          promoterEmail: model_eval_ingestions.promoted_by_email,
+        })
+        .from(model_eval_ingestions);
+      const anonymized = rows.find(row => row.benchEvalName === 'soft-delete-promoter-eval');
+      const retained = rows.find(row => row.benchEvalName === 'retained-promoter-eval');
+
+      expect(anonymized?.promoterEmail).toBe(`deleted+${promoter.id}@deleted.invalid`);
+      expect(retained?.promoterEmail).toBe(otherPromoter.google_user_email);
     });
 
     it('should anonymize kiloclaw admin audit logs where user is target', async () => {

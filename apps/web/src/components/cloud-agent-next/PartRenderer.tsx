@@ -17,6 +17,7 @@ import { TodoReadToolCard } from './TodoReadToolCard';
 import { TodoWriteToolCard } from './TodoWriteToolCard';
 import { QuestionToolStatus } from './QuestionToolStatus';
 import { SuggestToolCard } from './SuggestToolCard';
+import { SkillToolCard } from './SkillToolCard';
 import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
 import type { OpenChildSession, RenderPartFn } from './ChildSessionSection';
 import { useState } from 'react';
@@ -118,6 +119,7 @@ function hasRequiredInput(part: Extract<Part, { type: 'tool' }>): boolean {
     case 'todowrite':
     case 'question':
     case 'suggest':
+    case 'skill':
       // These tools can render without specific input or handle empty arrays gracefully
       return true;
     default:
@@ -247,6 +249,11 @@ function ToolPartRenderer({
   // input stays available for the user to send messages in parallel.
   if (part.tool === 'suggest') {
     return <SuggestToolCard toolPart={part} />;
+  }
+
+  // Skill tool — show the skill name being loaded
+  if (part.tool === 'skill') {
+    return <SkillToolCard toolPart={part} />;
   }
 
   return <GenericToolCard toolPart={part} />;

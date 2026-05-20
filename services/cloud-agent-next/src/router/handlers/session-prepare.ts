@@ -682,8 +682,9 @@ const prepareSessionHandler = internalApiProtectedProcedure
         );
         if (restoreResult.exitCode !== 0) {
           const stdout = restoreResult.stdout?.trim() ?? '';
+          const stderr = restoreResult.stderr?.trim() ?? '';
           logger
-            .withFields({ exitCode: restoreResult.exitCode, stdout })
+            .withFields({ exitCode: restoreResult.exitCode, stdout, stderr })
             .error('Pre-import of kilo session failed');
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',

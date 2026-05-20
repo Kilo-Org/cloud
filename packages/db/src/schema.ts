@@ -2918,6 +2918,28 @@ export const ModelStatsBenchmarksSchema = z
         lastUpdated: z.string().optional(),
       })
       .optional(),
+    kiloBench: z
+      .object({
+        overallScore: z.number(),
+        evals: z.record(
+          z.string(),
+          z.object({
+            taskSource: z.string(),
+            displayName: z.string().optional(),
+            overallScore: z.number(),
+            totalScore: z.number(),
+            avgCostUsd: z.number().nullable(),
+            avgInputTokens: z.number().nullable(),
+            avgOutputTokens: z.number().nullable(),
+            avgCacheReadTokens: z.number().nullable(),
+            avgExecutionMs: z.number().nullable(),
+            nTotalTrials: z.number(),
+            nErrored: z.number(),
+            lastPromotedAt: z.string(),
+          })
+        ),
+      })
+      .optional(),
   })
   .optional();
 
@@ -3018,6 +3040,51 @@ export const modelStats = pgTable(
 
 export type ModelStats = typeof modelStats.$inferSelect;
 export type NewModelStats = typeof modelStats.$inferInsert;
+
+export const model_eval_ingestions = pgTable(
+  'model_eval_ingestions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bench_eval_name: text('bench_eval_name').notNull().unique(),
+    bench_eval_url: text('bench_eval_url').notNull(),
+    provider: text('provider').notNull(),
+    model: text('model').notNull(),
+    model_stats_id: uuid('model_stats_id').references(() => modelStats.id),
+    variant: text('variant'),
+    task_source: text('task_source').notNull(),
+    n_total_trials: integer('n_total_trials').notNull(),
+    total_score: decimal('total_score', { precision: 14, scale: 6, mode: 'number' }).notNull(),
+    overall_score: decimal('overall_score', { precision: 12, scale: 8, mode: 'number' }).notNull(),
+    n_errored: integer('n_errored').notNull(),
+    avg_cost_microdollars: bigint('avg_cost_microdollars', { mode: 'number' }),
+    avg_input_tokens: integer('avg_input_tokens'),
+    avg_output_tokens: integer('avg_output_tokens'),
+    avg_cache_read_tokens: integer('avg_cache_read_tokens'),
+    avg_execution_ms: integer('avg_execution_ms'),
+    promoted_at: timestamp('promoted_at', { withTimezone: true, mode: 'string' }).notNull(),
+    promoted_by_email: text('promoted_by_email').notNull(),
+    promotion_note: text('promotion_note'),
+    created_at: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+  },
+  table => [
+    index('IDX_model_eval_ingestions_lookup').on(
+      table.provider,
+      table.model,
+      table.variant,
+      table.task_source,
+      table.promoted_at
+    ),
+    index('IDX_model_eval_ingestions_model_stats').on(table.model_stats_id),
+    index('IDX_model_eval_ingestions_promoted_by_email_lower').on(
+      sql`LOWER(${table.promoted_by_email})`
+    ),
+  ]
+);
+
+export type ModelEvalIngestion = typeof model_eval_ingestions.$inferSelect;
+export type NewModelEvalIngestion = typeof model_eval_ingestions.$inferInsert;
 
 export const MODELS_BY_PROVIDER_ADMIN_URL = '/admin/sync-providers';
 
@@ -6186,11 +6253,12 @@ export type ModelExperimentVariantVersion = typeof model_experiment_variant_vers
 export type NewModelExperimentVariantVersion = typeof model_experiment_variant_version.$inferInsert;
 
 // One row per experimented request, keyed on usage_id (1:1 with microdollar_usage).
-// Stores attribution + R2 prompt hashes. The two sha256 columns hold either
-// a 64-char lowercase hex digest pointing at an R2 object, or one of the
-// reserved sentinels: `__absent__` (system only, no leading system message),
-// `__failed__` (R2 storage failed), `__deleted__` (prompt content wiped
-// while retaining attribution).
+// Stores attribution + a single R2 prompt hash for the post-`transformRequest`
+// upstream body. `request_body_sha256` holds either a 64-char lowercase hex
+// digest pointing at an R2 object, or one of the reserved sentinels:
+// `__failed__` (R2 storage failed) or `__deleted__` (prompt content wiped
+// while retaining attribution). `request_kind` records which upstream API
+// shape the body was serialized for.
 export const model_experiment_request = pgTable(
   'model_experiment_request',
   {
@@ -6204,8 +6272,8 @@ export const model_experiment_request = pgTable(
     // 'user' | 'machine' | 'ip'
     allocation_subject: text().notNull(),
     client_request_id: text(),
-    // 64-char lowercase hex sha256, or '__absent__' | '__failed__' | '__deleted__'.
-    system_prompt_sha256: text().notNull(),
+    // 'chat_completions' | 'messages' | 'responses'
+    request_kind: text().notNull(),
     // 64-char lowercase hex sha256, or '__failed__' | '__deleted__'.
     request_body_sha256: text().notNull(),
     was_truncated: boolean().notNull().default(false),
@@ -6224,8 +6292,8 @@ export const model_experiment_request = pgTable(
       sql`${table.allocation_subject} IN ('user', 'machine', 'ip')`
     ),
     check(
-      'model_experiment_request_system_prompt_sha256_format',
-      sql`${table.system_prompt_sha256} ~ '^[0-9a-f]{64}$' OR ${table.system_prompt_sha256} IN ('__absent__', '__failed__', '__deleted__')`
+      'model_experiment_request_request_kind_valid',
+      sql`${table.request_kind} IN ('chat_completions', 'messages', 'responses')`
     ),
     check(
       'model_experiment_request_request_body_sha256_format',

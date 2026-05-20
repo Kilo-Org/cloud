@@ -157,6 +157,44 @@ export const mcpServerConfigNextSchema = z.discriminatedUnion('type', [
   mcpRemoteServerConfigSchema,
 ]);
 
+/**
+ * Mode field for sendMessage. Built-in enum slugs plus any custom slug —
+ * cloud-agent-next cross-validates against the session's stored runtimeAgents.
+ * The reserved slug `custom` is still rejected here (requires prepare).
+ */
+export const agentModeSendMessageSchema = z
+  .string()
+  .min(1)
+  .max(50)
+  .regex(/^[a-z][a-z0-9-]*$/, 'Mode must be a slug')
+  .refine(mode => mode !== 'custom', {
+    message: 'Custom mode requires prepareSession/updateSession, not sendMessage',
+  });
+
+/**
+ * Discriminated execution payload for follow-up messages and prepared-session
+ * initialization. Mirrors the worker's SendMessageV2Payload schema; both
+ * variants ride the same execution pipeline on the cloud-agent-next side.
+ */
+export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('prompt'),
+    prompt: z.string().min(1),
+    mode: agentModeSendMessageSchema,
+    model: z.string().min(1),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
+  }),
+  z.object({
+    type: z.literal('command'),
+    command: z.string().min(1),
+    arguments: z.string().default(''),
+  }),
+]);
+
 // Schema for preparing a session
 export const basePrepareSessionNextSchema = z
   .object({
@@ -200,6 +238,7 @@ export const basePrepareSessionNextSchema = z
     autoCommit: z.boolean().optional(),
     autoInitiate: z.boolean().optional(),
     initialMessageId: z.string().startsWith('msg_').length(30).optional(),
+    initialPayload: sendMessageNextPayloadSchema.optional(),
     images: cloudAgentImagesSchema,
     devcontainer: z.boolean().optional(),
   })
@@ -221,44 +260,6 @@ export const basePrepareSessionNextOutputSchema = z.object({
 export const baseInitiateFromPreparedSessionNextSchema = z.object({
   cloudAgentSessionId: z.string(),
 });
-
-/**
- * Mode field for sendMessage. Built-in enum slugs plus any custom slug —
- * cloud-agent-next cross-validates against the session's stored runtimeAgents.
- * The reserved slug `custom` is still rejected here (requires prepare).
- */
-export const agentModeSendMessageSchema = z
-  .string()
-  .min(1)
-  .max(50)
-  .regex(/^[a-z][a-z0-9-]*$/, 'Mode must be a slug')
-  .refine(mode => mode !== 'custom', {
-    message: 'Custom mode requires prepareSession/updateSession, not sendMessage',
-  });
-
-/**
- * Discriminated payload for sendMessage — free-text prompt or structured slash
- * command. Mirrors the worker's SendMessageV2Payload schema; both variants
- * ride the same execution pipeline on the cloud-agent-next side.
- */
-export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('prompt'),
-    prompt: z.string().min(1),
-    mode: agentModeSendMessageSchema,
-    model: z.string().min(1),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
-  }),
-  z.object({
-    type: z.literal('command'),
-    command: z.string().min(1),
-    arguments: z.string().default(''),
-  }),
-]);
 
 // Schema for sending a message (V2 - uses cloudAgentSessionId)
 export const baseSendMessageNextSchema = z.object({

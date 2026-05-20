@@ -13,8 +13,11 @@ type ConsentChangeListener = (change: ConsentChange) => void;
 
 const listeners = new Set<ConsentChangeListener>();
 
+// SecureStore on iOS only accepts alphanumerics, '.', '-', and '_' in keys.
+// User ids can contain other characters (e.g. "oauth/google:103283..."), so strip
+// everything else before using the id as part of a key.
 function keyFor(userId: string): string {
-  return `${CONSENT_USER_KEY_PREFIX}${userId}`;
+  return `${CONSENT_USER_KEY_PREFIX}${userId.replaceAll(/[^A-Za-z0-9]/g, '')}`;
 }
 
 function notifyConsentChange(change: ConsentChange) {

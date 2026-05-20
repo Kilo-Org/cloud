@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import { readDb } from '@/lib/drizzle';
 import { getEnvVariable } from '@/lib/dotenvx';
@@ -9,7 +9,8 @@ import {
   resolveSnowflakeConfig,
   type SnowflakeBinding,
 } from '@/lib/snowflake';
-import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
+import { kilocode_users, organization_memberships, user_auth_provider } from '@kilocode/db/schema';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 export const GranularitySchema = z.enum(['hour', 'day', 'week', 'month']);
@@ -651,6 +652,37 @@ const UserListOutputSchema = z.object({
   ),
 });
 
+function parseLegacyOAuthUserId(
+  userId: string
+): { provider: AuthProviderId; providerAccountId: string } | null {
+  if (!userId.startsWith('oauth/')) return null;
+  const separatorIndex = userId.indexOf(':');
+  if (separatorIndex <= 'oauth/'.length) return null;
+
+  const provider = userId.slice('oauth/'.length, separatorIndex);
+  const providerAccountId = userId.slice(separatorIndex + 1);
+  if (providerAccountId === '') return null;
+
+  switch (provider) {
+    case 'apple':
+    case 'email':
+    case 'google':
+    case 'github':
+    case 'gitlab':
+    case 'linkedin':
+    case 'discord':
+    case 'fake-login':
+    case 'workos':
+      return { provider, providerAccountId };
+    default:
+      return null;
+  }
+}
+
+function legacyOAuthProviderKey(provider: AuthProviderId, providerAccountId: string): string {
+  return `${provider}:${providerAccountId}`;
+}
+
 // ---------------------------------------------------------------------------
 // Router definition
 // ---------------------------------------------------------------------------
@@ -1067,12 +1099,77 @@ export const usageAnalyticsRouter = createTRPCRouter({
         )
         .where(inArray(kilocode_users.id, allowedIds));
 
+      const usersById = new Map(
+        rows.map(r => [
+          r.id,
+          {
+            id: r.id,
+            name: r.name,
+            email: r.email,
+          },
+        ])
+      );
+
+      const legacyLookups = allowedIds
+        .filter(id => !usersById.has(id))
+        .map(id => ({ id, parsed: parseLegacyOAuthUserId(id) }))
+        .filter((lookup): lookup is { id: string; parsed: NonNullable<typeof lookup.parsed> } =>
+          Boolean(lookup.parsed)
+        );
+
+      if (legacyLookups.length > 0) {
+        const legacyIdsByProviderKey = new Map(
+          legacyLookups.map(lookup => [
+            legacyOAuthProviderKey(lookup.parsed.provider, lookup.parsed.providerAccountId),
+            lookup.id,
+          ])
+        );
+        const legacyConditions = legacyLookups.map(lookup =>
+          and(
+            eq(user_auth_provider.provider, lookup.parsed.provider),
+            eq(user_auth_provider.provider_account_id, lookup.parsed.providerAccountId)
+          )
+        );
+        const legacyWhere = or(...legacyConditions);
+
+        if (legacyWhere) {
+          const legacyRows = await readDb
+            .select({
+              provider: user_auth_provider.provider,
+              providerAccountId: user_auth_provider.provider_account_id,
+              name: kilocode_users.google_user_name,
+              email: kilocode_users.google_user_email,
+            })
+            .from(user_auth_provider)
+            .innerJoin(kilocode_users, eq(user_auth_provider.kilo_user_id, kilocode_users.id))
+            .innerJoin(
+              organization_memberships,
+              and(
+                eq(organization_memberships.kilo_user_id, user_auth_provider.kilo_user_id),
+                eq(organization_memberships.organization_id, input.organizationId)
+              )
+            )
+            .where(legacyWhere);
+
+          for (const row of legacyRows) {
+            const id = legacyIdsByProviderKey.get(
+              legacyOAuthProviderKey(row.provider, row.providerAccountId)
+            );
+            if (!id) continue;
+            usersById.set(id, {
+              id,
+              name: row.name,
+              email: row.email,
+            });
+          }
+        }
+      }
+
       return {
-        users: rows.map(r => ({
-          id: r.id,
-          name: r.name,
-          email: r.email,
-        })),
+        users: allowedIds.flatMap(id => {
+          const user = usersById.get(id);
+          return user ? [user] : [];
+        }),
       };
     }),
 });

@@ -76,6 +76,17 @@ export async function putPromptIfAbsent(content: string): Promise<string> {
   return sha;
 }
 
+export async function putPromptOrNull(content: string): Promise<string | null> {
+  try {
+    return await putPromptIfAbsent(content);
+  } catch (err) {
+    captureException(err, {
+      tags: { source: 'experiment-prompts', operation: 'putPromptIfAbsent' },
+    });
+    return null;
+  }
+}
+
 /**
  * Reads the prompt content for a given sha256 hex digest, or returns null
  * when the object does not exist. Sentinels (`__absent__`, `__failed__`,

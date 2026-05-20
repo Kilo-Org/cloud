@@ -1,7 +1,7 @@
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { model_experiment_request } from '@kilocode/db/schema';
-import { putPromptIfAbsent } from '@/lib/r2/experiment-prompts';
+import { putPromptOrNull } from '@/lib/r2/experiment-prompts';
 import type { ExperimentPromptCapture } from '@/lib/ai-gateway/processUsage.types';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
@@ -106,7 +106,7 @@ export async function persistExperimentAttribution(
   const requestKind = input.capture?.requestKind ?? 'chat_completions';
   const wasTruncated = input.capture?.wasTruncated ?? false;
   const bodyHash = input.capture
-    ? await putPromptOrFailedHash(input.capture.requestBodyContent)
+    ? ((await putPromptOrNull(input.capture.requestBodyContent)) ?? PROMPT_HASH_FAILED)
     : PROMPT_HASH_FAILED;
 
   try {
@@ -135,15 +135,4 @@ async function insertRow(
     was_truncated: wasTruncated,
     created_at: input.createdAt,
   });
-}
-
-async function putPromptOrFailedHash(content: string): Promise<string> {
-  try {
-    return await putPromptIfAbsent(content);
-  } catch (err) {
-    captureException(err, {
-      tags: { source: 'model-experiments', operation: 'putPromptIfAbsent' },
-    });
-    return PROMPT_HASH_FAILED;
-  }
 }

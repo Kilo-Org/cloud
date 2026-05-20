@@ -16,7 +16,7 @@ import {
   kilocode_users,
   type CloudAgentCodeReview,
 } from '@kilocode/db/schema';
-import { eq, and, or, count, gte, lt, sql, inArray } from 'drizzle-orm';
+import { eq, and, or, count, lt, sql, inArray } from 'drizzle-orm';
 import type { Owner } from '../core';
 import { prepareReviewPayload } from '../triggers/prepare-review-payload';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -35,6 +35,7 @@ import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import type { CodeReviewPlatform } from '../core/schemas';
 import {
+  activeCodeReviewWorkCondition,
   FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS,
   MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER,
@@ -107,20 +108,7 @@ async function reservePendingReviewsForDispatch(owner: Owner): Promise<ReviewRes
       .where(
         and(
           ownerCondition,
-          or(
-            and(
-              eq(cloud_agent_code_reviews.status, 'running'),
-              sql`COALESCE(
-                ${cloud_agent_code_reviews.started_at},
-                ${cloud_agent_code_reviews.updated_at},
-                ${cloud_agent_code_reviews.created_at}
-              ) >= ${staleRunningCutoff}`
-            ),
-            and(
-              eq(cloud_agent_code_reviews.status, 'queued'),
-              gte(cloud_agent_code_reviews.updated_at, staleQueuedCutoff)
-            )
-          )
+          activeCodeReviewWorkCondition(staleQueuedCutoff, staleRunningCutoff)
         )
       );
 

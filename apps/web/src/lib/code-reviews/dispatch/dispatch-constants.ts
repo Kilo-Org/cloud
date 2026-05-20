@@ -1,3 +1,4 @@
+import { cloud_agent_code_reviews } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
 
 export const MAX_CONCURRENT_CODE_REVIEWS_PER_ORG = 20;
@@ -14,4 +15,24 @@ export function staleQueuedCodeReviewCutoffSql() {
 
 export function staleRunningCodeReviewCutoffSql() {
   return sql`now() - interval '${sql.raw(String(STALE_RUNNING_CODE_REVIEW_MINUTES))} minutes'`;
+}
+
+export function activeCodeReviewWorkCondition(
+  staleQueuedCutoff = staleQueuedCodeReviewCutoffSql(),
+  staleRunningCutoff = staleRunningCodeReviewCutoffSql()
+) {
+  return sql`(
+    (
+      ${cloud_agent_code_reviews.status} = 'running'
+      AND COALESCE(
+        ${cloud_agent_code_reviews.started_at},
+        ${cloud_agent_code_reviews.updated_at},
+        ${cloud_agent_code_reviews.created_at}
+      ) >= ${staleRunningCutoff}
+    )
+    OR (
+      ${cloud_agent_code_reviews.status} = 'queued'
+      AND ${cloud_agent_code_reviews.updated_at} >= ${staleQueuedCutoff}
+    )
+  )`;
 }

@@ -19,6 +19,7 @@ import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } f
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
 import {
+  activeCodeReviewWorkCondition,
   FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS,
   MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER,
@@ -223,18 +224,7 @@ export async function listDispatchableCodeReviewOwnerCandidates(
             ${cloud_agent_code_reviews.owned_by_organization_id}::text,
             ${cloud_agent_code_reviews.owned_by_user_id}
           )
-        WHERE (
-            ${cloud_agent_code_reviews.status} = 'running'
-            AND COALESCE(
-              ${cloud_agent_code_reviews.started_at},
-              ${cloud_agent_code_reviews.updated_at},
-              ${cloud_agent_code_reviews.created_at}
-            ) >= ${staleRunningCutoff}
-          )
-          OR (
-            ${cloud_agent_code_reviews.status} = 'queued'
-            AND ${cloud_agent_code_reviews.updated_at} >= ${staleQueuedCutoff}
-          )
+        WHERE ${activeCodeReviewWorkCondition(staleQueuedCutoff, staleRunningCutoff)}
         GROUP BY reconsiderable_work.owner_type, reconsiderable_work.owner_id
       ), capacity_candidates AS (
         SELECT

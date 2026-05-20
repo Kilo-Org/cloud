@@ -340,6 +340,7 @@ export async function completeAutoResumeIfReady(
 
   const [subscription] = await db
     .select({
+      status: kiloclaw_subscriptions.status,
       suspended_at: kiloclaw_subscriptions.suspended_at,
       auto_resume_requested_at: kiloclaw_subscriptions.auto_resume_requested_at,
       auto_resume_retry_after: kiloclaw_subscriptions.auto_resume_retry_after,
@@ -355,18 +356,29 @@ export async function completeAutoResumeIfReady(
     )
     .limit(1);
 
-  const hadPendingResume = !!(
+  // Per .specs/kiloclaw-billing.md §1132 (Auto-Resume on Payment Recovery),
+  // auto-resume completion fires when a subscription "transitions to active
+  // while the subscription's instance is suspended". A canceled or past_due
+  // subscription has not transitioned to active and MUST NOT have its
+  // suspension state cleared by a stale instance-ready callback — otherwise
+  // a Fly-Proxy-driven wakeup of a stopped machine would silently delete
+  // the once-per-lifecycle email-log entries (§1118.1) and re-enable the
+  // hourly subscription-expiry sweep to send another suspension email.
+  const hasPendingResumeState = !!(
     subscription?.suspended_at ||
     subscription?.auto_resume_requested_at ||
     subscription?.auto_resume_retry_after ||
     (subscription?.auto_resume_attempt_count ?? 0) > 0
   );
+  const isPendingResume = subscription?.status === 'active' && hasPendingResumeState;
 
-  if (!hadPendingResume) {
+  if (!isPendingResume) {
     logInfo('Instance ready without pending async auto-resume state', {
       user_id: kiloUserId,
       instance_id: targetInstance.id,
       sandbox_id: sandboxId,
+      subscription_status: subscription?.status ?? null,
+      has_suspended_at: subscription?.suspended_at != null,
     });
     return { instanceId: targetInstance.id, resumeCompleted: false };
   }

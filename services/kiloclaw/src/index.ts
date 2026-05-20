@@ -170,6 +170,12 @@ function routingTargetUrl(target: ProviderRoutingTarget, pathname: string, searc
  * still booting. Only the default-personal branch surfaces hints today (tests
  * assert the specific strings); branches that prefer the bare error
  * (`{ "error": "Instance not reachable" }`) just omit them.
+ *
+ * IMPORTANT: this function does NOT gate on instance status. Callers MUST
+ * verify the DO `status` is `'running'` before invoking, otherwise a request
+ * to a stopped machine will trigger Fly Proxy's autostart and silently wake
+ * an instance that we deliberately suspended for billing/lifecycle reasons.
+ * See the `status !== 'running'` checks in each proxy branch.
  */
 async function proxyThroughTarget(opts: {
   request: Request;
@@ -489,6 +495,14 @@ app.all('/i/:instanceId/*', async c => {
   if (status.status === 'recovering') {
     return c.json({ error: 'Instance is recovering from an unexpected stop' }, 409);
   }
+  // Refuse to forward to anything that isn't strictly running. A stopped
+  // machine still has runtimeId set (Fly machine IDs persist across stop),
+  // and proxying to it triggers Fly Proxy's autostart — which would silently
+  // restart instances we deliberately suspended for billing/lifecycle reasons.
+  // The only authorized waker of a stopped instance is an explicit start RPC.
+  if (status.status !== 'running') {
+    return c.json({ error: 'Instance not running', hint: 'Start it from the dashboard.' }, 409);
+  }
   if (!status.runtimeId) {
     return c.json({ error: 'Instance not provisioned' }, 404);
   }
@@ -760,6 +774,12 @@ async function handleHostBasedRoute(c: Context<AppEnv>): Promise<Response | null
   if (status.status === 'recovering') {
     return c.json({ error: 'Instance is recovering from an unexpected stop' }, 409);
   }
+  // See comment on the /i/:instanceId branch above: never forward to a non-
+  // running instance, otherwise Fly Proxy autostarts machines we deliberately
+  // stopped (billing suspension, manual stop, etc.).
+  if (status.status !== 'running') {
+    return c.json({ error: 'Instance not running', hint: 'Start it from the dashboard.' }, 409);
+  }
   if (!status.runtimeId) {
     return c.json({ error: 'Instance not provisioned' }, 404);
   }
@@ -871,6 +891,15 @@ app.all('*', async c => {
             409
           );
         }
+        // Never proxy to a non-running instance: forwarding to a stopped
+        // machine triggers Fly Proxy autostart and silently restarts
+        // instances suspended for billing/lifecycle reasons.
+        if (instanceStatus.status !== 'running') {
+          return c.json(
+            { error: 'Instance not running', hint: 'Start it from the dashboard.' },
+            409
+          );
+        }
         if (!instanceStatus.runtimeId) {
           return c.json(
             { error: 'Instance not provisioned', hint: 'The instance has no running machine.' },
@@ -947,6 +976,19 @@ app.all('*', async c => {
       {
         error: 'Instance is recovering',
         hint: 'Your instance is being recovered after an unexpected stop. Please wait.',
+      },
+      409
+    );
+  }
+  // Never proxy to a non-running instance: forwarding to a stopped machine
+  // triggers Fly Proxy autostart and silently restarts instances we
+  // deliberately suspended for billing/lifecycle reasons. The only
+  // authorized waker of a stopped instance is an explicit start RPC.
+  if (status && status !== 'running') {
+    return c.json(
+      {
+        error: 'Instance not running',
+        hint: 'Start it from the dashboard.',
       },
       409
     );

@@ -246,6 +246,174 @@ describe('proxy recovering state', () => {
   });
 });
 
+// Regression: a stopped Fly machine still has flyMachineId/runtimeId set, and
+// proxying to it would trigger Fly Proxy's autostart — silently waking
+// instances we deliberately suspended (subscription_expiry, manual stop, etc.)
+// and feeding the once-per-hour suspension-email loop. Each branch must refuse
+// to forward unless the DO status is strictly 'running'.
+describe('proxy refuses to wake stopped instances', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const baseEnv = () => ({
+    NEXTAUTH_SECRET: 'nextauth-secret',
+    GATEWAY_TOKEN_SECRET: 'gateway-secret',
+    KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+    KILOCLAW_INSTANCE_URL_SCHEME: 'https',
+    FLY_API_TOKEN: 'fly-token',
+    FLY_APP_NAME: 'test-app',
+  });
+
+  const stoppedStatus = {
+    userId: 'user-1',
+    sandboxId: 'ki_550e8400e29b41d4a716446655440000',
+    status: 'stopped' as const,
+    provider: 'fly' as const,
+    // runtimeId is still set: a stopped Fly machine retains its machine ID;
+    // only the Fly state transitions to "stopped".
+    runtimeId: 'machine-1',
+    flyMachineId: 'machine-1',
+    flyAppName: 'test-app',
+    controllerCapabilitiesVersion: 2,
+  };
+
+  it('returns 409 for the /i/:instanceId branch and never proxies', async () => {
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue(stoppedStatus),
+      getRoutingTarget: vi.fn(),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+
+    const response = await app.fetch(
+      new Request('https://example.com/i/550e8400-e29b-41d4-a716-446655440000/api/foo'),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Instance not running',
+      hint: 'Start it from the dashboard.',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(instanceStub.getRoutingTarget).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 for the host-based branch and never proxies', async () => {
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue(stoppedStatus),
+      getRoutingTarget: vi.fn(),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+
+    const response = await app.fetch(
+      new Request('https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai/api/foo'),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Instance not running',
+      hint: 'Start it from the dashboard.',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(instanceStub.getRoutingTarget).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 for the cookie-routed branch and never proxies', async () => {
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue(stoppedStatus),
+      getRoutingTarget: vi.fn(),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+
+    const response = await app.fetch(
+      new Request('https://example.com/', {
+        headers: {
+          Cookie: `${KILOCLAW_ACTIVE_INSTANCE_COOKIE}=550e8400-e29b-41d4-a716-446655440000`,
+        },
+      }),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Instance not running',
+      hint: 'Start it from the dashboard.',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(instanceStub.getRoutingTarget).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 for the default catch-all branch and never proxies', async () => {
+    const registryStub = {
+      listInstances: vi.fn().mockResolvedValue([
+        {
+          doKey: 'user-1',
+          instanceId: '',
+          assignedUserId: 'user-1',
+          createdAt: new Date().toISOString(),
+          destroyedAt: null,
+        },
+      ]),
+    };
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue(stoppedStatus),
+      getRoutingTarget: vi.fn(),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+
+    const response = await app.fetch(
+      new Request('https://example.com/'),
+      {
+        ...baseEnv(),
+        KILOCLAW_REGISTRY: {
+          idFromName: vi.fn().mockReturnValue('registry-id'),
+          get: vi.fn().mockReturnValue(registryStub),
+        },
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Instance not running',
+      hint: 'Start it from the dashboard.',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(instanceStub.getRoutingTarget).not.toHaveBeenCalled();
+  });
+});
+
 describe('kilo-chat webhook delivery', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());

@@ -199,13 +199,14 @@ describe('instance lifecycle async resume', () => {
     );
   });
 
-  it('completes async auto-resume for the correct instance and clears retry state', async () => {
+  it('completes async auto-resume for an active subscription and clears retry state', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
     selectResultsQueue.push(
       [{ id: instanceId, sandbox_id: sandboxId }],
       [
         {
+          status: 'active',
           suspended_at: '2026-04-07T20:00:00.000Z',
           auto_resume_requested_at: '2026-04-07T20:05:00.000Z',
           auto_resume_retry_after: '2026-04-07T22:05:00.000Z',
@@ -217,8 +218,8 @@ describe('instance lifecycle async resume', () => {
           id: 'sub-1',
           user_id: 'user-1',
           instance_id: instanceId,
-          plan: 'trial',
-          status: 'canceled',
+          plan: 'standard',
+          status: 'active',
           suspended_at: '2026-04-07T20:00:00.000Z',
           destruction_deadline: '2026-04-14T20:00:00.000Z',
           auto_resume_requested_at: '2026-04-07T20:05:00.000Z',
@@ -251,6 +252,67 @@ describe('instance lifecycle async resume', () => {
     );
   });
 
+  it('does not clear suspension state for a canceled subscription on stale ready callback', async () => {
+    // Regression: a stopped instance suspended by subscription_expiry could be
+    // woken by Fly Proxy if the worker proxied to it. The resulting controller
+    // checkin would fire the instance-ready callback, and previously this
+    // function would treat any non-null suspended_at as a pending auto-resume
+    // and wipe both the suspension state and the once-per-lifecycle email log.
+    // The next billing sweep would then re-stop and re-email.
+    // Per .specs/kiloclaw-billing.md §1132.1, auto-resume completion fires
+    // only on a transition to active status.
+    const instanceId = '11111111-1111-4111-8111-111111111111';
+    const sandboxId = 'ki_11111111111141118111111111111111';
+    selectResultsQueue.push(
+      [{ id: instanceId, sandbox_id: sandboxId }],
+      [
+        {
+          status: 'canceled',
+          suspended_at: '2026-04-07T20:00:00.000Z',
+          auto_resume_requested_at: null,
+          auto_resume_retry_after: null,
+          auto_resume_attempt_count: 0,
+        },
+      ]
+    );
+
+    const result = await completeAutoResumeIfReady('user-1', sandboxId, instanceId);
+
+    expect(result).toEqual({ instanceId, resumeCompleted: false });
+    expect(mockDb.transaction).not.toHaveBeenCalled();
+    expect(txUpdateSetCalls).toHaveLength(0);
+    expect(deleteWhereCalls).toHaveLength(0);
+    expect(txInsertValues).toHaveLength(0);
+  });
+
+  it('does not clear suspension state for a past_due subscription on stale ready callback', async () => {
+    // past_due has not transitioned to active yet (the credit-renewal sweep
+    // sets status to active before invoking auto-resume). A ready callback
+    // arriving while still past_due is stale state, not a recovery signal.
+    const instanceId = '11111111-1111-4111-8111-111111111111';
+    const sandboxId = 'ki_11111111111141118111111111111111';
+    selectResultsQueue.push(
+      [{ id: instanceId, sandbox_id: sandboxId }],
+      [
+        {
+          status: 'past_due',
+          suspended_at: '2026-04-07T20:00:00.000Z',
+          auto_resume_requested_at: '2026-04-07T20:05:00.000Z',
+          auto_resume_retry_after: '2026-04-07T22:05:00.000Z',
+          auto_resume_attempt_count: 1,
+        },
+      ]
+    );
+
+    const result = await completeAutoResumeIfReady('user-1', sandboxId, instanceId);
+
+    expect(result).toEqual({ instanceId, resumeCompleted: false });
+    expect(mockDb.transaction).not.toHaveBeenCalled();
+    expect(txUpdateSetCalls).toHaveLength(0);
+    expect(deleteWhereCalls).toHaveLength(0);
+    expect(txInsertValues).toHaveLength(0);
+  });
+
   it('clears auto-resume state when readiness arrives after the instance is already gone', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
@@ -280,6 +342,7 @@ describe('instance lifecycle async resume', () => {
       [{ id: instanceId, sandbox_id: sandboxId }],
       [
         {
+          status: 'active',
           suspended_at: null,
           auto_resume_requested_at: null,
           auto_resume_retry_after: null,

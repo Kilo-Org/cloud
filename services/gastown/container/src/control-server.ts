@@ -42,6 +42,11 @@ import { classifyStartupError } from './startup-error';
 const MAX_TICKETS = 1000;
 const streamTickets = new Map<string, { agentId: string; expiresAt: number }>();
 
+const RefreshTokenRequest = z.object({
+  token: z.string().min(1),
+  townId: z.string().optional(),
+});
+
 // Minimal Zod schema for the town config delivered via X-Town-Config header.
 // Uses z.record() so any string-keyed object is accepted and future keys are preserved.
 const TownConfigHeader = z.record(z.string(), z.unknown());
@@ -96,6 +101,8 @@ function syncTownConfigToProcessEnv(): void {
   if (!cfg) return;
 
   const CONFIG_ENV_MAP: Array<[string, string]> = [
+    ['town_id', 'GASTOWN_TOWN_ID'],
+    ['gastown_api_url', 'GASTOWN_API_URL'],
     ['github_cli_pat', 'GITHUB_CLI_PAT'],
     ['git_author_name', 'GASTOWN_GIT_AUTHOR_NAME'],
     ['git_author_email', 'GASTOWN_GIT_AUTHOR_EMAIL'],
@@ -177,6 +184,7 @@ app.use('*', async (c, next) => {
       const result = TownConfigHeader.safeParse(raw);
       if (result.success) {
         lastKnownTownConfig = result.data;
+        syncTownConfigToProcessEnv();
         const hasToken =
           typeof result.data.kilocode_token === 'string' && result.data.kilocode_token.length > 0;
         console.log(
@@ -261,11 +269,12 @@ app.post('/dashboard-context', async c => {
 // server — matching the model hot-swap path.
 app.post('/refresh-token', async c => {
   const body: unknown = await c.req.json().catch(() => null);
-  if (!body || typeof body !== 'object' || !('token' in body) || typeof body.token !== 'string') {
-    return c.json({ error: 'Missing or invalid token field' }, 400);
+  const parsed = RefreshTokenRequest.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
   }
   // Capture the new token into a local so it survives the await below.
-  const newToken = body.token;
+  const newToken = parsed.data.token;
 
   // Wait for boot hydration to release the global sdkServerLock before
   // we mutate process.env or serialise N agent restarts through it.
@@ -277,6 +286,9 @@ app.post('/refresh-token', async c => {
 
   // Now safe to assign: hydration is done, no concurrent env readers.
   process.env.GASTOWN_CONTAINER_TOKEN = newToken;
+  if (parsed.data.townId) {
+    process.env.GASTOWN_TOWN_ID = parsed.data.townId;
+  }
 
   const activeAgents = listAgents().filter(a => a.status === 'running' || a.status === 'starting');
   log.info('refresh_token.received', {
@@ -304,9 +316,8 @@ app.post('/refresh-token', async c => {
 
 // POST /sync-config
 // Push config-derived env vars from X-Town-Config into process.env on
-// the running container. Called by TownDO.syncConfigToContainer() after
-// persisting env vars to DO storage, so the live process picks up
-// changes (e.g. refreshed KILOCODE_TOKEN) without a container restart.
+// the running container, so the live process picks up changes (e.g.
+// refreshed KILOCODE_TOKEN) without a container restart.
 app.post('/sync-config', async c => {
   syncTownConfigToProcessEnv();
   return c.json({ synced: true });
@@ -339,6 +350,10 @@ app.post('/agents/start', async c => {
   // config rebuilds (e.g. model hot-swap). The env var is the primary
   // source of truth; KILO_CONFIG_CONTENT extraction is the fallback.
   process.env.GASTOWN_ORGANIZATION_ID = parsed.data.organizationId ?? '';
+  process.env.GASTOWN_TOWN_ID = parsed.data.townId;
+  if (parsed.data.envVars?.GASTOWN_CONTAINER_TOKEN) {
+    process.env.GASTOWN_CONTAINER_TOKEN = parsed.data.envVars.GASTOWN_CONTAINER_TOKEN;
+  }
 
   console.log(
     `[control-server] /agents/start: role=${parsed.data.role} name=${parsed.data.name} rigId=${parsed.data.rigId} agentId=${parsed.data.agentId}`
@@ -680,10 +695,14 @@ app.post('/git/merge', async c => {
 // Called by the process-manager when the agent goes idle.
 app.get('/agents/:agentId/pending-nudges', async c => {
   const { agentId } = c.req.param();
-  const apiUrl = process.env.GASTOWN_API_URL;
-  const token = process.env.GASTOWN_CONTAINER_TOKEN ?? process.env.GASTOWN_SESSION_TOKEN;
-  const townId = process.env.GASTOWN_TOWN_ID;
-  const rigId = process.env.GASTOWN_RIG_ID;
+  const agent = getAgentStatus(agentId);
+  const apiUrl = agent?.gastownApiUrl ?? process.env.GASTOWN_API_URL;
+  const token =
+    process.env.GASTOWN_CONTAINER_TOKEN ??
+    agent?.gastownContainerToken ??
+    agent?.gastownSessionToken;
+  const townId = agent?.townId ?? process.env.GASTOWN_TOWN_ID;
+  const rigId = agent?.rigId;
 
   if (!apiUrl || !token || !townId || !rigId) {
     return c.json({ error: 'Missing gastown configuration' }, 503);
@@ -713,10 +732,14 @@ app.get('/agents/:agentId/pending-nudges', async c => {
 // Body: { nudge_id: string }
 app.post('/agents/:agentId/nudge-delivered', async c => {
   const { agentId } = c.req.param();
-  const apiUrl = process.env.GASTOWN_API_URL;
-  const token = process.env.GASTOWN_CONTAINER_TOKEN ?? process.env.GASTOWN_SESSION_TOKEN;
-  const townId = process.env.GASTOWN_TOWN_ID;
-  const rigId = process.env.GASTOWN_RIG_ID;
+  const agent = getAgentStatus(agentId);
+  const apiUrl = agent?.gastownApiUrl ?? process.env.GASTOWN_API_URL;
+  const token =
+    process.env.GASTOWN_CONTAINER_TOKEN ??
+    agent?.gastownContainerToken ??
+    agent?.gastownSessionToken;
+  const townId = agent?.townId ?? process.env.GASTOWN_TOWN_ID;
+  const rigId = agent?.rigId;
 
   if (!apiUrl || !token || !townId || !rigId) {
     return c.json({ error: 'Missing gastown configuration' }, 503);

@@ -4880,7 +4880,13 @@ export class TownDO extends DurableObject<Env> {
       // actually starts the container. Already-running containers still rely
       // on the /health probe below as the application-level liveness source.
       try {
-        const warm = await container.warmUp();
+        const townConfig = await this.getTownConfig();
+        const userId = townConfig.owner_user_id ?? townConfig.created_by_user_id ?? townId;
+        const containerToken = await dispatch.mintContainerToken(this.env, { townId, userId });
+        const warm = await container.warmUp({
+          townId,
+          ...(containerToken ? { containerToken } : {}),
+        });
         if (warm.coldStart) {
           writeEvent(this.env, {
             event: 'container.cold_start',

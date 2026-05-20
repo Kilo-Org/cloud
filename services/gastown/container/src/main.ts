@@ -2,16 +2,17 @@ import { startControlServer } from './control-server';
 import { log } from './logger';
 import { activeAgentCount, bootHydration, getUptime, listAgents } from './process-manager';
 
-// Container-scoped identifiers for crash/diagnostic logs. The container is
-// pinned to a single town for its lifetime (see GASTOWN_TOWN_ID injection in
-// the deployer), so reading these once at module init is safe and lets us
-// emit them even when no agents are registered yet.
-const TOWN_ID = process.env.GASTOWN_TOWN_ID ?? null;
+// Container-scoped identifier for crash/diagnostic logs. It can arrive at
+// boot via container start options or shortly after via the first control
+// request, so read it when logging instead of capturing module-init state.
+function townIdForLogs(): string | null {
+  return process.env.GASTOWN_TOWN_ID ?? null;
+}
 
 log.info('container.cold_start', {
   uptime: getUptime(),
   ts: new Date().toISOString(),
-  townId: TOWN_ID,
+  townId: townIdForLogs(),
 });
 
 // Bun (like Node) will ignore unhandled promise rejections unless a handler
@@ -30,7 +31,7 @@ process.on('unhandledRejection', reason => {
       : { message: String(reason) };
   log.error('container.unhandled_rejection', {
     ...err,
-    townId: TOWN_ID,
+    townId: townIdForLogs(),
     uptimeMs: getUptime(),
     activeAgents: activeAgentCount(),
   });
@@ -41,7 +42,7 @@ process.on('uncaughtException', err => {
     message: err.message,
     stack: err.stack,
     name: err.name,
-    townId: TOWN_ID,
+    townId: townIdForLogs(),
     uptimeMs: getUptime(),
     activeAgents: activeAgentCount(),
   });
@@ -68,7 +69,7 @@ setInterval(() => {
       heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
       heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
       externalMB: Math.round(mem.external / 1024 / 1024),
-      townId: TOWN_ID,
+      townId: townIdForLogs(),
       uptimeMs: getUptime(),
       agents: listAgents().length,
       activeAgents: activeAgentCount(),

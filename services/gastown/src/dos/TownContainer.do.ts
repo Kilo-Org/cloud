@@ -58,7 +58,10 @@ export class TownContainerDO extends Container<Env> {
    * Returns how long startAndWaitForPorts took when this call actually
    * triggered a cold start.
    */
-  async warmUp(): Promise<{ coldStart: boolean; durationMs: number }> {
+  async warmUp(params: {
+    townId: string;
+    containerToken?: string;
+  }): Promise<{ coldStart: boolean; durationMs: number }> {
     if (this.ctx.container?.running === true) {
       // Runtime-level fast path only. TownDO's /health probe is the
       // application-level liveness source and may still recover a wedged
@@ -66,7 +69,15 @@ export class TownContainerDO extends Container<Env> {
       return { coldStart: false, durationMs: 0 };
     }
     const t0 = Date.now();
-    await this.startAndWaitForPorts();
+    await this.startAndWaitForPorts({
+      startOptions: {
+        envVars: {
+          ...this.envVars,
+          GASTOWN_TOWN_ID: params.townId,
+          ...(params.containerToken ? { GASTOWN_CONTAINER_TOKEN: params.containerToken } : {}),
+        },
+      },
+    });
     return { coldStart: true, durationMs: Date.now() - t0 };
   }
 

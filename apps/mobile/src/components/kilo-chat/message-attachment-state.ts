@@ -42,6 +42,14 @@ type AttachmentSelectionResult = {
   toast?: string;
 };
 
+type AddFilesWithinCapacityInput<TInput> = {
+  inputs: readonly TInput[];
+  capacity: number;
+  addFile: (input: TInput) => string | null;
+  onAcceptedFile?: (input: TInput, tempId: string) => void;
+  onLimitExceeded: () => void;
+};
+
 export function getAttachmentActionSheetConfig(): AttachmentActionSheetConfig {
   return {
     options: ATTACHMENT_ACTION_SHEET_OPTIONS,
@@ -73,6 +81,34 @@ export function buildAttachmentLimitToast(): string {
 
 export function buildAttachmentSizeRejectionToast(filename: string): string {
   return `${filename} exceeds the ${formatFileSize(ATTACHMENT_MAX_BYTES)} attachment limit.`;
+}
+
+export function addFilesWithinAttachmentCapacity<TInput>({
+  inputs,
+  capacity,
+  addFile,
+  onAcceptedFile,
+  onLimitExceeded,
+}: AddFilesWithinCapacityInput<TInput>) {
+  const maxAccepted = Math.max(capacity, 0);
+  let acceptedCount = 0;
+  let limitExceeded = false;
+
+  for (const input of inputs) {
+    if (acceptedCount >= maxAccepted) {
+      limitExceeded = true;
+    } else {
+      const tempId = addFile(input);
+      if (tempId !== null) {
+        acceptedCount += 1;
+        onAcceptedFile?.(input, tempId);
+      }
+    }
+  }
+
+  if (limitExceeded) {
+    onLimitExceeded();
+  }
 }
 
 export function selectAllowedAttachments({

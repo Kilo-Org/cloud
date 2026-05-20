@@ -48,6 +48,7 @@ import {
 } from './message-input-state';
 import { MessageAttachmentPreviewStrip } from './message-attachment-preview-strip';
 import {
+  addFilesWithinAttachmentCapacity,
   buildAttachmentLimitToast,
   buildAttachmentSizeRejectionToast,
   getAttachmentActionSheetConfig,
@@ -187,19 +188,20 @@ function MessageInputWithAttachmentQueue({
   const addFiles = useCallback(
     (inputs: AddFileInput[]) => {
       const capacity = Math.max(MESSAGE_ATTACHMENT_MAX_COUNT - queue.rows.length, 0);
-      const accepted = inputs.slice(0, capacity);
-
-      if (inputs.length > accepted.length) {
-        toast.error(buildAttachmentLimitToast());
-      }
-
-      for (const input of accepted) {
-        const tempId = queue.addFile(input);
-        const localUri = localUriFromInput(input);
-        if (tempId && localUri) {
-          localUrisRef.current.set(tempId, localUri);
-        }
-      }
+      addFilesWithinAttachmentCapacity({
+        inputs,
+        capacity,
+        addFile: queue.addFile,
+        onAcceptedFile: (input, tempId) => {
+          const localUri = localUriFromInput(input);
+          if (tempId && localUri) {
+            localUrisRef.current.set(tempId, localUri);
+          }
+        },
+        onLimitExceeded: () => {
+          toast.error(buildAttachmentLimitToast());
+        },
+      });
     },
     [queue]
   );

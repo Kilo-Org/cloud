@@ -2,6 +2,7 @@ import { ATTACHMENT_MAX_BYTES } from '@kilocode/kilo-chat';
 import { describe, expect, it } from 'vitest';
 
 import {
+  addFilesWithinAttachmentCapacity,
   buildAttachmentLimitToast,
   buildAttachmentSizeRejectionToast,
   getAttachmentActionSheetConfig,
@@ -141,5 +142,30 @@ describe('message attachment state helpers', () => {
       'large.mov exceeds the 100 MB attachment limit.'
     );
     expect(buildAttachmentLimitToast()).toBe('You can attach up to 10 files.');
+  });
+
+  it('only consumes attachment capacity when the queue accepts a selected file', () => {
+    const addFileCalls: string[] = [];
+    const acceptedFiles: { filename: string; tempId: string }[] = [];
+    let limitToastCount = 0;
+
+    addFilesWithinAttachmentCapacity({
+      inputs: [{ filename: 'large.mov' }, { filename: 'small.txt' }],
+      capacity: 1,
+      addFile: input => {
+        addFileCalls.push(input.filename);
+        return input.filename === 'large.mov' ? null : `temp-${input.filename}`;
+      },
+      onAcceptedFile: (input, tempId) => {
+        acceptedFiles.push({ filename: input.filename, tempId });
+      },
+      onLimitExceeded: () => {
+        limitToastCount += 1;
+      },
+    });
+
+    expect(addFileCalls).toEqual(['large.mov', 'small.txt']);
+    expect(acceptedFiles).toEqual([{ filename: 'small.txt', tempId: 'temp-small.txt' }]);
+    expect(limitToastCount).toBe(0);
   });
 });

@@ -14,7 +14,7 @@
  * 5. Trigger dispatch for pending fixes
  *
  * URL: POST /api/internal/auto-fix/pr-callback?ticketId=<ticketId>
- * Protected by scoped callback token, with rollout compatibility for legacy internal-secret callbacks
+ * Protected by scoped callback token
  *
  * Note: This callback is invoked by Cloud Agent when execution reaches a terminal state.
  * For label-triggered tickets, this endpoint creates the PR.
@@ -27,7 +27,7 @@ import { tryDispatchPendingFixes } from '@/lib/auto-fix/dispatch/dispatch-pendin
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { CALLBACK_TOKEN_SECRET, INTERNAL_API_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { postIssueComment } from '@/lib/auto-fix/github/post-comment';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
@@ -80,9 +80,7 @@ export async function POST(req: NextRequest) {
         scope: 'auto-fix-pr-callback',
         resourceParts: [callbackTicketId],
       }));
-    const legacySecret = req.headers.get('X-Internal-Secret');
-    const validLegacySecret = !!INTERNAL_API_SECRET && legacySecret === INTERNAL_API_SECRET;
-    if (!validCallbackToken && !validLegacySecret) {
+    if (!validCallbackToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -114,7 +112,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
     }
 
-    if (validCallbackToken && ticket.id !== callbackTicketId) {
+    if (ticket.id !== callbackTicketId) {
       logExceptInTest('[auto-fix-pr-callback] Callback ticket binding mismatch', {
         callbackTicketId,
         sessionId,

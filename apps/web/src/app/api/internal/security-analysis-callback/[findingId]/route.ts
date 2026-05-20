@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
-import { CALLBACK_TOKEN_SECRET, INTERNAL_API_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { getSecurityFindingById } from '@/lib/security-agent/db/security-findings';
 import {
@@ -91,9 +91,7 @@ export async function POST(
         scope: 'security-analysis-callback',
         resourceParts: [findingId],
       }));
-    const legacySecret = req.headers.get('X-Internal-Secret');
-    const validLegacySecret = !!INTERNAL_API_SECRET && legacySecret === INTERNAL_API_SECRET;
-    if (!validCallbackToken && !validLegacySecret) {
+    if (!validCallbackToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

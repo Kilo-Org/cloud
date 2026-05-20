@@ -682,7 +682,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     }
   ): Promise<UpdateStatusResult> {
     // Use path-based endpoint (same as callback endpoint for consistency)
-    const url = callbackUrlForAttempt(this.env.API_URL, this.state.reviewId, this.state.attemptId);
+    const callbackTarget = await callbackTargetForAttempt(
+      this.env.API_URL,
+      this.state.reviewId,
+      this.state.attemptId,
+      this.env.CALLBACK_TOKEN_SECRET
+    );
 
     // Payload without reviewId (it's in the URL path)
     const payload = {
@@ -694,11 +699,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       terminalReason: options?.terminalReason,
     };
 
-    const response = await fetch(url, {
+    const response = await fetch(callbackTarget.url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
+        ...callbackTarget.headers,
       },
       body: JSON.stringify(payload),
     });
@@ -1475,17 +1480,17 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
       // Build session input with callback for reliable completion notification
       // The callback URL includes reviewId in the path so cloud agent stays generic
+      const callbackTarget = await callbackTargetForAttempt(
+        this.env.API_URL,
+        this.state.reviewId,
+        this.state.attemptId,
+        this.env.CALLBACK_TOKEN_SECRET
+      );
       const sessionInputWithCallback = {
         ...this.state.sessionInput,
         createdOnPlatform: 'code-review',
-        callbackUrl: callbackUrlForAttempt(
-          this.env.API_URL,
-          this.state.reviewId,
-          this.state.attemptId
-        ),
-        callbackHeaders: {
-          'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
-        },
+        callbackUrl: callbackTarget.url,
+        callbackHeaders: callbackTarget.headers,
       };
 
       // Build tRPC SSE endpoint with query parameter

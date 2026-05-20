@@ -121,13 +121,13 @@ describe('webhook execution callback auth', () => {
     expect(getRequest).not.toHaveBeenCalled();
   });
 
-  it('keeps raw internal-key callbacks working during rollout', async () => {
-    const { env, updateRequest } = createRouteHarness();
+  it('rejects raw internal-key callbacks without a scoped token', async () => {
+    const { env, getRequest } = createRouteHarness();
 
     const response = await requestCallback(env, { legacySecret: INTERNAL_SECRET });
 
-    expect(response.status).toBe(200);
-    expect(updateRequest).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(401);
+    expect(getRequest).not.toHaveBeenCalled();
   });
 
   it('keeps session mismatch guard after callback authentication', async () => {

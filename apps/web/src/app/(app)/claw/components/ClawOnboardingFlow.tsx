@@ -27,7 +27,7 @@ import {
   INTEREST_TOPIC_PRESETS,
   MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION,
 } from '@/lib/kiloclaw/morning-briefing-interests';
-import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
+import { controllerCalverSupports } from '@/lib/kiloclaw/version';
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
@@ -150,12 +150,14 @@ function ClawOnboardingFlowInner({
   const controllerVersionQuery = useClawControllerVersion(status?.status === 'running');
   // Narrow off the instance-not-running sentinel so `.version` is safe.
   const controllerVersion = controllerVersionOk(controllerVersionQuery.data);
-  const controllerSupportsInterests =
-    controllerVersionQuery.isPending ||
-    calverAtLeast(
-      cleanVersion(controllerVersion?.version),
-      MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION
-    );
+  // Fail OPEN: keep the interests step unless the controller version is
+  // positively parsed as too old. Missing / still-loading / unparseable
+  // versions are treated as supported — the worker's
+  // `controller_route_unavailable` 404 on save is the real backstop.
+  const controllerSupportsInterests = controllerCalverSupports(
+    controllerVersion?.version,
+    MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION
+  );
   const hasInterestsStep = isAdminForInterests && controllerSupportsInterests;
 
   const gatewayUrl = useGatewayUrl(status);

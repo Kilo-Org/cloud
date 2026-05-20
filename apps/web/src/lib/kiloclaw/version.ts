@@ -48,6 +48,32 @@ export function calverAtLeast(version: string | null | undefined, minVersion: st
   return true;
 }
 
+/**
+ * Capability gate for controller-calver-gated UI features.
+ *
+ * Unlike `calverAtLeast` — which fails CLOSED on missing or malformed
+ * input, the correct behaviour for upgrade detection — this fails OPEN.
+ * It returns `false` only when `version` is a well-formed calver that is
+ * definitively older than `minVersion`. A missing, still-loading, or
+ * unparseable controller version is treated as supporting the feature.
+ *
+ * Rationale: the worker's `controller_route_unavailable` 404 on save is
+ * the real backstop for genuinely-old images. A false "upgrade required"
+ * banner on a current instance — e.g. when the version probe is briefly
+ * unavailable, errors, or returns a format the parser doesn't recognise
+ * — is a worse UX than optimistically showing the control and letting a
+ * rare stale-image save fail with a toast.
+ */
+export function controllerCalverSupports(
+  version: string | null | undefined,
+  minVersion: string
+): boolean {
+  // Unknown / unparseable version → optimistic. Only a version we can
+  // positively parse AND place below the threshold gates the feature off.
+  if (!parseCalver(version)) return true;
+  return calverAtLeast(version, minVersion);
+}
+
 function parseCalver(version: string | null | undefined): [number, number, number, number] | null {
   const cleaned = cleanVersion(version);
   if (!cleaned) return null;

@@ -26,7 +26,7 @@ import { useUser } from '@/hooks/useUser';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus, MorningBriefingStatusLite } from '@/lib/kiloclaw/types';
 import { morningBriefingStatusOk } from '@/lib/kiloclaw/types';
-import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
+import { calverAtLeast, cleanVersion, controllerCalverSupports } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import {
   useClawConfig,
@@ -2004,19 +2004,17 @@ export function SettingsTab({
     cleanVersion(controllerVersion?.version),
     OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION
   );
-  // Optimistic during the version query so we don't briefly flash
-  // "Upgrade required" while loading. Matches the onboarding-flow guard
-  // in `ClawOnboardingFlow.tsx` (`controllerVersionQuery.isPending ||
-  // calverAtLeast(...)`). Important for hook stability too — the editor
-  // returns early when this is false, so a false→true transition mid-
-  // session would otherwise trip the rules-of-hooks check on the next
-  // render.
-  const supportsBriefingInterests =
-    isLoadingControllerVersion ||
-    calverAtLeast(
-      cleanVersion(controllerVersion?.version),
-      MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION
-    );
+  // Fail OPEN: only hide the interests editor when the controller
+  // version is positively parsed as too old. A missing / still-loading /
+  // errored / unparseable version keeps the editor visible — the
+  // worker's `controller_route_unavailable` 404 on save is the real
+  // backstop, and a false "Upgrade required" on a current instance is a
+  // worse UX. Also keeps hook count stable (the editor early-returns on
+  // false) since unknown states no longer flip the gate.
+  const supportsBriefingInterests = controllerCalverSupports(
+    controllerVersion?.version,
+    MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION
+  );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;

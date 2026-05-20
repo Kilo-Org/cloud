@@ -24,7 +24,8 @@ export type AttachmentQueueAction =
   | { type: 'setFailed'; tempId: string; error: string }
   | { type: 'retry'; tempId: string }
   | { type: 'remove'; tempId: string }
-  | { type: 'clear' };
+  | { type: 'clear' }
+  | { type: 'clearFiles'; tempIds: string[] };
 
 function clamp01(n: number): number {
   if (n < 0) return 0;
@@ -90,6 +91,10 @@ export function attachmentQueueReducer(
       return { rows: state.rows.filter(r => r.tempId !== action.tempId) };
     case 'clear':
       return { rows: [] };
+    case 'clearFiles': {
+      const ids = new Set(action.tempIds);
+      return { rows: state.rows.filter(r => !ids.has(r.tempId)) };
+    }
   }
 }
 
@@ -142,6 +147,7 @@ export type UseAttachmentQueueResult = {
   removeFile: (tempId: string) => void;
   retryFile: (tempId: string) => void;
   clear: () => void;
+  clearFiles: (tempIds: string[]) => void;
   getBlob: (tempId: string) => Blob | null;
   readyBlocks: AttachmentBlock[];
   isUploading: boolean;
@@ -293,6 +299,16 @@ export function useAttachmentQueue(
     dispatch({ type: 'clear' });
   }, []);
 
+  const clearFiles = useCallback((tempIds: string[]) => {
+    for (const tempId of tempIds) {
+      const pending = pendingRef.current.get(tempId);
+      pending?.abort.abort();
+      pendingRef.current.delete(tempId);
+      blobsRef.current.delete(tempId);
+    }
+    dispatch({ type: 'clearFiles', tempIds });
+  }, []);
+
   const getBlob = useCallback((tempId: string) => blobsRef.current.get(tempId) ?? null, []);
 
   useEffect(() => {
@@ -313,6 +329,7 @@ export function useAttachmentQueue(
     removeFile,
     retryFile,
     clear,
+    clearFiles,
     getBlob,
     readyBlocks,
     isUploading,

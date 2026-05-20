@@ -92,6 +92,12 @@ describe('attachmentQueueReducer', () => {
     const next = reduce(s, { type: 'clear' });
     expect(next.rows).toEqual([]);
   });
+
+  it('clearFiles removes only submitted attachment rows', () => {
+    const s = state([row({ tempId: 'submitted' }), row({ tempId: 'next-message' })]);
+    const next = reduce(s, { type: 'clearFiles', tempIds: ['submitted'] });
+    expect(next.rows.map(r => r.tempId)).toEqual(['next-message']);
+  });
 });
 
 describe('queue selectors', () => {

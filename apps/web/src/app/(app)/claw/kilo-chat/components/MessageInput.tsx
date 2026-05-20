@@ -175,6 +175,9 @@ export function MessageInput({
     if (trimmed.length > 0) blocks.push({ type: 'text', text: trimmed });
     for (const block of queue.readyBlocks) blocks.push(block);
     if (blocks.length === 0) return;
+    const submittedAttachmentTempIds = queue.rows
+      .filter(row => row.status === 'ready' && typeof row.attachmentId === 'string')
+      .map(row => row.tempId);
     const submittedState = { text, replyingTo };
     setIsSubmitting(true);
     try {
@@ -184,7 +187,7 @@ export function MessageInput({
       latestStateRef.current = nextState;
       setText(nextState.text);
       if (sendSucceeded) {
-        queue.clear();
+        queue.clearFiles(submittedAttachmentTempIds);
       }
       if (currentState.replyingTo !== null && nextState.replyingTo === null) onCancelReply();
     } finally {

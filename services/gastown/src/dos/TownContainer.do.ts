@@ -60,14 +60,25 @@ export class TownContainerDO extends Container<Env> {
    * /health ping — gives an accurate cold-start measurement without being
    * capped by an arbitrary client-side timeout.
    */
-  async warmUp(): Promise<{ coldStart: boolean; durationMs: number }> {
+  async warmUp(params: {
+    townId: string;
+    containerToken?: string;
+  }): Promise<{ coldStart: boolean; durationMs: number }> {
     const state = await this.getState();
     const alreadyHealthy = this.ctx.container?.running === true && state.status === 'healthy';
     if (alreadyHealthy) {
       return { coldStart: false, durationMs: 0 };
     }
     const t0 = Date.now();
-    await this.startAndWaitForPorts();
+    await this.startAndWaitForPorts({
+      startOptions: {
+        envVars: {
+          ...this.envVars,
+          GASTOWN_TOWN_ID: params.townId,
+          ...(params.containerToken ? { GASTOWN_CONTAINER_TOKEN: params.containerToken } : {}),
+        },
+      },
+    });
     return { coldStart: true, durationMs: Date.now() - t0 };
   }
 

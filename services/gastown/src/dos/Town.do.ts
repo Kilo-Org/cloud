@@ -4814,7 +4814,13 @@ export class TownDO extends DurableObject<Env> {
       // 5s truncation of a plain /health ping. For already-warm containers
       // this is a cheap RPC that returns { coldStart: false }.
       try {
-        const warm = await container.warmUp();
+        const townConfig = await this.getTownConfig();
+        const userId = townConfig.owner_user_id ?? townConfig.created_by_user_id ?? townId;
+        const containerToken = await dispatch.mintContainerToken(this.env, { townId, userId });
+        const warm = await container.warmUp({
+          townId,
+          ...(containerToken ? { containerToken } : {}),
+        });
         if (warm.coldStart) {
           writeEvent(this.env, {
             event: 'container.cold_start',

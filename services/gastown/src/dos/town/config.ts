@@ -330,6 +330,7 @@ export async function buildContainerConfig(
   }
 
   return {
+    town_id: townId,
     env_vars: config.env_vars,
     default_model: resolveModel(config, null, ''),
     small_model: resolveSmallModel(config),

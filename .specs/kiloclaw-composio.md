@@ -160,13 +160,15 @@ provisioned.
     or anonymization.
 24. Kilo SHOULD store managed Composio identities in owner-scoped
     persistent storage rather than instance-scoped Durable Object state.
+    That storage SHOULD distinguish pending provisioning from active
+    identities.
 25. Managed Composio identity credentials MUST be encrypted at rest.
 26. The KiloClaw worker MUST NOT be the primary creator of persistent
     managed Composio identity records. Persistent identity writes SHOULD
     be owned by the Next.js web app or another explicitly designated
     control-plane service.
-27. At most one active managed Composio identity SHOULD exist per owner
-    scope unless a future spec explicitly supports multiple active
+27. At most one non-revoked managed Composio identity SHOULD exist per
+    owner scope unless a future spec explicitly supports multiple active
     identities.
 
 ### Organization Contexts

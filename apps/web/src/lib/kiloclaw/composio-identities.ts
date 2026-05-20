@@ -15,6 +15,7 @@ import {
   kiloclaw_composio_identities,
   type KiloClawComposioIdentity,
   type KiloClawComposioIdentityOwnerType,
+  type KiloClawComposioIdentityStatus,
   type NewKiloClawComposioIdentity,
 } from '@kilocode/db/schema';
 
@@ -48,7 +49,8 @@ export function composioConsumerUserId(scope: ComposioOwnerScope): string {
   return `kiloclaw:org-user:${scope.organizationId}:${scope.userId}`;
 }
 
-function scopeWhere(scope: ComposioOwnerScope) {
+function scopeWhere(scope: ComposioOwnerScope, status?: KiloClawComposioIdentityStatus) {
+  const statusClause = status ? eq(kiloclaw_composio_identities.status, status) : undefined;
   if (scope.ownerType === 'user') {
     return and(
       eq(
@@ -57,6 +59,7 @@ function scopeWhere(scope: ComposioOwnerScope) {
       ),
       eq(kiloclaw_composio_identities.user_id, scope.userId),
       isNull(kiloclaw_composio_identities.organization_id),
+      statusClause,
       isNull(kiloclaw_composio_identities.revoked_at)
     );
   }
@@ -68,6 +71,7 @@ function scopeWhere(scope: ComposioOwnerScope) {
     ),
     eq(kiloclaw_composio_identities.user_id, scope.userId),
     eq(kiloclaw_composio_identities.organization_id, scope.organizationId),
+    statusClause,
     isNull(kiloclaw_composio_identities.revoked_at)
   );
 }
@@ -78,21 +82,40 @@ async function findActiveComposioIdentity(
   const [row] = await db
     .select()
     .from(kiloclaw_composio_identities)
+    .where(scopeWhere(scope, 'active'))
+    .limit(1);
+  return row ?? null;
+}
+
+async function findCurrentComposioIdentity(
+  scope: ComposioOwnerScope
+): Promise<KiloClawComposioIdentity | null> {
+  const [row] = await db
+    .select()
+    .from(kiloclaw_composio_identities)
     .where(scopeWhere(scope))
     .limit(1);
   return row ?? null;
 }
 
+function requireIdentityField(value: string | null, field: string): string {
+  if (value) return value;
+  throw new Error(`Active Composio identity is missing ${field}`);
+}
+
 function decryptComposioIdentity(row: KiloClawComposioIdentity): DecryptedComposioIdentity {
   const encryptionKey = requireComposioEncryptionKey();
+  const agentKey = requireIdentityField(row.composio_agent_key_encrypted, 'agent key');
+  const userApiKey = requireIdentityField(row.composio_user_api_key_encrypted, 'user API key');
+  const org = requireIdentityField(row.composio_org_id, 'organization');
   return {
     row,
-    agentKey: decryptWithSymmetricKey(row.composio_agent_key_encrypted, encryptionKey),
-    userApiKey: decryptWithSymmetricKey(row.composio_user_api_key_encrypted, encryptionKey),
+    agentKey: decryptWithSymmetricKey(agentKey, encryptionKey),
+    userApiKey: decryptWithSymmetricKey(userApiKey, encryptionKey),
     apiKey: row.composio_api_key_encrypted
       ? decryptWithSymmetricKey(row.composio_api_key_encrypted, encryptionKey)
       : null,
-    org: row.composio_org_id,
+    org,
     consumerUserId: row.composio_consumer_user_id ?? composioConsumerUserId(scopeFromRow(row)),
   };
 }
@@ -118,6 +141,7 @@ function encryptComposioIdentityCredentials(
     owner_type: scope.ownerType,
     user_id: scope.userId,
     organization_id: scope.ownerType === 'organization_user' ? scope.organizationId : null,
+    status: 'pending',
     composio_agent_key_encrypted: encryptWithSymmetricKey(identity.agent_key, encryptionKey),
     composio_user_api_key_encrypted: encryptWithSymmetricKey(
       identity.composio.user_api_key,
@@ -150,7 +174,12 @@ async function encryptComposioIdentity(
   return {
     ...encryptComposioIdentityCredentials(scope, identity),
     ...(await resolveComposioIdentityContext(identity)),
+    status: 'active',
   };
+}
+
+function hasStoredComposioCredentials(row: KiloClawComposioIdentity): boolean {
+  return !!row.composio_agent_key_encrypted && !!row.composio_user_api_key_encrypted;
 }
 
 function needsComposioIdentityRefresh(row: KiloClawComposioIdentity): boolean {
@@ -161,22 +190,22 @@ function needsComposioIdentityRefresh(row: KiloClawComposioIdentity): boolean {
   );
 }
 
-async function insertPendingComposioIdentity(
-  values: NewKiloClawComposioIdentity
+async function createPendingComposioIdentityReservation(
+  scope: ComposioOwnerScope
 ): Promise<KiloClawComposioIdentity> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      const [inserted] = await db.insert(kiloclaw_composio_identities).values(values).returning();
-      if (inserted) return inserted;
-    } catch (error) {
-      lastError = error;
-    }
+  const [inserted] = await db
+    .insert(kiloclaw_composio_identities)
+    .values({
+      owner_type: scope.ownerType,
+      user_id: scope.userId,
+      organization_id: scope.ownerType === 'organization_user' ? scope.organizationId : null,
+      status: 'pending',
+    })
+    .returning();
+  if (!inserted) {
+    throw new Error('Failed to reserve managed Composio identity');
   }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error('Failed to store managed Composio identity');
+  return inserted;
 }
 
 export async function getActiveManagedComposioIdentity(
@@ -190,8 +219,8 @@ export async function ensureManagedComposioIdentity(
   scope: ComposioOwnerScope
 ): Promise<DecryptedComposioIdentity> {
   return await withKiloclawProvisionContextLock(ownerScopeLockKey(scope), async () => {
-    const existing = await findActiveComposioIdentity(scope);
-    if (existing) {
+    const existing = await findCurrentComposioIdentity(scope);
+    if (existing?.status === 'active') {
       const decrypted = decryptComposioIdentity(existing);
       if (!needsComposioIdentityRefresh(existing)) return decrypted;
 
@@ -205,18 +234,27 @@ export async function ensureManagedComposioIdentity(
     }
 
     requireComposioEncryptionKey();
-    const identity = await signupComposioAgentIdentity();
-    const insertedPending = await insertPendingComposioIdentity(
-      encryptComposioIdentityCredentials(scope, identity)
-    );
-    const [updated] = await db
+    const pending = existing ?? (await createPendingComposioIdentityReservation(scope));
+    const identity = hasStoredComposioCredentials(pending)
+      ? await getComposioAgentIdentity(decryptComposioIdentity(pending).agentKey)
+      : await signupComposioAgentIdentity({ idempotencyKey: pending.id });
+    const [storedCredentials] = await db
       .update(kiloclaw_composio_identities)
-      .set(await resolveComposioIdentityContext(identity))
-      .where(eq(kiloclaw_composio_identities.id, insertedPending.id))
+      .set(encryptComposioIdentityCredentials(scope, identity))
+      .where(eq(kiloclaw_composio_identities.id, pending.id))
       .returning();
-    if (!updated) {
+    if (!storedCredentials) {
+      throw new Error('Failed to store managed Composio identity credentials');
+    }
+
+    const [activated] = await db
+      .update(kiloclaw_composio_identities)
+      .set({ ...(await resolveComposioIdentityContext(identity)), status: 'active' })
+      .where(eq(kiloclaw_composio_identities.id, storedCredentials.id))
+      .returning();
+    if (!activated) {
       throw new Error('Failed to resolve managed Composio identity context');
     }
-    return decryptComposioIdentity(updated);
+    return decryptComposioIdentity(activated);
   });
 }

@@ -1,0 +1,10 @@
+DROP INDEX "UQ_kiloclaw_composio_identities_active_user";--> statement-breakpoint
+DROP INDEX "UQ_kiloclaw_composio_identities_active_org_user";--> statement-breakpoint
+ALTER TABLE "kiloclaw_composio_identities" ALTER COLUMN "composio_agent_key_encrypted" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "kiloclaw_composio_identities" ALTER COLUMN "composio_user_api_key_encrypted" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "kiloclaw_composio_identities" ALTER COLUMN "composio_org_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "kiloclaw_composio_identities" ADD COLUMN "status" text DEFAULT 'pending' NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_kiloclaw_composio_identities_current_user" ON "kiloclaw_composio_identities" USING btree ("user_id") WHERE "kiloclaw_composio_identities"."owner_type" = 'user' AND "kiloclaw_composio_identities"."revoked_at" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_kiloclaw_composio_identities_current_org_user" ON "kiloclaw_composio_identities" USING btree ("organization_id","user_id") WHERE "kiloclaw_composio_identities"."owner_type" = 'organization_user' AND "kiloclaw_composio_identities"."revoked_at" IS NULL;--> statement-breakpoint
+ALTER TABLE "kiloclaw_composio_identities" ADD CONSTRAINT "kiloclaw_composio_identities_status_check" CHECK ("kiloclaw_composio_identities"."status" IN ('pending', 'active', 'revoked'));--> statement-breakpoint
+ALTER TABLE "kiloclaw_composio_identities" ADD CONSTRAINT "kiloclaw_composio_identities_active_complete_check" CHECK ("kiloclaw_composio_identities"."status" <> 'active' OR ("kiloclaw_composio_identities"."composio_agent_key_encrypted" IS NOT NULL AND "kiloclaw_composio_identities"."composio_user_api_key_encrypted" IS NOT NULL AND "kiloclaw_composio_identities"."composio_org_id" IS NOT NULL AND "kiloclaw_composio_identities"."composio_project_id" IS NOT NULL AND "kiloclaw_composio_identities"."composio_consumer_user_id" IS NOT NULL AND "kiloclaw_composio_identities"."revoked_at" IS NULL));

@@ -4969,6 +4969,7 @@ export type NewKiloClawGoogleOAuthConnection =
   typeof kiloclaw_google_oauth_connections.$inferInsert;
 
 export type KiloClawComposioIdentityOwnerType = 'user' | 'organization_user';
+export type KiloClawComposioIdentityStatus = 'pending' | 'active' | 'revoked';
 
 export const kiloclaw_composio_identities = pgTable(
   'kiloclaw_composio_identities',
@@ -4982,10 +4983,11 @@ export const kiloclaw_composio_identities = pgTable(
       .notNull()
       .references(() => kilocode_users.id),
     organization_id: uuid().references(() => organizations.id),
-    composio_agent_key_encrypted: text().notNull(),
-    composio_user_api_key_encrypted: text().notNull(),
+    status: text().$type<KiloClawComposioIdentityStatus>().default('pending').notNull(),
+    composio_agent_key_encrypted: text(),
+    composio_user_api_key_encrypted: text(),
     composio_api_key_encrypted: text(),
-    composio_org_id: text().notNull(),
+    composio_org_id: text(),
     composio_org_name: text(),
     composio_project_id: text(),
     composio_consumer_user_id: text(),
@@ -4999,10 +5001,10 @@ export const kiloclaw_composio_identities = pgTable(
     revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [
-    uniqueIndex('UQ_kiloclaw_composio_identities_active_user')
+    uniqueIndex('UQ_kiloclaw_composio_identities_current_user')
       .on(table.user_id)
       .where(sql`${table.owner_type} = 'user' AND ${table.revoked_at} IS NULL`),
-    uniqueIndex('UQ_kiloclaw_composio_identities_active_org_user')
+    uniqueIndex('UQ_kiloclaw_composio_identities_current_org_user')
       .on(table.organization_id, table.user_id)
       .where(sql`${table.owner_type} = 'organization_user' AND ${table.revoked_at} IS NULL`),
     index('IDX_kiloclaw_composio_identities_user').on(table.user_id),
@@ -5012,8 +5014,16 @@ export const kiloclaw_composio_identities = pgTable(
       sql`${table.owner_type} IN ('user', 'organization_user')`
     ),
     check(
+      'kiloclaw_composio_identities_status_check',
+      sql`${table.status} IN ('pending', 'active', 'revoked')`
+    ),
+    check(
       'kiloclaw_composio_identities_owner_scope_check',
       sql`(${table.owner_type} = 'user' AND ${table.organization_id} IS NULL) OR (${table.owner_type} = 'organization_user' AND ${table.organization_id} IS NOT NULL)`
+    ),
+    check(
+      'kiloclaw_composio_identities_active_complete_check',
+      sql`${table.status} <> 'active' OR (${table.composio_agent_key_encrypted} IS NOT NULL AND ${table.composio_user_api_key_encrypted} IS NOT NULL AND ${table.composio_org_id} IS NOT NULL AND ${table.composio_project_id} IS NOT NULL AND ${table.composio_consumer_user_id} IS NOT NULL AND ${table.revoked_at} IS NULL)`
     ),
   ]
 );

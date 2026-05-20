@@ -51,6 +51,29 @@ describe('Composio client', () => {
     ]);
   });
 
+  it('sends a recovery request id when signing up an agent identity', async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ url: String(url), init });
+      return jsonResponse({
+        status: 'ready',
+        request_id: 'reservation-1',
+        agent_key: 'agent-key',
+        composio: {
+          org_id: 'org-1',
+          user_api_key: 'uak_123',
+        },
+      });
+    };
+
+    await signupComposioAgentIdentity({
+      idempotencyKey: 'reservation-1',
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    expect(requests[0]?.init?.body).toBe(JSON.stringify({ request_id: 'reservation-1' }));
+  });
+
   it('creates a Google Calendar Connect Link through a Composio session', async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {

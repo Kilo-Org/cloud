@@ -161,12 +161,14 @@ async function parseJsonResponse(response: Response, operation: string): Promise
 }
 
 export async function signupComposioAgentIdentity(
-  fetchImpl: typeof fetch = fetch
+  params: { idempotencyKey?: string; fetchImpl?: typeof fetch } | typeof fetch = {}
 ): Promise<ComposioAgentIdentity> {
+  const fetchImpl = typeof params === 'function' ? params : (params.fetchImpl ?? fetch);
+  const idempotencyKey = typeof params === 'function' ? undefined : params.idempotencyKey;
   const response = await fetchImpl(joinUrl(COMPOSIO_AGENTS_API_BASE_URL, '/api/signup'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: '{}',
+    body: JSON.stringify(idempotencyKey ? { request_id: idempotencyKey } : {}),
   });
   const json = await parseJsonResponse(response, 'agent signup');
   const parsed = AgentSignupReadyResponseSchema.safeParse(json);

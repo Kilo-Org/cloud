@@ -56,6 +56,7 @@ export const IMPACT_ADVOCATE_DEBUG_LOGGING =
 
 if (!NEXTAUTH_SECRET) throw new Error('NEXTAUTH_SECRET is required JWT signing');
 if (!TURNSTILE_SECRET_KEY) throw new Error('TURNSTILE_SECRET_KEY is required');
+if (!CALLBACK_TOKEN_SECRET) throw new Error('CALLBACK_TOKEN_SECRET is required');
 
 export const STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID = getEnvVariable(
   'STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID'

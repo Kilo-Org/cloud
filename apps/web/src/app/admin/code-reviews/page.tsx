@@ -315,7 +315,7 @@ export default function CodeReviewsPage() {
 
   // Handle CSV export
   const handleExport = useCallback(async () => {
-    if (isExporting || isIntervalDraftInvalid || !startDate || !endDate) return;
+    if (isExporting || isIntervalDraftInvalid) return;
 
     setIsExporting(true);
     try {

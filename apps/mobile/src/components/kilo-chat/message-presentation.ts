@@ -1,4 +1,5 @@
 import {
+  type AttachmentBlock,
   type ConversationDetailResponse,
   type CreateMessageRequest,
   type InputContentBlock,
@@ -28,6 +29,18 @@ export function buildSendMessageVariables(
     clientId: input.clientId,
     ...(input.inReplyToMessageId ? { inReplyToMessageId: input.inReplyToMessageId } : {}),
   };
+}
+
+export function getEditableAttachmentBlocks(message: Message): AttachmentBlock[] {
+  return message.content.filter((block): block is AttachmentBlock => block.type === 'attachment');
+}
+
+export function getVisibleEditableAttachmentBlocks(
+  attachments: readonly AttachmentBlock[],
+  removedAttachmentIds: readonly string[]
+): AttachmentBlock[] {
+  const removedAttachmentIdSet = new Set(removedAttachmentIds);
+  return attachments.filter(attachment => !removedAttachmentIdSet.has(attachment.attachmentId));
 }
 
 export function createSendMessageClientId(): string {

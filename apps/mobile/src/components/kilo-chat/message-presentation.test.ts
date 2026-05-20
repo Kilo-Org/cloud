@@ -7,7 +7,9 @@ import {
   canToggleReaction,
   createSendMessageClientId,
   getDeliveryFailureLabel,
+  getEditableAttachmentBlocks,
   getReplyPreviewText,
+  getVisibleEditableAttachmentBlocks,
   isMessageEdited,
   isMessageTextSelectionEnabled,
   resolveMessageAuthorLabel,
@@ -93,6 +95,59 @@ describe('buildSendMessageVariables', () => {
       clientId: 'client-1',
       inReplyToMessageId: 'parent-1',
     });
+  });
+});
+
+describe('getEditableAttachmentBlocks', () => {
+  it('returns only attachment content blocks from the original message', () => {
+    expect(
+      getEditableAttachmentBlocks(
+        message({
+          content: [
+            { type: 'text', text: 'with attachment' },
+            {
+              type: 'attachment',
+              attachmentId: '01HV0000000000000000000001',
+              mimeType: 'image/png',
+              size: 123,
+              filename: 'photo.png',
+            },
+          ],
+        })
+      )
+    ).toEqual([
+      {
+        type: 'attachment',
+        attachmentId: '01HV0000000000000000000001',
+        mimeType: 'image/png',
+        size: 123,
+        filename: 'photo.png',
+      },
+    ]);
+  });
+
+  it('filters removed editable attachment ids', () => {
+    const firstAttachment = {
+      type: 'attachment',
+      attachmentId: '01HV0000000000000000000001',
+      mimeType: 'image/png',
+      size: 123,
+      filename: 'photo.png',
+    } as const;
+    const secondAttachment = {
+      type: 'attachment',
+      attachmentId: '01HV0000000000000000000002',
+      mimeType: 'application/pdf',
+      size: 456,
+      filename: 'brief.pdf',
+    } as const;
+
+    expect(
+      getVisibleEditableAttachmentBlocks(
+        [firstAttachment, secondAttachment],
+        [firstAttachment.attachmentId]
+      )
+    ).toEqual([secondAttachment]);
   });
 });
 

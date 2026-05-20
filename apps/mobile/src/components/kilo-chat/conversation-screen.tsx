@@ -24,6 +24,7 @@ import {
   type ConversationDetailResponse,
   type ExecApprovalDecision,
   formatKiloChatError,
+  type InputContentBlock,
   type Message,
 } from '@kilocode/kilo-chat';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -48,7 +49,10 @@ import {
   canCopyMessage,
   canToggleReaction,
   createSendMessageClientId,
+  getEditableAttachmentBlocks,
+  getVisibleEditableAttachmentBlocks,
 } from './message-presentation';
+import { buildMobileEditContent } from './message-edit-attachments-state';
 import {
   getMessageHistoryContentState,
   shouldMarkLatestMessageRead,
@@ -111,6 +115,7 @@ export function ConversationScreen({
   const { showActionSheetWithOptions } = useActionSheet();
   const { bottom } = useSafeAreaInsets();
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [removedEditAttachmentIds, setRemovedEditAttachmentIds] = useState<string[]>([]);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [reactionPickerMessage, setReactionPickerMessage] = useState<Message | null>(null);
   const [recentReactions, setRecentReactions] = useState<string[]>([]);
@@ -127,6 +132,7 @@ export function ConversationScreen({
   const instanceStatus = instanceStatusQuery.data?.status ?? currentInstance?.status ?? null;
   const botStatus = useBotStatus(client, sandboxId);
   const botPresence = botStatus ? { online: botStatus.online, lastAt: botStatus.at } : undefined;
+  const hasAttachmentsCapability = botStatus?.capabilities?.includes('attachments') ?? false;
   const now = useNowTicker(10_000);
 
   const messagesQuery = useMessages(client, conversationId);
@@ -165,6 +171,14 @@ export function ConversationScreen({
   const editingText = useMemo(
     () => (editingMessage ? editableText(editingMessage) : ''),
     [editingMessage]
+  );
+  const editingAttachments = useMemo(
+    () => (editingMessage ? getEditableAttachmentBlocks(editingMessage) : []),
+    [editingMessage]
+  );
+  const visibleEditingAttachments = useMemo(
+    () => getVisibleEditableAttachmentBlocks(editingAttachments, removedEditAttachmentIds),
+    [editingAttachments, removedEditAttachmentIds]
   );
   const inputAvailability = resolveMobileMessageInputAvailability({
     currentUserId,
@@ -231,22 +245,32 @@ export function ConversationScreen({
     showActionSheetWithOptions,
   ]);
   const handleSend = useCallback(
-    (text: string, inReplyToMessageId?: string, controls?: MessageInputSubmitControls) => {
+    (
+      content: InputContentBlock[],
+      inReplyToMessageId?: string,
+      controls?: MessageInputSubmitControls
+    ) => {
       if (!editingMessage && inputAvailability.disabled) {
         return;
       }
       if (editingMessage) {
+        const editContent = buildMobileEditContent({
+          text: contentBlocksToText(content),
+          originalAttachments: editingAttachments,
+          removedAttachmentIds: removedEditAttachmentIds,
+        });
         editMessage.mutate(
           {
             messageId: editingMessage.id,
             conversationId,
-            content: [{ type: 'text', text }],
+            content: editContent,
             timestamp: Date.now(),
           },
           {
             onSuccess: () => {
               controls?.clearDraft();
               setEditingMessage(null);
+              setRemovedEditAttachmentIds([]);
               void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             },
             onError: err => {
@@ -259,7 +283,7 @@ export function ConversationScreen({
       sendMutation.mutate(
         buildSendMessageVariables({
           conversationId,
-          content: [{ type: 'text', text }],
+          content,
           clientId: createSendMessageClientId(),
           inReplyToMessageId,
         }),
@@ -277,8 +301,21 @@ export function ConversationScreen({
       );
       setScrollToNewestRequest(request => request + 1);
     },
-    [conversationId, editMessage, editingMessage, inputAvailability.disabled, sendMutation]
+    [
+      conversationId,
+      editMessage,
+      editingAttachments,
+      editingMessage,
+      inputAvailability.disabled,
+      removedEditAttachmentIds,
+      sendMutation,
+    ]
   );
+  const handleRemoveEditableAttachment = useCallback((attachmentId: string) => {
+    setRemovedEditAttachmentIds(current =>
+      current.includes(attachmentId) ? current : [...current, attachmentId]
+    );
+  }, []);
   const handleReactionPress = useCallback(
     (message: Message, emoji: string) => {
       if (!currentUserId || !canToggleReaction(message, currentUserId)) {
@@ -379,12 +416,14 @@ export function ConversationScreen({
           }
           if (selectedAction.kind === 'reply') {
             setEditingMessage(null);
+            setRemovedEditAttachmentIds([]);
             setReplyingTo(message);
             return;
           }
           if (selectedAction.kind === 'edit') {
             setReplyingTo(null);
             setEditingMessage(message);
+            setRemovedEditAttachmentIds([]);
             return;
           }
 
@@ -426,6 +465,7 @@ export function ConversationScreen({
         return;
       }
       setEditingMessage(null);
+      setRemovedEditAttachmentIds([]);
       setReplyingTo(message);
       void Haptics.selectionAsync();
     },
@@ -591,10 +631,16 @@ export function ConversationScreen({
           key={editingMessage?.id ?? 'compose'}
           onSend={handleSend}
           onTyping={sendTyping}
+          client={client}
+          conversationId={conversationId}
+          hasAttachmentsCapability={hasAttachmentsCapability}
           disabled={inputAvailability.disabled}
           submitDisabled={inputAvailability.submitDisabled}
           disabledReason={inputAvailability.disabledReason}
           initialText={editingText}
+          isEditing={editingMessage !== null}
+          editableAttachments={visibleEditingAttachments}
+          onRemoveEditableAttachment={handleRemoveEditableAttachment}
           botName={instanceLabel}
           typingMembers={typingMembers}
           replyingTo={replyingTo}
@@ -609,6 +655,7 @@ export function ConversationScreen({
             editingMessage
               ? () => {
                   setEditingMessage(null);
+                  setRemovedEditAttachmentIds([]);
                 }
               : undefined
           }

@@ -7,7 +7,7 @@ type Props = {
   rows: QueuedAttachment[];
   getLocalUri: (tempId: string) => string | null;
   onRemove: (tempId: string) => void;
-  onRetry: (tempId: string) => void;
+  onRetry?: (tempId: string) => void;
 };
 
 export function MessageAttachmentPreviewStrip({ rows, getLocalUri, onRemove, onRetry }: Props) {
@@ -31,7 +31,7 @@ export function MessageAttachmentPreviewStrip({ rows, getLocalUri, onRemove, onR
             onRemove(row.tempId);
           }}
           onRetry={() => {
-            onRetry(row.tempId);
+            onRetry?.(row.tempId);
           }}
         />
       ))}

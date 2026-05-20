@@ -2,7 +2,7 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { File } from 'expo-file-system';
 import { Paperclip, Send, X } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type LayoutChangeEvent, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -14,7 +14,11 @@ import {
   type Message,
   MESSAGE_TEXT_MAX_CHARS,
 } from '@kilocode/kilo-chat';
-import { type AddFileInput, useAttachmentQueue } from '@kilocode/kilo-chat-hooks';
+import {
+  type AddFileInput,
+  type QueuedAttachment,
+  useAttachmentQueue,
+} from '@kilocode/kilo-chat-hooks';
 
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { Text } from '@/components/ui/text';
@@ -92,6 +96,8 @@ type CommonProps = {
   clearOnSubmit?: boolean;
   botName?: string | null;
   typingMembers?: Map<string, number>;
+  editableAttachments?: readonly AttachmentBlock[];
+  onRemoveEditableAttachment?: (attachmentId: string) => void;
 };
 
 type Props = CommonProps & (AttachmentEnabledProps | AttachmentUnavailableProps);
@@ -286,6 +292,8 @@ function MessageInputContent({
   clearOnSubmit,
   botName,
   typingMembers = new Map(),
+  editableAttachments = EMPTY_READY_ATTACHMENT_BLOCKS,
+  onRemoveEditableAttachment,
   hasAttachmentsCapability,
   attachmentQueue,
 }: CommonProps & {
@@ -296,7 +304,9 @@ function MessageInputContent({
 }) {
   const colors = useThemeColors();
   const valueRef = useRef(initialText);
-  const [canSend, setCanSend] = useState(initialText.trim().length > 0);
+  const [canSend, setCanSend] = useState(() =>
+    canSubmitMessageInputContent({ text: initialText, readyAttachmentBlocks: editableAttachments })
+  );
   const [draftLength, setDraftLength] = useState(initialText.length);
   const [inputWidth, setInputWidth] = useState(0);
   const inputRef = useRef<TextInput>(null);
@@ -305,7 +315,15 @@ function MessageInputContent({
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentReplyingToRef = useRef<string | undefined>(replyingTo?.id);
   currentReplyingToRef.current = replyingTo?.id;
-  const readyAttachmentBlocks = attachmentQueue?.readyBlocks ?? EMPTY_READY_ATTACHMENT_BLOCKS;
+  const queuedReadyAttachmentBlocks = attachmentQueue?.readyBlocks ?? EMPTY_READY_ATTACHMENT_BLOCKS;
+  const readyAttachmentBlocks = useMemo(
+    () => [...editableAttachments, ...queuedReadyAttachmentBlocks],
+    [editableAttachments, queuedReadyAttachmentBlocks]
+  );
+  const editableAttachmentRows = useMemo(
+    () => editableAttachments.map(attachment => editableAttachmentToPreviewRow(attachment)),
+    [editableAttachments]
+  );
   const hasUploadingAttachment = attachmentQueue?.isUploading ?? false;
   const hasFailedAttachment = attachmentQueue?.hasFailed ?? false;
   const overLimit = isMessageInputOverLimit(valueRef.current);
@@ -429,6 +447,10 @@ function MessageInputContent({
     attachmentQueue?.retryFile(tempId);
   };
 
+  const handleRemoveEditableAttachment = (attachmentId: string) => {
+    onRemoveEditableAttachment?.(attachmentId);
+  };
+
   return (
     <View
       style={{
@@ -469,6 +491,13 @@ function MessageInputContent({
           onRetry={handleRetryAttachment}
         />
       )}
+      {editableAttachmentRows.length > 0 ? (
+        <MessageAttachmentPreviewStrip
+          rows={editableAttachmentRows}
+          getLocalUri={() => null}
+          onRemove={handleRemoveEditableAttachment}
+        />
+      ) : null}
       <View className="gap-1">
         {inputMeasure.measureElement}
         <View className="flex-row items-center gap-2">
@@ -556,4 +585,16 @@ function MessageInputContent({
       </View>
     </View>
   );
+}
+
+function editableAttachmentToPreviewRow(attachment: AttachmentBlock): QueuedAttachment {
+  return {
+    tempId: attachment.attachmentId,
+    attachmentId: attachment.attachmentId,
+    filename: attachment.filename,
+    mimeType: attachment.mimeType,
+    size: attachment.size,
+    status: 'ready',
+    progress: 1,
+  };
 }

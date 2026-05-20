@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET, INTERNAL_API_SECRET } from '@/lib/config.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { getSecurityFindingById } from '@/lib/security-agent/db/security-findings';
 import {
@@ -19,6 +19,7 @@ import { generateApiToken } from '@/lib/tokens';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
 import type { SecurityFindingAnalysis, SecurityReviewOwner } from '@/lib/security-agent/core/types';
 import {
@@ -77,12 +78,22 @@ export async function POST(
   { params }: { params: Promise<{ findingId: string }> }
 ) {
   try {
-    const secret = req.headers.get('X-Internal-Secret');
-    if (!INTERNAL_API_SECRET || secret !== INTERNAL_API_SECRET) {
+    const { findingId } = await params;
+    const callbackToken = req.headers.get('X-Callback-Token');
+    const validCallbackToken =
+      !!CALLBACK_TOKEN_SECRET &&
+      (await verifyCallbackToken({
+        token: callbackToken,
+        secret: CALLBACK_TOKEN_SECRET,
+        scope: 'security-analysis-callback',
+        resourceParts: [findingId],
+      }));
+    const legacySecret = req.headers.get('X-Internal-Secret');
+    const validLegacySecret = !!INTERNAL_API_SECRET && legacySecret === INTERNAL_API_SECRET;
+    if (!validCallbackToken && !validLegacySecret) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { findingId } = await params;
     const payload: ExecutionCallbackPayload = await req.json();
 
     if (!payload.status) {

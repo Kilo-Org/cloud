@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { HonoContext } from '../index';
-import { internalApiMiddleware } from '../util/auth';
+import { INTERNAL_API_KEY_HEADER, validateInternalApiKey } from '../util/auth';
 import { logger } from '../util/logger';
-import { resError, resSuccess } from '@kilocode/worker-utils';
+import { resError, resSuccess, verifyCallbackToken } from '@kilocode/worker-utils';
 import { withDORetry } from '../util/do-retry';
 
 const callbacks = new Hono<HonoContext>();
@@ -18,8 +18,6 @@ const ExecutionCallbackPayloadSchema = z.object({
   kiloSessionId: z.string().optional(),
 });
 
-callbacks.use('*', internalApiMiddleware);
-
 callbacks.post('/execution', async c => {
   const namespace = c.req.header('x-webhook-namespace');
   const triggerId = c.req.header('x-webhook-trigger-id');
@@ -32,6 +30,33 @@ callbacks.post('/execution', async c => {
       hasRequestId: !!requestId,
     });
     return c.json(resError('Missing webhook identification headers'), 400);
+  }
+
+  const [callbackTokenSecret, internalApiSecret] = await Promise.all([
+    c.env.CALLBACK_TOKEN_SECRET.get(),
+    c.env.INTERNAL_API_SECRET.get(),
+  ]);
+  if (!callbackTokenSecret && !internalApiSecret) {
+    logger.error('Callback authentication secrets not configured');
+    return c.json(resError('Internal server error'), 500);
+  }
+
+  const callbackToken = c.req.header('X-Callback-Token');
+  const validCallbackToken =
+    !!callbackTokenSecret &&
+    (await verifyCallbackToken({
+      token: callbackToken,
+      secret: callbackTokenSecret,
+      scope: 'webhook-execution-callback',
+      resourceParts: [namespace, triggerId, requestId],
+    }));
+  const validLegacySecret =
+    !!internalApiSecret &&
+    validateInternalApiKey(c.req.header(INTERNAL_API_KEY_HEADER) ?? null, internalApiSecret)
+      .success;
+  if (!validCallbackToken && !validLegacySecret) {
+    logger.warn('Callback authentication failed', { requestId, namespace, triggerId });
+    return c.json(resError('Unauthorized'), 401);
   }
 
   let payload: z.infer<typeof ExecutionCallbackPayloadSchema>;

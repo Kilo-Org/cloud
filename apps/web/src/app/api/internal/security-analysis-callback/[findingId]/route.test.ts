@@ -8,6 +8,7 @@ import type * as posthogModule from '@/lib/security-agent/posthog-tracking';
 import type * as tokensModule from '@/lib/tokens';
 import type { SecurityFinding, User } from '@kilocode/db/schema';
 import type { SecurityFindingAnalysis } from '@/lib/security-agent/core/types';
+import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 
 // --- Mock functions ---
 
@@ -59,6 +60,7 @@ async function flushAfterCallbacks() {
 
 jest.mock('@/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'test-internal-secret',
+  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
 jest.mock('@/lib/security-agent/db/security-findings', () => ({
@@ -126,16 +128,22 @@ jest.mock('drizzle-orm', () => ({
 // --- Helpers ---
 
 const VALID_SECRET = 'test-internal-secret';
+const CALLBACK_SECRET = 'test-callback-token-secret';
 const FINDING_ID = 'finding-abc-123';
 
 function makeRequest(
   findingId: string,
   body: Record<string, unknown>,
-  secret = VALID_SECRET
+  secret: string | null = VALID_SECRET,
+  callbackToken: string | null = null
 ): NextRequest {
   return {
     headers: {
-      get: (name: string) => (name === 'X-Internal-Secret' ? secret : null),
+      get: (name: string) => {
+        if (name === 'X-Internal-Secret') return secret;
+        if (name === 'X-Callback-Token') return callbackToken;
+        return null;
+      },
     },
     json: () => Promise.resolve(body),
   } as unknown as NextRequest;
@@ -265,6 +273,40 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       const response = await POST(req, makeParams(FINDING_ID));
 
       expect(response.status).toBe(401);
+    });
+
+    it('accepts token scoped to the finding', async () => {
+      mockGetSecurityFindingById.mockResolvedValue(null);
+      const callbackToken = await deriveCallbackToken({
+        secret: CALLBACK_SECRET,
+        scope: 'security-analysis-callback',
+        resourceParts: [FINDING_ID],
+      });
+      const req = makeRequest(FINDING_ID, completedPayload, null, callbackToken);
+      const response = await POST(req, makeParams(FINDING_ID));
+
+      expect(response.status).toBe(404);
+    });
+
+    it('rejects token scoped to a different finding', async () => {
+      const callbackToken = await deriveCallbackToken({
+        secret: CALLBACK_SECRET,
+        scope: 'security-analysis-callback',
+        resourceParts: ['different-finding'],
+      });
+      const req = makeRequest(FINDING_ID, completedPayload, null, callbackToken);
+      const response = await POST(req, makeParams(FINDING_ID));
+
+      expect(response.status).toBe(401);
+      expect(mockGetSecurityFindingById).not.toHaveBeenCalled();
+    });
+
+    it('keeps legacy internal-secret callbacks working during rollout', async () => {
+      mockGetSecurityFindingById.mockResolvedValue(null);
+      const req = makeRequest(FINDING_ID, completedPayload, VALID_SECRET, null);
+      const response = await POST(req, makeParams(FINDING_ID));
+
+      expect(response.status).toBe(404);
     });
   });
 

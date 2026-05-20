@@ -8,6 +8,7 @@ import {
 import { db } from '@/lib/drizzle';
 import { redisGet, redisSet } from '@/lib/redis';
 import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, modelExperimentRedisKey } from '@/lib/redis-keys';
+import { createCachedFetch } from '@/lib/cached-fetch';
 import { decryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
@@ -24,77 +25,36 @@ import type {
   SerializedCachedExperiment,
 } from '@/lib/ai-gateway/experiments/pick-variant.types';
 
-/** TTL for the per-public-id experiment cache. The cache holds CIPHERTEXT
- *  (encrypted api keys + the upstream blob); decryption happens per-pick
- *  inside `pickModelExperimentVariant`, so this TTL only governs how stale
- *  the variant set / current-version-per-variant resolution can be, not
- *  how long plaintext keys can live in Redis. */
-const PER_PUBLIC_ID_CACHE_TTL_SECONDS = 600;
+/** Shared Redis cache TTL. Cached experiment rows hold ciphertext only;
+ *  plaintext keys are decrypted per-pick and never stored in Redis. */
+const EXPERIMENT_REDIS_CACHE_TTL_SECONDS = 600;
+const EXPERIMENTED_PUBLIC_IDS_LOCAL_CACHE_TTL_MS = 60_000;
+
+const getExperimentedPublicIds = createCachedFetch<string[]>(
+  async () => {
+    try {
+      const cached = await redisGet(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
+      if (cached === null) return [];
+      return parseStringArray(cached) ?? [];
+    } catch {
+      // captureException already invoked by the redis helper
+      return [];
+    }
+  },
+  EXPERIMENTED_PUBLIC_IDS_LOCAL_CACHE_TTL_MS,
+  []
+);
 
 /**
  * Fast pre-check: does any active|paused experiment target this public id?
  *
- * Reads from a JSON-encoded array in Redis. On Redis error, falls back to a
- * single Postgres query for that public id. If both fail, returns
- * `unavailable` so the caller can fail closed instead of routing as
- * unexperimented traffic.
+ * Reads from a short-lived in-process cache backed by Redis. Admin writes are
+ * responsible for maintaining the Redis membership set; if Redis is empty,
+ * corrupt, or unavailable, treat it as "no experimented public ids".
  */
-export async function isPublicIdExperimented(
-  publicId: string
-): Promise<true | false | 'unavailable'> {
-  try {
-    const cached = await redisGet(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
-    if (cached !== null) {
-      const ids = parseStringArray(cached);
-      if (ids === null) {
-        // Corrupt cache; fall through to DB. (Already captured by Sentry below.)
-      } else {
-        return ids.includes(publicId);
-      }
-    }
-  } catch {
-    // captureException already invoked by the redis helper
-  }
-
-  // Cache miss / corrupt / Redis error: rebuild the full set from DB and
-  // backfill the cache so the next request hits Redis. We deliberately
-  // query the full set rather than just `publicId` — the cache contract
-  // is "the complete list of routing-eligible public ids", and a single-id
-  // lookup can't satisfy it. Falling through without a backfill (the
-  // previous behavior) sent every miss straight to Postgres.
-  try {
-    const ids = await loadExperimentedPublicIdsFromDb();
-    // Best-effort backfill; if Redis is genuinely down the helper has
-    // already reported it and we still return the right answer below.
-    void backfillExperimentedPublicIdsCache(ids);
-    return ids.includes(publicId);
-  } catch (err) {
-    captureException(err, {
-      tags: { source: 'model-experiments', operation: 'isPublicIdExperimented' },
-      extra: { publicId },
-    });
-    return 'unavailable';
-  }
-}
-
-async function loadExperimentedPublicIdsFromDb(): Promise<string[]> {
-  const rows = await db
-    .select({ public_model_id: model_experiment.public_model_id })
-    .from(model_experiment)
-    .where(inArray(model_experiment.status, ['active', 'paused']));
-  return Array.from(new Set(rows.map(r => r.public_model_id))).sort();
-}
-
-async function backfillExperimentedPublicIdsCache(ids: string[]): Promise<void> {
-  try {
-    await redisSet(
-      EXPERIMENTED_PUBLIC_IDS_REDIS_KEY,
-      JSON.stringify(ids),
-      PER_PUBLIC_ID_CACHE_TTL_SECONDS
-    );
-  } catch {
-    // captureException already invoked by the redis helper
-  }
+export async function isPublicIdExperimented(publicId: string): Promise<boolean> {
+  const ids = await getExperimentedPublicIds();
+  return ids.includes(publicId);
 }
 
 function parseStringArray(raw: string): string[] | null {
@@ -153,10 +113,14 @@ export async function getRoutingExperimentForPublicId(publicId: string): Promise
       await redisSet(
         cacheKey,
         JSON.stringify(serializeCachedExperiment(resolved.experiment)),
-        PER_PUBLIC_ID_CACHE_TTL_SECONDS
+        EXPERIMENT_REDIS_CACHE_TTL_SECONDS
       );
     } else if (resolved.kind === 'none') {
-      await redisSet(cacheKey, JSON.stringify({ kind: 'none' }), PER_PUBLIC_ID_CACHE_TTL_SECONDS);
+      await redisSet(
+        cacheKey,
+        JSON.stringify({ kind: 'none' }),
+        EXPERIMENT_REDIS_CACHE_TTL_SECONDS
+      );
     }
   } catch {
     // already captured

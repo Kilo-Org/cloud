@@ -198,9 +198,6 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   // `kilo-internal/...` and the `kiloExclusiveModels` lookup so an
   // experimented public id never falls through to OpenRouter/Vercel.
   const experimented = await isPublicIdExperimented(requestedModel);
-  if (experimented === 'unavailable') {
-    return { kind: 'unavailable' };
-  }
   if (experimented === true) {
     const userId = isAnonymousContext(user) ? null : user.id;
     const selection = await pickModelExperimentVariant({

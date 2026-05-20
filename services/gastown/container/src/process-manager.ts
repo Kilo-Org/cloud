@@ -9,7 +9,7 @@
 import { createKilo, type KiloClient } from '@kilocode/sdk';
 import { z } from 'zod';
 import * as fs from 'node:fs/promises';
-import type { ManagedAgent, StartAgentRequest } from './types';
+import { type ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
 import {
   buildKiloConfigContent,
@@ -31,6 +31,15 @@ const MANAGER_LOG = '[process-manager]';
 // Validates the shape returned by client.session.create() so we fail fast
 // if the SDK changes its return type.
 const SessionResponse = z.object({ id: z.string().min(1) }).passthrough();
+
+const ContainerRegistryResponse = z.object({ data: z.unknown() }).passthrough();
+const ContainerRegistryEntry = z.object({
+  agentId: z.string().min(1),
+  request: StartAgentRequest,
+  workdir: z.string().min(1),
+  env: z.record(z.string(), z.string()),
+});
+type ContainerRegistryEntry = z.infer<typeof ContainerRegistryEntry>;
 
 type SDKInstance = {
   client: KiloClient;
@@ -2909,67 +2918,121 @@ async function bootHydrationImpl(LOG: string): Promise<void> {
 
   console.log(`${LOG} Fetching container registry for town=${townId}`);
   let registry: unknown;
+  const registryFetchStart = Date.now();
   try {
     const resp = await fetch(`${apiUrl}/api/towns/${townId}/container-registry`, {
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(10_000),
     });
+    const registryFetchMs = Date.now() - registryFetchStart;
+    log.info('bootHydration.registry_fetch_ms', {
+      townId,
+      durationMs: registryFetchMs,
+      statusCode: resp.status,
+    });
+    postEventToWorker('bootHydration.registry_fetch_ms', { durationMs: registryFetchMs });
     if (!resp.ok) {
       console.warn(`${LOG} Failed to fetch registry: ${resp.status}`);
       return;
     }
-    const json = (await resp.json()) as { data: unknown };
-    registry = json.data;
+    registry = ContainerRegistryResponse.parse(await resp.json()).data;
   } catch (err) {
+    const registryFetchMs = Date.now() - registryFetchStart;
+    log.warn('bootHydration.registry_fetch_ms', {
+      townId,
+      durationMs: registryFetchMs,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    postEventToWorker('bootHydration.registry_fetch_ms', {
+      durationMs: registryFetchMs,
+      error: err instanceof Error ? err.message : String(err),
+    });
     console.warn(`${LOG} Registry fetch failed:`, err);
     return;
   }
 
-  if (!Array.isArray(registry) || registry.length === 0) {
+  const registryEntries = parseRegistryEntries(LOG, registry);
+  if (registryEntries.length === 0) {
     console.log(`${LOG} No agents in registry — nothing to hydrate`);
   } else {
-    console.log(`${LOG} Resuming ${registry.length} agent(s) from registry`);
-
-    for (const entry of registry as Record<string, unknown>[]) {
-      const agentId = entry.agentId as string | undefined;
-      const agentRequest = entry.request as StartAgentRequest | undefined;
-      const workdir = entry.workdir as string | undefined;
-      const env = entry.env as Record<string, string> | undefined;
-
-      if (!agentId || !agentRequest || !workdir || !env) {
-        console.warn(`${LOG} Skipping malformed registry entry:`, entry);
-        continue;
-      }
-
-      // Registry entries were written with the token snapshot at dispatch
-      // time. If we just refreshed, overlay the fresh value so the hydrated
-      // kilo serve child inherits the current token.
-      const hydratedEnv = { ...env, GASTOWN_CONTAINER_TOKEN: token };
-
-      console.log(`${LOG} Resuming agent ${agentId} in ${workdir}`);
-      try {
-        await startAgent(agentRequest, workdir, hydratedEnv);
-        console.log(`${LOG} Agent ${agentId} resumed`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`${LOG} Failed to resume agent ${agentId}:`, msg);
-      }
-    }
+    console.log(`${LOG} Resuming ${registryEntries.length} agent(s) from registry`);
   }
 
-  const mayorAlreadyResumed = (Array.isArray(registry) ? registry : []).some(
-    (e: unknown) =>
-      typeof e === 'object' &&
-      e !== null &&
-      'request' in e &&
-      typeof (e as { request?: { role?: string } }).request?.role === 'string' &&
-      (e as { request: { role: string } }).request.role === 'mayor'
-  );
-  if (!mayorAlreadyResumed) {
+  const mayorEntries = registryEntries.filter(entry => entry.request.role === 'mayor');
+  const nonMayorEntries = registryEntries.filter(entry => !mayorEntries.includes(entry));
+
+  if (mayorEntries.length > 0) {
+    const mayorResumeStart = Date.now();
+    await resumeRegistryEntries(LOG, mayorEntries, token);
+    const mayorResumeMs = Date.now() - mayorResumeStart;
+    log.info('bootHydration.mayor_resume_ms', { townId, durationMs: mayorResumeMs });
+    postEventToWorker('bootHydration.mayor_resume_ms', { durationMs: mayorResumeMs });
+  } else {
+    const mayorPrewarmStart = Date.now();
     try {
       await prewarmMayorSDK(townId, apiUrl, token);
     } catch (err) {
       console.warn(`${LOG} Mayor SDK prewarm failed:`, err);
+    } finally {
+      const mayorPrewarmMs = Date.now() - mayorPrewarmStart;
+      log.info('bootHydration.mayor_prewarm_ms', { townId, durationMs: mayorPrewarmMs });
+      postEventToWorker('bootHydration.mayor_prewarm_ms', { durationMs: mayorPrewarmMs });
     }
   }
+
+  if (nonMayorEntries.length > 0) {
+    setTimeout(() => {
+      void (async () => {
+        const nonMayorResumeStart = Date.now();
+        await resumeRegistryEntries(LOG, nonMayorEntries, token);
+        const nonMayorResumeMs = Date.now() - nonMayorResumeStart;
+        log.info('bootHydration.non_mayor_resume_ms', {
+          townId,
+          durationMs: nonMayorResumeMs,
+          count: nonMayorEntries.length,
+        });
+        postEventToWorker('bootHydration.non_mayor_resume_ms', {
+          durationMs: nonMayorResumeMs,
+          count: nonMayorEntries.length,
+        });
+      })();
+    }, 0);
+  }
+}
+
+async function resumeRegistryEntries(
+  LOG: string,
+  entries: ContainerRegistryEntry[],
+  token: string
+): Promise<void> {
+  for (const entry of entries) {
+    // Registry entries were written with the token snapshot at dispatch
+    // time. If we just refreshed, overlay the fresh value so the hydrated
+    // kilo serve child inherits the current token.
+    const hydratedEnv = { ...entry.env, GASTOWN_CONTAINER_TOKEN: token };
+
+    console.log(`${LOG} Resuming agent ${entry.agentId} in ${entry.workdir}`);
+    try {
+      await startAgent(entry.request, entry.workdir, hydratedEnv);
+      console.log(`${LOG} Agent ${entry.agentId} resumed`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`${LOG} Failed to resume agent ${entry.agentId}:`, msg);
+    }
+  }
+}
+
+function parseRegistryEntries(LOG: string, registry: unknown): ContainerRegistryEntry[] {
+  if (!Array.isArray(registry)) return [];
+
+  const entries: ContainerRegistryEntry[] = [];
+  for (const entry of registry) {
+    const parsed = ContainerRegistryEntry.safeParse(entry);
+    if (!parsed.success) {
+      console.warn(`${LOG} Skipping malformed registry entry:`, parsed.error.issues);
+      continue;
+    }
+    entries.push(parsed.data);
+  }
+  return entries;
 }

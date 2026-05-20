@@ -16,6 +16,7 @@ import { getGastownOrgStub } from '../dos/GastownOrg.do';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
+import { writeEvent } from '../util/analytics.util';
 import { TownConfigSchema, TownConfigUpdateSchema, RigOverrideConfigSchema } from '../types';
 import { resolveModel } from '../dos/town/config';
 import type { UserRigRecord } from '../db/tables/user-rigs.table';
@@ -74,6 +75,46 @@ async function refreshGitCredentials(
       platform_integration_id: result.installationId,
     },
   });
+}
+
+async function refreshFirstGithubRigCredentials(params: {
+  env: Env;
+  townId: string;
+  ownerStub: RigOwnerStub;
+  credentialUserId: string;
+  organizationId?: string;
+}): Promise<void> {
+  const start = Date.now();
+  try {
+    const rigList = await params.ownerStub.listRigs(params.townId);
+    for (const rig of rigList) {
+      if (extractGithubRepo(rig.git_url)) {
+        await refreshGitCredentials(
+          params.env,
+          params.townId,
+          rig.git_url,
+          params.credentialUserId,
+          params.organizationId
+        );
+        break;
+      }
+    }
+    writeEvent(params.env, {
+      event: 'ensureMayor.git_credential_refresh_ms',
+      townId: params.townId,
+      userId: params.credentialUserId,
+      durationMs: Date.now() - start,
+    });
+  } catch (err) {
+    writeEvent(params.env, {
+      event: 'ensureMayor.git_credential_refresh_ms',
+      townId: params.townId,
+      userId: params.credentialUserId,
+      durationMs: Date.now() - start,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    console.warn('[gastown-trpc] ensureMayor: git credential refresh failed', err);
+  }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -1004,23 +1045,15 @@ export const gastownRouter = router({
       // Best-effort: refresh git credentials using the town owner's identity
       const townConfig = await getTownDOStub(ctx.env, input.townId).getTownConfig();
       const credentialUserId = townConfig.owner_user_id ?? ctx.userId;
-      try {
-        const rigList = await ownerStub.listRigs(input.townId);
-        for (const rig of rigList) {
-          if (extractGithubRepo(rig.git_url)) {
-            await refreshGitCredentials(
-              ctx.env,
-              input.townId,
-              rig.git_url,
-              credentialUserId,
-              townConfig.organization_id
-            );
-            break;
-          }
-        }
-      } catch (err) {
-        console.warn('[gastown-trpc] ensureMayor: git credential refresh failed', err);
-      }
+      ctx.executionCtx.waitUntil(
+        refreshFirstGithubRigCredentials({
+          env: ctx.env,
+          townId: input.townId,
+          ownerStub,
+          credentialUserId,
+          organizationId: townConfig.organization_id,
+        })
+      );
 
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.ensureMayor();

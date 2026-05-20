@@ -167,7 +167,14 @@ export async function ensureContainerToken(
   townId: string,
   userId: string
 ): Promise<string | null> {
+  const mintStart = Date.now();
   const token = await mintContainerToken(env, { townId, userId });
+  writeEvent(env, {
+    event: 'startAgentInContainer.token_mint_ms',
+    townId,
+    userId,
+    durationMs: Date.now() - mintStart,
+  });
   if (!token) {
     return null;
   }
@@ -176,6 +183,7 @@ export async function ensureContainerToken(
 
   // Push to running process so existing agents pick up the fresh token.
   // Throw on non-2xx so the alarm's throttle doesn't advance on failure.
+  const refreshStart = Date.now();
   try {
     const resp = await container.fetch('http://container/refresh-token', {
       method: 'POST',
@@ -186,12 +194,27 @@ export async function ensureContainerToken(
     if (!resp.ok) {
       throw new Error(`container returned ${resp.status}`);
     }
+    writeEvent(env, {
+      event: 'startAgentInContainer.refresh_token_ms',
+      townId,
+      userId,
+      durationMs: Date.now() - refreshStart,
+      statusCode: resp.status,
+    });
   } catch (err) {
     // If the container isn't running yet, the next dispatch will include
     // the token in request env. But if it IS running and rejected the
     // refresh, propagate the error so the alarm retries on the next tick.
     const isContainerDown =
       err instanceof TypeError || (err instanceof Error && err.message.includes('fetch'));
+    writeEvent(env, {
+      event: 'startAgentInContainer.refresh_token_ms',
+      townId,
+      userId,
+      durationMs: Date.now() - refreshStart,
+      error: err instanceof Error ? err.message : String(err),
+      label: isContainerDown ? 'container_down' : 'failed',
+    });
     if (!isContainerDown) throw err;
   }
 
@@ -404,8 +427,24 @@ export async function startAgentInContainer(
   try {
     // Mint a container-scoped JWT (8h expiry, refreshed by TownDO alarm).
     // One token per container — shared by all agents in the town.
-    // Carries { townId, userId, scope: 'container' }.
-    const containerToken = await ensureContainerToken(env, params.townId, params.userId);
+    // Carries { townId, userId, scope: 'container' }. Fresh dispatches
+    // pass the token in /agents/start instead of first pushing
+    // /refresh-token, keeping cold starts off the extra live request path.
+    // Already-running agents receive token rotation from the alarm or
+    // explicit refresh paths rather than this user-visible startup path.
+    const tokenMintStart = Date.now();
+    const containerToken = await mintContainerToken(env, {
+      townId: params.townId,
+      userId: params.userId,
+    });
+    writeEvent(env, {
+      event: 'startAgentInContainer.token_mint_ms',
+      townId: params.townId,
+      userId: params.userId,
+      agentId: params.agentId,
+      role: params.role,
+      durationMs: Date.now() - tokenMintStart,
+    });
 
     // Also mint a per-agent JWT as fallback during rollout.
     const agentToken = await mintAgentToken(env, {
@@ -466,6 +505,9 @@ export async function startAgentInContainer(
     }
 
     // Container token is preferred (shared by all agents, refreshed by alarm).
+    // This freshly minted token is for the agent being started; it is not
+    // pushed to existing SDK children here so mayor cold starts avoid a
+    // pre-start /refresh-token request.
     // Legacy per-agent JWT kept as fallback during rollout.
     if (containerToken) envVars.GASTOWN_CONTAINER_TOKEN = containerToken;
     if (agentToken) envVars.GASTOWN_SESSION_TOKEN = agentToken;

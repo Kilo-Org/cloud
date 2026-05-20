@@ -139,7 +139,7 @@ export function formatLinearIssueLine(
  * is connected but no issues are assigned to the user. Wrapped in
  * `_..._` so it renders italic and survives the channel flattener.
  */
-export const LINEAR_EMPTY_LINE = '_Linear is connected — your queue is clear._';
+export const LINEAR_EMPTY_LINE = '_Linear is connected and your queue is clear._';
 
 /**
  * Short TL;DR fragment for the briefing header. Counts assigned issues

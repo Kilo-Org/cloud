@@ -189,7 +189,7 @@ describe('briefing-utils', () => {
         { source: 'linear', configured: true, ok: true, summary: 'Fetched 1 issue' },
         { source: 'github', configured: false, ok: false, summary: 'GitHub CLI not authenticated' },
       ],
-      sections: [{ title: '📈 Linear', lines: ['_Linear is connected — your queue is clear._'] }],
+      sections: [{ title: '📈 Linear', lines: ['_Linear is connected and your queue is clear._'] }],
       failures: [],
       tldr: '3 events today',
     });
@@ -203,7 +203,7 @@ describe('briefing-utils', () => {
     expect(message).toContain('📈 Linear');
     expect(message).not.toContain('## ');
     // Italic empty-state line: underscores stripped, sentence kept.
-    expect(message).toContain('Linear is connected — your queue is clear.');
+    expect(message).toContain('Linear is connected and your queue is clear.');
     expect(message).not.toContain('_Linear');
     // Connect more nudge survives.
     expect(message).toContain('⚙️ Connect more');

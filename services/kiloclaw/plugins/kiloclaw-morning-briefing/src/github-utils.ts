@@ -167,7 +167,7 @@ export function buildGithubEmptySummary(ctx: GithubEmptyResultContext): string {
  * verbose diagnostic from `buildGithubEmptySectionLines` instead — only
  * the genuinely-clean empty case uses this friendly line.
  */
-export const GITHUB_EMPTY_LINE = '_GitHub is connected — no issues need your attention._';
+export const GITHUB_EMPTY_LINE = '_GitHub is connected and nothing needs your attention._';
 
 /**
  * True when the empty-result context represents a cleanly-configured

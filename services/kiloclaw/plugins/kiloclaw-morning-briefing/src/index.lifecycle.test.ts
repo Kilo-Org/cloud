@@ -1202,7 +1202,7 @@ describe('morning briefing lifecycle', () => {
       const sent = harness.sentMessages[0]?.message ?? '';
       // Clean empty (classic PAT, no missing scopes) collapses the verbose
       // PR-7 diagnostic into the friendly one-liner.
-      expect(sent).toContain('GitHub is connected — no issues need your attention');
+      expect(sent).toContain('GitHub is connected and nothing needs your attention');
       expect(sent).not.toContain('classic PAT');
       expect(sent).not.toContain('Missing scopes');
       expect(sent).not.toContain('gh auth refresh');
@@ -1315,7 +1315,7 @@ describe('morning briefing lifecycle', () => {
       expect(response.statusCode).toBe(200);
 
       const sent = harness.sentMessages[0]?.message ?? '';
-      expect(sent).toContain('Linear is connected — your queue is clear');
+      expect(sent).toContain('Linear is connected and your queue is clear');
 
       const summaries = await readGithubAndLinearStatus(harness.stateDir);
       const linearSummary = summaries.find(s => s.source === 'linear');

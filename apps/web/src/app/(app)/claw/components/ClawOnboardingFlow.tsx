@@ -827,6 +827,7 @@ function ClawOnboardingFlowInner({
           flowState.instanceStatus !== null && onboardingSaves.ready && !composioConfigPending
         }
         manualConfigured={composioManualConfigured}
+        organizationContext={!!organizationId}
         onConnect={() => {
           const returnTo = `${basePath}/new?step=tools`;
           posthog?.capture('claw_setup_tools_connect_clicked', { toolkit: 'googlecalendar' });

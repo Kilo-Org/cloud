@@ -18,6 +18,7 @@ type ConnectToolsStepViewProps = {
   savingManual: boolean;
   readyToConnect: boolean;
   manualConfigured: boolean;
+  organizationContext: boolean;
   onConnect: () => void;
   onSkip: () => void;
   onContinue: () => void;
@@ -49,6 +50,7 @@ export function ConnectToolsStepView({
   savingManual,
   readyToConnect,
   manualConfigured,
+  organizationContext,
   onConnect,
   onSkip,
   onContinue,
@@ -135,9 +137,15 @@ export function ConnectToolsStepView({
               <Check className="h-3 w-3" />
             </span>
             <div className="space-y-0.5">
-              <p className="text-foreground font-medium">For this OpenClaw instance</p>
+              <p className="text-foreground font-medium">
+                {organizationContext
+                  ? 'For you in this organization'
+                  : 'For this OpenClaw instance'}
+              </p>
               <p className="text-muted-foreground text-xs">
-                Kilo-managed setup connects this OpenClaw instance to its Composio workspace.
+                {organizationContext
+                  ? 'This connects Google Calendar for you in this organization context, not for every organization member.'
+                  : 'Kilo-managed setup connects this OpenClaw instance to its Composio workspace.'}
               </p>
             </div>
           </div>

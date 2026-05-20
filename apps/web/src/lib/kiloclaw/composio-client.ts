@@ -66,16 +66,6 @@ export type ComposioUserContextAuth = {
 
 const GOOGLE_CALENDAR_TOOLKIT_SLUG = 'googlecalendar';
 
-const SENSITIVE_RESPONSE_KEYS = new Set([
-  'redirect_url',
-  'link_token',
-  'token',
-  'api_key',
-  'user_api_key',
-  'access_token',
-  'refresh_token',
-]);
-
 class ComposioApiError extends Error {
   constructor(
     message: string,
@@ -107,23 +97,20 @@ function userOrgAuthHeaders(params: { userApiKey: string; orgId: string }): Reco
   };
 }
 
-function sanitizeComposioErrorBody(value: unknown): unknown {
-  if (typeof value === 'string') return value.slice(0, 300);
-  if (Array.isArray(value)) return value.slice(0, 5).map(sanitizeComposioErrorBody);
-  if (typeof value !== 'object' || value === null) return undefined;
+function safeComposioErrorMetadata(
+  value: unknown
+): Record<string, string | number | boolean> | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
 
   const source = value as Record<string, unknown>;
-  const sanitized: Record<string, unknown> = {};
-  for (const key of ['code', 'message', 'error', 'detail', 'details', 'errors', 'field', 'path']) {
-    if (!(key in source) || SENSITIVE_RESPONSE_KEYS.has(key)) continue;
+  const metadata: Record<string, string | number | boolean> = {};
+  for (const key of ['code', 'field', 'path', 'status']) {
     const field = source[key];
-    if (typeof field === 'string') sanitized[key] = field.slice(0, 300);
-    else if (typeof field === 'number' || typeof field === 'boolean') sanitized[key] = field;
-    else if (typeof field === 'object' && field !== null) {
-      sanitized[key] = sanitizeComposioErrorBody(field);
-    }
+    if (typeof field === 'string') metadata[key] = field.slice(0, 120);
+    else if (typeof field === 'number' || typeof field === 'boolean') metadata[key] = field;
   }
-  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+
+  return Object.keys(metadata).length > 0 ? metadata : undefined;
 }
 
 async function parseJsonResponse(response: Response, operation: string): Promise<unknown> {
@@ -148,7 +135,7 @@ async function parseJsonResponse(response: Response, operation: string): Promise
   }
 
   if (!response.ok) {
-    const upstream = sanitizeComposioErrorBody(json);
+    const upstream = safeComposioErrorMetadata(json);
     console.warn('[kiloclaw:composio] upstream request failed', {
       operation,
       status: response.status,

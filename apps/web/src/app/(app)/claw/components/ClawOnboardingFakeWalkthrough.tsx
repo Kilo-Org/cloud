@@ -206,6 +206,7 @@ function renderFakeStep({ step, setStep, stepProgress, basePath }: RenderFakeSte
           savingManual={false}
           readyToConnect={true}
           manualConfigured={false}
+          organizationContext={false}
           onConnect={() => setStep('email')}
           onSkip={() => setStep('email')}
           onContinue={() => setStep('email')}

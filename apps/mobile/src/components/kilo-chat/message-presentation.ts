@@ -1,5 +1,6 @@
 import {
   type AttachmentBlock,
+  contentBlocksPreviewText,
   contentBlocksToText,
   type ConversationDetailResponse,
   type CreateMessageRequest,
@@ -57,15 +58,6 @@ function expoCryptoPrng(): number {
   return byte / 255;
 }
 
-function contentBlocksToPreviewText(content: Message['content']): string {
-  const preview = content
-    .filter(block => block.type === 'text')
-    .map(block => block.text)
-    .join('\n')
-    .trim();
-  return preview || 'Message';
-}
-
 export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string {
   if (replyToMessage.deleted) {
     return '[deleted message]';
@@ -73,7 +65,7 @@ export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string 
   if ('previewText' in replyToMessage) {
     return replyToMessage.previewText ?? 'Message';
   }
-  return contentBlocksToPreviewText(replyToMessage.content);
+  return contentBlocksPreviewText(replyToMessage.content) || 'Message';
 }
 
 export function getDeliveryFailureLabel(message: Message): string | null {

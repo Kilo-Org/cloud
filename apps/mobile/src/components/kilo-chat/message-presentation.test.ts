@@ -159,6 +159,24 @@ describe('getReplyPreviewText', () => {
     );
   });
 
+  it('uses attachment filenames for loaded attachment-only parent previews', () => {
+    expect(
+      getReplyPreviewText(
+        message({
+          content: [
+            {
+              type: 'attachment',
+              attachmentId: '01HV0000000000000000000001',
+              mimeType: 'image/png',
+              size: 123,
+              filename: 'photo.png',
+            },
+          ],
+        })
+      )
+    ).toBe('photo.png');
+  });
+
   it('uses a deleted-message label for deleted parents', () => {
     expect(getReplyPreviewText(message({ deleted: true }))).toBe('[deleted message]');
   });

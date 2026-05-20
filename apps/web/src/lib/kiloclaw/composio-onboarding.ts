@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 import { APP_URL } from '@/lib/constants';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
@@ -134,7 +135,10 @@ export async function buildComposioProvisionSecrets(params: {
       if (params.skipIncompleteManagedConnection) {
         return { secrets: params.secrets, configToMark: null };
       }
-      throw new Error('Managed Composio connection is still completing');
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'Managed Composio connection is still completing',
+      });
     }
   }
 

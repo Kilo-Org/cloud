@@ -846,7 +846,6 @@ function ClawOnboardingFlowInner({
     skipIncompleteManagedComposioConnection?: boolean
   ) {
     handleCreateFlowStarted();
-    clearOnboardingDraft(organizationId);
 
     mutations.provision.mutate(
       {
@@ -859,6 +858,7 @@ function ClawOnboardingFlowInner({
           : undefined),
       },
       {
+        onSuccess: () => clearOnboardingDraft(organizationId),
         onError: err => {
           posthog?.capture('claw_setup_provision_failed', {
             selected_model: KILO_AUTO_BALANCED_MODEL.id,
@@ -918,14 +918,14 @@ function ClawOnboardingFlowInner({
             defaulted: true,
           });
           setBotIdentity(identity);
-          if (!flowState.instanceStatus && currentUser?.id) {
-            writeOnboardingDraft(organizationId, {
-              userId: currentUser.id,
-              botIdentity: identity,
-              userLocation: weatherLocation?.location ?? null,
-            });
-          }
           if (hasToolsStep) {
+            if (!flowState.instanceStatus && currentUser?.id) {
+              writeOnboardingDraft(organizationId, {
+                userId: currentUser.id,
+                botIdentity: identity,
+                userLocation: weatherLocation?.location ?? null,
+              });
+            }
             setOnboardingStep('tools');
           } else if (hasCalendarStep) {
             if (!flowState.instanceStatus) provisionInstance(weatherLocation?.location);

@@ -2050,7 +2050,6 @@ export function SettingsTab({
       : '/api/integrations/google/disconnect';
   }, [organizationId]);
   const canSeeGoogleCalendar = !!user?.is_admin;
-  const canSeeMorningBriefing = !!user?.is_admin;
 
   function handleCycleInboundEmailAddress() {
     mutations.cycleInboundEmailAddress.mutate(undefined, {
@@ -2520,23 +2519,21 @@ export function SettingsTab({
             mutations={mutations}
             onRedeploy={onRedeploy}
           />
-          {canSeeMorningBriefing && (
-            <MorningBriefingCard
-              mutations={mutations}
-              briefingStatus={morningBriefingStatus}
-              isRunning={isRunning}
-              actionsReady={morningBriefingActionsReady}
-              onRequestUpgrade={onRequestUpgrade}
-              supportsInterests={supportsBriefingInterests}
-              userLocation={status.userLocation ?? null}
-              userTimezone={status.userTimezone ?? null}
-              fallbackReadiness={{
-                githubConfigured: configuredSecrets.github ?? false,
-                linearConfigured: configuredSecrets.linear ?? false,
-                webConfigured: braveSearchConfigured || exaSearchConfigured,
-              }}
-            />
-          )}
+          <MorningBriefingCard
+            mutations={mutations}
+            briefingStatus={morningBriefingStatus}
+            isRunning={isRunning}
+            actionsReady={morningBriefingActionsReady}
+            onRequestUpgrade={onRequestUpgrade}
+            supportsInterests={supportsBriefingInterests}
+            userLocation={status.userLocation ?? null}
+            userTimezone={status.userTimezone ?? null}
+            fallbackReadiness={{
+              githubConfigured: configuredSecrets.github ?? false,
+              linearConfigured: configuredSecrets.linear ?? false,
+              webConfigured: braveSearchConfigured || exaSearchConfigured,
+            }}
+          />
         </div>
       </div>
 

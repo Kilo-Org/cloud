@@ -3040,17 +3040,6 @@ export const kiloclawRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Morning briefing is admin-only today (matches the UI gate
-      // `canSeeMorningBriefing = !!user?.is_admin` in SettingsTab.tsx
-      // and `isAdminForInterests` in ClawOnboardingFlow.tsx). Without
-      // the server-side check, a non-admin could call this mutation
-      // directly via the tRPC client and bypass the hidden UI.
-      if (!ctx.user.is_admin) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Morning briefing is admin-only',
-        });
-      }
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       return client.updateBriefingInterests(ctx.user.id, input.topics, workerInstanceId(instance));
@@ -3064,12 +3053,6 @@ export const kiloclawRouter = createTRPCRouter({
   updateUserLocation: clawAccessProcedure
     .input(z.object({ userLocation: userLocationSchema.nullable() }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.user.is_admin) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Morning briefing is admin-only',
-        });
-      }
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       return client.updateUserLocation(ctx.user.id, input.userLocation, workerInstanceId(instance));

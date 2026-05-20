@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { File as FileIcon, Download, AlertCircle } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { File as FileIcon, Download, AlertCircle, ImageOff } from 'lucide-react';
 import type { AttachmentBlock } from '@kilocode/kilo-chat';
 import { useAttachmentUrl } from '@kilocode/kilo-chat-hooks';
 
@@ -31,17 +31,22 @@ export function MessageAttachment({
 
   if (isImage) {
     return (
-      <div className="relative mt-1">
+      <div className="relative mt-1 inline-block">
         {isLoading || !data ? (
-          <div className="bg-muted/40 h-[240px] w-[320px] max-w-full animate-pulse rounded-md" />
+          <ImageSlot>
+            <div className="bg-muted/40 h-[160px] w-[200px] max-w-full animate-pulse rounded-md" />
+          </ImageSlot>
+        ) : isError ? (
+          <ImageSlot>
+            <ImagePlaceholder filename={block.filename} reason="error" />
+          </ImageSlot>
         ) : (
-          <ImageAttachment url={data.url} filename={block.filename} size={block.size} />
-        )}
-        {isError && (
-          <div className="text-destructive mt-1 flex items-center gap-1 text-xs">
-            <AlertCircle className="h-3 w-3" />
-            <span>Couldn't load image</span>
-          </div>
+          <ImageAttachment
+            url={data.url}
+            filename={block.filename}
+            size={block.size}
+            interactive={!onRemove}
+          />
         )}
         {onRemove && (
           <button
@@ -71,24 +76,64 @@ export function MessageAttachment({
   );
 }
 
-function ImageAttachment({ url, filename, size }: { url: string; filename: string; size: number }) {
+function ImageSlot({ children }: { children: ReactNode }) {
+  return (
+    <div className="bg-muted/30 flex min-h-[120px] min-w-[160px] max-w-full items-center justify-center rounded-md">
+      {children}
+    </div>
+  );
+}
+
+function ImagePlaceholder({ filename, reason }: { filename: string; reason: 'error' | 'tiny' }) {
+  const label = reason === 'error' ? "Couldn't load image" : filename;
+  return (
+    <div className="text-muted-foreground flex flex-col items-center gap-1 px-2 text-center">
+      <ImageOff className="h-6 w-6" />
+      <span className="line-clamp-2 break-all text-[11px]">{label}</span>
+    </div>
+  );
+}
+
+function ImageAttachment({
+  url,
+  filename,
+  size: _size,
+  interactive,
+}: {
+  url: string;
+  filename: string;
+  size: number;
+  interactive: boolean;
+}) {
   const [errored, setErrored] = useState(false);
   // Signed URLs are refreshed periodically by useAttachmentUrl; reset the
   // error state on each new URL so a transient failure doesn't pin the
-  // FileChip fallback forever.
+  // placeholder fallback forever.
   useEffect(() => setErrored(false), [url]);
   if (errored) {
-    return <FileChip url={url} filename={filename} size={size} loading={false} error={false} />;
+    return (
+      <ImageSlot>
+        <ImagePlaceholder filename={filename} reason="error" />
+      </ImageSlot>
+    );
+  }
+  const img = (
+    <img
+      src={url}
+      alt={filename}
+      loading="lazy"
+      onError={() => setErrored(true)}
+      className={`max-h-[240px] max-w-[320px] rounded-md object-contain ${
+        interactive ? 'cursor-zoom-in' : ''
+      }`}
+    />
+  );
+  if (!interactive) {
+    return <ImageSlot>{img}</ImageSlot>;
   }
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer">
-      <img
-        src={url}
-        alt={filename}
-        loading="lazy"
-        onError={() => setErrored(true)}
-        className="max-h-[240px] max-w-[320px] cursor-zoom-in rounded-md object-contain"
-      />
+    <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+      <ImageSlot>{img}</ImageSlot>
     </a>
   );
 }

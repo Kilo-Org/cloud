@@ -20,6 +20,7 @@ import {
   MESSAGE_TEXT_MAX_CHARS,
   ulidToTimestamp,
   contentBlocksToText,
+  contentBlocksPreviewText,
 } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './kiloChatContext';
 import { toast } from 'sonner';
@@ -66,7 +67,7 @@ function getReplyPreviewText(replyToMessage: Message | ReplyToMessageSnapshot): 
   const preview =
     'previewText' in replyToMessage
       ? (replyToMessage.previewText ?? 'Message')
-      : contentBlocksToText(replyToMessage.content);
+      : contentBlocksPreviewText(replyToMessage.content);
   return preview.length > 60 ? `${preview.slice(0, 60)}...` : preview;
 }
 
@@ -316,8 +317,8 @@ export const MessageBubble = memo(function MessageBubble({
             ) : isEditing ? (
               <div>
                 <textarea
-                  className="bg-transparent w-full text-sm outline-none border-b border-current/20 pb-0.5 resize-none"
-                  rows={Math.min(editText.split('\n').length, 8)}
+                  className="bg-transparent w-full text-sm outline-none border-b border-current/20 pb-0.5 resize-none overflow-y-auto"
+                  rows={Math.min(Math.max(editText.split('\n').length, 1), 8)}
                   value={editText}
                   onChange={e => setEditText(e.target.value)}
                   onKeyDown={e => {

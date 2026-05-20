@@ -3,6 +3,7 @@ export { KiloChatApiError, formatKiloChatError } from './errors';
 export {
   ulidToTimestamp,
   contentBlocksToText,
+  contentBlocksPreviewText,
   buildReplyToMessageSnapshot,
   encodeConversationCursor,
   decodeConversationCursor,

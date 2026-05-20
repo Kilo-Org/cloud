@@ -67,12 +67,33 @@ export function contentBlocksToText(content: Array<{ type: string; text?: string
     .join('');
 }
 
+type PreviewBlock = { type: string; text?: string; filename?: string; mimeType?: string };
+
+/**
+ * Short, human-readable single-line preview of a message's content blocks.
+ * Falls back to attachment filenames (or a mime-typed descriptor) when no
+ * text is present, so attachment-only messages don't render as empty strings
+ * in reply previews, conversation list previews, etc.
+ */
+export function contentBlocksPreviewText(content: Array<PreviewBlock>): string {
+  const text = contentBlocksToText(content).trim();
+  if (text) return text;
+  const attachments = content.filter(
+    (b): b is { type: 'attachment'; filename?: string; mimeType?: string } =>
+      b.type === 'attachment'
+  );
+  if (attachments.length === 0) return '';
+  return attachments
+    .map(a => a.filename || (a.mimeType?.startsWith('image/') ? 'Image' : 'Attachment'))
+    .join(', ');
+}
+
 const REPLY_PREVIEW_MAX_CHARS = 160;
 
 type ReplySnapshotParent = {
   senderId: string;
   deleted: boolean;
-  content: Array<{ type: string; text?: string }>;
+  content: Array<PreviewBlock>;
 };
 
 export function buildReplyToMessageSnapshot(
@@ -87,7 +108,7 @@ export function buildReplyToMessageSnapshot(
     return { messageId, senderId: parent.senderId, deleted: true, previewText: null };
   }
 
-  const preview = contentBlocksToText(parent.content).trim();
+  const preview = contentBlocksPreviewText(parent.content);
   return {
     messageId,
     senderId: parent.senderId,

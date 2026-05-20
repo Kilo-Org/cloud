@@ -528,7 +528,7 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
 
     // On fresh containers the browse worktrees won't exist yet. Refresh
     // them in the background so mayor readiness does not wait on clone/fetch
-    // work across every rig. AGENTS.md is rewritten when setup completes.
+    // work across every rig.
     if (request.rigs?.length) {
       void setupMayorBrowseWorktrees(request).catch(err => {
         console.error('[runAgent] background mayor browse worktree setup failed:', err);

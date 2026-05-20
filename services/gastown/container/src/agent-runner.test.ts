@@ -18,7 +18,7 @@ vi.mock('./logger', () => ({
   log: { info: vi.fn() },
 }));
 
-import { buildAgentEnv, buildKiloConfigContent } from './agent-runner';
+import { buildAgentEnv, buildKiloAuthEnv, buildKiloConfigContent } from './agent-runner';
 import type { StartAgentRequest } from './types';
 
 function baseRequest(overrides: Partial<StartAgentRequest> = {}): StartAgentRequest {
@@ -115,5 +115,46 @@ describe('buildKiloConfigContent', () => {
     );
     const parsed = JSON.parse(json);
     expect(parsed.provider.kilo.options.kilocodeOrganizationId).toBeUndefined();
+  });
+});
+
+describe('buildKiloAuthEnv', () => {
+  it('sets KILO_PLATFORM to gastown', () => {
+    const env = buildKiloAuthEnv(undefined, undefined);
+    expect(env.KILO_PLATFORM).toBe('gastown');
+  });
+
+  it('sets KILO_AUTH_CONTENT when kilocodeToken is provided', () => {
+    const env = buildKiloAuthEnv('tok-abc', undefined);
+    expect(env.KILO_AUTH_CONTENT).toBe(JSON.stringify({ kilo: { type: 'api', key: 'tok-abc' } }));
+  });
+
+  it('omits KILO_AUTH_CONTENT when kilocodeToken is absent', () => {
+    const env = buildKiloAuthEnv(undefined, undefined);
+    expect(env.KILO_AUTH_CONTENT).toBeUndefined();
+  });
+
+  it('sets KILO_ORG_ID when organizationId is provided', () => {
+    const env = buildKiloAuthEnv('tok', 'org-123');
+    expect(env.KILO_ORG_ID).toBe('org-123');
+  });
+
+  it('omits KILO_ORG_ID when organizationId is null', () => {
+    const env = buildKiloAuthEnv('tok', null);
+    expect(env.KILO_ORG_ID).toBeUndefined();
+  });
+
+  it('omits KILO_ORG_ID when organizationId is undefined', () => {
+    const env = buildKiloAuthEnv('tok', undefined);
+    expect(env.KILO_ORG_ID).toBeUndefined();
+  });
+
+  it('sets all three env vars when both inputs are provided', () => {
+    const env = buildKiloAuthEnv('tok-full', 'org-full');
+    expect(env).toEqual({
+      KILO_PLATFORM: 'gastown',
+      KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: 'tok-full' } }),
+      KILO_ORG_ID: 'org-full',
+    });
   });
 });

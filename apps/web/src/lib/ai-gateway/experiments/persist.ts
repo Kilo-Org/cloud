@@ -103,16 +103,14 @@ export type PersistExperimentAttributionInput = {
 export async function persistExperimentAttribution(
   input: PersistExperimentAttributionInput
 ): Promise<void> {
+  const requestKind = input.capture?.requestKind ?? 'chat_completions';
+  const wasTruncated = input.capture?.wasTruncated ?? false;
+  const bodyHash = input.capture
+    ? await putPromptOrFailedHash(input.capture.requestBodyContent)
+    : PROMPT_HASH_FAILED;
+
   try {
-    if (!input.capture) {
-      // Should not happen in production: an experimented request always
-      // builds a capture in the route handler. Record `__failed__` so the
-      // attribution row still lands and the gap is observable.
-      await insertRow(input, 'chat_completions', PROMPT_HASH_FAILED, false);
-      return;
-    }
-    const bodyHash = await putPromptSafely(input.capture.requestBodyContent);
-    await insertRow(input, input.capture.requestKind, bodyHash, input.capture.wasTruncated);
+    await insertRow(input, requestKind, bodyHash, wasTruncated);
   } catch (err) {
     captureException(err, {
       tags: { source: 'model-experiments', operation: 'persistExperimentAttribution' },
@@ -139,7 +137,7 @@ async function insertRow(
   });
 }
 
-async function putPromptSafely(content: string): Promise<string> {
+async function putPromptOrFailedHash(content: string): Promise<string> {
   try {
     return await putPromptIfAbsent(content);
   } catch (err) {

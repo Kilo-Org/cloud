@@ -2017,7 +2017,7 @@ export default definePluginEntry({
       }
     })();
 
-    const runBriefingCommand = async (argsText: string) => {
+    const runBriefingCommand = async (argsText: string, options?: { forAgent?: boolean }) => {
       const args = argsText.trim();
       const [subcommand = 'status'] = args.split(/\s+/).filter(Boolean);
 
@@ -2060,7 +2060,9 @@ export default definePluginEntry({
         if (!briefing.exists || !briefing.markdown) {
           return `No saved briefing for ${briefing.dateKey}.`;
         }
-        return briefing.markdown;
+        return options?.forAgent
+          ? wrapBriefingMarkdownForAgent(briefing.markdown)
+          : briefing.markdown;
       }
 
       const status = await getStatusSnapshot(api);
@@ -2119,7 +2121,7 @@ export default definePluginEntry({
           };
         }
 
-        const resultText = await runBriefingCommand(commandArgs);
+        const resultText = await runBriefingCommand(commandArgs, { forAgent: true });
         return {
           content: [
             {

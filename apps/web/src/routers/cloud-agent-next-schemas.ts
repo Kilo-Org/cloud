@@ -362,12 +362,6 @@ export const executionStatusNextSchema = z
   })
   .nullable();
 
-// Callback target configuration
-export const callbackTargetNextSchema = z.object({
-  url: z.string().url(),
-  headers: z.record(z.string(), z.string()).optional(),
-});
-
 // Output schema for getSession (sanitized, no secrets)
 export const baseGetSessionNextOutputSchema = z.object({
   // Session identifiers
@@ -411,8 +405,10 @@ export const baseGetSessionNextOutputSchema = z.object({
   preparedAt: z.number().optional(),
   initiatedAt: z.number().optional(),
 
-  // Callback configuration
-  callbackTarget: callbackTargetNextSchema.optional(),
+  // Callback configuration is intentionally NOT exposed: the stored target
+  // may carry service-to-service auth headers (e.g. X-Internal-Secret used
+  // by Worker callback ingresses), and `getSession` is reachable by the
+  // session's owning user. Mirrors cloud-agent-next/router/schemas.ts.
 
   // Initial message ID for correlation
   initialMessageId: z.string().startsWith('msg_').length(30).optional(),

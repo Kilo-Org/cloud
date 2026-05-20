@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- message bubble grows with each new content-block type */
-import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
-import { AlertCircle, CheckCircle2, Paperclip, Reply, XCircle } from 'lucide-react-native';
+import { type ExecApprovalDecision, type KiloChatClient, type Message } from '@kilocode/kilo-chat';
+import { AlertCircle, CheckCircle2, Reply, XCircle } from 'lucide-react-native';
 import { memo } from 'react';
 import { Pressable, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -31,9 +31,12 @@ import {
   isMessageEdited,
   type ReplyPreviewSource,
 } from './message-presentation';
+import { MessageAttachment } from './message-attachment';
 import { MessageReactionPills } from './message-reaction-pills';
 
 type Props = {
+  client: KiloChatClient;
+  conversationId: string;
   message: Message;
   currentUserId: string | null;
   isFromMe: boolean;
@@ -64,6 +67,8 @@ function actionStyleToVariant(
 }
 
 function MessageBubbleComponent({
+  client,
+  conversationId,
   message,
   currentUserId,
   isFromMe,
@@ -240,15 +245,13 @@ function MessageBubbleComponent({
 
                   if (block.type === 'attachment') {
                     return (
-                      <View key={block.attachmentId} className="mt-1 flex-row items-center gap-1.5">
-                        <Paperclip
-                          size={12}
-                          color={isFromMe ? colors.primaryForeground : colors.mutedForeground}
-                        />
-                        <Text className={cn('text-xs italic opacity-80', textColor)}>
-                          {block.filename}
-                        </Text>
-                      </View>
+                      <MessageAttachment
+                        key={block.attachmentId}
+                        client={client}
+                        conversationId={conversationId}
+                        block={block}
+                        isFromMe={isFromMe}
+                      />
                     );
                   }
 

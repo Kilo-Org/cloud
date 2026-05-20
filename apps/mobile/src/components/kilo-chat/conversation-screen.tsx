@@ -614,6 +614,8 @@ export function ConversationScreen({
       />
       <AppAwareKeyboardPaddingView className="flex-1">
         <MessageList
+          client={client}
+          conversationId={conversationId}
           messages={messages}
           currentUserId={currentUserId}
           members={conversationMembers}

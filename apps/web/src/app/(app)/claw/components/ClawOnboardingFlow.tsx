@@ -172,6 +172,68 @@ function createComposioConnectAttemptId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+const ONBOARDING_DRAFT_STORAGE_PREFIX = 'kiloclaw:onboarding-draft:';
+
+type OnboardingDraft = {
+  userId: string;
+  botIdentity: BotIdentity;
+  userLocation: string | null;
+};
+
+function onboardingDraftStorageKey(organizationId?: string): string {
+  return `${ONBOARDING_DRAFT_STORAGE_PREFIX}${organizationId ?? 'personal'}`;
+}
+
+function readOnboardingDraft(
+  organizationId: string | undefined,
+  userId: string
+): OnboardingDraft | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(onboardingDraftStorageKey(organizationId));
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const record = parsed as Record<string, unknown>;
+    if (record.userId !== userId) return null;
+    const botIdentity = record.botIdentity;
+    if (typeof botIdentity !== 'object' || botIdentity === null) return null;
+    const identity = botIdentity as Record<string, unknown>;
+    if (
+      typeof identity.botName !== 'string' ||
+      typeof identity.botNature !== 'string' ||
+      typeof identity.botVibe !== 'string' ||
+      typeof identity.botEmoji !== 'string'
+    ) {
+      return null;
+    }
+    const userLocation = record.userLocation;
+    if (userLocation !== null && typeof userLocation !== 'string') return null;
+    return {
+      userId,
+      botIdentity: {
+        botName: identity.botName,
+        botNature: identity.botNature,
+        botVibe: identity.botVibe,
+        botEmoji: identity.botEmoji,
+      },
+      userLocation,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeOnboardingDraft(organizationId: string | undefined, draft: OnboardingDraft): void {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.setItem(onboardingDraftStorageKey(organizationId), JSON.stringify(draft));
+}
+
+function clearOnboardingDraft(organizationId?: string): void {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.removeItem(onboardingDraftStorageKey(organizationId));
+}
+
 export type { ClawOnboardingMode };
 
 export function ClawOnboardingFlow({
@@ -287,14 +349,16 @@ function ClawOnboardingFlowInner({
   );
   const composioStatus = organizationId ? orgComposioStatus : personalComposioStatus;
   const hasToolsStep = hasCalendarStep && composioStatus.data?.enabled !== false;
-  const configQuery = useClawConfig();
+  const configQuery = useClawConfig(status !== undefined && status.status !== null);
   const composioManualConfigured = composioStatus.data?.sandboxConfigSource === 'manual';
-  const composioConfigPending = configQuery.isPending;
+  const composioConfigPending =
+    status !== undefined && status.status !== null && configQuery.isPending;
 
   const gatewayUrl = useGatewayUrl(status);
 
   const selectedPreset: ExecPreset = DEFAULT_ONBOARDING_EXEC_PRESET;
   const [botIdentity, setBotIdentity] = useState<BotIdentity | null>(null);
+  const [pendingUserLocation, setPendingUserLocation] = useState<string | null>(null);
   // Interest topics chosen on the Interests step are deferred until the
   // provisioning step completes — the plugin endpoint that backs
   // `updateBriefingInterests` isn't reachable until the instance gateway
@@ -313,8 +377,20 @@ function ClawOnboardingFlowInner({
   const composioPopupRef = useRef<Window | null>(null);
   const composioPopupPendingRef = useRef(false);
   const composioPopupResultHandledRef = useRef(false);
+  const composioPopupAwaitingConfirmationRef = useRef(false);
   const composioPopupAttemptIdRef = useRef<string | null>(null);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
+
+  useEffect(() => {
+    if (!currentUser?.id || botIdentity !== null) return;
+    const draft = readOnboardingDraft(organizationId, currentUser.id);
+    if (!draft) {
+      clearOnboardingDraft(organizationId);
+      return;
+    }
+    setBotIdentity(draft.botIdentity);
+    setPendingUserLocation(draft.userLocation);
+  }, [botIdentity, currentUser?.id, organizationId]);
 
   const stateInput = {
     status,
@@ -374,7 +450,10 @@ function ClawOnboardingFlowInner({
 
   const setComposioPopupPendingState = useCallback((pending: boolean) => {
     composioPopupPendingRef.current = pending;
-    if (pending) composioPopupResultHandledRef.current = false;
+    if (pending) {
+      composioPopupResultHandledRef.current = false;
+      composioPopupAwaitingConfirmationRef.current = false;
+    }
     setComposioPopupPending(pending);
   }, []);
 
@@ -386,16 +465,15 @@ function ClawOnboardingFlowInner({
       composioPopupRef.current?.close();
       composioPopupRef.current = null;
       composioPopupAttemptIdRef.current = null;
-      setComposioPopupPendingState(false);
       setOnboardingStep('tools');
       void composioStatus.refetch();
 
       if (message.result === 'success') {
-        posthog?.capture('claw_setup_tools_composio_completed');
-        toast.success('Google Calendar connected');
+        composioPopupAwaitingConfirmationRef.current = true;
         return;
       }
 
+      setComposioPopupPendingState(false);
       posthog?.capture('claw_setup_tools_connect_failed', {
         toolkit: 'googlecalendar',
       });
@@ -444,9 +522,19 @@ function ClawOnboardingFlowInner({
   useEffect(() => {
     if (!composioPopupPending) return;
 
+    let closedChecks = 0;
     const intervalId = window.setInterval(() => {
       const popup = composioPopupRef.current;
-      if (!popup || !popup.closed) return;
+      if (!popup?.closed || composioPopupAwaitingConfirmationRef.current) {
+        closedChecks = 0;
+        return;
+      }
+
+      // Cross-origin popup navigation can transiently look closed during the
+      // handoff from our pre-opened window to Composio. Require consecutive
+      // closed observations before treating it as a user dismissal.
+      closedChecks += 1;
+      if (closedChecks < 3) return;
 
       composioPopupRef.current = null;
       composioPopupAttemptIdRef.current = null;
@@ -456,7 +544,6 @@ function ClawOnboardingFlowInner({
         toolkit: 'googlecalendar',
         reason: 'popup_closed',
       });
-      toast.message('Connection window closed. Checking Google Calendar status.');
     }, 700);
 
     return () => window.clearInterval(intervalId);
@@ -468,6 +555,7 @@ function ClawOnboardingFlowInner({
     composioPopupRef.current?.close();
     composioPopupRef.current = null;
     composioPopupAttemptIdRef.current = null;
+    composioPopupAwaitingConfirmationRef.current = false;
     setComposioPopupPendingState(false);
     posthog?.capture('claw_setup_tools_composio_completed', { source: 'status_refetch' });
     toast.success('Google Calendar connected');
@@ -540,14 +628,15 @@ function ClawOnboardingFlowInner({
   const resetWizardSelections = useCallback(() => {
     setOnboardingStep('identity');
     setBotIdentity(null);
-  }, []);
+    setPendingUserLocation(null);
+    clearOnboardingDraft(organizationId);
+  }, [organizationId]);
 
   const handleCreateFlowStarted = useCallback(() => {
     setLocalCreateSetupStarted(true);
     setOnboardingSaveSession(value => value + 1);
-    resetWizardSelections();
     onCreateFlowStarted?.();
-  }, [onCreateFlowStarted, resetWizardSelections]);
+  }, [onCreateFlowStarted]);
 
   const handleCreateFlowFailed = useCallback(() => {
     setLocalCreateSetupStarted(false);
@@ -709,14 +798,23 @@ function ClawOnboardingFlowInner({
     router.push(`${basePath}/chat`);
   }, [flowState.renderStep, flowState.gatewayReady, basePath, router, posthog]);
 
-  function provisionInstance(userLocation?: string) {
+  function provisionInstance(
+    userLocation?: string,
+    composioManualCredentials?: { composioUserApiKey: string; composioOrg: string },
+    skipIncompleteManagedComposioConnection?: boolean
+  ) {
     handleCreateFlowStarted();
+    clearOnboardingDraft(organizationId);
 
     mutations.provision.mutate(
       {
         kilocodeDefaultModel: `kilocode/${KILO_AUTO_BALANCED_MODEL.id}`,
         userTimezone: getBrowserTimeZone(),
         ...(userLocation ? { userLocation } : undefined),
+        ...(composioManualCredentials ? { secrets: composioManualCredentials } : undefined),
+        ...(skipIncompleteManagedComposioConnection
+          ? { skipIncompleteManagedComposioConnection: true }
+          : undefined),
       },
       {
         onError: err => {
@@ -728,6 +826,21 @@ function ClawOnboardingFlowInner({
           toast.error(`Failed to create: ${err.message}`);
         },
       }
+    );
+  }
+
+  function startProvisionForCreateFlow(
+    composioManualCredentials?: { composioUserApiKey: string; composioOrg: string },
+    skipIncompleteManagedComposioConnection?: boolean
+  ) {
+    if (mode !== 'create-first' || flowState.instanceStatus !== null || createSetupStarted) return;
+    posthog?.capture('claw_create_instance_clicked', {
+      selected_model: KILO_AUTO_BALANCED_MODEL.id,
+    });
+    provisionInstance(
+      pendingUserLocation ?? undefined,
+      composioManualCredentials,
+      skipIncompleteManagedComposioConnection
     );
   }
 
@@ -756,21 +869,27 @@ function ClawOnboardingFlowInner({
               );
             }
           } else {
-            posthog?.capture('claw_create_instance_clicked', {
-              selected_model: KILO_AUTO_BALANCED_MODEL.id,
-            });
-            provisionInstance(weatherLocation?.location);
+            setPendingUserLocation(weatherLocation?.location ?? null);
           }
           posthog?.capture('claw_setup_permissions_completed', {
             preset: DEFAULT_ONBOARDING_EXEC_PRESET,
             defaulted: true,
           });
           setBotIdentity(identity);
+          if (!flowState.instanceStatus && currentUser?.id) {
+            writeOnboardingDraft(organizationId, {
+              userId: currentUser.id,
+              botIdentity: identity,
+              userLocation: weatherLocation?.location ?? null,
+            });
+          }
           if (hasToolsStep) {
             setOnboardingStep('tools');
           } else if (hasCalendarStep) {
+            if (!flowState.instanceStatus) provisionInstance(weatherLocation?.location);
             setOnboardingStep('calendar');
           } else {
+            if (!flowState.instanceStatus) provisionInstance(weatherLocation?.location);
             setOnboardingStep('email');
           }
         }}
@@ -789,6 +908,7 @@ function ClawOnboardingFlowInner({
     const connectedEmail = flowState.instanceStatus?.googleOAuthAccountEmail ?? null;
 
     function advanceToEmail() {
+      startProvisionForCreateFlow();
       setOnboardingStep('email');
     }
 
@@ -816,7 +936,14 @@ function ClawOnboardingFlowInner({
   }
 
   function renderToolsStep() {
-    function advanceToEmail() {
+    function advanceToEmail(
+      composioManualCredentials?: { composioUserApiKey: string; composioOrg: string },
+      skipIncompleteManagedComposioConnection?: boolean
+    ) {
+      startProvisionForCreateFlow(
+        composioManualCredentials,
+        skipIncompleteManagedComposioConnection
+      );
       setOnboardingStep('email');
     }
 
@@ -828,8 +955,9 @@ function ClawOnboardingFlowInner({
         loading={composioStatus.isPending || composioConfigPending}
         connecting={mutations.createComposioGoogleCalendarLink.isPending || composioPopupPending}
         savingManual={mutations.patchSecrets.isPending}
-        readyToConnect={
-          flowState.instanceStatus !== null && onboardingSaves.ready && !composioConfigPending
+        readyToConnect={botIdentity !== null && !composioConfigPending}
+        readyToSaveManualCredentials={
+          botIdentity !== null && (flowState.instanceStatus === null || onboardingSaves.ready)
         }
         manualConfigured={composioManualConfigured}
         organizationContext={!!organizationId}
@@ -873,7 +1001,7 @@ function ClawOnboardingFlowInner({
         }}
         onSkip={() => {
           posthog?.capture('claw_setup_tools_completed', { connected: false, skipped: true });
-          advanceToEmail();
+          advanceToEmail(undefined, true);
         }}
         onContinue={() => {
           posthog?.capture('claw_setup_tools_completed', { connected: true, skipped: false });
@@ -881,6 +1009,13 @@ function ClawOnboardingFlowInner({
         }}
         onSaveManualCredentials={credentials => {
           posthog?.capture('claw_setup_tools_manual_credentials_save_clicked');
+          if (flowState.instanceStatus === null) {
+            posthog?.capture('claw_setup_tools_manual_credentials_saved', {
+              provision_input: true,
+            });
+            advanceToEmail(credentials);
+            return;
+          }
           mutations.patchSecrets.mutate(
             { secrets: credentials },
             {

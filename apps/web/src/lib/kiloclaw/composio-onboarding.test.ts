@@ -21,6 +21,7 @@ jest.mock('@/lib/kiloclaw/encryption', () => ({
 }));
 
 const selectedRows: unknown[][] = [];
+const updateSets: unknown[] = [];
 
 jest.mock('@/lib/drizzle', () => ({
   db: {
@@ -39,9 +40,12 @@ jest.mock('@/lib/drizzle', () => ({
       })),
     })),
     update: jest.fn(() => ({
-      set: jest.fn(() => ({
-        where: jest.fn(async () => undefined),
-      })),
+      set: jest.fn((values: unknown) => {
+        updateSets.push(values);
+        return {
+          where: jest.fn(async () => undefined),
+        };
+      }),
     })),
     delete: jest.fn(),
   },
@@ -90,6 +94,7 @@ function mockManagedIdentity() {
 beforeEach(() => {
   jest.clearAllMocks();
   selectedRows.length = 0;
+  updateSets.length = 0;
   mockManagedIdentity();
   mockedListComposioConnectedAccounts.mockResolvedValue([
     { id: 'ca_123', status: 'ACTIVE' },
@@ -128,6 +133,49 @@ describe('getManagedComposioGoogleCalendarStatus', () => {
       status: 'connected',
       connectedAccountId: 'ca_123',
       sandboxConfigSource: 'managed',
+    });
+  });
+
+  it('reports connected before provision when the owner identity has an active account', async () => {
+    const status = await getManagedComposioGoogleCalendarStatus({
+      scope,
+      instance: null,
+      sandboxHasComposioSecrets: false,
+    });
+
+    expect(status).toEqual({
+      enabled: true,
+      status: 'connected',
+      connectedAccountId: 'ca_123',
+      sandboxConfigSource: null,
+    });
+  });
+
+  it('does not report pre-provision connected until the callback stores the durable account marker', async () => {
+    mockedGetActiveManagedComposioIdentity.mockResolvedValue({
+      row: {
+        id: 'identity-1',
+        composio_project_id: 'project-1',
+        google_calendar_connected_account_id: null,
+      },
+      agentKey: 'agent-key',
+      userApiKey: 'uak_123',
+      apiKey: 'api-key',
+      org: 'org-1',
+      consumerUserId: 'consumer-user-1',
+    } as never);
+
+    const status = await getManagedComposioGoogleCalendarStatus({
+      scope,
+      instance: null,
+      sandboxHasComposioSecrets: false,
+    });
+
+    expect(status).toEqual({
+      enabled: true,
+      status: 'disconnected',
+      connectedAccountId: null,
+      sandboxConfigSource: null,
     });
   });
 
@@ -185,6 +233,26 @@ describe('completeManagedComposioGoogleCalendarConnection', () => {
       undefined
     );
   });
+
+  it('records the connected account without patching secrets before an instance exists', async () => {
+    const patchSecrets = jest.fn(async () => ({}));
+    mockedKiloClawInternalClient.mockImplementation(
+      () => ({ patchSecrets }) as unknown as KiloClawInternalClient
+    );
+
+    const result = await completeManagedComposioGoogleCalendarConnection({
+      userId: 'user-1',
+      instance: null,
+      scope,
+      connectedAccountId: 'ca_123',
+    });
+
+    expect(result).toBe(true);
+    expect(patchSecrets).not.toHaveBeenCalled();
+    expect(updateSets[0]).toMatchObject({
+      google_calendar_connected_account_id: 'ca_123',
+    });
+  });
 });
 
 describe('composioSecretsPatchSource', () => {
@@ -232,6 +300,44 @@ describe('buildComposioProvisionSecrets', () => {
       },
       configToMark: { source: 'managed' },
     });
+  });
+
+  it('blocks first provision while a managed Composio connect attempt has no durable marker', async () => {
+    mockedGetActiveManagedComposioIdentity.mockResolvedValue({
+      row: {
+        id: 'identity-1',
+        composio_project_id: 'project-1',
+        google_calendar_connected_account_id: null,
+      },
+      agentKey: 'agent-key',
+      userApiKey: 'uak_123',
+      apiKey: 'api-key',
+      org: 'org-1',
+      consumerUserId: 'consumer-user-1',
+    } as never);
+
+    await expect(buildComposioProvisionSecrets({ scope })).rejects.toThrow(
+      'Managed Composio connection is still completing'
+    );
+  });
+
+  it('allows an explicit Tools skip to provision while a managed connect attempt is incomplete', async () => {
+    mockedGetActiveManagedComposioIdentity.mockResolvedValue({
+      row: {
+        id: 'identity-1',
+        composio_project_id: 'project-1',
+        google_calendar_connected_account_id: null,
+      },
+      agentKey: 'agent-key',
+      userApiKey: 'uak_123',
+      apiKey: 'api-key',
+      org: 'org-1',
+      consumerUserId: 'consumer-user-1',
+    } as never);
+
+    await expect(
+      buildComposioProvisionSecrets({ scope, skipIncompleteManagedConnection: true })
+    ).resolves.toEqual({ secrets: undefined, configToMark: null });
   });
 
   it('does not inject managed credentials into a current manual sandbox', async () => {

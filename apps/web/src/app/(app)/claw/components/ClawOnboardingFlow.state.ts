@@ -392,7 +392,11 @@ function getRenderStepDecision({
     };
   }
 
-  if (instanceStatus === null && !createSetupStarted) {
+  if (
+    instanceStatus === null &&
+    !createSetupStarted &&
+    (onboardingStep === 'identity' || !hasBotIdentity)
+  ) {
     return {
       renderStep: 'identity',
       reason: 'create-first mode starts with bot identity before setup is requested',

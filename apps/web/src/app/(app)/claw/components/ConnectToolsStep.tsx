@@ -17,6 +17,7 @@ type ConnectToolsStepViewProps = {
   connecting: boolean;
   savingManual: boolean;
   readyToConnect: boolean;
+  readyToSaveManualCredentials: boolean;
   manualConfigured: boolean;
   organizationContext: boolean;
   onConnect: () => void;
@@ -49,6 +50,7 @@ export function ConnectToolsStepView({
   connecting,
   savingManual,
   readyToConnect,
+  readyToSaveManualCredentials,
   manualConfigured,
   organizationContext,
   onConnect,
@@ -268,7 +270,7 @@ export function ConnectToolsStepView({
               </label>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              {!readyToConnect ? (
+              {!readyToSaveManualCredentials ? (
                 <p className="text-muted-foreground text-xs">
                   Wait for instance setup before saving credentials.
                 </p>
@@ -277,7 +279,7 @@ export function ConnectToolsStepView({
               )}
               <Button
                 variant="outline"
-                disabled={!manualReady || !readyToConnect || savingManual}
+                disabled={!manualReady || !readyToSaveManualCredentials || savingManual}
                 onClick={() =>
                   onSaveManualCredentials({
                     composioUserApiKey: userApiKey.trim(),
@@ -287,7 +289,7 @@ export function ConnectToolsStepView({
               >
                 {savingManual
                   ? 'Saving…'
-                  : readyToConnect
+                  : readyToSaveManualCredentials
                     ? 'Save Composio credentials'
                     : 'Waiting for instance setup'}
               </Button>

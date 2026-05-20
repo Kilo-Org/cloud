@@ -74,6 +74,7 @@ import {
   getPersonalProvisionLockKey,
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
+import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
 import {
   buildComposioProvisionSecrets,
   composioSecretsPatchSource,
@@ -831,6 +832,7 @@ const updateConfigSchema = z.object({
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
   userTimezone: userTimezoneSchema.nullable().optional(),
   userLocation: userLocationSchema.nullable().optional(),
+  skipIncompleteManagedComposioConnection: z.boolean().optional(),
 });
 
 const updateKiloCodeConfigSchema = z.object({
@@ -1098,13 +1100,10 @@ async function provisionInstance(
     scope: { ownerType: 'user', userId: user.id },
     instanceId: params.instanceId,
     secrets: input.secrets,
+    skipIncompleteManagedConnection: input.skipIncompleteManagedComposioConnection,
   });
 
-  const encryptedSecrets = composioProvision.secrets
-    ? Object.fromEntries(
-        Object.entries(composioProvision.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
-      )
-    : undefined;
+  const encryptedSecrets = encryptProvisionSecretsForWorker(composioProvision.secrets);
 
   const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
   const kilocodeApiKey = generateApiToken(user, undefined, {
@@ -3504,30 +3503,30 @@ export const kiloclawRouter = createTRPCRouter({
   createComposioGoogleCalendarLink: baseProcedure
     .input(composioConnectLinkSchema)
     .mutation(async ({ ctx, input }) => {
-      const instance = await getActiveInstance(ctx.user.id);
-      if (!instance) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'No active KiloClaw instance found',
-        });
-      }
+      return await withKiloclawProvisionContextLock(
+        getPersonalProvisionLockKey(ctx.user.id),
+        async () => {
+          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
+          const instance = await getActiveInstance(ctx.user.id);
+          const sandboxConfigSource = instance
+            ? await getComposioInstanceConfigSource(instance.id)
+            : null;
+          if (sandboxConfigSource === 'manual') {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'This sandbox already uses your own Composio credentials.',
+            });
+          }
 
-      const sandboxConfigSource = await getComposioInstanceConfigSource(instance.id);
-      if (sandboxConfigSource === 'manual') {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'This sandbox already uses your own Composio credentials.',
-        });
-      }
-
-      return await createManagedComposioGoogleCalendarLink({
-        userId: ctx.user.id,
-        instance,
-        scope: { ownerType: 'user', userId: ctx.user.id },
-        returnTo: input.returnTo,
-        popup: input.popup,
-        attemptId: input.attemptId,
-      });
+          return await createManagedComposioGoogleCalendarLink({
+            userId: ctx.user.id,
+            scope: { ownerType: 'user', userId: ctx.user.id },
+            returnTo: input.returnTo,
+            popup: input.popup,
+            attemptId: input.attemptId,
+          });
+        }
+      );
     }),
 
   getChannelCatalog: baseProcedure.query(async ({ ctx }) => {

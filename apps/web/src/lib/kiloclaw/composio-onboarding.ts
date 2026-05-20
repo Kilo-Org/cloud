@@ -119,12 +119,23 @@ export async function buildComposioProvisionSecrets(params: {
   scope: ComposioOwnerScope;
   instanceId?: string | null;
   secrets?: Record<string, string>;
+  skipIncompleteManagedConnection?: boolean;
 }): Promise<{
   secrets?: Record<string, string>;
   configToMark: ProvisionComposioConfigToMark;
 }> {
   if (hasComposioProvisionSecrets(params.secrets)) {
     return { secrets: params.secrets, configToMark: { source: 'manual' } };
+  }
+
+  if (!params.instanceId) {
+    const pendingIdentity = await getActiveManagedComposioIdentity(params.scope);
+    if (pendingIdentity && !pendingIdentity.row.google_calendar_connected_account_id) {
+      if (params.skipIncompleteManagedConnection) {
+        return { secrets: params.secrets, configToMark: null };
+      }
+      throw new Error('Managed Composio connection is still completing');
+    }
   }
 
   const identity = await getReusableManagedComposioIdentityForProvision({
@@ -145,7 +156,7 @@ export async function buildComposioProvisionSecrets(params: {
 
 export async function completeManagedComposioGoogleCalendarConnection(params: {
   userId: string;
-  instance: ActiveKiloClawInstance;
+  instance: ActiveKiloClawInstance | null;
   scope: ComposioOwnerScope;
   connectedAccountId: string;
 }): Promise<boolean> {
@@ -162,6 +173,14 @@ export async function completeManagedComposioGoogleCalendarConnection(params: {
     account => account.id === params.connectedAccountId && account.status === 'ACTIVE'
   );
   if (!connected) return false;
+
+  if (!params.instance) {
+    await db
+      .update(kiloclaw_composio_identities)
+      .set({ google_calendar_connected_account_id: params.connectedAccountId })
+      .where(eq(kiloclaw_composio_identities.id, identity.row.id));
+    return true;
+  }
 
   // Blocks callbacks after manual mode is recorded. The worker secret write
   // below is cross-service, so a manual save starting concurrently still races
@@ -193,7 +212,6 @@ export async function completeManagedComposioGoogleCalendarConnection(params: {
 
 export async function createManagedComposioGoogleCalendarLink(params: {
   userId: string;
-  instance: ActiveKiloClawInstance;
   scope: ComposioOwnerScope;
   organizationId?: string;
   returnTo: string;
@@ -251,7 +269,11 @@ export async function getManagedComposioGoogleCalendarStatus(params: {
         account.status === 'ACTIVE' &&
         (!knownConnectedAccountId || account.id === knownConnectedAccountId)
     );
-    if (active && params.sandboxHasComposioSecrets && sandboxConfigSource === 'managed') {
+    if (
+      active &&
+      ((!params.instance && knownConnectedAccountId !== null) ||
+        (params.instance && params.sandboxHasComposioSecrets && sandboxConfigSource === 'managed'))
+    ) {
       return {
         enabled: true,
         status: 'connected',

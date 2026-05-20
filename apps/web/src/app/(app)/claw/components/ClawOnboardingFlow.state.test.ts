@@ -101,6 +101,20 @@ describe('ClawOnboardingFlow state machine', () => {
     expect(state.instanceStatus).toBeNull();
   });
 
+  test('allows managed tools before initial provisioning starts', () => {
+    const state = getClawOnboardingFlowState(
+      createInput({
+        onboardingStep: 'tools',
+        hasBotIdentity: true,
+        hasToolsStep: true,
+      })
+    );
+
+    expect(state.renderStep).toBe('tools');
+    expect(state.createSetupActive).toBe(false);
+    expect(state.instanceStatus).toBeNull();
+  });
+
   test('keeps create setup active once an instance status exists', () => {
     const state = getClawOnboardingFlowState(
       createInput({

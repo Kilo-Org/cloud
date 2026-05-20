@@ -7,6 +7,11 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { isSafeGoogleOAuthReturnTo } from '@/lib/integrations/google/oauth-state';
 import { completeManagedComposioGoogleCalendarConnection } from '@/lib/kiloclaw/composio-onboarding';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
+import {
+  getOrganizationProvisionLockKey,
+  getPersonalProvisionLockKey,
+  withKiloclawProvisionContextLock,
+} from '@/lib/kiloclaw/provision-lock';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 const OrganizationIdSchema = z.string().uuid();
@@ -183,22 +188,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL(appendResult(returnTo, 'unknown'), APP_URL));
     }
 
-    const instance = organizationId
-      ? await getActiveOrgInstance(user.id, organizationId)
-      : await getActiveInstance(user.id);
-    if (!instance) {
-      if (popup) return popupResultResponse('failed', 'missing_instance', attemptId);
-      return NextResponse.redirect(new URL(appendError(returnTo, 'missing_instance'), APP_URL));
-    }
-
-    const verified = await completeManagedComposioGoogleCalendarConnection({
-      userId: user.id,
-      instance,
-      scope: organizationId
-        ? { ownerType: 'organization_user', userId: user.id, organizationId }
-        : { ownerType: 'user', userId: user.id },
-      connectedAccountId,
-    });
+    const verified = await withKiloclawProvisionContextLock(
+      organizationId
+        ? getOrganizationProvisionLockKey(user.id, organizationId)
+        : getPersonalProvisionLockKey(user.id),
+      async () => {
+        const instance = organizationId
+          ? await getActiveOrgInstance(user.id, organizationId)
+          : await getActiveInstance(user.id);
+        return await completeManagedComposioGoogleCalendarConnection({
+          userId: user.id,
+          instance,
+          scope: organizationId
+            ? { ownerType: 'organization_user', userId: user.id, organizationId }
+            : { ownerType: 'user', userId: user.id },
+          connectedAccountId,
+        });
+      }
+    );
 
     if (popup) return popupResultResponse(verified ? 'success' : 'failed', undefined, attemptId);
     return NextResponse.redirect(

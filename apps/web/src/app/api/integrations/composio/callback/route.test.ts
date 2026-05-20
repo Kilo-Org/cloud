@@ -3,11 +3,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import { completeManagedComposioGoogleCalendarConnection } from '@/lib/kiloclaw/composio-onboarding';
+import { withKiloclawProvisionContextLock } from '@/lib/kiloclaw/provision-lock';
 import { failureResult } from '@/lib/maybe-result';
 
 jest.mock('@/lib/user.server');
 jest.mock('@/lib/kiloclaw/instance-registry');
 jest.mock('@/lib/kiloclaw/composio-onboarding');
+jest.mock('@/lib/kiloclaw/provision-lock', () => ({
+  getPersonalProvisionLockKey: jest.fn((userId: string) => `personal:${userId}`),
+  getOrganizationProvisionLockKey: jest.fn(
+    (userId: string, organizationId: string) => `org:${userId}:${organizationId}`
+  ),
+  withKiloclawProvisionContextLock: jest.fn(async (_key: string, work: () => Promise<unknown>) => {
+    return await work();
+  }),
+}));
 const mockedEnsureOrganizationAccess = jest.fn();
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: mockedEnsureOrganizationAccess,
@@ -19,6 +29,7 @@ const mockedGetActiveOrgInstance = jest.mocked(getActiveOrgInstance);
 const mockedCompleteManagedComposioGoogleCalendarConnection = jest.mocked(
   completeManagedComposioGoogleCalendarConnection
 );
+const mockedWithKiloclawProvisionContextLock = jest.mocked(withKiloclawProvisionContextLock);
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 const ORG_ID = 'a32ba169-8d90-43f6-98ee-95e509a1b06b';
@@ -59,6 +70,9 @@ describe('GET /api/integrations/composio/callback', () => {
     mockedGetActiveInstance.mockResolvedValue(fakeInstance as never);
     mockedGetActiveOrgInstance.mockResolvedValue(fakeInstance as never);
     mockedCompleteManagedComposioGoogleCalendarConnection.mockResolvedValue(true);
+    mockedWithKiloclawProvisionContextLock.mockImplementation(async (_key, work) => {
+      return await work();
+    });
   });
 
   test('redirects to sign-in when auth fails', async () => {
@@ -148,6 +162,25 @@ describe('GET /api/integrations/composio/callback', () => {
       userId: USER_ID,
       instance: fakeInstance,
       scope: { ownerType: 'organization_user', userId: USER_ID, organizationId: ORG_ID },
+      connectedAccountId: 'ca_123',
+    });
+  });
+
+  test('records managed connection before an instance exists', async () => {
+    mockedGetActiveInstance.mockResolvedValue(null as never);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        '/api/integrations/composio/callback?returnTo=%2Fclaw%2Fnew%3Fstep%3Dtools&status=success&connected_account_id=ca_123'
+      ) as never
+    );
+
+    expect(redirectPath(response)).toBe('/claw/new?step=tools&success=composio_connected');
+    expect(mockedCompleteManagedComposioGoogleCalendarConnection).toHaveBeenCalledWith({
+      userId: USER_ID,
+      instance: null,
+      scope: { ownerType: 'user', userId: USER_ID },
       connectedAccountId: 'ca_123',
     });
   });

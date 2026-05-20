@@ -318,20 +318,19 @@ export function accountForMicrodollarUsage(
         // the time we reach here. `persistExperimentAttribution`
         // swallows errors internally.
         if (
-          !usageIdentity ||
-          !usageContext.modelExperimentVariantVersionId ||
-          !usageContext.modelExperimentAllocationSubject
+          usageIdentity &&
+          usageContext.modelExperimentVariantVersionId &&
+          usageContext.modelExperimentAllocationSubject
         ) {
-          return;
+          await persistExperimentAttribution({
+            usageId: usageIdentity.usageId,
+            createdAt: usageIdentity.createdAt,
+            variantVersionId: usageContext.modelExperimentVariantVersionId,
+            allocationSubject: usageContext.modelExperimentAllocationSubject,
+            clientRequestId: usageContext.clientRequestId ?? null,
+            capture: usageContext.experimentPromptCapture ?? null,
+          });
         }
-        await persistExperimentAttribution({
-          usageId: usageIdentity.usageId,
-          createdAt: usageIdentity.createdAt,
-          variantVersionId: usageContext.modelExperimentVariantVersionId,
-          allocationSubject: usageContext.modelExperimentAllocationSubject,
-          clientRequestId: usageContext.clientRequestId ?? null,
-          capture: usageContext.experimentPromptCapture ?? null,
-        });
       }
     )
   );

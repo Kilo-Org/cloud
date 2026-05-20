@@ -111,6 +111,9 @@ export const MessageBubble = memo(function MessageBubble({
     () => message.content.filter((b): b is AttachmentBlock => b.type === 'attachment'),
     [message.content]
   );
+  const visibleAttachmentBlocks = attachmentBlocks.filter(
+    b => !isEditing || !removedAttachmentIds.has(b.attachmentId)
+  );
   const editOverLimit = isMessageEditOverLimit(editText);
   const showEditCounter = editText.length >= EDIT_COUNTER_SHOW_AT || editOverLimit;
   const baseActionAvailability = buildMessageActionAvailability(message, isOwn);
@@ -174,6 +177,32 @@ export const MessageBubble = memo(function MessageBubble({
     setEditText('');
     setRemovedAttachmentIds(new Set());
     setIsSavingEdit(false);
+  }
+
+  function handleRemoveAttachment(attachmentId: string) {
+    setRemovedAttachmentIds(prev => {
+      const next = new Set(prev);
+      next.add(attachmentId);
+      return next;
+    });
+  }
+
+  function renderAttachmentList(editable: boolean) {
+    if (visibleAttachmentBlocks.length === 0) return null;
+
+    return (
+      <div className="mt-2 flex flex-col gap-2">
+        {visibleAttachmentBlocks.map(block => (
+          <MessageAttachment
+            key={block.attachmentId}
+            block={block}
+            conversationId={conversationId}
+            isOwn={isOwn}
+            onRemove={editable ? () => handleRemoveAttachment(block.attachmentId) : undefined}
+          />
+        ))}
+      </div>
+    );
   }
 
   function handleQuickPickSelect(emoji: string) {
@@ -315,9 +344,9 @@ export const MessageBubble = memo(function MessageBubble({
             {message.deleted ? (
               <p className="text-sm italic opacity-50">[deleted message]</p>
             ) : isEditing ? (
-              <div>
+              <div className="min-w-0">
                 <textarea
-                  className="bg-transparent w-full text-sm outline-none border-b border-current/20 pb-0.5 resize-none overflow-y-auto"
+                  className="bg-transparent w-full resize-none overflow-y-auto border-b border-current/20 pb-0.5 text-sm outline-none"
                   rows={Math.min(Math.max(editText.split('\n').length, 1), 8)}
                   value={editText}
                   onChange={e => setEditText(e.target.value)}
@@ -330,30 +359,35 @@ export const MessageBubble = memo(function MessageBubble({
                   }}
                   autoFocus
                 />
-                <div
-                  className={`mt-1 text-right text-[11px] ${
-                    editOverLimit ? 'text-destructive' : 'opacity-70'
-                  } ${showEditCounter ? '' : 'invisible'}`}
-                  aria-live="polite"
-                >
-                  {editText.length.toLocaleString('en-US')} /{' '}
-                  {MESSAGE_TEXT_MAX_CHARS.toLocaleString('en-US')}
-                </div>
-                <div className="mt-1 flex items-center gap-1">
+                {showEditCounter && (
+                  <div
+                    className={`mt-1 text-right text-[11px] ${
+                      editOverLimit ? 'text-destructive' : 'opacity-70'
+                    }`}
+                    aria-live="polite"
+                  >
+                    {editText.length.toLocaleString('en-US')} /{' '}
+                    {MESSAGE_TEXT_MAX_CHARS.toLocaleString('en-US')}
+                  </div>
+                )}
+                {renderAttachmentList(true)}
+                <div className="mt-2 flex items-center justify-end gap-1">
                   <button
                     onClick={() => void handleSaveEdit()}
                     disabled={!canSaveEdit}
-                    className="rounded p-0.5 hover:opacity-70 cursor-pointer transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                    className="hover:bg-current/10 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Save edit"
                     title="Save (Enter)"
                   >
-                    <Check className="h-3 w-3" />
+                    <Check className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={handleCancelEdit}
-                    className="rounded p-0.5 hover:opacity-70 cursor-pointer transition-opacity opacity-60"
+                    className="hover:bg-current/10 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded opacity-60 transition-colors"
+                    aria-label="Cancel edit"
                     title="Cancel (Esc)"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
@@ -438,27 +472,7 @@ export const MessageBubble = memo(function MessageBubble({
                   );
                 })}
 
-            {!message.deleted &&
-              attachmentBlocks
-                .filter(b => !isEditing || !removedAttachmentIds.has(b.attachmentId))
-                .map(block => (
-                  <MessageAttachment
-                    key={block.attachmentId}
-                    block={block}
-                    conversationId={conversationId}
-                    isOwn={isOwn}
-                    onRemove={
-                      isEditing
-                        ? () =>
-                            setRemovedAttachmentIds(prev => {
-                              const next = new Set(prev);
-                              next.add(block.attachmentId);
-                              return next;
-                            })
-                        : undefined
-                    }
-                  />
-                ))}
+            {!message.deleted && !isEditing && renderAttachmentList(false)}
 
             <div
               className={`mt-1 flex items-center gap-1 text-[10px] ${

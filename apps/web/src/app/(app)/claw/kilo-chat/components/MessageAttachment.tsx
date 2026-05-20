@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { File as FileIcon, Download, AlertCircle, ImageOff } from 'lucide-react';
+import { File as FileIcon, Download, AlertCircle, ImageOff, X } from 'lucide-react';
 import type { AttachmentBlock } from '@kilocode/kilo-chat';
 import { useAttachmentUrl } from '@kilocode/kilo-chat-hooks';
 
@@ -31,7 +31,7 @@ export function MessageAttachment({
 
   if (isImage) {
     return (
-      <div className="relative mt-1 inline-block">
+      <div className="relative inline-block max-w-full">
         {isLoading || !data ? (
           <ImageSlot>
             <div className="bg-muted/40 h-[160px] w-[200px] max-w-full animate-pulse rounded-md" />
@@ -52,10 +52,11 @@ export function MessageAttachment({
           <button
             type="button"
             onClick={onRemove}
-            className="bg-background/80 hover:bg-background absolute right-1 top-1 rounded-full p-1 text-xs"
+            className="bg-background/90 text-foreground border-border hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1"
+            aria-label={`Remove ${block.filename}`}
             title="Remove attachment"
           >
-            ×
+            <X className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
@@ -63,7 +64,7 @@ export function MessageAttachment({
   }
 
   return (
-    <div className={`mt-1 ${isOwn ? 'self-end' : ''}`}>
+    <div className={isOwn ? 'self-end' : ''}>
       <FileChip
         url={data?.url}
         filename={block.filename}
@@ -180,10 +181,11 @@ function FileChip({ url, filename, size, loading, error, onRemove }: FileChipPro
         <button
           type="button"
           onClick={onRemove}
-          className="bg-background/90 hover:bg-background absolute -right-1 -top-1 rounded-full p-0.5 text-xs leading-none"
+          className="bg-background/90 text-foreground border-border hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring absolute -right-2 -top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1"
+          aria-label={`Remove ${filename}`}
           title="Remove attachment"
         >
-          ×
+          <X className="h-3 w-3" />
         </button>
       )}
     </span>

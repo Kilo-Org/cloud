@@ -226,6 +226,17 @@ export default function CodeReviewsPage() {
   const handleRefresh = useCallback(() => {
     if (isIntervalDraftInvalid) return;
 
+    if (rangeType === '7d') {
+      const nextPresetState = createTrailingSevenDayIntervalState();
+      if (
+        nextPresetState.activeInterval.startDate !== startDate ||
+        nextPresetState.activeInterval.endDate !== endDate
+      ) {
+        setDateIntervalState(nextPresetState);
+        return;
+      }
+    }
+
     void overviewQuery.refetch();
     void dailyQuery.refetch();
     void performanceQuery.refetch();
@@ -235,6 +246,9 @@ export default function CodeReviewsPage() {
     void segmentationQuery.refetch();
   }, [
     isIntervalDraftInvalid,
+    rangeType,
+    startDate,
+    endDate,
     overviewQuery,
     dailyQuery,
     performanceQuery,

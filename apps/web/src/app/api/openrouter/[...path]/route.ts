@@ -496,7 +496,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user) && !bypassAccessCheck) {
     const { balance, settings, plan } = await balanceAndSettingsPromise;
 
-    if (!skipBalanceCheck && balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok) {
+    if (balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok && !skipBalanceCheck) {
       return await usageLimitExceededResponse(user, balance);
     }
 

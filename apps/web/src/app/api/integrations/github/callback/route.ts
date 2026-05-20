@@ -229,7 +229,7 @@ export async function GET(request: NextRequest) {
             });
 
             const queryParam =
-              returnTo || owner.type === 'org'
+              owner.type === 'org'
                 ? `error=pending_installation_exists&org=${existingOwnerId}`
                 : 'error=pending_installation_exists';
 

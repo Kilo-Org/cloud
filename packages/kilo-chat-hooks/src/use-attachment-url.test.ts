@@ -3,7 +3,11 @@ import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import type { AttachmentGetUrlResponse, KiloChatClient } from '@kilocode/kilo-chat';
 
 import { attachmentUrlKey } from './query-keys';
-import { attachmentUrlQueryOptions, computeAttachmentUrlStaleMs } from './use-attachment-url';
+import {
+  attachmentUrlQueryOptions,
+  computeAttachmentUrlStaleMs,
+  isAttachmentUrlValid,
+} from './use-attachment-url';
 
 describe('computeAttachmentUrlStaleMs', () => {
   it('returns the lifetime minus the refresh buffer in ms', () => {
@@ -23,6 +27,22 @@ describe('computeAttachmentUrlStaleMs', () => {
     const now = 1_000_000_000_000;
     const expiresAt = Math.floor(now / 1000) - 10;
     expect(computeAttachmentUrlStaleMs(expiresAt, now)).toBe(0);
+  });
+});
+
+describe('isAttachmentUrlValid', () => {
+  it('returns true while the signed URL has not expired', () => {
+    const now = 1_000_000_000_000;
+    const expiresAt = Math.floor(now / 1000) + 60;
+
+    expect(isAttachmentUrlValid(expiresAt, now)).toBe(true);
+  });
+
+  it('returns false once the signed URL has expired', () => {
+    const now = 1_000_000_000_000;
+    const expiresAt = Math.floor(now / 1000) - 1;
+
+    expect(isAttachmentUrlValid(expiresAt, now)).toBe(false);
   });
 });
 

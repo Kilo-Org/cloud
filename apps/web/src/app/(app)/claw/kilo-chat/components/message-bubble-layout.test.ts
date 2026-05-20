@@ -46,4 +46,9 @@ describe('message attachment download URLs', () => {
     expect(messageAttachmentSource).toContain('onOpen={handleImageOpen}');
     expect(messageAttachmentSource).toContain('onDownload={handleFileDownload}');
   });
+
+  it('reuses cached download URLs until they expire', () => {
+    expect(messageAttachmentSource).toContain('isAttachmentUrlValid(data.expiresAt, Date.now())');
+    expect(messageAttachmentSource).toContain('return data.url;');
+  });
 });

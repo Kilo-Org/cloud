@@ -3,7 +3,7 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { File as FileIcon, Download, AlertCircle, ImageOff, X } from 'lucide-react';
 import type { AttachmentBlock } from '@kilocode/kilo-chat';
-import { useAttachmentUrl } from '@kilocode/kilo-chat-hooks';
+import { isAttachmentUrlValid, useAttachmentUrl } from '@kilocode/kilo-chat-hooks';
 
 import { useKiloChatContext } from './kiloChatContext';
 import { formatFileSize } from '../lib/format-file-size';
@@ -51,6 +51,9 @@ export function MessageAttachment({
   const [downloadPending, setDownloadPending] = useState(false);
 
   async function loadDownloadUrl() {
+    if (data && isAttachmentUrlValid(data.expiresAt, Date.now())) {
+      return data.url;
+    }
     const result = await refetch();
     if (!result.data) {
       throw new Error('Attachment URL unavailable');

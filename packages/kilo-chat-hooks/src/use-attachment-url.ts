@@ -11,6 +11,10 @@ export function computeAttachmentUrlStaleMs(expiresAtSeconds: number, nowMs: num
   return Math.max(0, remaining);
 }
 
+export function isAttachmentUrlValid(expiresAtSeconds: number, nowMs: number): boolean {
+  return expiresAtSeconds * 1000 > nowMs;
+}
+
 export function attachmentUrlQueryOptions(
   client: KiloChatClient,
   conversationId: string | null,

@@ -26,12 +26,14 @@ export async function getAvailableModelsForOrganization(
   }
 
   const responseData = await getEnhancedOpenRouterModels();
+  const experimentModels = await listAvailableExperimentModels();
+  const restrictionCandidates = responseData.data.concat(experimentModels);
 
-  let filteredModels = responseData.data;
+  let filteredModels = restrictionCandidates;
   if (hasActiveModelRestrictions(restrictions)) {
     const isAllowed = createAllowPredicateFromRestrictions(restrictions);
     const models = [];
-    for (const model of responseData.data) {
+    for (const model of restrictionCandidates) {
       if (await isAllowed(model.id)) {
         models.push(model);
       }
@@ -41,7 +43,6 @@ export async function getAvailableModelsForOrganization(
 
   filteredModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
   filteredModels.push(...(await listAvailableCustomLlms(organizationId)));
-  filteredModels.push(...(await listAvailableExperimentModels()));
 
   return {
     ...responseData,

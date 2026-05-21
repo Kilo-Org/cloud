@@ -1,5 +1,5 @@
 {
-  "id": "8164d94c-7070-484e-a062-84779df93922",
+  "id": "44040937-9b40-43cb-ae54-997526bbe51e",
   "prevId": "85b052d0-0f82-4ece-941a-6876fe87892c",
   "version": "7",
   "dialect": "postgresql",
@@ -9291,7 +9291,7 @@
       "checkConstraints": {
         "kilo_pass_audit_log_action_check": {
           "name": "kilo_pass_audit_log_action_check",
-          "value": "\"kilo_pass_audit_log\".\"action\" IN ('stripe_webhook_received', 'kilo_pass_invoice_paid_handled', 'store_purchase_completed', 'store_notification_received', 'store_subscription_renewed', 'store_subscription_canceled', 'store_subscription_expired', 'store_subscription_refunded', 'base_credits_issued', 'bonus_credits_issued', 'bonus_credits_skipped_idempotent', 'first_month_50pct_promo_issued', 'yearly_monthly_base_cron_started', 'yearly_monthly_base_cron_completed', 'issue_yearly_remaining_credits', 'yearly_monthly_bonus_cron_started', 'yearly_monthly_bonus_cron_completed')"
+          "value": "\"kilo_pass_audit_log\".\"action\" IN ('stripe_webhook_received', 'kilo_pass_invoice_paid_handled', 'store_purchase_completed', 'store_notification_received', 'store_subscription_renewed', 'store_subscription_canceled', 'store_subscription_expired', 'store_subscription_refunded', 'base_credits_issued', 'bonus_credits_issued', 'bonus_credits_skipped_idempotent', 'first_month_50pct_promo_issued', 'yearly_monthly_base_cron_started', 'yearly_monthly_base_cron_completed', 'issue_yearly_remaining_credits', 'duplicate_card_subscription_canceled', 'yearly_monthly_bonus_cron_started', 'yearly_monthly_bonus_cron_completed')"
         },
         "kilo_pass_audit_log_result_check": {
           "name": "kilo_pass_audit_log_result_check",
@@ -15866,11 +15866,17 @@
           "method": "btree",
           "with": {}
         },
-        "idx_microdollar_usage_metadata_session_id": {
-          "name": "idx_microdollar_usage_metadata_session_id",
+        "idx_microdollar_usage_metadata_session_id_created_at": {
+          "name": "idx_microdollar_usage_metadata_session_id_created_at",
           "columns": [
             {
               "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

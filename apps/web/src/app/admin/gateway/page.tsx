@@ -9,14 +9,21 @@ import { SyncProvidersContent } from '@/app/admin/sync-providers/SyncProvidersCo
 import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
 import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
 import { ModelExperimentsContent } from '@/app/admin/model-experiments/ModelExperimentsContent';
+import { ModelExperimentRequestsContent } from '@/app/admin/model-experiments/ModelExperimentRequestsContent';
 
 const VALID_TABS: readonly string[] = [
   'sync-providers',
   'custom-llms',
   'routing',
   'model-experiments',
+  'experiment-requests',
 ];
-type Tab = 'sync-providers' | 'custom-llms' | 'routing' | 'model-experiments';
+type Tab =
+  | 'sync-providers'
+  | 'custom-llms'
+  | 'routing'
+  | 'model-experiments'
+  | 'experiment-requests';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -76,6 +83,9 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="model-experiments" className={tabTriggerClass}>
               Model Experiments
             </TabsTrigger>
+            <TabsTrigger value="experiment-requests" className={tabTriggerClass}>
+              Experiment Requests
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
             <SyncProvidersContent />
@@ -88,6 +98,9 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="model-experiments" className="mt-4">
             <ModelExperimentsContent />
+          </TabsContent>
+          <TabsContent value="experiment-requests" className="mt-4">
+            <ModelExperimentRequestsContent />
           </TabsContent>
         </Tabs>
       </div>

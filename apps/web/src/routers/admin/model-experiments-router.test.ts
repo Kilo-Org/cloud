@@ -3,7 +3,9 @@ import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import {
+  microdollar_usage,
   model_experiment,
+  model_experiment_request,
   model_experiment_variant,
   model_experiment_variant_version,
 } from '@kilocode/db/schema';
@@ -11,6 +13,7 @@ import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { eq } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
+import { randomUUID } from 'crypto';
 
 let admin: User;
 
@@ -91,6 +94,67 @@ describe('admin.modelExperiments — basic CRUD', () => {
 
     const withArchived = await caller.admin.modelExperiments.list({ includeArchived: true });
     expect(withArchived.items.map(i => i.id).sort()).toEqual([a.id, b.id].sort());
+  });
+
+  it('lists the last experiment attribution requests with usage and variant metadata', async () => {
+    const { caller, experimentId, variantA } =
+      await makeDraftWithTwoVariants('kilo/preview-requests');
+    await caller.admin.modelExperiments.activate({ id: experimentId });
+    const [version] = await db
+      .select({ id: model_experiment_variant_version.id })
+      .from(model_experiment_variant_version)
+      .where(eq(model_experiment_variant_version.variant_id, variantA.id))
+      .limit(1);
+    expect(version).toBeDefined();
+
+    const usageId = randomUUID();
+    await db.insert(microdollar_usage).values({
+      id: usageId,
+      kilo_user_id: 'request-user',
+      cost: 0,
+      input_tokens: 123,
+      output_tokens: 45,
+      cache_write_tokens: 6,
+      cache_hit_tokens: 7,
+      provider: 'custom',
+      model: 'partner-checkpoint-rc1',
+      requested_model: 'kilo/preview-requests',
+      inference_provider: 'partner',
+      organization_id: null,
+    });
+    await db.insert(model_experiment_request).values({
+      usage_id: usageId,
+      variant_version_id: version.id,
+      allocation_subject: 'user',
+      client_request_id: 'client-request-123',
+      request_kind: 'chat_completions',
+      request_body_sha256: '__failed__',
+      was_truncated: true,
+    });
+
+    const requests = await caller.admin.modelExperiments.listRequests();
+
+    expect(requests.items[0]).toEqual(
+      expect.objectContaining({
+        usageId,
+        experimentId,
+        experimentName: 'exp-kilo/preview-requests',
+        publicModelId: 'kilo/preview-requests',
+        variantId: variantA.id,
+        variantLabel: 'control',
+        variantVersionId: version.id,
+        allocationSubject: 'user',
+        clientRequestId: 'client-request-123',
+        requestKind: 'chat_completions',
+        requestBodySha256: '__failed__',
+        wasTruncated: true,
+        userId: 'request-user',
+        requestedModel: 'kilo/preview-requests',
+        upstreamModel: 'partner-checkpoint-rc1',
+        inputTokens: 123,
+        outputTokens: 45,
+      })
+    );
   });
 
   it('rejects delete unless status is draft', async () => {

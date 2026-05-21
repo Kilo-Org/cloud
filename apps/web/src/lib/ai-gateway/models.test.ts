@@ -1,5 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
-import { autoFreeModels, isFreeModel, kiloExclusiveModels } from './models';
+import { autoFreeModels, kiloExclusiveModels } from './models';
+import { isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
 
 describe('isFreeModel', () => {

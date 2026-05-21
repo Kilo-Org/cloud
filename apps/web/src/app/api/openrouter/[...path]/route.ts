@@ -19,19 +19,19 @@ import type {
 import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { buildExperimentPromptCapture } from '@/lib/ai-gateway/experiments/persist';
-import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/pick-variant';
+import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
-  isFreeModel,
   isDeadFreeModel,
   isExcludedForFeature,
   isKiloExclusiveFreeModel,
   isKiloStealthModel,
 } from '@/lib/ai-gateway/models';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
   accountForMicrodollarUsage,
   captureProxyError,

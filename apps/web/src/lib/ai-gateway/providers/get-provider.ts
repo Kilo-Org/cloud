@@ -19,8 +19,8 @@ import {
   buildDirectProvider,
   inferSupportedChatApis,
 } from '@/lib/ai-gateway/experiments/build-direct-provider';
+import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import {
-  isPublicIdExperimented,
   pickModelExperimentVariant,
   type AllocationSubject,
 } from '@/lib/ai-gateway/experiments/pick-variant';

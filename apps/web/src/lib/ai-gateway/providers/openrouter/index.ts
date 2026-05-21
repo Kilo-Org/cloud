@@ -1,9 +1,9 @@
 import {
-  isFreeModel,
   isPdfSupportingModel,
   kiloExclusiveModels,
   preferredModels,
 } from '@/lib/ai-gateway/models';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {

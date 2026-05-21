@@ -34,7 +34,6 @@ import {
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
-import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/pick-variant';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
@@ -58,17 +57,6 @@ export const preferredModels = [
   qwen36_plus_model.public_id,
   GLM_CURRENT_MODEL_ID,
 ];
-
-export async function isFreeModel(model: string): Promise<boolean> {
-  return (
-    isKiloExclusiveFreeModel(model) ||
-    model === KILO_AUTO_FREE_MODEL.id ||
-    (model ?? '').endsWith(':free') ||
-    model === 'openrouter/free' ||
-    isOpenRouterStealthModel(model ?? '') ||
-    (await isPublicIdExperimented(model ?? ''))
-  );
-}
 
 export function isPdfSupportingModel(model: string): boolean {
   return isClaudeModel(model) || isOpenAiModel(model) || isGrok4Model(model);
@@ -99,7 +87,7 @@ export function isKiloStealthModel(model: string): boolean {
   return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('stealth'));
 }
 
-function isOpenRouterStealthModel(model: string): boolean {
+export function isOpenRouterStealthModel(model: string): boolean {
   return model.startsWith('openrouter/') && (model.endsWith('-alpha') || model.endsWith('-beta'));
 }
 

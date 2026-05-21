@@ -6,9 +6,6 @@ import {
   model_experiment_variant_version,
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { redisGet } from '@/lib/redis';
-import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
-import { createCachedFetch } from '@/lib/cached-fetch';
 import { decryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
@@ -22,52 +19,13 @@ import type {
   RoutingVariant,
 } from '@/lib/ai-gateway/experiments/pick-variant.types';
 
-const EXPERIMENTED_PUBLIC_IDS_LOCAL_CACHE_TTL_MS = process.env.NODE_ENV === 'test' ? 0 : 60_000;
-
-const getExperimentedPublicIds = createCachedFetch<string[]>(
-  async () => {
-    try {
-      const cached = await redisGet(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
-      if (cached === null) return [];
-      return parseStringArray(cached) ?? [];
-    } catch {
-      // captureException already invoked by the redis helper
-      return [];
-    }
-  },
-  EXPERIMENTED_PUBLIC_IDS_LOCAL_CACHE_TTL_MS,
-  []
-);
-
-/**
- * Fast pre-check: does any active|paused experiment target this public id?
- *
- * Reads from a short-lived in-process cache backed by Redis. Admin writes are
- * responsible for maintaining the Redis membership set; if Redis is empty,
- * corrupt, or unavailable, treat it as "no experimented public ids".
- */
-export async function isPublicIdExperimented(publicId: string): Promise<boolean> {
-  const ids = await getExperimentedPublicIds();
-  return ids.includes(publicId);
-}
-
-function parseStringArray(raw: string): string[] | null {
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return null;
-    if (parsed.some(v => typeof v !== 'string')) return null;
-    return parsed as string[];
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Returns the routing-relevant experiment for `publicId` (status active or
  * paused) with all variants resolved to their current
  * `model_experiment_variant_version`. This only runs after the Redis-backed
- * membership pre-check says the public id is experiment-routed, so preview
- * traffic pays the Postgres lookup while normal models avoid it.
+ * membership pre-check (`isPublicIdExperimented` in `./membership.ts`) says
+ * the public id is experiment-routed, so preview traffic pays the Postgres
+ * lookup while normal models avoid it.
  */
 export async function getRoutingExperimentForPublicId(publicId: string): Promise<ResolveResult> {
   try {

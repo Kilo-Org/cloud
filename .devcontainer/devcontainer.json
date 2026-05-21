@@ -1,0 +1,22 @@
+{
+  "name": "Kilo Cloud",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true,
+      "dockerDashComposeVersion": "v2",
+      "installDockerBuildx": true
+    }
+  },
+  "remoteUser": "node",
+  "containerEnv": {
+    "COREPACK_ENABLE_DOWNLOAD_PROMPT": "0",
+    "PNPM_HOME": "/home/node/.local/share/pnpm"
+  },
+  "postCreateCommand": "git lfs install --skip-repo && pnpm install --frozen-lockfile",
+  "forwardPorts": [3000, 4000, 5432, 6379, 8787]
+}

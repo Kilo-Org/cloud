@@ -74,6 +74,15 @@ export async function isFeatureFlagEnabled(
   }
 }
 
+export async function isFeatureFlagEnabledOrDevelopment(
+  flagName: string,
+  distinctId: string = 'server-config-fetch'
+): Promise<boolean> {
+  return (
+    process.env.NODE_ENV === 'development' || (await isFeatureFlagEnabled(flagName, distinctId))
+  );
+}
+
 /**
  * Strict boolean-only release toggle check.
  * Intended for authorization decisions where multivariate feature flag variants must not grant access.

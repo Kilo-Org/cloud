@@ -125,7 +125,11 @@ beforeEach(() => {
   mockFindExistingReview.mockResolvedValue(null);
   mockFindActiveReviewsForPR.mockResolvedValue([]);
   mockUpdateReviewHeadShaAndCheckRun.mockResolvedValue(undefined);
-  mockTryDispatchPendingReviews.mockResolvedValue({ dispatched: 0, pending: 1, activeCount: 0 });
+  mockTryDispatchPendingReviews.mockResolvedValue({
+    dispatched: 0,
+    notDispatched: 1,
+    activeCount: 0,
+  });
   mockCancelReview.mockResolvedValue({ success: true, reviewId: 'old-review' });
   mockAddReactionToMR.mockResolvedValue(undefined);
   mockSetCommitStatus.mockResolvedValue(undefined);

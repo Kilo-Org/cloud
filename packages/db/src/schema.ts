@@ -1600,8 +1600,8 @@ export const microdollar_usage_metadata = pgTable(
   },
   table => [
     index('idx_microdollar_usage_metadata_created_at').on(table.created_at),
-    index('idx_microdollar_usage_metadata_session_id_created_at')
-      .on(table.session_id, table.created_at)
+    index('idx_microdollar_usage_metadata_session_id')
+      .using('btree', table.session_id)
       .where(isNotNull(table.session_id)),
   ]
 );
@@ -3253,6 +3253,7 @@ export const cloud_agent_code_reviews = pgTable(
 
     // Review status
     status: text().notNull().default('pending'), // 'pending' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
+    dispatch_reservation_id: text(),
     error_message: text(),
     terminal_reason: text(),
 

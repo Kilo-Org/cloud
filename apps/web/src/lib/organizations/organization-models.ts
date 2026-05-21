@@ -9,6 +9,7 @@ import { listAvailableCustomLlms } from '@/lib/ai-gateway/custom-llm/listAvailab
 import { getDirectByokModelsForOrganization } from '@/lib/ai-gateway/providers/direct-byok';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
+import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 
 export async function getAvailableModelsForOrganization(
   organizationId: string
@@ -25,12 +26,14 @@ export async function getAvailableModelsForOrganization(
   }
 
   const responseData = await getEnhancedOpenRouterModels();
+  const experimentModels = await listAvailableExperimentModels();
+  const restrictionCandidates = responseData.data.concat(experimentModels);
 
-  let filteredModels = responseData.data;
+  let filteredModels = restrictionCandidates;
   if (hasActiveModelRestrictions(restrictions)) {
     const isAllowed = createAllowPredicateFromRestrictions(restrictions);
     const models = [];
-    for (const model of responseData.data) {
+    for (const model of restrictionCandidates) {
       if (await isAllowed(model.id)) {
         models.push(model);
       }

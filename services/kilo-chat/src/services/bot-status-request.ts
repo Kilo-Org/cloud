@@ -93,13 +93,21 @@ async function triggerBotStatusWebhook(env: Env, sandboxId: string): Promise<voi
 
 // Definitive vs transient classification for the upstream RPC error. Strings
 // come from `deliverChatWebhook` in services/kiloclaw/src/index.ts; treat
-// "no routing target" / "no sandboxId" as definitive (the bot is gone), and
-// any 4xx upstream as definitive (the controller actively rejected). Network
-// errors and 5xx/timeouts stay transient.
+// "no routing target" / "no sandboxId" / "is not running" as definitive
+// (the bot is gone or suspended and won't autostart), and any 4xx upstream
+// as definitive (the controller actively rejected). Network errors and
+// 5xx/timeouts stay transient.
 export function isDefiniteUnreachable(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes('No routing target')) return true;
   if (msg.includes('has no sandboxId')) return true;
+  // `is not running` is thrown by deliverChatWebhook when the target
+  // instance's DO status is anything other than 'running' (stopped,
+  // provisioned, recovering, etc.). Match the prefix only so additional
+  // status values introduced later still classify correctly without
+  // requiring a lock-step update here. The full thrown shape is
+  // "Instance for <label> is not running (status=<value>)".
+  if (msg.includes('is not running')) return true;
   const m = msg.match(/Webhook forward failed: (\d{3})/);
   if (m) {
     const code = Number(m[1]);

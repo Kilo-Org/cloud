@@ -9,51 +9,65 @@
  * 2. Review completion (status update API) to dispatch next in queue
  */
 
-import { db } from '@/lib/drizzle';
+import crypto from 'crypto';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   cloud_agent_code_reviews,
   kilocode_users,
   type CloudAgentCodeReview,
 } from '@kilocode/db/schema';
-import { eq, and, or, count, gte, lt, sql } from 'drizzle-orm';
+import { eq, and, count, sql, inArray } from 'drizzle-orm';
 import type { Owner } from '../core';
 import { prepareReviewPayload } from '../triggers/prepare-review-payload';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import {
   ensureCurrentCodeReviewAttemptFromReview,
+  failReservedQueuedReview,
   releaseQueuedReviewClaim,
-  reviewIsSuperseded,
   reviewIsStillQueued,
+  reviewIsStillReserved,
+  reviewIsSuperseded,
   updateCodeReviewAttemptForCallback,
-  updateCodeReviewStatus,
   updateCodeReviewStatusIfNonTerminal,
 } from '../db/code-reviews';
 import { captureException } from '@sentry/nextjs';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import type { CodeReviewPlatform } from '../core/schemas';
-
-const MAX_CONCURRENT_REVIEWS_PER_ORG = 20;
-const MAX_CONCURRENT_REVIEWS_PER_FUNDED_USER = 3;
-const MAX_CONCURRENT_REVIEWS_PER_DEFAULT_USER = 1;
-const FUNDED_USER_BALANCE_THRESHOLD_MICRODOLLARS = 5_000_000;
-
-// Reviews claimed (queued) but not picked up by the worker within this
-// window are considered abandoned (e.g. process crashed after claim) and
-// become eligible for re-dispatch.
-const STALE_CLAIM_MINUTES = 5;
-const STALE_RUNNING_MINUTES = 90;
+import {
+  activeCodeReviewWorkCondition,
+  reconsiderableCodeReviewWorkCondition,
+  FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS,
+  MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER,
+  MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER,
+  MAX_CONCURRENT_CODE_REVIEWS_PER_ORG,
+  staleQueuedCodeReviewCutoffSql,
+  staleRunningCodeReviewCutoffSql,
+} from './dispatch-constants';
 
 export type DispatchResult = {
   dispatched: number;
-  pending: number;
+  notDispatched: number;
   activeCount: number;
 };
 
-async function getMaxConcurrentReviewsForOwner(owner: Owner): Promise<number> {
-  if (owner.type === 'org') return MAX_CONCURRENT_REVIEWS_PER_ORG;
+type ReservedReview = {
+  review: CloudAgentCodeReview;
+  dispatchReservationId: string;
+};
 
-  const [user] = await db
+type ReviewReservationBatch = {
+  activeCount: number;
+  reservations: ReservedReview[];
+};
+
+async function getMaxConcurrentReviewsForOwner(
+  tx: DrizzleTransaction,
+  owner: Owner
+): Promise<number> {
+  if (owner.type === 'org') return MAX_CONCURRENT_CODE_REVIEWS_PER_ORG;
+
+  const [user] = await tx
     .select({
       totalMicrodollarsAcquired: kilocode_users.total_microdollars_acquired,
       microdollarsUsed: kilocode_users.microdollars_used,
@@ -64,55 +78,40 @@ async function getMaxConcurrentReviewsForOwner(owner: Owner): Promise<number> {
 
   if (!user) {
     logExceptInTest('[getMaxConcurrentReviewsForOwner] User owner not found', { owner });
-    return MAX_CONCURRENT_REVIEWS_PER_DEFAULT_USER;
+    return MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER;
   }
 
   const balanceMicrodollars = user.totalMicrodollarsAcquired - user.microdollarsUsed;
-  return balanceMicrodollars > FUNDED_USER_BALANCE_THRESHOLD_MICRODOLLARS
-    ? MAX_CONCURRENT_REVIEWS_PER_FUNDED_USER
-    : MAX_CONCURRENT_REVIEWS_PER_DEFAULT_USER;
+  return balanceMicrodollars > FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS
+    ? MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER
+    : MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER;
 }
 
-/**
- * Try to dispatch pending reviews for an owner
- * Checks available slots and dispatches up to available capacity
- */
-export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchResult> {
-  try {
-    logExceptInTest(`[tryDispatchPendingReviews] Starting dispatch check`, { owner });
+function ownerReviewCondition(owner: Owner) {
+  return owner.type === 'org'
+    ? eq(cloud_agent_code_reviews.owned_by_organization_id, owner.id)
+    : eq(cloud_agent_code_reviews.owned_by_user_id, owner.id);
+}
 
-    const staleQueuedCutoff = sql`now() - interval '${sql.raw(String(STALE_CLAIM_MINUTES))} minutes'`;
-    const staleRunningCutoff = sql`now() - interval '${sql.raw(String(STALE_RUNNING_MINUTES))} minutes'`;
+async function reservePendingReviewsForDispatch(owner: Owner): Promise<ReviewReservationBatch> {
+  return await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`code-review-dispatch:${owner.type}:${owner.id}`}))`
+    );
 
-    // 1. Get active review count for this owner.
-    //    Stale queued and running rows are excluded so abandoned work does not block recovery.
-    const activeCountResult = await db
+    const staleQueuedCutoff = staleQueuedCodeReviewCutoffSql();
+    const staleRunningCutoff = staleRunningCodeReviewCutoffSql();
+    const ownerCondition = ownerReviewCondition(owner);
+
+    const activeCountResult = await tx
       .select({ count: count() })
       .from(cloud_agent_code_reviews)
       .where(
-        and(
-          owner.type === 'org'
-            ? eq(cloud_agent_code_reviews.owned_by_organization_id, owner.id)
-            : eq(cloud_agent_code_reviews.owned_by_user_id, owner.id),
-          or(
-            and(
-              eq(cloud_agent_code_reviews.status, 'running'),
-              sql`COALESCE(
-                ${cloud_agent_code_reviews.started_at},
-                ${cloud_agent_code_reviews.updated_at},
-                ${cloud_agent_code_reviews.created_at}
-              ) >= ${staleRunningCutoff}`
-            ),
-            and(
-              eq(cloud_agent_code_reviews.status, 'queued'),
-              gte(cloud_agent_code_reviews.updated_at, staleQueuedCutoff)
-            )
-          )
-        )
+        and(ownerCondition, activeCodeReviewWorkCondition(staleQueuedCutoff, staleRunningCutoff))
       );
 
-    const activeCount = activeCountResult[0]?.count || 0;
-    const maxConcurrentReviews = await getMaxConcurrentReviewsForOwner(owner);
+    const activeCount = Number(activeCountResult[0]?.count) || 0;
+    const maxConcurrentReviews = await getMaxConcurrentReviewsForOwner(tx, owner);
     const availableSlots = maxConcurrentReviews - activeCount;
 
     logExceptInTest('[tryDispatchPendingReviews] Active count check', {
@@ -122,53 +121,76 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
       availableSlots,
     });
 
-    // 2. If no slots available, return early
     if (availableSlots <= 0) {
-      logExceptInTest('[tryDispatchPendingReviews] No slots available', { owner, activeCount });
-      return { dispatched: 0, pending: 0, activeCount };
+      return { activeCount, reservations: [] };
     }
 
-    // 3. Get dispatchable reviews: pending, or queued-but-stale (abandoned claim).
-    //    A review is stale-queued if it was claimed but the process crashed
-    //    before the worker dispatch completed.
-    const pendingReviews = await db
+    const candidates = await tx
       .select()
       .from(cloud_agent_code_reviews)
-      .where(
-        and(
-          owner.type === 'org'
-            ? eq(cloud_agent_code_reviews.owned_by_organization_id, owner.id)
-            : eq(cloud_agent_code_reviews.owned_by_user_id, owner.id),
-          or(
-            eq(cloud_agent_code_reviews.status, 'pending'),
-            and(
-              eq(cloud_agent_code_reviews.status, 'queued'),
-              lt(cloud_agent_code_reviews.updated_at, staleQueuedCutoff)
-            )
-          )
-        )
-      )
+      .where(and(ownerCondition, reconsiderableCodeReviewWorkCondition(staleQueuedCutoff)))
       .orderBy(
-        // Stale queued rows are recovery work and must not starve fresh pending reviews.
         sql`CASE WHEN ${cloud_agent_code_reviews.status} = 'pending' THEN 0 ELSE 1 END`,
         cloud_agent_code_reviews.created_at
       )
       .limit(availableSlots);
 
-    logExceptInTest('[tryDispatchPendingReviews] Found pending reviews', {
+    logExceptInTest('[tryDispatchPendingReviews] Found dispatchable reviews', {
       owner,
-      pendingCount: pendingReviews.length,
+      dispatchableCount: candidates.length,
       availableSlots,
     });
 
-    // 4. If no pending reviews, return early
-    if (pendingReviews.length === 0) {
-      return { dispatched: 0, pending: 0, activeCount };
+    if (candidates.length === 0) {
+      return { activeCount, reservations: [] };
     }
 
-    // 5. Dispatch all pending reviews in parallel
+    const dispatchReservationId = crypto.randomUUID();
+    const reservedReviews = await tx
+      .update(cloud_agent_code_reviews)
+      .set({
+        status: 'queued',
+        dispatch_reservation_id: dispatchReservationId,
+      })
+      .where(
+        and(
+          ownerCondition,
+          inArray(
+            cloud_agent_code_reviews.id,
+            candidates.map(candidate => candidate.id)
+          ),
+          reconsiderableCodeReviewWorkCondition(staleQueuedCutoff)
+        )
+      )
+      .returning();
+
+    const reservedReviewsById = new Map(reservedReviews.map(review => [review.id, review]));
+    const reservations = candidates.flatMap(candidate => {
+      const review = reservedReviewsById.get(candidate.id);
+      return review ? [{ review, dispatchReservationId }] : [];
+    });
+
+    return { activeCount, reservations };
+  });
+}
+
+/**
+ * Try to dispatch pending reviews for an owner.
+ * Checks available slots and dispatches up to available capacity.
+ */
+export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchResult> {
+  try {
+    logExceptInTest('[tryDispatchPendingReviews] Starting dispatch check', { owner });
+
+    const { activeCount, reservations } = await reservePendingReviewsForDispatch(owner);
+
+    if (reservations.length === 0) {
+      logExceptInTest('[tryDispatchPendingReviews] No reviews reserved', { owner, activeCount });
+      return { dispatched: 0, notDispatched: 0, activeCount };
+    }
+
     const results = await Promise.allSettled(
-      pendingReviews.map(review => dispatchReview(review, owner, staleQueuedCutoff))
+      reservations.map(reservation => dispatchReservedReview(reservation, owner))
     );
 
     let dispatched = 0;
@@ -179,25 +201,26 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
           dispatched++;
         }
       } else {
-        const review = pendingReviews[i];
+        const reservation = reservations[i];
         const error = result.reason;
         errorExceptInTest('[tryDispatchPendingReviews] Failed to dispatch review', {
-          reviewId: review.id,
+          reviewId: reservation.review.id,
           error,
         });
         captureException(error, {
           tags: { operation: 'dispatch-pending-review' },
-          extra: { reviewId: review.id, owner },
+          extra: { reviewId: reservation.review.id, owner },
         });
 
-        // Mark as failed so it doesn't block the queue
         try {
-          await updateCodeReviewStatus(review.id, 'failed', {
-            errorMessage: `Dispatch failed: ${error instanceof Error ? error.message : String(error)}`,
-          });
+          await failReservedQueuedReview(
+            reservation.review.id,
+            reservation.dispatchReservationId,
+            `Dispatch failed: ${error instanceof Error ? error.message : String(error)}`
+          );
         } catch (updateError) {
           errorExceptInTest('[tryDispatchPendingReviews] Failed to mark review as failed', {
-            reviewId: review.id,
+            reviewId: reservation.review.id,
             updateError,
           });
         }
@@ -207,12 +230,12 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
     logExceptInTest('[tryDispatchPendingReviews] Dispatch complete', {
       owner,
       dispatched,
-      total: pendingReviews.length,
+      total: reservations.length,
     });
 
     return {
       dispatched,
-      pending: pendingReviews.length - dispatched,
+      notDispatched: reservations.length - dispatched,
       activeCount: activeCount + dispatched,
     };
   } catch (error) {
@@ -221,22 +244,13 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
       tags: { operation: 'try-dispatch-pending-reviews' },
       extra: { owner },
     });
-    return { dispatched: 0, pending: 0, activeCount: 0 };
+    return { dispatched: 0, notDispatched: 0, activeCount: 0 };
   }
 }
 
-/**
- * Dispatch a single review to Cloudflare Worker.
- * Returns true if the review was dispatched, false if it was already claimed
- * by another concurrent dispatcher.
- */
-async function dispatchReview(
-  review: CloudAgentCodeReview,
-  owner: Owner,
-  staleQueuedCutoff: ReturnType<typeof sql>
-): Promise<boolean> {
-  // Get platform from review (defaults to 'github' for backward compatibility)
-  const platform = (review.platform || 'github') as CodeReviewPlatform;
+async function dispatchReservedReview(reservation: ReservedReview, owner: Owner): Promise<boolean> {
+  const { review, dispatchReservationId } = reservation;
+  const platform: CodeReviewPlatform = review.platform === 'gitlab' ? 'gitlab' : 'github';
 
   logExceptInTest('[dispatchReview] Dispatching review', {
     reviewId: review.id,
@@ -244,7 +258,13 @@ async function dispatchReview(
     platform,
   });
 
-  // 1. Get agent config for owner (use platform from review)
+  if (!(await reviewIsStillReserved(review.id, dispatchReservationId))) {
+    logExceptInTest('[dispatchReview] Review reservation changed before preparation', {
+      reviewId: review.id,
+    });
+    return false;
+  }
+
   const agentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
 
   if (!agentConfig) {
@@ -253,7 +273,6 @@ async function dispatchReview(
     );
   }
 
-  // 2. Prepare complete payload for cloud agent
   const payload = await prepareReviewPayload({
     reviewId: review.id,
     owner,
@@ -261,64 +280,38 @@ async function dispatchReview(
     platform,
   });
 
-  // 3. Atomically claim the review to prevent concurrent dispatchers from
-  //    picking the same review. Done as late as possible (after all prep work)
-  //    to minimise the crash window between claim and dispatch.
-  //    Accepts 'pending' (normal) or stale 'queued' (abandoned claim recovery).
-  const claimed = await db
-    .update(cloud_agent_code_reviews)
-    .set({ status: 'queued' })
-    .where(
-      and(
-        eq(cloud_agent_code_reviews.id, review.id),
-        or(
-          eq(cloud_agent_code_reviews.status, 'pending'),
-          and(
-            eq(cloud_agent_code_reviews.status, 'queued'),
-            lt(cloud_agent_code_reviews.updated_at, staleQueuedCutoff)
-          )
-        )
-      )
-    )
-    .returning({ id: cloud_agent_code_reviews.id });
-
-  if (claimed.length === 0) {
-    logExceptInTest('[dispatchReview] Review already claimed by another dispatcher', {
+  if (!(await reviewIsStillReserved(review.id, dispatchReservationId))) {
+    logExceptInTest('[dispatchReview] Review reservation changed after preparation', {
       reviewId: review.id,
     });
     return false;
   }
 
-  if (!(await reviewIsStillQueued(review.id))) {
-    logExceptInTest('[dispatchReview] Review was cancelled after claim, skipping worker dispatch', {
-      reviewId: review.id,
-    });
-    return false;
-  }
-
-  // 4. Dispatch to Cloudflare Worker to create CodeReviewOrchestrator DO.
-  //    If this fails, probe DO state before deciding whether to release the claim.
   const agentVersion = 'v2';
-  const attempt = await ensureCurrentCodeReviewAttemptFromReview({
-    ...review,
-    status: 'queued',
-  });
+  const attempt = await ensureCurrentCodeReviewAttemptFromReview(review);
 
-  if (!(await reviewIsStillQueued(review.id))) {
-    const superseded = await reviewIsSuperseded(review.id);
-    await updateCodeReviewAttemptForCallback({
-      codeReviewId: review.id,
-      attemptId: attempt.id,
-      status: 'cancelled',
-      errorMessage: superseded ? 'Superseded by new push' : 'Review cancelled before dispatch',
-      terminalReason: superseded ? 'superseded' : undefined,
-      completedAt: new Date(),
-    });
-    logExceptInTest('[dispatchReview] Review was cancelled before worker dispatch', {
-      reviewId: review.id,
-      attemptId: attempt.id,
-      superseded,
-    });
+  if (!(await reviewIsStillReserved(review.id, dispatchReservationId))) {
+    if (!(await reviewIsStillQueued(review.id))) {
+      const superseded = await reviewIsSuperseded(review.id);
+      await updateCodeReviewAttemptForCallback({
+        codeReviewId: review.id,
+        attemptId: attempt.id,
+        status: 'cancelled',
+        errorMessage: superseded ? 'Superseded by new push' : 'Review cancelled before dispatch',
+        terminalReason: superseded ? 'superseded' : undefined,
+        completedAt: new Date(),
+      });
+      logExceptInTest('[dispatchReview] Review was cancelled before worker dispatch', {
+        reviewId: review.id,
+        attemptId: attempt.id,
+        superseded,
+      });
+    } else {
+      logExceptInTest('[dispatchReview] Review reservation was reclaimed before worker dispatch', {
+        reviewId: review.id,
+        attemptId: attempt.id,
+      });
+    }
     return false;
   }
 
@@ -338,11 +331,9 @@ async function dispatchReview(
       tags: { operation: 'dispatch-review-worker-call' },
       extra: { reviewId: review.id, owner },
     });
-    return handleAmbiguousDispatchFailure(review, owner, attempt.id);
+    return handleAmbiguousDispatchFailure(review, owner, attempt.id, dispatchReservationId);
   }
 
-  // 5. Record which agent version was dispatched without rewriting status.
-  //    The worker may already have advanced the review to running/completed.
   try {
     await db
       .update(cloud_agent_code_reviews)
@@ -370,13 +361,14 @@ async function dispatchReview(
 async function handleAmbiguousDispatchFailure(
   review: CloudAgentCodeReview,
   owner: Owner,
-  attemptId: string
+  attemptId: string,
+  dispatchReservationId: string
 ): Promise<boolean> {
   try {
     const workerStatus = await codeReviewWorkerClient.getReviewStatus(review.id, attemptId);
 
     if (!workerStatus) {
-      const released = await releaseQueuedReviewClaim(review.id);
+      const released = await releaseQueuedReviewClaim(review.id, dispatchReservationId);
       logExceptInTest('[dispatchReview] Worker has no DO state after dispatch failure', {
         reviewId: review.id,
         released,
@@ -410,7 +402,8 @@ async function handleAmbiguousDispatchFailure(
         cliSessionId: workerStatus.cliSessionId,
         errorMessage: workerStatus.errorMessage,
         completedAt,
-      }
+      },
+      dispatchReservationId
     );
 
     logExceptInTest('[dispatchReview] Worker returned terminal status for fresh dispatch', {

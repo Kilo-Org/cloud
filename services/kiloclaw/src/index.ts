@@ -170,6 +170,12 @@ function routingTargetUrl(target: ProviderRoutingTarget, pathname: string, searc
  * still booting. Only the default-personal branch surfaces hints today (tests
  * assert the specific strings); branches that prefer the bare error
  * (`{ "error": "Instance not reachable" }`) just omit them.
+ *
+ * IMPORTANT: this function does NOT gate on instance status. Callers MUST
+ * verify the DO `status` is `'running'` before invoking, otherwise a request
+ * to a stopped machine will trigger Fly Proxy's autostart and silently wake
+ * an instance that we deliberately suspended for billing/lifecycle reasons.
+ * See the `status !== 'running'` checks in each proxy branch.
  */
 async function proxyThroughTarget(opts: {
   request: Request;
@@ -489,6 +495,26 @@ app.all('/i/:instanceId/*', async c => {
   if (status.status === 'recovering') {
     return c.json({ error: 'Instance is recovering from an unexpected stop' }, 409);
   }
+  // Transient lifecycle states the platform is actively driving. Tell the
+  // client to retry rather than surfacing a misleading "start it from the
+  // dashboard" 409 — the instance IS being started.
+  if (status.status === 'starting' || status.status === 'restarting') {
+    return c.json(
+      {
+        error: 'Instance is starting up',
+        hint: 'The instance is starting. Please retry shortly.',
+      },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
+  // Refuse to forward to anything that isn't strictly running. A stopped
+  // machine still has runtimeId set (Fly machine IDs persist across stop),
+  // and proxying to it triggers Fly Proxy's autostart — which would silently
+  // restart instances we deliberately suspended for billing/lifecycle reasons.
+  // The only authorized waker of a stopped instance is an explicit start RPC.
+  if (status.status !== 'running') {
+    return c.json({ error: 'Instance not running', hint: 'Start it from the dashboard.' }, 409);
+  }
   if (!status.runtimeId) {
     return c.json({ error: 'Instance not provisioned' }, 404);
   }
@@ -760,6 +786,23 @@ async function handleHostBasedRoute(c: Context<AppEnv>): Promise<Response | null
   if (status.status === 'recovering') {
     return c.json({ error: 'Instance is recovering from an unexpected stop' }, 409);
   }
+  // Transient lifecycle states: tell the client to retry rather than
+  // returning a misleading "not running" 409.
+  if (status.status === 'starting' || status.status === 'restarting') {
+    return c.json(
+      {
+        error: 'Instance is starting up',
+        hint: 'The instance is starting. Please retry shortly.',
+      },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
+  // See comment on the /i/:instanceId branch above: never forward to a non-
+  // running instance, otherwise Fly Proxy autostarts machines we deliberately
+  // stopped (billing suspension, manual stop, etc.).
+  if (status.status !== 'running') {
+    return c.json({ error: 'Instance not running', hint: 'Start it from the dashboard.' }, 409);
+  }
   if (!status.runtimeId) {
     return c.json({ error: 'Instance not provisioned' }, 404);
   }
@@ -871,6 +914,25 @@ app.all('*', async c => {
             409
           );
         }
+        // Transient lifecycle states: tell the client to retry.
+        if (instanceStatus.status === 'starting' || instanceStatus.status === 'restarting') {
+          return c.json(
+            {
+              error: 'Instance is starting up',
+              hint: 'The instance is starting. Please retry shortly.',
+            },
+            { status: 503, headers: { 'Retry-After': '5' } }
+          );
+        }
+        // Never proxy to a non-running instance: forwarding to a stopped
+        // machine triggers Fly Proxy autostart and silently restarts
+        // instances suspended for billing/lifecycle reasons.
+        if (instanceStatus.status !== 'running') {
+          return c.json(
+            { error: 'Instance not running', hint: 'Start it from the dashboard.' },
+            409
+          );
+        }
         if (!instanceStatus.runtimeId) {
           return c.json(
             { error: 'Instance not provisioned', hint: 'The instance has no running machine.' },
@@ -947,6 +1009,30 @@ app.all('*', async c => {
       {
         error: 'Instance is recovering',
         hint: 'Your instance is being recovered after an unexpected stop. Please wait.',
+      },
+      409
+    );
+  }
+  // Transient lifecycle states: tell the client to retry rather than
+  // surfacing a misleading "not running" 409 while we're actively starting.
+  if (status === 'starting' || status === 'restarting') {
+    return c.json(
+      {
+        error: 'Instance is starting up',
+        hint: 'Your instance is starting. Please retry shortly.',
+      },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
+  // Never proxy to a non-running instance: forwarding to a stopped machine
+  // triggers Fly Proxy autostart and silently restarts instances we
+  // deliberately suspended for billing/lifecycle reasons. The only
+  // authorized waker of a stopped instance is an explicit start RPC.
+  if (status && status !== 'running') {
+    return c.json(
+      {
+        error: 'Instance not running',
+        hint: 'Start it from the dashboard.',
       },
       409
     );
@@ -1081,13 +1167,15 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
    * See resolveChatWebhookDoKey for the two supported sandboxId formats.
    *
    * Load-bearing error strings: the messages thrown below ("has no sandboxId",
-   * "No routing target", "Webhook forward failed: <status>") are pattern-matched
-   * by `isDefiniteUnreachable` in services/kilo-chat/src/services/bot-status-request.ts
-   * to decide whether to flip a bot to offline immediately. Typed errors don't
-   * survive the Workers RPC boundary, so kilo-chat does substring matching on
-   * `err.message`. If you reword these, update the classifier in lock-step —
-   * otherwise the worst case is degrading to "always transient" (UI shows
-   * stale-online until staleness inference catches up, ~poll interval).
+   * "is not running", "No routing target", "Webhook forward failed: <status>")
+   * are pattern-matched by `isDefiniteUnreachable` in
+   * services/kilo-chat/src/services/bot-status-request.ts to decide whether
+   * to flip a bot to offline immediately. Typed errors don't survive the
+   * Workers RPC boundary, so kilo-chat does substring matching on
+   * `err.message`. If you reword these or add a new pre-flight throw, update
+   * the classifier in lock-step — otherwise the worst case is degrading to
+   * "always transient" (UI shows stale-online until staleness inference
+   * catches up, ~poll interval).
    */
   async deliverChatWebhook(payload: ChatWebhookPayload): Promise<void> {
     const { targetBotId, ...rpcPayload } = payload;
@@ -1112,6 +1200,16 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
     );
     if (!status.sandboxId) {
       throw new Error(`Instance for ${label} has no sandboxId`);
+    }
+    // Refuse to deliver chat webhooks to a non-running instance. Issuing
+    // fetch() to {flyAppName}.fly.dev with fly-force-instance-id triggers
+    // Fly Proxy's autostart and silently wakes instances we deliberately
+    // suspended for billing/lifecycle reasons. The chat dispatcher should
+    // surface "recipient unavailable" rather than driving a wake-loop.
+    if (status.status !== 'running') {
+      throw new Error(
+        `Instance for ${label} is not running (status=${status.status ?? 'unknown'})`
+      );
     }
 
     const routingTarget = await withDORetry(

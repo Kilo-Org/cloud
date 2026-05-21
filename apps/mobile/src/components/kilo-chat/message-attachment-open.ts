@@ -1,5 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 
 type AttachmentImageRenderState = 'loading' | 'ready' | 'error';
 
@@ -91,8 +92,12 @@ export async function shareMaterializedAttachment(
 ): Promise<void> {
   try {
     await shareFile(attachment.uri);
-  } finally {
+    if (Platform.OS !== 'android') {
+      attachment.delete();
+    }
+  } catch (error) {
     attachment.delete();
+    throw error;
   }
 }
 

@@ -1,5 +1,5 @@
 import { attachmentMetadataSchema } from '@kilocode/kilo-chat';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getAttachmentCacheFilename,
   getAttachmentImageRenderState,
@@ -17,16 +17,28 @@ const expoFileSystemMock = vi.hoisted(() => {
   };
 });
 
+const reactNativeMock = vi.hoisted(() => ({
+  Platform: { OS: 'ios' },
+}));
+
 vi.mock('expo-file-system', () => ({
   Directory: expoFileSystemMock.Directory,
   File: expoFileSystemMock.File,
   Paths: expoFileSystemMock.Paths,
 }));
 
+vi.mock('react-native', () => ({
+  Platform: reactNativeMock.Platform,
+}));
+
 vi.mock('expo-sharing', () => ({
   isAvailableAsync: vi.fn(),
   shareAsync: vi.fn(),
 }));
+
+beforeEach(() => {
+  reactNativeMock.Platform.OS = 'ios';
+});
 
 describe('message attachment render state', () => {
   it('maps image query state to render states', () => {
@@ -97,6 +109,25 @@ describe('message attachment render state', () => {
 
     expect(shared).toEqual(['file:///cache/kilo-chat-attachments/attachment.txt']);
     expect(deleted).toEqual(['file:///cache/kilo-chat-attachments/attachment.txt']);
+  });
+
+  it('keeps materialized attachment files after successful Android shares', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    const deleted: string[] = [];
+
+    await shareMaterializedAttachment(
+      {
+        uri: 'file:///cache/kilo-chat-attachments/attachment.txt',
+        delete: () => {
+          deleted.push('file:///cache/kilo-chat-attachments/attachment.txt');
+        },
+      },
+      async () => {
+        await Promise.resolve();
+      }
+    );
+
+    expect(deleted).toEqual([]);
   });
 
   it('deletes materialized attachment files after share failures', async () => {

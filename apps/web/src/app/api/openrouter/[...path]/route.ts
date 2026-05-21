@@ -19,6 +19,7 @@ import type {
 import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { buildExperimentPromptCapture } from '@/lib/ai-gateway/experiments/persist';
+import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/pick-variant';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
@@ -316,7 +317,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (authFailedResponse) {
     // No valid auth
-    if (!isFreeModel(originalModelIdLowerCased)) {
+    const allowsAnonymousAccess =
+      isFreeModel(originalModelIdLowerCased) ||
+      (await isPublicIdExperimented(originalModelIdLowerCased));
+    if (!allowsAnonymousAccess) {
       // Paid model requires authentication
       return NextResponse.json(
         {
@@ -354,7 +358,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       );
     }
 
-    // Anonymous access for free model (already rate-limited above)
+    // Anonymous access for free/provider-funded model (already rate-limited above when applicable)
     user = createAnonymousContext(ipAddress);
     organizationId = undefined;
     botId = undefined;

@@ -1055,6 +1055,9 @@ describe('WrapperClient', () => {
           KILOCODE_TOKEN: 'secret-token',
           KILO_SESSION_INGEST_URL: 'https://ingest.example',
           KILO_API_URL: 'https://api.example',
+          XDG_DATA_HOME: '/tmp',
+          XDG_CONFIG_HOME: '/tmp',
+          XDG_CACHE_HOME: '/tmp',
         },
         devcontainer: {
           containerId: 'container-id',
@@ -1073,6 +1076,9 @@ describe('WrapperClient', () => {
       );
       expect(writeFileCall[1]).toContain("export KILOCODE_TOKEN='secret-token'");
       expect(writeFileCall[1]).toContain("export KILO_SESSION_INGEST_URL='https://ingest.example'");
+      expect(writeFileCall[1]).toContain("export XDG_DATA_HOME='/home/agent_test/.local/share'");
+      expect(writeFileCall[1]).toContain("export XDG_CONFIG_HOME='/home/agent_test/.config'");
+      expect(writeFileCall[1]).toContain("export XDG_CACHE_HOME='/home/agent_test/.cache'");
       expect(writeFileCall[1]).toContain("export WRAPPER_PORT='5000'");
       expect(writeFileCall[1]).not.toContain('DOCKER_HOST=');
 

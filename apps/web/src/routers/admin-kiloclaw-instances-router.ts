@@ -1,6 +1,10 @@
 import { adminProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import {
+  getAccessGrantingOrphanVolumeContexts,
+  insertKiloClawSubscriptionChangeLog,
+  orphanVolumeSubscriptionContextKey,
+} from '@kilocode/db';
 import { createHash } from 'crypto';
 import {
   kiloclaw_instances,
@@ -38,6 +42,11 @@ import {
 } from '@/lib/kiloclaw/admin-audit-log';
 import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
+import {
+  classifyOrphanVolume,
+  ORPHAN_VOLUME_GRACE_PERIOD_MS,
+  type OrphanVolumeClassification,
+} from '@/lib/kiloclaw/orphan-volume';
 import type {
   PlatformDebugStatusResponse,
   VolumeSnapshot,
@@ -126,6 +135,13 @@ const DetectOrphansSchema = z.object({
   createdAfter: z.string().datetime(),
   /** ISO date string — only check instances created on or before this date. */
   createdBefore: z.string().datetime(),
+});
+
+const FindOrphanVolumesSchema = z.object({
+  /** ISO date string — only check instances destroyed on or after this date. */
+  destroyedAfter: z.string().datetime(),
+  /** ISO date string — only check instances destroyed on or before this date. */
+  destroyedBefore: z.string().datetime(),
 });
 
 const GetInstanceSchema = z.object({
@@ -3802,6 +3818,317 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
 
       return { success: true };
+    }),
+
+  // ── Orphan-volume reaper ──────────────────────────────────────────────
+  //
+  // Finds Fly volumes left behind by destroyed instances and lets an admin
+  // reap them one row at a time. Detection is anchored on the (soft-deleted,
+  // never hard-deleted) `kiloclaw_instances` row — the Fly app + volume name
+  // are derived deterministically from it by the worker, so a finalized DO
+  // with wiped storage does not impair correlation. Every safety check is
+  // re-run server-side in `destroyOrphanVolume` before anything is deleted.
+
+  // A mutation, not a query: this is an expensive admin-triggered fan-out
+  // (matches `detectOrphans`) — it must not auto-refetch on the client.
+  findOrphanVolumes: adminProcedure.input(FindOrphanVolumesSchema).mutation(async ({ input }) => {
+    const MAX_SCAN = 500;
+    const CONCURRENCY = 10;
+
+    // 1. Destroyed instances in the window, with user + subscription joins.
+    //    leftJoin on subscriptions: a missing subscription row is fine (no
+    //    access to preserve); `UQ_kiloclaw_subscriptions_instance` guarantees
+    //    at most one subscription per instance, so the join stays 1:1.
+    const instances = await db
+      .select({
+        id: kiloclaw_instances.id,
+        user_id: kiloclaw_instances.user_id,
+        sandbox_id: kiloclaw_instances.sandbox_id,
+        organization_id: kiloclaw_instances.organization_id,
+        destroyed_at: kiloclaw_instances.destroyed_at,
+        user_email: kilocode_users.google_user_email,
+        subscription_id: kiloclaw_subscriptions.id,
+        subscription_status: kiloclaw_subscriptions.status,
+        subscription_suspended_at: kiloclaw_subscriptions.suspended_at,
+        subscription_trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
+      })
+      .from(kiloclaw_instances)
+      .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+      .leftJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
+      )
+      .where(
+        and(
+          isNotNull(kiloclaw_instances.destroyed_at),
+          gte(kiloclaw_instances.destroyed_at, input.destroyedAfter),
+          lte(kiloclaw_instances.destroyed_at, input.destroyedBefore)
+        )
+      )
+      .orderBy(desc(kiloclaw_instances.destroyed_at))
+      .limit(MAX_SCAN + 1);
+
+    const capped = instances.length > MAX_SCAN;
+    const toScan = capped ? instances.slice(0, MAX_SCAN) : instances;
+
+    type VolumeRow = {
+      instance_id: string;
+      user_id: string;
+      user_email: string | null;
+      sandbox_id: string;
+      organization_id: string | null;
+      destroyed_at: string;
+      subscription_status: string | null;
+      fly_app: string;
+      volume_id: string;
+      volume_name: string;
+      volume_state: string;
+      volume_region: string;
+      volume_size_gb: number;
+      attached_machine_id: string | null;
+      volume_created_at: string;
+      do_status: string | null;
+      classification: OrphanVolumeClassification;
+    };
+    type ScanErrorRow = {
+      instance_id: string;
+      user_id: string;
+      user_email: string | null;
+      sandbox_id: string;
+      error: string;
+    };
+
+    if (toScan.length === 0) {
+      return {
+        volumes: [] as VolumeRow[],
+        errors: [] as ScanErrorRow[],
+        scanned: 0,
+        capped: false,
+      };
+    }
+
+    const client = new KiloClawInternalClient();
+    const now = new Date();
+    const accessGrantingContextKeys = await getAccessGrantingOrphanVolumeContexts(
+      db,
+      toScan.map(instance => ({
+        user_id: instance.user_id,
+        organization_id: instance.organization_id,
+      })),
+      now
+    );
+    const volumes: VolumeRow[] = [];
+    const errors: ScanErrorRow[] = [];
+
+    for (let i = 0; i < toScan.length; i += CONCURRENCY) {
+      const batch = toScan.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(instance =>
+          client.scanOrphanVolumes(instance.user_id, instance.id, instance.sandbox_id)
+        )
+      );
+
+      for (let j = 0; j < results.length; j++) {
+        const instance = batch[j];
+        const result = results[j];
+        if (!instance || !result) continue;
+
+        // The worker call itself failed — surface it so an empty result is
+        // never silently read as "no orphans".
+        if (result.status === 'rejected') {
+          errors.push({
+            instance_id: instance.id,
+            user_id: instance.user_id,
+            user_email: instance.user_email,
+            sandbox_id: instance.sandbox_id,
+            error: result.reason instanceof Error ? result.reason.message : 'Volume scan failed',
+          });
+          continue;
+        }
+
+        const scan = result.value;
+        // listVolumes failed inside the worker — same false-negative risk.
+        if (scan.scanError) {
+          errors.push({
+            instance_id: instance.id,
+            user_id: instance.user_id,
+            user_email: instance.user_email,
+            sandbox_id: instance.sandbox_id,
+            error: `Could not list Fly volumes: ${scan.scanError}`,
+          });
+          continue;
+        }
+
+        // destroyed_at is non-null here (the WHERE clause guarantees it).
+        const destroyedAt = instance.destroyed_at as string;
+        const graceElapsed =
+          now.getTime() - new Date(destroyedAt).getTime() > ORPHAN_VOLUME_GRACE_PERIOD_MS;
+        const hasAccess = accessGrantingContextKeys.has(
+          orphanVolumeSubscriptionContextKey({
+            user_id: instance.user_id,
+            organization_id: instance.organization_id,
+          })
+        );
+
+        // Only volumes whose name exactly matches THIS instance are ours.
+        // A non-matching volume belongs to a different (possibly live)
+        // sandbox sharing the app and must never be surfaced as reapable.
+        for (const v of scan.volumes) {
+          if (!v.nameMatchesInstance) continue;
+          if (v.state === 'destroyed') continue; // already gone — noise
+
+          volumes.push({
+            instance_id: instance.id,
+            user_id: instance.user_id,
+            user_email: instance.user_email,
+            sandbox_id: instance.sandbox_id,
+            organization_id: instance.organization_id,
+            destroyed_at: destroyedAt,
+            subscription_status: instance.subscription_status,
+            fly_app: scan.flyApp,
+            volume_id: v.id,
+            volume_name: v.name,
+            volume_state: v.state,
+            volume_region: v.region,
+            volume_size_gb: v.size_gb,
+            attached_machine_id: v.attached_machine_id,
+            volume_created_at: v.created_at,
+            do_status: scan.doStatus,
+            classification: classifyOrphanVolume({
+              volumeState: v.state,
+              attachedMachineId: v.attached_machine_id,
+              trackedByLiveDo: v.trackedByLiveDo,
+              doStatus: scan.doStatus,
+              doStatusError: scan.doStatusError,
+              hasAccessGrantingSubscription: hasAccess,
+              graceElapsed,
+            }),
+          });
+        }
+      }
+    }
+
+    return { volumes, errors, scanned: toScan.length, capped };
+  }),
+
+  destroyOrphanVolume: adminProcedure
+    .input(
+      z.object({
+        instanceId: z.string().uuid(),
+        volumeId: z
+          .string()
+          .min(1)
+          .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // 1. Re-fetch the instance. Every DB-side guard is re-evaluated here —
+      //    the scan result the admin saw may be stale.
+      const [row] = await db
+        .select({
+          id: kiloclaw_instances.id,
+          user_id: kiloclaw_instances.user_id,
+          sandbox_id: kiloclaw_instances.sandbox_id,
+          organization_id: kiloclaw_instances.organization_id,
+          destroyed_at: kiloclaw_instances.destroyed_at,
+        })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, input.instanceId))
+        .limit(1);
+
+      if (!row) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+      }
+
+      // 2. The instance must be destroyed. This endpoint never touches a
+      //    volume belonging to a live instance.
+      if (row.destroyed_at === null) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Instance is not destroyed — orphan-volume cleanup does not apply',
+        });
+      }
+
+      // 3. Grace period — give Fly + the DO sweep time to self-heal first.
+      const now = new Date();
+      const destroyedMsAgo = now.getTime() - new Date(row.destroyed_at).getTime();
+      if (destroyedMsAgo <= ORPHAN_VOLUME_GRACE_PERIOD_MS) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Instance was destroyed too recently — wait out the 7-day grace period',
+        });
+      }
+
+      // 4. Subscription guard — never destroy data while this ownership
+      //    context still has access (active / unsuspended past_due / live trial).
+      //    Reprovision transfers cancel the destroyed instance's predecessor
+      //    row and move access to a current successor row, so this lookup must
+      //    evaluate the context rather than only the destroyed instance.
+      const accessGrantingContextKeys = await getAccessGrantingOrphanVolumeContexts(
+        db,
+        [{ user_id: row.user_id, organization_id: row.organization_id }],
+        now
+      );
+      if (
+        accessGrantingContextKeys.has(
+          orphanVolumeSubscriptionContextKey({
+            user_id: row.user_id,
+            organization_id: row.organization_id,
+          })
+        )
+      ) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'User has an access-granting subscription — volume preserved',
+        });
+      }
+
+      console.log(
+        `[admin-kiloclaw] Orphan volume cleanup by admin ${ctx.user.id} (${ctx.user.google_user_email}) ` +
+          `instance=${row.id} volume=${input.volumeId} (user: ${row.user_id})`
+      );
+
+      // 5. Hand off to the worker, which re-verifies the Fly-side and
+      //    DO-side invariants (name match, quiescent state, no live DO
+      //    reference) before deleting.
+      let result: Awaited<ReturnType<KiloClawInternalClient['destroyOrphanVolume']>>;
+      try {
+        const client = new KiloClawInternalClient();
+        result = await client.destroyOrphanVolume(
+          row.user_id,
+          row.id,
+          row.sandbox_id,
+          input.volumeId
+        );
+      } catch (err) {
+        throwKiloclawAdminError(err, 'Failed to destroy orphan volume');
+      }
+
+      try {
+        await createKiloClawAdminAuditLog({
+          action: 'kiloclaw.orphan_volume.destroy',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          target_user_id: row.user_id,
+          message: `Orphan volume destroyed: ${result.volumeId} (${result.volumeName})`,
+          metadata: {
+            instance_id: row.id,
+            sandbox_id: row.sandbox_id,
+            fly_app: result.flyApp,
+            volume_id: result.volumeId,
+            volume_name: result.volumeName,
+            already_gone: result.alreadyGone,
+          },
+        });
+      } catch (auditErr) {
+        console.error(
+          '[admin-kiloclaw] Failed to write audit log for orphan volume destroy:',
+          auditErr
+        );
+      }
+
+      return { success: true, ...result };
     }),
 
   setEarlyAccess: adminProcedure

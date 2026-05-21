@@ -24,6 +24,7 @@ import { UpstreamApiError } from '@/lib/trpc/init';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockGetDebugStatus: jest.Mock<any, any> = jest.fn();
 const mockDestroyFlyMachine: jest.Mock<any, any> = jest.fn();
+const mockDestroyOrphanVolume: jest.Mock<any, any> = jest.fn();
 const mockGetKiloCliRunStatus: jest.Mock<any, any> = jest.fn();
 const mockCancelKiloCliRun: jest.Mock<any, any> = jest.fn();
 const mockStartKiloCliRun: jest.Mock<any, any> = jest.fn();
@@ -43,6 +44,7 @@ function mockKiloClawInternalClient() {
   KiloClawInternalClient.mockImplementation(() => ({
     getDebugStatus: mockGetDebugStatus,
     destroyFlyMachine: mockDestroyFlyMachine,
+    destroyOrphanVolume: mockDestroyOrphanVolume,
     getKiloCliRunStatus: mockGetKiloCliRunStatus,
     cancelKiloCliRun: mockCancelKiloCliRun,
     startKiloCliRun: mockStartKiloCliRun,
@@ -55,6 +57,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
   KiloClawInternalClient: jest.fn().mockImplementation(() => ({
     getDebugStatus: mockGetDebugStatus,
     destroyFlyMachine: mockDestroyFlyMachine,
+    destroyOrphanVolume: mockDestroyOrphanVolume,
     getKiloCliRunStatus: mockGetKiloCliRunStatus,
     cancelKiloCliRun: mockCancelKiloCliRun,
     startKiloCliRun: mockStartKiloCliRun,
@@ -156,6 +159,7 @@ beforeEach(async () => {
   cliRunId = run.id;
   mockGetDebugStatus.mockReset();
   mockDestroyFlyMachine.mockReset();
+  mockDestroyOrphanVolume.mockReset();
   mockGetKiloCliRunStatus.mockReset();
   mockCancelKiloCliRun.mockReset();
   mockStartKiloCliRun.mockReset();
@@ -2818,5 +2822,167 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       expect(otherTargetRows.length).toBeGreaterThan(0);
       expect(otherTargetRows.every(n => n.status === 'pending')).toBe(true);
     });
+  });
+});
+
+describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
+  const VOLUME_ID = 'vol_orphantest00000';
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+
+  async function insertDestroyedInstance(opts: {
+    destroyedAt: string;
+    subscriptionStatus?: 'active' | 'canceled' | 'trialing';
+  }): Promise<string> {
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        destroyed_at: opts.destroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    if (opts.subscriptionStatus) {
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: regularUser.id,
+        instance_id: instance.id,
+        plan: 'trial',
+        status: opts.subscriptionStatus,
+      });
+    }
+    return instance.id;
+  }
+
+  it('rejects when the instance does not exist', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.destroyOrphanVolume({
+        instanceId: crypto.randomUUID(),
+        volumeId: VOLUME_ID,
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the instance is not destroyed', async () => {
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.destroyOrphanVolume({
+        instanceId: instance.id,
+        volumeId: VOLUME_ID,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
+  });
+
+  it('rejects while the instance is within the 7-day grace period', async () => {
+    const instanceId = await insertDestroyedInstance({ destroyedAt: daysAgo(2) });
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.destroyOrphanVolume({ instanceId, volumeId: VOLUME_ID })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the user has an access-granting subscription', async () => {
+    const instanceId = await insertDestroyedInstance({
+      destroyedAt: daysAgo(30),
+      subscriptionStatus: 'active',
+    });
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.destroyOrphanVolume({ instanceId, volumeId: VOLUME_ID })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
+  });
+
+  it('rejects when an access-granting successor subscription replaced the destroyed instance row', async () => {
+    const instanceId = await insertDestroyedInstance({ destroyedAt: daysAgo(30) });
+    const [successorInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    const [successorSubscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: regularUser.id,
+        instance_id: successorInstance.id,
+        plan: 'trial',
+        status: 'active',
+      })
+      .returning({ id: kiloclaw_subscriptions.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: regularUser.id,
+      instance_id: instanceId,
+      plan: 'trial',
+      status: 'canceled',
+      transferred_to_subscription_id: successorSubscription.id,
+    });
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(
+      caller.admin.kiloclawInstances.destroyOrphanVolume({ instanceId, volumeId: VOLUME_ID })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
+  });
+
+  it('destroys the volume for a long-destroyed instance with no subscription', async () => {
+    mockDestroyOrphanVolume.mockResolvedValue({
+      ok: true,
+      flyApp: 'inst-abc',
+      volumeId: VOLUME_ID,
+      volumeName: 'kiloclaw_ki_test',
+      alreadyGone: false,
+    });
+    const instanceId = await insertDestroyedInstance({ destroyedAt: daysAgo(30) });
+    const caller = await createCallerForUser(adminUser.id);
+
+    const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
+      instanceId,
+      volumeId: VOLUME_ID,
+    });
+
+    expect(result).toMatchObject({ success: true, ok: true, volumeId: VOLUME_ID });
+    expect(mockDestroyOrphanVolume).toHaveBeenCalledWith(
+      regularUser.id,
+      instanceId,
+      expect.any(String),
+      VOLUME_ID
+    );
+  });
+
+  it('allows destroy when the subscription is canceled (positive guard case)', async () => {
+    mockDestroyOrphanVolume.mockResolvedValue({
+      ok: true,
+      flyApp: 'inst-abc',
+      volumeId: VOLUME_ID,
+      volumeName: 'kiloclaw_ki_test',
+      alreadyGone: false,
+    });
+    const instanceId = await insertDestroyedInstance({
+      destroyedAt: daysAgo(30),
+      subscriptionStatus: 'canceled',
+    });
+    const caller = await createCallerForUser(adminUser.id);
+
+    const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
+      instanceId,
+      volumeId: VOLUME_ID,
+    });
+
+    expect(result).toMatchObject({ success: true });
+    expect(mockDestroyOrphanVolume).toHaveBeenCalledTimes(1);
   });
 });

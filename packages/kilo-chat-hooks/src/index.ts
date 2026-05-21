@@ -6,3 +6,5 @@ export * from './use-bot-status';
 export * from './use-conversations';
 export * from './use-messages';
 export * from './use-presence-subscription';
+export * from './use-attachment-url';
+export * from './use-attachment-queue';

@@ -141,7 +141,15 @@ function getAliveCurrentRows(rows: PersonalSubscriptionRow[]): PersonalSubscript
   return getCurrentRows(rows).filter(row => row.instance.destroyedAt === null);
 }
 
-function isAccessGrantingSubscription(
+/**
+ * Whether a subscription row currently grants the user product access.
+ *
+ * `active` always grants; `past_due` grants until suspended; `trialing`
+ * grants until the trial end passes. `canceled` / `unpaid` never grant.
+ * Exported so callers that must preserve user data for paying/trialing
+ * users (e.g. the orphan-volume reaper) share one definition of "active".
+ */
+export function isAccessGrantingSubscription(
   row: Pick<KiloClawSubscription, 'status' | 'suspended_at' | 'trial_ends_at'>,
   now: Date
 ): boolean {

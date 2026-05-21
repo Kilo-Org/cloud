@@ -32,6 +32,8 @@ export type ExecutionMetadata = {
   lastEventAt?: number;
   /** Token for authenticating ingest WebSocket connections */
   ingestToken?: string;
+  /** Message ID accepted by this execution, when available. */
+  messageId?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -64,7 +66,6 @@ export type LatestAssistantMessage = {
  * These fields are stored in the DO key-value storage alongside metadata.
  */
 export type CloudAgentSessionStateExtension = {
-  activeExecutionId?: ExecutionId;
   executions?: ExecutionMetadata[];
   interruptRequested?: boolean;
 };
@@ -82,6 +83,8 @@ export type AddExecutionParams = {
   streamingMode: StreamingMode;
   /** Token for authenticating ingest WebSocket connections */
   ingestToken?: string;
+  /** Message ID accepted by this execution, when available. */
+  messageId?: string;
 };
 
 /**

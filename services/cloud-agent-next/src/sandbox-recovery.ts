@@ -19,6 +19,11 @@ type PreparationInfrastructureFailure =
       message: 'Sandbox returned 500 during workspace preparation';
     }
   | {
+      type: 'sandbox_workspace_probe_timeout';
+      error: unknown;
+      message: string;
+    }
+  | {
       type: 'workspace_filesystem_preparation_error';
       error: WorkspaceFilesystemPreparationError;
       message: string;
@@ -50,6 +55,14 @@ function getNestedProperty(value: unknown, key: string): unknown {
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+export const SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE =
+  'Sandbox workspace Git probe timed out before wrapper bootstrap';
+
+export function isSandboxWorkspaceProbeTimeoutError(error: unknown): boolean {
+  const message = getStringProperty(error, 'message') ?? getErrorMessage(error);
+  return message.startsWith(SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE);
 }
 
 function messageLooksLikeSandboxInternalServerError(message: string): boolean {
@@ -165,6 +178,20 @@ export function getPreparationInfrastructureFailure(
     };
   }
 
+  const workspaceProbeTimeoutError = isSandboxWorkspaceProbeTimeoutError(cause)
+    ? cause
+    : isSandboxWorkspaceProbeTimeoutError(error)
+      ? error
+      : undefined;
+
+  if (workspaceProbeTimeoutError !== undefined) {
+    return {
+      type: 'sandbox_workspace_probe_timeout',
+      error: workspaceProbeTimeoutError,
+      message: SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE,
+    };
+  }
+
   const workspaceError = getWorkspaceFilesystemPreparationError(error);
   if (workspaceError) {
     return {
@@ -233,6 +260,44 @@ export async function destroySandboxAfterPreparationInfrastructureFailure(
 
   if (failure.type === 'sandbox_internal_server_error') {
     return destroySandboxAfterInternalServerError(context, failure.error);
+  }
+
+  if (failure.type === 'sandbox_workspace_probe_timeout') {
+    const errorMessage = getErrorMessage(failure.error);
+    logger
+      .withFields({
+        sandboxId: context.sandboxId,
+        sessionId: context.sessionId,
+        phase: context.phase,
+        error: errorMessage,
+        logTag: 'sandbox_workspace_probe_timeout_detected',
+      })
+      .error('Sandbox workspace Git probe timed out; destroying sandbox');
+
+    try {
+      await context.sandbox.destroy();
+      logger
+        .withFields({
+          sandboxId: context.sandboxId,
+          sessionId: context.sessionId,
+          phase: context.phase,
+          logTag: 'sandbox_workspace_probe_timeout_destroyed',
+        })
+        .info('Destroyed sandbox after workspace Git probe timeout');
+      return true;
+    } catch (destroyError) {
+      logger
+        .withFields({
+          sandboxId: context.sandboxId,
+          sessionId: context.sessionId,
+          phase: context.phase,
+          originalError: errorMessage,
+          destroyError: getErrorMessage(destroyError),
+          logTag: 'sandbox_workspace_probe_timeout_destroy_failed',
+        })
+        .error('Failed to destroy sandbox after workspace Git probe timeout');
+      return false;
+    }
   }
 
   const errorMessage = getErrorMessage(failure.error);

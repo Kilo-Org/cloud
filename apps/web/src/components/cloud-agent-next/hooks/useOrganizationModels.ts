@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
+import { appendCloudAgentNextLocalTestModel } from '@/components/cloud-agent-next/model-preferences';
 
 type UseOrganizationModelsReturn = {
   /** Models formatted for the ModelCombobox component */
@@ -34,7 +35,7 @@ export function useOrganizationModels(organizationId?: string): UseOrganizationM
 
   // Format models for the combobox
   const modelOptions = useMemo<ModelOption[]>(() => {
-    return (
+    return appendCloudAgentNextLocalTestModel(
       openRouterModels?.data.map(model => ({
         id: model.id,
         name: model.name,

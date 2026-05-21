@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import type { SandboxId } from '../types.js';
 
@@ -309,14 +310,8 @@ export type InitialExecutionPayload = z.infer<typeof InitialExecutionPayloadSche
 
 /**
  * Schema for the profile-derived configuration bundle persisted with a
- * session. Writers always emit this nested shape; readers prefer it but
- * fall back to the legacy flat fields (`envVars`, `encryptedSecrets`, …)
- * co-located on the same record for backwards compatibility with sessions
- * stored before the nesting landed.
- *
- * The flat read-fallback can be deleted once all live sessions have been
- * rewritten with the nested `profile` key (typically a few weeks of
- * session TTL after deploy).
+ * session. Current metadata stores this under the nested `profile` key.
+ * Legacy flat profile fields are normalized by `parseSessionMetadata`.
  */
 export const SessionProfileBundleSchema = z.object({
   envVars: z
@@ -341,8 +336,9 @@ export const SessionProfileBundleSchema = z.object({
 export type SessionProfileBundle = z.infer<typeof SessionProfileBundleSchema>;
 
 /**
- * Zod schema for CloudAgentSession metadata validation.
- * Used for both DO storage and restoration validation.
+ * Legacy flat CloudAgentSession metadata schema.
+ * Current storage reads and writes go through `session-metadata.ts`, which
+ * converts this shape to the grouped SessionMetadata boundary type.
  */
 export const MetadataSchema = z.object({
   version: z.number(),
@@ -363,9 +359,9 @@ export const MetadataSchema = z.object({
   /**
    * Profile-derived configuration (envVars, encryptedSecrets, MCP servers,
    * setup commands, runtime skills/agents). This nested form is what
-   * writers emit; the flat fields below are kept optional so that records
-   * written before this key existed still parse. Readers must go through
-   * `readProfileBundle` so the fallback stays in one place.
+   * older grouped profile form. Current metadata uses the schema in
+   * `session-metadata.ts`; the flat fields below are retained only for
+   * legacy record parsing.
    */
   profile: SessionProfileBundleSchema.optional(),
   // --- Legacy flat profile fields (read-only fallback, no longer written) ---
@@ -402,6 +398,7 @@ export const MetadataSchema = z.object({
   autoCommit: z.boolean().optional(),
   condenseOnComplete: z.boolean().optional(),
   appendSystemPrompt: z.string().max(10000).optional(),
+  shallow: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
 
   // Lifecycle
@@ -439,70 +436,8 @@ export const MetadataSchema = z.object({
     .optional(),
 
   // Initial message ID for correlation
-  initialMessageId: z.string().startsWith('msg_').length(30).optional(),
+  initialMessageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION).optional(),
 
   // Discriminated payload for the first execution (prompt or command)
   initialPayload: InitialExecutionPayloadSchema.optional(),
 });
-
-/**
- * Schema for async preparation input stored in DO storage.
- * Single source of truth for the shape of data passed between
- * startPreparationAsync (write) and runPreparationAsync (read via alarm).
- */
-export const PreparationInputSchema = z.object({
-  // Session identity
-  sessionId: z.string(),
-  kiloSessionId: z.string().optional(),
-  userId: z.string(),
-  orgId: z.string().optional(),
-  botId: z.string().optional(),
-  // Auth
-  authToken: z.string(),
-  // Git source
-  githubRepo: z.string().optional(),
-  githubToken: z.string().optional(),
-  gitUrl: z.string().optional(),
-  gitToken: z.string().optional(),
-  platform: z.enum(['github', 'gitlab']).optional(),
-  // Set to true when gitToken was resolved by the caller via the managed
-  // GitLab integration (git-token-service). Signals that async prep should
-  // NOT re-resolve the token, avoiding a refresh-token rotation race
-  // between the caller and the alarm.
-  gitlabTokenManaged: z.boolean().optional(),
-  // Execution params
-  prompt: z.string(),
-  mode: z.string(),
-  model: z.string(),
-  variant: z.string().optional(),
-  // Profile-derived configuration (nested form — what writers emit).
-  profile: SessionProfileBundleSchema.optional(),
-  // Legacy flat profile fields (read-only fallback, no longer written).
-  envVars: z.record(z.string(), z.string()).optional(),
-  encryptedSecrets: EncryptedSecretsSchema.optional(),
-  setupCommands: z.array(z.string()).optional(),
-  mcpServers: z.record(z.string(), MCPServerConfigSchema).optional(),
-  runtimeSkills: RuntimeSkillsSchema.optional(),
-  runtimeAgents: RuntimeAgentsSchema.optional(),
-  kiloCommands: RuntimeKiloCommandsSchema.optional(),
-  upstreamBranch: z.string().optional(),
-  autoCommit: z.boolean().optional(),
-  condenseOnComplete: z.boolean().optional(),
-  appendSystemPrompt: z.string().optional(),
-  callbackTarget: CallbackTargetSchema.optional(),
-  images: ImagesSchema.optional(),
-  createdOnPlatform: z.string().optional(),
-  shallow: z.boolean().optional(),
-  gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
-  kilocodeOrganizationId: z.string().optional(),
-  // Auto-initiate after preparation
-  autoInitiate: z.boolean(),
-  devcontainer: z.boolean().optional(),
-
-  initialMessageId: z.string().optional(),
-
-  // Discriminated payload for the first execution (prompt or command)
-  initialPayload: InitialExecutionPayloadSchema.optional(),
-});
-
-export type PreparationInput = z.infer<typeof PreparationInputSchema>;

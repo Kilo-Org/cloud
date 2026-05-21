@@ -11,6 +11,38 @@ function createSdkClient(): SDKClient {
 
 const workspacePath = '/workspace/project';
 
+describe('createWrapperKiloClient prompt handoff', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('throws when the SDK async prompt response contains an error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ message: 'server rejected prompt' }), {
+          status: 409,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+    );
+
+    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+
+    await expect(
+      client.sendPromptAsync({
+        sessionId: 'kilo_sess_rejected',
+        messageId: 'msg_rejected',
+        prompt: 'queue this prompt',
+      })
+    ).rejects.toThrow('Async prompt for session kilo_sess_rejected failed: server rejected prompt');
+  });
+});
+
 describe('createWrapperKiloClient network endpoints', () => {
   beforeEach(() => {
     vi.clearAllMocks();

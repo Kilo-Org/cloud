@@ -1,6 +1,6 @@
 /**
- * Integration tests for disconnect handling (Fix 1), reaper event emission (Fix 4),
- * and dynamic alarm scheduling (Fix 5).
+ * Integration tests for disconnect handling, alarm deadline scheduling,
+ * execution timeouts, and idle cleanup gating.
  *
  * Uses @cloudflare/vitest-pool-workers to test against real SQLite in DOs.
  * Each test gets isolated storage automatically.
@@ -15,145 +15,14 @@ import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
+import { storePendingSessionMessage } from '../../../src/session/pending-messages.js';
+import { putSessionMessageState } from '../../../src/session/session-message-state.js';
 import type { ExecutionId } from '../../../src/types/ids.js';
 
 describe('Disconnect handling & reaper', () => {
   // ---------------------------------------------------------------------------
-  // Fix 4: Reaper inserts synthetic error events when marking executions failed
+  // Active execution timeout and cleanup behavior
   // ---------------------------------------------------------------------------
-
-  it('reaper marks stale running execution as failed and inserts error event', async () => {
-    const userId = 'user_reaper_1';
-    const sessionId = 'agent_reaper_1';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
-
-    const result = await runInDurableObject(stub, async (instance, state) => {
-      const now = Date.now();
-
-      // Setup session metadata
-      await instance.updateMetadata({
-        version: now,
-        sessionId,
-        userId,
-        timestamp: now,
-      });
-
-      // Add an execution and make it active
-      const excId = 'exc_stale_running' as ExecutionId;
-      await instance.addExecution({
-        executionId: excId,
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: excId,
-      });
-      await instance.setActiveExecution(excId);
-
-      // Transition to running
-      await instance.updateExecutionStatus({
-        executionId: excId,
-        status: 'running',
-      });
-
-      // Set a heartbeat old enough to be stale under default and configured thresholds.
-      const staleHeartbeat = now - 11 * 60 * 1000;
-      await instance.updateExecutionHeartbeat(excId, staleHeartbeat);
-
-      // Run the alarm (reaper)
-      await instance.alarm();
-
-      // Check execution status
-      const execution = await instance.getExecution(excId);
-
-      // Check events for synthetic error event
-      const db = drizzle(state.storage, { logger: false });
-      const eventQueries = createEventQueries(db, state.storage.sql);
-      const events = eventQueries.findByFilters({ executionIds: [excId] });
-      const errorEvents = events.filter(e => e.stream_event_type === 'error');
-
-      // Check active execution was cleared
-      const activeExecId = await instance.getActiveExecutionId();
-
-      return { execution, errorEvents, activeExecId };
-    });
-
-    expect(result.execution?.status).toBe('failed');
-    expect(result.execution?.error).toContain('no heartbeat');
-    expect(result.activeExecId).toBeNull();
-    expect(result.errorEvents).toHaveLength(1);
-
-    const payload = JSON.parse(result.errorEvents[0].payload);
-    expect(payload.fatal).toBe(true);
-    expect(payload.error).toContain('no heartbeat');
-  });
-
-  it('reaper marks stuck pending execution as failed and inserts error event', async () => {
-    const userId = 'user_reaper_2';
-    const sessionId = 'agent_reaper_2';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
-
-    const result = await runInDurableObject(stub, async (instance, state) => {
-      const now = Date.now();
-
-      await instance.updateMetadata({
-        version: now,
-        sessionId,
-        userId,
-        timestamp: now,
-      });
-
-      const excId = 'exc_stale_pending' as ExecutionId;
-      await instance.addExecution({
-        executionId: excId,
-        mode: 'code',
-        streamingMode: 'websocket',
-        ingestToken: excId,
-      });
-      await instance.setActiveExecution(excId);
-      // Execution starts as 'pending' — leave it there.
-
-      // The pending timeout is 5 minutes by default. We need the execution's
-      // startedAt to be far enough in the past. Because addExecution uses
-      // Date.now() internally, we can't control it directly. Instead we
-      // manipulate the execution storage to backdate startedAt.
-      const executions =
-        await state.storage.get<
-          Array<{ executionId: string; startedAt: number; [k: string]: unknown }>
-        >('executions');
-      if (executions) {
-        const idx = executions.findIndex(e => e.executionId === excId);
-        if (idx !== -1) {
-          // 6 minutes ago — exceeds the 5-minute default pending timeout
-          executions[idx].startedAt = now - 6 * 60 * 1000;
-          await state.storage.put('executions', executions);
-        }
-      }
-
-      // Run the alarm (reaper)
-      await instance.alarm();
-
-      const execution = await instance.getExecution(excId);
-
-      const db = drizzle(state.storage, { logger: false });
-      const eventQueries = createEventQueries(db, state.storage.sql);
-      const events = eventQueries.findByFilters({ executionIds: [excId] });
-      const errorEvents = events.filter(e => e.stream_event_type === 'error');
-
-      const activeExecId = await instance.getActiveExecutionId();
-
-      return { execution, errorEvents, activeExecId };
-    });
-
-    expect(result.execution?.status).toBe('failed');
-    expect(result.execution?.error).toContain('wrapper never connected');
-    expect(result.activeExecId).toBeNull();
-    expect(result.errorEvents).toHaveLength(1);
-
-    const payload = JSON.parse(result.errorEvents[0].payload);
-    expect(payload.fatal).toBe(true);
-    expect(payload.error).toContain('wrapper never connected');
-  });
 
   it('reaper does NOT mark execution as failed when heartbeat is fresh', async () => {
     const userId = 'user_reaper_3';
@@ -178,7 +47,12 @@ describe('Disconnect handling & reaper', () => {
         streamingMode: 'websocket',
         ingestToken: excId,
       });
-      await instance.setActiveExecution(excId);
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-current',
+        wrapperExecutionId: excId,
+        acceptedExecutionId: excId,
+      });
 
       await instance.updateExecutionStatus({
         executionId: excId,
@@ -198,52 +72,21 @@ describe('Disconnect handling & reaper', () => {
       const events = eventQueries.findByFilters({ executionIds: [excId] });
       const errorEvents = events.filter(e => e.stream_event_type === 'error');
 
-      const activeExecId = await instance.getActiveExecutionId();
+      const currentRuntimeExecution = await instance.getCurrentRuntimeExecution();
 
-      return { execution, errorEvents, activeExecId };
+      return { execution, errorEvents, currentRuntimeExecution };
     });
 
     expect(result.execution?.status).toBe('running');
-    expect(result.activeExecId).toBe('exc_fresh');
+    expect(result.currentRuntimeExecution?.executionId).toBe('exc_fresh');
     expect(result.errorEvents).toHaveLength(0);
   });
 
-  it('reaper clears orphaned active execution ID', async () => {
-    const userId = 'user_reaper_4';
-    const sessionId = 'agent_reaper_4';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
-
-    const result = await runInDurableObject(stub, async (instance, state) => {
-      const now = Date.now();
-
-      await instance.updateMetadata({
-        version: now,
-        sessionId,
-        userId,
-        timestamp: now,
-      });
-
-      // Write a dangling active execution ID directly into storage — the
-      // execution itself was never added, simulating an orphan.
-      await state.storage.put('active_execution_id', 'exc_orphan');
-
-      // Run the alarm (reaper)
-      await instance.alarm();
-
-      const activeExecId = await instance.getActiveExecutionId();
-
-      return { activeExecId };
-    });
-
-    expect(result.activeExecId).toBeNull();
-  });
-
   // ---------------------------------------------------------------------------
-  // Fix 5: Dynamic alarm scheduling — 2-min interval when active, 1-hour idle
+  // Deadline-based alarm scheduling for max runtime and idle cadence
   // ---------------------------------------------------------------------------
 
-  it('alarm schedules 2-minute interval when an active execution exists', async () => {
+  it('alarm schedules max-runtime deadline for current wrapper runtime execution', async () => {
     const userId = 'user_alarm_1';
     const sessionId = 'agent_alarm_1';
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -266,17 +109,27 @@ describe('Disconnect handling & reaper', () => {
         streamingMode: 'websocket',
         ingestToken: excId,
       });
-      await instance.setActiveExecution(excId);
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-current',
+        wrapperExecutionId: excId,
+        acceptedExecutionId: excId,
+      });
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-current',
+        wrapperExecutionId: excId,
+        acceptedMessageId: 'msg_current',
+        acceptedExecutionId: excId,
+      });
 
       await instance.updateExecutionStatus({
         executionId: excId,
         status: 'running',
       });
 
-      // Fresh heartbeat so the reaper won't kill it
       await instance.updateExecutionHeartbeat(excId, now - 5_000);
 
-      // Run the alarm
       await instance.alarm();
 
       // Read the scheduled alarm time
@@ -285,15 +138,13 @@ describe('Disconnect handling & reaper', () => {
       return { nextAlarm, now };
     });
 
-    // 2-minute active interval = 120_000 ms
     expect(result.nextAlarm).toBeDefined();
     const delta = (result.nextAlarm as number) - result.now;
-    // Allow ± 5s for clock drift inside the DO
-    expect(delta).toBeGreaterThanOrEqual(115_000);
-    expect(delta).toBeLessThanOrEqual(125_000);
+    expect(delta).toBeGreaterThanOrEqual(3_595_000);
+    expect(delta).toBeLessThanOrEqual(3_605_000);
   });
 
-  it('alarm schedules 1-hour interval when no active execution exists', async () => {
+  it('alarm schedules 1-hour interval when no pending runtime deadlines exist', async () => {
     const userId = 'user_alarm_2';
     const sessionId = 'agent_alarm_2';
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -309,7 +160,7 @@ describe('Disconnect handling & reaper', () => {
         timestamp: now,
       });
 
-      // No active execution — just metadata
+      // No pending runtime deadlines -- just metadata
 
       // Run the alarm
       await instance.alarm();
@@ -319,10 +170,8 @@ describe('Disconnect handling & reaper', () => {
       return { nextAlarm, now };
     });
 
-    // 1-hour idle interval = 3_600_000 ms
     expect(result.nextAlarm).toBeDefined();
     const delta = (result.nextAlarm as number) - result.now;
-    // Allow ± 5s for clock drift
     expect(delta).toBeGreaterThanOrEqual(3_595_000);
     expect(delta).toBeLessThanOrEqual(3_605_000);
   });
@@ -354,14 +203,18 @@ describe('Disconnect handling & reaper', () => {
         streamingMode: 'websocket',
         ingestToken: excId,
       });
-      await instance.setActiveExecution(excId);
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-current',
+        wrapperExecutionId: excId,
+        acceptedExecutionId: excId,
+      });
 
       await instance.updateExecutionStatus({
         executionId: excId,
         status: 'running',
       });
 
-      // Fresh heartbeat so the reaper's stale-execution check won't trigger
       await instance.updateExecutionHeartbeat(excId, now - 5_000);
 
       // Simulate writing the disconnect grace state directly into storage
@@ -379,7 +232,7 @@ describe('Disconnect handling & reaper', () => {
       await instance.alarm();
 
       const execution = await instance.getExecution(excId);
-      const activeExecId = await instance.getActiveExecutionId();
+      const currentRuntimeExecution = await instance.getCurrentRuntimeExecution();
 
       // The grace state should be cleared after processing
       const graceAfter = await state.storage.get('disconnect_grace');
@@ -389,12 +242,12 @@ describe('Disconnect handling & reaper', () => {
       const events = eventQueries.findByFilters({ executionIds: [excId] });
       const disconnectEvents = events.filter(e => e.stream_event_type === 'wrapper_disconnected');
 
-      return { execution, activeExecId, graceAfter, disconnectEvents };
+      return { execution, currentRuntimeExecution, graceAfter, disconnectEvents };
     });
 
     expect(result.execution?.status).toBe('failed');
     expect(result.execution?.error).toBe('Wrapper disconnected');
-    expect(result.activeExecId).toBeNull();
+    expect(result.currentRuntimeExecution).toBeNull();
     expect(result.graceAfter).toBeUndefined();
     expect(result.disconnectEvents).toHaveLength(1);
 
@@ -425,7 +278,12 @@ describe('Disconnect handling & reaper', () => {
         streamingMode: 'websocket',
         ingestToken: excId,
       });
-      await instance.setActiveExecution(excId);
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-current',
+        wrapperExecutionId: excId,
+        acceptedExecutionId: excId,
+      });
 
       await instance.updateExecutionStatus({
         executionId: excId,
@@ -446,15 +304,15 @@ describe('Disconnect handling & reaper', () => {
       await instance.alarm();
 
       const execution = await instance.getExecution(excId);
-      const activeExecId = await instance.getActiveExecutionId();
+      const currentRuntimeExecution = await instance.getCurrentRuntimeExecution();
       // Grace state should still be present (not yet expired)
       const graceAfter = await state.storage.get('disconnect_grace');
 
-      return { execution, activeExecId, graceAfter };
+      return { execution, currentRuntimeExecution, graceAfter };
     });
 
     expect(result.execution?.status).toBe('running');
-    expect(result.activeExecId).toBe('exc_grace_not_expired');
+    expect(result.currentRuntimeExecution?.executionId).toBe('exc_grace_not_expired');
     expect(result.graceAfter).toBeDefined();
   });
 
@@ -481,7 +339,12 @@ describe('Disconnect handling & reaper', () => {
         streamingMode: 'websocket',
         ingestToken: excId,
       });
-      await instance.setActiveExecution(excId);
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-current',
+        wrapperExecutionId: excId,
+        acceptedExecutionId: excId,
+      });
 
       await instance.updateExecutionStatus({
         executionId: excId,
@@ -527,7 +390,77 @@ describe('Disconnect handling & reaper', () => {
   // failExecution idempotency & interrupt cleanup
   // ---------------------------------------------------------------------------
 
-  it('reaper is idempotent - second alarm after failure produces no additional events', async () => {
+  it('failExecution clears fenced disconnect grace for the same execution', async () => {
+    const userId = 'user_grace_terminal';
+    const sessionId = 'agent_grace_terminal';
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      const now = Date.now();
+
+      await instance.updateMetadata({
+        version: now,
+        sessionId,
+        userId,
+        timestamp: now,
+      });
+
+      const excId = 'exc_fenced_grace_terminal' as ExecutionId;
+      await instance.addExecution({
+        executionId: excId,
+        mode: 'code',
+        streamingMode: 'websocket',
+        ingestToken: excId,
+      });
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 7,
+        wrapperConnectionId: 'connection-fenced',
+        wrapperExecutionId: excId,
+        acceptedExecutionId: excId,
+      });
+      await instance.updateExecutionStatus({
+        executionId: excId,
+        status: 'running',
+      });
+
+      await state.storage.put('disconnect_grace', {
+        executionId: excId,
+        disconnectedAt: now - 15_000,
+        wsCloseCode: 1006,
+        wsCloseReason: 'test fenced grace',
+        wrapperGeneration: 7,
+        wrapperConnectionId: 'connection-fenced',
+      });
+
+      const failed = await instance.failExecutionRpc({
+        executionId: excId,
+        status: 'failed',
+        error: 'non-reconnect failure',
+        streamEventType: 'error',
+      });
+      const graceAfterFailure = await state.storage.get('disconnect_grace');
+
+      await instance.alarm();
+
+      const db = drizzle(state.storage, { logger: false });
+      const eventQueries = createEventQueries(db, state.storage.sql);
+      const events = eventQueries.findByFilters({ executionIds: [excId] });
+      const errorEvents = events.filter(e => e.stream_event_type === 'error');
+      const disconnectEvents = events.filter(e => e.stream_event_type === 'wrapper_disconnected');
+      const execution = await instance.getExecution(excId);
+
+      return { failed, graceAfterFailure, errorEvents, disconnectEvents, execution };
+    });
+
+    expect(result.failed).toBe(true);
+    expect(result.graceAfterFailure).toBeUndefined();
+    expect(result.execution?.status).toBe('failed');
+    expect(result.errorEvents).toHaveLength(1);
+    expect(result.disconnectEvents).toHaveLength(0);
+  });
+
+  it('max runtime reaper is idempotent - second alarm after failure produces no additional events', async () => {
     const userId = 'user_reaper_5';
     const sessionId = 'agent_reaper_5';
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -550,15 +483,26 @@ describe('Disconnect handling & reaper', () => {
         streamingMode: 'websocket',
         ingestToken: excId,
       });
-      await instance.setActiveExecution(excId);
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-current',
+        wrapperExecutionId: excId,
+        acceptedMessageId: 'msg_current',
+        acceptedExecutionId: excId,
+      });
 
       await instance.updateExecutionStatus({
         executionId: excId,
         status: 'running',
       });
 
-      // Stale heartbeat — exceeds default and configured thresholds.
-      await instance.updateExecutionHeartbeat(excId, now - 11 * 60 * 1000);
+      const executions =
+        await state.storage.get<Array<{ executionId: string; startedAt: number }>>('executions');
+      const storedExecution = executions?.find(e => e.executionId === excId);
+      if (storedExecution) {
+        storedExecution.startedAt = now - 61 * 60 * 1000;
+        await state.storage.put('executions', executions);
+      }
 
       // First alarm: should mark execution as failed and insert error event
       await instance.alarm();
@@ -580,18 +524,85 @@ describe('Disconnect handling & reaper', () => {
       ).length;
 
       const execution = await instance.getExecution(excId);
-      const activeExecId = await instance.getActiveExecutionId();
+      const currentRuntimeExecution = await instance.getCurrentRuntimeExecution();
 
-      return { errorCountAfterFirst, errorCountAfterSecond, execution, activeExecId };
+      return { errorCountAfterFirst, errorCountAfterSecond, execution, currentRuntimeExecution };
     });
 
     expect(result.errorCountAfterFirst).toBe(1);
     expect(result.errorCountAfterSecond).toBe(1);
     expect(result.execution?.status).toBe('failed');
-    expect(result.activeExecId).toBeNull();
+    expect(result.currentRuntimeExecution).toBeNull();
   });
 
-  it('reaper clears interrupt flag when marking stale execution as failed', async () => {
+  it('max runtime uses current wrapper runtime only', async () => {
+    const userId = 'user_reaper_runtime';
+    const sessionId = 'agent_reaper_runtime';
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      const now = Date.now();
+
+      await instance.updateMetadata({
+        version: now,
+        sessionId,
+        userId,
+        timestamp: now,
+      });
+
+      const unrelatedId = 'exc_unrelated_running' as ExecutionId;
+      await instance.addExecution({
+        executionId: unrelatedId,
+        mode: 'code',
+        streamingMode: 'websocket',
+        ingestToken: unrelatedId,
+      });
+      await instance.updateExecutionStatus({
+        executionId: unrelatedId,
+        status: 'running',
+      });
+
+      const runtimeId = 'exc_runtime_current' as ExecutionId;
+      await instance.addExecution({
+        executionId: runtimeId,
+        mode: 'code',
+        streamingMode: 'websocket',
+        ingestToken: runtimeId,
+      });
+      await instance.updateExecutionStatus({
+        executionId: runtimeId,
+        status: 'running',
+      });
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-current',
+        wrapperExecutionId: runtimeId,
+        acceptedMessageId: 'msg_current',
+        acceptedExecutionId: runtimeId,
+      });
+
+      const executions =
+        await state.storage.get<Array<{ executionId: string; startedAt: number }>>('executions');
+      const storedRuntimeExecution = executions?.find(e => e.executionId === runtimeId);
+      if (storedRuntimeExecution) {
+        storedRuntimeExecution.startedAt = now - 61 * 60 * 1000;
+        await state.storage.put('executions', executions);
+      }
+
+      await instance.alarm();
+
+      const unrelatedExecution = await instance.getExecution(unrelatedId);
+      const runtimeExecution = await instance.getExecution(runtimeId);
+
+      return { unrelatedExecution, runtimeExecution };
+    });
+
+    expect(result.unrelatedExecution?.status).toBe('running');
+    expect(result.runtimeExecution?.status).toBe('failed');
+  });
+
+  it('reaper clears interrupt flag when max runtime fails execution', async () => {
     const userId = 'user_reaper_6';
     const sessionId = 'agent_reaper_6';
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -614,21 +625,32 @@ describe('Disconnect handling & reaper', () => {
         streamingMode: 'websocket',
         ingestToken: excId,
       });
-      await instance.setActiveExecution(excId);
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-current',
+        wrapperExecutionId: excId,
+        acceptedMessageId: 'msg_current',
+        acceptedExecutionId: excId,
+      });
 
       await instance.updateExecutionStatus({
         executionId: excId,
         status: 'running',
       });
 
-      // Stale heartbeat — exceeds default and configured thresholds.
-      await instance.updateExecutionHeartbeat(excId, now - 11 * 60 * 1000);
+      const executions =
+        await state.storage.get<Array<{ executionId: string; startedAt: number }>>('executions');
+      const storedExecution = executions?.find(e => e.executionId === excId);
+      if (storedExecution) {
+        storedExecution.startedAt = now - 61 * 60 * 1000;
+        await state.storage.put('executions', executions);
+      }
 
       // Set the interrupt flag before the reaper runs
       await instance.requestInterrupt();
       const interruptBefore = await instance.isInterruptRequested();
 
-      // Run the alarm — reaper should fail the execution AND clear the interrupt
+      // Run the alarm — max runtime should fail the execution AND clear the interrupt
       await instance.alarm();
 
       const execution = await instance.getExecution(excId);
@@ -640,6 +662,69 @@ describe('Disconnect handling & reaper', () => {
     expect(result.interruptBefore).toBe(true);
     expect(result.execution?.status).toBe('failed');
     expect(result.interruptAfter).toBe(false);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Idle kilo server cleanup
+  // ---------------------------------------------------------------------------
+
+  it('idle cleanup respects runtime and pending work', async () => {
+    const userId = 'user_idle_cleanup';
+    const sessionId = 'agent_idle_cleanup';
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      const now = Date.now();
+      const expiredActivity = now - 20 * 60 * 1000;
+
+      await instance.updateMetadata({
+        version: now,
+        sessionId,
+        userId,
+        timestamp: now,
+        kiloServerLastActivity: expiredActivity,
+      });
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperRunId: 'wr_idle_cleanup',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-current',
+        lastWrapperMessageAt: now,
+        wrapperExecutionId: 'execution-current',
+        acceptedMessageId: 'msg_current',
+        acceptedExecutionId: 'execution-current',
+      });
+      await putSessionMessageState(state.storage, {
+        messageId: 'msg_018f1e2d3c4bIdleRuntimeAbC',
+        status: 'accepted',
+        prompt: 'running task',
+        createdAt: now,
+        acceptedAt: now,
+        wrapperRunId: 'wr_idle_cleanup',
+      });
+
+      await instance.alarm();
+      const metadataAfterRuntime = await instance.getMetadata();
+
+      await state.storage.delete('wrapper_runtime_state');
+      await storePendingSessionMessage(state.storage, {
+        messageId: 'msg_123456789abc123456789abc12',
+        role: 'user',
+        content: 'queued',
+        createdAt: now,
+      });
+
+      await instance.alarm();
+      const metadataAfterPending = await instance.getMetadata();
+
+      return {
+        keptWithRuntime: metadataAfterRuntime?.lifecycle.kiloServerLastActivity,
+        keptWithPending: metadataAfterPending?.lifecycle.kiloServerLastActivity,
+      };
+    });
+
+    expect(result.keptWithRuntime).toBeDefined();
+    expect(result.keptWithPending).toBeDefined();
   });
 
   // ---------------------------------------------------------------------------
@@ -669,7 +754,12 @@ describe('Disconnect handling & reaper', () => {
         streamingMode: 'websocket',
         ingestToken: excId,
       });
-      await instance.setActiveExecution(excId);
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-current',
+        wrapperExecutionId: excId,
+        acceptedExecutionId: excId,
+      });
 
       await instance.updateExecutionStatus({
         executionId: excId,
@@ -685,7 +775,7 @@ describe('Disconnect handling & reaper', () => {
       });
 
       const execution = await instance.getExecution(excId);
-      const activeExecId = await instance.getActiveExecutionId();
+      const currentRuntimeExecution = await instance.getCurrentRuntimeExecution();
       const interruptAfter = await instance.isInterruptRequested();
 
       const db = drizzle(state.storage, { logger: false });
@@ -693,13 +783,13 @@ describe('Disconnect handling & reaper', () => {
       const events = eventQueries.findByFilters({ executionIds: [excId] });
       const errorEvents = events.filter(e => e.stream_event_type === 'error');
 
-      return { rpcResult, execution, activeExecId, interruptAfter, errorEvents };
+      return { rpcResult, execution, currentRuntimeExecution, interruptAfter, errorEvents };
     });
 
     expect(result.rpcResult).toBe(true);
     expect(result.execution?.status).toBe('failed');
     expect(result.execution?.error).toContain('Interrupted - no running processes found');
-    expect(result.activeExecId).toBeNull();
+    expect(result.currentRuntimeExecution).toBeNull();
     expect(result.interruptAfter).toBe(false);
     expect(result.errorEvents).toHaveLength(1);
 
@@ -731,7 +821,12 @@ describe('Disconnect handling & reaper', () => {
         streamingMode: 'websocket',
         ingestToken: excId,
       });
-      await instance.setActiveExecution(excId);
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-current',
+        wrapperExecutionId: excId,
+        acceptedExecutionId: excId,
+      });
 
       // Transition to running, then to failed
       await instance.updateExecutionStatus({
@@ -789,7 +884,12 @@ describe('Disconnect handling & reaper', () => {
         streamingMode: 'websocket',
         ingestToken: excId,
       });
-      await instance.setActiveExecution(excId);
+      await state.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'connection-current',
+        wrapperExecutionId: excId,
+        acceptedExecutionId: excId,
+      });
 
       await instance.updateExecutionStatus({
         executionId: excId,

@@ -50,7 +50,7 @@ import {
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import type { AgentMode } from './types';
-import type { StoredMessage } from '@/lib/cloud-agent-sdk';
+import type { MessageDeliveryState, StoredMessage } from '@/lib/cloud-agent-sdk';
 import type { Images } from '@/lib/images-schema';
 import type { WorkspaceTabId } from './terminal-tabs';
 import type { TerminalStatus } from './useCloudAgentTerminal';
@@ -61,10 +61,12 @@ import type { TerminalStatus } from './useCloudAgentTerminal';
 const StaticMessages = memo(
   ({
     messages,
+    pendingMessages,
     getChildMessages,
     onOpenChildSession,
   }: {
     messages: StoredMessage[];
+    pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
     getChildMessages?: (sessionId: string) => StoredMessage[];
     onOpenChildSession?: OpenChildSession;
   }) => (
@@ -73,6 +75,7 @@ const StaticMessages = memo(
         <MessageErrorBoundary key={msg.info.id}>
           <MessageBubble
             message={msg}
+            deliveryState={pendingMessages.get(msg.info.id)}
             getChildMessages={getChildMessages}
             onOpenChildSession={onOpenChildSession}
           />
@@ -88,10 +91,12 @@ StaticMessages.displayName = 'StaticMessages';
 // ---------------------------------------------------------------------------
 function DynamicMessages({
   messages,
+  pendingMessages,
   getChildMessages,
   onOpenChildSession,
 }: {
   messages: StoredMessage[];
+  pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
 }) {
@@ -104,6 +109,7 @@ function DynamicMessages({
             <MessageBubble
               message={msg}
               isStreaming={streaming}
+              deliveryState={pendingMessages.get(msg.info.id)}
               getChildMessages={getChildMessages}
               onOpenChildSession={onOpenChildSession}
             />
@@ -197,6 +203,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const failedPrompt = useAtomValue(manager.atoms.failedPrompt);
   const staticMessages = useAtomValue(manager.atoms.staticMessages);
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
+  const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const fetchedSessionData = useAtomValue(manager.atoms.fetchedSessionData);
@@ -686,11 +693,13 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                             <div ref={messagesContentRef}>
                               <StaticMessages
                                 messages={staticMessages}
+                                pendingMessages={pendingMessages}
                                 getChildMessages={getChildMessages}
                                 onOpenChildSession={handleOpenTopLevelChildSession}
                               />
                               <DynamicMessages
                                 messages={dynamicMessages}
+                                pendingMessages={pendingMessages}
                                 getChildMessages={getChildMessages}
                                 onOpenChildSession={handleOpenTopLevelChildSession}
                               />
@@ -765,7 +774,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                                 onSend={handleSendMessage}
                                 onSendCommand={handleSendSlashCommand}
                                 onStop={handleStopExecution}
-                                disabled={(isStreaming && !activeSuggestion) || !canSend}
+                                disabled={!canSend}
                                 isStreaming={isStreaming && !activeSuggestion}
                                 placeholder={placeholder}
                                 slashCommands={availableCommands}

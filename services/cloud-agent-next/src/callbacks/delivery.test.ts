@@ -5,7 +5,7 @@ import type { CallbackTarget, ExecutionCallbackPayload } from './types.js';
 const mockPayload: ExecutionCallbackPayload = {
   sessionId: 'test-session',
   cloudAgentSessionId: 'test-session',
-  executionId: 'test-execution',
+  messageId: 'msg_test123',
   status: 'completed',
 };
 
@@ -156,6 +156,25 @@ describe('deliverCallbackJob', () => {
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify(mockPayload),
+        })
+      );
+    });
+
+    it('should preserve messageId and include idempotencyKey in request payload', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
+      globalThis.fetch = mockFetch;
+      const target: CallbackTarget = { url: 'https://example.com/callback' };
+      const payload: ExecutionCallbackPayload = {
+        ...mockPayload,
+        messageId: 'msg_018f1e2d3c4bCallbackMsgId',
+      };
+
+      await deliverCallbackJob(target, payload, 1);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://example.com/callback',
+        expect.objectContaining({
+          body: JSON.stringify(payload),
         })
       );
     });

@@ -69,7 +69,7 @@ afterAll(() => {
 const flushPromises = () => new Promise(jest.requireActual('timers').setImmediate);
 const mockRandom = jest.spyOn(Math, 'random');
 
-function eventMessage(eventId: number): string {
+function eventMessage(eventId: number, overrides: Record<string, unknown> = {}): string {
   return JSON.stringify({
     eventId,
     executionId: 'exec-123',
@@ -77,6 +77,7 @@ function eventMessage(eventId: number): string {
     streamEventType: 'status',
     timestamp: new Date().toISOString(),
     data: {},
+    ...overrides,
   });
 }
 
@@ -212,5 +213,41 @@ describe('cloud-agent-next websocket-manager', () => {
     }
     expect(secondWs.url).toContain('ticket=old-ticket');
     expect(secondWs.url).toContain('fromId=2269');
+  });
+
+  it('transitions to connected without executionId when event omits it', () => {
+    const onStateChange = jest.fn();
+    const onEvent = jest.fn();
+    const manager = createWebSocketManager(createConfig({ onStateChange, onEvent }));
+
+    manager.connect();
+
+    const ws = MockWebSocket.instances[0];
+    if (ws === undefined) {
+      throw new Error('Expected initial WebSocket');
+    }
+
+    const { executionId, ...eventWithoutExecId } = JSON.parse(eventMessage(1));
+    void executionId;
+    ws.simulateMessage(JSON.stringify(eventWithoutExecId));
+
+    expect(onStateChange).toHaveBeenCalledWith({ status: 'connected' });
+    expect(onEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('transitions to connected with executionId when event includes it', () => {
+    const onStateChange = jest.fn();
+    const manager = createWebSocketManager(createConfig({ onStateChange }));
+
+    manager.connect();
+
+    const ws = MockWebSocket.instances[0];
+    if (ws === undefined) {
+      throw new Error('Expected initial WebSocket');
+    }
+
+    ws.simulateMessage(eventMessage(1));
+
+    expect(onStateChange).toHaveBeenCalledWith({ status: 'connected', executionId: 'exec-123' });
   });
 });

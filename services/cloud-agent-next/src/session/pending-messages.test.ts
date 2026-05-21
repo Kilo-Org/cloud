@@ -1,0 +1,550 @@
+import { describe, expect, it } from 'vitest';
+import {
+  createPendingSessionMessage,
+  createPendingSessionMessageFromIntent,
+  resolvePendingSessionMessageExecutionOptions,
+  resolvePendingSessionMessageIntent,
+  storePendingSessionMessage,
+  listPendingSessionMessages,
+  countPendingSessionMessages,
+  checkPendingSessionMessageCapacity,
+  shouldSkipPendingFlush,
+  recordPendingFlushFailure,
+  deletePendingSessionMessageByMessageId,
+  findPendingSessionMessageByMessageId,
+  findPendingSessionMessageByClientRequestId,
+  clearPendingSessionMessages,
+  PENDING_SESSION_MESSAGE_LIMIT,
+  type SessionQueueStorage,
+  type PendingSessionMessage,
+} from './pending-messages.js';
+import type { SessionMessageIntent } from '../execution/types.js';
+
+function createMemoryStorage(initialEntries?: Array<[string, unknown]>): SessionQueueStorage {
+  const store = new Map(initialEntries ?? []);
+  return {
+    async get<T = unknown>(key: string) {
+      return store.get(key) as T | undefined;
+    },
+    async put(key, value) {
+      store.set(key, value);
+    },
+    async delete(keys) {
+      for (const key of Array.isArray(keys) ? keys : [keys]) {
+        store.delete(key);
+      }
+    },
+    async list<T = unknown>({ prefix }: { prefix: string }) {
+      return new Map(
+        Array.from(store.entries()).filter(([key]) => key.startsWith(prefix)) as Array<[string, T]>
+      );
+    },
+  };
+}
+
+const BASE_MSG_ID = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+
+function makeMessage(overrides: Partial<PendingSessionMessage> = {}): PendingSessionMessage {
+  return createPendingSessionMessage({
+    messageId: BASE_MSG_ID,
+    role: 'user',
+    content: 'hello',
+    createdAt: 1,
+    ...overrides,
+  });
+}
+
+describe('createPendingSessionMessage', () => {
+  it('creates a valid message with required fields', () => {
+    const message = makeMessage();
+    expect(message.messageId).toBe(BASE_MSG_ID);
+    expect(message.role).toBe('user');
+    expect(message.content).toBe('hello');
+    expect(message.createdAt).toBe(1);
+  });
+
+  it('includes optional fields when provided', () => {
+    const message = makeMessage({
+      clientRequestId: 'client-1',
+      callbackUrl: 'https://example.com/cb',
+      callbackMetadata: { key: 'value' },
+      executionOptions: { mode: 'code', model: 'gpt-4' },
+    });
+    expect(message.clientRequestId).toBe('client-1');
+    expect(message.callbackUrl).toBe('https://example.com/cb');
+    expect(message.callbackMetadata).toEqual({ key: 'value' });
+    expect(message.executionOptions).toEqual({ mode: 'code', model: 'gpt-4' });
+  });
+
+  it('omits empty executionOptions', () => {
+    const message = makeMessage({ executionOptions: {} });
+    expect(message.executionOptions).toBeUndefined();
+  });
+
+  it('omits executionOptions with only undefined values', () => {
+    const message = makeMessage({
+      executionOptions: { mode: undefined, model: undefined },
+    });
+    expect(message.executionOptions).toBeUndefined();
+  });
+});
+
+describe('createPendingSessionMessageFromIntent', () => {
+  it('creates a message from a session message intent', () => {
+    const intent: SessionMessageIntent = {
+      turn: {
+        messageId: 'msg_018f1e2d3c4bIntentAbCdEfGh',
+        prompt: 'write tests',
+        images: {
+          path: '123e4567-e89b-12d3-a456-426614174000',
+          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+        },
+      },
+      agent: { mode: 'plan', model: 'claude', variant: 'thinking' },
+      finalization: { autoCommit: true, condenseOnComplete: false },
+      repositoryAuthOverrides: { gitToken: 'git-token-123' },
+    };
+
+    const message = createPendingSessionMessageFromIntent(intent, 42);
+
+    expect(message).toMatchObject({
+      messageId: 'msg_018f1e2d3c4bIntentAbCdEfGh',
+      role: 'user',
+      content: 'write tests',
+      images: {
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+      },
+      createdAt: 42,
+      executionOptions: {
+        mode: 'plan',
+        model: 'claude',
+        variant: 'thinking',
+        autoCommit: true,
+        condenseOnComplete: false,
+        gitTokenOverride: 'git-token-123',
+      },
+    });
+  });
+});
+
+describe('resolvePendingSessionMessageExecutionOptions', () => {
+  it('merges message options over defaults', () => {
+    const message = makeMessage({
+      executionOptions: { mode: 'plan', model: 'gpt-4' },
+    });
+    const resolved = resolvePendingSessionMessageExecutionOptions(message, {
+      mode: 'code',
+      model: 'default-model',
+      variant: 'alpha',
+      autoCommit: false,
+      condenseOnComplete: false,
+    });
+    expect(resolved.mode).toBe('plan');
+    expect(resolved.model).toBe('gpt-4');
+    expect(resolved.variant).toBe('alpha');
+    expect(resolved.autoCommit).toBe(false);
+  });
+
+  it('falls back to defaults when message has no options', () => {
+    const message = makeMessage();
+    const resolved = resolvePendingSessionMessageExecutionOptions(message, {
+      mode: 'code',
+      model: 'default-model',
+    });
+    expect(resolved.mode).toBe('code');
+    expect(resolved.model).toBe('default-model');
+  });
+});
+
+describe('resolvePendingSessionMessageIntent', () => {
+  it('restores an accepted turn plus resolved delivery semantics from flat pending storage', () => {
+    const message = makeMessage({
+      images: {
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+      },
+      executionOptions: {
+        mode: 'plan',
+        model: 'queued-model',
+        variant: 'thinking',
+        autoCommit: true,
+        condenseOnComplete: false,
+        githubTokenOverride: 'github-override',
+      },
+    });
+
+    const intent = resolvePendingSessionMessageIntent(message, {
+      mode: 'code',
+      model: 'default-model',
+    });
+
+    expect(intent).toEqual({
+      turn: {
+        messageId: BASE_MSG_ID,
+        prompt: 'hello',
+        images: {
+          path: '123e4567-e89b-12d3-a456-426614174000',
+          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+        },
+      },
+      agent: { mode: 'plan', model: 'queued-model', variant: 'thinking' },
+      finalization: { autoCommit: true, condenseOnComplete: false },
+      repositoryAuthOverrides: { githubToken: 'github-override', gitToken: undefined },
+    });
+  });
+});
+
+describe('storePendingSessionMessage', () => {
+  it('round-trips through listPendingSessionMessages', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    const listed = await listPendingSessionMessages(storage);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject(message);
+  });
+});
+
+describe('listPendingSessionMessages', () => {
+  it('returns messages in FIFO order by createdAt', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      makeMessage({ messageId: 'msg_018f1e2d3c4bAAAAAAAAAAAAAA', createdAt: 10 })
+    );
+    await storePendingSessionMessage(
+      storage,
+      makeMessage({ messageId: 'msg_018f1e2d3c4bBBBBBBBBBBBBBB', createdAt: 20 })
+    );
+    await storePendingSessionMessage(
+      storage,
+      makeMessage({ messageId: 'msg_018f1e2d3c4bCCCCCCCCCCCCCC', createdAt: 30 })
+    );
+
+    const listed = await listPendingSessionMessages(storage);
+    expect(listed.map(m => m.messageId)).toEqual([
+      'msg_018f1e2d3c4bAAAAAAAAAAAAAA',
+      'msg_018f1e2d3c4bBBBBBBBBBBBBBB',
+      'msg_018f1e2d3c4bCCCCCCCCCCCCCC',
+    ]);
+  });
+
+  it('skips invalid stored entries', async () => {
+    const storage = createMemoryStorage();
+    await storage.put('pending_message:0000000000000001:invalid', {
+      messageId: 'bad',
+      role: 'user',
+      content: 'bad',
+      createdAt: 1,
+    });
+    await storePendingSessionMessage(
+      storage,
+      makeMessage({ messageId: 'msg_018f1e2d3c4bValidMsgAbCdEf', createdAt: 2 })
+    );
+
+    const listed = await listPendingSessionMessages(storage);
+    expect(listed.map(m => m.messageId)).toEqual(['msg_018f1e2d3c4bValidMsgAbCdEf']);
+  });
+});
+
+describe('countPendingSessionMessages', () => {
+  it('returns correct count', async () => {
+    const storage = createMemoryStorage();
+    expect(await countPendingSessionMessages(storage)).toBe(0);
+
+    await storePendingSessionMessage(
+      storage,
+      makeMessage({ messageId: 'msg_018f1e2d3c4bAAAAAAAAAAAAAA', createdAt: 1 })
+    );
+    expect(await countPendingSessionMessages(storage)).toBe(1);
+
+    await storePendingSessionMessage(
+      storage,
+      makeMessage({ messageId: 'msg_018f1e2d3c4bBBBBBBBBBBBBBB', createdAt: 2 })
+    );
+    expect(await countPendingSessionMessages(storage)).toBe(2);
+  });
+});
+
+describe('checkPendingSessionMessageCapacity', () => {
+  it('reports available when under limit', async () => {
+    const storage = createMemoryStorage();
+    const capacity = await checkPendingSessionMessageCapacity(storage);
+    expect(capacity.available).toBe(true);
+    expect(capacity.count).toBe(0);
+    expect(capacity.limit).toBe(PENDING_SESSION_MESSAGE_LIMIT);
+  });
+
+  it('reports unavailable at limit', async () => {
+    const storage = createMemoryStorage();
+    for (let i = 0; i < PENDING_SESSION_MESSAGE_LIMIT; i++) {
+      await storePendingSessionMessage(
+        storage,
+        makeMessage({ messageId: `msg_018f1e2d3c4b${String(i).padStart(14, 'A')}`, createdAt: i })
+      );
+    }
+    const capacity = await checkPendingSessionMessageCapacity(storage);
+    expect(capacity.available).toBe(false);
+    expect(capacity.count).toBe(PENDING_SESSION_MESSAGE_LIMIT);
+    expect(capacity.message).toContain('full');
+  });
+});
+
+describe('shouldSkipPendingFlush', () => {
+  it('skips when nextFlushAttemptAt is in the future', () => {
+    const message = makeMessage({ nextFlushAttemptAt: 100 });
+    expect(shouldSkipPendingFlush(message, 50)).toBe(true);
+  });
+
+  it('does not skip when nextFlushAttemptAt is in the past', () => {
+    const message = makeMessage({ nextFlushAttemptAt: 50 });
+    expect(shouldSkipPendingFlush(message, 100)).toBe(false);
+  });
+
+  it('does not skip when nextFlushAttemptAt is undefined', () => {
+    const message = makeMessage();
+    expect(shouldSkipPendingFlush(message, 100)).toBe(false);
+  });
+});
+
+describe('recordPendingFlushFailure', () => {
+  it('applies warm-followup retry backoff', async () => {
+    const storage = createMemoryStorage();
+    let message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    const delays: (number | undefined)[] = [];
+    const now = 100_000;
+
+    for (let i = 0; i < 5; i++) {
+      const result = await recordPendingFlushFailure(storage, message, 'error', now, {
+        policy: 'warm-followup',
+        code: 'WORKSPACE_SETUP_FAILED',
+      });
+      delays.push(
+        result.nextFlushAttemptAt !== undefined ? result.nextFlushAttemptAt - now : undefined
+      );
+      message = result.message;
+    }
+
+    expect(delays).toEqual([2_000, 4_000, 8_000, 15_000, undefined]);
+  });
+
+  it('applies cold-init retry backoff', async () => {
+    const storage = createMemoryStorage();
+    let message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    const delays: (number | undefined)[] = [];
+    const now = 100_000;
+
+    for (let i = 0; i < 10; i++) {
+      const result = await recordPendingFlushFailure(storage, message, 'error', now, {
+        policy: 'cold-init',
+        code: 'SANDBOX_CONNECT_FAILED',
+      });
+      delays.push(
+        result.nextFlushAttemptAt !== undefined ? result.nextFlushAttemptAt - now : undefined
+      );
+      message = result.message;
+    }
+
+    expect(delays).toEqual([
+      2_000,
+      4_000,
+      8_000,
+      16_000,
+      32_000,
+      60_000,
+      60_000,
+      60_000,
+      120_000,
+      undefined,
+    ]);
+  });
+
+  it('exhausts immediately for non-retryable codes', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    const result = await recordPendingFlushFailure(storage, message, 'bad', 100_000, {
+      policy: 'warm-followup',
+      code: 'BAD_REQUEST',
+    });
+
+    expect(result.exhausted).toBe(true);
+    expect(result.nextFlushAttemptAt).toBeUndefined();
+  });
+
+  it('removes the message from storage when exhausted', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    await recordPendingFlushFailure(storage, message, 'bad', 100_000, {
+      policy: 'warm-followup',
+      code: 'BAD_REQUEST',
+    });
+
+    const listed = await listPendingSessionMessages(storage);
+    expect(listed).toHaveLength(0);
+  });
+
+  it('keeps the message in storage when not exhausted', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    await recordPendingFlushFailure(storage, message, 'transient', 100_000, {
+      policy: 'warm-followup',
+      code: 'WORKSPACE_SETUP_FAILED',
+    });
+
+    const listed = await listPendingSessionMessages(storage);
+    expect(listed).toHaveLength(1);
+    expect(listed[0].flushAttempts).toBe(1);
+    expect(listed[0].lastFlushError).toBe('transient');
+  });
+
+  it('retains images when re-storing a retryable pending message', async () => {
+    const storage = createMemoryStorage();
+    const images = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+    };
+    const message = makeMessage({ images });
+    await storePendingSessionMessage(storage, message);
+
+    await recordPendingFlushFailure(storage, message, 'transient', 100_000, {
+      policy: 'warm-followup',
+      code: 'WORKSPACE_SETUP_FAILED',
+    });
+
+    const listed = await listPendingSessionMessages(storage);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.images).toEqual(images);
+  });
+
+  it('treats undefined code as retryable', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    const result = await recordPendingFlushFailure(storage, message, 'unknown', 100_000, {
+      policy: 'warm-followup',
+    });
+
+    expect(result.exhausted).toBe(false);
+    expect(result.attempts).toBe(1);
+  });
+});
+
+describe('deletePendingSessionMessageByMessageId', () => {
+  it('deletes all messages with matching messageId', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      makeMessage({ messageId: 'msg_018f1e2d3c4bDDDDDDDDDDDDDD', createdAt: 1 })
+    );
+    await storePendingSessionMessage(
+      storage,
+      makeMessage({ messageId: 'msg_018f1e2d3c4bDDDDDDDDDDDDDD', createdAt: 2 })
+    );
+    await storePendingSessionMessage(
+      storage,
+      makeMessage({ messageId: 'msg_018f1e2d3c4bEEEEEEEEEEEEEE', createdAt: 3 })
+    );
+
+    const deleted = await deletePendingSessionMessageByMessageId(
+      storage,
+      'msg_018f1e2d3c4bDDDDDDDDDDDDDD'
+    );
+    const remaining = await listPendingSessionMessages(storage);
+
+    expect(deleted).toBe(true);
+    expect(remaining.map(m => m.messageId)).toEqual(['msg_018f1e2d3c4bEEEEEEEEEEEEEE']);
+  });
+
+  it('returns false when no message matches', async () => {
+    const storage = createMemoryStorage();
+    const deleted = await deletePendingSessionMessageByMessageId(storage, 'missing');
+    expect(deleted).toBe(false);
+  });
+});
+
+describe('findPendingSessionMessageByMessageId', () => {
+  it('finds the message by messageId', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      makeMessage({ messageId: 'msg_018f1e2d3c4bFindMsgAbCdEfG', createdAt: 1 })
+    );
+
+    const found = await findPendingSessionMessageByMessageId(
+      storage,
+      'msg_018f1e2d3c4bFindMsgAbCdEfG'
+    );
+    expect(found?.messageId).toBe('msg_018f1e2d3c4bFindMsgAbCdEfG');
+  });
+
+  it('returns undefined when not found', async () => {
+    const storage = createMemoryStorage();
+    const found = await findPendingSessionMessageByMessageId(storage, 'missing');
+    expect(found).toBeUndefined();
+  });
+});
+
+describe('findPendingSessionMessageByClientRequestId', () => {
+  it('finds the message by clientRequestId', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      makeMessage({
+        messageId: 'msg_018f1e2d3c4bAAAAAAAAAAAAAA',
+        clientRequestId: 'client-1',
+        createdAt: 1,
+      })
+    );
+
+    const found = await findPendingSessionMessageByClientRequestId(storage, 'client-1');
+    expect(found?.messageId).toBe('msg_018f1e2d3c4bAAAAAAAAAAAAAA');
+  });
+
+  it('returns undefined when not found', async () => {
+    const storage = createMemoryStorage();
+    const found = await findPendingSessionMessageByClientRequestId(storage, 'missing');
+    expect(found).toBeUndefined();
+  });
+});
+
+describe('clearPendingSessionMessages', () => {
+  it('clears all messages and returns them', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      makeMessage({ messageId: 'msg_018f1e2d3c4bAAAAAAAAAAAAAA', createdAt: 1 })
+    );
+    await storePendingSessionMessage(
+      storage,
+      makeMessage({ messageId: 'msg_018f1e2d3c4bBBBBBBBBBBBBBB', createdAt: 2 })
+    );
+
+    const cleared = await clearPendingSessionMessages(storage);
+    const remaining = await listPendingSessionMessages(storage);
+
+    expect(cleared.map(m => m.messageId)).toEqual([
+      'msg_018f1e2d3c4bAAAAAAAAAAAAAA',
+      'msg_018f1e2d3c4bBBBBBBBBBBBBBB',
+    ]);
+    expect(remaining).toHaveLength(0);
+  });
+
+  it('returns empty array when no messages exist', async () => {
+    const storage = createMemoryStorage();
+    const cleared = await clearPendingSessionMessages(storage);
+    expect(cleared).toEqual([]);
+  });
+});

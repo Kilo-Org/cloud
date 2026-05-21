@@ -159,10 +159,6 @@ export type Env = {
   CLI_TIMEOUT_SECONDS?: string;
   /** Reaper interval override (ms) */
   REAPER_INTERVAL_MS?: string;
-  /** Execution stale threshold override (ms) */
-  STALE_THRESHOLD_MS?: string;
-  /** Pending execution start timeout override (ms) */
-  PENDING_START_TIMEOUT_MS?: string;
   /** Kilo server idle timeout override (ms) - defaults to 15 minutes */
   KILO_SERVER_IDLE_TIMEOUT_MS?: string;
   /** Shared secret for backend-to-backend authentication (prepareSession/updateSession) */

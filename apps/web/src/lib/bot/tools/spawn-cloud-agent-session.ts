@@ -113,9 +113,8 @@ export default async function spawnCloudAgentSession(
     throw error;
   }
 
-  // Build platform-specific prepareInput and initiateInput
+  // Build platform-specific prepare input
   let prepareInput: PrepareSessionInput;
-  let initiateInput: { githubToken?: string; kilocodeOrganizationId?: string };
   const mode: AgentMode = args.mode;
   const chatPlatform = options?.chatPlatform ?? 'slack';
   const callbackTarget = {
@@ -192,7 +191,6 @@ export default async function spawnCloudAgentSession(
       runtimeSkills: profileConfig.skills,
       runtimeAgents: profileConfig.agents,
     };
-    initiateInput = { kilocodeOrganizationId };
   } else {
     // GitHub path: get token, use githubRepo/githubToken
     const githubToken =
@@ -224,7 +222,6 @@ export default async function spawnCloudAgentSession(
       runtimeSkills: profileConfig.skills,
       runtimeAgents: profileConfig.agents,
     };
-    initiateInput = { githubToken, kilocodeOrganizationId };
   }
 
   const client = createCloudAgentNextClient(authToken, { skipBalanceCheck: true });
@@ -244,7 +241,6 @@ export default async function spawnCloudAgentSession(
   try {
     await client.initiateFromPreparedSession({
       cloudAgentSessionId,
-      ...initiateInput,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

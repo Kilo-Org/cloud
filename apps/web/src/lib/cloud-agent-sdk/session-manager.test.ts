@@ -10,7 +10,7 @@ import { createCloudAgentSession } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import type { AssistantMessage, UserMessage } from '@/types/opencode.gen';
 import { kiloId, cloudAgentId, stubUserMessage, stubTextPart, makeSnapshot } from './test-helpers';
-import type { CloudStatus, ResolvedSession, SessionActivity } from './types';
+import type { CloudStatus, MessageDeliveryState, ResolvedSession, SessionActivity } from './types';
 
 // ---------------------------------------------------------------------------
 // Mock createCloudAgentSession — prevents real WebSocket connections
@@ -41,6 +41,7 @@ const mockSession = {
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
     getSuggestion: jest.fn(() => null),
+    getPendingMessages: jest.fn<ReadonlyMap<string, MessageDeliveryState>, []>(() => new Map()),
   },
   storage: null as JotaiSessionStorage | null,
 };
@@ -54,6 +55,12 @@ const mockSessionCallbacks: {
   onSuggestionAsked?: (...args: unknown[]) => void;
   onSuggestionResolved?: (...args: unknown[]) => void;
   onResolved?: (resolved: ResolvedSession) => void;
+  onMessageQueued?: (messageId: string) => void;
+  onMessageCompleted?: (messageId: string) => void;
+  onMessageFailed?: (
+    messageId: string,
+    state: Extract<MessageDeliveryState, { status: 'failed' }>
+  ) => void;
 } = {};
 
 let latestStorage: JotaiSessionStorage | null = null;
@@ -71,6 +78,12 @@ jest.mock('./session', () => ({
       onSuggestionAsked?: (...args: unknown[]) => void;
       onSuggestionResolved?: (...args: unknown[]) => void;
       onResolved?: (resolved: ResolvedSession) => void;
+      onMessageQueued?: (messageId: string) => void;
+      onMessageCompleted?: (messageId: string) => void;
+      onMessageFailed?: (
+        messageId: string,
+        state: Extract<MessageDeliveryState, { status: 'failed' }>
+      ) => void;
     }) => {
       latestStorage = sessionConfig.storage;
       mockSession.storage = sessionConfig.storage;
@@ -92,6 +105,9 @@ jest.mock('./session', () => ({
       mockSessionCallbacks.onSuggestionAsked = sessionConfig.onSuggestionAsked;
       mockSessionCallbacks.onSuggestionResolved = sessionConfig.onSuggestionResolved;
       mockSessionCallbacks.onResolved = sessionConfig.onResolved;
+      mockSessionCallbacks.onMessageQueued = sessionConfig.onMessageQueued;
+      mockSessionCallbacks.onMessageCompleted = sessionConfig.onMessageCompleted;
+      mockSessionCallbacks.onMessageFailed = sessionConfig.onMessageFailed;
       return mockSession;
     }
   ),
@@ -115,8 +131,8 @@ const defaultFetchedSession = {
   isInitiated: true,
   needsLegacyPrepare: false,
   isPreparingAsync: false,
-  prompt: null,
-  initialMessageId: null,
+  prompt: 'Initial prompt',
+  initialMessageId: 'msg_0123456789abcdefghijklmnop',
   associatedPr: null,
 } satisfies FetchedSessionData;
 
@@ -217,6 +233,7 @@ describe('createSessionManager', () => {
     });
     mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
     mockSession.state.getCloudStatus.mockReturnValue(null);
+    mockSession.state.getPendingMessages.mockReturnValue(new Map());
     mockSession.storage = latestStorage;
     latestStorage = null;
     mockSessionCallbacks.onQuestionAsked = undefined;
@@ -225,6 +242,9 @@ describe('createSessionManager', () => {
     mockSessionCallbacks.onPermissionResolved = undefined;
     mockSessionCallbacks.onSessionCreated = undefined;
     mockSessionCallbacks.onResolved = undefined;
+    mockSessionCallbacks.onMessageQueued = undefined;
+    mockSessionCallbacks.onMessageCompleted = undefined;
+    mockSessionCallbacks.onMessageFailed = undefined;
   });
 
   // -------------------------------------------------------------------------
@@ -397,6 +417,28 @@ describe('createSessionManager', () => {
       expect(sessionConfig?.variant).toBe(null);
     });
 
+    it('uses the generic setup indicator for bare preparing cloud status', async () => {
+      mockSession.state.getCloudStatus.mockReturnValue({ type: 'preparing' });
+      mockSession.state.subscribe.mockImplementation(callback => {
+        callback();
+        return () => {};
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toEqual(
+        expect.objectContaining({
+          type: 'progress',
+          message: 'Setting up environment…',
+        })
+      );
+    });
+
     it('clears cloud status indicator when cloud status returns to ready', async () => {
       let subscriptionCallback = (): void => {
         throw new Error('Expected service state subscription callback');
@@ -436,77 +478,19 @@ describe('createSessionManager', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Initial message pre-insertion (new sessions before initiation)
-  // -------------------------------------------------------------------------
-
-  describe('initial message pre-insertion', () => {
-    it('pre-inserts user message for non-initiated sessions with prompt and initialMessageId', async () => {
-      jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_123);
-      const config = createMockConfig({
-        fetchSession: jest.fn().mockResolvedValue({
-          ...defaultFetchedSession,
-          isInitiated: false,
-          prompt: 'Fix the bug',
-          initialMessageId: 'msg_000000000000AAAAAAAAAAAAAA',
-        }),
-      });
-      const mgr = createSessionManager(config);
-
-      await mgr.switchSession(kiloId('ses-1'));
-
-      const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
-      expect(messages).toHaveLength(1);
-      expect(messages[0]?.info.id).toBe('msg_000000000000AAAAAAAAAAAAAA');
-      expect(messages[0]?.info.role).toBe('user');
-      expect(messages[0]?.info.time.created).toBe(1_700_000_000_123);
-      const textPart = messages[0]?.parts[0];
-      expect(textPart?.type).toBe('text');
-      if (textPart?.type === 'text') {
-        expect(textPart.text).toBe('Fix the bug');
-      }
-    });
-
-    it('pre-inserts user message for initiated sessions with prompt and initialMessageId', async () => {
-      const config = createMockConfig({
-        fetchSession: jest.fn().mockResolvedValue({
-          ...defaultFetchedSession,
-          isInitiated: true,
-          prompt: 'Fix the bug',
-          initialMessageId: 'msg_000000000000AAAAAAAAAAAAAA',
-        }),
-      });
-      const mgr = createSessionManager(config);
-
-      await mgr.switchSession(kiloId('ses-1'));
-
-      const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
-      expect(messages).toHaveLength(1);
-      expect(messages[0]?.info.id).toBe('msg_000000000000AAAAAAAAAAAAAA');
-    });
-
-    it('does not pre-insert message when initialMessageId is null', async () => {
-      const config = createMockConfig({
-        fetchSession: jest.fn().mockResolvedValue({
-          ...defaultFetchedSession,
-          isInitiated: false,
-          prompt: 'Fix the bug',
-          initialMessageId: null,
-        }),
-      });
-      const mgr = createSessionManager(config);
-
-      await mgr.switchSession(kiloId('ses-1'));
-
-      const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
-      expect(messages).toHaveLength(0);
-    });
-  });
-
-  // -------------------------------------------------------------------------
   // Overlapping switchSession
   // -------------------------------------------------------------------------
 
   describe('overlapping switchSession', () => {
+    it('connects one transport for concurrent switches to the same session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await Promise.all([mgr.switchSession(kiloId('ses-1')), mgr.switchSession(kiloId('ses-1'))]);
+
+      expect(mockSession.connect).toHaveBeenCalledTimes(1);
+    });
+
     it('first call is abandoned when second starts', async () => {
       let resolveFetch: (val: FetchedSessionData) => void;
       const slowFetch = new Promise<FetchedSessionData>(resolve => {
@@ -550,8 +534,6 @@ describe('createSessionManager', () => {
         ...defaultFetchedSession,
         cloudAgentSessionId: cloudAgentId('stale-agent'),
         model: 'stale-model',
-        prompt: null,
-        initialMessageId: null,
       } satisfies FetchedSessionData;
 
       const config = createMockConfig({
@@ -580,8 +562,40 @@ describe('createSessionManager', () => {
   // -------------------------------------------------------------------------
 
   describe('send', () => {
-    it('creates optimistic message and calls session.send', async () => {
-      jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_456);
+    it('keeps queued follow-up sends available while the session is busy', async () => {
+      mockSession.state.getActivity.mockReturnValueOnce({ type: 'busy' });
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.isStreaming)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      mockSession.send.mockResolvedValue(undefined);
+      const accepted = await mgr.send({
+        payload: {
+          type: 'prompt',
+          prompt: 'Queue this follow-up',
+          mode: 'code',
+          model: 'claude-3-5-sonnet',
+        },
+      });
+
+      expect(accepted).toBe(true);
+      expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: {
+          type: 'prompt',
+          prompt: 'Queue this follow-up',
+          mode: 'code',
+          model: 'claude-3-5-sonnet',
+        },
+        images: undefined,
+      });
+    });
+
+    it('does not write to storage before cloud.message.queued arrives', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
@@ -592,14 +606,7 @@ describe('createSessionManager', () => {
         payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
       });
 
-      const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
-      expect(messages).toHaveLength(1);
-      const [optimisticMessage] = messages;
-      expect(optimisticMessage?.info.role).toBe('user');
-      expect(optimisticMessage?.info.time.created).toBe(1_700_000_000_456);
-      expect(optimisticMessage?.info.id).toMatch(/^msg_/);
-      expect(optimisticMessage?.parts[0]?.id).toBe(`${optimisticMessage?.info.id}-text`);
-      expect(optimisticMessage?.parts[0]?.messageID).toBe(optimisticMessage?.info.id);
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
         payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
@@ -607,52 +614,7 @@ describe('createSessionManager', () => {
       });
     });
 
-    it('reconciles optimistic user text when authoritative part has a different id', async () => {
-      const prompt =
-        "I want to build mobile portrait mode friendly interactive birthday invitation for an upcoming 6 year old girl party. Please suggest some cool ideas and let's implement.";
-      const realPartId = 'prt_ca0395df1001ez5Rq0YoFEEjdO';
-      const config = createMockConfig();
-      const mgr = createSessionManager(config);
-
-      await mgr.switchSession(kiloId('ses-1'));
-      if (!latestStorage) throw new Error('expected session storage');
-
-      mockSession.send.mockImplementation(() => new Promise(() => {}));
-      void mgr.send({
-        payload: { type: 'prompt', prompt, mode: 'code', model: 'claude-3-5-sonnet' },
-      });
-
-      const [optimisticMessage] = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
-      const messageId = optimisticMessage?.info.id;
-      if (!messageId) throw new Error('expected optimistic message id');
-
-      latestStorage.upsertMessage(
-        stubUserMessage({
-          id: messageId,
-          sessionID: 'ses-1',
-          time: { created: 1_772_214_640_111 },
-          agent: 'code',
-          model: { providerID: 'kilo', modelID: 'anthropic/claude-opus-4.6' },
-        })
-      );
-      latestStorage.upsertPart(
-        messageId,
-        stubTextPart({
-          id: realPartId,
-          sessionID: 'ses-1',
-          messageID: messageId,
-          text: prompt,
-          time: { start: 1_772_214_640_152 },
-        })
-      );
-
-      const [message] = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
-      expect(message?.parts).toEqual([
-        expect.objectContaining({ id: realPartId, type: 'text', text: prompt }),
-      ]);
-    });
-
-    it('does not persist optimistic message for remote sessions', async () => {
+    it('does not persist any optimistic message for remote sessions', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
@@ -671,7 +633,7 @@ describe('createSessionManager', () => {
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
     });
 
-    it('clears optimistic message and sets error indicator on failure', async () => {
+    it('leaves storage empty and sets error indicator + failedPrompt on failure', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
@@ -683,6 +645,8 @@ describe('createSessionManager', () => {
       });
 
       expect(accepted).toBe(false);
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Hello');
       const indicator = atomValue<{ type: string; message: string } | null>(
         config.store,
         mgr.atoms.statusIndicator
@@ -1169,6 +1133,44 @@ describe('createSessionManager', () => {
       expect(sc?.variant).toBe(null);
     });
 
+    it('ignores sessionConfig updates from child assistant messages', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = mockedCreate.mock.calls[0][0];
+
+      sessionConfig.onEvent?.({
+        type: 'message.updated',
+        info: {
+          id: 'msg-child-1',
+          sessionID: 'child-1',
+          role: 'assistant',
+          modelID: 'child-model',
+          providerID: 'test',
+          mode: 'primary',
+          variant: 'high',
+          time: { created: 1 },
+          agent: 'child-agent',
+          cost: 0,
+          parentID: '',
+          path: { cwd: '', root: '' },
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+      });
+
+      const sc = atomValue<{ model?: string; mode?: string; variant?: string | null }>(
+        config.store,
+        mgr.atoms.sessionConfig
+      );
+      expect(sc?.model).toBe('claude-3-5-sonnet');
+      expect(sc?.mode).toBe('code');
+      expect(sc?.variant).toBe(null);
+    });
+
     it('updates sessionConfig.mode from assistant agent slug, not visibility mode', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -1341,7 +1343,13 @@ describe('createSessionManager', () => {
 
       await mgr.createAndStart(input);
 
-      expect(config.prepare).toHaveBeenCalledWith(input);
+      expect(config.prepare).toHaveBeenCalledWith({
+        ...input,
+        initialMessageId: expect.stringMatching(/^msg_/),
+      });
+      const prepareMock = jest.mocked(config.prepare);
+      const preparedInput = prepareMock.mock.calls[0]?.[0];
+      expect(preparedInput?.initialMessageId).toEqual(expect.stringMatching(/^msg_/));
       expect(config.initiate).toHaveBeenCalledWith({
         cloudAgentSessionId: cloudAgentId('agent-new'),
       });
@@ -1640,6 +1648,218 @@ describe('createSessionManager', () => {
       // switchSession after destroy should still work (fresh state)
       await mgr.switchSession(kiloId('ses-2'));
       expect(atomValue<string | null>(config.store, mgr.atoms.sessionId)).toBe('agent-1');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // pendingMessages atom
+  // -------------------------------------------------------------------------
+
+  describe('pendingMessages atom', () => {
+    async function switchAndCaptureSubscriber(
+      config: SessionManagerConfig,
+      mgr: ReturnType<typeof createSessionManager>
+    ): Promise<() => void> {
+      let subscriberCallback: (() => void) | null = null;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        subscriberCallback = callback;
+        callback();
+        return () => {};
+      });
+      await mgr.switchSession(kiloId('ses-1'));
+      if (!subscriberCallback) {
+        throw new Error('Expected service state subscription callback');
+      }
+      return subscriberCallback;
+    }
+
+    it('starts empty', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const pending = atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+        config.store,
+        mgr.atoms.pendingMessages
+      );
+      expect(pending.size).toBe(0);
+    });
+
+    it('surfaces queued entries from service state', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      const triggerSubscriber = await switchAndCaptureSubscriber(config, mgr);
+
+      const queuedMap: ReadonlyMap<string, MessageDeliveryState> = new Map([
+        ['m1', { status: 'queued' }],
+      ]);
+      mockSession.state.getPendingMessages.mockReturnValue(queuedMap);
+      triggerSubscriber();
+
+      const pending = atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+        config.store,
+        mgr.atoms.pendingMessages
+      );
+      expect(pending.get('m1')).toEqual({ status: 'queued' });
+    });
+
+    it('clears entry when service state completes the message', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      const triggerSubscriber = await switchAndCaptureSubscriber(config, mgr);
+
+      mockSession.state.getPendingMessages.mockReturnValue(
+        new Map<string, MessageDeliveryState>([['m1', { status: 'queued' }]])
+      );
+      triggerSubscriber();
+
+      mockSession.state.getPendingMessages.mockReturnValue(new Map());
+      triggerSubscriber();
+
+      const pending = atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+        config.store,
+        mgr.atoms.pendingMessages
+      );
+      expect(pending.has('m1')).toBe(false);
+    });
+
+    it('notifies subscribers when service state mutates the same pending map reference', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const pendingMap = new Map<string, MessageDeliveryState>();
+      mockSession.state.getPendingMessages.mockReturnValue(pendingMap);
+
+      const triggerSubscriber = await switchAndCaptureSubscriber(config, mgr);
+      const snapshots: string[][] = [];
+      const unsubscribe = config.store.sub(mgr.atoms.pendingMessages, () => {
+        snapshots.push(
+          Array.from(
+            atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+              config.store,
+              mgr.atoms.pendingMessages
+            ).keys()
+          )
+        );
+      });
+
+      pendingMap.set('m1', { status: 'queued' });
+      triggerSubscriber();
+      pendingMap.delete('m1');
+      triggerSubscriber();
+      unsubscribe();
+
+      expect(snapshots).toEqual([['m1'], []]);
+    });
+
+    it('leaves failedPromptAtom null when a queued message transitions', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      const triggerSubscriber = await switchAndCaptureSubscriber(config, mgr);
+
+      mockSession.state.getPendingMessages.mockReturnValue(
+        new Map<string, MessageDeliveryState>([['m1', { status: 'queued' }]])
+      );
+      triggerSubscriber();
+
+      mockSession.state.getPendingMessages.mockReturnValue(new Map());
+      triggerSubscriber();
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
+    });
+
+    it('clears pendingMessages on destroy', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      const triggerSubscriber = await switchAndCaptureSubscriber(config, mgr);
+
+      mockSession.state.getPendingMessages.mockReturnValue(
+        new Map<string, MessageDeliveryState>([['m1', { status: 'queued' }]])
+      );
+      triggerSubscriber();
+
+      mgr.destroy();
+
+      const pending = atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+        config.store,
+        mgr.atoms.pendingMessages
+      );
+      expect(pending.size).toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // delivery failure indicator
+  // -------------------------------------------------------------------------
+
+  describe('delivery failure status indicator', () => {
+    it('exhausted-retry failure sets an error indicator and leaves failedPrompt null', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const onMessageFailed = mockSessionCallbacks.onMessageFailed;
+      if (!onMessageFailed) {
+        throw new Error('Expected onMessageFailed to be plumbed through');
+      }
+      onMessageFailed('m1', {
+        status: 'failed',
+        error: 'flush failed',
+        reason: 'exhausted',
+        attempts: 5,
+      });
+
+      const indicator = atomValue<{ type: string; message: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(indicator).toEqual(
+        expect.objectContaining({ type: 'error', message: 'Message failed to deliver' })
+      );
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
+    });
+
+    it('interrupted queued failure sets an error indicator with the interrupted wording', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onMessageFailed?.('m1', {
+        status: 'failed',
+        error: 'Pending queued message interrupted by user',
+        reason: 'interrupted',
+      });
+
+      const indicator = atomValue<{ type: string; message: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(indicator).toEqual(
+        expect.objectContaining({ type: 'error', message: 'Queued message interrupted' })
+      );
+    });
+
+    it('execution failure does not overwrite the indicator', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const before = atomValue<unknown>(config.store, mgr.atoms.statusIndicator);
+
+      mockSessionCallbacks.onMessageFailed?.('m1', {
+        status: 'failed',
+        error: 'boom',
+        reason: 'execution',
+      });
+
+      expect(atomValue<unknown>(config.store, mgr.atoms.statusIndicator)).toBe(before);
     });
   });
 });

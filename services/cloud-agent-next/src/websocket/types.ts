@@ -36,7 +36,13 @@ export type StreamEventType =
   | 'status' // execution status updates
   | 'heartbeat' // keep-alive during idle periods
   | 'pong' // response to ping command from DO
-  | 'commands.available'; // catalog of kilo slash commands
+  | 'commands.available' // catalog of kilo slash commands
+  | 'preparing' // lazy workspace preparation step progress
+  | 'cloud.status' // cloud infrastructure status
+  | 'cloud.message.queued' // user message accepted into pending queue
+  | 'cloud.message.sent' // queued user message delivered to Kilo
+  | 'cloud.message.completed' // accepted user message completed execution
+  | 'cloud.message.failed'; // user message delivery failed or was canceled
 
 // ---------------------------------------------------------------------------
 // Server -> Client Events (/stream endpoint)
@@ -49,8 +55,8 @@ export type StreamEventType =
 export type StreamEvent = {
   /** Auto-incrementing event ID from SQLite storage */
   eventId: EventId;
-  /** Execution this event belongs to */
-  executionId: ExecutionId;
+  /** Execution this event belongs to (absent for message-based events) */
+  executionId?: ExecutionId;
   /** Session this event belongs to */
   sessionId: SessionId;
   /** Type of stream event */

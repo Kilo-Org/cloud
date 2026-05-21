@@ -50,11 +50,14 @@
     "@cloudflare/vitest-pool-workers": "catalog:",
     "@types/jsonwebtoken": "catalog:",
     "@types/node": "catalog:",
+    "@types/ws": "^8.5.12",
     "@typescript/native-preview": "catalog:",
     "@vitest/ui": "catalog:",
     "drizzle-kit": "catalog:",
+    "tsx": "^4.21.0",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "wrangler": "catalog:"
+    "wrangler": "catalog:",
+    "ws": "^8.18.0"
   }
 }

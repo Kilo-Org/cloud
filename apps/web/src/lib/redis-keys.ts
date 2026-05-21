@@ -61,3 +61,9 @@ export const modelExperimentRedisKey = (publicId: string) =>
 
 export const gitLabOAuthCredentialsRedisKey = (credentialRef: string) =>
   redisKey(`auth-credentials:gitlab:${credentialRef}`);
+
+/** Cached PostHog feature flag definitions for local evaluation (JSON blob). */
+export const POSTHOG_FLAG_DEFINITIONS_REDIS_KEY = redisKey('posthog:flags:definitions');
+
+/** Distributed lock key used to elect a single leader for polling PostHog flag definitions. */
+export const POSTHOG_FLAG_CACHE_LOCK_REDIS_KEY = redisKey('posthog:flags:lock');

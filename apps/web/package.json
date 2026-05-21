@@ -141,7 +141,7 @@
     "openai": "6.29.0",
     "p-limit": "catalog:",
     "posthog-js": "1.360.2",
-    "posthog-node": "5.10.4",
+    "posthog-node": "5.34.2",
     "react": "19.2.6",
     "react-countup": "6.5.3",
     "react-dom": "19.2.6",

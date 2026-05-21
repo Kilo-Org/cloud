@@ -6,11 +6,11 @@
  * definition — both sides enforce these gates, so they must not drift.
  */
 
-import { and, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 
 import type { WorkerDb } from './client';
 import { isAccessGrantingSubscription } from './kiloclaw-personal-subscription-collapse';
-import { kiloclaw_subscriptions } from './schema';
+import { kiloclaw_instances, kiloclaw_subscriptions } from './schema';
 
 /**
  * Minimum age, since its owning instance was destroyed, before a leftover
@@ -23,82 +23,114 @@ export const ORPHAN_VOLUME_GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
 /** Minimal drizzle executor surface — satisfied by both web and worker DBs. */
 type OrphanVolumeContextExecutor = Pick<WorkerDb, 'select'>;
 
-/**
- * Per-user signals that withhold a leftover volume from the orphan reaper.
- * A volume is reaper-eligible only when its owning user appears in NEITHER
- * set.
- */
-export type OrphanVolumeUserProtections = {
-  /**
-   * Users with a current access-granting subscription — an `active` one, an
-   * unsuspended `past_due` one, or a `trialing` one whose `trial_ends_at`
-   * has not passed. Their data must be preserved.
-   */
-  accessGrantingUserIds: Set<string>;
-  /**
-   * Users with a current subscription whose billing `destruction_deadline`
-   * is still in the future. The kiloclaw-billing lifecycle reaper is already
-   * scheduled to destroy that subscription's instance (and, with it, the
-   * volume) once the deadline passes — so a leftover volume is not a true
-   * orphan yet. It only becomes one if that reaper later fails, i.e. once
-   * the deadline is in the past and the volume is still present.
-   */
-  pendingDestructionUserIds: Set<string>;
+/** The ownership context a leftover volume belongs to. */
+export type OrphanVolumeSubscriptionContext = {
+  user_id: string;
+  organization_id: string | null;
 };
 
+/** Signals that withhold leftover volumes from the orphan reaper. */
+export type OrphanVolumeContextProtections = {
+  accessGrantingContextKeys: Set<string>;
+  pendingDestructionContextKeys: Set<string>;
+};
+
+/** Stable string key for a volume ownership context. */
+export function orphanVolumeSubscriptionContextKey(
+  context: OrphanVolumeSubscriptionContext
+): string {
+  return JSON.stringify([context.user_id, context.organization_id]);
+}
+
 /**
- * For the given users, resolve the per-user signals that withhold their
+ * For the given volume ownership contexts, resolve signals that withhold
  * leftover volumes from the orphan reaper.
  *
  * "Current" means `transferred_to_subscription_id IS NULL` — the head of
- * any reprovision transfer chain.
- *
- * The check is per-user and deliberately ignores which instance a
- * subscription is linked to. `kiloclaw_subscriptions.instance_id` is
- * nullable, so an instance-joined version silently dropped any subscription
- * whose `instance_id` was absent — treating an active or trialing user as
- * having no access and making their leftover volumes look reapable (a
- * data-loss false positive). Keying purely on the user removes that hole.
+ * any reprovision transfer chain. Linked subscriptions protect only their
+ * exact ownership context. A current subscription with no resolvable instance
+ * context is ambiguous, so it fails closed across every requested context for
+ * that user instead of silently making one of their leftover volumes reapable.
  */
-export async function getOrphanVolumeUserProtections(
+export async function getOrphanVolumeContextProtections(
   executor: OrphanVolumeContextExecutor,
-  userIds: string[],
+  contexts: OrphanVolumeSubscriptionContext[],
   now: Date
-): Promise<OrphanVolumeUserProtections> {
-  const uniqueUserIds = [...new Set(userIds)];
-  if (uniqueUserIds.length === 0) {
-    return { accessGrantingUserIds: new Set(), pendingDestructionUserIds: new Set() };
+): Promise<OrphanVolumeContextProtections> {
+  const requestedContextKeys = new Set(contexts.map(orphanVolumeSubscriptionContextKey));
+  const contextKeysByUserId = new Map<string, Set<string>>();
+  for (const context of contexts) {
+    const contextKey = orphanVolumeSubscriptionContextKey(context);
+    const userContextKeys = contextKeysByUserId.get(context.user_id) ?? new Set<string>();
+    userContextKeys.add(contextKey);
+    contextKeysByUserId.set(context.user_id, userContextKeys);
+  }
+
+  const userIds = [...contextKeysByUserId.keys()];
+  if (userIds.length === 0) {
+    return { accessGrantingContextKeys: new Set(), pendingDestructionContextKeys: new Set() };
   }
 
   const currentSubscriptions = await executor
     .select({
       user_id: kiloclaw_subscriptions.user_id,
+      instance_id: kiloclaw_subscriptions.instance_id,
+      instance_user_id: kiloclaw_instances.user_id,
+      organization_id: kiloclaw_instances.organization_id,
       status: kiloclaw_subscriptions.status,
       suspended_at: kiloclaw_subscriptions.suspended_at,
       trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
       destruction_deadline: kiloclaw_subscriptions.destruction_deadline,
     })
     .from(kiloclaw_subscriptions)
+    .leftJoin(
+      kiloclaw_instances,
+      and(
+        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id),
+        eq(kiloclaw_instances.user_id, kiloclaw_subscriptions.user_id)
+      )
+    )
     .where(
       and(
-        inArray(kiloclaw_subscriptions.user_id, uniqueUserIds),
+        inArray(kiloclaw_subscriptions.user_id, userIds),
         isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
       )
     );
 
-  const accessGrantingUserIds = new Set<string>();
-  const pendingDestructionUserIds = new Set<string>();
+  const accessGrantingContextKeys = new Set<string>();
+  const pendingDestructionContextKeys = new Set<string>();
+
+  function addProtectedContexts(
+    subscription: (typeof currentSubscriptions)[number],
+    target: Set<string>
+  ) {
+    if (subscription.instance_id === null || subscription.instance_user_id === null) {
+      for (const contextKey of contextKeysByUserId.get(subscription.user_id) ?? []) {
+        target.add(contextKey);
+      }
+      return;
+    }
+
+    const contextKey = orphanVolumeSubscriptionContextKey({
+      user_id: subscription.user_id,
+      organization_id: subscription.organization_id,
+    });
+    if (requestedContextKeys.has(contextKey)) {
+      target.add(contextKey);
+    }
+  }
+
   for (const subscription of currentSubscriptions) {
     if (isAccessGrantingSubscription(subscription, now)) {
-      accessGrantingUserIds.add(subscription.user_id);
+      addProtectedContexts(subscription, accessGrantingContextKeys);
     }
     if (
       subscription.destruction_deadline !== null &&
       new Date(subscription.destruction_deadline).getTime() > now.getTime()
     ) {
-      pendingDestructionUserIds.add(subscription.user_id);
+      addProtectedContexts(subscription, pendingDestructionContextKeys);
     }
   }
 
-  return { accessGrantingUserIds, pendingDestructionUserIds };
+  return { accessGrantingContextKeys, pendingDestructionContextKeys };
 }

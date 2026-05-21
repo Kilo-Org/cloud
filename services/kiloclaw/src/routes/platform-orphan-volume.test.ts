@@ -64,8 +64,8 @@ const DEFAULT_DESTROY_ROW = {
 /**
  * Build a fake worker DB for the destroy endpoint. It runs two queries on
  * one DB handle — the instance lookup (terminated by `.limit(1)`) and the
- * per-user access-granting subscription lookup inside
- * `getAccessGrantingOrphanVolumeUserIds` (awaited directly, no `.limit`).
+ * ownership-context protection lookup inside
+ * `getOrphanVolumeContextProtections` (awaited directly, no `.limit`).
  * They resolve `instanceRows` and `subscriptionRows` respectively.
  */
 function makeWorkerDb(instanceRows: unknown[], subscriptionRows: unknown[]) {
@@ -88,7 +88,7 @@ function makeWorkerDb(instanceRows: unknown[], subscriptionRows: unknown[]) {
 /**
  * Drive the destroy endpoint's DB queries: `instanceRow` is what the
  * instance lookup resolves; `subscriptions` are the current
- * (non-transferred) subscription rows the per-user access query resolves
+ * (non-transferred) subscription rows the context protection query resolves
  * for the owning user.
  */
 function mockDestroyLookup(
@@ -100,10 +100,13 @@ function mockDestroyLookup(
   );
 }
 
-/** A current, access-granting subscription row for the owning user. */
+/** A current subscription row linked to the destroyed row's ownership context. */
 function accessGrantingSubscriptionRow(status: string): Record<string, unknown> {
   return {
     user_id: USER_ID,
+    instance_id: INSTANCE_ID,
+    instance_user_id: USER_ID,
+    organization_id: null,
     status,
     suspended_at: null,
     trial_ends_at: null,
@@ -546,9 +549,8 @@ describe('POST /admin/orphan-volume-destroy', () => {
 
   it('refuses (409) when the user has a current access-granting subscription', async () => {
     // Models the reprovision case: the destroyed instance's own subscription
-    // was transferred away, but the user still has access via a current
-    // successor subscription. The per-user gate — not the destroyed row's
-    // own subscription — must catch this and block the delete.
+    // was transferred away, but the same ownership context still has access via
+    // a current successor subscription. The context gate must block the delete.
     const { env } = makeEnv();
     mockDestroyLookup(DEFAULT_DESTROY_ROW, [accessGrantingSubscriptionRow('active')]);
 
@@ -562,17 +564,42 @@ describe('POST /admin/orphan-volume-destroy', () => {
     expect(fly.deleteVolume).not.toHaveBeenCalled();
   });
 
+  it('allows destroy when an access-granting subscription belongs to another context', async () => {
+    const { env } = makeEnv();
+    mockDestroyLookup(DEFAULT_DESTROY_ROW, [
+      {
+        ...accessGrantingSubscriptionRow('active'),
+        instance_id: '22222222-2222-4222-8222-222222222222',
+        organization_id: '33333333-3333-4333-8333-333333333333',
+      },
+    ]);
+    vi.mocked(fly.listVolumes).mockResolvedValue([flyVolume()]);
+    vi.mocked(fly.deleteVolume).mockResolvedValue(undefined);
+
+    const response = await platform.request(
+      '/admin/orphan-volume-destroy',
+      destroyInit(validDestroyBody),
+      env
+    );
+    expect(response.status).toBe(200);
+    expect(fly.deleteVolume).toHaveBeenCalledTimes(1);
+  });
+
   it('refuses (409) when the user has a current live trial', async () => {
     // The Odai case: the destroyed instance's own subscription is canceled,
-    // but the user has a separate trialing subscription whose trial has not
-    // ended. A live trial grants access, so the volume must be preserved.
+    // but the user has a detached trialing subscription whose trial has not
+    // ended. The context cannot be resolved safely, so it must fail closed.
     const { env } = makeEnv();
     mockDestroyLookup(DEFAULT_DESTROY_ROW, [
       {
         user_id: USER_ID,
+        instance_id: null,
+        instance_user_id: null,
+        organization_id: null,
         status: 'trialing',
         suspended_at: null,
         trial_ends_at: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        destruction_deadline: null,
       },
     ]);
 
@@ -595,6 +622,9 @@ describe('POST /admin/orphan-volume-destroy', () => {
     mockDestroyLookup(DEFAULT_DESTROY_ROW, [
       {
         user_id: USER_ID,
+        instance_id: INSTANCE_ID,
+        instance_user_id: USER_ID,
+        organization_id: null,
         status: 'canceled',
         suspended_at: new Date(Date.now() - 86_400_000).toISOString(),
         trial_ends_at: null,

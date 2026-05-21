@@ -23,9 +23,11 @@ export {
   type DestroyedInstanceRow,
 } from './kiloclaw-personal-subscription-collapse';
 export {
-  getOrphanVolumeUserProtections,
+  getOrphanVolumeContextProtections,
   ORPHAN_VOLUME_GRACE_PERIOD_MS,
-  type OrphanVolumeUserProtections,
+  orphanVolumeSubscriptionContextKey,
+  type OrphanVolumeContextProtections,
+  type OrphanVolumeSubscriptionContext,
 } from './kiloclaw-orphan-volume';
 export { computeDatabaseUrl, getDatabaseClientConfig } from './database-url';
 export {

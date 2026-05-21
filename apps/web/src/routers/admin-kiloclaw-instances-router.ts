@@ -1,6 +1,10 @@
 import { adminProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { getOrphanVolumeUserProtections, insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import {
+  getOrphanVolumeContextProtections,
+  insertKiloClawSubscriptionChangeLog,
+  orphanVolumeSubscriptionContextKey,
+} from '@kilocode/db';
 import { createHash } from 'crypto';
 import {
   kiloclaw_instances,
@@ -3931,10 +3935,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
     const client = new KiloClawInternalClient();
     const now = new Date();
-    const { accessGrantingUserIds, pendingDestructionUserIds } =
-      await getOrphanVolumeUserProtections(
+    const { accessGrantingContextKeys, pendingDestructionContextKeys } =
+      await getOrphanVolumeContextProtections(
         db,
-        toScan.map(instance => instance.user_id),
+        toScan.map(instance => ({
+          user_id: instance.user_id,
+          organization_id: instance.organization_id,
+        })),
         now
       );
     const volumes: VolumeRow[] = [];
@@ -3983,8 +3990,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         const destroyedAt = instance.destroyed_at as string;
         const graceElapsed =
           now.getTime() - new Date(destroyedAt).getTime() > ORPHAN_VOLUME_GRACE_PERIOD_MS;
-        const hasAccess = accessGrantingUserIds.has(instance.user_id);
-        const destructionScheduled = pendingDestructionUserIds.has(instance.user_id);
+        const contextKey = orphanVolumeSubscriptionContextKey({
+          user_id: instance.user_id,
+          organization_id: instance.organization_id,
+        });
+        const hasAccess = accessGrantingContextKeys.has(contextKey);
+        const destructionScheduled = pendingDestructionContextKeys.has(contextKey);
 
         // Only volumes whose name exactly matches THIS instance are ours.
         // A non-matching volume belongs to a different (possibly live)
@@ -4076,22 +4087,26 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         });
       }
 
-      // 4. Subscription guard — never destroy data while the owning user
-      //    still has access (active / unsuspended past_due / live trial), or
-      //    while the billing lifecycle reaper is still scheduled to destroy
-      //    it (a future `destruction_deadline`). Checked per-user, not
-      //    per-instance: a reprovision transfer moves access to a current
-      //    successor subscription, and a subscription may have no
-      //    `instance_id` link at all.
-      const { accessGrantingUserIds, pendingDestructionUserIds } =
-        await getOrphanVolumeUserProtections(db, [row.user_id], now);
-      if (accessGrantingUserIds.has(row.user_id)) {
+      // 4. Subscription guard — never destroy data while this ownership
+      //    context still has access (active / unsuspended past_due / live trial),
+      //    or while the billing lifecycle reaper is still scheduled to destroy
+      //    it (a future `destruction_deadline`). Reprovision transfers move
+      //    access to a current successor row; a detached current row has no
+      //    resolvable context, so the shared lookup fails closed for the user.
+      const context = {
+        user_id: row.user_id,
+        organization_id: row.organization_id,
+      };
+      const { accessGrantingContextKeys, pendingDestructionContextKeys } =
+        await getOrphanVolumeContextProtections(db, [context], now);
+      const contextKey = orphanVolumeSubscriptionContextKey(context);
+      if (accessGrantingContextKeys.has(contextKey)) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'User has an access-granting subscription — volume preserved',
         });
       }
-      if (pendingDestructionUserIds.has(row.user_id)) {
+      if (pendingDestructionContextKeys.has(contextKey)) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message:

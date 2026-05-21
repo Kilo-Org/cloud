@@ -39,7 +39,7 @@ export const botIdentityRedisKey = (platform: string, teamId: string, userId: st
 /**
  * Set of public_model_ids that have a routing-relevant model_experiment row
  * (status IN 'active' | 'paused'). Used by `getProvider` as a fast pre-check
- * before loading the experiment routing payload from Postgres.
+ * before fetching the per-public-id experiment payload.
  *
  * Stored as a JSON array string. Recomputed and rewritten on every status
  * transition into or out of (active, paused).

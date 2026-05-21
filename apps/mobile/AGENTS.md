@@ -20,6 +20,18 @@ Follow the official Expo guide to set up the development environment: https://do
 
 The dev server (`pnpm start`) is always started by the user — do not start it yourself.
 
+## Tmux Services
+
+The user typically has a `tmux` session running with all backend services and the Expo dev server in separate windows (e.g., `kilo-chat`, `kiloclaw`, `nextjs`, `postgres`, `redis`, etc.). When debugging mobile issues that touch the backend, inspect the relevant window's logs to confirm what the server actually received:
+
+```bash
+tmux ls                                       # list sessions
+tmux list-windows -t <session>                # list windows
+tmux capture-pane -p -t <session>:<window> -S -200   # last 200 lines of a window
+```
+
+If `tmux ls` shows no session, tell the user the expected services aren't running and ask them to start the tmux session before continuing — don't try to start services yourself.
+
 ## Commands
 
 ```bash

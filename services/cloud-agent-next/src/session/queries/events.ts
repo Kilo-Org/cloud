@@ -138,6 +138,74 @@ function parseStoredEventRow(row: unknown): StoredEvent | null {
   return parsed.success ? parsed.data : null;
 }
 
+function buildLatestAssistantMessage(
+  sessionId: string,
+  rawSql: SqlStorage,
+  messageRow: StoredEvent
+): LatestAssistantMessage | null {
+  const messagePayload = parseJsonPayload(messageRow.payload, assistantMessageUpdatedPayloadSchema);
+  if (!messagePayload) return null;
+
+  const messageId = messagePayload.properties.info.id;
+  const partPrefix = `part/${messageId}/`;
+  const partsById = new Map<string, AssistantMessagePart>();
+
+  for (const rawPartRow of rawSql.exec(
+    `
+    SELECT id, execution_id, session_id, stream_event_type, payload, timestamp
+    FROM events
+    WHERE session_id = ?
+      AND stream_event_type = 'kilocode'
+      AND (
+        (
+          entity_id IS NOT NULL
+          AND substr(entity_id, 1, ?) = ?
+          AND json_extract(payload, '$.event') = 'message.part.updated'
+        )
+        OR (
+          json_extract(payload, '$.event') = 'message.part.removed'
+          AND json_extract(payload, '$.properties.messageID') = ?
+        )
+      )
+    ORDER BY timestamp ASC, id ASC
+    `,
+    sessionId,
+    partPrefix.length,
+    partPrefix,
+    messageId
+  )) {
+    const partRow = parseStoredEventRow(rawPartRow);
+    if (!partRow) continue;
+
+    const updatedPartPayload = parseJsonPayload(
+      partRow.payload,
+      assistantMessagePartUpdatedPayloadSchema
+    );
+    if (updatedPartPayload?.properties.part.messageID === messageId) {
+      const part = updatedPartPayload.properties.part;
+      partsById.set(part.id, part);
+      continue;
+    }
+
+    const removedPartPayload = parseJsonPayload(
+      partRow.payload,
+      assistantMessagePartRemovedPayloadSchema
+    );
+    if (removedPartPayload?.properties.messageID === messageId) {
+      partsById.delete(removedPartPayload.properties.partID);
+    }
+  }
+
+  const parts = [...partsById.values()].sort((a, b) => a.id.localeCompare(b.id));
+
+  return {
+    eventId: messageRow.id,
+    timestamp: messageRow.timestamp,
+    info: messagePayload.properties.info,
+    parts,
+  } satisfies LatestAssistantMessage;
+}
+
 // ---------------------------------------------------------------------------
 // Factory Function
 // ---------------------------------------------------------------------------
@@ -232,70 +300,44 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
       );
       if (!messageRow) return null;
 
-      const messagePayload = parseJsonPayload(
-        messageRow.payload,
-        assistantMessageUpdatedPayloadSchema
-      );
-      if (!messagePayload) return null;
+      return buildLatestAssistantMessage(sessionId, rawSql, messageRow);
+    },
 
-      const messageId = messagePayload.properties.info.id;
-      const partPrefix = `part/${messageId}/`;
-      const partsById = new Map<string, AssistantMessagePart>();
-
-      for (const rawPartRow of rawSql.exec(
-        `
-        SELECT id, execution_id, session_id, stream_event_type, payload, timestamp
-        FROM events
-        WHERE session_id = ?
-          AND stream_event_type = 'kilocode'
-          AND (
-            (
-              entity_id IS NOT NULL
-              AND substr(entity_id, 1, ?) = ?
-              AND json_extract(payload, '$.event') = 'message.part.updated'
-            )
-            OR (
-              json_extract(payload, '$.event') = 'message.part.removed'
-              AND json_extract(payload, '$.properties.messageID') = ?
-            )
+    getAssistantMessageForUserMessage(
+      sessionId: string,
+      kiloSessionId: string,
+      parentMessageId: string
+    ): LatestAssistantMessage | null {
+      const messageRow = parseStoredEventRow(
+        rawSql
+          .exec(
+            `
+            SELECT id, execution_id, session_id, stream_event_type, payload, timestamp
+            FROM events
+            WHERE session_id = ?
+              AND stream_event_type = 'kilocode'
+              AND entity_id IS NOT NULL
+              AND substr(entity_id, 1, 8) = 'message/'
+              AND json_extract(payload, '$.event') = 'message.updated'
+              AND json_extract(payload, '$.properties.info.role') = 'assistant'
+              AND json_extract(payload, '$.properties.info.sessionID') = ?
+              AND json_extract(payload, '$.properties.info.parentID') = ?
+              AND (
+                json_extract(payload, '$.properties.info.time.completed') IS NOT NULL
+                OR json_extract(payload, '$.properties.info.error') IS NOT NULL
+              )
+            ORDER BY id DESC
+            LIMIT 1
+            `,
+            sessionId,
+            kiloSessionId,
+            parentMessageId
           )
-        ORDER BY timestamp ASC, id ASC
-        `,
-        sessionId,
-        partPrefix.length,
-        partPrefix,
-        messageId
-      )) {
-        const partRow = parseStoredEventRow(rawPartRow);
-        if (!partRow) continue;
+          .toArray()[0]
+      );
+      if (!messageRow) return null;
 
-        const updatedPartPayload = parseJsonPayload(
-          partRow.payload,
-          assistantMessagePartUpdatedPayloadSchema
-        );
-        if (updatedPartPayload?.properties.part.messageID === messageId) {
-          const part = updatedPartPayload.properties.part;
-          partsById.set(part.id, part);
-          continue;
-        }
-
-        const removedPartPayload = parseJsonPayload(
-          partRow.payload,
-          assistantMessagePartRemovedPayloadSchema
-        );
-        if (removedPartPayload?.properties.messageID === messageId) {
-          partsById.delete(removedPartPayload.properties.partID);
-        }
-      }
-
-      const parts = [...partsById.values()].sort((a, b) => a.id.localeCompare(b.id));
-
-      return {
-        eventId: messageRow.id,
-        timestamp: messageRow.timestamp,
-        info: messagePayload.properties.info,
-        parts,
-      } satisfies LatestAssistantMessage;
+      return buildLatestAssistantMessage(sessionId, rawSql, messageRow);
     },
 
     // Uses toSQL() + raw exec() for true lazy cursor-based iteration.

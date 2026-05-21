@@ -37,6 +37,10 @@ export const cloudAgentGetImageUploadUrlSchema = z.object({
  * - build, architect: Backward-compatible aliases (build → code, architect → plan)
  * - custom: Custom mode (requires appendSystemPrompt)
  */
+const messageIdNextSchema = z
+  .string()
+  .regex(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/, 'Invalid message ID format');
+
 export const agentModeNextSchema = z.enum([
   'code',
   'plan',
@@ -237,7 +241,7 @@ export const basePrepareSessionNextSchema = z
     upstreamBranch: z.string().optional(),
     autoCommit: z.boolean().optional(),
     autoInitiate: z.boolean().optional(),
-    initialMessageId: z.string().startsWith('msg_').length(30).optional(),
+    initialMessageId: messageIdNextSchema.optional(),
     initialPayload: sendMessageNextPayloadSchema.optional(),
     images: cloudAgentImagesSchema,
     devcontainer: z.boolean().optional(),
@@ -257,16 +261,18 @@ export const basePrepareSessionNextOutputSchema = z.object({
 });
 
 // Schema for initiating from a prepared session
-export const baseInitiateFromPreparedSessionNextSchema = z.object({
-  cloudAgentSessionId: z.string(),
-});
+export const baseInitiateFromPreparedSessionNextSchema = z
+  .object({
+    cloudAgentSessionId: z.string(),
+  })
+  .strict();
 
 // Schema for sending a message (V2 - uses cloudAgentSessionId)
 export const baseSendMessageNextSchema = z.object({
   cloudAgentSessionId: z.string(),
   payload: sendMessageNextPayloadSchema,
   autoCommit: z.boolean().optional(),
-  messageId: z.string().startsWith('msg_').length(30).optional(),
+  messageId: messageIdNextSchema.nullish(),
   images: cloudAgentImagesSchema,
 });
 
@@ -411,7 +417,7 @@ export const baseGetSessionNextOutputSchema = z.object({
   // session's owning user. Mirrors cloud-agent-next/router/schemas.ts.
 
   // Initial message ID for correlation
-  initialMessageId: z.string().startsWith('msg_').length(30).optional(),
+  initialMessageId: messageIdNextSchema.optional(),
 
   // Versioning
   timestamp: z.number(),
@@ -441,7 +447,9 @@ export const baseAnswerPermissionNextSchema = z.object({
 // Output schema for V2 initiation/message procedures
 export const baseInitiateSessionNextOutputSchema = z.object({
   cloudAgentSessionId: z.string(),
-  executionId: z.string(),
+  executionId: z.string().optional(),
   status: z.literal('started'),
   streamUrl: z.string().min(1), // Can be relative path or full URL
+  messageId: messageIdNextSchema,
+  delivery: z.enum(['sent', 'queued']),
 });

@@ -4,6 +4,31 @@ import type { ModelOption } from '@/components/shared/ModelCombobox';
 const MODEL_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-model';
 const VARIANTS_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-variants';
 const DEVCONTAINER_ENABLED_STORAGE_KEY = 'cloud-agent:devcontainer-enabled';
+const CLOUD_AGENT_NEXT_LOCAL_TEST_MODEL = {
+  id: 'kilo/fake-deterministic',
+  name: 'Deterministic test model',
+} satisfies ModelOption;
+
+export function shouldExposeCloudAgentNextLocalTestModel() {
+  return (
+    process.env.NODE_ENV === 'development' &&
+    process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_ENABLE_LOCAL_FAKE_MODEL === 'true'
+  );
+}
+
+export function appendCloudAgentNextLocalTestModel(
+  modelOptions: ModelOption[],
+  shouldExposeLocalTestModel = shouldExposeCloudAgentNextLocalTestModel()
+): ModelOption[] {
+  if (
+    !shouldExposeLocalTestModel ||
+    modelOptions.some(model => model.id === CLOUD_AGENT_NEXT_LOCAL_TEST_MODEL.id)
+  ) {
+    return modelOptions;
+  }
+
+  return [...modelOptions, CLOUD_AGENT_NEXT_LOCAL_TEST_MODEL];
+}
 
 export function getLastUsedModelStorageKey(organizationId?: string) {
   return organizationId

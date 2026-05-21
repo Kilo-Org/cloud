@@ -86,6 +86,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres'],
     dir: 'services/session-ingest',
   },
+  'fake-llm': {
+    group: 'cloud-agent',
+    dependsOn: [],
+    dir: 'services/cloud-agent-next/test/e2e',
+  },
   // git-token-service (shared by cloud-agent, app-builder, gastown)
   'cloudflare-git-token-service': {
     group: 'git-token-service',
@@ -360,6 +365,20 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
+    if (name === 'fake-llm') {
+      const fakeLlmPort = 8811 + portOffset;
+      defs.push({
+        name,
+        type: 'process',
+        dir: meta.dir ?? name,
+        port: fakeLlmPort,
+        dependsOn: meta.dependsOn,
+        command: ['env', `PORT=${fakeLlmPort}`, 'pnpm', 'exec', 'tsx', 'fake-llm-server.ts'],
+        group: meta.group,
+      });
+      continue;
+    }
+
     if (name in INFRA_PORTS) {
       defs.push({
         name,
@@ -444,23 +463,25 @@ function buildServiceDefs(): ServiceDef[] {
     const port = basePort + portOffset;
     const inspectorPort = port + 10000;
 
+    const command = [
+      'pnpm',
+      'run',
+      'dev',
+      '--port',
+      String(port),
+      '--inspector-port',
+      String(inspectorPort),
+      '--ip',
+      '0.0.0.0',
+    ];
+
     defs.push({
       name,
       type: 'worker',
       dir,
       port,
       dependsOn: meta.dependsOn,
-      command: [
-        'pnpm',
-        'run',
-        'dev',
-        '--port',
-        String(port),
-        '--inspector-port',
-        String(inspectorPort),
-        '--ip',
-        '0.0.0.0',
-      ],
+      command,
       group: meta.group,
       ...(meta.useLanIp ? { useLanIp: true } : {}),
     });

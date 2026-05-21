@@ -261,7 +261,10 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       initiate: async input => {
         if (organizationId) {
           return trpcClient.organizations.cloudAgentNext.initiateFromPreparedSession.mutate(
-            { cloudAgentSessionId: input.cloudAgentSessionId, organizationId },
+            {
+              cloudAgentSessionId: input.cloudAgentSessionId,
+              organizationId,
+            },
             { context: { skipBatch: true } }
           );
         }

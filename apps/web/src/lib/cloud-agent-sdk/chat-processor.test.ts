@@ -1,4 +1,4 @@
-import type { FilePart, Message, Part, TextPart } from '@/types/opencode.gen';
+import type { FilePart, Message, Part, TextPart, UserMessage } from '@/types/opencode.gen';
 import { createChatProcessor } from './chat-processor';
 import type { ChatEvent } from './normalizer';
 import { createMemoryStorage } from './storage/memory';
@@ -202,6 +202,96 @@ describe('createChatProcessor', () => {
       });
 
       expect(storage.getParts('msg-1')).toHaveLength(0);
+    });
+  });
+
+  describe('synthesizeQueuedUserMessage', () => {
+    it('inserts a synthetic user message with text part when storage is empty', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-queued',
+        sessionId: 'ses-1',
+        content: 'hello',
+      });
+
+      expect(storage.getMessageIds()).toEqual(['msg-queued']);
+      const info = storage.getMessageInfo('msg-queued') as UserMessage;
+      expect(info?.role).toBe('user');
+      expect(info?.sessionID).toBe('ses-1');
+      const parts = storage.getParts('msg-queued');
+      expect(parts).toHaveLength(1);
+      const textPart = parts[0] satisfies Part as TextPart;
+      expect(textPart.type).toBe('text');
+      expect(textPart.text).toBe('hello');
+      expect(textPart.synthetic).toBe(true);
+    });
+
+    it('is idempotent when the message already exists in storage', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const authoritativeMsg = makeUserMsg('msg-1');
+      processor.process({ type: 'message.updated', info: authoritativeMsg });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTextPart('part-real', 'msg-1', 'authoritative text'),
+      });
+
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-1',
+        sessionId: 'ses-1',
+        content: 'duplicate',
+      });
+
+      expect(storage.getMessageIds()).toEqual(['msg-1']);
+      expect(storage.getMessageInfo('msg-1')).toEqual(authoritativeMsg);
+      const parts = storage.getParts('msg-1');
+      expect(parts).toHaveLength(1);
+      expect(parts[0]?.id).toBe('part-real');
+      expect((parts[0] satisfies Part as TextPart).text).toBe('authoritative text');
+    });
+
+    it('authoritative message.updated arriving after synthesizer overwrites synthetic info', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-1',
+        sessionId: 'ses-1',
+        content: 'placeholder',
+      });
+
+      const authoritativeMsg = makeUserMsg('msg-1');
+      processor.process({ type: 'message.updated', info: authoritativeMsg });
+
+      expect(storage.getMessageInfo('msg-1')).toEqual(authoritativeMsg);
+    });
+
+    it('does nothing when content is undefined and storage has no existing message', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-queued',
+        sessionId: 'ses-1',
+        content: undefined,
+      });
+
+      expect(storage.getMessageIds()).toEqual([]);
+    });
+
+    it('does nothing when content is an empty string', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-queued',
+        sessionId: 'ses-1',
+        content: '',
+      });
+
+      expect(storage.getMessageIds()).toEqual([]);
     });
   });
 

@@ -3,7 +3,12 @@ import { ExecutionError } from './errors.js';
 import { logger } from '../logger.js';
 import type { Images } from '../router/schemas.js';
 import type { Env, ExecutionSession } from '../types.js';
-import { deriveAttachmentService, downloadImagesToSandbox } from '../utils/image-download.js';
+import {
+  buildPresignedImageAttachments,
+  deriveAttachmentService,
+  downloadImagesToSandbox,
+} from '../utils/image-download.js';
+import type { WrapperBootstrapAttachment } from '../shared/wrapper-bootstrap.js';
 
 export type TextPromptPart = {
   type: 'text';
@@ -27,6 +32,13 @@ export type DownloadImagePromptPartsOptions = {
   createdOnPlatform?: string;
 };
 
+type R2AttachmentDownloadEnv = {
+  R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID?: string;
+  R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY?: string;
+  R2_ENDPOINT?: string;
+  R2_ATTACHMENTS_BUCKET?: string;
+};
+
 const MIME_TYPES: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -38,7 +50,9 @@ const MIME_TYPES: Record<string, string> = {
   '.pdf': 'application/pdf',
 };
 
-export function assertR2AttachmentDownloadConfigured(env: Env): asserts env is Env & {
+export function assertR2AttachmentDownloadConfigured<T extends R2AttachmentDownloadEnv>(
+  env: T
+): asserts env is T & {
   R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID: string;
   R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY: string;
   R2_ENDPOINT: string;
@@ -107,6 +121,59 @@ export async function downloadImagePromptParts({
   return buildImageFileParts(images, localPaths);
 }
 
+export async function buildSignedImagePromptAttachments({
+  env,
+  userId,
+  sessionId,
+  images,
+  createdOnPlatform,
+}: {
+  env: R2AttachmentDownloadEnv;
+  userId: string;
+  sessionId: string;
+  images?: Images;
+  createdOnPlatform?: string;
+}): Promise<WrapperBootstrapAttachment[]> {
+  if (!images) return [];
+
+  if (
+    !env.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID ||
+    !env.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY ||
+    !env.R2_ENDPOINT ||
+    !env.R2_ATTACHMENTS_BUCKET
+  ) {
+    logger.warn('Image attachments requested but R2 download config is incomplete', {
+      hasAccessKeyId: Boolean(env.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID),
+      hasSecretAccessKey: Boolean(env.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY),
+      hasEndpoint: Boolean(env.R2_ENDPOINT),
+      hasBucket: Boolean(env.R2_ATTACHMENTS_BUCKET),
+    });
+  }
+
+  assertR2AttachmentDownloadConfigured(env);
+
+  const r2Client = createR2Client({
+    accessKeyId: env.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID,
+    secretAccessKey: env.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY,
+    endpoint: env.R2_ENDPOINT,
+  });
+
+  const attachmentService = deriveAttachmentService(createdOnPlatform);
+  const attachments = await buildPresignedImageAttachments(
+    r2Client,
+    env.R2_ATTACHMENTS_BUCKET,
+    sessionId,
+    userId,
+    attachmentService,
+    images
+  );
+
+  return attachments.map(attachment => ({
+    ...attachment,
+    mime: inferMimeType(attachment.filename),
+  }));
+}
+
 export function buildImageFileParts(images: Images, localPaths: string[]): ImageFilePart[] {
   return localPaths.map<ImageFilePart>((localPath, index) => {
     const filename = images.files[index] ?? localPath.split('/').pop() ?? 'image';
@@ -118,13 +185,6 @@ export function buildImageFileParts(images: Images, localPaths: string[]): Image
       filename,
     };
   });
-}
-
-export function buildImagePromptParts(
-  prompt: string,
-  imageFileParts: ImageFilePart[]
-): ImagePromptPart[] {
-  return [{ type: 'text', text: prompt }, ...imageFileParts];
 }
 
 function inferMimeType(filename: string): string {

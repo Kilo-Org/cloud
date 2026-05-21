@@ -5,32 +5,19 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
-import { TRPCError } from '@trpc/server';
-import type {
-  CloudAgentSessionState,
-  OperationResult,
-  MCPServerConfig,
-  RuntimeSkill,
-  RuntimeAgent,
-  RuntimeKiloCommand,
-} from './types.js';
+import type { OperationResult } from './types.js';
 import {
-  MetadataSchema,
-  PreparationInputSchema,
-  type Images,
-  type InitialExecutionPayload,
-  type PreparationInput,
-  type SessionProfileBundle,
-} from './schemas.js';
-import { readProfileBundle } from '../session-profile.js';
-import type { EncryptedSecrets } from '../router/schemas.js';
+  parseSessionMetadata,
+  serializeSessionMetadata,
+  type SessionMetadata,
+} from './session-metadata.js';
+import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { logger } from '../logger.js';
-import { Limits, BUILTIN_AGENT_MODES } from '../schema.js';
+import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
-import { normalizeKilocodeModel } from './model-utils.js';
 import {
   createExecutionQueries,
   createEventQueries,
@@ -40,8 +27,14 @@ import {
   type LeaseQueries,
   type LeaseAcquireError,
 } from '../session/queries/index.js';
-import { createExecutionId } from '../types/ids.js';
-import type { ExecutionId, EventSourceId, EventId, SessionId, UserId } from '../types/ids.js';
+import {
+  isExecutionId,
+  type ExecutionId,
+  type EventSourceId,
+  type EventId,
+  type SessionId,
+  type UserId,
+} from '../types/ids.js';
 import type {
   ExecutionMetadata,
   AddExecutionParams,
@@ -51,48 +44,65 @@ import type {
 } from '../session/types.js';
 import type { ExecutionStatus } from '../core/execution.js';
 import type { Result } from '../lib/result.js';
-import type {
-  AddExecutionError,
-  UpdateStatusError,
-  SetActiveError,
-} from '../session/queries/executions.js';
-import { createStreamHandler, type StreamHandler } from '../websocket/stream.js';
+import type { AddExecutionError, UpdateStatusError } from '../session/queries/executions.js';
+import {
+  createStreamHandler,
+  type StreamHandler,
+  type QueuedMessageSnapshot,
+} from '../websocket/stream.js';
 import {
   createIngestHandler,
   type IngestHandler,
   type IngestDOContext,
 } from '../websocket/ingest.js';
 import type { StoredEvent } from '../websocket/types.js';
-import type {
-  WrapperCommand,
-  PreparingStep,
-  PreparingEventData,
-  CloudStatusData,
-} from '../shared/protocol.js';
+import type { WrapperCommand, CloudStatusData } from '../shared/protocol.js';
 import { commandsOrDefault, type SlashCommandInfo } from '../shared/slash-commands.js';
-import { STALE_THRESHOLD_MS, SANDBOX_SLEEP_AFTER_SECONDS } from '../core/lease.js';
-import { ExecutionOrchestrator, type OrchestratorDeps } from '../execution/orchestrator.js';
 import type {
-  ExecutionMode,
-  ExecutionPayload,
-  ExecutionPlan,
-  StartExecutionV2Request,
-  StartExecutionV2Result,
-  InitializeContext,
-  TokenResumeContext,
+  AgentSelection,
+  ExecutionDeliveryContext,
+  ExecutionTurnSubmission,
+  MessageDeliveryPlan,
+  QueueSessionMessageRequest,
+  QueueSessionMessageResult,
+  SessionFinalization,
 } from '../execution/types.js';
-import { isExecutionError } from '../execution/errors.js';
+import { renderExecutionTurnContent } from '../execution/types.js';
 import type { Env as WorkerEnv, SandboxId } from '../types.js';
-import { generateSandboxId, getSandboxNamespace } from '../sandbox-id.js';
+import { generateSandboxId } from '../sandbox-id.js';
 
 import { validateStreamTicket } from '../auth.js';
-import { getSandbox } from '@cloudflare/sandbox';
-import { stopWrapper } from '../kilo/wrapper-manager.js';
-import { SessionService } from '../session-service.js';
-import { executePreparationSteps } from './async-preparation.js';
-import { resolveManagedGitLabToken } from '../services/git-token-service-client.js';
 import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
+import { countPendingSessionMessages } from '../session/pending-messages.js';
+import {
+  createSessionMessageQueue,
+  PENDING_FLUSH_DEBOUNCE_MS,
+  type SessionMessageQueue,
+} from '../session/session-message-queue.js';
+import {
+  clearWrapperRuntimeIdentity,
+  getWrapperRuntimeState,
+} from '../session/wrapper-runtime-state.js';
+import {
+  getSessionMessageState,
+  listNonTerminalAcceptedMessages,
+  markMessageAccepted,
+  putSessionMessageState,
+  type TerminalizeParams,
+} from '../session/session-message-state.js';
+import {
+  createMessageSettlementOutbox,
+  type MessageSettlementOutbox,
+} from '../session/message-settlement-outbox.js';
+import {
+  createAgentRuntime,
+  type AgentRuntime,
+  type AgentRuntimeAcceptedDelivery,
+  type AgentRuntimeOrchestrator,
+  type AgentRuntimeStopReason,
+} from '../session/agent-runtime.js';
+import { createWrapperSupervisor, type WrapperSupervisor } from '../session/wrapper-supervisor.js';
 
 // ---------------------------------------------------------------------------
 // Alarm Constants
@@ -100,11 +110,8 @@ import type { WrapperPty } from '../kilo/wrapper-client.js';
 
 /** Reaper alarm interval: 5 minutes */
 const REAPER_INTERVAL_MS_DEFAULT = 5 * 60 * 1000;
-/** Shorter reaper interval while execution is active: 2 minutes */
-const REAPER_ACTIVE_INTERVAL_MS = 2 * 60 * 1000;
-/** Longer reaper interval when idle (no active execution): 1 hour */
+/** Longer reaper interval when idle: 1 hour */
 const REAPER_IDLE_INTERVAL_MS = 60 * 60 * 1000;
-const PENDING_START_TIMEOUT_MS_DEFAULT = 3 * 60 * 1000;
 
 /** Event retention period: 90 days (aligns with session TTL) */
 const EVENT_RETENTION_MS = Limits.SESSION_TTL_MS;
@@ -118,27 +125,6 @@ const KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT = 15 * 60 * 1000;
 /** Default per-execution wall-clock deadline: 60 minutes */
 const DEFAULT_MAX_RUNTIME_MS = 3_600_000;
 
-/** Hung execution timeout: no non-heartbeat events for 5 minutes */
-const HUNG_EXECUTION_TIMEOUT_MS = 5 * 60 * 1000;
-
-/** Grace period before failing execution after wrapper disconnect (ms).
- *  Covers the first few reconnection attempts (exponential backoff: 1s, 2s, 4s …). */
-const DISCONNECT_GRACE_MS = 10_000;
-
-/** DO storage key for persisting disconnect grace state across hibernation. */
-const DISCONNECT_GRACE_KEY = 'disconnect_grace';
-
-/** DO storage key for pending async preparation input. */
-const PENDING_PREPARATION_KEY = 'pending_preparation';
-
-/** Stored in DO storage under DISCONNECT_GRACE_KEY while a grace period is active. */
-type DisconnectGraceState = {
-  executionId: ExecutionId;
-  disconnectedAt: number;
-  wsCloseCode: number;
-  wsCloseReason: string;
-};
-
 type TerminalSizeInput = {
   cols: number;
   rows: number;
@@ -146,11 +132,13 @@ type TerminalSizeInput = {
 
 type TerminalCreateInput = Partial<TerminalSizeInput>;
 
-function validateModeAgainstRuntimeAgents(metadata: CloudAgentSessionState): string | null {
-  const mode = metadata.mode;
+function validateModeAgainstRuntimeAgents(
+  metadata: SessionMetadata,
+  mode = metadata.agent?.mode
+): string | null {
   if (!mode || BUILTIN_AGENT_MODES.has(mode)) return null;
 
-  const knownSlugs = new Set((readProfileBundle(metadata).runtimeAgents ?? []).map(m => m.slug));
+  const knownSlugs = new Set((readProfileBundle(metadata).runtimeAgents ?? []).map(a => a.slug));
   if (knownSlugs.has(mode)) return null;
 
   return `Mode "${mode}" is not a built-in and does not match any runtimeAgents on this session`;
@@ -173,6 +161,42 @@ function extractAssistantTextFromParts(parts: AssistantMessagePart[]): string {
   return pieces.join('').trim();
 }
 
+type GroupedRegisterSessionInput = {
+  identity: SessionMetadata['identity'];
+  auth: SessionMetadata['auth'];
+  message: {
+    initialMessageId?: string;
+    turn: ExecutionTurnSubmission;
+  };
+  agent: AgentSelection & {
+    appendSystemPrompt?: string;
+  };
+  repository?:
+    | {
+        type: 'github';
+        repo: string;
+        branch?: string;
+      }
+    | {
+        type: 'gitlab';
+        url: string;
+        branch?: string;
+      }
+    | {
+        type: 'git';
+        url: string;
+        token?: string;
+        branch?: string;
+      };
+  profile?: SessionProfileBundle;
+  finalization?: SessionFinalization;
+  callback?: SessionMetadata['callback'];
+  workspace?: Pick<
+    NonNullable<SessionMetadata['workspace']>,
+    'sandboxId' | 'shallow' | 'devcontainerRequested'
+  >;
+};
+
 export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private executionQueries: ExecutionQueries;
   private eventQueries: EventQueries;
@@ -182,7 +206,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private streamHandlerSessionId?: SessionId;
   private ingestHandlerSessionId?: SessionId;
   private sessionId?: SessionId;
-  private orchestrator?: ExecutionOrchestrator;
+  private orchestrator?: AgentRuntimeOrchestrator;
+  private agentRuntime?: AgentRuntime;
+  private messageSettlementOutbox?: MessageSettlementOutbox;
+  private sessionMessageQueue?: SessionMessageQueue;
+  private wrapperSupervisor?: WrapperSupervisor;
   private isTerminalStatus(
     status: ExecutionStatus
   ): status is 'completed' | 'failed' | 'interrupted' {
@@ -190,56 +218,76 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   private async enqueueCallbackNotification(
-    executionId: ExecutionId,
+    execution: ExecutionMetadata,
     status: 'completed' | 'failed' | 'interrupted',
     error?: string,
     gateResult?: 'pass' | 'fail'
   ): Promise<void> {
+    const { messageId } = execution;
     const metadata = await this.getMetadata();
     const callbackQueue = this.env.CALLBACK_QUEUE;
 
-    if (!metadata?.callbackTarget || !callbackQueue) {
+    const callbackTarget = metadata?.callback?.target;
+    if (!metadata || !callbackTarget || !callbackQueue) {
       return;
     }
 
-    logger.info('Enqueued callback job', {
-      cloudAgentSessionId: metadata.sessionId,
-      kiloSessionId: metadata.kiloSessionId,
-      executionId,
-      callbackUrl: metadata.callbackTarget.url,
+    logger.info('Callback enqueue requested', {
+      cloudAgentSessionId: metadata.identity.sessionId,
+      kiloSessionId: metadata.auth.kiloSessionId,
+      messageId,
+      callbackTarget: this.redactCallbackTargetUrl(callbackTarget.url),
     });
 
-    const resolvedSessionId = await this.resolveSessionId(metadata.sessionId as SessionId);
-    const sessionId = resolvedSessionId ?? metadata.sessionId ?? '';
+    const resolvedSessionId = await this.resolveSessionId(metadata.identity.sessionId as SessionId);
+    const sessionId = resolvedSessionId ?? metadata.identity.sessionId ?? '';
 
     const lastAssistantMessageText =
       status === 'completed' ? await this.getLatestAssistantMessageText() : undefined;
 
+    const payload: CallbackJob['payload'] = {
+      sessionId,
+      cloudAgentSessionId: sessionId,
+      status,
+      errorMessage: error,
+      lastSeenBranch: metadata.repository?.upstreamBranch,
+      kiloSessionId: metadata.auth.kiloSessionId,
+      gateResult,
+      lastAssistantMessageText,
+    };
+
+    if (messageId) {
+      payload.messageId = messageId;
+      payload.idempotencyKey = messageId;
+    }
+
     const callbackJob: CallbackJob = {
-      target: metadata.callbackTarget,
-      payload: {
-        sessionId,
-        cloudAgentSessionId: sessionId,
-        executionId,
-        status,
-        errorMessage: error,
-        lastSeenBranch: metadata.upstreamBranch,
-        kiloSessionId: metadata.kiloSessionId,
-        gateResult,
-        lastAssistantMessageText,
-      },
+      target: callbackTarget,
+      payload,
     };
 
     // Fire-and-forget enqueue - don't block execution completion
-    callbackQueue.send(callbackJob).catch(err => {
-      logger
-        .withFields({
-          sessionId,
-          executionId,
-          error: err instanceof Error ? err.message : String(err),
-        })
-        .error('Failed to enqueue callback job');
-    });
+    callbackQueue
+      .send(callbackJob)
+      .then(() => {
+        logger
+          .withFields({
+            sessionId,
+            messageId,
+            status,
+            callbackTarget: this.redactCallbackTargetUrl(callbackTarget.url),
+          })
+          .info('Callback job enqueued');
+      })
+      .catch(err => {
+        logger
+          .withFields({
+            sessionId,
+            messageId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+          .error('Failed to enqueue callback job');
+      });
   }
 
   constructor(ctx: DurableObjectState, env: WorkerEnv) {
@@ -283,12 +331,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return this.sessionId;
     }
 
-    const metadata = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
-    if (metadata?.sessionId) {
-      if (expected && metadata.sessionId !== expected) {
-        throw new Error(`SessionId mismatch: ${expected} != ${metadata.sessionId}`);
+    const rawMetadata = await this.ctx.storage.get('metadata');
+    const metadata = rawMetadata ? parseSessionMetadata(rawMetadata) : null;
+    if (metadata?.identity.sessionId) {
+      if (expected && metadata.identity.sessionId !== expected) {
+        throw new Error(`SessionId mismatch: ${expected} != ${metadata.identity.sessionId}`);
       }
-      this.sessionId = metadata.sessionId as SessionId;
+      this.sessionId = metadata.identity.sessionId as SessionId;
       return this.sessionId;
     }
 
@@ -308,11 +357,164 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return sessionId;
   }
 
+  private getMessageSettlementOutbox(): MessageSettlementOutbox {
+    if (!this.messageSettlementOutbox) {
+      this.messageSettlementOutbox = createMessageSettlementOutbox({
+        storage: this.ctx.storage,
+        getMetadata: () => this.getMetadata(),
+        requireSessionId: () => this.requireSessionId(),
+        resolveCallbackSessionId: async metadata => {
+          const resolvedSessionId = await this.resolveSessionId(
+            metadata?.identity.sessionId as SessionId
+          );
+          return resolvedSessionId ?? metadata?.identity.sessionId ?? '';
+        },
+        getCallbackQueue: () => this.env.CALLBACK_QUEUE,
+        getAssistantMessageForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
+          this.eventQueries.getAssistantMessageForUserMessage(
+            sessionId,
+            kiloSessionId,
+            parentMessageId
+          ),
+        insertAndBroadcastMessageEvent: event => {
+          this.insertAndBroadcastEvent({
+            executionId: '' as EventSourceId,
+            ...event,
+          });
+        },
+        hasObservedWrapperIdle: async () => {
+          const state = await getWrapperRuntimeState(this.ctx.storage);
+          return state.lastWrapperIdleAt !== undefined;
+        },
+        requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
+        getSessionIdForLogs: () => this.sessionId,
+      });
+    }
+
+    return this.messageSettlementOutbox;
+  }
+
+  private getAgentRuntime(): AgentRuntime {
+    if (!this.agentRuntime) {
+      this.agentRuntime = createAgentRuntime({
+        storage: this.ctx.storage,
+        env: this.env,
+        getMetadata: () => this.getMetadata(),
+        getSessionIdForLogs: () => this.sessionId,
+        resolveLegacyIngestTagId: () => this.getRawWrapperRuntimeExecutionId(),
+        sendToWrapper: (ingestTagId, command) => this.sendToWrapper(ingestTagId, command),
+        getOrchestratorOverride: () => this.orchestrator,
+      });
+    }
+
+    return this.agentRuntime;
+  }
+
+  private getWrapperSupervisor(): WrapperSupervisor {
+    if (!this.wrapperSupervisor) {
+      this.wrapperSupervisor = createWrapperSupervisor({
+        storage: this.ctx.storage,
+        agentRuntime: {
+          sendPing: ingestTagId => this.getAgentRuntime().sendPing(ingestTagId),
+          stopWrapperProcess: reason => this.stopCurrentWrapperProcess(reason),
+        },
+        messageSettlementOutbox: this.getMessageSettlementOutbox(),
+        sessionMessageQueue: this.getSessionMessageQueue(),
+        getMetadata: () => this.getMetadata(),
+        getAssistantMessageForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
+          this.eventQueries.getAssistantMessageForUserMessage(
+            sessionId,
+            kiloSessionId,
+            parentMessageId
+          ),
+        getCurrentRuntimeExecutionId: () => this.getRawWrapperRuntimeExecutionId(),
+        getExecution: executionId => this.executionQueries.get(executionId),
+        hasActiveIngestConnection: async params =>
+          (await this.getIngestHandler()).hasActiveConnection(params),
+        failExecution: params => this.failExecution(params),
+        clearInterruptRequest: () => this.executionQueries.clearInterrupt(),
+        getSessionIdForLogs: () => this.sessionId,
+      });
+    }
+
+    return this.wrapperSupervisor;
+  }
+
+  private async getPendingMessageDeliveryContext(): Promise<ExecutionDeliveryContext | null> {
+    const metadata = await this.getMetadata();
+    if (!metadata) return null;
+
+    const sandboxId =
+      metadata.workspace?.sandboxId ??
+      (await generateSandboxId(
+        this.env.PER_SESSION_SANDBOX_ORG_IDS,
+        metadata.identity.orgId,
+        metadata.identity.userId,
+        metadata.identity.sessionId,
+        metadata.identity.botId
+      ));
+
+    return {
+      sessionId: metadata.identity.sessionId as SessionId,
+      userId: metadata.identity.userId as UserId,
+      orgId: metadata.identity.orgId,
+      sandboxId,
+      kiloSessionId: metadata.auth.kiloSessionId,
+      metadata,
+    };
+  }
+
+  private getSessionMessageQueue(): SessionMessageQueue {
+    if (!this.sessionMessageQueue) {
+      this.sessionMessageQueue = createSessionMessageQueue({
+        storage: this.ctx.storage,
+        getMetadata: () => this.getMetadata(),
+        requireSessionId: () => this.requireSessionId(),
+        validateModeAgainstRuntimeAgents,
+        getDeliveryContext: () => this.getPendingMessageDeliveryContext(),
+        hasCurrentRuntimeExecution: async () => (await this.getCurrentRuntimeExecution()) !== null,
+        hasActiveAcceptedWrapperMessages: async () => {
+          const state = await getWrapperRuntimeState(this.ctx.storage);
+          if (!state.wrapperConnectionId) return false;
+          return (
+            (await listNonTerminalAcceptedMessages(this.ctx.storage, state.wrapperRunId)).length > 0
+          );
+        },
+        isLegacyAcceptedMessageRunning: async messageId => {
+          const state = await getWrapperRuntimeState(this.ctx.storage);
+          if (state.acceptedMessageId !== messageId || !state.acceptedExecutionId) {
+            return false;
+          }
+          const acceptedExecution = await this.executionQueries.get(
+            state.acceptedExecutionId as ExecutionId
+          );
+          return Boolean(
+            acceptedExecution && this.isCurrentRuntimeStatus(acceptedExecution.status)
+          );
+        },
+        deliver: plan => this.executeDirectly(plan),
+        insertAndBroadcastMessageEvent: event => {
+          this.insertAndBroadcastEvent({
+            executionId: '' as EventSourceId,
+            ...event,
+          });
+        },
+        terminalizeSessionMessageOnce: (messageId, params, options) =>
+          this.terminalizeSessionMessageOnce(messageId, params, options),
+        requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
+        getSessionIdForLogs: () => this.sessionId,
+      });
+    }
+
+    return this.sessionMessageQueue;
+  }
+
   private async getStreamHandler(expected?: SessionId): Promise<StreamHandler> {
     const sessionId = await this.requireSessionId(expected);
     if (!this.streamHandler || this.streamHandlerSessionId !== sessionId) {
       this.streamHandler = createStreamHandler(this.ctx, this.eventQueries, sessionId, {
         deriveCloudStatus: () => this.deriveCloudStatus(),
+        deriveQueuedMessages: () => this.deriveQueuedMessages(),
         getAvailableCommands: () => this.getAvailableCommands(),
       });
       this.streamHandlerSessionId = sessionId;
@@ -327,49 +529,30 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       const doContext: IngestDOContext = {
         updateKiloSessionId: (id: string) => this.updateKiloSessionId(id),
         updateUpstreamBranch: (branch: string) => this.updateUpstreamBranch(branch),
-        clearActiveExecution: () => this.clearActiveExecution(),
-        getActiveExecutionId: () => this.executionQueries.getActiveExecutionId(),
-        cancelDisconnectGrace: () => this.cancelDisconnectGrace(),
+        // Rollout-only executionId ingest reconnect adapters. Keep adjacent so
+        // the pre-fenced compatibility path can be removed as one deletion.
+        getLegacyIngestExecution: executionId => {
+          if (!isExecutionId(executionId)) return Promise.resolve(null);
+          return this.getExecution(executionId);
+        },
+        transitionLegacyExecutionToRunning: async executionId => {
+          await this.updateExecutionStatus({ executionId, status: 'running' });
+        },
+        handleLegacyExecutionTerminal: async (executionId, terminal) => {
+          await this.onExecutionComplete(
+            executionId,
+            terminal.status,
+            terminal.error,
+            terminal.gateResult
+          );
+        },
         setAvailableCommands: (commands: SlashCommandInfo[]) => this.setAvailableCommands(commands),
-        getExecution: async (executionId: string) => {
-          const execution = await this.executionQueries.get(executionId as ExecutionId);
-          if (!execution) return null;
-          return {
-            executionId: execution.executionId,
-            status: execution.status,
-            ingestToken: execution.ingestToken,
-          };
-        },
-        transitionToRunning: async (executionId: string) => {
-          const result = await this.executionQueries.updateStatus({
-            executionId: executionId as ExecutionId,
-            status: 'running',
-          });
-          return result.ok;
-        },
-        updateHeartbeat: async (executionId: string, timestamp: number) => {
-          await this.executionQueries.updateHeartbeat(executionId as ExecutionId, timestamp);
-          // Reset the sandbox container's sleep timer alongside the heartbeat.
-          // The wrapper heartbeat travels over an outbound WebSocket that
-          // bypasses containerFetch(), so the idle timer never refreshes otherwise.
+        wrapperSupervisor: this.getWrapperSupervisor(),
+        keepContainerAlive: () => {
           void this.keepContainerAlive();
         },
-        updateLastEventAt: async (executionId: string, timestamp: number) => {
-          await this.executionQueries.updateLastEventAt(executionId as ExecutionId, timestamp);
-        },
-        updateExecutionStatus: async (
-          executionId: string,
-          status: 'completed' | 'failed' | 'interrupted',
-          error?: string,
-          gateResult?: 'pass' | 'fail'
-        ) => {
-          await this.updateExecutionStatus({
-            executionId: executionId as ExecutionId,
-            status,
-            error,
-            completedAt: Date.now(),
-            gateResult,
-          });
+        terminalizeSessionMessageOnce: async (messageId, params) => {
+          await this.terminalizeSessionMessageOnce(messageId, params as TerminalizeParams);
         },
       };
 
@@ -469,7 +652,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     // Check if this is an ingest connection
     if (tags.some(tag => tag.startsWith('ingest:'))) {
       const ingestHandler = await this.getIngestHandler();
-      void ingestHandler.handleIngestMessage(ws, message);
+      await ingestHandler.handleIngestMessage(ws, message);
       return;
     }
 
@@ -492,18 +675,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     // Clean up ingest connection tracking
     if (tags.some(tag => tag.startsWith('ingest:'))) {
       const ingestHandler = await this.getIngestHandler();
-      const disconnectedExecutionId = ingestHandler.handleIngestClose(ws);
+      const disconnected = await ingestHandler.handleIngestClose(ws);
 
-      // If the wrapper disconnected while its execution was still active, start a
-      // grace period before failing. This gives the wrapper time to reconnect
-      // (exponential backoff: 1s, 2s, 4s …).
-      if (disconnectedExecutionId) {
-        const activeExecutionId = await this.executionQueries.getActiveExecutionId();
-        if (activeExecutionId === disconnectedExecutionId) {
-          const execution = await this.executionQueries.get(activeExecutionId);
-          if (execution && (execution.status === 'running' || execution.status === 'pending')) {
-            await this.startDisconnectGrace(activeExecutionId, code, reason);
-          }
+      if (disconnected) {
+        const wrapperSupervisor = this.getWrapperSupervisor();
+        await wrapperSupervisor.onDisconnected({
+          disconnected,
+          wsCloseCode: code,
+          wsCloseReason: reason,
+        });
+        for (const deadline of await wrapperSupervisor.nextMaintenanceDeadlines()) {
+          await this.scheduleAlarmAtOrBefore(deadline);
         }
       }
     }
@@ -604,21 +786,38 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Used to populate the `connected` event on WebSocket upgrade.
    */
   private async deriveCloudStatus(): Promise<CloudStatusData['cloudStatus'] | null> {
-    const activeExecId = await this.executionQueries.getActiveExecutionId();
-    if (!activeExecId) {
-      const metadata = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
-      return metadata?.preparedAt ? { type: 'ready' } : null;
+    const runtimeExecutionId = await this.getCurrentWrapperRuntimeExecutionId();
+    if (!runtimeExecutionId) {
+      const metadata = await this.getMetadata();
+      if (metadata?.lifecycle.preparedAt) return { type: 'ready' };
+
+      const pendingCount = await countPendingSessionMessages(this.ctx.storage);
+      return pendingCount > 0 ? { type: 'preparing' } : null;
     }
 
-    const exec = await this.executionQueries.get(activeExecId);
+    const exec = await this.executionQueries.get(runtimeExecutionId);
     if (!exec) return null;
 
     if (exec.status === 'pending') {
       return { type: 'preparing' };
     }
 
-    // Running executions mean the agent has control — infrastructure is ready
+    // Running executions mean the agent has control - infrastructure is ready
     return { type: 'ready' };
+  }
+
+  /**
+   * List user messages that are currently queued and awaiting delivery, so
+   * the /stream handler can resurface them on WebSocket connect. This is
+   * volatile catch-up state — nothing here is persisted into the event log.
+   *
+   * Pending messages (including the initial message) live under
+   * `pending_message:*` with their real executionId. These are the messages a
+   * reconnecting client would otherwise miss entirely because the client opts
+   * out of event-log replay.
+   */
+  private async deriveQueuedMessages(): Promise<QueuedMessageSnapshot[]> {
+    return this.getSessionMessageQueue().snapshotForStreamConnect();
   }
 
   /**
@@ -637,16 +836,16 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Get session metadata.
    * Returns null if no metadata has been written yet (e.g., before first CLI execution).
    */
-  async getMetadata(): Promise<CloudAgentSessionState | null> {
-    const metadata = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
-    return metadata || null;
+  async getMetadata(): Promise<SessionMetadata | null> {
+    const metadata = await this.ctx.storage.get('metadata');
+    return metadata ? parseSessionMetadata(metadata) : null;
   }
 
   async getLatestAssistantMessage(): Promise<LatestAssistantMessage | null> {
     const sessionId = await this.requireSessionId();
     const metadata = await this.getMetadata();
-    if (!metadata?.kiloSessionId) return null;
-    return this.eventQueries.getLatestAssistantMessage(sessionId, metadata.kiloSessionId);
+    if (!metadata?.auth.kiloSessionId) return null;
+    return this.eventQueries.getLatestAssistantMessage(sessionId, metadata.auth.kiloSessionId);
   }
 
   private async getLatestAssistantMessageText(): Promise<string | undefined> {
@@ -668,12 +867,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Throws an error if validation fails.
    */
   async updateMetadata(data: unknown): Promise<void> {
-    const result = MetadataSchema.safeParse(data);
-    if (!result.success) {
-      throw new Error(`Invalid metadata structure: ${JSON.stringify(result.error.format())}`);
-    }
-
-    const newMetadata: CloudAgentSessionState = result.data;
+    const newMetadata = serializeSessionMetadata(parseSessionMetadata(data));
     await this.ctx.storage.put('metadata', newMetadata);
 
     // Track activity for session TTL
@@ -716,46 +910,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     const updated = {
       ...metadata,
-      kiloSessionId,
-      version: Date.now(), // Bump version for cache invalidation
-    };
-
-    await this.updateMetadata(updated);
-  }
-
-  /**
-   * Update the GitHub Personal Access Token for this session.
-   * This allows refreshing tokens without re-initializing the session.
-   */
-  async updateGithubToken(githubToken: string): Promise<void> {
-    const metadata = await this.getMetadata();
-    if (!metadata) {
-      throw new Error('Cannot update githubToken: session metadata not found');
-    }
-
-    const updated = {
-      ...metadata,
-      githubToken,
-      version: Date.now(), // Bump version for cache invalidation
-    };
-
-    await this.updateMetadata(updated);
-  }
-
-  /**
-   * Update the Git token for this session (for generic git repos).
-   * This allows refreshing tokens without re-initializing the session.
-   */
-  async updateGitToken(gitToken: string): Promise<void> {
-    const metadata = await this.getMetadata();
-    if (!metadata) {
-      throw new Error('Cannot update gitToken: session metadata not found');
-    }
-
-    const updated = {
-      ...metadata,
-      gitToken,
-      version: Date.now(), // Bump version for cache invalidation
+      auth: {
+        ...metadata.auth,
+        kiloSessionId,
+      },
+      lifecycle: {
+        ...metadata.lifecycle,
+        version: Date.now(),
+      },
     };
 
     await this.updateMetadata(updated);
@@ -773,8 +935,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     const updated = {
       ...metadata,
-      callbackTarget,
-      version: Date.now(), // Bump version for cache invalidation
+      callback: { target: callbackTarget },
+      lifecycle: {
+        ...metadata.lifecycle,
+        version: Date.now(),
+      },
     };
 
     await this.updateMetadata(updated);
@@ -805,11 +970,20 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (!metadata) {
       throw new Error('Cannot update upstreamBranch: session metadata not found');
     }
+    if (!metadata.repository) {
+      throw new Error('Cannot update upstreamBranch: session repository metadata not found');
+    }
 
     const updated = {
       ...metadata,
-      upstreamBranch,
-      version: Date.now(), // Bump version for cache invalidation
+      repository: {
+        ...metadata.repository,
+        upstreamBranch,
+      },
+      lifecycle: {
+        ...metadata.lifecycle,
+        version: Date.now(),
+      },
     };
 
     await this.updateMetadata(updated);
@@ -828,8 +1002,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     const updated = {
       ...metadata,
-      kiloServerLastActivity: Date.now(),
-      version: Date.now(),
+      lifecycle: {
+        ...metadata.lifecycle,
+        kiloServerLastActivity: Date.now(),
+        version: Date.now(),
+      },
     };
 
     await this.updateMetadata(updated);
@@ -843,11 +1020,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Send a command to the wrapper via its ingest WebSocket connection.
    * Used for bidirectional communication (kill, ping).
    *
-   * @param executionId - The execution whose wrapper should receive the command
+   * @param ingestTagId - Wrapper run or legacy execution tag on the ingest socket.
    * @param command - The command to send (kill, ping)
    */
-  sendToWrapper(executionId: ExecutionId, command: WrapperCommand): void {
-    const wrappers = this.ctx.getWebSockets(`ingest:${executionId}`);
+  sendToWrapper(ingestTagId: string, command: WrapperCommand): void {
+    const wrappers = this.ctx.getWebSockets(`ingest:${ingestTagId}`);
     for (const ws of wrappers) {
       ws.send(JSON.stringify(command));
     }
@@ -860,29 +1037,52 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Best-effort: silently does nothing if no wrapper is connected.
    */
   private requestKiloSnapshot(): void {
-    void this.executionQueries.getActiveExecutionId().then(activeExecId => {
-      if (!activeExecId) return;
-      this.sendToWrapper(activeExecId, { type: 'request_snapshot' });
-    });
+    void this.getAgentRuntime().requestSnapshot();
   }
 
   /**
-   * Interrupt the currently active execution by sending a kill command to the wrapper.
+   * Interrupt the current wrapper runtime execution by sending a kill command to the wrapper.
    * Returns success/failure status.
    *
    * @returns Result indicating if the interrupt was initiated
    */
-  async interruptExecution(): Promise<{ success: boolean; message?: string }> {
-    const activeExecutionId = await this.executionQueries.getActiveExecutionId();
+  async interruptExecution(): Promise<{
+    success: boolean;
+    executionId?: ExecutionId;
+    message?: string;
+  }> {
+    const runtimeExecutionId = await this.getCurrentWrapperRuntimeExecutionId();
+    const targetExecutionId = runtimeExecutionId ?? undefined;
+    let acceptedMessageCount = 0;
+    let wrapperCommandSent = false;
+    const clearedMessages = await this.getSessionMessageQueue().interruptPendingQueuedMessages(
+      async () => {
+        const state = await getWrapperRuntimeState(this.ctx.storage);
+        const acceptedMessages = await listNonTerminalAcceptedMessages(
+          this.ctx.storage,
+          state.wrapperRunId
+        );
+        acceptedMessageCount = acceptedMessages.length;
+        for (const msg of acceptedMessages) {
+          await this.terminalizeSessionMessageOnce(msg.messageId, {
+            kind: 'interrupted',
+            error: 'Message interrupted by user',
+            completionSource: 'interrupt',
+          });
+        }
 
-    if (!activeExecutionId) {
-      return { success: false, message: 'No active execution' };
+        const interrupt = await this.getAgentRuntime().interruptWrapper();
+        wrapperCommandSent = interrupt.commandSent;
+      }
+    );
+
+    await this.finalizeIdleBatchCallbackIfReady({ allowWithoutObservedIdle: true });
+
+    if (!wrapperCommandSent && clearedMessages.length === 0 && acceptedMessageCount === 0) {
+      return { success: false, message: 'No current runtime execution or pending queued messages' };
     }
 
-    // Send kill command directly to wrapper
-    this.sendToWrapper(activeExecutionId, { type: 'kill', signal: 'SIGTERM' });
-
-    return { success: true };
+    return { success: true, executionId: targetExecutionId };
   }
 
   private async getTerminalClient(): Promise<OperationResult<{ client: TerminalWrapperClient }>> {
@@ -988,471 +1188,149 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   /**
-   * Atomically prepare a session - sets preparedAt timestamp.
-   * Fails if session was already prepared.
-   * Validates input against MetadataSchema before storing.
+   * Register full session metadata without setting preparedAt.
+   * Workspace preparation happens lazily when the pending-message flusher
+   * delivers the first message.
    */
-  async prepare(input: {
-    sessionId: string;
-    userId: string;
-    orgId?: string;
-    botId?: string;
-    kiloSessionId: string;
-    prompt: string;
-    mode: string;
-    model: string;
-    variant?: string;
-    kilocodeToken?: string;
-    githubRepo?: string;
-    githubToken?: string;
-    githubInstallationId?: string;
-    githubAppType?: 'standard' | 'lite';
-    gitUrl?: string;
-    gitToken?: string;
-    platform?: 'github' | 'gitlab';
-    gitlabTokenManaged?: boolean;
-    envVars?: Record<string, string>;
-    encryptedSecrets?: EncryptedSecrets;
-    setupCommands?: string[];
-    mcpServers?: Record<string, MCPServerConfig>;
-    runtimeSkills?: readonly RuntimeSkill[];
-    runtimeAgents?: readonly RuntimeAgent[];
-    kiloCommands?: readonly RuntimeKiloCommand[];
-    autoCommit?: boolean;
-    condenseOnComplete?: boolean;
-    appendSystemPrompt?: string;
-    upstreamBranch?: string;
-    callbackTarget?: CallbackTarget;
-    images?: Images;
-    createdOnPlatform?: string;
-    gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
-    initialMessageId?: string;
-    initialPayload?: InitialExecutionPayload;
-    // Workspace metadata (set during prepareSession)
-    workspacePath?: string;
-    sessionHome?: string;
-    branchName?: string;
-    sandboxId?: SandboxId;
-    devcontainer?: CloudAgentSessionState['devcontainer'];
-  }): Promise<OperationResult> {
-    await this.requireSessionId(input.sessionId as SessionId);
-    const existing = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
-    if (existing?.preparedAt) {
-      return { success: false, error: 'Session already prepared' };
-    }
-
-    const now = Date.now();
-
-    const {
-      envVars,
-      encryptedSecrets,
-      setupCommands,
-      mcpServers,
-      runtimeSkills,
-      runtimeAgents,
-      kiloCommands,
-      ...rest
-    } = input;
-
-    const metadata: CloudAgentSessionState = {
-      ...rest,
-      profile: {
-        envVars,
-        encryptedSecrets,
-        setupCommands,
-        mcpServers,
-        runtimeSkills: runtimeSkills ? [...runtimeSkills] : undefined,
-        runtimeAgents: runtimeAgents ? [...runtimeAgents] : undefined,
-        kiloCommands: kiloCommands ? [...kiloCommands] : undefined,
-      },
-      version: now,
-      timestamp: now,
-      preparedAt: now,
-    };
-
-    // Validate against schema before storing
-    const parseResult = MetadataSchema.safeParse(metadata);
-    if (!parseResult.success) {
-      return {
-        success: false,
-        error: `Invalid metadata: ${JSON.stringify(parseResult.error.format())}`,
-      };
-    }
-
-    await this.ctx.storage.put('metadata', parseResult.data);
-
-    // Track activity and ensure reaper alarm is scheduled
-    await this.updateLastActivity();
-    await this.ensureAlarmScheduled();
-
-    return { success: true };
-  }
-
-  /**
-   * Lightweight registration for async preparation flow.
-   * Stores minimal metadata WITHOUT setting preparedAt.
-   * Makes getMetadata() return non-null so the chat page can distinguish
-   * "async prep in progress" from "no DO at all".
-   *
-   * Accepts an optional `profile` bundle so that profile-derived fields the
-   * chat UI needs immediately after navigation (notably `runtimeAgents` for
-   * the custom-mode picker) are readable before the async `prepare()` alarm
-   * fires. Fields like encryptedSecrets/envVars/mcpServers that are only
-   * consumed by workspace setup are intentionally re-written by `prepare()`.
-   */
-  async registerSession(input: {
-    sessionId: string;
-    userId: string;
-    orgId?: string;
-    botId?: string;
-    prompt: string;
-    mode: string;
-    model: string;
-    variant?: string;
-    kiloSessionId?: string;
-    githubRepo?: string;
-    gitUrl?: string;
-    platform?: 'github' | 'gitlab';
-    initialMessageId?: string;
-    initialPayload?: InitialExecutionPayload;
-    profile?: SessionProfileBundle;
-  }): Promise<OperationResult> {
-    await this.requireSessionId(input.sessionId as SessionId);
-    const existing = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
+  async registerSession(input: GroupedRegisterSessionInput): Promise<OperationResult> {
+    await this.requireSessionId(input.identity.sessionId as SessionId);
+    const existing = await this.ctx.storage.get('metadata');
     if (existing) {
       return { success: false, error: 'Session already registered' };
     }
 
     const now = Date.now();
-    const metadata: CloudAgentSessionState = {
-      sessionId: input.sessionId,
-      userId: input.userId,
-      orgId: input.orgId,
-      botId: input.botId,
-      prompt: input.prompt,
-      mode: input.mode,
-      model: input.model,
-      variant: input.variant,
-      kiloSessionId: input.kiloSessionId,
-      githubRepo: input.githubRepo,
-      gitUrl: input.gitUrl,
-      platform: input.platform,
-      initialMessageId: input.initialMessageId,
-      initialPayload: input.initialPayload,
+    const repository: SessionMetadata['repository'] =
+      input.repository?.type === 'github'
+        ? {
+            type: 'github',
+            repo: input.repository.repo,
+            upstreamBranch: input.repository.branch,
+          }
+        : input.repository?.type === 'gitlab'
+          ? {
+              type: 'gitlab',
+              url: input.repository.url,
+              platform: 'gitlab',
+              upstreamBranch: input.repository.branch,
+            }
+          : input.repository?.type === 'git'
+            ? {
+                type: 'git',
+                url: input.repository.url,
+                token: input.repository.token,
+                upstreamBranch: input.repository.branch,
+              }
+            : undefined;
+
+    const metadata: SessionMetadata = {
+      metadataSchemaVersion: 2,
+      identity: input.identity,
+      auth: input.auth,
+      repository,
+      initialMessage: {
+        id: input.message.initialMessageId ?? input.message.turn.id ?? undefined,
+        prompt:
+          input.message.turn.type === 'prompt'
+            ? input.message.turn.prompt
+            : input.message.turn.arguments.length > 0
+              ? `/${input.message.turn.command} ${input.message.turn.arguments}`
+              : `/${input.message.turn.command}`,
+        images: input.message.turn.type === 'prompt' ? input.message.turn.images : undefined,
+        turn:
+          input.message.turn.type === 'prompt'
+            ? {
+                type: 'prompt',
+                prompt: input.message.turn.prompt,
+                images: input.message.turn.images,
+              }
+            : {
+                type: 'command',
+                command: input.message.turn.command,
+                arguments: input.message.turn.arguments,
+              },
+      },
+      agent: {
+        mode: input.agent.mode,
+        model: input.agent.model,
+        variant: input.agent.variant,
+        appendSystemPrompt: input.agent.appendSystemPrompt,
+      },
+      finalization: input.finalization,
       profile: input.profile,
-      version: now,
-      timestamp: now,
-      // NOTE: preparedAt is NOT set — this is the key difference from prepare()
+      callback: input.callback,
+      workspace: input.workspace,
+      lifecycle: {
+        version: now,
+        timestamp: now,
+      },
     };
 
-    const parseResult = MetadataSchema.safeParse(metadata);
-    if (!parseResult.success) {
+    let serialized: SessionMetadata;
+    try {
+      serialized = serializeSessionMetadata(metadata);
+    } catch (error) {
       return {
         success: false,
-        error: `Invalid metadata: ${JSON.stringify(parseResult.error.format())}`,
+        error: `Invalid metadata: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
 
-    await this.ctx.storage.put('metadata', parseResult.data);
+    const modeError = validateModeAgainstRuntimeAgents(serialized);
+    if (modeError) {
+      return { success: false, error: modeError };
+    }
+
+    await this.ctx.storage.put('metadata', serialized);
     await this.updateLastActivity();
     await this.ensureAlarmScheduled();
 
     return { success: true };
   }
 
-  /**
-   * Schedule async preparation via alarm.
-   * Stores the preparation input in DO storage and schedules an immediate
-   * alarm. The alarm handler will pick it up and run the expensive work.
-   * This approach is safe regardless of caller lifetime — the DO wakes
-   * itself up via the alarm even if the original worker request has ended.
-   */
-  async startPreparationAsync(input: PreparationInput): Promise<void> {
-    await this.ctx.storage.put(PENDING_PREPARATION_KEY, input);
-    // Schedule an immediate alarm to run the preparation.
-    // If an alarm is already pending (e.g. reaper), setAlarm replaces it —
-    // the reaper will self-reschedule when it next runs.
-    await this.ctx.storage.setAlarm(Date.now());
-  }
+  async tryUpdate(updates: { callbackTarget?: CallbackTarget | null }): Promise<OperationResult> {
+    const metadata = await this.getMetadata();
 
-  /**
-   * Internal: run all expensive preparation steps, emitting progress events.
-   * Workspace orchestration (clone, setup, wrapper start) is delegated to
-   * executePreparationSteps(); this method handles the DO-specific bookkeeping
-   * (metadata, progress events, auto-initiate, error cleanup).
-   */
-  private async runPreparationAsync(input: PreparationInput): Promise<void> {
-    const sessionId = input.sessionId as SessionId;
-    const prepExecutionId: EventSourceId = `prep_${input.sessionId}`;
-    const env = this.env;
-
-    const emitProgress = (
-      step: PreparingStep,
-      message: string,
-      extra?: Omit<PreparingEventData, 'step' | 'message'>
-    ) => {
-      const now = Date.now();
-      // Backward-compatible preparing event
-      this.broadcastVolatileEvent({
-        executionId: prepExecutionId,
-        sessionId: input.sessionId,
-        streamEventType: 'preparing',
-        payload: JSON.stringify({ step, message, ...extra }),
-        timestamp: now,
-      });
-      // cloud.status event derived from preparation step
-      const cloudStatus =
-        step === 'ready'
-          ? { type: 'ready' as const }
-          : step === 'failed'
-            ? { type: 'error' as const, message }
-            : { type: 'preparing' as const, step, message };
-      this.broadcastVolatileEvent({
-        executionId: prepExecutionId,
-        sessionId: input.sessionId,
-        streamEventType: 'cloud.status',
-        payload: JSON.stringify({ cloudStatus }),
-        timestamp: now,
-      });
-    };
-
-    let createdKiloSessionId: string | undefined = input.kiloSessionId;
-
-    const cleanupCliSession = async () => {
-      if (!createdKiloSessionId) return;
-      const svc = new SessionService();
-      try {
-        await svc.deleteCliSessionViaSessionIngest(createdKiloSessionId, input.userId, env, {
-          onlyIfEmpty: true,
-        });
-      } catch (cleanupError) {
-        logger
-          .withFields({
-            sessionId,
-            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-          })
-          .warn('Failed to clean up cli_sessions_v2 record (onlyIfEmpty)');
-      }
-    };
-
-    try {
-      // Steps 1–9: workspace orchestration (token, disk, clone, branch, setup, wrapper)
-      const result = await executePreparationSteps(input, env, emitProgress);
-      if (!result) {
-        // executePreparationSteps already emitted 'failed' — clean up DO metadata
-        await this.ctx.storage.delete('metadata');
-        await cleanupCliSession();
-        return;
-      }
-
-      createdKiloSessionId = result.kiloSessionId;
-
-      // 10. Store full metadata via prepare() — sets preparedAt
-      const inputProfile = readProfileBundle(input);
-      const prepareResult = await this.prepare({
-        sessionId: input.sessionId,
-        userId: input.userId,
-        orgId: input.orgId,
-        botId: input.botId,
-        kiloSessionId: result.kiloSessionId,
-        prompt: input.prompt,
-        mode: input.mode,
-        model: input.model,
-        variant: input.variant,
-        kilocodeToken: input.authToken,
-        githubRepo: input.githubRepo,
-        githubToken: result.resolvedGithubToken ?? input.githubToken,
-        githubInstallationId: result.resolvedInstallationId,
-        githubAppType: result.resolvedGithubAppType,
-        gitUrl: input.gitUrl,
-        gitToken: result.resolvedGitToken,
-        platform: input.platform,
-        gitlabTokenManaged: result.gitlabTokenManaged,
-        envVars: inputProfile.envVars,
-        encryptedSecrets: inputProfile.encryptedSecrets,
-        setupCommands: inputProfile.setupCommands,
-        mcpServers: inputProfile.mcpServers,
-        runtimeSkills: inputProfile.runtimeSkills,
-        runtimeAgents: inputProfile.runtimeAgents,
-        kiloCommands: inputProfile.kiloCommands,
-        upstreamBranch: input.upstreamBranch,
-        autoCommit: input.autoCommit,
-        condenseOnComplete: input.condenseOnComplete,
-        appendSystemPrompt: input.appendSystemPrompt,
-        callbackTarget: input.callbackTarget,
-        images: input.images,
-        createdOnPlatform: input.createdOnPlatform,
-        gateThreshold: input.gateThreshold,
-        workspacePath: result.workspacePath,
-        sessionHome: result.sessionHome,
-        branchName: result.branchName,
-        devcontainer: result.devcontainer,
-        sandboxId: result.sandboxId,
-        initialMessageId: input.initialMessageId,
-        initialPayload: input.initialPayload,
-      });
-
-      if (!prepareResult.success) {
-        emitProgress('failed', prepareResult.error ?? 'Failed to prepare session');
-        await this.ctx.storage.delete('metadata');
-        await cleanupCliSession();
-        return;
-      }
-
-      await this.recordKiloServerActivity();
-
-      // 11. Auto-initiate if requested, then emit ready only on success.
-      // Emitting 'ready' before startExecutionV2 would let the client
-      // unlock chat input for a session that may fail to initiate.
-      if (input.autoInitiate) {
-        const initiateResult = await this.startExecutionV2({
-          kind: 'initiatePrepared',
-          userId: input.userId as UserId,
-          botId: input.botId,
-          authToken: input.authToken,
-        });
-
-        if (!initiateResult.success) {
-          logger
-            .withFields({ sessionId, error: initiateResult.error })
-            .error('Auto-initiate failed after async preparation');
-
-          // startExecutionV2 persists initiatedAt via tryInitiate() before
-          // attempting execution. Roll it back so the session doesn't appear
-          // initiated with no running execution (stuck state).
-          const staleMetadata = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
-          if (staleMetadata?.initiatedAt) {
-            const { initiatedAt: _, ...rest } = staleMetadata;
-            await this.ctx.storage.put('metadata', { ...rest, version: Date.now() });
-          }
-
-          emitProgress('failed', `Auto-initiate failed: ${initiateResult.error}`);
-          return;
-        }
-      }
-
-      // 12. Emit ready — session is prepared (and initiated, if autoInitiate)
-      emitProgress('ready', 'Session ready', { branch: result.branchName });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger
-        .withFields({
-          sessionId,
-          error: message,
-          stack: error instanceof Error ? error.stack : undefined,
-        })
-        .error('Async preparation failed');
-
-      await cleanupCliSession();
-
-      emitProgress('failed', message);
-      await this.ctx.storage.delete('metadata');
-    }
-  }
-
-  /**
-   * Atomically update a prepared session - only succeeds if prepared but not initiated.
-   * Single DO request ensures atomicity.
-   * Validates updated metadata against MetadataSchema before storing.
-   */
-  async tryUpdate(updates: {
-    mode?: string | null;
-    model?: string | null;
-    variant?: string | null;
-    githubToken?: string | null;
-    gitToken?: string | null;
-    autoCommit?: boolean | null;
-    condenseOnComplete?: boolean | null;
-    appendSystemPrompt?: string | null;
-    envVars?: Record<string, string>;
-    encryptedSecrets?: EncryptedSecrets;
-    setupCommands?: string[];
-    mcpServers?: Record<string, MCPServerConfig>;
-    runtimeSkills?: readonly RuntimeSkill[];
-    runtimeAgents?: readonly RuntimeAgent[];
-    kiloCommands?: readonly RuntimeKiloCommand[];
-    callbackTarget?: CallbackTarget | null;
-    upstreamBranch?: string | null;
-  }): Promise<OperationResult> {
-    const metadata = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
-
-    if (!metadata?.preparedAt) {
-      return { success: false, error: 'Session has not been prepared' };
+    if (!metadata) {
+      return { success: false, error: 'Session metadata is not available' };
     }
 
-    // callbackTarget can be updated even after initiation (needed for follow-up
-    // reviews that reuse an existing session with a new callback URL).
-    // All other fields are immutable once initiated.
     const allKeys = Object.keys(updates).filter(
       k => updates[k as keyof typeof updates] !== undefined
     );
-    const onlyCallbackTarget = allKeys.length === 1 && allKeys[0] === 'callbackTarget';
-    if (metadata.initiatedAt && !onlyCallbackTarget) {
-      return { success: false, error: 'Session has already been initiated' };
+    if (allKeys.some(key => key !== 'callbackTarget')) {
+      return { success: false, error: 'Only callbackTarget can be updated' };
     }
 
-    // Profile-derived fields are merged into `metadata.profile` (nested).
-    // Everything else (mode, model, tokens, …) lives flat on metadata.
-    // Legacy flat profile fields on the existing record are ignored on
-    // read (via `readProfileBundle`) so we don't bother stripping them —
-    // they go away when the `profile` field and fallback branch are
-    // eventually removed.
-    const PROFILE_UPDATE_KEYS = new Set([
-      'envVars',
-      'encryptedSecrets',
-      'setupCommands',
-      'mcpServers',
-      'runtimeSkills',
-      'runtimeAgents',
-      'kiloCommands',
-    ]);
-
-    const updated = { ...metadata };
-
-    // Seed `updated.profile` from whatever profile the existing record
-    // currently carries (nested or flat); subsequent per-key updates then
-    // apply on top.
-    const baseProfile = readProfileBundle(metadata);
-    const hasBaseProfile = Object.values(baseProfile).some(v => v !== undefined);
-    updated.profile = hasBaseProfile ? { ...baseProfile } : metadata.profile;
-
-    for (const [key, value] of Object.entries(updates)) {
-      if (PROFILE_UPDATE_KEYS.has(key)) {
-        // Lazily materialize updated.profile so we don't emit an empty object
-        // when the caller only clears fields.
-        const nextProfile = { ...(updated.profile ?? {}) } as Record<string, unknown>;
-        if (value === null) {
-          delete nextProfile[key];
-        } else if (value !== undefined) {
-          nextProfile[key] = value;
-        }
-        updated.profile =
-          Object.keys(nextProfile).length > 0 ? (nextProfile as SessionProfileBundle) : undefined;
-      } else if (value === null) {
-        delete (updated as Record<string, unknown>)[key];
-      } else if (value !== undefined) {
-        (updated as Record<string, unknown>)[key] = value;
-      }
+    const updated: SessionMetadata = { ...metadata };
+    if (updates.callbackTarget === null) {
+      delete updated.callback;
+    } else if (updates.callbackTarget !== undefined) {
+      updated.callback = { target: updates.callbackTarget };
     }
     const now = Date.now();
-    updated.version = now;
-    updated.timestamp = now;
+    updated.lifecycle = {
+      ...updated.lifecycle,
+      version: now,
+      timestamp: now,
+    };
 
-    // Validate against schema before storing
-    const parseResult = MetadataSchema.safeParse(updated);
-    if (!parseResult.success) {
+    let serialized: SessionMetadata;
+    try {
+      serialized = serializeSessionMetadata(updated);
+    } catch (error) {
       return {
         success: false,
-        error: `Invalid metadata after update: ${JSON.stringify(parseResult.error.format())}`,
+        error: `Invalid metadata after update: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
 
-    const modeError = validateModeAgainstRuntimeAgents(parseResult.data);
+    const modeError = validateModeAgainstRuntimeAgents(serialized);
     if (modeError) {
       return { success: false, error: modeError };
     }
 
-    await this.ctx.storage.put('metadata', parseResult.data);
+    await this.ctx.storage.put('metadata', serialized);
 
     // Track activity for session TTL
     await this.updateLastActivity();
@@ -1460,36 +1338,105 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return { success: true };
   }
 
-  /**
-   * Atomically initiate a prepared session - sets initiatedAt timestamp.
-   * Returns the full metadata on success for execution.
-   * Single DO request ensures no race between update and initiate.
-   */
-  async tryInitiate(): Promise<OperationResult<CloudAgentSessionState>> {
-    const metadata = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
+  async recordSessionReady(input: {
+    workspacePath: string;
+    sandboxId: string;
+    sessionHome: string;
+    branchName: string;
+    kiloSessionId: string;
+    githubInstallationId?: string;
+    githubAppType?: 'standard' | 'lite';
+    gitToken?: string;
+    gitlabTokenManaged?: boolean;
+    devcontainer?: SessionMetadata['devcontainer'];
+  }): Promise<OperationResult<SessionMetadata>> {
+    const metadata = await this.getMetadata();
 
-    if (!metadata?.preparedAt) {
-      return { success: false, error: 'Session has not been prepared' };
-    }
-    if (metadata.initiatedAt) {
-      return { success: false, error: 'Session has already been initiated' };
+    if (!metadata) {
+      return { success: false, error: 'Session metadata is not available' };
     }
 
     const now = Date.now();
+    const repository: SessionMetadata['repository'] =
+      metadata.repository?.type === 'github'
+        ? {
+            ...metadata.repository,
+            githubInstallationId:
+              input.githubInstallationId ?? metadata.repository.githubInstallationId,
+            githubAppType: input.githubAppType ?? metadata.repository.githubAppType,
+          }
+        : metadata.repository?.type === 'gitlab'
+          ? {
+              ...metadata.repository,
+              gitlabTokenManaged:
+                input.gitlabTokenManaged ?? metadata.repository.gitlabTokenManaged,
+            }
+          : metadata.repository;
 
-    const updated: CloudAgentSessionState = {
+    const updated: SessionMetadata = {
       ...metadata,
-      initiatedAt: now,
-      version: now,
-      timestamp: now,
+      auth: {
+        ...metadata.auth,
+        kiloSessionId: input.kiloSessionId,
+      },
+      repository,
+      workspace: {
+        ...metadata.workspace,
+        workspacePath: input.workspacePath,
+        sandboxId: input.sandboxId as SandboxId,
+        sessionHome: input.sessionHome,
+        branchName: input.branchName,
+      },
+      ...((input.devcontainer ?? metadata.devcontainer)
+        ? { devcontainer: input.devcontainer ?? metadata.devcontainer }
+        : {}),
+      lifecycle: {
+        ...metadata.lifecycle,
+        preparedAt: metadata.lifecycle.preparedAt ?? now,
+        version: now,
+        timestamp: now,
+      },
     };
 
-    await this.ctx.storage.put('metadata', updated);
+    let serialized: SessionMetadata;
+    try {
+      serialized = serializeSessionMetadata(updated);
+    } catch (error) {
+      return {
+        success: false,
+        error: `Invalid metadata after readiness update: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
 
-    // Track activity for session TTL
+    await this.ctx.storage.put('metadata', serialized);
     await this.updateLastActivity();
 
-    return { success: true, data: updated };
+    return { success: true, data: serialized };
+  }
+
+  private async recordSessionInitiatedIfNeeded(initiatedAt: number): Promise<void> {
+    const metadata = await this.getMetadata();
+    if (!metadata || metadata.lifecycle.initiatedAt) return;
+
+    const updated: SessionMetadata = {
+      ...metadata,
+      lifecycle: {
+        ...metadata.lifecycle,
+        initiatedAt,
+        version: initiatedAt,
+        timestamp: initiatedAt,
+      },
+    };
+    let serialized: SessionMetadata;
+    try {
+      serialized = serializeSessionMetadata(updated);
+    } catch (error) {
+      throw new Error(
+        `Invalid metadata after initiation update: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    await this.ctx.storage.put('metadata', serialized);
+    await this.updateLastActivity();
   }
 
   // ---------------------------------------------------------------------------
@@ -1498,79 +1445,16 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
   /**
    * Alarm handler for periodic cleanup tasks.
-   * Runs every REAPER_INTERVAL_MS to:
-   * 1. Clean up stale executions (no heartbeat for STALE_THRESHOLD_MS)
-   * 2. Clean up old events (older than EVENT_RETENTION_MS)
-   * 3. Clean up expired leases
-   * 4. Check if session should be deleted due to inactivity
+   * Runs periodic retention/TTL cleanup and schedules nearer deadlines for
+   * pending message flushes, disconnect grace, wrapper liveness, and max runtime.
    */
   async alarm(): Promise<void> {
     const now = Date.now();
 
-    logger
-      .withFields({ doId: this.ctx.id.toString(), sessionId: this.sessionId })
-      .info('Alarm fired');
+    let pendingFlushRetryAt: number | undefined;
+    let remainingPendingCount: number | undefined;
 
     try {
-      // Run pending async preparation if scheduled.
-      // This must run before other alarm duties because it can take minutes
-      // (git clone, setup commands, etc.). The reaper self-reschedules at the end.
-      const pendingPrep = await this.ctx.storage.get(PENDING_PREPARATION_KEY);
-      if (pendingPrep) {
-        await this.ctx.storage.delete(PENDING_PREPARATION_KEY);
-        const parsed = PreparationInputSchema.safeParse(pendingPrep);
-        if (parsed.success) {
-          await this.runPreparationAsync(parsed.data);
-        } else {
-          logger
-            .withFields({ error: JSON.stringify(parsed.error.format()) })
-            .error('Invalid pending preparation data in storage');
-
-          // Clean up resources left behind by registerSession/createCliSession
-          // so the session doesn't sit in a zombie preparing state forever.
-          const metadata = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
-          await this.ctx.storage.delete('metadata');
-
-          if (metadata?.kiloSessionId && metadata?.userId) {
-            const svc = new SessionService();
-            try {
-              await svc.deleteCliSessionViaSessionIngest(
-                metadata.kiloSessionId,
-                metadata.userId,
-                this.env,
-                { onlyIfEmpty: true }
-              );
-            } catch {
-              // Best-effort — already logged the root cause above
-            }
-          }
-
-          if (this.sessionId) {
-            const prepId: EventSourceId = `prep_${this.sessionId}`;
-            const failNow = Date.now();
-            const failMessage = 'Internal error: invalid preparation data';
-            this.broadcastVolatileEvent({
-              executionId: prepId,
-              sessionId: this.sessionId,
-              streamEventType: 'preparing',
-              payload: JSON.stringify({ step: 'failed', message: failMessage }),
-              timestamp: failNow,
-            });
-            this.broadcastVolatileEvent({
-              executionId: prepId,
-              sessionId: this.sessionId,
-              streamEventType: 'cloud.status',
-              payload: JSON.stringify({ cloudStatus: { type: 'error', message: failMessage } }),
-              timestamp: failNow,
-            });
-          }
-        }
-      }
-
-      // Check disconnect grace period first — this alarm may have been
-      // rescheduled specifically for the grace deadline.
-      await this.checkDisconnectGrace();
-
       // Check if session should be deleted due to inactivity (90 days)
       const lastActivity = await this.ctx.storage.get<number>(LAST_ACTIVITY_KEY);
       if (lastActivity && now - lastActivity > Limits.SESSION_TTL_MS) {
@@ -1583,45 +1467,19 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         return;
       }
 
-      logger
-        .withFields({ sessionId: this.sessionId, lastActivity, elapsedMs: Date.now() - now })
-        .debug('TTL check passed');
+      await this.getWrapperSupervisor().runMaintenance(now);
+
+      await this.retryPendingCallbacks(now);
 
       // Run cleanup tasks
-      logger
-        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
-        .debug('Starting cleanupStaleExecutions');
-      await this.cleanupStaleExecutions(now);
-
-      logger
-        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
-        .debug('Starting checkHungExecution');
-      await this.checkHungExecution(now);
-
-      logger
-        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
-        .debug('Starting checkMaxRuntime');
       await this.checkMaxRuntime(now);
-
-      logger
-        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
-        .debug('Starting cleanupOldEvents');
       this.cleanupOldEvents(now);
-
-      logger
-        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
-        .debug('Starting cleanupExpiredLeases');
       this.cleanupExpiredLeases(now);
-
-      // Check if kilo server should be stopped due to inactivity
-      logger
-        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
-        .debug('Starting cleanupIdleKiloServer');
       await this.cleanupIdleKiloServer(now);
 
-      logger
-        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
-        .debug('All cleanup steps completed');
+      const flushOneResult = await this.flushOnePendingSessionMessage();
+      pendingFlushRetryAt = flushOneResult.retryAt;
+      remainingPendingCount = flushOneResult.remainingPendingCount;
     } catch (error) {
       logger
         .withFields({
@@ -1634,24 +1492,38 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         .error('Error during alarm reaper');
     }
 
-    // Schedule next alarm run — use shorter interval while an execution is active,
-    // longer idle interval otherwise so we don't wake the DO every 5 min for nothing.
+    // Schedule next alarm run from the nearest pending deadline, retry pending
+    // work promptly when idle, and otherwise use the long idle cadence.
     // Wrapped in try/catch so a failure here never prevents rescheduling the alarm.
-    let nextInterval = REAPER_IDLE_INTERVAL_MS;
+    let nextAlarmAt = Date.now() + REAPER_IDLE_INTERVAL_MS;
     try {
-      const activeExecutionId = await this.executionQueries.getActiveExecutionId();
-      if (activeExecutionId) {
-        nextInterval = REAPER_ACTIVE_INTERVAL_MS;
+      const pendingCount = remainingPendingCount ?? 0;
+      const currentTime = Date.now();
+      const deadlines = await this.getNextAlarmDeadlines();
+      if (pendingFlushRetryAt !== undefined) {
+        deadlines.push(pendingFlushRetryAt);
+      }
+
+      for (const deadline of deadlines) {
+        const clampedDeadline = deadline <= currentTime ? currentTime + 1_000 : deadline;
+        if (clampedDeadline < nextAlarmAt) {
+          nextAlarmAt = clampedDeadline;
+        }
+      }
+
+      if (
+        pendingFlushRetryAt === undefined &&
+        pendingCount > 0 &&
+        currentTime + PENDING_FLUSH_DEBOUNCE_MS < nextAlarmAt
+      ) {
+        nextAlarmAt = currentTime + PENDING_FLUSH_DEBOUNCE_MS;
       }
     } catch {
       // Can't determine state — use a conservative short interval so the
       // reaper retries soon rather than sleeping for an hour.
-      nextInterval = REAPER_INTERVAL_MS_DEFAULT;
+      nextAlarmAt = Date.now() + REAPER_INTERVAL_MS_DEFAULT;
     }
-    logger
-      .withFields({ sessionId: this.sessionId, nextInterval, elapsedMs: Date.now() - now })
-      .info('Rescheduling alarm');
-    await this.ctx.storage.setAlarm(Date.now() + nextInterval);
+    await this.ctx.storage.setAlarm(nextAlarmAt);
   }
 
   /**
@@ -1662,6 +1534,25 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const alarm = await this.ctx.storage.getAlarm();
     if (alarm === null) {
       await this.ctx.storage.setAlarm(Date.now() + this.getReaperIntervalMs());
+      return;
+    }
+  }
+
+  private async scheduleAlarmAtOrBefore(deadline: number): Promise<void> {
+    const now = Date.now();
+    const clampedDeadline = deadline <= now ? now + 1_000 : deadline;
+    const existingAlarm = await this.ctx.storage.getAlarm();
+    if (existingAlarm === null || existingAlarm <= now || clampedDeadline < existingAlarm) {
+      await this.ctx.storage.setAlarm(clampedDeadline);
+    }
+  }
+
+  private redactCallbackTargetUrl(callbackUrl: string): string {
+    try {
+      const url = new URL(callbackUrl);
+      return `${url.origin}${url.pathname}`;
+    } catch {
+      return 'invalid-url';
     }
   }
 
@@ -1673,106 +1564,28 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     await this.ctx.storage.put(LAST_ACTIVITY_KEY, Date.now());
   }
 
-  /**
-   * Clean up stale executions that have stopped heartbeating.
-   * Marks them as failed and clears the active execution.
-   */
-  private async cleanupStaleExecutions(now: number): Promise<void> {
-    const activeExecutionId = await this.executionQueries.getActiveExecutionId();
-
-    if (!activeExecutionId) return;
-
-    // Get the execution metadata
-    const execution = await this.executionQueries.get(activeExecutionId);
-
-    if (!execution) {
-      // Orphaned active execution ID - clear it
-      logger
-        .withFields({ sessionId: this.sessionId, executionId: activeExecutionId })
-        .warn('Clearing orphaned active execution ID');
-      await this.executionQueries.clearActiveExecution();
-      return;
-    }
-
-    // Check if execution is stale (no heartbeat for STALE_THRESHOLD_MS)
-    if (execution.status === 'running') {
-      const staleThresholdMs = this.getStaleThresholdMs();
-      const isStale = !execution.lastHeartbeat || now - execution.lastHeartbeat > staleThresholdMs;
-
-      if (isStale) {
-        logger
-          .withFields({
-            sessionId: this.sessionId,
-            executionId: activeExecutionId,
-            lastHeartbeat: execution.lastHeartbeat,
-            staleDurationMs: execution.lastHeartbeat ? now - execution.lastHeartbeat : 'never',
-            staleThresholdMs,
-          })
-          .info('Marking stale execution as failed');
-
-        await this.failExecution({
-          executionId: activeExecutionId,
-          status: 'failed',
-          error: 'Execution timeout - no heartbeat received',
-          streamEventType: 'error',
-        });
-      }
-    }
-
-    if (execution.status === 'pending') {
-      const pendingTimeoutMs = this.getPendingStartTimeoutMs();
-      const isPendingTooLong = now - execution.startedAt > pendingTimeoutMs;
-
-      if (isPendingTooLong) {
-        logger
-          .withFields({
-            sessionId: this.sessionId,
-            executionId: activeExecutionId,
-            startedAt: execution.startedAt,
-            pendingTimeoutMs,
-          })
-          .info('Marking stuck pending execution as failed');
-
-        await this.failExecution({
-          executionId: activeExecutionId,
-          status: 'failed',
-          error: 'Execution timeout - wrapper never connected',
-          streamEventType: 'error',
-        });
-      }
-    }
+  private async getRawWrapperRuntimeExecutionId(): Promise<ExecutionId | null> {
+    const state = await getWrapperRuntimeState(this.ctx.storage);
+    const legacyExecutionId = state.acceptedExecutionId ?? state.wrapperExecutionId;
+    if (!legacyExecutionId) return null;
+    const execution = await this.executionQueries.get(legacyExecutionId as ExecutionId);
+    return execution && this.isCurrentRuntimeStatus(execution.status)
+      ? (legacyExecutionId as ExecutionId)
+      : null;
   }
 
-  /**
-   * Fail a running execution that hasn't received any non-heartbeat events
-   * for HUNG_EXECUTION_TIMEOUT_MS. Skipped when lastEventAt is undefined
-   * (other checks handle that case).
-   */
-  private async checkHungExecution(now: number): Promise<void> {
-    const activeExecutionId = await this.executionQueries.getActiveExecutionId();
-    if (!activeExecutionId) return;
+  private isCurrentRuntimeStatus(status: ExecutionStatus): status is 'pending' | 'running' {
+    return status === 'pending' || status === 'running';
+  }
 
-    const execution = await this.executionQueries.get(activeExecutionId);
-    if (!execution || execution.status !== 'running') return;
-    if (execution.lastEventAt === undefined) return;
+  private async getCurrentWrapperRuntimeExecutionId(): Promise<ExecutionId | null> {
+    const execution = await this.getCurrentRuntimeExecution();
+    return execution?.executionId ?? null;
+  }
 
-    if (now - execution.lastEventAt > HUNG_EXECUTION_TIMEOUT_MS) {
-      logger
-        .withFields({
-          sessionId: this.sessionId,
-          executionId: activeExecutionId,
-          lastEventAt: execution.lastEventAt,
-          hungDurationMs: now - execution.lastEventAt,
-        })
-        .info('Marking hung execution as failed');
-
-      await this.failExecution({
-        executionId: activeExecutionId,
-        status: 'failed',
-        error: 'Execution hung — no events received for 5 minutes',
-        streamEventType: 'error',
-      });
-    }
+  private async getMaxRuntimeExecution(): Promise<ExecutionMetadata | null> {
+    const execution = await this.getCurrentRuntimeExecution();
+    return execution?.status === 'running' ? execution : null;
   }
 
   /**
@@ -1780,17 +1593,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * (DEFAULT_MAX_RUNTIME_MS = 60 min).
    */
   private async checkMaxRuntime(now: number): Promise<void> {
-    const activeExecutionId = await this.executionQueries.getActiveExecutionId();
-    if (!activeExecutionId) return;
+    const execution = await this.getMaxRuntimeExecution();
+    if (!execution) return;
 
-    const execution = await this.executionQueries.get(activeExecutionId);
-    if (!execution || execution.status !== 'running') return;
-
-    if (now - execution.startedAt > DEFAULT_MAX_RUNTIME_MS) {
+    if (now - execution.startedAt >= DEFAULT_MAX_RUNTIME_MS) {
       logger
         .withFields({
           sessionId: this.sessionId,
-          executionId: activeExecutionId,
+          executionId: execution.executionId,
           startedAt: execution.startedAt,
           maxRuntimeMs: DEFAULT_MAX_RUNTIME_MS,
           elapsedMs: now - execution.startedAt,
@@ -1798,7 +1608,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         .info('Marking execution as failed — exceeded maximum runtime');
 
       await this.failExecution({
-        executionId: activeExecutionId,
+        executionId: execution.executionId,
         status: 'failed',
         error: 'Execution exceeded maximum runtime',
         streamEventType: 'error',
@@ -1831,21 +1641,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     }
   }
 
-  /** Initial reaper interval used only by {@link ensureAlarmScheduled}.
-   *  Steady-state intervals are {@link REAPER_IDLE_INTERVAL_MS} / {@link REAPER_ACTIVE_INTERVAL_MS}. */
   private getReaperIntervalMs(): number {
     const value = Number(this.env.REAPER_INTERVAL_MS);
     return Number.isFinite(value) && value > 0 ? value : REAPER_INTERVAL_MS_DEFAULT;
-  }
-
-  private getStaleThresholdMs(): number {
-    const value = Number(this.env.STALE_THRESHOLD_MS);
-    return Number.isFinite(value) && value > 0 ? value : STALE_THRESHOLD_MS;
-  }
-
-  private getPendingStartTimeoutMs(): number {
-    const value = Number(this.env.PENDING_START_TIMEOUT_MS);
-    return Number.isFinite(value) && value > 0 ? value : PENDING_START_TIMEOUT_MS_DEFAULT;
   }
 
   private getKiloServerIdleTimeoutMs(): number {
@@ -1863,7 +1661,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return;
     }
 
-    const lastActivity = metadata.kiloServerLastActivity;
+    const lastActivity = metadata.lifecycle.kiloServerLastActivity;
     if (!lastActivity) {
       // No kilo server activity recorded, nothing to clean up
       return;
@@ -1877,20 +1675,18 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return;
     }
 
-    // Check if there's an active execution - don't stop the server mid-run
-    const activeExecutionId = await this.executionQueries.getActiveExecutionId();
-    if (activeExecutionId !== null) {
+    const hasRuntimeWork = await this.hasWrapperRuntimeOrPendingWork();
+    if (hasRuntimeWork) {
       logger
         .withFields({
           sessionId: this.sessionId,
-          executionId: activeExecutionId,
           idleMs,
         })
-        .debug('Skipping idle kilo server cleanup - execution is active');
+        .debug('Skipping idle kilo server cleanup - wrapper or pending work is active');
       return;
     }
 
-    // Server has been idle too long and no active execution, stop it
+    // Server has been idle too long and no wrapper/pending work remains, stop it
     logger
       .withFields({
         sessionId: this.sessionId,
@@ -1899,108 +1695,35 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       })
       .info('Stopping idle kilo server');
 
-    try {
-      const sandboxId =
-        metadata.sandboxId ??
-        (await generateSandboxId(
-          this.env.PER_SESSION_SANDBOX_ORG_IDS,
-          metadata.orgId,
-          metadata.userId,
-          metadata.sessionId,
-          metadata.botId
-        ));
-      const sandbox = getSandbox(getSandboxNamespace(this.env, sandboxId), sandboxId);
-
-      const rpcStart = Date.now();
-      logger
-        .withFields({ sessionId: this.sessionId, sandboxId })
-        .debug('Starting stopKiloServer RPC');
-
-      await stopWrapper(sandbox, metadata.sessionId, {
-        devcontainer: metadata.devcontainer
-          ? {
-              workspacePath: metadata.devcontainer.workspacePath,
-              configPath: metadata.devcontainer.configPath,
-            }
-          : undefined,
-      });
-
-      logger
-        .withFields({ sessionId: this.sessionId, sandboxId, rpcElapsedMs: Date.now() - rpcStart })
-        .debug('stopKiloServer RPC completed');
-
-      // Clear the activity timestamp since server is stopped
-      // Must merge with existing metadata since updateMetadata validates the full schema
-      const updated = {
-        ...metadata,
-        kiloServerLastActivity: undefined,
+    const stopped = await this.getAgentRuntime().stopWrapperProcess('idle-timeout');
+    const updated = {
+      ...metadata,
+      lifecycle: {
+        ...metadata.lifecycle,
+        ...(stopped ? { kiloServerLastActivity: undefined } : {}),
         version: Date.now(),
-      };
-      await this.updateMetadata(updated);
+      },
+    };
+    await this.updateMetadata(updated);
 
+    if (stopped) {
+      await this.getMessageSettlementOutbox().releaseWrapperTerminalWaitForIdleBatch();
+      await this.finalizeIdleBatchCallbackIfReady({ allowWithoutObservedIdle: true });
       logger
-        .withFields({ sessionId: this.sessionId, sandboxId })
+        .withFields({ sessionId: this.sessionId })
         .info('Idle kilo server stopped successfully');
-    } catch (error) {
-      // Log but don't fail - server may already be stopped or sandbox recycled
-      logger
-        .withFields({
-          sessionId: this.sessionId,
-          error: error instanceof Error ? error.message : String(error),
-        })
-        .warn('Failed to stop idle kilo server (may already be stopped)');
+      return;
     }
+
+    logger.withFields({ sessionId: this.sessionId }).warn('Failed to stop idle kilo server');
   }
 
   /**
-   * Reset the sandbox container's inactivity timer so it stays alive during
-   * an active execution.
-   *
-   * The @cloudflare/containers runtime expires the container after
-   * `sleepAfter` of inactivity and refreshes that window from
-   * `containerFetch()` only.  The wrapper communicates with the worker over
-   * an outbound WebSocket to `/ingest` that bypasses `containerFetch()`, so
-   * the activity timer is never refreshed by wrapper traffic and the
-   * container is SIGTERM-ed at the 15-minute mark even mid-execution.
-   *
-   * `setSleepAfter()` cannot be used to refresh the timer because the
-   * Sandbox implementation is idempotent — when called with the same value
-   * it returns early without resetting `sleepAfterMs`.  Call
-   * `renewActivityTimeout()` (inherited from the base Container class)
-   * directly instead; it is a synchronous in-memory update of
-   * `sleepAfterMs = Date.now() + sleepAfter*1000`.
-   *
-   * Called from the DO context's `updateHeartbeat` callback (debounced
-   * to every 30 s by the ingest handler) while an execution is running.
+   * Keep the sandbox active while wrapper heartbeat traffic bypasses container fetches.
+   * Called from the ingest heartbeat adapter; AgentRuntime owns the renewal transport.
    */
   private async keepContainerAlive(): Promise<void> {
-    try {
-      const metadata = await this.getMetadata();
-      if (!metadata) return;
-
-      const sandboxId =
-        metadata.sandboxId ??
-        (await generateSandboxId(
-          this.env.PER_SESSION_SANDBOX_ORG_IDS,
-          metadata.orgId,
-          metadata.userId,
-          metadata.sessionId,
-          metadata.botId
-        ));
-      const sandbox = getSandbox(getSandboxNamespace(this.env, sandboxId), sandboxId);
-      // `renewActivityTimeout` is declared as synchronous `void` on the
-      // base Container class, but `sandbox` is a DO RPC stub so the call
-      // is actually async.  `Promise.resolve` wraps the call without
-      // hiding rejection — failures still propagate to the catch below.
-      await Promise.resolve(sandbox.renewActivityTimeout());
-    } catch (error) {
-      logger
-        .withFields({
-          sessionId: this.sessionId,
-          error: error instanceof Error ? error.message : String(error),
-        })
-        .warn('Failed to reset sandbox sleep timer');
-    }
+    await this.getAgentRuntime().keepSandboxAlive();
   }
 
   // ---------------------------------------------------------------------------
@@ -2024,121 +1747,118 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * (orchestrator) handles the error synchronously and enqueuing a callback
    * would race with a fallback session's callbacks.
    */
+  private async emitAcceptedMessageTerminalEvent(
+    execution: ExecutionMetadata,
+    params: UpdateExecutionStatusParams,
+    status: 'completed' | 'failed' | 'interrupted'
+  ): Promise<void> {
+    if (!execution.messageId) {
+      return;
+    }
+
+    const payload: Record<string, unknown> = {
+      messageId: execution.messageId,
+      executionId: execution.executionId,
+      status,
+      delivery: 'sent',
+      accepted: true,
+    };
+
+    if (status === 'interrupted') {
+      payload.reason = 'interrupted';
+      payload.error = params.error ?? 'Execution was interrupted';
+    } else if (status === 'failed') {
+      payload.reason = 'execution';
+      if (params.error !== undefined) payload.error = params.error;
+    } else if (params.error !== undefined) {
+      payload.error = params.error;
+    }
+    if (params.gateResult !== undefined) {
+      payload.gateResult = params.gateResult;
+    }
+
+    const sessionId = await this.requireSessionId();
+    this.insertAndBroadcastEvent({
+      executionId: execution.executionId,
+      sessionId,
+      streamEventType: status === 'completed' ? 'cloud.message.completed' : 'cloud.message.failed',
+      payload: JSON.stringify(payload),
+      timestamp: Date.now(),
+    });
+  }
+
+  private async emitSessionMessageSent(messageId: string): Promise<void> {
+    const sessionId = await this.requireSessionId();
+    this.insertAndBroadcastEvent({
+      executionId: '' as EventSourceId,
+      sessionId,
+      streamEventType: 'cloud.message.sent',
+      payload: JSON.stringify({
+        messageId,
+        delivery: 'sent',
+      }),
+      timestamp: Date.now(),
+    });
+  }
+
+  private async finalizeIdleBatchCallbackIfReady(options?: {
+    allowWithoutObservedIdle?: boolean;
+  }): Promise<void> {
+    await this.getMessageSettlementOutbox().finalizeIdleBatchCallbackIfReady(options);
+  }
+
+  private async terminalizeSessionMessageOnce(
+    messageId: string,
+    params: TerminalizeParams,
+    opts?: {
+      gateResult?: 'pass' | 'fail';
+      suppressCallback?: boolean;
+      allowIdleBatchWithoutObservedIdle?: boolean;
+    }
+  ) {
+    return this.getMessageSettlementOutbox().terminalizeSessionMessageOnce(messageId, params, opts);
+  }
+
   async updateExecutionStatus(
     params: UpdateExecutionStatusParams,
     opts?: { suppressCallback?: boolean }
   ): Promise<Result<ExecutionMetadata, UpdateStatusError>> {
+    const existing = await this.executionQueries.get(params.executionId);
+    if (existing?.status === params.status && this.isTerminalStatus(params.status)) {
+      return { ok: true, value: existing };
+    }
+
     const result = await this.executionQueries.updateStatus(params);
 
-    if (result.ok && this.isTerminalStatus(params.status) && !opts?.suppressCallback) {
-      await this.enqueueCallbackNotification(
-        params.executionId,
-        params.status,
-        params.error,
-        params.gateResult
-      );
+    if (result.ok && this.isTerminalStatus(params.status)) {
+      const state = await getWrapperRuntimeState(this.ctx.storage);
+      if (state.wrapperConnectionId) {
+        const isCurrentExecution =
+          state.wrapperExecutionId === params.executionId ||
+          state.acceptedExecutionId === params.executionId;
+        if (isCurrentExecution) {
+          await clearWrapperRuntimeIdentity(
+            this.ctx.storage,
+            {
+              wrapperGeneration: state.wrapperGeneration,
+              wrapperConnectionId: state.wrapperConnectionId,
+            },
+            { incrementGeneration: true }
+          );
+        }
+      }
+      if (!opts?.suppressCallback) {
+        await this.emitAcceptedMessageTerminalEvent(result.value, params, params.status);
+        await this.enqueueCallbackNotification(
+          result.value,
+          params.status,
+          params.error,
+          params.gateResult
+        );
+      }
     }
 
     return result;
-  }
-
-  /**
-   * Cancel any pending disconnect grace period.
-   * Clears the storage-persisted state so the next alarm ignores it.
-   * Called when the wrapper reconnects or when another codepath fails
-   * the execution.
-   */
-  private async cancelDisconnectGrace(): Promise<void> {
-    await this.ctx.storage.delete(DISCONNECT_GRACE_KEY);
-  }
-
-  /**
-   * Start the disconnect grace period for a wrapper that just disconnected.
-   * Persists state to DO storage (survives hibernation) and reschedules the
-   * alarm to fire at the grace deadline so it runs even if the DO sleeps.
-   */
-  private async startDisconnectGrace(
-    executionId: ExecutionId,
-    wsCloseCode: number,
-    wsCloseReason: string
-  ): Promise<void> {
-    const now = Date.now();
-
-    logger
-      .withFields({
-        sessionId: this.sessionId,
-        executionId,
-        wsCloseCode,
-        wsCloseReason,
-        graceMs: DISCONNECT_GRACE_MS,
-      })
-      .warn('Wrapper disconnected — starting grace period before marking as failed');
-
-    const graceState: DisconnectGraceState = {
-      executionId,
-      disconnectedAt: now,
-      wsCloseCode,
-      wsCloseReason,
-    };
-    await this.ctx.storage.put(DISCONNECT_GRACE_KEY, graceState);
-
-    // Reschedule alarm to fire at the grace deadline. The alarm handler
-    // always reschedules itself afterward, so the normal reaper cadence
-    // self-heals once this fires.
-    await this.ctx.storage.setAlarm(now + DISCONNECT_GRACE_MS);
-  }
-
-  /**
-   * Check and handle an expired disconnect grace period.
-   * Called from alarm() before normal reaper duties.
-   * Re-checks whether the wrapper reconnected or the execution completed
-   * during the grace window before failing it.
-   */
-  private async checkDisconnectGrace(): Promise<void> {
-    const graceState = await this.ctx.storage.get<DisconnectGraceState>(DISCONNECT_GRACE_KEY);
-    if (!graceState) return;
-
-    const elapsed = Date.now() - graceState.disconnectedAt;
-    if (elapsed < DISCONNECT_GRACE_MS) return; // alarm fired early (e.g. reaper cadence)
-
-    // Grace period has elapsed — clear the state first to avoid re-processing
-    await this.ctx.storage.delete(DISCONNECT_GRACE_KEY);
-
-    const { executionId, wsCloseCode, wsCloseReason } = graceState;
-
-    // Re-check: wrapper may have reconnected during grace period
-    const ingestHandler = await this.getIngestHandler();
-    if (ingestHandler.hasActiveConnection(executionId)) {
-      logger
-        .withFields({ executionId })
-        .info('Wrapper reconnected during grace period — skipping failure');
-      return;
-    }
-
-    // Re-check execution state (may have completed normally during grace period)
-    const currentExecution = await this.executionQueries.get(executionId);
-    if (
-      !currentExecution ||
-      (currentExecution.status !== 'running' && currentExecution.status !== 'pending')
-    ) {
-      logger
-        .withFields({
-          executionId,
-          status: currentExecution?.status,
-        })
-        .info('Execution no longer active during grace period — skipping failure');
-      return;
-    }
-
-    logger.withFields({ executionId }).warn('Grace period expired — marking execution as failed');
-
-    await this.failExecution({
-      executionId,
-      status: 'failed',
-      error: 'Wrapper disconnected',
-      streamEventType: 'wrapper_disconnected',
-      streamPayload: { wsCloseCode, wsCloseReason },
-    });
   }
 
   /**
@@ -2147,7 +1867,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    *
    * Performs:
    * 1. Update execution status to terminal (enqueues callback)
-   * 2. Clear active execution (safety net)
+   * 2. Clear current wrapper runtime liveness state when applicable
    * 3. Clear interrupt flag
    * 4. Broadcast event to /stream clients
    *
@@ -2164,13 +1884,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }): Promise<boolean> {
     const { executionId, status, error, streamEventType, streamPayload } = params;
 
-    // Clear disconnect grace state — prevents double-failure if another codepath
-    // already failed the execution while a grace period was pending.
-    await this.cancelDisconnectGrace();
+    // Terminal cleanup must clear fenced disconnect grace as well as unfenced legacy grace.
+    await this.getWrapperSupervisor().clearDisconnectGraceForExecution(executionId);
 
-    // Snapshot active execution before updateStatus clears it — we need this to
-    // decide whether to clean up the interrupt flag afterward.
-    const wasActive = (await this.executionQueries.getActiveExecutionId()) === executionId;
+    const stateBeforeUpdate = await getWrapperRuntimeState(this.ctx.storage);
+    const wasCurrentRuntimeExecution =
+      stateBeforeUpdate.wrapperExecutionId === executionId ||
+      stateBeforeUpdate.acceptedExecutionId === executionId;
 
     // 1. Update status (enqueues callback notification on terminal unless suppressed)
     const statusResult = await this.updateExecutionStatus(
@@ -2190,15 +1910,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return false;
     }
 
-    // 2. Clear active execution + interrupt only if this was the active execution.
-    //    updateStatus already clears active_execution_id internally when it matches,
-    //    so the clear here is a safety net. We skip both clears when this execution
-    //    wasn't active to avoid clobbering a newer execution that started in between.
-    if (wasActive) {
-      const activeId = await this.executionQueries.getActiveExecutionId();
-      if (activeId === executionId) {
-        await this.executionQueries.clearActiveExecution();
-      }
+    // 2. Clear interrupt only if this was the current runtime execution.
+    if (wasCurrentRuntimeExecution) {
+      await clearWrapperRuntimeIdentity(this.ctx.storage, {
+        wrapperGeneration: stateBeforeUpdate.wrapperGeneration,
+        wrapperConnectionId: stateBeforeUpdate.wrapperConnectionId,
+      });
       await this.executionQueries.clearInterrupt();
     }
 
@@ -2219,6 +1936,47 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return true;
   }
 
+  private async hasWrapperRuntimeOrPendingWork(): Promise<boolean> {
+    const pendingCount = await countPendingSessionMessages(this.ctx.storage);
+    if (pendingCount > 0) return true;
+
+    const state = await getWrapperRuntimeState(this.ctx.storage);
+    if (!state.wrapperConnectionId) return false;
+
+    const acceptedMessages = await listNonTerminalAcceptedMessages(
+      this.ctx.storage,
+      state.wrapperRunId
+    );
+    if (acceptedMessages.length > 0) return true;
+
+    return false;
+  }
+
+  private async getNextAlarmDeadlines(): Promise<number[]> {
+    const deadlines = await this.getWrapperSupervisor().nextMaintenanceDeadlines();
+
+    const maxRuntimeExecution = await this.getMaxRuntimeExecution();
+    if (maxRuntimeExecution) {
+      const maxRuntimeDeadline = maxRuntimeExecution.startedAt + DEFAULT_MAX_RUNTIME_MS;
+      deadlines.push(maxRuntimeDeadline);
+    }
+
+    const nextCallbackDeadline = await this.getMessageSettlementOutbox().nextCallbackDeadline();
+    if (nextCallbackDeadline !== undefined) {
+      deadlines.push(nextCallbackDeadline);
+    }
+
+    return deadlines;
+  }
+
+  private async retryPendingCallbacks(now: number): Promise<void> {
+    await this.getMessageSettlementOutbox().retryPendingCallbacks(now);
+  }
+
+  private async stopCurrentWrapperProcess(reason: AgentRuntimeStopReason): Promise<boolean> {
+    return this.getAgentRuntime().stopWrapperProcess(reason);
+  }
+
   /**
    * Update execution heartbeat timestamp.
    */
@@ -2232,20 +1990,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    */
   async setProcessId(executionId: ExecutionId, processId: string): Promise<boolean> {
     return this.executionQueries.setProcessId(executionId, processId);
-  }
-
-  /**
-   * Set the active execution for this session.
-   */
-  async setActiveExecution(executionId: ExecutionId): Promise<Result<void, SetActiveError>> {
-    return this.executionQueries.setActiveExecution(executionId);
-  }
-
-  /**
-   * Clear the active execution.
-   */
-  async clearActiveExecution(): Promise<void> {
-    return this.executionQueries.clearActiveExecution();
   }
 
   /**
@@ -2276,6 +2020,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     error: string;
     streamEventType?: string;
   }): Promise<boolean> {
+    const execution = await this.executionQueries.get(params.executionId as ExecutionId);
+    if (!execution || this.isTerminalStatus(execution.status)) {
+      return false;
+    }
+
     return this.failExecution({
       executionId: params.executionId as ExecutionId,
       status: 'failed',
@@ -2298,11 +2047,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.executionQueries.getAll();
   }
 
-  /**
-   * Get the currently active execution ID.
-   */
-  async getActiveExecutionId(): Promise<ExecutionId | null> {
-    return this.executionQueries.getActiveExecutionId();
+  async getCurrentRuntimeExecution(): Promise<ExecutionMetadata | null> {
+    const executionId = await this.getRawWrapperRuntimeExecutionId();
+    if (!executionId) return null;
+
+    const execution = await this.executionQueries.get(executionId);
+    return execution && this.isCurrentRuntimeStatus(execution.status) ? execution : null;
   }
 
   /**
@@ -2377,654 +2127,75 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   // Direct Execution Methods
   // ---------------------------------------------------------------------------
 
-  /**
-   * Build an execution plan for the orchestrator.
-   */
-  private buildExecutionPlan(params: {
-    executionId: ExecutionId;
-    sandboxId: string;
-    sessionId: SessionId;
-    userId: UserId;
-    orgId?: string;
-    mode: ExecutionMode;
-    payload: ExecutionPayload;
-    model?: string;
-    variant?: string;
-    autoCommit?: boolean;
-    condenseOnComplete?: boolean;
-    messageId?: string;
-    images?: Images;
-    initContext?: InitializeContext;
-    resumeContext?: TokenResumeContext;
-    existingMetadata?: CloudAgentSessionState;
-    kiloSessionId?: string;
-  }): ExecutionPlan {
-    const existingMetadataProfile = params.existingMetadata
-      ? readProfileBundle(params.existingMetadata)
-      : undefined;
-    const existingMetadataView = params.existingMetadata
-      ? {
-          workspacePath: params.existingMetadata.workspacePath ?? '',
-          kiloSessionId: params.existingMetadata.kiloSessionId ?? '',
-          branchName: params.existingMetadata.branchName ?? '',
-          sandboxId: params.existingMetadata.sandboxId,
-          sessionHome: params.existingMetadata.sessionHome,
-          devcontainer: params.existingMetadata.devcontainer,
-          upstreamBranch: params.existingMetadata.upstreamBranch,
-          appendSystemPrompt: params.existingMetadata.appendSystemPrompt,
-          profile: existingMetadataProfile,
-          githubRepo: params.existingMetadata.githubRepo,
-          gitUrl: params.existingMetadata.gitUrl,
-          createdOnPlatform: params.existingMetadata.createdOnPlatform,
-        }
-      : undefined;
-
-    const workspace = params.initContext
-      ? {
-          shouldPrepare: true as const,
-          sandboxId: params.sandboxId,
-          initContext: params.initContext,
-          existingMetadata: existingMetadataView,
-        }
-      : {
-          shouldPrepare: false as const,
-          sandboxId: params.sandboxId,
-          resumeContext: {
-            kiloSessionId: params.kiloSessionId ?? '',
-            workspacePath: params.existingMetadata?.workspacePath ?? '',
-            kilocodeToken: params.resumeContext?.kilocodeToken ?? '',
-            kilocodeModel: params.resumeContext?.kilocodeModel,
-            branchName: params.existingMetadata?.branchName ?? '',
-            githubToken: params.resumeContext?.githubToken,
-            gitToken: params.resumeContext?.gitToken,
-            createdOnPlatform: params.existingMetadata?.createdOnPlatform,
-          },
-          existingMetadata: existingMetadataView,
-        };
-
-    return {
-      executionId: params.executionId,
-      sessionId: params.sessionId,
-      userId: params.userId,
-      orgId: params.orgId,
-      payload: params.payload,
-      mode: params.mode,
-      workspace,
-      wrapper: {
-        kiloSessionId: params.kiloSessionId,
-        model: params.model ? { modelID: params.model.replace(/^kilo\//, '') } : undefined,
-        variant: params.variant,
-        autoCommit: params.autoCommit,
-        condenseOnComplete: params.condenseOnComplete,
-      },
-      images: params.images,
-      messageId: params.messageId,
-    };
+  async queueSessionMessage(
+    request: QueueSessionMessageRequest
+  ): Promise<QueueSessionMessageResult> {
+    return this.getSessionMessageQueue().enqueue(request);
   }
 
-  /**
-   * Get or create the execution orchestrator.
-   */
-  private getOrCreateOrchestrator(): ExecutionOrchestrator {
-    if (!this.orchestrator) {
-      const deps: OrchestratorDeps = {
-        getSandbox: async (sandboxId: string) => {
-          return getSandbox(getSandboxNamespace(this.env, sandboxId), sandboxId, {
-            sleepAfter: SANDBOX_SLEEP_AFTER_SECONDS,
-          });
-        },
-        getSessionStub: (userId, sessionId) => {
-          const doKey = `${userId}:${sessionId}`;
-          const id = this.env.CLOUD_AGENT_SESSION.idFromName(doKey);
-          return this.env.CLOUD_AGENT_SESSION.get(id);
-        },
-        getIngestUrl: (sessionId, userId) => {
-          const workerUrl = this.env.WORKER_URL || 'http://localhost:8788';
-          // Encode userId to handle OAuth IDs like "oauth/google:123" that contain slashes
-          return `${workerUrl}/sessions/${encodeURIComponent(userId)}/${sessionId}/ingest`;
-        },
-        env: this.env,
-      };
-      this.orchestrator = new ExecutionOrchestrator(deps);
-    }
-    return this.orchestrator;
+  private async flushOnePendingSessionMessage(): Promise<{
+    retryAt?: number;
+    remainingPendingCount: number;
+  }> {
+    return this.getSessionMessageQueue().drainNextPendingMessage();
   }
 
-  private buildStartResult(executionId: ExecutionId): StartExecutionV2Result {
-    return {
-      success: true,
-      executionId,
-      status: 'started',
-    };
-  }
+  private async recordRuntimeAcceptedMessage(
+    plan: MessageDeliveryPlan,
+    delivery: AgentRuntimeAcceptedDelivery
+  ): Promise<void> {
+    const { turn } = plan;
+    const sessionId = plan.scope.sessionId;
+    const { acceptedAt, wrapperRunId } = delivery;
 
-  private buildStartError(
-    code: Extract<StartExecutionV2Result, { success: false }>['code'],
-    error: string,
-    activeExecutionId?: ExecutionId
-  ): StartExecutionV2Result {
-    return {
-      success: false,
-      code,
-      error,
-      activeExecutionId,
-    };
-  }
-
-  /**
-   * Refresh a managed GitLab token via GIT_TOKEN_SERVICE. Logs and returns
-   * the current value if the refresh fails with a transient reason so callers
-   * can keep running with the last-known token (best effort). Successful
-   * refreshes are persisted to metadata so a later refresh failure falls back
-   * to the most recent working token rather than a stale prepare-time token.
-   *
-   * Access-revocation reasons (`no_integration_found`, `invalid_org_id`) fail
-   * closed by throwing `BAD_REQUEST`: the stored token is no longer authorized
-   * (integration was removed, or user lost access to the org) and continuing
-   * to use it would bypass revocation.
-   *
-   * `gitlabTokenManaged === false` (explicitly set during prepare when the
-   * caller supplied their own PAT) skips refresh. `undefined` — i.e. sessions
-   * prepared before this flag existed — is treated as managed for backwards
-   * compatibility, since the previous code path relied on the web app
-   * injecting a fresh managed token on every `sendMessage`.
-   */
-  private async refreshManagedGitLabToken(
-    metadata: CloudAgentSessionState,
-    current: string | undefined
-  ): Promise<string | undefined> {
-    if (metadata.platform !== 'gitlab' || metadata.gitlabTokenManaged === false) {
-      return current;
-    }
-    const result = await resolveManagedGitLabToken(this.env, {
-      userId: metadata.userId,
-      orgId: metadata.orgId,
-    });
-    if (result.success) {
-      if (result.token !== current) {
-        await this.updateGitToken(result.token);
-      }
-      return result.token;
-    }
-    if (result.reason === 'no_integration_found' || result.reason === 'invalid_org_id') {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'No GitLab integration found. Please connect your GitLab account first.',
-      });
-    }
-    logger
-      .withFields({ reason: result.reason, sessionId: metadata.sessionId })
-      .warn('Managed GitLab token refresh failed; using last-known value');
-    return current;
-  }
-
-  /**
-   * Start a V2 execution using direct execution (no queue).
-   * This method performs validation, checks for active execution, and executes directly.
-   *
-   * Returns 409 Conflict (EXECUTION_IN_PROGRESS) if an execution is already active.
-   */
-  async startExecutionV2(request: StartExecutionV2Request): Promise<StartExecutionV2Result> {
-    const sessionId = await this.requireSessionId();
-    const executionId = createExecutionId();
-
-    // Maps TRPCError codes to StartExecutionV2Result error codes.
-    const mapTRPCCodeToResultCode = (
-      trpcCode: string
-    ): Extract<StartExecutionV2Result, { success: false }>['code'] => {
-      switch (trpcCode) {
-        case 'BAD_REQUEST':
-          return 'BAD_REQUEST';
-        case 'NOT_FOUND':
-          return 'NOT_FOUND';
-        default:
-          return 'INTERNAL';
-      }
-    };
-
-    try {
-      // Check if there's already an active execution - return 409 if so
-      const activeExecutionId = await this.executionQueries.getActiveExecutionId();
-      if (activeExecutionId) {
-        return this.buildStartError(
-          'EXECUTION_IN_PROGRESS',
-          `Execution ${activeExecutionId} is in progress`,
-          activeExecutionId
-        );
-      }
-
-      if (request.kind === 'initiate') {
-        // Validate githubRepo requires authentication
-        if (request.githubRepo && !request.githubToken) {
-          return this.buildStartError(
-            'BAD_REQUEST',
-            'GitHub authentication required for this repository'
-          );
-        }
-
-        const kiloSessionId = crypto.randomUUID();
-        const normalizedModel = normalizeKilocodeModel(request.model);
-        if (!normalizedModel) {
-          return this.buildStartError('BAD_REQUEST', 'No model specified');
-        }
-
-        const sandboxId = await generateSandboxId(
-          this.env.PER_SESSION_SANDBOX_ORG_IDS,
-          request.orgId,
-          request.userId,
-          sessionId,
-          request.botId
-        );
-
-        const prepareResult = await this.prepare({
-          sessionId,
-          userId: request.userId,
-          orgId: request.orgId,
-          kiloSessionId,
-          prompt: request.prompt,
-          mode: request.mode,
-          model: normalizedModel,
-          variant: request.variant,
-          kilocodeToken: request.authToken,
-          githubRepo: request.githubRepo,
-          githubToken: request.githubToken,
-          gitUrl: request.gitUrl,
-          gitToken: request.gitToken,
-          envVars: request.envVars,
-          encryptedSecrets: request.encryptedSecrets,
-          setupCommands: request.setupCommands,
-          mcpServers: request.mcpServers,
-          autoCommit: request.autoCommit,
-          upstreamBranch: request.upstreamBranch,
-          sandboxId,
+    if (wrapperRunId) {
+      const existingState = await getSessionMessageState(this.ctx.storage, turn.messageId);
+      if (existingState && existingState.status === 'queued') {
+        await markMessageAccepted(this.ctx.storage, turn.messageId, wrapperRunId, acceptedAt);
+        logger
+          .withFields({ sessionId, messageId: turn.messageId, wrapperRunId })
+          .info('Session message transitioned from queued to accepted');
+      } else if (!existingState) {
+        await putSessionMessageState(this.ctx.storage, {
+          messageId: turn.messageId,
+          status: 'accepted',
+          prompt: renderExecutionTurnContent(turn),
+          createdAt: acceptedAt,
+          queuedAt: acceptedAt,
+          acceptedAt,
+          wrapperRunId,
         });
-
-        if (!prepareResult.success) {
-          return this.buildStartError(
-            'INTERNAL',
-            prepareResult.error ?? 'Failed to prepare session'
-          );
-        }
-
-        // Transition to initiated state
-        const initiateResult = await this.tryInitiate();
-        if (
-          !initiateResult.success &&
-          initiateResult.error !== 'Session has already been initiated'
-        ) {
-          return this.buildStartError(
-            'INTERNAL',
-            initiateResult.error ?? 'Failed to initiate session'
-          );
-        }
-        const initContext: InitializeContext = {
-          kilocodeToken: request.authToken,
-          kilocodeModel: request.model,
-          githubRepo: request.githubRepo,
-          githubToken: request.githubToken,
-          gitUrl: request.gitUrl,
-          gitToken: request.gitToken,
-          profile: {
-            envVars: request.envVars,
-            encryptedSecrets: request.encryptedSecrets,
-            setupCommands: request.setupCommands,
-            mcpServers: request.mcpServers,
-            runtimeSkills: request.runtimeSkills ? [...request.runtimeSkills] : undefined,
-            runtimeAgents: request.runtimeAgents ? [...request.runtimeAgents] : undefined,
-            kiloCommands: request.kiloCommands ? [...request.kiloCommands] : undefined,
-          },
-          upstreamBranch: request.upstreamBranch,
-          botId: request.botId,
-          platform: request.platform,
-          createdOnPlatform: request.createdOnPlatform,
-        };
-
-        const plan = this.buildExecutionPlan({
-          executionId,
-          sandboxId,
-          sessionId,
-          userId: request.userId,
-          orgId: request.orgId,
-          mode: request.mode,
-          payload: {
-            type: 'prompt',
-            prompt: request.prompt,
-            mode: request.mode,
-            model: normalizedModel ?? undefined,
-            variant: request.variant,
-          },
-          model: normalizedModel,
-          variant: request.variant,
-          autoCommit: request.autoCommit,
-          condenseOnComplete: request.condenseOnComplete,
-          initContext,
-          kiloSessionId,
-        });
-
-        return await this.executeDirectly(plan);
+        logger
+          .withFields({ sessionId, messageId: turn.messageId, wrapperRunId })
+          .warn('Accepted session message state was missing and has been reconstructed');
       }
-
-      if (request.kind === 'initiatePrepared') {
-        const metadata = await this.getMetadata();
-        if (!metadata) {
-          return this.buildStartError('NOT_FOUND', 'Session not found');
-        }
-        if (!metadata.preparedAt) {
-          return this.buildStartError('BAD_REQUEST', 'Session has not been prepared');
-        }
-        if (metadata.initiatedAt) {
-          return this.buildStartError('BAD_REQUEST', 'Session has already been initiated');
-        }
-        if (!metadata.prompt || !metadata.mode || !metadata.model) {
-          return this.buildStartError(
-            'BAD_REQUEST',
-            'Session is missing required fields (prompt, mode, model)'
-          );
-        }
-
-        const modeError = validateModeAgainstRuntimeAgents(metadata);
-        if (modeError) {
-          return this.buildStartError('BAD_REQUEST', modeError);
-        }
-
-        // Transition to initiated state
-        const initiateResult = await this.tryInitiate();
-        if (
-          !initiateResult.success &&
-          initiateResult.error !== 'Session has already been initiated'
-        ) {
-          return this.buildStartError(
-            'INTERNAL',
-            initiateResult.error ?? 'Failed to initiate session'
-          );
-        }
-
-        const token = request.authToken || metadata.kilocodeToken || '';
-        let githubToken = metadata.githubToken;
-        if (metadata.githubInstallationId) {
-          const appType = metadata.githubAppType || 'standard';
-          githubToken = await this.env.GIT_TOKEN_SERVICE.getToken(
-            metadata.githubInstallationId,
-            appType
-          );
-        }
-        if (metadata.githubRepo && !githubToken) {
-          return this.buildStartError(
-            'BAD_REQUEST',
-            'GitHub authentication required for this repository'
-          );
-        }
-
-        const gitToken = await this.refreshManagedGitLabToken(metadata, metadata.gitToken);
-
-        const sandboxId =
-          metadata.sandboxId ??
-          (await generateSandboxId(
-            this.env.PER_SESSION_SANDBOX_ORG_IDS,
-            metadata.orgId,
-            metadata.userId,
-            metadata.sessionId,
-            metadata.botId
-          ));
-        const initContext: InitializeContext = {
-          kilocodeToken: token,
-          kilocodeModel: metadata.model,
-          githubRepo: metadata.githubRepo,
-          githubToken,
-          gitUrl: metadata.gitUrl,
-          gitToken,
-          profile: readProfileBundle(metadata),
-          upstreamBranch: metadata.upstreamBranch,
-          botId: request.botId,
-          kiloSessionId: metadata.kiloSessionId,
-          isPreparedSession: true,
-          githubAppType: metadata.githubAppType,
-          platform: metadata.platform,
-          createdOnPlatform: metadata.createdOnPlatform,
-        };
-
-        const initialPayload = metadata.initialPayload ?? {
-          type: 'prompt' as const,
-          prompt: metadata.prompt ?? '',
-          mode: metadata.mode ?? '',
-          model: metadata.model ?? '',
-          variant: metadata.variant,
-        };
-
-        const plan = this.buildExecutionPlan({
-          executionId,
-          sandboxId,
-          sessionId,
-          userId: metadata.userId as UserId,
-          orgId: metadata.orgId,
-          mode: metadata.mode ?? '',
-          payload: initialPayload,
-          model: metadata.model,
-          variant: metadata.variant,
-          autoCommit: metadata.autoCommit,
-          condenseOnComplete: metadata.condenseOnComplete,
-          messageId: metadata.initialMessageId,
-          images: metadata.images,
-          initContext,
-          existingMetadata: metadata,
-          kiloSessionId: metadata.kiloSessionId,
-        });
-
-        return await this.executeDirectly(plan);
-      }
-
-      // Follow-up message (kind === 'followup')
-      const metadata = await this.getMetadata();
-      if (!metadata) {
-        return this.buildStartError('NOT_FOUND', 'Session not found');
-      }
-      if (!metadata.initiatedAt) {
-        return this.buildStartError('BAD_REQUEST', 'Session has not been initiated yet');
-      }
-
-      if (request.tokenOverrides?.githubToken && metadata.githubRepo) {
-        await this.updateGithubToken(request.tokenOverrides.githubToken);
-        metadata.githubToken = request.tokenOverrides.githubToken;
-      }
-      if (request.tokenOverrides?.gitToken && metadata.gitUrl) {
-        await this.updateGitToken(request.tokenOverrides.gitToken);
-        metadata.gitToken = request.tokenOverrides.gitToken;
-      }
-
-      // Slash commands carry their own agent/model overrides on the kilo side
-      // (Command.Info.agent / .model) — for the cloud-agent-next plan we just
-      // reuse the session's existing mode/model so logger tags + plan shape
-      // stay sensible. Mode/model validation only applies to prompt payloads.
-      const isCommand = request.payload.type === 'command';
-      const mode =
-        (request.payload.type === 'prompt' ? request.payload.mode : undefined) ??
-        metadata.mode ??
-        'code';
-      const model = normalizeKilocodeModel(
-        (request.payload.type === 'prompt' ? request.payload.model : undefined) ?? metadata.model
-      );
-      const variant =
-        (request.payload.type === 'prompt' ? request.payload.variant : undefined) ??
-        metadata.variant;
-      if (!model && !isCommand) {
-        return this.buildStartError(
-          'BAD_REQUEST',
-          'No model specified and session has no default model'
-        );
-      }
-      // Reject custom slugs that aren't in the session's stored runtimeAgents.
-      // Built-in slugs and `custom` (which sendMessageV2 schema already rejects
-      // at the API boundary) pass through unchanged.
-      if (!BUILTIN_AGENT_MODES.has(mode)) {
-        const knownSlugs = new Set(
-          (readProfileBundle(metadata).runtimeAgents ?? []).map(m => m.slug)
-        );
-        if (!knownSlugs.has(mode)) {
-          return this.buildStartError(
-            'BAD_REQUEST',
-            `Mode "${mode}" is not a built-in and does not match any runtimeAgents on this session`
-          );
-        }
-      }
-
-      // Token overrides win: only generate from installation ID if no override provided
-      let githubToken = request.tokenOverrides?.githubToken ?? metadata.githubToken;
-      if (!request.tokenOverrides?.githubToken && metadata.githubInstallationId) {
-        const appType = metadata.githubAppType || 'standard';
-        githubToken = await this.env.GIT_TOKEN_SERVICE.getToken(
-          metadata.githubInstallationId,
-          appType
-        );
-      }
-      if (metadata.githubRepo && !githubToken) {
-        return this.buildStartError(
-          'BAD_REQUEST',
-          'GitHub authentication required for this repository'
-        );
-      }
-
-      // Refresh GitLab token if auto-managed (override wins when provided)
-      const overrideGitToken = request.tokenOverrides?.gitToken;
-      const gitToken = overrideGitToken
-        ? overrideGitToken
-        : await this.refreshManagedGitLabToken(metadata, metadata.gitToken);
-
-      const sandboxId =
-        metadata.sandboxId ??
-        (await generateSandboxId(
-          this.env.PER_SESSION_SANDBOX_ORG_IDS,
-          metadata.orgId,
-          metadata.userId,
-          metadata.sessionId,
-          metadata.botId
-        ));
-      // For command payloads `model` may be undefined (command's own
-      // Command.Info.model takes effect); fall back to the session's stored
-      // model so the resume context still has a string for kilo to log.
-      const resumeContext: TokenResumeContext = {
-        kilocodeToken: metadata.kilocodeToken ?? '',
-        kilocodeModel: model ?? metadata.model ?? '',
-        githubToken,
-        gitToken,
-      };
-
-      const plan = this.buildExecutionPlan({
-        executionId,
-        sandboxId,
-        sessionId,
-        userId: metadata.userId as UserId,
-        orgId: metadata.orgId,
-        mode,
-        payload: request.payload,
-        model,
-        variant,
-        autoCommit: request.autoCommit ?? metadata.autoCommit,
-        condenseOnComplete: request.condenseOnComplete ?? metadata.condenseOnComplete,
-        messageId: request.messageId,
-        images: request.images,
-        resumeContext,
-        existingMetadata: metadata,
-        kiloSessionId: metadata.kiloSessionId,
-      });
-
-      // Suppress failure callback for followup executions: the caller
-      // (orchestrator) receives the error synchronously via the tRPC
-      // response and has its own fallback logic.  Enqueuing a callback
-      // here would race with the fallback session's callbacks and
-      // corrupt the new review's state (see PLAN-callback-race-fix.md).
-      return await this.executeDirectly(plan, { suppressCallbackOnError: true });
-    } catch (error) {
-      // Handle ExecutionError specifically for proper error code mapping
-      if (isExecutionError(error)) {
-        if (error.code === 'EXECUTION_IN_PROGRESS') {
-          return this.buildStartError(
-            'EXECUTION_IN_PROGRESS',
-            error.message,
-            error.activeExecutionId as ExecutionId
-          );
-        }
-        // Retryable errors pass through specific code -> 503 in tRPC handler
-        if (error.retryable) {
-          // error.code is a RetryableErrorCode which matches RetryableResultCode
-          return this.buildStartError(
-            error.code as Extract<StartExecutionV2Result, { success: false }>['code'],
-            error.message
-          );
-        }
-        return this.buildStartError('INTERNAL', error.message);
-      }
-      if (error instanceof TRPCError) {
-        return this.buildStartError(mapTRPCCodeToResultCode(error.code), error.message);
-      }
-      return this.buildStartError(
-        'INTERNAL',
-        error instanceof Error ? error.message : String(error)
-      );
     }
+
+    await this.emitSessionMessageSent(turn.messageId);
+    await this.recordSessionInitiatedIfNeeded(acceptedAt);
   }
 
   /**
-   * Execute a plan directly using the orchestrator.
-   * This replaces the queue-based enqueueExecution pattern.
-   *
-   * @param suppressCallbackOnError — when true, a pre-start failure (e.g.
-   *   workspace restore) will NOT enqueue a callback notification.  The caller
-   *   is expected to handle the error synchronously (used by the followup path
-   *   where the orchestrator falls back to a fresh session on failure).
+   * Deliver one pending message through the shared wrapper delivery path.
    */
-  private async executeDirectly(
-    plan: ExecutionPlan,
-    opts?: { suppressCallbackOnError?: boolean }
-  ): Promise<StartExecutionV2Result> {
-    const { executionId, sessionId, mode } = plan;
+  private async executeDirectly(plan: MessageDeliveryPlan): Promise<QueueSessionMessageResult> {
+    const sessionId = plan.scope.sessionId;
+    const eventSourceId = '' as EventSourceId;
 
-    logger.withFields({ sessionId, executionId }).info('executeDirectly called');
+    await this.scheduleAlarmAtOrBefore(Date.now() + PENDING_FLUSH_DEBOUNCE_MS);
 
-    // Add execution metadata to the DO
-    const ingestToken = executionId;
-    const addResult = await this.executionQueries.add({
-      executionId,
-      mode,
-      streamingMode: 'websocket',
-      ingestToken,
-    });
-
-    if (!addResult.ok) {
-      logger
-        .withFields({ sessionId, executionId, error: addResult.error })
-        .warn('Failed to add execution (may already exist)');
-    }
-
-    // Set this as the active execution
-    const setActiveResult = await this.executionQueries.setActiveExecution(executionId);
-    if (!setActiveResult.ok) {
-      logger
-        .withFields({ sessionId, executionId, error: setActiveResult.error })
-        .error('Failed to set active execution');
-      return this.buildStartError('INTERNAL', 'Failed to set active execution');
-    }
-
-    // Reschedule the alarm to the active interval — the idle alarm may be up
-    // to an hour away, but we need the reaper checking every 2 min while an
-    // execution is running (stale detection, hung execution, max runtime, etc.).
-    await this.ctx.storage.setAlarm(Date.now() + REAPER_ACTIVE_INTERVAL_MS);
-
-    // Execute via orchestrator
-    try {
-      const orchestrator = this.getOrCreateOrchestrator();
-
-      const emitProgress = (step: string, message: string) => {
+    const result = await this.getAgentRuntime().send(plan, {
+      onProgress: (step, message) => {
         const now = Date.now();
         this.broadcastVolatileEvent({
-          executionId,
+          executionId: eventSourceId,
           sessionId,
           streamEventType: 'preparing',
           payload: JSON.stringify({ step, message }),
           timestamp: now,
         });
-        // cloud.status mirrors the preparation step
         this.broadcastVolatileEvent({
-          executionId,
+          executionId: eventSourceId,
           sessionId,
           streamEventType: 'cloud.status',
           payload: JSON.stringify({
@@ -3032,71 +2203,40 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           }),
           timestamp: now,
         });
-      };
-
-      const result = await orchestrator.execute(plan, { onProgress: emitProgress });
-
-      // Emit cloud.status = ready after successful execution start
-      this.broadcastVolatileEvent({
-        executionId,
-        sessionId,
-        streamEventType: 'cloud.status',
-        payload: JSON.stringify({ cloudStatus: { type: 'ready' } }),
-        timestamp: Date.now(),
-      });
-
-      logger
-        .withFields({ sessionId, executionId, kiloSessionId: result.kiloSessionId })
-        .info('Execution started successfully');
-
-      return this.buildStartResult(executionId);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
-      try {
-        this.broadcastVolatileEvent({
-          executionId,
-          sessionId,
-          streamEventType: 'cloud.status',
-          payload: JSON.stringify({ cloudStatus: { type: 'error', message: errorMessage } }),
-          timestamp: Date.now(),
-        });
-      } catch {
-        // Best-effort — must not prevent failExecution from running.
-      }
-
-      try {
-        await this.failExecution({
-          executionId,
-          status: 'failed',
-          error: errorMessage,
-          streamEventType: 'error',
-          suppressCallback: opts?.suppressCallbackOnError,
-        });
-      } catch (failError) {
-        // failExecution itself threw — force-clear the active execution as a
-        // last-resort safety net so the session is not permanently locked.
-        logger
-          .withFields({ sessionId, executionId, error: String(failError) })
-          .error(
-            'failExecution threw during executeDirectly cleanup — force-clearing active execution'
-          );
-        try {
-          await this.executionQueries.clearActiveExecution();
-        } catch {
-          // Storage write failed — the reaper alarm will catch this.
+      },
+      onWorkspaceReady: async ready => {
+        const readyResult = await this.recordSessionReady(ready);
+        if (!readyResult.success) {
+          throw new Error(readyResult.error ?? 'Failed to record session readiness');
         }
-      }
+      },
+      onAccepted: delivery => this.recordRuntimeAcceptedMessage(plan, delivery),
+    });
 
-      throw error;
-    }
+    this.broadcastVolatileEvent({
+      executionId: eventSourceId,
+      sessionId,
+      streamEventType: 'cloud.status',
+      payload: JSON.stringify({ cloudStatus: { type: 'ready' } }),
+      timestamp: Date.now(),
+    });
+
+    logger
+      .withFields({
+        sessionId,
+        messageId: plan.turn.messageId,
+        wrapperRunId: result.success ? result.wrapperRunId : undefined,
+      })
+      .info('Execution started successfully');
+
+    return result;
   }
 
   /**
    * Called when an execution completes (successfully, failed, or interrupted).
    *
-   * Updates the execution status and clears the active execution.
-   * With direct execution model, there's no queue to advance.
+   * Updates the execution status and clears the current wrapper runtime execution.
+   * Schedules a pending-message flush if more work is waiting.
    *
    * @param executionId - ID of the completed execution
    * @param status - Final status of the execution
@@ -3105,20 +2245,31 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async onExecutionComplete(
     executionId: ExecutionId,
     status: 'completed' | 'failed' | 'interrupted',
-    error?: string
+    error?: string,
+    gateResult?: 'pass' | 'fail'
   ): Promise<void> {
     const sessionId = await this.resolveSessionId();
-    logger.withFields({ sessionId, executionId, status, error }).info('onExecutionComplete called');
+    const stateBeforeUpdate = await getWrapperRuntimeState(this.ctx.storage);
+    logger
+      .withFields({
+        sessionId,
+        executionId,
+        status,
+        error,
+        wrapperRunId: stateBeforeUpdate.wrapperRunId,
+      })
+      .info('onExecutionComplete called');
 
-    // Snapshot active execution before updateStatus clears it — we need this to
-    // decide whether to clean up the interrupt flag afterward.
-    const wasActive = (await this.executionQueries.getActiveExecutionId()) === executionId;
+    const wasCurrentRuntimeExecution =
+      stateBeforeUpdate.wrapperExecutionId === executionId ||
+      stateBeforeUpdate.acceptedExecutionId === executionId;
 
     // Update execution status
     const updateResult = await this.updateExecutionStatus({
       executionId,
       status,
       error,
+      gateResult,
       completedAt: Date.now(),
     });
 
@@ -3128,18 +2279,26 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         .warn('Failed to update execution status');
     }
 
-    // Clear active execution + interrupt only if this was the active execution.
-    // updateStatus already clears active_execution_id internally when it matches,
-    // so the clear here is a safety net. We skip both clears when this execution
-    // wasn't active to avoid clobbering a newer execution that started in between.
-    if (wasActive) {
-      const activeExecutionId = await this.executionQueries.getActiveExecutionId();
-      if (activeExecutionId === executionId) {
-        await this.executionQueries.clearActiveExecution();
-      }
+    if (wasCurrentRuntimeExecution) {
+      await clearWrapperRuntimeIdentity(this.ctx.storage, {
+        wrapperGeneration: stateBeforeUpdate.wrapperGeneration,
+        wrapperConnectionId: stateBeforeUpdate.wrapperConnectionId,
+      });
       await this.executionQueries.clearInterrupt();
     }
 
+    await this.getSessionMessageQueue().requestPendingDrainIfNeeded();
+
     logger.withFields({ sessionId, executionId }).info('Execution complete - session is idle');
+  }
+
+  async handleWrapperTerminalEvent(params: {
+    wrapperRunId: string;
+    status: 'completed' | 'failed' | 'interrupted';
+    error?: string;
+    gateResult?: 'pass' | 'fail';
+  }): Promise<void> {
+    await this.resolveSessionId();
+    await this.getWrapperSupervisor().onTerminalEvent(params);
   }
 }

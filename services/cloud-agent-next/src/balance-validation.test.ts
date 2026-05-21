@@ -8,6 +8,7 @@ import {
 } from './balance-validation.js';
 import type { PersistenceEnv } from './persistence/types.js';
 import type { Env } from './types.js';
+import { parseSessionMetadata } from './persistence/session-metadata.js';
 
 // Mock the session-service module
 vi.mock('./session-service.js', () => ({
@@ -356,13 +357,15 @@ describe('balance-validation', () => {
     });
 
     it('returns orgId when session metadata exists', async () => {
-      vi.mocked(fetchSessionMetadata).mockResolvedValue({
-        version: 1,
-        sessionId: 'agent_123',
-        orgId: 'org-456',
-        userId: 'user-789',
-        timestamp: Date.now(),
-      });
+      vi.mocked(fetchSessionMetadata).mockResolvedValue(
+        parseSessionMetadata({
+          version: 1,
+          sessionId: 'agent_123',
+          orgId: 'org-456',
+          userId: 'user-789',
+          timestamp: Date.now(),
+        })
+      );
 
       const result = await fetchOrgIdForSession(mockPersistenceEnv, 'user-789', 'agent_123');
 
@@ -383,12 +386,14 @@ describe('balance-validation', () => {
     });
 
     it('returns undefined when session metadata has no orgId (personal account)', async () => {
-      vi.mocked(fetchSessionMetadata).mockResolvedValue({
-        version: 1,
-        sessionId: 'agent_123',
-        userId: 'user-789',
-        timestamp: Date.now(),
-      });
+      vi.mocked(fetchSessionMetadata).mockResolvedValue(
+        parseSessionMetadata({
+          version: 1,
+          sessionId: 'agent_123',
+          userId: 'user-789',
+          timestamp: Date.now(),
+        })
+      );
 
       const result = await fetchOrgIdForSession(mockPersistenceEnv, 'user-789', 'agent_123');
 

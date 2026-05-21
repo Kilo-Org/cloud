@@ -11,16 +11,24 @@
  * - Execution-level: passed via POST /job/prompt body (per-turn)
  */
 
-import { createKilo, type KiloClient as SDKClient } from '@kilocode/sdk';
+import { createKilo } from '@kilocode/sdk';
 import { SESSION_ID_RE } from '../../src/shared/protocol.js';
 import { WRAPPER_VERSION } from '../../src/shared/wrapper-version.js';
 import { WrapperState } from './state.js';
-import { createWrapperKiloClient, type KiloServerHandle } from './kilo-api.js';
-import { createConnectionManager } from './connection.js';
+import { createWrapperKiloClient, type WrapperKiloClient } from './kilo-api.js';
+import { createConnectionManager, openIngestProgressChannel } from './connection.js';
 import { createLifecycleManager } from './lifecycle.js';
-import { createServer } from './server.js';
+import { bindSessionContext, createServer } from './server.js';
 import { logToFile } from './utils.js';
 import type { WrapperCommand } from '../../src/shared/protocol.js';
+import type {
+  WrapperSessionReadyRequest,
+  WrapperSessionReadyResponse,
+} from '../../src/shared/wrapper-bootstrap.js';
+import {
+  materializePromptAttachments,
+  prepareWrapperBootstrapWorkspace,
+} from './session-bootstrap.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -35,16 +43,6 @@ const KILO_STARTUP_TIMEOUT_MS = 30_000;
 // ---------------------------------------------------------------------------
 // Environment Variable Parsing
 // ---------------------------------------------------------------------------
-
-function getRequiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    logToFile(`ERROR: Missing required environment variable: ${name}`);
-    console.error(`Missing required environment variable: ${name}`);
-    process.exit(1);
-  }
-  return value;
-}
 
 function getOptionalEnvInt(name: string, defaultValue: number): number {
   const value = process.env[name];
@@ -130,7 +128,7 @@ async function main() {
   // Per-execution config (autoCommit, condenseOnComplete, model, upstreamBranch)
   // is now passed in the POST /job/prompt body.
   const wrapperPort = getOptionalEnvInt('WRAPPER_PORT', 5000);
-  const workspacePath = getRequiredEnv('WORKSPACE_PATH');
+  const initialWorkspacePath = process.env.WORKSPACE_PATH;
   const {
     agentSessionId,
     userId,
@@ -141,208 +139,364 @@ async function main() {
     failStartup(`Invalid agent session ID: ${agentSessionId}`);
   }
 
-  // The wrapper process is started with cwd outside the workspace.
-  // Switch into the workspace now so the kilo server (started in-process)
-  // sees the correct project root. This is an attempt to fix an issue where
-  // the bun process crashes in some repos but not others.
-  process.chdir(workspacePath);
-
   // Set log path if not already set
   if (!process.env.WRAPPER_LOG_PATH) {
     process.env.WRAPPER_LOG_PATH = `/tmp/kilocode-wrapper-${Date.now()}.log`;
   }
 
   logToFile(
-    `config: wrapperPort=${wrapperPort} workspacePath=${workspacePath} agentSessionId=${agentSessionId}`
+    `config: wrapperPort=${wrapperPort} workspacePath=${initialWorkspacePath ?? '(bootstrap)'} agentSessionId=${agentSessionId}`
   );
   if (configuredSessionId) {
     logToFile(`config: sessionId=${configuredSessionId}`);
   }
 
   // ---------------------------------------------------------------------------
-  // Start kilo server in-process via SDK
-  // ---------------------------------------------------------------------------
-  logToFile('starting kilo server in-process via @kilocode/sdk');
-  let sdkClient: SDKClient;
-  let kiloServer: KiloServerHandle;
-  try {
-    const result = await createKilo({
-      hostname: '127.0.0.1',
-      port: 0, // Let OS assign a random port
-      timeout: KILO_STARTUP_TIMEOUT_MS,
-    });
-    sdkClient = result.client;
-    kiloServer = result.server;
-    logToFile(`kilo server started at ${kiloServer.url}`);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logToFile(`failed to start kilo server: ${msg}`);
-    console.error('Failed to start kilo server:', msg);
-    process.exit(1);
-  }
-
-  // Create wrapper kilo client (adapter over SDK client + raw fetch)
-  const kiloClient = createWrapperKiloClient(sdkClient, kiloServer.url, workspacePath);
-
-  // ---------------------------------------------------------------------------
-  // Create or verify kilo session
-  // ---------------------------------------------------------------------------
-  let kiloSessionId: string;
-
-  if (configuredSessionId) {
-    // Verify the expected session exists — fail hard if it doesn't.
-    // The Worker passed --session-id because it expects conversation continuity;
-    // silently creating a new session would lose history without anyone noticing.
-    try {
-      await kiloClient.getSession(configuredSessionId);
-      kiloSessionId = configuredSessionId;
-      logToFile(`verified existing kilo session: ${kiloSessionId}`);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      failStartup(`configured session ${configuredSessionId} not found: ${msg}`);
-    }
-  } else {
-    // Create a new session
-    const session = await kiloClient.createSession();
-    kiloSessionId = session.id;
-    logToFile(`created kilo session: ${kiloSessionId}`);
-  }
-
-  // ---------------------------------------------------------------------------
   // Wire up components
   // ---------------------------------------------------------------------------
   const state = new WrapperState();
-
-  // Late-bound: assigned after connectionManager is created (the lifecycle
-  // callbacks below capture this variable by reference and only read it at
-  // runtime, well after the assignment on the next line after createConnectionManager).
-  // eslint-disable-next-line prefer-const
+  let kiloClient: WrapperKiloClient | undefined;
+  let kiloSessionId = configuredSessionId ?? '';
+  let closeKiloServer: (() => void) | undefined;
+  let connectionManager: ReturnType<typeof createConnectionManager> | undefined;
   let lifecycleManager: ReturnType<typeof createLifecycleManager> | undefined;
+  let runtimeWorkspacePath = initialWorkspacePath;
 
-  // Create connection manager
-  const connectionManager = createConnectionManager(
-    state,
-    { kiloClient },
+  const unavailableKiloClient = new Proxy(
+    {},
     {
-      onMessageComplete: (messageId: string) => {
-        lifecycleManager?.onMessageComplete(messageId);
+      get() {
+        throw new Error('Kilo server has not been bootstrapped');
       },
-      onTerminalError: (reason: string) => {
-        logToFile(`terminal error: ${reason}`);
-        state.sendToIngest({
-          streamEventType: 'error',
-          data: { error: reason, fatal: true },
-          timestamp: new Date().toISOString(),
-        });
-        const job = state.currentJob;
-        if (job) {
-          kiloClient.abortSession({ sessionId: job.kiloSessionId }).catch(() => {});
-        }
-        lifecycleManager?.setAborted();
-        state.setActive(false);
-        lifecycleManager?.triggerDrainAndClose();
-      },
-      onCommand: (cmd: WrapperCommand) => {
-        logToFile(`command received: ${cmd.type}`);
-        if (cmd.type === 'kill') {
+    }
+  ) as WrapperKiloClient;
+
+  const serverConfig = {
+    port: wrapperPort,
+    workspacePath: initialWorkspacePath ?? '',
+    version: WRAPPER_VERSION,
+    sessionId: kiloSessionId,
+    agentSessionId,
+    userId,
+    platform: process.env.KILO_PLATFORM,
+  };
+
+  const serverDeps = {
+    state,
+    kiloClient: unavailableKiloClient,
+    openConnection: () => {
+      if (!connectionManager) throw new Error('Connection manager is not bootstrapped');
+      return connectionManager.open();
+    },
+    closeConnection: () => connectionManager?.close() ?? Promise.resolve(),
+    setAborted: () => lifecycleManager?.setAborted(),
+    resetLifecycle: () => lifecycleManager?.reset(),
+    readySession: readySession,
+    materializePromptAttachments,
+  };
+
+  async function verifyExistingKiloSession(
+    client: WrapperKiloClient,
+    expectedSessionId: string,
+    runtime: 'reused' | 'new',
+    workspacePath: string
+  ): Promise<void> {
+    const lookupStartedAt = Date.now();
+    logToFile(
+      `post-bootstrap kilo session lookup begin runtime=${runtime} expectedSessionId=${expectedSessionId} currentSessionId=${kiloSessionId || '(unset)'} workspacePath=${workspacePath} runtimeWorkspacePath=${runtimeWorkspacePath ?? '(unset)'} home=${process.env.HOME ?? '(unset)'}`
+    );
+    try {
+      const session = await client.getSession(expectedSessionId);
+      logToFile(
+        `post-bootstrap kilo session lookup end runtime=${runtime} outcome=ok expectedSessionId=${expectedSessionId} returnedSessionId=${session.id} elapsedMs=${Date.now() - lookupStartedAt}`
+      );
+    } catch (error) {
+      logToFile(
+        `post-bootstrap kilo session lookup end runtime=${runtime} outcome=error expectedSessionId=${expectedSessionId} elapsedMs=${Date.now() - lookupStartedAt} error=${error instanceof Error ? error.message : String(error)}`
+      );
+      throw error;
+    }
+  }
+
+  async function startKiloRuntime(
+    workspacePath: string,
+    expectedSessionId?: string
+  ): Promise<void> {
+    logToFile(
+      `startKiloRuntime requested workspacePath=${workspacePath} expectedSessionId=${expectedSessionId ?? '(none)'} currentSessionId=${kiloSessionId || '(unset)'} hasClient=${Boolean(kiloClient)} runtimeWorkspacePath=${runtimeWorkspacePath ?? '(unset)'} home=${process.env.HOME ?? '(unset)'}`
+    );
+    if (kiloClient && runtimeWorkspacePath === workspacePath) {
+      if (expectedSessionId && expectedSessionId !== kiloSessionId) {
+        await verifyExistingKiloSession(kiloClient, expectedSessionId, 'reused', workspacePath);
+        kiloSessionId = expectedSessionId;
+        serverConfig.sessionId = expectedSessionId;
+        logToFile(`startKiloRuntime reused runtime session rebound sessionId=${expectedSessionId}`);
+      } else {
+        logToFile(
+          `startKiloRuntime reused existing runtime without session rebinding sessionId=${kiloSessionId || '(unset)'}`
+        );
+      }
+      return;
+    }
+
+    logToFile(
+      `startKiloRuntime preparing new runtime workspacePath=${workspacePath} previousWorkspacePath=${runtimeWorkspacePath ?? '(unset)'} hadLifecycle=${Boolean(lifecycleManager)} hadConnection=${Boolean(connectionManager)} hadServer=${Boolean(closeKiloServer)}`
+    );
+    lifecycleManager?.stop();
+    await connectionManager?.close();
+    if (closeKiloServer) {
+      closeKiloServer();
+      closeKiloServer = undefined;
+    }
+
+    process.chdir(workspacePath);
+    logToFile('starting kilo server in-process via @kilocode/sdk');
+    let nextKiloClient: WrapperKiloClient;
+    try {
+      const result = await createKilo({
+        hostname: '127.0.0.1',
+        port: 0,
+        timeout: KILO_STARTUP_TIMEOUT_MS,
+      });
+      const realKiloServer = result.server;
+      logToFile(`kilo server started at ${realKiloServer.url}`);
+      nextKiloClient = createWrapperKiloClient(result.client, realKiloServer.url, workspacePath);
+      closeKiloServer = () => realKiloServer.close();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logToFile(`failed to start kilo server: ${msg}`);
+      throw new Error(`Failed to start kilo server: ${msg}`);
+    }
+
+    if (expectedSessionId) {
+      await verifyExistingKiloSession(nextKiloClient, expectedSessionId, 'new', workspacePath);
+      kiloSessionId = expectedSessionId;
+      logToFile(`verified existing kilo session: ${kiloSessionId}`);
+    } else {
+      const session = await nextKiloClient.createSession();
+      kiloSessionId = session.id;
+      logToFile(`created kilo session: ${kiloSessionId}`);
+    }
+
+    kiloClient = nextKiloClient;
+    serverDeps.kiloClient = nextKiloClient;
+    serverConfig.workspacePath = workspacePath;
+    serverConfig.sessionId = kiloSessionId;
+    serverConfig.platform = process.env.KILO_PLATFORM;
+    runtimeWorkspacePath = workspacePath;
+    logToFile(
+      `startKiloRuntime runtime ready workspacePath=${workspacePath} kiloSessionId=${kiloSessionId} platform=${serverConfig.platform ?? '(unset)'} home=${process.env.HOME ?? '(unset)'}`
+    );
+
+    connectionManager = createConnectionManager(
+      state,
+      { kiloClient: nextKiloClient },
+      {
+        onMessageComplete: (messageId: string) => {
+          lifecycleManager?.onMessageComplete(messageId);
+        },
+        onTerminalError: (reason: string) => {
+          logToFile(`terminal error: ${reason}`);
           state.sendToIngest({
-            streamEventType: 'interrupted',
-            data: { reason: 'Session stopped' },
+            streamEventType: 'error',
+            data: { error: reason, fatal: true },
             timestamp: new Date().toISOString(),
           });
-          const job = state.currentJob;
-          if (job) {
-            kiloClient.abortSession({ sessionId: job.kiloSessionId }).catch(() => {});
+          const session = state.currentSession;
+          if (session) {
+            nextKiloClient.abortSession({ sessionId: session.kiloSessionId }).catch(() => {});
+          }
+          lifecycleManager?.setAborted();
+          state.clearAllMessages();
+          lifecycleManager?.triggerDrainAndClose();
+        },
+        onCommand: (cmd: WrapperCommand) => {
+          logToFile(`command received: ${cmd.type}`);
+          if (cmd.type === 'kill') {
+            state.sendToIngest({
+              streamEventType: 'interrupted',
+              data: { reason: 'Session stopped' },
+              timestamp: new Date().toISOString(),
+            });
+            const session = state.currentSession;
+            if (session) {
+              nextKiloClient.abortSession({ sessionId: session.kiloSessionId }).catch(() => {});
+            }
+            lifecycleManager?.setAborted();
+            state.clearAllMessages();
+            lifecycleManager?.triggerDrainAndClose();
+          }
+          if (cmd.type === 'ping') {
+            const session = state.currentSession;
+            state.sendToIngest({
+              streamEventType: 'pong',
+              data: {
+                kiloSessionId: session?.kiloSessionId,
+                wrapperGeneration: session?.wrapperGeneration,
+                wrapperConnectionId: session?.wrapperConnectionId,
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
+          if (cmd.type === 'request_snapshot') {
+            void connectionManager?.sendKiloSnapshot();
+          }
+        },
+        onDisconnect: (reason: string) => {
+          logToFile(`disconnect: ${reason}`);
+          state.setLastError({
+            code: 'DISCONNECT',
+            message: reason,
+            timestamp: Date.now(),
+          });
+          const session = state.currentSession;
+          const targetSessionId = session?.kiloSessionId;
+          if (targetSessionId) {
+            nextKiloClient.abortSession({ sessionId: targetSessionId }).catch(() => {});
           }
           lifecycleManager?.setAborted();
           state.setActive(false);
           lifecycleManager?.triggerDrainAndClose();
-        }
-        if (cmd.type === 'ping') {
-          state.sendToIngest({
-            streamEventType: 'pong',
-            data: { executionId: state.currentJob?.executionId },
-            timestamp: new Date().toISOString(),
-          });
-        }
-        if (cmd.type === 'request_snapshot') {
-          // Fire-and-forget: reuse the existing snapshot logic from connection manager.
-          void connectionManager.sendKiloSnapshot();
-        }
-      },
-      onDisconnect: (reason: string) => {
-        logToFile(`disconnect: ${reason}`);
-        state.setLastError({
-          code: 'DISCONNECT',
-          message: reason,
-          timestamp: Date.now(),
-        });
-        const job = state.currentJob;
-        if (job) {
-          kiloClient.abortSession({ sessionId: job.kiloSessionId }).catch(() => {});
-        }
-        lifecycleManager?.setAborted();
-        state.setActive(false);
-        lifecycleManager?.triggerDrainAndClose();
-      },
-      onCompletionSignal: () => {
-        lifecycleManager?.signalCompletion();
-      },
-      onReconnecting: (attempt: number) => {
-        logToFile(`ingest WS reconnecting: attempt ${attempt}`);
-      },
-      onReconnected: () => {
-        logToFile('ingest WS reconnected');
-        const lastError = state.getLastError();
-        if (lastError?.code === 'DISCONNECT') {
-          state.clearLastError();
-        }
-      },
-      onSseEvent: () => {
-        lifecycleManager?.onSseEvent();
-      },
-    }
-  );
+        },
+        onCompletionSignal: () => {
+          lifecycleManager?.signalCompletion();
+        },
+        onSessionIdle: () => {
+          lifecycleManager?.onSessionIdle();
+        },
+        onRootSessionActivity: () => {
+          lifecycleManager?.onRootSessionActivity();
+        },
+        onReconnecting: (attempt: number) => {
+          logToFile(`ingest WS reconnecting: attempt ${attempt}`);
+        },
+        onReconnected: () => {
+          logToFile('ingest WS reconnected');
+          const lastError = state.getLastError();
+          if (lastError?.code === 'DISCONNECT') {
+            state.clearLastError();
+          }
+        },
+        onSseEvent: () => {
+          lifecycleManager?.onSseEvent();
+        },
+      }
+    );
 
-  // Create lifecycle manager
-  lifecycleManager = createLifecycleManager(
-    { workspacePath },
-    {
-      state,
-      kiloClient,
-      closeConnections: () => connectionManager.close(),
-      isConnected: () => connectionManager.isConnected(),
-      reconnectEventSubscription: () => connectionManager.reconnectEventSubscription(),
+    lifecycleManager = createLifecycleManager(
+      { workspacePath },
+      {
+        state,
+        kiloClient: nextKiloClient,
+        closeConnections: () => connectionManager?.close() ?? Promise.resolve(),
+        isConnected: () => connectionManager?.isConnected() ?? false,
+        reconnectEventSubscription: () => connectionManager?.reconnectEventSubscription(),
+      }
+    );
+    lifecycleManager.start();
+  }
+
+  async function readySession(
+    request: WrapperSessionReadyRequest
+  ): Promise<WrapperSessionReadyResponse> {
+    const readyStartedAt = Date.now();
+    let progressChannel: Awaited<ReturnType<typeof openIngestProgressChannel>> | undefined;
+    logToFile(
+      `session/ready received agentSessionId=${request.agentSessionId} kiloSessionId=${request.kiloSessionId} preferSnapshot=${request.workspace.preferSnapshot} workspacePath=${request.workspace.workspacePath} sessionHome=${request.workspace.sessionHome} branchName=${request.workspace.branchName} strictBranch=${request.workspace.strictBranch ?? false} repoKind=${request.repo?.kind ?? '(none)'} setupCommandCount=${request.materialized.setupCommands?.length ?? 0} runtimeSkillCount=${request.materialized.runtimeSkills?.length ?? 0} platform=${request.materialized.env.KILO_PLATFORM ?? process.env.KILO_PLATFORM ?? '(unset)'} stateConnected=${state.isConnected}`
+    );
+    try {
+      serverConfig.workspacePath = request.workspace.workspacePath;
+      serverConfig.sessionId = request.kiloSessionId;
+      serverConfig.platform = request.materialized.env.KILO_PLATFORM ?? process.env.KILO_PLATFORM;
+
+      const bindError = await bindSessionContext(request.session, serverConfig, serverDeps);
+      if (bindError) {
+        const error = (await bindError.json()) as { error?: string; message?: string };
+        logToFile(
+          `session/ready binding rejected kiloSessionId=${request.kiloSessionId} status=${bindError.status} message=${error.message ?? error.error ?? 'Invalid session binding'} elapsedMs=${Date.now() - readyStartedAt}`
+        );
+        return {
+          status: 'error',
+          error: {
+            code: 'INVALID_REQUEST',
+            message: error.message ?? error.error ?? 'Invalid session binding',
+            retryable: false,
+          },
+        };
+      }
+
+      if (!state.isConnected) {
+        progressChannel = await openIngestProgressChannel(state);
+      }
+
+      logToFile(
+        `session/ready bootstrap workspace starting kiloSessionId=${request.kiloSessionId}`
+      );
+      await prepareWrapperBootstrapWorkspace(request, (step, message) => {
+        state.sendToIngest({
+          streamEventType: 'preparing',
+          data: { step, message },
+          timestamp: new Date().toISOString(),
+        });
+      });
+      logToFile(
+        `session/ready bootstrap workspace finished kiloSessionId=${request.kiloSessionId}`
+      );
+
+      progressChannel?.close();
+      progressChannel = undefined;
+
+      await startKiloRuntime(request.workspace.workspacePath, request.kiloSessionId);
+      if (!kiloClient) {
+        throw new Error('Kilo server did not start');
+      }
+      logToFile(
+        `session/ready complete kiloSessionId=${request.kiloSessionId} elapsedMs=${Date.now() - readyStartedAt}`
+      );
+
+      return {
+        status: 'ready',
+        kiloSessionId: request.kiloSessionId,
+        workspaceReady: {
+          workspacePath: request.workspace.workspacePath,
+          sandboxId: request.sandboxId,
+          sessionHome: request.workspace.sessionHome,
+          branchName: request.workspace.branchName,
+          kiloSessionId: request.kiloSessionId,
+        },
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logToFile(
+        `session/ready failed kiloSessionId=${request.kiloSessionId} elapsedMs=${Date.now() - readyStartedAt} error=${message}`
+      );
+      return {
+        status: 'error',
+        error: {
+          code: message.includes('Kilo server') ? 'KILO_SERVER_FAILED' : 'WORKSPACE_SETUP_FAILED',
+          message,
+          retryable: true,
+        },
+      };
+    } finally {
+      progressChannel?.close();
     }
-  );
+  }
 
   // Create HTTP server
-  const server = createServer(
-    {
-      port: wrapperPort,
-      workspacePath,
-      version: WRAPPER_VERSION,
-      sessionId: kiloSessionId,
-      agentSessionId,
-      userId,
-      platform: process.env.KILO_PLATFORM,
-    },
-    {
-      state,
-      kiloClient,
-      openConnection: () => connectionManager.open(),
-      closeConnection: () => connectionManager.close(),
-      setAborted: () => lifecycleManager?.setAborted(),
-      resetLifecycle: () => lifecycleManager?.reset(),
-      setPerTurnConfig: config => lifecycleManager?.setPerTurnConfig(config),
-    },
-    () => lifecycleManager?.triggerDrainAndClose()
+  if (initialWorkspacePath) {
+    await startKiloRuntime(initialWorkspacePath, configuredSessionId);
+  }
+
+  const server = createServer(serverConfig, serverDeps, () =>
+    lifecycleManager?.triggerDrainAndClose()
   );
 
-  // Start lifecycle timers
-  lifecycleManager?.start();
-
-  logToFile(`wrapper ready on port ${wrapperPort} (kilo server at ${kiloServer.url})`);
+  logToFile(
+    `wrapper ready on port ${wrapperPort}${
+      kiloClient ? ` (kilo server at ${kiloClient.serverUrl})` : ' (awaiting bootstrap)'
+    }`
+  );
   console.log(`Wrapper listening on port ${wrapperPort}`);
 
   // ---------------------------------------------------------------------------
@@ -382,18 +536,20 @@ async function main() {
     }
 
     // Abort kilo session if running
-    const job = state.currentJob;
-    if (job) {
-      kiloClient.abortSession({ sessionId: job.kiloSessionId }).catch(() => {});
+    const session = state.currentSession;
+    if (session && kiloClient) {
+      kiloClient.abortSession({ sessionId: session.kiloSessionId }).catch(() => {});
     }
 
     // Close connections
-    void connectionManager.close();
+    void connectionManager?.close();
 
-    // Close kilo server
+    // Close kilo server (real or fake)
     try {
-      kiloServer.close();
-      logToFile('kilo server closed');
+      closeKiloServer?.();
+      if (closeKiloServer) {
+        logToFile('kilo server closed');
+      }
     } catch (err) {
       logToFile(`kilo server close error: ${err instanceof Error ? err.message : String(err)}`);
     }

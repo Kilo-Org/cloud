@@ -6,7 +6,10 @@ export type CallbackTarget = {
 export type ExecutionCallbackPayload = {
   sessionId: string;
   cloudAgentSessionId: string;
-  executionId: string;
+  /** Deprecated compatibility alias for messageId. */
+  executionId?: string;
+  /** Message ID correlated with this execution. */
+  messageId?: string;
   status: 'completed' | 'failed' | 'interrupted';
   errorMessage?: string;
   lastSeenBranch?: string;
@@ -18,6 +21,12 @@ export type ExecutionCallbackPayload = {
    * Undefined when no assistant message has been recorded yet.
    */
   lastAssistantMessageText?: string;
+  /**
+   * Deterministic idempotency key based on messageId.
+   * Receivers can use this to safely deduplicate retried callbacks after a
+   * DO crash between queue.send() and callbackEnqueuedAt persistence.
+   */
+  idempotencyKey?: string;
 };
 
 export type CallbackJob = {

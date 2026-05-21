@@ -1,200 +1,112 @@
-import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Mock } from 'vitest';
 import * as schemas from './router/schemas.js';
-import * as schemaLimits from './schema.js';
-import type * as WorkspaceModule from './workspace.js';
-import type * as SessionServiceModule from './session-service.js';
 
-// Create a mock execution session
-const createMockExecutionSession = () => ({
-  id: 'mock-session-id',
-  exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
-  execStream: vi.fn(),
-  startProcess: vi.fn().mockResolvedValue({
-    id: 'mock-process-id',
-    status: 'running',
-    waitForPort: vi.fn().mockResolvedValue(undefined),
-  }),
-  listProcesses: vi.fn().mockResolvedValue([]),
-  writeFile: vi.fn().mockResolvedValue(undefined),
-  readFile: vi.fn().mockResolvedValue(''),
-  mkdir: vi.fn().mockResolvedValue(undefined),
-});
-
-// Create a mock sandbox
-const createMockSandbox = () => {
-  const mockSession = createMockExecutionSession();
-  return {
-    getSession: vi.fn().mockResolvedValue(mockSession),
-    createSession: vi.fn().mockResolvedValue(mockSession),
-    listProcesses: vi.fn().mockResolvedValue([]),
-    mkdir: vi.fn().mockResolvedValue(undefined),
-    writeFile: vi.fn().mockResolvedValue(undefined),
-    destroy: vi.fn().mockResolvedValue(undefined),
-  };
-};
-
-// Mock Cloudflare sandbox to prevent module resolution errors
-vi.mock('@cloudflare/sandbox', () => ({
-  getSandbox: vi.fn(() => createMockSandbox()),
-}));
-
-// Mock workspace functions, but keep the real exported error classes so
-// `instanceof` checks in the handler work against the same constructors.
-vi.mock('./workspace.js', async importOriginal => {
-  const actual = await importOriginal<typeof WorkspaceModule>();
-  return {
-    ...actual,
-    checkDiskAndCleanBeforeSetup: vi.fn().mockResolvedValue(undefined),
-    setupWorkspace: vi.fn().mockResolvedValue({
-      workspacePath: '/workspace/test',
-      sessionHome: '/home/test',
-    }),
-    cloneGitHubRepo: vi.fn().mockResolvedValue(undefined),
-    cloneGitRepo: vi.fn().mockResolvedValue(undefined),
-    manageBranch: vi.fn().mockResolvedValue(undefined),
-  };
-});
+const { generateSessionIdMock, generateSandboxIdMock, createCliSessionMock, deleteCliSessionMock } =
+  vi.hoisted(() => ({
+    generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
+    generateSandboxIdMock: vi.fn().mockResolvedValue('sb-test-123'),
+    createCliSessionMock: vi.fn().mockResolvedValue(undefined),
+    deleteCliSessionMock: vi.fn().mockResolvedValue(undefined),
+  }));
 
 vi.mock('./utils/kilo-session-id.js', () => ({
-  generateKiloSessionId: () => generateKiloSessionIdMock(),
+  generateKiloSessionId: vi.fn(() => 'cli-session-abc123'),
 }));
 
-// Mock WrapperClient.ensureWrapper (wrapper now starts kilo server in-process)
-vi.mock('./kilo/wrapper-client.js', () => ({
-  WrapperClient: {
-    ensureWrapper: vi.fn().mockResolvedValue({
-      client: {},
-      sessionId: 'cli-session-abc123',
-    }),
+vi.mock('./sandbox-id.js', () => ({
+  generateSandboxId: generateSandboxIdMock,
+  getSandboxNamespace: vi.fn(),
+}));
+
+vi.mock('@cloudflare/sandbox', () => ({
+  getSandbox: vi.fn(),
+  Sandbox: class Sandbox {},
+}));
+
+vi.mock('./session-service.js', () => ({
+  generateSessionId: () => generateSessionIdMock(),
+  fetchSessionMetadata: vi.fn(),
+  determineBranchName: vi.fn(
+    (sessionId: string, upstreamBranch?: string) => upstreamBranch || `session/${sessionId}`
+  ),
+  runSetupCommands: vi.fn().mockResolvedValue(undefined),
+  writeAuthFile: vi.fn().mockResolvedValue(undefined),
+  InvalidSessionMetadataError: class InvalidSessionMetadataError extends Error {
+    constructor(
+      public readonly userId: string,
+      public readonly sessionId: string,
+      public readonly details?: string
+    ) {
+      super(`Invalid session metadata for session ${sessionId}`);
+      this.name = 'InvalidSessionMetadataError';
+    }
+  },
+  SessionService: class SessionService {
+    createCliSessionViaSessionIngest = createCliSessionMock;
+    deleteCliSessionViaSessionIngest = deleteCliSessionMock;
   },
 }));
 
-// Define mocks BEFORE vi.mock() to avoid hoisting issues
-// vi.hoisted() ensures these are available when the mock factory runs
-const {
-  generateSessionIdMock,
-  generateKiloSessionIdMock,
-  createCliSessionViaSessionIngestMock,
-  deleteCliSessionViaSessionIngestMock,
-} = vi.hoisted(() => ({
-  generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
-  generateKiloSessionIdMock: vi.fn(() => 'ses_mock-kilo-session-id'),
-  createCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
-  deleteCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
-}));
-
-// Mock session-service to isolate router tests, but keep the real exported
-// error classes (`SetupCommandFailedError`, `InvalidSessionMetadataError`)
-// so `instanceof` checks in the handler resolve to the same constructors
-// the production code throws.
-vi.mock('./session-service.js', async importOriginal => {
-  const actual = await importOriginal<typeof SessionServiceModule>();
-  return {
-    ...actual,
-    generateSessionId: () => generateSessionIdMock(),
-    fetchSessionMetadata: vi.fn(),
-    determineBranchName: vi.fn(
-      (sessionId: string, upstreamBranch?: string) => upstreamBranch || `session/${sessionId}`
-    ),
-    runSetupCommands: vi.fn().mockResolvedValue(undefined),
-    writeAuthFile: vi.fn().mockResolvedValue(undefined),
-    writeGlobalRules: vi.fn().mockResolvedValue(undefined),
-    writeRuntimeSkills: vi.fn().mockResolvedValue(undefined),
-    SessionService: class SessionService {
-      createCliSessionViaSessionIngest = createCliSessionViaSessionIngestMock;
-      deleteCliSessionViaSessionIngest = deleteCliSessionViaSessionIngestMock;
-      getOrCreateSession = vi.fn().mockResolvedValue(createMockExecutionSession());
-      buildRuntimeEnv = vi.fn().mockReturnValue({
-        SESSION_HOME: '/home/test',
-        KILO_SESSION_INGEST_URL: 'https://ingest.example',
-      });
-      buildContext = vi.fn().mockReturnValue({
-        sandboxId: 'test-sandbox',
-        orgId: 'test-org',
-        userId: 'test-user',
-        sessionId: 'test-session',
-        workspacePath: '/workspace/test',
-        sessionHome: '/home/test',
-      });
-    },
-  };
-});
-
 import { appRouter } from './router.js';
 import type { TRPCContext, SessionId } from './types.js';
-import type { CloudAgentSessionState } from './persistence/types.js';
-import {
-  BranchNotFoundError,
-  GitRepositoryNotFoundError,
-  cloneGitHubRepo as mockedCloneGitHubRepo,
-  manageBranch as mockedManageBranch,
-  setupWorkspace as mockedSetupWorkspace,
-} from './workspace.js';
-import { WorkspaceFilesystemPreparationError } from './workspace-errors.js';
-import {
-  SetupCommandFailedError,
-  runSetupCommands as mockedRunSetupCommands,
-} from './session-service.js';
 
-type MockDOProcedure = Mock<(...args: unknown[]) => Promise<unknown>>;
-
-// Helper to create a mock DO stub
 function createMockDOStub(
   overrides: {
-    prepare?: MockDOProcedure;
-    tryUpdate?: MockDOProcedure;
-    tryInitiate?: MockDOProcedure;
-    getMetadata?: MockDOProcedure;
-    updateMetadata?: MockDOProcedure;
-    deleteSession?: MockDOProcedure;
+    registerSession?: ReturnType<typeof vi.fn>;
+    tryUpdate?: ReturnType<typeof vi.fn>;
+    getMetadata?: ReturnType<typeof vi.fn>;
+    queueSessionMessage?: ReturnType<typeof vi.fn>;
   } = {}
 ) {
   return {
-    prepare: overrides.prepare ?? vi.fn().mockResolvedValue({ success: true }),
+    registerSession: overrides.registerSession ?? vi.fn().mockResolvedValue({ success: true }),
     tryUpdate: overrides.tryUpdate ?? vi.fn().mockResolvedValue({ success: true }),
-    tryInitiate: overrides.tryInitiate ?? vi.fn().mockResolvedValue({ success: true, data: {} }),
     getMetadata: overrides.getMetadata ?? vi.fn().mockResolvedValue(null),
-    updateMetadata: overrides.updateMetadata ?? vi.fn().mockResolvedValue(undefined),
-    deleteSession: overrides.deleteSession ?? vi.fn().mockResolvedValue(undefined),
+    queueSessionMessage:
+      overrides.queueSessionMessage ??
+      vi.fn().mockResolvedValue({
+        success: true,
+        status: 'started',
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        delivery: 'queued',
+      }),
     markAsInterrupted: vi.fn().mockResolvedValue(undefined),
     isInterrupted: vi.fn().mockResolvedValue(false),
     clearInterrupted: vi.fn().mockResolvedValue(undefined),
     updateKiloSessionId: vi.fn().mockResolvedValue(undefined),
-    updateGithubToken: vi.fn().mockResolvedValue(undefined),
   };
 }
 
-// Helper to create a properly typed context for internal-API-protected endpoints
 function createInternalApiContext(options: {
-  userId?: string | null; // null means explicitly no userId
-  authToken?: string | null; // null means explicitly no authToken
-  internalApiSecret?: string | null; // null means explicitly no internal API secret configured
-  requestInternalApiKey?: string | null; // null means no x-internal-api-key header
+  userId?: string | null;
+  authToken?: string | null;
+  internalApiSecret?: string | null;
+  requestInternalApiKey?: string | null;
   doStub?: ReturnType<typeof createMockDOStub>;
 }): TRPCContext {
-  const {
-    userId,
-    authToken,
-    internalApiSecret,
-    requestInternalApiKey,
-    doStub = createMockDOStub(),
-  } = options;
-
-  // Apply defaults only if not explicitly set to null
+  const doStub = options.doStub ?? createMockDOStub();
   const effectiveUserId =
-    userId === undefined ? 'test-user-123' : userId === null ? undefined : userId;
-  const effectiveAuthToken =
-    authToken === undefined ? 'test-auth-token' : authToken === null ? undefined : authToken;
-  const effectiveInternalApiSecret =
-    internalApiSecret === undefined
-      ? 'test-internal-api-secret'
-      : internalApiSecret === null
+    options.userId === undefined
+      ? 'test-user-123'
+      : options.userId === null
         ? undefined
-        : internalApiSecret;
+        : options.userId;
+  const effectiveAuthToken =
+    options.authToken === undefined
+      ? 'test-auth-token'
+      : options.authToken === null
+        ? undefined
+        : options.authToken;
+  const effectiveInternalApiSecret =
+    options.internalApiSecret === undefined
+      ? 'test-internal-api-secret'
+      : options.internalApiSecret === null
+        ? undefined
+        : options.internalApiSecret;
   const effectiveRequestInternalApiKey =
-    requestInternalApiKey === undefined ? 'test-internal-api-secret' : requestInternalApiKey;
+    options.requestInternalApiKey === undefined
+      ? 'test-internal-api-secret'
+      : options.requestInternalApiKey;
 
   const headers = new Headers();
   if (effectiveRequestInternalApiKey !== null) {
@@ -204,12 +116,10 @@ function createInternalApiContext(options: {
   return {
     userId: effectiveUserId,
     authToken: effectiveAuthToken,
-    botId: undefined,
-    request: {
-      headers,
-    } as unknown as Request,
+    request: { headers } as Request,
     env: {
       Sandbox: {} as TRPCContext['env']['Sandbox'],
+      SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
       CLOUD_AGENT_SESSION: {
         idFromName: vi.fn((id: string) => ({ id })),
         get: vi.fn(() => doStub),
@@ -221,6 +131,8 @@ function createInternalApiContext(options: {
       } as unknown as TRPCContext['env']['SESSION_INGEST'],
       INTERNAL_API_SECRET: effectiveInternalApiSecret,
       NEXTAUTH_SECRET: 'test-secret',
+      R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+      GIT_TOKEN_SERVICE: {} as TRPCContext['env']['GIT_TOKEN_SERVICE'],
     },
   } as TRPCContext;
 }
@@ -229,454 +141,487 @@ describe('prepareSession endpoint', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
-    createCliSessionViaSessionIngestMock.mockResolvedValue(undefined);
-    deleteCliSessionViaSessionIngestMock.mockResolvedValue(undefined);
+    generateSandboxIdMock.mockResolvedValue('sb-test-123');
+    createCliSessionMock.mockResolvedValue(undefined);
+    deleteCliSessionMock.mockResolvedValue(undefined);
   });
 
-  describe('authentication', () => {
-    it('should reject request without internal API key header', async () => {
-      const doStub = createMockDOStub();
-      const ctx = createInternalApiContext({
-        requestInternalApiKey: null, // No internal API key
-        doStub,
-      });
+  it('rejects request without internal API key header', async () => {
+    const caller = appRouter.createCaller(
+      createInternalApiContext({ requestInternalApiKey: null })
+    );
 
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: 'Test prompt',
-          mode: 'code',
-          model: 'claude-3',
-          githubRepo: 'acme/repo',
-          githubToken: 'ghp_test_token',
-        })
-      ).rejects.toThrow('Invalid or missing internal API key');
-    });
-
-    it('should reject request with invalid internal API key', async () => {
-      const doStub = createMockDOStub();
-      const ctx = createInternalApiContext({
-        requestInternalApiKey: 'wrong-key',
-        internalApiSecret: 'correct-key',
-        doStub,
-      });
-
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: 'Test prompt',
-          mode: 'code',
-          model: 'claude-3',
-          githubRepo: 'acme/repo',
-          githubToken: 'ghp_test_token',
-        })
-      ).rejects.toThrow('Invalid or missing internal API key');
-    });
-
-    it('should reject request without customer token (userId)', async () => {
-      const doStub = createMockDOStub();
-      const ctx = createInternalApiContext({
-        userId: null, // Explicitly no userId
-        doStub,
-      });
-
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: 'Test prompt',
-          mode: 'code',
-          model: 'claude-3',
-          githubRepo: 'acme/repo',
-          githubToken: 'ghp_test_token',
-        })
-      ).rejects.toThrow('Invalid customer token');
-    });
-
-    it('should reject when INTERNAL_API_SECRET is not configured', async () => {
-      const doStub = createMockDOStub();
-      const ctx = createInternalApiContext({
-        internalApiSecret: null, // Explicitly no internal API secret configured
-        doStub,
-      });
-
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: 'Test prompt',
-          mode: 'code',
-          model: 'claude-3',
-          githubRepo: 'acme/repo',
-          githubToken: 'ghp_test_token',
-        })
-      ).rejects.toThrow('Internal API secret not configured');
-    });
-  });
-
-  describe('success cases', () => {
-    it('should successfully prepare a new session with GitHub repo', async () => {
-      const doStub = createMockDOStub({
-        prepare: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-      const result = await caller.prepareSession({
+    await expect(
+      caller.prepareSession({
         prompt: 'Test prompt',
         mode: 'code',
         model: 'claude-3',
         githubRepo: 'acme/repo',
-        githubToken: 'ghp_token',
-      });
+      })
+    ).rejects.toThrow('Invalid or missing internal API key');
+  });
 
-      expect(result.cloudAgentSessionId).toMatch(/^agent_[0-9a-f-]+$/);
-      expect(result.kiloSessionId).toBe('ses_mock-kilo-session-id');
-      expect(doStub.prepare).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sessionId: expect.stringMatching(/^agent_/) as unknown,
+  it('rejects request without customer token', async () => {
+    const caller = appRouter.createCaller(createInternalApiContext({ userId: null }));
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Test prompt',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+      })
+    ).rejects.toThrow('Invalid customer token');
+  });
+
+  it('registers full lazy-prep metadata in one DO call', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    const result = await caller.prepareSession({
+      prompt: 'Test prompt',
+      mode: 'plan',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      githubToken: 'ghp_token',
+      envVars: { API_KEY: 'secret' },
+      setupCommands: ['npm install'],
+      mcpServers: { test: { type: 'local', command: ['npx', 'test-server'] } },
+      upstreamBranch: 'feature/test-branch',
+      autoCommit: true,
+      condenseOnComplete: true,
+      appendSystemPrompt: 'extra rules',
+      callbackTarget: { url: 'https://example.com/callback' },
+      createdOnPlatform: 'code-review',
+      shallow: true,
+      gateThreshold: 'warning',
+      kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+    });
+
+    expect(result).toEqual({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'cli-session-abc123',
+    });
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      'cli-session-abc123',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      'test-user-123',
+      expect.any(Object),
+      'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      'code-review',
+      expect.stringMatching(/^New session - /)
+    );
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: {
+          sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
           userId: 'test-user-123',
-          kiloSessionId: 'ses_mock-kilo-session-id',
-          prompt: 'Test prompt',
-          mode: 'code',
+          orgId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+          botId: undefined,
+          createdOnPlatform: 'code-review',
+        },
+        auth: {
+          kiloSessionId: 'cli-session-abc123',
+          kilocodeToken: 'test-auth-token',
+        },
+        message: {
+          initialMessageId: expect.stringMatching(/^msg_/) as unknown,
+          turn: {
+            type: 'prompt',
+            id: expect.stringMatching(/^msg_/) as unknown,
+            prompt: 'Test prompt',
+            images: undefined,
+          },
+        },
+        agent: {
+          mode: 'plan',
           model: 'claude-3',
-          githubRepo: 'acme/repo',
-          githubToken: 'ghp_token',
-        })
-      );
-    });
-
-    it('should successfully prepare a session with git URL', async () => {
-      const doStub = createMockDOStub({
-        prepare: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-      const result = await caller.prepareSession({
-        prompt: 'Test prompt',
-        mode: 'code',
-        model: 'claude-3',
-        gitUrl: 'https://gitlab.com/org/repo.git',
-        gitToken: 'token123',
-      });
-
-      expect(result.cloudAgentSessionId).toBeDefined();
-      expect(result.kiloSessionId).toBe('ses_mock-kilo-session-id');
-      expect(doStub.prepare).toHaveBeenCalledWith(
-        expect.objectContaining({
-          gitUrl: 'https://gitlab.com/org/repo.git',
-          gitToken: 'token123',
-        })
-      );
-    });
-
-    it('should forward variant to DO prepare', async () => {
-      const doStub = createMockDOStub({
-        prepare: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-      await caller.prepareSession({
-        prompt: 'Test prompt',
-        mode: 'code',
-        model: 'claude-3',
-        githubRepo: 'acme/repo',
-        githubToken: 'ghp_token',
-        variant: 'high',
-      });
-
-      expect(doStub.prepare).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: 'high',
-        })
-      );
-    });
-
-    it('should pass optional configuration to DO', async () => {
-      const doStub = createMockDOStub({
-        prepare: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-      await caller.prepareSession({
-        prompt: 'Test prompt',
-        mode: 'plan',
-        model: 'claude-3',
-        githubRepo: 'acme/repo',
-        githubToken: 'ghp_test_token',
-        envVars: { API_KEY: 'secret' },
-        setupCommands: ['npm install'],
-        mcpServers: { test: { type: 'local', command: ['npx', 'test-server'] } },
-        upstreamBranch: 'feature/test-branch',
-        autoCommit: true,
-        kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-      });
-
-      // Verify the DO was called with the expected configuration
-      expect(doStub.prepare).toHaveBeenCalledTimes(1);
-      const callArg = doStub.prepare.mock.calls[0][0] as Record<string, unknown>;
-      expect(callArg.envVars).toEqual({ API_KEY: 'secret' });
-      expect(callArg.setupCommands).toEqual(['npm install']);
-      expect(callArg.upstreamBranch).toBe('feature/test-branch');
-      expect(callArg.autoCommit).toBe(true);
-      expect(callArg.orgId).toBe('f47ac10b-58cc-4372-a567-0e02b2c3d479');
-      expect((callArg.mcpServers as Record<string, unknown>).test).toEqual({
-        type: 'local',
-        command: ['npx', 'test-server'],
-      });
-    });
-  });
-
-  describe('validation', () => {
-    it('should reject when prompt is empty', async () => {
-      const ctx = createInternalApiContext({});
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: '',
-          mode: 'code',
-          model: 'claude-3',
-          githubRepo: 'acme/repo',
-        })
-      ).rejects.toThrow();
-    });
-
-    it('should reject when neither githubRepo nor gitUrl is provided', async () => {
-      const ctx = createInternalApiContext({});
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: 'Test prompt',
-          mode: 'code',
-          model: 'claude-3',
-        } as Parameters<typeof caller.prepareSession>[0])
-      ).rejects.toThrow();
-    });
-
-    it('should reject invalid mode', async () => {
-      const ctx = createInternalApiContext({});
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: 'Test prompt',
-          mode: 'invalid-mode' as Parameters<typeof caller.prepareSession>[0]['mode'],
-          model: 'claude-3',
-          githubRepo: 'acme/repo',
-        })
-      ).rejects.toThrow();
-    });
-
-    it('should reject devcontainer without autoInitiate', async () => {
-      const ctx = createInternalApiContext({});
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: 'Test prompt',
-          mode: 'code',
-          model: 'claude-3',
-          githubRepo: 'acme/repo',
-          devcontainer: true,
-        })
-      ).rejects.toThrow('devcontainer sessions must use autoInitiate');
-    });
-  });
-
-  describe('error handling', () => {
-    it('should return error when DO prepare fails', async () => {
-      const doStub = createMockDOStub({
-        prepare: vi.fn().mockResolvedValue({ success: false, error: 'Session already prepared' }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: 'Test prompt',
-          mode: 'code',
-          model: 'claude-3',
-          githubRepo: 'acme/repo',
-          githubToken: 'ghp_test_token',
-        })
-      ).rejects.toThrow('Session already prepared');
-    });
-
-    // NOTE: CLI session creation (createCliSessionViaSessionIngest) is handled via session-ingest.
-    // The kiloSessionId now comes from the kilo CLI server's POST /session API.
-    // Tests for backend session creation error handling and rollback have been removed.
-
-    it('marks sandbox 500 preparation failures as retryable', async () => {
-      const sandbox = createMockSandbox();
-      const sandboxError = new Error('HTTP error! status: 500');
-      Object.assign(sandboxError, { name: 'SandboxError' });
-      vi.mocked(mockedCloneGitHubRepo).mockRejectedValueOnce(sandboxError);
-      const { getSandbox } = await import('@cloudflare/sandbox');
-      vi.mocked(getSandbox).mockReturnValueOnce(
-        sandbox as unknown as ReturnType<typeof getSandbox>
-      );
-
-      const doStub = createMockDOStub();
-      const ctx = createInternalApiContext({ doStub });
-      const caller = appRouter.createCaller(ctx);
-
-      try {
-        await caller.prepareSession({
-          prompt: 'Test prompt',
-          mode: 'code',
-          model: 'claude-3',
-          githubRepo: 'acme/repo',
-          githubToken: 'ghp_test_token',
-        });
-        expect.unreachable('should have thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(TRPCError);
-        const trpcError = error as TRPCError;
-        expect(trpcError.code).toBe('INTERNAL_SERVER_ERROR');
-        expect(trpcError.message).toBe('Sandbox returned 500 during workspace preparation');
-        expect(trpcError.cause).toMatchObject({
-          error: 'sandbox_internal_server_error',
-          retryable: true,
-        });
-      }
-
-      expect(sandbox.destroy).toHaveBeenCalledOnce();
-      expect(doStub.prepare).not.toHaveBeenCalled();
-    });
-
-    it('marks workspace mkdir preparation failures as retryable', async () => {
-      const sandbox = createMockSandbox();
-      const cause = new Error('FileSystemError: mkdir operation failed with exit code NaN');
-      vi.mocked(mockedSetupWorkspace).mockRejectedValueOnce(
-        new WorkspaceFilesystemPreparationError(
-          'workspace_directory',
-          'Failed to create workspace directory: FileSystemError: mkdir operation failed with exit code NaN',
-          cause
-        )
-      );
-      const { getSandbox } = await import('@cloudflare/sandbox');
-      vi.mocked(getSandbox).mockReturnValueOnce(
-        sandbox as unknown as ReturnType<typeof getSandbox>
-      );
-
-      const doStub = createMockDOStub();
-      const ctx = createInternalApiContext({ doStub });
-      const caller = appRouter.createCaller(ctx);
-
-      try {
-        await caller.prepareSession({
-          prompt: 'Test prompt',
-          mode: 'code',
-          model: 'claude-3',
-          githubRepo: 'acme/repo',
-          githubToken: 'ghp_test_token',
-        });
-        expect.unreachable('should have thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(TRPCError);
-        const trpcError = error as TRPCError;
-        expect(trpcError.code).toBe('INTERNAL_SERVER_ERROR');
-        expect(trpcError.message).toBe(
-          'Failed to create workspace directory: FileSystemError: mkdir operation failed with exit code NaN'
-        );
-        expect(trpcError.cause).toMatchObject({
-          error: 'sandbox_internal_server_error',
-          retryable: true,
-        });
-      }
-
-      expect(sandbox.destroy).toHaveBeenCalledOnce();
-      expect(doStub.prepare).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('user-error mapping (HTTP 400)', () => {
-    it('returns BAD_REQUEST when the repository is not found', async () => {
-      const doStub = createMockDOStub();
-      vi.mocked(mockedCloneGitHubRepo).mockRejectedValueOnce(
-        new GitRepositoryNotFoundError('https://github.com/acme/missing.git')
-      );
-
-      const ctx = createInternalApiContext({ doStub });
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: 'Test prompt',
-          mode: 'code',
-          model: 'claude-3',
-          githubRepo: 'acme/missing',
-          githubToken: 'ghp_test_token',
-        })
-      ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining('Repository not found') as unknown as string,
-      });
-
-      expect(doStub.prepare).not.toHaveBeenCalled();
-    });
-
-    it('returns BAD_REQUEST when the upstream branch is missing', async () => {
-      const doStub = createMockDOStub();
-      vi.mocked(mockedManageBranch).mockRejectedValueOnce(
-        new BranchNotFoundError('feature/does-not-exist')
-      );
-
-      const ctx = createInternalApiContext({ doStub });
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: 'Test prompt',
-          mode: 'code',
-          model: 'claude-3',
-          githubRepo: 'acme/repo',
-          githubToken: 'ghp_test_token',
-          upstreamBranch: 'feature/does-not-exist',
-        })
-      ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining(
-          'Branch "feature/does-not-exist" not found'
-        ) as unknown as string,
-      });
-
-      expect(doStub.prepare).not.toHaveBeenCalled();
-    });
-
-    it('returns BAD_REQUEST when a setup command fails', async () => {
-      const doStub = createMockDOStub();
-      vi.mocked(mockedRunSetupCommands).mockRejectedValueOnce(
-        new SetupCommandFailedError('npm install', 1, 'ENOENT')
-      );
-
-      const ctx = createInternalApiContext({ doStub });
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: 'Test prompt',
-          mode: 'code',
-          model: 'claude-3',
-          githubRepo: 'acme/repo',
-          githubToken: 'ghp_test_token',
+          variant: undefined,
+          appendSystemPrompt: 'extra rules',
+        },
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          branch: 'feature/test-branch',
+        },
+        profile: {
+          envVars: { API_KEY: 'secret' },
           setupCommands: ['npm install'],
-        })
-      ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining('Setup command failed') as unknown as string,
-      });
+          mcpServers: { test: { type: 'local', command: ['npx', 'test-server'] } },
+          encryptedSecrets: undefined,
+          runtimeSkills: undefined,
+          runtimeAgents: undefined,
+          kiloCommands: undefined,
+        },
+        finalization: {
+          autoCommit: true,
+          condenseOnComplete: true,
+          gateThreshold: 'warning',
+        },
+        callback: {
+          target: { url: 'https://example.com/callback' },
+        },
+        workspace: {
+          sandboxId: 'sb-test-123',
+          shallow: true,
+        },
+      })
+    );
+  });
 
-      expect(doStub.prepare).not.toHaveBeenCalled();
+  it('registers GitLab repository metadata without caller gitToken', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: 'Test GitLab prompt',
+      mode: 'code',
+      model: 'claude-3',
+      gitUrl: 'https://gitlab.com/acme/repo.git',
+      gitToken: 'caller-gitlab-token',
+      platform: 'gitlab',
+      upstreamBranch: 'feature/gitlab',
     });
+
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repository: {
+          type: 'gitlab',
+          url: 'https://gitlab.com/acme/repo.git',
+          branch: 'feature/gitlab',
+        },
+      })
+    );
+  });
+
+  it('preserves caller gitToken for generic git repositories', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: 'Test generic git prompt',
+      mode: 'code',
+      model: 'claude-3',
+      gitUrl: 'https://git.example.com/acme/repo.git',
+      gitToken: 'generic-git-token',
+      upstreamBranch: 'feature/generic',
+    });
+
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repository: {
+          type: 'git',
+          url: 'https://git.example.com/acme/repo.git',
+          token: 'generic-git-token',
+          branch: 'feature/generic',
+        },
+      })
+    );
+  });
+
+  it('auto-initiates the same registered first-turn message ID, prompt, and images', async () => {
+    const initialMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+    const images = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+    };
+    const queueSessionMessage = vi.fn().mockResolvedValue({
+      success: true,
+      status: 'started',
+      messageId: initialMessageId,
+      delivery: 'queued',
+    });
+    const doStub = createMockDOStub({ queueSessionMessage });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: 'Inspect the screenshot',
+      images,
+      initialMessageId,
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+    });
+
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: {
+          initialMessageId,
+          turn: {
+            type: 'prompt',
+            id: initialMessageId,
+            prompt: 'Inspect the screenshot',
+            images,
+          },
+        },
+      })
+    );
+    expect(queueSessionMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'user-message',
+        turn: {
+          type: 'prompt',
+          id: initialMessageId,
+          prompt: 'Inspect the screenshot',
+          images,
+        },
+      })
+    );
+  });
+
+  it('registers auto-initiated devcontainer sessions with DIND sandbox intent', async () => {
+    generateSandboxIdMock.mockResolvedValueOnce('dind-abcdef');
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: 'Prepare the devcontainer runtime',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      devcontainer: true,
+    });
+
+    expect(generateSandboxIdMock).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      'test-user-123',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      undefined,
+      true
+    );
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: {
+          sandboxId: 'dind-abcdef',
+          shallow: false,
+          devcontainerRequested: true,
+        },
+      })
+    );
+  });
+
+  it('rejects devcontainer preparation without auto-initiation', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Prepare the devcontainer runtime',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        autoInitiate: false,
+        devcontainer: true,
+      })
+    ).rejects.toThrow('devcontainer sessions must use autoInitiate');
+
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+  });
+
+  it('auto-initiates command-valued initialPayload as a command turn', async () => {
+    const initialMessageId = 'msg_018f1e2d3c4bInitCmdAbCdEfG';
+    const queueSessionMessage = vi.fn().mockResolvedValue({
+      success: true,
+      status: 'started',
+      messageId: initialMessageId,
+      delivery: 'queued',
+    });
+    const doStub = createMockDOStub({ queueSessionMessage });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: '/compact --aggressive',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      initialMessageId,
+      initialPayload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+      },
+    });
+
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: {
+          initialMessageId,
+          turn: {
+            type: 'command',
+            id: initialMessageId,
+            command: 'compact',
+            arguments: '--aggressive',
+          },
+        },
+      })
+    );
+    expect(queueSessionMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'user-message',
+        turn: {
+          type: 'command',
+          id: initialMessageId,
+          command: 'compact',
+          arguments: '--aggressive',
+        },
+      })
+    );
+  });
+
+  it('rejects command-valued initialPayload images before registration', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.prepareSession({
+        prompt: '/compact --aggressive',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        images: {
+          path: '123e4567-e89b-12d3-a456-426614174000',
+          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+        },
+        initialPayload: {
+          type: 'command',
+          command: 'compact',
+          arguments: '--aggressive',
+        },
+      })
+    ).rejects.toThrow('Images cannot be attached to slash commands');
+
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(doStub.queueSessionMessage).not.toHaveBeenCalled();
+  });
+
+  it('rolls back the cli session when registration fails', async () => {
+    const doStub = createMockDOStub({
+      registerSession: vi
+        .fn()
+        .mockResolvedValue({ success: false, error: 'Session already exists' }),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Test prompt',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+      })
+    ).rejects.toThrow('Session already exists');
+
+    expect(deleteCliSessionMock).toHaveBeenCalledWith(
+      'cli-session-abc123',
+      'test-user-123',
+      expect.any(Object),
+      { onlyIfEmpty: true }
+    );
+  });
+});
+
+describe('start endpoint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
+    generateSandboxIdMock.mockResolvedValue('sb-test-123');
+    createCliSessionMock.mockResolvedValue(undefined);
+    deleteCliSessionMock.mockResolvedValue(undefined);
+  });
+
+  it('queues the registered first-turn message ID, prompt, and images', async () => {
+    const initialMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+    const images = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+    };
+    const queueSessionMessage = vi.fn().mockResolvedValue({
+      success: true,
+      status: 'started',
+      messageId: initialMessageId,
+      delivery: 'queued',
+    });
+    const doStub = createMockDOStub({ queueSessionMessage });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    const result = await caller.start({
+      message: {
+        id: initialMessageId,
+        prompt: 'Describe the attached image',
+        images,
+      },
+      agent: {
+        mode: 'code',
+        model: 'anthropic/claude-sonnet-4-20250514',
+      },
+      repository: {
+        type: 'github',
+        repo: 'acme/repo',
+      },
+    });
+
+    expect(result).toMatchObject({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'cli-session-abc123',
+      messageId: initialMessageId,
+      delivery: 'queued',
+    });
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: {
+          initialMessageId,
+          turn: {
+            type: 'prompt',
+            id: initialMessageId,
+            prompt: 'Describe the attached image',
+            images,
+          },
+        },
+      })
+    );
+    expect(queueSessionMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'user-message',
+        turn: {
+          type: 'prompt',
+          id: initialMessageId,
+          prompt: 'Describe the attached image',
+          images,
+        },
+      })
+    );
+  });
+
+  it('rejects callbackTarget options before session registration or queueing', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+    const options = {
+      kilocodeOrganizationId: '123e4567-e89b-12d3-a456-426614174011',
+      callbackTarget: { url: 'https://example.com/public-callback' },
+    };
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Create the first turn' },
+        agent: {
+          mode: 'code',
+          model: 'anthropic/claude-sonnet-4-20250514',
+        },
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+        },
+        options,
+      })
+    ).rejects.toThrow();
+
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(doStub.queueSessionMessage).not.toHaveBeenCalled();
   });
 });
 
@@ -685,995 +630,88 @@ describe('updateSession endpoint', () => {
     vi.clearAllMocks();
   });
 
-  describe('authentication', () => {
-    it('should reject without internal API key', async () => {
-      const ctx = createInternalApiContext({ requestInternalApiKey: null });
-      const caller = appRouter.createCaller(ctx);
+  it('updates callbackTarget only', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
-      await expect(
-        caller.updateSession({
-          cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-          mode: 'plan',
-        })
-      ).rejects.toThrow('Invalid or missing internal API key');
+    const result = await caller.updateSession({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
+      callbackTarget: { url: 'https://example.com/next-callback', headers: { 'X-Test': '1' } },
     });
 
-    it('should reject without customer token', async () => {
-      const ctx = createInternalApiContext({ userId: null }); // Explicitly no userId
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.updateSession({
-          cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-          mode: 'plan',
-        })
-      ).rejects.toThrow('Invalid customer token');
+    expect(result).toEqual({ success: true });
+    expect(doStub.tryUpdate).toHaveBeenCalledWith({
+      callbackTarget: { url: 'https://example.com/next-callback', headers: { 'X-Test': '1' } },
     });
   });
 
-  describe('success cases', () => {
-    it('should successfully update a prepared session', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
+  it('passes null callbackTarget through for clearing', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
-      const caller = appRouter.createCaller(ctx);
-      const result = await caller.updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-        mode: 'plan',
-        model: 'claude-3.5-sonnet',
-      });
-
-      expect(result.success).toBe(true);
-      expect(doStub.tryUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mode: 'plan',
-          model: 'claude-3.5-sonnet',
-        })
-      );
+    await caller.updateSession({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
+      callbackTarget: null,
     });
 
-    it('should clear fields with null', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-      await caller.updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-        githubToken: null,
-        autoCommit: null,
-      });
-
-      expect(doStub.tryUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          githubToken: null,
-          autoCommit: null,
-        })
-      );
-    });
-
-    it('should clear collections with empty arrays/objects', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-      await caller.updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-        envVars: {},
-        setupCommands: [],
-        mcpServers: {},
-      });
-
-      // Handler converts empty to null for DO
-      expect(doStub.tryUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          envVars: null,
-          setupCommands: null,
-          mcpServers: null,
-        })
-      );
-    });
-
-    it('should forward variant via tryUpdate', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-      await caller.updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-        variant: 'low',
-      });
-
-      expect(doStub.tryUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: 'low',
-        })
-      );
-    });
-
-    it('should update collections with values', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-      await caller.updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-        envVars: { NEW_VAR: 'value' },
-        setupCommands: ['new-command'],
-      });
-
-      expect(doStub.tryUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          envVars: { NEW_VAR: 'value' },
-          setupCommands: ['new-command'],
-        })
-      );
-    });
+    expect(doStub.tryUpdate).toHaveBeenCalledWith({ callbackTarget: null });
   });
 
-  describe('error handling', () => {
-    it('should return error if session not prepared', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi
-          .fn()
-          .mockResolvedValue({ success: false, error: 'Session has not been prepared' }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.updateSession({
-          cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-          mode: 'plan',
-        })
-      ).rejects.toThrow('Session has not been prepared');
+  it('surfaces DO update errors', async () => {
+    const doStub = createMockDOStub({
+      tryUpdate: vi
+        .fn()
+        .mockResolvedValue({ success: false, error: 'Session metadata is not available' }),
     });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
-    it('should return error if session already initiated', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi
-          .fn()
-          .mockResolvedValue({ success: false, error: 'Session has already been initiated' }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.updateSession({
-          cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-          mode: 'plan',
-        })
-      ).rejects.toThrow('Session has already been initiated');
-    });
+    await expect(
+      caller.updateSession({
+        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
+        callbackTarget: { url: 'https://example.com/callback' },
+      })
+    ).rejects.toThrow('Session metadata is not available');
   });
 });
 
-describe('DO state machine methods', () => {
-  describe('prepare()', () => {
-    it('should set preparedAt and return success', async () => {
-      // This is implicitly tested via prepareSession above,
-      // but we can add unit tests for CloudAgentSession class directly if needed.
-      // For now, the integration tests cover this path.
+describe('schema validation', () => {
+  it('accepts prepared session input', () => {
+    const result = schemas.InitiateFromPreparedSessionInput.safeParse({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
     });
-
-    it('should fail if already prepared', async () => {
-      const doStub = createMockDOStub({
-        prepare: vi.fn().mockResolvedValue({ success: false, error: 'Session already prepared' }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: 'Test',
-          mode: 'code',
-          model: 'test',
-          githubRepo: 'acme/repo',
-          githubToken: 'ghp_test_token',
-        })
-      ).rejects.toThrow('Session already prepared');
-    });
+    expect(result.success).toBe(true);
   });
 
-  describe('tryUpdate()', () => {
-    it('should update only if prepared but not initiated', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-      const result = await caller.updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-        mode: 'code',
-      });
-
-      expect(result.success).toBe(true);
-    });
-
-    it('should handle null values for clearing fields', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-
-      const caller = appRouter.createCaller(ctx);
-      await caller.updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-        gitToken: null,
-      });
-
-      expect(doStub.tryUpdate).toHaveBeenCalledWith(expect.objectContaining({ gitToken: null }));
-    });
-  });
-
-  describe('tryInitiate()', () => {
-    it('should set initiatedAt and return metadata on success', async () => {
-      const metadata: CloudAgentSessionState = {
-        version: Date.now(),
-        sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-        userId: 'test-user',
-        timestamp: Date.now(),
-        preparedAt: Date.now() - 1000,
-        initiatedAt: Date.now(),
-        prompt: 'Test prompt',
+  it('accepts valid prepareSession input and rejects invalid sources', () => {
+    expect(
+      schemas.PrepareSessionInput.safeParse({
+        prompt: 'Test',
         mode: 'code',
         model: 'claude-3',
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
         githubRepo: 'acme/repo',
-      };
-
-      const doStub = createMockDOStub({
-        tryInitiate: vi.fn().mockResolvedValue({ success: true, data: metadata }),
-      });
-
-      // tryInitiate is called internally by initiateFromKilocodeSession
-      // when using prepared session mode
-      expect(doStub.tryInitiate).toBeDefined();
-    });
-
-    it('should fail if session not prepared', async () => {
-      const doStub = createMockDOStub({
-        tryInitiate: vi.fn().mockResolvedValue({
-          success: false,
-          error: 'Session has not been prepared',
-        }),
-      });
-
-      const result = (await doStub.tryInitiate()) as {
-        success: boolean;
-        error?: string;
-        data?: Record<string, unknown>;
-      };
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Session has not been prepared');
-    });
-
-    it('should fail if session already initiated', async () => {
-      const doStub = createMockDOStub({
-        tryInitiate: vi.fn().mockResolvedValue({
-          success: false,
-          error: 'Session has already been initiated',
-        }),
-      });
-
-      const result = (await doStub.tryInitiate()) as {
-        success: boolean;
-        error?: string;
-        data?: Record<string, unknown>;
-      };
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Session has already been initiated');
-    });
+      }).success
+    ).toBe(true);
+    expect(
+      schemas.PrepareSessionInput.safeParse({
+        prompt: 'Test',
+        mode: 'code',
+        model: 'claude-3',
+      }).success
+    ).toBe(false);
   });
-});
 
-describe('initiateFromKilocodeSession (prepared mode)', () => {
-  // Note: Testing subscription endpoints is more complex.
-  // Here we test the validation and initialization logic only.
-  // Full integration tests would require consuming the stream.
-
-  describe('input validation', () => {
-    it('should accept prepared session input (cloudAgentSessionId only)', () => {
-      // This tests the schema via Zod's safeParse
-      const result = schemas.InitiateFromPreparedSessionInput.safeParse({
+  it('restricts updateSession to callbackTarget', () => {
+    expect(
+      schemas.UpdateSessionInput.safeParse({
         cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('should reject invalid cloudAgentSessionId format', () => {
-      const result = schemas.InitiateFromPreparedSessionInput.safeParse({
-        cloudAgentSessionId: 'invalid-id',
-      });
-      expect(result.success).toBe(false);
-    });
-  });
-});
-
-describe('PrepareSessionInput schema validation', () => {
-  it('should accept all valid modes', () => {
-    // All valid modes including aliases
-    const modes = ['code', 'plan', 'debug', 'orchestrator', 'ask', 'build', 'architect'];
-    for (const mode of modes) {
-      const result = schemas.PrepareSessionInput.safeParse({
-        prompt: 'Test',
-        mode,
-        model: 'claude-3',
-        githubRepo: 'acme/repo',
-      });
-      expect(result.success).toBe(true);
-    }
-  });
-
-  it('requires appendSystemPrompt for custom mode', () => {
-    const missingPrompt = schemas.PrepareSessionInput.safeParse({
-      prompt: 'Test',
-      mode: 'custom',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-    });
-    expect(missingPrompt.success).toBe(false);
-
-    const withPrompt = schemas.PrepareSessionInput.safeParse({
-      prompt: 'Test',
-      mode: 'custom',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      appendSystemPrompt: 'Follow the house style.',
-    });
-    expect(withPrompt.success).toBe(true);
-  });
-
-  it('should validate githubRepo format', () => {
-    // Valid formats
-    const validRepos = ['acme/repo', 'a/b', 'org_name/repo-name', 'org.name/repo.name'];
-    for (const repo of validRepos) {
-      const result = schemas.PrepareSessionInput.safeParse({
-        prompt: 'Test',
-        mode: 'code',
-        model: 'claude-3',
-        githubRepo: repo,
-      });
-      expect(result.success).toBe(true);
-    }
-
-    // Invalid formats
-    const invalidRepos = ['just-repo', '', 'https://github.com/acme/repo'];
-    for (const repo of invalidRepos) {
-      const result = schemas.PrepareSessionInput.safeParse({
-        prompt: 'Test',
-        mode: 'code',
-        model: 'claude-3',
-        githubRepo: repo,
-      });
-      expect(result.success).toBe(false);
-    }
-  });
-
-  it('should validate gitUrl format', () => {
-    // Valid formats
-    const validUrls = [
-      'https://gitlab.com/org/repo.git',
-      'https://bitbucket.org/org/repo.git',
-      'https://github.mycompany.com/org/repo.git',
-    ];
-    for (const gitUrl of validUrls) {
-      const result = schemas.PrepareSessionInput.safeParse({
-        prompt: 'Test',
-        mode: 'code',
-        model: 'claude-3',
-        gitUrl,
-      });
-      expect(result.success).toBe(true);
-    }
-
-    // Invalid formats
-    const invalidUrls = ['not-a-url', 'git@github.com:org/repo.git', 'ftp://example.com/repo'];
-    for (const gitUrl of invalidUrls) {
-      const result = schemas.PrepareSessionInput.safeParse({
-        prompt: 'Test',
-        mode: 'code',
-        model: 'claude-3',
-        gitUrl,
-      });
-      expect(result.success).toBe(false);
-    }
-  });
-
-  it('should limit prompt length', () => {
-    const longPrompt = 'a'.repeat(schemaLimits.Limits.MAX_PROMPT_LENGTH + 1);
-    const result = schemas.PrepareSessionInput.safeParse({
-      prompt: longPrompt,
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('should limit setup commands count', () => {
-    const tooManyCommands = Array(schemaLimits.Limits.MAX_SETUP_COMMANDS + 1).fill('echo test');
-    const result = schemas.PrepareSessionInput.safeParse({
-      prompt: 'Test',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      setupCommands: tooManyCommands,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('should limit setup command length', () => {
-    const longCommand = 'a'.repeat(schemaLimits.Limits.MAX_SETUP_COMMAND_LENGTH + 1);
-    const result = schemas.PrepareSessionInput.safeParse({
-      prompt: 'Test',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      setupCommands: [longCommand],
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('UpdateSessionInput schema validation', () => {
-  it('should accept valid cloudAgentSessionId', () => {
-    const result = schemas.UpdateSessionInput.safeParse({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('should reject invalid cloudAgentSessionId', () => {
-    const result = schemas.UpdateSessionInput.safeParse({
-      cloudAgentSessionId: 'invalid-session-id',
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('should accept nullable scalar fields', () => {
-    const result = schemas.UpdateSessionInput.safeParse({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-      mode: null,
-      model: null,
-      githubToken: null,
-      gitToken: null,
-      autoCommit: null,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('should accept optional fields being undefined', () => {
-    const result = schemas.UpdateSessionInput.safeParse({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-    });
-    expect(result.success).toBe(true);
-    // All optional fields should be undefined
-    if (result.success) {
-      expect(result.data.mode).toBeUndefined();
-      expect(result.data.model).toBeUndefined();
-      expect(result.data.envVars).toBeUndefined();
-    }
-  });
-
-  it('should validate mode values', () => {
-    // All modes except 'custom' don't require appendSystemPrompt
-    // Includes backward-compatible aliases: build -> code, architect -> plan
-    const modesWithoutPrompt = [
-      'code',
-      'plan',
-      'debug',
-      'orchestrator',
-      'ask',
-      'build',
-      'architect',
-      null,
-    ];
-    for (const mode of modesWithoutPrompt) {
-      const result = schemas.UpdateSessionInput.safeParse({
+        callbackTarget: { url: 'https://example.com/callback' },
+      }).success
+    ).toBe(true);
+    expect(
+      schemas.UpdateSessionInput.safeParse({
         cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-        mode,
-      });
-      expect(result.success).toBe(true);
-    }
-
-    // Non-built-in slugs pass schema validation as long as they look like a
-    // slug — the handler cross-checks them against the session's
-    // stored runtimeAgents. Reject only malformed slugs at the schema layer.
-    const badSlug = schemas.UpdateSessionInput.safeParse({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-      mode: 'Invalid Mode!',
-    });
-    expect(badSlug.success).toBe(false);
-
-    // A well-formed custom slug is allowed, but when runtimeAgents is provided
-    // in the same payload the slug must match one of them.
-    const unknownWithRuntimeAgents = schemas.UpdateSessionInput.safeParse({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-      mode: 'my-custom',
-      runtimeAgents: [],
-    });
-    expect(unknownWithRuntimeAgents.success).toBe(false);
-
-    const knownWithRuntimeAgents = schemas.UpdateSessionInput.safeParse({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-      mode: 'my-custom',
-      runtimeAgents: [
-        {
-          slug: 'my-custom',
-          name: 'My Custom',
-          config: { prompt: 'Do things' },
-        },
-      ],
-    });
-    expect(knownWithRuntimeAgents.success).toBe(true);
-  });
-
-  it('requires appendSystemPrompt for custom mode updates', () => {
-    const missingPrompt = schemas.UpdateSessionInput.safeParse({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-      mode: 'custom',
-    });
-    expect(missingPrompt.success).toBe(false);
-
-    const withPrompt = schemas.UpdateSessionInput.safeParse({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-      mode: 'custom',
-      appendSystemPrompt: 'Custom rules.',
-    });
-    expect(withPrompt.success).toBe(true);
-  });
-});
-
-describe('integration flow tests', () => {
-  describe('full prepare → update → initiate flow', () => {
-    it('should work end-to-end', async () => {
-      // This is a conceptual test showing the expected flow
-      // Real integration testing would require consuming SSE streams
-
-      // 1. Prepare session
-      const prepareStub = createMockDOStub({
-        prepare: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const prepareCtx = createInternalApiContext({ doStub: prepareStub });
-      const prepareCaller = appRouter.createCaller(prepareCtx);
-
-      const prepareResult = await prepareCaller.prepareSession({
-        prompt: 'Test prompt',
-        mode: 'code',
-        model: 'claude-3',
-        githubRepo: 'acme/repo',
-        githubToken: 'ghp_test_token',
-      });
-
-      expect(prepareResult.cloudAgentSessionId).toBeDefined();
-      expect(prepareResult.kiloSessionId).toBeDefined();
-
-      // 2. Update session
-      const updateStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const updateCtx = createInternalApiContext({ doStub: updateStub });
-      const updateCaller = appRouter.createCaller(updateCtx);
-
-      const updateResult = await updateCaller.updateSession({
-        cloudAgentSessionId: prepareResult.cloudAgentSessionId as SessionId,
         mode: 'plan',
-        envVars: { DEBUG: 'true' },
-      });
-
-      expect(updateResult.success).toBe(true);
-
-      // 3. Initiate would be via SSE subscription - not tested here
-      // See session-init.ts for implementation
-    });
-  });
-});
-
-describe('MCP server count limits', () => {
-  it('should reject more than MAX_MCP_SERVERS in PrepareSessionInput', () => {
-    // Create an object with MAX_MCP_SERVERS + 1 servers
-    const tooManyServers: Record<string, { type: 'local'; command: string[] }> = {};
-    for (let i = 0; i <= schemaLimits.Limits.MAX_MCP_SERVERS; i++) {
-      tooManyServers[`server${i}`] = { type: 'local', command: ['npx'] };
-    }
-
-    const result = schemas.PrepareSessionInput.safeParse({
-      prompt: 'Test',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      mcpServers: tooManyServers,
-    });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.message).toContain('MCP servers');
-    }
-  });
-
-  it('should accept exactly MAX_MCP_SERVERS in PrepareSessionInput', () => {
-    const maxServers: Record<string, { type: 'local'; command: string[] }> = {};
-    for (let i = 0; i < schemaLimits.Limits.MAX_MCP_SERVERS; i++) {
-      maxServers[`server${i}`] = { type: 'local', command: ['npx'] };
-    }
-
-    const result = schemas.PrepareSessionInput.safeParse({
-      prompt: 'Test',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      mcpServers: maxServers,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('should reject more than MAX_MCP_SERVERS in UpdateSessionInput', () => {
-    const tooManyServers: Record<string, { type: 'local'; command: string[] }> = {};
-    for (let i = 0; i <= schemaLimits.Limits.MAX_MCP_SERVERS; i++) {
-      tooManyServers[`server${i}`] = { type: 'local', command: ['npx'] };
-    }
-
-    const result = schemas.UpdateSessionInput.safeParse({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-      mcpServers: tooManyServers,
-    });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.message).toContain('MCP servers');
-    }
-  });
-});
-
-describe('DO state machine edge cases', () => {
-  describe('tryInitiate required-field validation', () => {
-    it('should fail when metadata is missing prompt', async () => {
-      const incompleteMetadata: Partial<CloudAgentSessionState> = {
-        version: Date.now(),
-        sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-        userId: 'test-user',
-        timestamp: Date.now(),
-        preparedAt: Date.now() - 1000,
-        initiatedAt: Date.now(),
-        // Missing: prompt
-        mode: 'code',
-        model: 'claude-3',
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-        githubRepo: 'acme/repo',
-      };
-
-      const doStub = createMockDOStub({
-        tryInitiate: vi.fn().mockResolvedValue({
-          success: true,
-          data: incompleteMetadata,
-        }),
-      });
-
-      // The router handler should validate required fields after tryInitiate
-      // This tests that the validation catches missing prompt
-      const result = (await doStub.tryInitiate()) as {
-        success: boolean;
-        error?: string;
-        data: Record<string, unknown>;
-      };
-      expect(result.success).toBe(true);
-      expect(result.data.prompt).toBeUndefined();
-    });
-
-    it('should fail when metadata is missing mode', async () => {
-      const incompleteMetadata: Partial<CloudAgentSessionState> = {
-        version: Date.now(),
-        sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-        userId: 'test-user',
-        timestamp: Date.now(),
-        preparedAt: Date.now() - 1000,
-        initiatedAt: Date.now(),
-        prompt: 'Test prompt',
-        // Missing: mode (this test verifies we handle missing mode gracefully)
-        model: 'claude-3',
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-        githubRepo: 'acme/repo',
-      };
-
-      const doStub = createMockDOStub({
-        tryInitiate: vi.fn().mockResolvedValue({
-          success: true,
-          data: incompleteMetadata,
-        }),
-      });
-
-      const result = (await doStub.tryInitiate()) as {
-        success: boolean;
-        error?: string;
-        data: Record<string, unknown>;
-      };
-      expect(result.success).toBe(true);
-      expect(result.data.mode).toBeUndefined();
-    });
-
-    it('should fail when metadata is missing kiloSessionId', async () => {
-      const incompleteMetadata: Partial<CloudAgentSessionState> = {
-        version: Date.now(),
-        sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-        userId: 'test-user',
-        timestamp: Date.now(),
-        preparedAt: Date.now() - 1000,
-        initiatedAt: Date.now(),
-        prompt: 'Test prompt',
-        mode: 'code',
-        model: 'claude-3',
-        // Missing: kiloSessionId
-        githubRepo: 'acme/repo',
-      };
-
-      const doStub = createMockDOStub({
-        tryInitiate: vi.fn().mockResolvedValue({
-          success: true,
-          data: incompleteMetadata,
-        }),
-      });
-
-      const result = (await doStub.tryInitiate()) as {
-        success: boolean;
-        error?: string;
-        data: Record<string, unknown>;
-      };
-      expect(result.success).toBe(true);
-      expect(result.data.kiloSessionId).toBeUndefined();
-    });
-  });
-
-  describe('double-init guard', () => {
-    it('should prevent double initiation', async () => {
-      const doStub = createMockDOStub({
-        tryInitiate: vi
-          .fn()
-          .mockResolvedValueOnce({
-            success: true,
-            data: {
-              version: Date.now(),
-              sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-              userId: 'test-user',
-              timestamp: Date.now(),
-              preparedAt: Date.now() - 1000,
-              initiatedAt: Date.now(),
-              prompt: 'Test prompt',
-              mode: 'code',
-              model: 'claude-3',
-              kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-              githubRepo: 'acme/repo',
-            },
-          })
-          .mockResolvedValueOnce({
-            success: false,
-            error: 'Session has already been initiated',
-          }),
-      });
-
-      // First call succeeds
-      const firstResult = (await doStub.tryInitiate()) as {
-        success: boolean;
-        error?: string;
-        data?: Record<string, unknown>;
-      };
-      expect(firstResult.success).toBe(true);
-
-      // Second call fails
-      const secondResult = (await doStub.tryInitiate()) as { success: boolean; error?: string };
-      expect(secondResult.success).toBe(false);
-      expect(secondResult.error).toBe('Session has already been initiated');
-    });
-
-    it('should preserve initiatedAt timestamp on second call attempt', async () => {
-      // Simulate a real DO where storage is tracked
-      const firstInitiatedAt = Date.now();
-      let storedMetadata: CloudAgentSessionState | null = null;
-
-      const doStub = createMockDOStub({
-        tryInitiate: vi.fn().mockImplementation(async () => {
-          // First call: session is prepared but not initiated
-          if (!storedMetadata || !storedMetadata.initiatedAt) {
-            storedMetadata = {
-              version: Date.now(),
-              sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-              userId: 'test-user',
-              timestamp: Date.now(),
-              preparedAt: Date.now() - 1000,
-              initiatedAt: firstInitiatedAt,
-              prompt: 'Test prompt',
-              mode: 'code',
-              model: 'claude-3',
-              kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-              githubRepo: 'acme/repo',
-            };
-            return { success: true, data: storedMetadata };
-          }
-          // Second call: session already initiated, storage unchanged
-          return { success: false, error: 'Session has already been initiated' };
-        }),
-        getMetadata: vi.fn().mockImplementation(async () => storedMetadata),
-      });
-
-      // First call succeeds and sets initiatedAt
-      const firstResult = (await doStub.tryInitiate()) as {
-        success: boolean;
-        data: Record<string, unknown>;
-      };
-      expect(firstResult.success).toBe(true);
-      expect(firstResult.data.initiatedAt).toBe(firstInitiatedAt);
-
-      // Second call fails
-      const secondResult = (await doStub.tryInitiate()) as { success: boolean; error?: string };
-      expect(secondResult.success).toBe(false);
-      expect(secondResult.error).toBe('Session has already been initiated');
-
-      // Verify storage wasn't mutated - initiatedAt is still the first timestamp
-      const metadata = (await doStub.getMetadata()) as CloudAgentSessionState | null;
-      expect(metadata).not.toBeNull();
-      expect(metadata!.initiatedAt).toBe(firstInitiatedAt);
-    });
-  });
-
-  describe('null clearing in tryUpdate', () => {
-    it('should pass null values to DO for clearing scalar fields', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-      const caller = appRouter.createCaller(ctx);
-
-      await caller.updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-        mode: null,
-        model: null,
-        githubToken: null,
-        gitToken: null,
-        autoCommit: null,
-      });
-
-      expect(doStub.tryUpdate).toHaveBeenCalledWith({
-        mode: null,
-        model: null,
-        githubToken: null,
-        gitToken: null,
-        autoCommit: null,
-      });
-    });
-  });
-
-  describe('empty object/array clearing in tryUpdate', () => {
-    it('should convert empty envVars to null for clearing', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-      const caller = appRouter.createCaller(ctx);
-
-      await caller.updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-        envVars: {},
-      });
-
-      expect(doStub.tryUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          envVars: null,
-        })
-      );
-    });
-
-    it('should convert empty setupCommands to null for clearing', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-      const caller = appRouter.createCaller(ctx);
-
-      await caller.updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-        setupCommands: [],
-      });
-
-      expect(doStub.tryUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          setupCommands: null,
-        })
-      );
-    });
-
-    it('should convert empty mcpServers to null for clearing', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-      const caller = appRouter.createCaller(ctx);
-
-      await caller.updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-        mcpServers: {},
-      });
-
-      expect(doStub.tryUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mcpServers: null,
-        })
-      );
-    });
-
-    it('should preserve non-empty collections', async () => {
-      const doStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({ success: true }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-      const caller = appRouter.createCaller(ctx);
-
-      await caller.updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-        envVars: { KEY: 'value' },
-        setupCommands: ['npm install'],
-      });
-
-      expect(doStub.tryUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          envVars: { KEY: 'value' },
-          setupCommands: ['npm install'],
-        })
-      );
-    });
-  });
-
-  describe('schema validation in DO methods', () => {
-    it('should reject invalid metadata in prepare via schema validation', async () => {
-      // This tests that the DO's prepare method validates against MetadataSchema
-      // The mock simulates what happens when schema validation fails
-      const doStub = createMockDOStub({
-        prepare: vi.fn().mockResolvedValue({
-          success: false,
-          error: 'Invalid metadata: {"mode":{"_errors":["Invalid enum value"]}}',
-        }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.prepareSession({
-          prompt: 'Test',
-          mode: 'code',
-          model: 'claude-3',
-          githubRepo: 'acme/repo',
-          githubToken: 'ghp_test_token',
-        })
-      ).rejects.toThrow('Invalid metadata');
-    });
-
-    it('should reject invalid metadata in tryUpdate via schema validation', async () => {
-      // This tests that the DO's tryUpdate method validates against MetadataSchema
-      const doStub = createMockDOStub({
-        tryUpdate: vi.fn().mockResolvedValue({
-          success: false,
-          error: 'Invalid metadata after update: {"mode":{"_errors":["Invalid enum value"]}}',
-        }),
-      });
-      const ctx = createInternalApiContext({ doStub });
-      const caller = appRouter.createCaller(ctx);
-
-      await expect(
-        caller.updateSession({
-          cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
-          mode: 'plan',
-        })
-      ).rejects.toThrow('Invalid metadata after update');
-    });
+      }).success
+    ).toBe(false);
   });
 });

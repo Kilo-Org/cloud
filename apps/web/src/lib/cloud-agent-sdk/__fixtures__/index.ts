@@ -6,6 +6,7 @@ import { autocommit } from './autocommit';
 import { interruption } from './interruption';
 import { realSessionExcerpt } from './real-session-excerpt';
 import { optimisticUserTextReconciliation } from './optimistic-user-text-reconciliation';
+import { messageDeliveryExhausted } from './message-delivery-exhausted';
 
 const allFixtures: Fixture[] = [
   basicStreaming,
@@ -15,6 +16,7 @@ const allFixtures: Fixture[] = [
   interruption,
   realSessionExcerpt,
   optimisticUserTextReconciliation,
+  messageDeliveryExhausted,
 ];
 
 export { allFixtures };

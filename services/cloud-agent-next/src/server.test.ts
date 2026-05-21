@@ -133,13 +133,22 @@ describe('server /terminal', () => {
     const env = createEnv();
     const sandboxId = `usr-${'a'.repeat(48)}`;
     const metadata = {
-      version: 1,
-      sessionId: 'session-1',
-      userId: 'user-1',
-      sandboxId,
-      createdOnPlatform: 'cloud-agent-web',
-      preparedAt: Date.now(),
-      workspacePath: '/workspace/user/repo',
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'session-1',
+        userId: 'user-1',
+        createdOnPlatform: 'cloud-agent-web',
+      },
+      auth: {},
+      workspace: {
+        sandboxId,
+        workspacePath: '/workspace/user/repo',
+      },
+      lifecycle: {
+        version: 1,
+        timestamp: Date.now(),
+        preparedAt: Date.now(),
+      },
     };
     const terminalResponse = new Response('proxied', { status: 200 });
     const wsConnect = vi.fn().mockResolvedValueOnce(terminalResponse);

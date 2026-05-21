@@ -46,6 +46,7 @@ import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { db } from '@/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
+import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -257,7 +258,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       try {
         return await client.initiateFromPreparedSession({
           cloudAgentSessionId: input.cloudAgentSessionId,
-          kilocodeOrganizationId: input.organizationId,
         });
       } catch (error) {
         rethrowAsPaymentRequired(error);
@@ -286,7 +286,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           cloudAgentSessionId: input.cloudAgentSessionId,
           payload: input.payload,
           autoCommit: input.autoCommit,
-          messageId: input.messageId,
+          messageId: input.messageId ?? generateMessageId(),
           images: input.images,
         });
       } catch (error) {

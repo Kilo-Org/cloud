@@ -8,7 +8,7 @@ import {
 export type ConnectionState =
   | { status: 'disconnected' }
   | { status: 'connecting' }
-  | { status: 'connected'; executionId: string | null }
+  | { status: 'connected'; executionId?: string }
   | { status: 'reconnecting'; lastEventId: number; attempt: number }
   | { status: 'refreshing_ticket' }
   | { status: 'error'; error: string; retryable: boolean };
@@ -213,7 +213,10 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
       ticketRefreshAttempted = false;
 
       if (state.status !== 'connected') {
-        setState({ status: 'connected', executionId: event.executionId });
+        setState({
+          status: 'connected',
+          ...(event.executionId != null && { executionId: event.executionId }),
+        });
       }
 
       config.onEvent(event);

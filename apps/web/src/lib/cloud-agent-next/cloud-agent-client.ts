@@ -138,6 +138,7 @@ export type PrepareSessionInput = {
   autoInitiate?: boolean;
   /** When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes */
   devcontainer?: boolean;
+  initialMessageId?: string | null;
 };
 
 /** Output from prepareSession procedure */
@@ -150,7 +151,6 @@ export type PrepareSessionOutput = {
 /** Input for initiating from a prepared session */
 export type InitiateFromPreparedSessionInput = {
   cloudAgentSessionId: string;
-  kilocodeOrganizationId?: string;
 };
 
 /** Input for sendMessage procedure (V2 - uses cloudAgentSessionId) */
@@ -166,7 +166,7 @@ export type SendMessageInput = {
   /** Custom text to append to the system prompt */
   appendSystemPrompt?: string;
   /** Message ID for correlating the request */
-  messageId?: string;
+  messageId?: string | null;
 };
 
 export type TerminalPty = {
@@ -215,6 +215,8 @@ export type InitiateSessionOutput = {
   executionId: string;
   status: 'started';
   streamUrl: string;
+  messageId: string;
+  delivery: 'sent' | 'queued';
 };
 
 /** Input for getSession procedure */

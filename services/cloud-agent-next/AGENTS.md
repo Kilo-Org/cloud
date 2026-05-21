@@ -4,7 +4,11 @@ This file provides guidance to AI coding agents working in this repository.
 
 ## Project Overview
 
-Cloudflare Worker that powers Kilocode Cloud Agents. It exposes a tRPC API for session preparation and execution, streams output over WebSockets, and runs the Kilocode CLI inside Cloudflare Sandbox containers. Durable Objects track sessions; git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved via the shared `git-token-service` Worker. The wrapper in `wrapper/` is a core component that brokers Kilocode CLI events into the worker’s `/ingest` WebSocket and handles job lifecycle.
+Cloudflare Worker that powers Kilocode Cloud Agents. It exposes tRPC APIs for starting sessions and sending messages, streams output over WebSockets, and orchestrates Cloudflare Sandbox containers that run the Kilo wrapper.
+
+The Durable Object is intentionally a small coordinator: it durably queues messages when a sandbox or wrapper is not ready, owns session metadata and event replay state, schedules alarms, prepares or restores the sandbox, and hands prompts to the wrapper. Most product behavior after the sandbox is available belongs on the wrapper/Kilo side. Keep the DO focused on durable coordination, not feature logic.
+
+Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved via the shared `git-token-service` Worker. The wrapper in `wrapper/` brokers Kilo SDK events into the worker’s `/ingest` WebSocket and owns the job lifecycle inside the sandbox.
 
 ## Development Commands
 
@@ -23,6 +27,14 @@ Cloudflare Worker that powers Kilocode Cloud Agents. It exposes a tRPC API for s
 - `pnpm run test:integration` - Integration tests in Workers runtime (Miniflare)
 - `pnpm run test:all` - Unit + integration
 
+### Local fake-LLM smoke harness
+
+- `services/cloud-agent-next/test/e2e/README.md` is the source of truth for setup, fake-LLM routing, lifecycle directives, and troubleshooting.
+- Prefer focused scenario debugging first: `pnpm exec tsx services/cloud-agent-next/test/e2e/run.ts <lifecycle> <conversation>`.
+- Run the aggregate local regression matrix with `pnpm exec tsx services/cloud-agent-next/test/e2e/smoke.ts` when validating the full real Worker + DO + sandbox + wrapper path.
+- This harness is local/manual rather than part of normal `pnpm test` or CI; use `dev/logs/cloud-agent-next.log` and `dev/logs/fake-llm.log` when debugging it.
+- Read `services/cloud-agent-next/DEBUG.md` when correlating local Wrangler logs with Docker sandbox containers, wrapper log files, Kilo CLI logs, uploaded archives, or stuck session flows.
+
 ### Code Quality
 
 - `pnpm run lint` - oxlint
@@ -40,13 +52,22 @@ Cloudflare Worker that powers Kilocode Cloud Agents. It exposes a tRPC API for s
 
 - `src/index.ts` - Entry point, request routing
 - `src/router/` - tRPC router and handlers
-- `src/session-service.ts` - Session lifecycle orchestration
+- `src/router/handlers/session-start.ts` - Primary `start` endpoint
+- `src/router/handlers/session-send.ts` - Primary follow-up `send` endpoint
+- `src/router/handlers/session-prepare.ts` - Legacy `prepareSession` adapter
+- `src/router/handlers/session-execution.ts` - Legacy V2 queue adapters
+- `src/session/session-requests.ts` - Grouped internal session request types
+- `src/session/session-registration.ts` - Shared grouped session registration
+- `src/session/queue-message.ts` - Shared grouped queue command helper
+- `src/session-service.ts` - Sandbox/workspace lifecycle orchestration
 - `src/workspace.ts` - Workspace setup and git operations
-- `src/streaming.ts` - WebSocket streaming
+- `src/websocket/stream.ts` - Client-facing WebSocket stream
+- `src/websocket/ingest.ts` - Wrapper-facing ingest WebSocket
 
 ### Durable Objects
 
 - `src/persistence/CloudAgentSession.ts` - Session DO storage + lifecycle
+- `src/persistence/session-metadata.ts` - Current grouped metadata schema plus legacy read fallback
 - `src/db/` - SQLite table definitions and store helpers for DOs
 
 ### Sandbox + Execution
@@ -86,10 +107,22 @@ This pattern blocks API endpoints from running for external contributors who don
 ### Code Style
 
 - Keep streaming payloads and schemas aligned with `src/shared/protocol.ts`
+- Prefer grouped domain structures for new internals. Do not introduce new flat shared request or metadata shapes.
+
+### Cloud Agent Architecture
+
+- Treat `messageId` as the primary user-message identity. Legacy `executionId` exists only as a compatibility alias in V2 response paths.
+- Public legacy endpoints may accept flat input, but handlers should adapt that input at the boundary into grouped `SessionCreateRequest` or `QueueMessageInput`.
+- New session metadata writes must use grouped `SessionMetadata` with `metadataSchemaVersion: 2`.
+- Legacy flat metadata reads are allowed only inside `src/persistence/session-metadata.ts` via `parseSessionMetadata`. Application code should consume current grouped metadata only.
+- Queueing is explicit: use `kind: "registered-initial"` when initiating the persisted initial message, and `kind: "user-message"` when the request carries a prompt.
+- The DO should remain a durable coordinator: queue messages, persist metadata/events, fence wrapper connections, schedule alarms, prepare/restore sandbox state, and hand work to the wrapper.
+- Put Kilo/job behavior in `wrapper/` or Kilo SDK integration code when it does not require durable DO coordination.
+- Avoid growing `CloudAgentSession.ts` with product behavior that can live in the wrapper, Kilo SDK layer, or a small helper module.
 
 ### Runtime Guidelines
 
-- Durable Object calls should be retried using `withDoRetry` in `src/utils/do-retry.ts`
+- Durable Object calls should be retried using `withDORetry` in `src/utils/do-retry.ts`
 - Execute commands inside a session context (use `session.exec(...)`, not `sandbox.exec(...)`)
 
 ### Testing Standards

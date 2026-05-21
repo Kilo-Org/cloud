@@ -40,6 +40,12 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
         if ('kilocodeOrganizationId' in body && typeof body.kilocodeOrganizationId === 'string') {
           orgId = body.kilocodeOrganizationId;
         }
+        if (!orgId && 'options' in body && body.options && typeof body.options === 'object') {
+          const options = body.options as Record<string, unknown>;
+          if (typeof options.kilocodeOrganizationId === 'string') {
+            orgId = options.kilocodeOrganizationId;
+          }
+        }
         if ('cloudAgentSessionId' in body && typeof body.cloudAgentSessionId === 'string') {
           sessionId = body.cloudAgentSessionId;
         }
@@ -57,8 +63,13 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
       return buildTrpcErrorResponse(401, 'Missing auth token', procedureName);
     }
 
+    // For message-send procedures the caller only supplies cloudAgentSessionId;
+    // resolve the org for balance checks from the DO metadata. `start` always
+    // carries `kilocodeOrganizationId` in the body, so it is not included here.
     if (
-      (procedureName === 'sendMessageV2' || procedureName === 'initiateFromKilocodeSessionV2') &&
+      (procedureName === 'sendMessageV2' ||
+        procedureName === 'initiateFromKilocodeSessionV2' ||
+        procedureName === 'send') &&
       !orgId &&
       sessionId &&
       userId

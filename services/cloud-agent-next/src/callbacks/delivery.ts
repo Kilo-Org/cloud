@@ -37,10 +37,11 @@ async function deliverToTarget(
       .withFields({
         cloudAgentSessionId: payload.cloudAgentSessionId,
         kiloSessionId: payload.kiloSessionId,
-        executionId: payload.executionId,
+        messageId: payload.messageId,
         status: response.status,
+        ok: response.ok,
       })
-      .info('Callback delivered');
+      .info('Callback HTTP response received');
 
     return response.ok
       ? { ok: true, status: response.status }
@@ -50,7 +51,7 @@ async function deliverToTarget(
       .withFields({
         cloudAgentSessionId: payload.cloudAgentSessionId,
         kiloSessionId: payload.kiloSessionId,
-        executionId: payload.executionId,
+        messageId: payload.messageId,
         error: err instanceof Error ? err.message : 'Unknown error',
       })
       .error('Callback delivery failed');
@@ -71,10 +72,31 @@ export async function deliverCallbackJob(
 
   if (attempts < MAX_ATTEMPTS && shouldRetry(result.status)) {
     const delaySeconds = BASE_BACKOFF_SECONDS * 2 ** (attempts - 1);
+    logger
+      .withFields({
+        cloudAgentSessionId: payload.cloudAgentSessionId,
+        kiloSessionId: payload.kiloSessionId,
+        messageId: payload.messageId,
+        attempts,
+        resultType: 'retry',
+        status: result.status,
+        delaySeconds,
+      })
+      .warn('Callback delivery classified');
     return { type: 'retry', delaySeconds };
   }
 
   const errorMsg = result.error ?? `HTTP ${result.status}`;
+  logger
+    .withFields({
+      cloudAgentSessionId: payload.cloudAgentSessionId,
+      kiloSessionId: payload.kiloSessionId,
+      messageId: payload.messageId,
+      attempts,
+      resultType: 'failed',
+      status: result.status,
+    })
+    .error('Callback delivery classified');
   return {
     type: 'failed',
     error: `Callback delivery failed after ${attempts} attempts: ${errorMsg}`,

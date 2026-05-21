@@ -6,7 +6,7 @@ import * as z from 'zod';
 
 export const cloudAgentEventSchema = z.object({
   eventId: z.number(),
-  executionId: z.string().nullable(),
+  executionId: z.string().nullable().optional(),
   sessionId: z.string(),
   streamEventType: z.string(),
   timestamp: z.string(),
@@ -340,6 +340,48 @@ export const commandsAvailableDataSchema = z.object({
   commands: z.array(slashCommandInfoSchema),
 });
 export type CommandsAvailableData = z.infer<typeof commandsAvailableDataSchema>;
+
+// ---------------------------------------------------------------------------
+// Per-message delivery lifecycle (cloud.message.*)
+// ---------------------------------------------------------------------------
+
+export const cloudMessageQueuedDataSchema = z.object({
+  messageId: z.string(),
+  executionId: z.string().optional(),
+  content: z.string().optional(),
+  delivery: z.literal('queued').optional(),
+});
+export type CloudMessageQueuedData = z.infer<typeof cloudMessageQueuedDataSchema>;
+
+export const cloudMessageSentDataSchema = z
+  .object({
+    messageId: z.string(),
+    executionId: z.string().optional(),
+    delivery: z.literal('sent').optional(),
+  })
+  .passthrough();
+export type CloudMessageSentData = z.infer<typeof cloudMessageSentDataSchema>;
+
+export const cloudMessageCompletedDataSchema = z
+  .object({
+    messageId: z.string(),
+    executionId: z.string().optional(),
+  })
+  .passthrough();
+export type CloudMessageCompletedData = z.infer<typeof cloudMessageCompletedDataSchema>;
+
+export const cloudMessageFailedDataSchema = z
+  .object({
+    messageId: z.string(),
+    executionId: z.string().optional(),
+    error: z.unknown().optional(),
+    reason: z.string().optional(),
+    delivery: z.enum(['queued', 'sent']).optional(),
+    attempts: z.number().optional(),
+    status: z.string().optional(),
+  })
+  .passthrough();
+export type CloudMessageFailedData = z.infer<typeof cloudMessageFailedDataSchema>;
 
 // ---------------------------------------------------------------------------
 // Session snapshot (historical transport / replay)

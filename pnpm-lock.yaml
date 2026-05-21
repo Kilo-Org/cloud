@@ -1540,6 +1540,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
+      '@types/ws':
+        specifier: ^8.5.12
+        version: 8.18.1
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260514.1
@@ -1549,6 +1552,9 @@ importers:
       drizzle-kit:
         specifier: 'catalog:'
         version: 0.31.10
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1558,6 +1564,9 @@ importers:
       wrangler:
         specifier: 'catalog:'
         version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws:
+        specifier: ^8.18.0
+        version: 8.20.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/cloud-agent-next/wrapper:
     dependencies:

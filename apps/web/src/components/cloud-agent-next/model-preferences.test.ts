@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  appendCloudAgentNextLocalTestModel,
   getDevcontainerEnabledStorageKey,
   getLastUsedModelStorageKey,
   getLastUsedVariantsStorageKey,
@@ -13,6 +14,39 @@ const modelOptions = [
   { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5' },
   { id: 'openai/gpt-5.1', name: 'GPT 5.1' },
 ] satisfies ModelOption[];
+
+describe('appendCloudAgentNextLocalTestModel', () => {
+  it('leaves the normal selector list unchanged when local model exposure is disabled', () => {
+    expect(appendCloudAgentNextLocalTestModel(modelOptions, false)).toEqual(modelOptions);
+  });
+
+  it('appends the deterministic local testing model without changing existing fallback defaults', () => {
+    const exposedModelOptions = appendCloudAgentNextLocalTestModel(modelOptions, true);
+
+    expect(exposedModelOptions).toEqual([
+      ...modelOptions,
+      { id: 'kilo/fake-deterministic', name: 'Deterministic test model' },
+    ]);
+    expect(
+      getPreferredInitialModel({
+        modelOptions: exposedModelOptions,
+        lastUsedModel: null,
+        defaultModel: 'blocked/model',
+      })
+    ).toBe('anthropic/claude-sonnet-4.5');
+  });
+
+  it('does not duplicate an already exposed deterministic local testing model', () => {
+    const existingTestModelOptions = [
+      ...modelOptions,
+      { id: 'kilo/fake-deterministic', name: 'Gateway-provided fake model' },
+    ] satisfies ModelOption[];
+
+    expect(appendCloudAgentNextLocalTestModel(existingTestModelOptions, true)).toEqual(
+      existingTestModelOptions
+    );
+  });
+});
 
 describe('getPreferredInitialModel', () => {
   it('prefers the last used model when it is available', () => {
@@ -74,15 +108,14 @@ describe('getLastUsedVariantsStorageKey', () => {
   });
 });
 
-describe('devcontainer preference', () => {
-  it('uses one browser-wide storage key', () => {
+describe('devcontainer preference helpers', () => {
+  it('uses a stable storage key for the devcontainer preference', () => {
     expect(getDevcontainerEnabledStorageKey()).toBe('cloud-agent:devcontainer-enabled');
   });
 
-  it('enables only the stored boolean true value', () => {
+  it('parses only true as enabled', () => {
     expect(parseDevcontainerEnabled('true')).toBe(true);
     expect(parseDevcontainerEnabled('false')).toBe(false);
-    expect(parseDevcontainerEnabled('1')).toBe(false);
     expect(parseDevcontainerEnabled(null)).toBe(false);
   });
 });

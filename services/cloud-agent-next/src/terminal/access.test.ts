@@ -8,27 +8,38 @@ vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(),
 }));
 
-const baseMetadata: CloudAgentSessionState = {
-  version: 1,
-  sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-  userId: 'user-1',
-  timestamp: 1,
-  preparedAt: 1,
-  workspacePath: '/workspace/repo',
-  createdOnPlatform: 'cloud-agent-web',
-};
+const baseMetadata = {
+  metadataSchemaVersion: 2,
+  identity: {
+    sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+    userId: 'user-1',
+    createdOnPlatform: 'cloud-agent-web',
+  },
+  auth: {},
+  workspace: {
+    workspacePath: '/workspace/repo',
+  },
+  lifecycle: {
+    version: 1,
+    timestamp: 1,
+    preparedAt: 1,
+  },
+} satisfies CloudAgentSessionState;
 
 describe('validateTerminalMetadata', () => {
   it('allows prepared interactive cloud-agent sessions', () => {
-    const result = validateTerminalMetadata(baseMetadata, baseMetadata.sessionId);
+    const result = validateTerminalMetadata(baseMetadata, baseMetadata.identity.sessionId);
 
     expect(result).toEqual({ success: true, data: { metadata: baseMetadata } });
   });
 
   it('rejects sessions created by non-interactive platforms', () => {
     const result = validateTerminalMetadata(
-      { ...baseMetadata, createdOnPlatform: 'code-review' },
-      baseMetadata.sessionId
+      {
+        ...baseMetadata,
+        identity: { ...baseMetadata.identity, createdOnPlatform: 'code-review' },
+      },
+      baseMetadata.identity.sessionId
     );
 
     expect(result).toEqual({
@@ -39,8 +50,11 @@ describe('validateTerminalMetadata', () => {
 
   it('rejects unprepared sessions', () => {
     const result = validateTerminalMetadata(
-      { ...baseMetadata, preparedAt: undefined },
-      baseMetadata.sessionId
+      {
+        ...baseMetadata,
+        lifecycle: { ...baseMetadata.lifecycle, preparedAt: undefined },
+      },
+      baseMetadata.identity.sessionId
     );
 
     expect(result).toEqual({
@@ -52,12 +66,18 @@ describe('validateTerminalMetadata', () => {
   it('treats minimal async-preparation metadata as unprepared', () => {
     const result = validateTerminalMetadata(
       {
-        ...baseMetadata,
-        preparedAt: undefined,
-        workspacePath: undefined,
-        createdOnPlatform: undefined,
+        metadataSchemaVersion: 2,
+        identity: {
+          sessionId: baseMetadata.identity.sessionId,
+          userId: baseMetadata.identity.userId,
+        },
+        auth: {},
+        lifecycle: {
+          version: baseMetadata.lifecycle.version,
+          timestamp: baseMetadata.lifecycle.timestamp,
+        },
       },
-      baseMetadata.sessionId
+      baseMetadata.identity.sessionId
     );
 
     expect(result).toEqual({
@@ -87,7 +107,7 @@ describe('resolveTerminalWrapperClient', () => {
       {
         env: { PER_SESSION_SANDBOX_ORG_IDS: '' } as Env,
         metadata: baseMetadata,
-        sessionId: baseMetadata.sessionId,
+        sessionId: baseMetadata.identity.sessionId,
       },
       {
         getSandboxInstance: vi.fn().mockReturnValue(sandbox),
@@ -113,7 +133,7 @@ describe('resolveTerminalWrapperClient', () => {
       {
         env: { PER_SESSION_SANDBOX_ORG_IDS: '' } as Env,
         metadata: baseMetadata,
-        sessionId: baseMetadata.sessionId,
+        sessionId: baseMetadata.identity.sessionId,
       },
       {
         getSandboxInstance: vi.fn().mockReturnValue({} as SandboxInstance),

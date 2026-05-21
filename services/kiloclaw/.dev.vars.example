@@ -2,7 +2,7 @@
 # The dev-start script creates .dev.vars from this file on first run.
 #
 # Most values below are working defaults. The script auto-manages:
-#   NEXTAUTH_SECRET, KILOCLAW_INTERNAL_API_SECRET            (synced from Vercel)
+#   NEXTAUTH_SECRET, INTERNAL_API_SECRET                     (synced from Vercel)
 #   GOOGLE_WORKSPACE_OAUTH_CLIENT_ID, GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI,
 #   GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET,
 #   GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY            (synced from Vercel)
@@ -21,8 +21,8 @@
 # @from NEXTAUTH_SECRET
 NEXTAUTH_SECRET=dev-secret-change-me
 # Platform API authentication key (for internal service-to-service calls)
-# @from KILOCLAW_INTERNAL_API_SECRET
-KILOCLAW_INTERNAL_API_SECRET=dev-internal-secret
+# @from INTERNAL_API_SECRET
+INTERNAL_API_SECRET=dev-internal-secret
 
 # Auth (static defaults — these work as-is for local dev)
 # HMAC secret for deriving per-sandbox gateway tokens (machine authentication)

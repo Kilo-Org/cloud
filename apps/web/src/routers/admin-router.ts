@@ -1,3 +1,4 @@
+// admin-router.ts
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog, type KiloClawSubscription } from '@kilocode/db';
@@ -56,6 +57,7 @@ import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-life
 import * as z from 'zod';
 import { eq, and, ne, or, ilike, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { toNonNullish } from '@/lib/utils';
 import { TRPCError } from '@trpc/server';
@@ -493,22 +495,52 @@ export const adminRouter = createTRPCRouter({
     updateBlockStatus: adminProcedure
       .input(UpdateUserBlockStatusSchema)
       .mutation(async ({ input, ctx }) => {
-        const blockMetadata = input.blocked_reason
-          ? {
-              blocked_reason: input.blocked_reason,
-              blocked_at: new Date().toISOString(),
-              blocked_by_kilo_user_id: ctx.user.id,
-            }
-          : {
-              blocked_reason: null,
-              blocked_at: null,
-              blocked_by_kilo_user_id: null,
-            };
+        const isBlocking = Boolean(input.blocked_reason);
+        let didTransition = false;
 
-        await db
-          .update(kilocode_users)
-          .set(blockMetadata)
-          .where(eq(kilocode_users.id, input.userId));
+        await db.transaction(async tx => {
+          const [current] = await tx
+            .select({ blocked_reason: kilocode_users.blocked_reason })
+            .from(kilocode_users)
+            .where(eq(kilocode_users.id, input.userId))
+            .for('update')
+            .limit(1);
+
+          const wasBlocked = Boolean(current?.blocked_reason);
+          didTransition = isBlocking !== wasBlocked;
+
+          const blockMetadata = isBlocking
+            ? {
+                blocked_reason: input.blocked_reason,
+                blocked_at: new Date().toISOString(),
+                blocked_by_kilo_user_id: ctx.user.id,
+              }
+            : {
+                blocked_reason: null,
+                blocked_at: null,
+                blocked_by_kilo_user_id: null,
+              };
+
+          await tx
+            .update(kilocode_users)
+            .set(blockMetadata)
+            .where(eq(kilocode_users.id, input.userId));
+        });
+
+        if (didTransition) {
+          void reportEvents({
+            events: [
+              {
+                type: isBlocking ? 'user.blocked' : 'user.unblocked',
+                data: {
+                  kilo_user_id: input.userId,
+                  reason: input.blocked_reason ?? null,
+                  actor_email: ctx.user.google_user_email,
+                },
+              },
+            ],
+          });
+        }
 
         return successResult();
       }),

@@ -471,6 +471,7 @@ describe('logMicrodollarUsage', () => {
       messageId: 'test-msg-456',
       hasError: true,
       cost_mUsd: 0, // Zero cost
+      market_cost: 500,
       model: 'openai/gpt-4.1',
     };
 
@@ -486,7 +487,7 @@ describe('logMicrodollarUsage', () => {
       },
     };
 
-    await logMicrodollarUsage(usageStats, usageContext);
+    const usageIdentity = await logMicrodollarUsage(usageStats, usageContext);
 
     // Verify user microdollars were NOT incremented
     const updatedUser = await findUserById('test-log-user-2');
@@ -501,8 +502,11 @@ describe('logMicrodollarUsage', () => {
       where: eq(microdollar_usage.id, metadataRecord!.id),
     });
     expect(usageRecord).toBeTruthy();
+    expect(usageIdentity?.usageId).toBe(usageRecord?.id);
+    expect(usageIdentity?.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     expect(usageRecord?.kilo_user_id).toBe('test-log-user-2');
     expect(usageRecord?.cost).toBe(0);
+    expect(metadataRecord?.market_cost).toBe(500);
     expect(usageRecord?.has_error).toBe(true);
     expect(usageRecord?.model).toBe('openai/gpt-4.1');
     expect(metadataRecord?.has_middle_out_transform).toBe(false);

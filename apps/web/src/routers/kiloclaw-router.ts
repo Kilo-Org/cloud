@@ -74,6 +74,16 @@ import {
   getPersonalProvisionLockKey,
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
+import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
+import {
+  buildComposioProvisionSecrets,
+  composioSecretsPatchSource,
+  createManagedComposioGoogleCalendarLink,
+  clearComposioInstanceConfig,
+  getManagedComposioGoogleCalendarStatus,
+  getComposioInstanceConfigSource,
+  markComposioInstanceConfig,
+} from '@/lib/kiloclaw/composio-onboarding';
 import {
   clearSubscriptionLifecycleAfterInstanceDestroy,
   clearTrialInactivityStopAfterStart,
@@ -817,11 +827,12 @@ const channelsSchema = z
 
 const updateConfigSchema = z.object({
   envVars: z.record(z.string(), z.string()).optional(),
-  secrets: z.record(z.string(), z.string()).optional(),
+  secrets: z.record(z.string(), z.string().max(MAX_CUSTOM_SECRET_VALUE_LENGTH)).optional(),
   channels: channelsSchema,
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
   userTimezone: userTimezoneSchema.nullable().optional(),
   userLocation: userLocationSchema.nullable().optional(),
+  skipIncompleteManagedComposioConnection: z.boolean().optional(),
 });
 
 const updateKiloCodeConfigSchema = z.object({
@@ -847,6 +858,18 @@ const patchBotIdentitySchema = z.object({
   botNature: z.string().trim().min(1).max(120).nullable().optional(),
   botVibe: z.string().trim().min(1).max(120).nullable().optional(),
   botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
+});
+
+const composioConnectLinkSchema = z.object({
+  returnTo: z
+    .string()
+    .min(1)
+    .max(500)
+    .refine(value => value.startsWith('/'), {
+      message: 'returnTo must be a relative path',
+    }),
+  popup: z.boolean().optional(),
+  attemptId: z.string().min(1).max(100).optional(),
 });
 
 /**
@@ -1073,11 +1096,14 @@ async function provisionInstance(
   params: { instanceId: string | null; bootstrapSubscription: boolean },
   executor: typeof db | DrizzleTransaction = db
 ) {
-  const encryptedSecrets = input.secrets
-    ? Object.fromEntries(
-        Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
-      )
-    : undefined;
+  const composioProvision = await buildComposioProvisionSecrets({
+    scope: { ownerType: 'user', userId: user.id },
+    instanceId: params.instanceId,
+    secrets: input.secrets,
+    skipIncompleteManagedConnection: input.skipIncompleteManagedComposioConnection,
+  });
+
+  const encryptedSecrets = encryptProvisionSecretsForWorker(composioProvision.secrets);
 
   const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
   const kilocodeApiKey = generateApiToken(user, undefined, {
@@ -1096,7 +1122,7 @@ async function provisionInstance(
     : undefined;
 
   const client = new KiloClawInternalClient();
-  return client.provision(
+  const result = await client.provision(
     user.id,
     {
       envVars: input.envVars,
@@ -1116,6 +1142,17 @@ async function provisionInstance(
         }
       : undefined
   );
+
+  if (composioProvision.configToMark?.source === 'manual') {
+    await markComposioInstanceConfig({ instanceId: result.instanceId, source: 'manual' });
+  } else if (composioProvision.configToMark?.source === 'managed') {
+    await markComposioInstanceConfig({
+      instanceId: result.instanceId,
+      source: 'managed',
+    });
+  }
+
+  return result;
 }
 
 async function emitProvisionTrialStartSideEffects(params: {
@@ -3040,17 +3077,6 @@ export const kiloclawRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Morning briefing is admin-only today (matches the UI gate
-      // `canSeeMorningBriefing = !!user?.is_admin` in SettingsTab.tsx
-      // and `isAdminForInterests` in ClawOnboardingFlow.tsx). Without
-      // the server-side check, a non-admin could call this mutation
-      // directly via the tRPC client and bypass the hidden UI.
-      if (!ctx.user.is_admin) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Morning briefing is admin-only',
-        });
-      }
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       return client.updateBriefingInterests(ctx.user.id, input.topics, workerInstanceId(instance));
@@ -3064,12 +3090,6 @@ export const kiloclawRouter = createTRPCRouter({
   updateUserLocation: clawAccessProcedure
     .input(z.object({ userLocation: userLocationSchema.nullable() }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.user.is_admin) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Morning briefing is admin-only',
-        });
-      }
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       return client.updateUserLocation(ctx.user.id, input.userLocation, workerInstanceId(instance));
@@ -3402,11 +3422,18 @@ export const kiloclawRouter = createTRPCRouter({
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       try {
-        return await client.patchSecrets(
+        const result = await client.patchSecrets(
           ctx.user.id,
           { secrets: encryptedPatch, meta: input.meta },
           workerInstanceId(instance)
         );
+        const sourceAction = instance ? composioSecretsPatchSource(secrets) : 'none';
+        if (instance && sourceAction === 'upsert_manual') {
+          await markComposioInstanceConfig({ instanceId: instance.id, source: 'manual' });
+        } else if (instance && sourceAction === 'clear') {
+          await clearComposioInstanceConfig(instance.id);
+        }
+        return result;
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           // Extract message from worker response body (JSON or plain text)
@@ -3432,6 +3459,58 @@ export const kiloclawRouter = createTRPCRouter({
     );
     return client.getConfig({ userId: ctx.user.id, instanceId: workerInstanceId(instance) });
   }),
+
+  getComposioOnboardingStatus: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    let sandboxHasComposioSecrets = false;
+    if (instance) {
+      const client = new KiloClawUserClient(
+        generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
+      );
+      const config = await client.getConfig({
+        userId: ctx.user.id,
+        instanceId: workerInstanceId(instance),
+      });
+      sandboxHasComposioSecrets = config.configuredSecrets.composio === true;
+    }
+    return await getManagedComposioGoogleCalendarStatus({
+      scope: {
+        ownerType: 'user',
+        userId: ctx.user.id,
+      },
+      instance,
+      sandboxHasComposioSecrets,
+    });
+  }),
+
+  createComposioGoogleCalendarLink: baseProcedure
+    .input(composioConnectLinkSchema)
+    .mutation(async ({ ctx, input }) => {
+      return await withKiloclawProvisionContextLock(
+        getPersonalProvisionLockKey(ctx.user.id),
+        async () => {
+          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
+          const instance = await getActiveInstance(ctx.user.id);
+          const sandboxConfigSource = instance
+            ? await getComposioInstanceConfigSource(instance.id)
+            : null;
+          if (sandboxConfigSource === 'manual') {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'This sandbox already uses your own Composio credentials.',
+            });
+          }
+
+          return await createManagedComposioGoogleCalendarLink({
+            userId: ctx.user.id,
+            scope: { ownerType: 'user', userId: ctx.user.id },
+            returnTo: input.returnTo,
+            popup: input.popup,
+            attemptId: input.attemptId,
+          });
+        }
+      );
+    }),
 
   getChannelCatalog: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);

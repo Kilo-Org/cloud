@@ -13,7 +13,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { and, eq, isNull, or } from 'drizzle-orm';
-import { KILOCLAW_INTERNAL_API_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
+import { INTERNAL_API_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
 import { send as sendEmail } from '@/lib/email';
 import { findUserById } from '@/lib/user';
 import { db } from '@/lib/drizzle';
@@ -85,7 +85,7 @@ async function hasSentCompatibleInstanceReadyEmail(
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('X-Internal-Secret');
-  if (!KILOCLAW_INTERNAL_API_SECRET || secret !== KILOCLAW_INTERNAL_API_SECRET) {
+  if (!INTERNAL_API_SECRET || secret !== INTERNAL_API_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

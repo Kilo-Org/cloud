@@ -7,7 +7,7 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
-import { reportAuthEvent } from '@/lib/ai-gateway/abuse-service';
+import { reportAuthEvent, reportEvents } from '@/lib/ai-gateway/abuse-service';
 import {
   payment_methods,
   kilocode_users,
@@ -24,6 +24,7 @@ import {
   code_indexing_search,
   code_indexing_manifest,
   referral_codes,
+  organizations,
   organization_memberships,
   organization_user_limits,
   organization_user_usage,
@@ -46,6 +47,7 @@ import {
   bot_requests,
   cloud_agent_code_reviews,
   kiloclaw_instances,
+  kiloclaw_composio_identities,
   kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
   kiloclaw_access_codes,
@@ -306,13 +308,56 @@ export async function findUserByEmail(email: string): Promise<User | undefined> 
   });
 }
 
-function fireAuthEvent(
-  user: Pick<User, 'id' | 'google_user_email' | 'created_at'>,
+async function fireAuthEvent(
+  user: Pick<
+    User,
+    | 'id'
+    | 'google_user_email'
+    | 'created_at'
+    | 'hosted_domain'
+    | 'signup_ip'
+    | 'is_admin'
+    | 'is_bot'
+    | 'blocked_at'
+    | 'completed_welcome_form'
+    | 'linkedin_url'
+    | 'github_url'
+    | 'discord_server_membership_verified_at'
+    | 'customer_source'
+    | 'cohorts'
+    | 'has_validation_stytch'
+    | 'has_validation_novel_card_with_hold'
+  >,
   eventType: 'signup' | 'signin',
   provider: AuthProviderId,
   requestHeaders?: Headers
 ) {
   if (!requestHeaders) return;
+
+  const enrichmentResult = await Promise.all([
+    db
+      .select({ provider: user_auth_provider.provider })
+      .from(user_auth_provider)
+      .where(eq(user_auth_provider.kilo_user_id, user.id)),
+    db
+      .select({
+        organization_id: organization_memberships.organization_id,
+        role: organization_memberships.role,
+        plan: organizations.plan,
+        sso_domain: organizations.sso_domain,
+        free_trial_end_at: organizations.free_trial_end_at,
+      })
+      .from(organization_memberships)
+      .innerJoin(organizations, eq(organization_memberships.organization_id, organizations.id))
+      .where(
+        and(eq(organization_memberships.kilo_user_id, user.id), isNull(organizations.deleted_at))
+      ),
+  ]).catch(() => null);
+
+  // DB enrichment failures must not abort auth telemetry; fall through with empty arrays
+  const authProviderRows = enrichmentResult?.[0] ?? [];
+  const membershipRows = enrichmentResult?.[1] ?? [];
+
   void reportAuthEvent({
     kilo_user_id: user.id,
     event_type: eventType,
@@ -324,6 +369,28 @@ function fireAuthEvent(
     ja4_digest: requestHeaders.get('x-vercel-ja4-digest'),
     user_agent: requestHeaders.get('user-agent'),
     auth_method: provider,
+    hosted_domain: user.hosted_domain,
+    signup_ip: user.signup_ip,
+    signup_geo_country: null, // not stored on user; set at signup time only via request headers
+    is_admin: user.is_admin,
+    is_bot: user.is_bot,
+    is_blocked: user.blocked_at != null,
+    completed_welcome_form: user.completed_welcome_form,
+    has_linkedin_url: user.linkedin_url != null,
+    has_github_url: user.github_url != null,
+    has_discord_verified: user.discord_server_membership_verified_at != null,
+    customer_source: user.customer_source,
+    cohorts: Object.keys(user.cohorts),
+    has_validation_stytch: user.has_validation_stytch,
+    has_validation_novel_card_with_hold: user.has_validation_novel_card_with_hold,
+    auth_providers: authProviderRows.map(r => r.provider),
+    org_memberships: membershipRows.map(m => ({
+      organization_id: m.organization_id,
+      role: m.role,
+      plan: m.plan,
+      has_sso: m.sso_domain != null,
+      in_free_trial: m.free_trial_end_at != null && new Date(m.free_trial_end_at) > new Date(),
+    })),
   });
 }
 
@@ -337,7 +404,7 @@ export async function createOrUpdateUser(
 ): Promise<Result<{ user: User; isNew: boolean }, AuthErrorType>> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
-    fireAuthEvent(existingUser, 'signin', args.provider, requestHeaders);
+    void fireAuthEvent(existingUser, 'signin', args.provider, requestHeaders);
 
     // User signed in or is being updated
     posthogClient.capture({
@@ -384,7 +451,7 @@ export async function createOrUpdateUser(
       if (!linkResult.success) {
         return { success: false, error: linkResult.error };
       }
-      fireAuthEvent(userByEmail, 'signin', args.provider, requestHeaders);
+      void fireAuthEvent(userByEmail, 'signin', args.provider, requestHeaders);
       // Successfully linked account, return the existing user
       posthogClient.capture({
         distinctId: userByEmail.google_user_email,
@@ -589,7 +656,7 @@ export async function createOrUpdateUser(
   }
   const savedUser = txResult.user;
 
-  fireAuthEvent(savedUser, 'signup', args.provider, requestHeaders);
+  void fireAuthEvent(savedUser, 'signup', args.provider, requestHeaders);
 
   // User created event in PostHog
   posthogClient.capture({
@@ -961,6 +1028,9 @@ export async function softDeleteUser(userId: string) {
       .set({ initiated_by_admin_id: null })
       .where(eq(kiloclaw_cli_runs.initiated_by_admin_id, userId));
     await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
+    await tx
+      .delete(kiloclaw_composio_identities)
+      .where(eq(kiloclaw_composio_identities.user_id, userId));
     // Remove stored Google OAuth credentials for all instances owned by this user.
     await tx
       .delete(kiloclaw_google_oauth_connections)
@@ -1179,6 +1249,8 @@ export async function softDeleteUser(userId: string) {
       .set({ kilo_user_id: 'deleted', public_ip: null })
       .where(eq(security_advisor_scans.kilo_user_id, userId));
   });
+
+  void reportEvents({ events: [{ type: 'user.deleted', data: { kilo_user_id: userId } }] });
 }
 
 // We always stytch approve users who accept organization invites

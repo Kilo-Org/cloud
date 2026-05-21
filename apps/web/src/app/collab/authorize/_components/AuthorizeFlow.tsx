@@ -1,12 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, ChevronRight } from 'lucide-react';
+import { AlertCircle, Check, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import KiloLogo from '@/components/KiloLogo';
+import { useUser } from '@/hooks/useUser';
+import {
+  getPlatformOAuthConnectPath,
+  type StandardOAuthPlatform,
+} from '@/lib/integrations/oauth/paths';
 import { getPlatform, type PlatformId, type PlatformOption } from '../../_components/platforms';
 
 type ProgressListProps = {
@@ -16,33 +21,65 @@ type ProgressListProps = {
 
 type AuthorizeFlowProps = {
   serviceIds: PlatformId[];
+  organizationId?: string;
+  initialIndex: number;
+  initialError?: string;
 };
 
 export function AuthorizeFlow(props: AuthorizeFlowProps) {
-  const { serviceIds } = props;
+  const { serviceIds, organizationId, initialIndex, initialError } = props;
   const router = useRouter();
-  const [index, setIndex] = useState(0);
-  const [done, setDone] = useState(false);
+  const { data: user } = useUser();
+  const [index, setIndex] = useState(initialIndex);
+  const [done, setDone] = useState(initialIndex >= serviceIds.length);
+  const [connectionError, setConnectionError] = useState<string | null>(initialError ?? null);
+  const [isStartingOAuth, setIsStartingOAuth] = useState(false);
 
   const services = serviceIds.map(id => getPlatform(id)).filter(p => p !== undefined);
   const current = services[index];
   const isLast = index === services.length - 1;
+  const returnTo = buildReturnToPath({ serviceIds, organizationId, step: index });
 
-  const handleAuthorize = () => {
-    // Design-only: simulate a successful OAuth round trip.
-    if (!isLast) {
-      setIndex(i => i + 1);
-    } else {
+  const isLoadingGitHubUser = current?.id === 'github' && !organizationId && !user;
+
+  const advance = () => {
+    setConnectionError(null);
+    if (isLast) {
       setDone(true);
+      return;
+    }
+    setIndex(i => i + 1);
+  };
+
+  const handleAuthorize = async () => {
+    if (!current || isStartingOAuth || isLoadingGitHubUser) return;
+    setConnectionError(null);
+
+    try {
+      setIsStartingOAuth(true);
+      const oauthUrl = await getOAuthUrl(current.id, {
+        organizationId,
+        returnTo,
+        userId: user?.id,
+      });
+
+      if (!oauthUrl) {
+        setConnectionError(`${current.name} setup is not available from this flow yet.`);
+        setIsStartingOAuth(false);
+        return;
+      }
+
+      window.location.href = oauthUrl;
+    } catch (error) {
+      setIsStartingOAuth(false);
+      setConnectionError(
+        error instanceof Error ? error.message : `Couldn't start ${current.name}.`
+      );
     }
   };
 
   const handleSkip = () => {
-    if (!isLast) {
-      setIndex(i => i + 1);
-    } else {
-      setDone(true);
-    }
+    advance();
   };
 
   if (done || !current) {
@@ -79,8 +116,21 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
           </div>
 
           <div className="flex w-full flex-col items-center gap-4">
-            <Button onClick={handleAuthorize} size="lg" className="w-full">
-              Authorize on {current.name}
+            {connectionError && (
+              <p className="text-destructive flex items-center gap-2 text-sm" role="alert">
+                <AlertCircle className="size-4" />
+                {connectionError}
+              </p>
+            )}
+            <Button
+              onClick={handleAuthorize}
+              size="lg"
+              className="w-full"
+              disabled={isStartingOAuth || isLoadingGitHubUser}
+            >
+              {isStartingOAuth || isLoadingGitHubUser
+                ? 'Starting authorization...'
+                : `Authorize on ${current.name}`}
               <ChevronRight className="size-4" />
             </Button>
             <button
@@ -95,6 +145,58 @@ export function AuthorizeFlow(props: AuthorizeFlowProps) {
       </AnimatePresence>
     </div>
   );
+}
+
+function buildReturnToPath({
+  serviceIds,
+  organizationId,
+  step,
+}: {
+  serviceIds: PlatformId[];
+  organizationId?: string;
+  step: number;
+}): string {
+  const params = new URLSearchParams({ services: serviceIds.join(','), step: step.toString() });
+  if (organizationId) params.set('organizationId', organizationId);
+  return `/collab/authorize?${params.toString()}`;
+}
+
+async function getOAuthUrl(
+  platformId: PlatformId,
+  options: {
+    organizationId?: string;
+    returnTo: string;
+    userId?: string;
+  }
+): Promise<string | null> {
+  if (isCollabOAuthConnectPlatform(platformId)) {
+    return getPlatformOAuthConnectPath(platformId, options.organizationId, options.returnTo);
+  }
+  if (platformId === 'github') {
+    const ownerToken = options.organizationId
+      ? `org_${options.organizationId}`
+      : options.userId
+        ? `user_${options.userId}`
+        : null;
+    if (!ownerToken) return null;
+    const githubAppName = process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';
+    const state = `${ownerToken}|return=${encodeURIComponent(options.returnTo)}`;
+    return `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(state)}`;
+  }
+  return null;
+}
+
+const COLLAB_OAUTH_CONNECT_PLATFORM_IDS = new Set<PlatformId>([
+  'slack',
+  'discord',
+  'linear',
+  'gitlab',
+]);
+
+function isCollabOAuthConnectPlatform(
+  platformId: PlatformId
+): platformId is Extract<PlatformId, StandardOAuthPlatform> {
+  return COLLAB_OAUTH_CONNECT_PLATFORM_IDS.has(platformId);
 }
 
 function ConnectionBadge({ service }: { service: PlatformOption }) {

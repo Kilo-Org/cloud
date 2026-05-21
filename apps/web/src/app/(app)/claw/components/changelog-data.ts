@@ -11,6 +11,13 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-05-20',
+    description:
+      'Morning Briefing is now generally available to all KiloClaw users. Enable it in Settings → Morning Briefing for a daily briefing covering your calendar, open GitHub and Linear issues, news on the topics you choose, local news, and a summary of your recent KiloClaw chat activity. It is delivered each morning, or on demand with Run Now.',
+    category: 'feature',
+    deployHint: null,
+  },
+  {
     date: '2026-05-13',
     description:
       'Baked bundled OpenClaw plugin runtime dependencies into the KiloClaw image so doctor and gateway startup no longer need to install them one plugin at a time. This reduces cold-start delays on shared-CPU instances and only affects bundled OpenClaw plugins; custom user-installed plugins keep their normal install behavior.',

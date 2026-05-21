@@ -7,6 +7,7 @@ import type { User } from '@kilocode/db/schema';
 import type { SessionSnapshot } from '@/lib/session-ingest-client';
 import type { startSecurityAnalysis as startSecurityAnalysisType } from './analysis-service';
 import type { extractLastAssistantMessage as extractLastAssistantMessageType } from './analysis-service';
+import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 
 const mockGetSecurityFindingById = jest.fn() as jest.MockedFunction<
   typeof securityFindingsModule.getSecurityFindingById
@@ -53,7 +54,7 @@ jest.mock('@/lib/security-agent/db/security-analysis', () => {
 });
 
 jest.mock('@/lib/config.server', () => ({
-  INTERNAL_API_SECRET: 'test-internal-secret',
+  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
 jest.mock('./triage-service', () => ({
@@ -188,6 +189,11 @@ describe('analysis-service', () => {
 
     expect(result.started).toBe(true);
     expect(result.triageOnly).toBe(false);
+    const expectedCallbackToken = await deriveCallbackToken({
+      secret: 'test-callback-token-secret',
+      scope: 'security-analysis-callback',
+      resourceParts: [findingId],
+    });
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({
         kilocodeOrganizationId: organizationId,
@@ -197,7 +203,7 @@ describe('analysis-service', () => {
         model: 'anthropic/claude-opus-4.6',
         callbackTarget: expect.objectContaining({
           url: expect.stringContaining(`/api/internal/security-analysis-callback/${findingId}`),
-          headers: expect.objectContaining({ 'X-Internal-Secret': expect.any(String) }),
+          headers: { 'X-Callback-Token': expectedCallbackToken },
         }),
       })
     );

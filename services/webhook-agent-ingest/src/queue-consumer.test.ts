@@ -32,7 +32,8 @@ vi.mock('./util/do-retry', () => ({
   ): Promise<T> => op(getStub()),
 }));
 
-import { processKiloclawChatMessage } from './queue-consumer';
+import { handleWebhookDeliveryBatch, processKiloclawChatMessage } from './queue-consumer';
+import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 
 type UpdateCall = { requestId: string; patch: Record<string, unknown> };
 
@@ -245,5 +246,85 @@ describe('processKiloclawChatMessage', () => {
     expect(updateCalls[0].patch).toMatchObject({ process_status: 'failed' });
     expect(updateCalls[0].patch.error_message).toContain('user-scoped');
     expect(mockFindActiveSandboxIdForInstance).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
+  it('stores scoped callback token instead of raw internal API key', async () => {
+    const internalSecret = 'test-internal-secret';
+    const callbackTokenSecret = 'test-callback-token-secret';
+    const webhook = makeWebhook();
+    const prepareRequests: Request[] = [];
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const stub = {
+      getRequest: vi.fn(async () => makeRequest()),
+      getConfig: vi.fn(async () =>
+        makeTriggerConfig({
+          targetType: 'cloud_agent',
+          mode: 'code',
+          model: 'model-1',
+          githubRepo: 'owner/repo',
+          profileId: 'profile-1',
+        })
+      ),
+      updateRequest: vi.fn(async () => ({ success: true })),
+    };
+    const env = {
+      WEBHOOK_AGENT_URL: 'https://hooks.test',
+      WEBHOOK_TOKEN_CACHE: {
+        get: vi.fn(async () => 'api-token'),
+        put: vi.fn(async () => undefined),
+      },
+      INTERNAL_API_SECRET: { get: vi.fn(async () => internalSecret) },
+      CALLBACK_TOKEN_SECRET: { get: vi.fn(async () => callbackTokenSecret) },
+      TRIGGER_DO: {
+        idFromName: vi.fn((name: string) => name),
+        get: vi.fn(() => stub),
+      },
+      CLOUD_AGENT: {
+        fetch: vi.fn(async (request: Request) => {
+          if (request.url.includes('/trpc/prepareSession')) {
+            prepareRequests.push(request);
+            return Response.json({
+              result: { data: { cloudAgentSessionId: 'cloud-session-1' } },
+            });
+          }
+
+          return Response.json({
+            result: { data: { executionId: 'execution-1', status: 'running' } },
+          });
+        }),
+      },
+    } as unknown as Env;
+    const batch = {
+      queue: 'webhook-delivery',
+      messages: [{ body: webhook, attempts: 1, ack, retry }],
+    } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>;
+
+    await handleWebhookDeliveryBatch(batch, env);
+
+    const prepareBody = await prepareRequests[0]?.json();
+    const expectedToken = await deriveCallbackToken({
+      secret: callbackTokenSecret,
+      scope: 'webhook-execution-callback',
+      resourceParts: [webhook.namespace, webhook.triggerId, webhook.requestId],
+    });
+    expect(prepareBody).toMatchObject({
+      callbackTarget: {
+        url: 'https://hooks.test/api/callbacks/execution',
+        headers: {
+          'X-Callback-Token': expectedToken,
+          'x-webhook-namespace': webhook.namespace,
+          'x-webhook-trigger-id': webhook.triggerId,
+          'x-webhook-request-id': webhook.requestId,
+        },
+      },
+    });
+    expect(prepareBody).not.toMatchObject({
+      callbackTarget: { headers: { 'x-internal-api-key': expect.any(String) } },
+    });
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
   });
 });

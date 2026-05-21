@@ -730,10 +730,10 @@ async function requestKiloClaw<T>(
   entityFields: BillingEntityFields = {},
   options: { handledErrorStatuses?: readonly number[] } = {}
 ): Promise<T> {
-  if (!env.KILOCLAW_INTERNAL_API_SECRET) {
-    throw new Error('KILOCLAW_INTERNAL_API_SECRET is not configured');
+  if (!env.INTERNAL_API_SECRET) {
+    throw new Error('INTERNAL_API_SECRET is not configured');
   }
-  const kiloclawInternalApiSecret = env.KILOCLAW_INTERNAL_API_SECRET;
+  const internalApiSecret = env.INTERNAL_API_SECRET;
 
   const billingCallId = crypto.randomUUID();
   const startedAt = performance.now();
@@ -753,7 +753,7 @@ async function requestKiloClaw<T>(
     async () => {
       const headers = new Headers(init?.headers);
       headers.set('content-type', 'application/json');
-      headers.set('x-internal-api-key', kiloclawInternalApiSecret);
+      headers.set('x-internal-api-key', internalApiSecret);
       const correlationHeaders = createBillingCorrelationHeaders(callContext);
       for (const key of Object.keys(correlationHeaders)) {
         const value = correlationHeaders[key];

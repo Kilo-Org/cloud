@@ -1,5 +1,5 @@
 process.env.KILOCLAW_API_URL ||= 'http://localhost:8795';
-process.env.KILOCLAW_INTERNAL_API_SECRET ||= 'test-secret';
+process.env.INTERNAL_API_SECRET ||= 'test-secret';
 
 import { describe, expect, it } from '@jest/globals';
 import { db } from '@/lib/drizzle';

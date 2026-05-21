@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatLinearIssueLine,
+  formatLinearTldr,
   hasHighSignalPriority,
+  LINEAR_EMPTY_LINE,
   type LinearIssueSummary,
   normalizeLinearIssues,
   shouldShowPriorityBadge,
@@ -253,5 +255,33 @@ describe('summarizeLinearCallFailure', () => {
   it('falls back to combined stderr/stdout for non-JSON errors', () => {
     const summary = summarizeLinearCallFailure('', 'mcporter: Unknown tool list_issues_typo');
     expect(summary).toContain('Unknown tool');
+  });
+});
+
+describe('formatLinearTldr', () => {
+  it('pluralizes the issue count', () => {
+    expect(formatLinearTldr([buildIssue({ id: 'KIL-1' }), buildIssue({ id: 'KIL-2' })])).toBe(
+      '2 Linear issues'
+    );
+    expect(formatLinearTldr([buildIssue({ id: 'KIL-1' })])).toBe('1 Linear issue');
+  });
+
+  it('notes how many issues are Urgent', () => {
+    const issues = [
+      buildIssue({ id: 'KIL-1', priority: { value: 1, name: 'Urgent' } }),
+      buildIssue({ id: 'KIL-2', priority: { value: 3, name: 'Medium' } }),
+    ];
+    expect(formatLinearTldr(issues)).toBe('2 Linear issues (1 urgent)');
+  });
+
+  it('returns an empty string when there are no issues', () => {
+    expect(formatLinearTldr([])).toBe('');
+  });
+});
+
+describe('LINEAR_EMPTY_LINE', () => {
+  it('is an italic-wrapped one-liner', () => {
+    expect(LINEAR_EMPTY_LINE.startsWith('_')).toBe(true);
+    expect(LINEAR_EMPTY_LINE.endsWith('_')).toBe(true);
   });
 });

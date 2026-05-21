@@ -134,6 +134,26 @@ export function formatLinearIssueLine(
   return `- [${issue.id}](${issue.url})${badge} ${issue.title} - ${issue.status}${suffix}`;
 }
 
+/**
+ * Italic one-line empty state for the `## 📈 Linear` section when Linear
+ * is connected but no issues are assigned to the user. Wrapped in
+ * `_..._` so it renders italic and survives the channel flattener.
+ */
+export const LINEAR_EMPTY_LINE = '_Linear is connected and your queue is clear._';
+
+/**
+ * Short TL;DR fragment for the briefing header. Counts assigned issues
+ * and, when any are Urgent (priority value 1), notes how many. Returns
+ * an empty string when there are no issues so the caller can drop it.
+ */
+export function formatLinearTldr(issues: readonly LinearIssueSummary[]): string {
+  const count = issues.length;
+  if (count === 0) return '';
+  const urgent = issues.filter(issue => issue.priority?.value === 1).length;
+  const base = count === 1 ? '1 Linear issue' : `${count} Linear issues`;
+  return urgent > 0 ? `${base} (${urgent} urgent)` : base;
+}
+
 export function summarizeLinearCallFailure(stdout: string, stderr: string): string {
   const parsed = tryParseJson(stdout);
   if (parsed) {

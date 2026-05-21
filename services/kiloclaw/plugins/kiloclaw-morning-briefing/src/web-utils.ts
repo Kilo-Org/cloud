@@ -38,6 +38,22 @@ function hostnameFromUrl(url: string): string {
   }
 }
 
+/**
+ * Italic one-line empty state for the `## 🌐 Web` section when interest
+ * topics are set but the search turned up nothing fresh. Wrapped in
+ * `_..._` so it renders italic and survives the channel flattener.
+ */
+export const WEB_EMPTY_LINE = '_No fresh items on your interests from the last 24h._';
+
+/**
+ * Short TL;DR fragment for the briefing header. Returns an empty string
+ * when there is nothing to count so the caller can drop it.
+ */
+export function formatWebTldr(count: number): string {
+  if (count <= 0) return '';
+  return count === 1 ? '1 web news item' : `${count} web news items`;
+}
+
 export function normalizeWebResults(payload: unknown): WebResultSummary[] {
   const root = asObject(payload);
   const results = Array.isArray(root.results) ? root.results : [];

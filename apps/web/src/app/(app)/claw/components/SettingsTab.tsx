@@ -22,7 +22,6 @@ import { OpenclawImportCard } from './OpenclawImportCard';
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
-import { useUser } from '@/hooks/useUser';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus, MorningBriefingStatusLite } from '@/lib/kiloclaw/types';
 import { morningBriefingStatusOk } from '@/lib/kiloclaw/types';
@@ -1890,7 +1889,6 @@ export function SettingsTab({
   organizationName?: string;
 }) {
   const posthog = usePostHog();
-  const { data: user } = useUser();
   const { data: config } = useClawConfig();
   const { data: composioOnboardingStatus } = useClawComposioOnboardingStatus();
   const { organizationId } = useClawContext();
@@ -2042,26 +2040,6 @@ export function SettingsTab({
     supportsExaSearchUi && kiloExaSearchMode === null ? 'kilo-proxy' : kiloExaSearchMode;
   const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;
   const toolEntries = getEntriesByCategory('tool');
-  const googleCalendarConnectHref = useMemo(() => {
-    const params = new URLSearchParams({ capabilities: 'calendar_read' });
-    if (organizationId) {
-      params.set('organizationId', organizationId);
-    }
-
-    return `/api/integrations/google/connect?${params.toString()}`;
-  }, [organizationId]);
-  const googleCalendarDisconnectHref = useMemo(() => {
-    const params = new URLSearchParams();
-    if (organizationId) {
-      params.set('organizationId', organizationId);
-    }
-
-    const qs = params.toString();
-    return qs.length > 0
-      ? `/api/integrations/google/disconnect?${qs}`
-      : '/api/integrations/google/disconnect';
-  }, [organizationId]);
-  const canSeeGoogleCalendar = !!user?.is_admin;
 
   function handleCycleInboundEmailAddress() {
     mutations.cycleInboundEmailAddress.mutate(undefined, {
@@ -2286,35 +2264,6 @@ export function SettingsTab({
 
       {/* ── Webhook Integration ── */}
       <WebhookIntegrationSection />
-
-      {canSeeGoogleCalendar && (
-        <div className="rounded-lg border px-4 py-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <GoogleGIcon className="h-5 w-5 shrink-0" />
-              <div>
-                <p className="text-sm font-medium">Google Calendar</p>
-                <div className="text-muted-foreground text-xs">
-                  {status.googleOAuthConnected
-                    ? `Connected${status.googleOAuthAccountEmail ? ` as ${status.googleOAuthAccountEmail}` : ''}`
-                    : 'Not connected'}
-                </div>
-              </div>
-            </div>
-            {status.googleOAuthConnected ? (
-              <form action={googleCalendarDisconnectHref} method="POST">
-                <Button type="submit" variant="outline" size="sm">
-                  Disconnect
-                </Button>
-              </form>
-            ) : (
-              <Button asChild variant="outline" size="sm">
-                <a href={googleCalendarConnectHref}>Connect</a>
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* ── Messaging Channels ── */}
       <div>

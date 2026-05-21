@@ -71,14 +71,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install EAS CLI
-        run: pnpm install --global eas-cli@latest
-
       - name: Build and submit
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build --profile production --platform all --submit --non-interactive
+        run: pnpx eas-cli@latest build --profile production --platform all --submit --non-interactive
 
       - name: Tag release
         run: |

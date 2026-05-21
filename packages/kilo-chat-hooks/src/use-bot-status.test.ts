@@ -1,6 +1,7 @@
 import type * as ReactModule from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BotStatusEvent, BotStatusRecord } from '@kilocode/kilo-chat';
+import { type EventServiceClient } from '@kilocode/event-service';
+import { type BotStatusEvent, type BotStatusRecord, type KiloChatClient } from '@kilocode/kilo-chat';
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
@@ -116,8 +117,8 @@ function makeClients({ connected = false } = {}) {
   };
 
   return {
-    eventClient: eventClient as never,
-    kiloChatClient: kiloChatClient as never,
+    eventClient: eventClient as unknown as EventServiceClient,
+    kiloChatClient: kiloChatClient as unknown as KiloChatClient,
     fireConnected: () => capturedOnConnected.forEach(h => h()),
     fireBotStatus: (ev: BotStatusEvent) => capturedBotStatus.forEach(h => h('ctx', ev)),
     mockRequestBotStatus,
@@ -282,6 +283,35 @@ describe('useBotStatus', () => {
     const result = await queryCall?.queryFn();
     // Should keep fresher WS record, not clobber with stale cached
     expect(result).toBe(fresherRecord);
+  });
+
+  it('queryFn preserves a WS record that lands after requestBotStatus resolves', async () => {
+    // Scenario: server returns cached={at:2000}, but a WS event with at=3000 arrives
+    // and writes to the cache between requestBotStatus resolving and queryFn returning.
+    // The functional setQueryData should see the WS record as prev and keep it.
+    const serverRecord = record({ at: 2000, online: false });
+    const wsRecord = record({ at: 3000, online: true });
+    const key = JSON.stringify(botStatusKey('sb-1'));
+
+    const { eventClient, kiloChatClient, mockRequestBotStatus } = makeClients({ connected: true });
+
+    // requestBotStatus returns the server record (at=2000).
+    mockRequestBotStatus.mockResolvedValue({ ok: true, cached: serverRecord });
+
+    // Pre-seed the cache with the WS record (at=3000) *before* calling queryFn,
+    // simulating a WS event that landed while the HTTP request was in flight.
+    testState.queryData.set(key, wsRecord);
+
+    beginRender();
+    useBotStatus(kiloChatClient, eventClient, 'sb-1');
+
+    const queryCall = testState.queryCalls[0];
+    const result = await queryCall?.queryFn();
+
+    // The functional updater sees wsRecord (at=3000) as prev and keeps it,
+    // because wsRecord.at > serverRecord.at.
+    expect(testState.queryData.get(key)).toBe(wsRecord);
+    expect(result).toBe(wsRecord);
   });
 
   it('WS bot.status event is reduced into the query cache', () => {

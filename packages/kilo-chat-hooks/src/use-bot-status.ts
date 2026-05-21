@@ -60,11 +60,14 @@ export function useBotStatus(
     queryFn: async () => {
       if (!sandboxId) return null;
       const res = await client.requestBotStatus(sandboxId);
-      const prev = queryClient.getQueryData<BotStatusRecord | null>(botStatusKey(sandboxId));
-      if (!res.cached) return prev ?? null;
-      // Don't clobber a fresher record that arrived via WS while the request was in flight.
-      if (prev && prev.at >= res.cached.at) return prev;
-      return res.cached;
+      // Use a functional updater so any WS event that races between requestBotStatus resolving
+      // and this write is preserved: the updater sees the current cache value atomically.
+      queryClient.setQueryData<BotStatusRecord | null>(botStatusKey(sandboxId), prev => {
+        if (!res.cached) return prev ?? null;
+        if (prev && prev.at >= res.cached.at) return prev;
+        return res.cached;
+      });
+      return queryClient.getQueryData<BotStatusRecord | null>(botStatusKey(sandboxId)) ?? null;
     },
     enabled: sandboxId !== null && wsReady,
     refetchInterval: POLL_INTERVAL_MS,

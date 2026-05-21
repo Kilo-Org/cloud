@@ -16,7 +16,7 @@ const IMAGE_PICKER_OPTIONS = {
   quality: 1,
 } satisfies ImagePicker.ImagePickerOptions;
 
-function assetToAddFileInput(asset: LocalAttachmentAsset): AddFileInput {
+async function assetToAddFileInput(asset: LocalAttachmentAsset): Promise<AddFileInput> {
   const file = new File(asset.uri);
   const attachment = normalizeAttachmentSelection({
     uri: asset.uri,
@@ -27,8 +27,14 @@ function assetToAddFileInput(asset: LocalAttachmentAsset): AddFileInput {
     fileSize: asset.fileSize,
   });
 
+  // expo-file-system's `File` is not a `Blob`, so XHR's `send(...)` cannot
+  // upload it. Materialize a real `Blob` from the file:// URI here so the
+  // upload PUT carries the correct body and matches the signed Content-Length.
+  const response = await fetch(asset.uri);
+  const blob = await response.blob();
+
   return {
-    blob: file,
+    blob,
     filename: attachment.filename,
     mimeType: attachment.mimeType,
   };
@@ -57,16 +63,7 @@ export async function pickCameraImage(): Promise<AddFileInput[]> {
     return [];
   }
 
-  return Promise.all(
-    result.assets.map(asset =>
-      assetToAddFileInput({
-        uri: asset.uri,
-        fileName: asset.fileName,
-        mimeType: asset.mimeType,
-        fileSize: asset.fileSize,
-      })
-    )
-  );
+  return Promise.all(result.assets.map(imageAssetToInput));
 }
 
 export async function pickLibraryImages(): Promise<AddFileInput[]> {
@@ -79,16 +76,7 @@ export async function pickLibraryImages(): Promise<AddFileInput[]> {
     return [];
   }
 
-  return Promise.all(
-    result.assets.map(asset =>
-      assetToAddFileInput({
-        uri: asset.uri,
-        fileName: asset.fileName,
-        mimeType: asset.mimeType,
-        fileSize: asset.fileSize,
-      })
-    )
-  );
+  return Promise.all(result.assets.map(imageAssetToInput));
 }
 
 export async function pickFiles(): Promise<AddFileInput[]> {
@@ -102,14 +90,35 @@ export async function pickFiles(): Promise<AddFileInput[]> {
     return [];
   }
 
-  return Promise.all(
-    result.assets.map(asset =>
-      assetToAddFileInput({
-        uri: asset.uri,
-        name: asset.name,
-        mimeType: asset.mimeType,
-        size: asset.size,
-      })
-    )
-  );
+  return Promise.all(result.assets.map(documentAssetToInput));
+}
+
+// eslint-disable-next-line typescript-eslint/promise-function-async -- thin pass-through; making it async only to satisfy this rule conflicts with `require-await`.
+function imageAssetToInput(asset: {
+  uri: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+  fileSize?: number | null;
+}): Promise<AddFileInput> {
+  return assetToAddFileInput({
+    uri: asset.uri,
+    fileName: asset.fileName,
+    mimeType: asset.mimeType,
+    fileSize: asset.fileSize,
+  });
+}
+
+// eslint-disable-next-line typescript-eslint/promise-function-async -- thin pass-through; making it async only to satisfy this rule conflicts with `require-await`.
+function documentAssetToInput(asset: {
+  uri: string;
+  name: string;
+  mimeType?: string;
+  size?: number;
+}): Promise<AddFileInput> {
+  return assetToAddFileInput({
+    uri: asset.uri,
+    name: asset.name,
+    mimeType: asset.mimeType,
+    size: asset.size,
+  });
 }

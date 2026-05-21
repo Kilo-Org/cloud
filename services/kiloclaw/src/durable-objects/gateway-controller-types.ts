@@ -58,6 +58,18 @@ export const ControllerVersionResponseSchema = z.object({
   // optional() for backward compat with older controllers that don't include these fields
   openclawVersion: z.string().nullable().optional(),
   openclawCommit: z.string().nullable().optional(),
+  apiVersion: z.number().int().positive().optional(),
+  capabilities: z
+    .array(z.string().regex(/^[a-z][a-z0-9]*(?:[.-][a-z][a-z0-9]*)*$/))
+    .refine(
+      capabilities =>
+        capabilities.every((capability, index) => {
+          if (index === 0) return true;
+          return capabilities[index - 1] < capability;
+        }),
+      { message: 'Capabilities must be sorted and unique' }
+    )
+    .optional(),
 });
 
 export type ControllerHealthResponse = {

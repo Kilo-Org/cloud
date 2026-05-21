@@ -514,6 +514,8 @@ export type ControllerVersionResponse =
       commit: string | null;
       openclawVersion?: string | null;
       openclawCommit?: string | null;
+      apiVersion?: number;
+      capabilities?: string[];
     }
   | InstanceNotRunningSentinel;
 

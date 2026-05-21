@@ -5,6 +5,10 @@ import type { ControllerStateRef } from '../bootstrap';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from '../version';
 import { getBearerToken } from './gateway';
 import { getOpenclawVersion } from '../openclaw-version';
+import {
+  CONTROLLER_API_VERSION,
+  getControllerEndpointCapabilities,
+} from '../endpoint-capabilities';
 
 export { parseOpenclawVersion } from '../openclaw-version';
 
@@ -73,7 +77,8 @@ export function registerHealthRoute(
   supervisor: Supervisor | null,
   expectedToken?: string,
   stateRef?: ControllerStateRef,
-  kiloChatHealth?: KiloChatHealthProbe
+  kiloChatHealth?: KiloChatHealthProbe,
+  options?: { includeKiloChatCapabilities?: boolean }
 ): void {
   // Eagerly resolve so the first /_kilo/version request doesn't wait on the subprocess.
   void getOpenclawVersion();
@@ -112,6 +117,8 @@ export function registerHealthRoute(
     return c.json({
       version: CONTROLLER_VERSION,
       commit: CONTROLLER_COMMIT,
+      apiVersion: CONTROLLER_API_VERSION,
+      capabilities: getControllerEndpointCapabilities(options),
       openclawVersion: openclaw.version,
       openclawCommit: openclaw.commit,
       gateway: supervisor?.getStats() ?? null,

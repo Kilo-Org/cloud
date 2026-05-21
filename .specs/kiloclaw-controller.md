@@ -588,9 +588,27 @@ The response fields are:
 | `commit`          | string         | Yes      | Controller build commit hash                                                       |
 | `openclawVersion` | string \| null | Yes      | Installed openclaw version                                                         |
 | `openclawCommit`  | string \| null | Yes      | Installed openclaw commit hash                                                     |
+| `apiVersion`      | number         | No       | Controller response/protocol envelope shape version                                |
+| `capabilities`    | string[]       | No       | Sorted capability hints for controller routes/behaviors registered in this build   |
 | `gateway`         | object \| null | Yes      | Supervisor stats (same as `/_kilo/gateway/status`), null if supervisor not created |
 | `controllerState` | object         | No       | Current controller lifecycle state, present when state ref is wired                |
 | `kiloChatHealth`  | object         | No       | Kilo Chat health probe summary, present when Kilo Chat probing is active           |
+
+Version capability hint rules:
+
+1. `apiVersion`, when present, describes the version response/protocol
+   envelope shape only. It MUST NOT be used as the sole proof that a
+   specific endpoint exists when a named capability is available.
+2. `capabilities`, when present, MUST be a sorted, duplicate-free array
+   of stable lowercase dot/kebab strings.
+3. A capability MUST only be advertised when the corresponding route or
+   behavior is registered in the running controller build.
+4. Capability hints are advisory. Clients MUST keep normal mutation-time
+   handling for old routes, auth failures, validation failures,
+   conflicts, and runtime errors.
+5. Missing `capabilities` on a controller with a non-null version means
+   capability support is unknown and SHOULD fail closed for newly
+   capability-gated features.
 
 #### Gateway (bearer token)
 
@@ -690,6 +708,7 @@ running. When forwarding, it MUST authenticate to gog with
 | POST   | `/_kilo/morning-briefing/disable`        | Disable the morning briefing schedule |
 | POST   | `/_kilo/morning-briefing/run`            | Run briefing generation immediately   |
 | POST   | `/_kilo/morning-briefing/interests`      | Update briefing interest topics       |
+| POST   | `/_kilo/morning-briefing/user-location`  | Update briefing user location         |
 | GET    | `/_kilo/morning-briefing/read/today`     | Read today's briefing markdown        |
 | GET    | `/_kilo/morning-briefing/read/yesterday` | Read yesterday's briefing markdown    |
 
@@ -718,6 +737,8 @@ per-sandbox gateway token.
 | GET    | `/_kilo/kilo-chat/conversations/:conversationId/members`                             | List conversation members       |
 | POST   | `/_kilo/kilo-chat/conversations/:conversationId/messages/:messageId/delivery-failed` | Report message delivery failure |
 | POST   | `/_kilo/kilo-chat/conversations/:conversationId/actions/:groupId/delivery-failed`    | Report action delivery failure  |
+| POST   | `/_kilo/kilo-chat/attachments/init`                                                  | Initialize an attachment upload |
+| GET    | `/_kilo/kilo-chat/attachments/:attachmentId/url`                                     | Resolve an attachment URL       |
 
 #### Catch-All Proxy (proxy token)
 

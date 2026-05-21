@@ -6,7 +6,7 @@ import {
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { generateCloudAgentToken } from '@/lib/tokens';
-import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
+import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -196,7 +196,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       if (
         input.devcontainer &&
         process.env.NODE_ENV !== 'development' &&
-        !(await isReleaseToggleEnabled('cloud-agent-devcontainer', ctx.user.id))
+        !(await isFeatureFlagEnabled('cloud-agent-devcontainer', ctx.user.id))
       ) {
         throw new TRPCError({
           code: 'FORBIDDEN',

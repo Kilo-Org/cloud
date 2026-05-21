@@ -13,7 +13,7 @@ const mockCreateCloudAgentNextClient = jest.fn(() => ({
   prepareSession: mockPrepareSession,
 }));
 
-const mockIsReleaseToggleEnabled =
+const mockIsFeatureFlagEnabled =
   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
 
 jest.mock('@/lib/tokens', () => ({
@@ -26,7 +26,7 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
 }));
 
 jest.mock('@/lib/posthog-feature-flags', () => ({
-  isReleaseToggleEnabled: mockIsReleaseToggleEnabled,
+  isFeatureFlagEnabled: mockIsFeatureFlagEnabled,
 }));
 
 let createCaller: (ctx: { user: User }) => {
@@ -57,8 +57,8 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     });
   });
 
-  it('rejects devcontainer sessions when the release toggle is disabled', async () => {
-    mockIsReleaseToggleEnabled.mockResolvedValue(false);
+  it('rejects devcontainer sessions when the feature flag is disabled', async () => {
+    mockIsFeatureFlagEnabled.mockResolvedValue(false);
     const caller = createCaller({
       user: { id: 'user-1', is_admin: true } as User,
     });
@@ -73,12 +73,12 @@ describe('cloudAgentNextRouter.prepareSession', () => {
         devcontainer: true,
       })
     ).rejects.toThrow('Dev container sessions are not available');
-    expect(mockIsReleaseToggleEnabled).toHaveBeenCalledWith('cloud-agent-devcontainer', 'user-1');
+    expect(mockIsFeatureFlagEnabled).toHaveBeenCalledWith('cloud-agent-devcontainer', 'user-1');
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
 
-  it('forwards devcontainer sessions when the release toggle is enabled', async () => {
-    mockIsReleaseToggleEnabled.mockResolvedValue(true);
+  it('forwards devcontainer sessions when the feature flag is enabled', async () => {
+    mockIsFeatureFlagEnabled.mockResolvedValue(true);
     const caller = createCaller({
       user: { id: 'user-2', is_admin: false } as User,
     });
@@ -96,7 +96,7 @@ describe('cloudAgentNextRouter.prepareSession', () => {
       cloudAgentSessionId: 'agent_123',
       kiloSessionId: 'ses_12345678901234567890123456',
     });
-    expect(mockIsReleaseToggleEnabled).toHaveBeenCalledWith('cloud-agent-devcontainer', 'user-2');
+    expect(mockIsFeatureFlagEnabled).toHaveBeenCalledWith('cloud-agent-devcontainer', 'user-2');
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({
         githubRepo: 'acme/repo',

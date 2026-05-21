@@ -5,6 +5,8 @@ import {
   getControllerEndpointCapabilities,
 } from './endpoint-capabilities';
 
+const CAPABILITY_NAME_PATTERN = /^[a-z][a-z0-9]*(?:[.-][a-z][a-z0-9]*)*$/;
+
 describe('getControllerEndpointCapabilities', () => {
   it('returns sorted unique capabilities', () => {
     const capabilities = getControllerEndpointCapabilities();
@@ -26,5 +28,14 @@ describe('getControllerEndpointCapabilities', () => {
     }
     expect(kiloChatCapabilities).toEqual([...kiloChatCapabilities].sort());
     expect(kiloChatCapabilities).toHaveLength(new Set(kiloChatCapabilities).size);
+  });
+
+  it('only contains names accepted by the Worker schema', () => {
+    for (const capability of [
+      ...CONTROLLER_ENDPOINT_CAPABILITIES,
+      ...KILO_CHAT_ENDPOINT_CAPABILITIES,
+    ]) {
+      expect(capability).toMatch(CAPABILITY_NAME_PATTERN);
+    }
   });
 });

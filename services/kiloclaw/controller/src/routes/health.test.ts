@@ -208,6 +208,7 @@ describe('GET /_kilo/version', () => {
     expect(body.commit).toBe('unknown');
     expect(body.apiVersion).toBe(CONTROLLER_API_VERSION);
     expect(body.capabilities).toEqual(getControllerEndpointCapabilities());
+    expect(body.capabilities).not.toContain('kilo-chat.attachments');
     expect(body.gateway).toEqual(MOCK_STATS);
     expect(body.controllerState).toEqual({ state: 'ready' });
   });

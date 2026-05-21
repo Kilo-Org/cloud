@@ -52,9 +52,9 @@ export type ControllerEndpointCapability =
 
 export function getControllerEndpointCapabilities(options?: {
   includeKiloChatCapabilities?: boolean;
-}): string[] {
+}): ControllerEndpointCapability[] {
   const capabilities = options?.includeKiloChatCapabilities
     ? [...CONTROLLER_ENDPOINT_CAPABILITIES, ...KILO_CHAT_ENDPOINT_CAPABILITIES]
     : CONTROLLER_ENDPOINT_CAPABILITIES;
-  return [...new Set(capabilities)].sort();
+  return [...new Set<ControllerEndpointCapability>(capabilities)].sort();
 }

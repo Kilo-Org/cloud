@@ -599,8 +599,10 @@ Version capability hint rules:
 1. `apiVersion`, when present, describes the version response/protocol
    envelope shape only. It MUST NOT be used as the sole proof that a
    specific endpoint exists when a named capability is available.
-2. `capabilities`, when present, MUST be a sorted, duplicate-free array
-   of stable lowercase dot/kebab strings.
+2. `capabilities`, when present, MUST be sorted in ascending ASCII
+   lexicographic order by stable lowercase dot/kebab capability string
+   and MUST be duplicate-free. Clients MUST treat the array as a set;
+   ordering is canonicalization only and carries no feature semantics.
 3. Capability names MUST be derived from the controller behavior they
    expose, not from UI labels or release names. Names MUST use dots to
    separate stable resource/behavior hierarchy and kebab-case inside a

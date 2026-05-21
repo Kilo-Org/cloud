@@ -80,20 +80,37 @@ describe('message attachment picker permissions', () => {
     expect(reactNativeMock.openSettings).toHaveBeenCalledTimes(1);
   });
 
-  it('shows settings alert and skips library launch when photo library permission is denied', async () => {
+  it('launches the library picker without preflighting photo library permission', async () => {
     requestMediaLibraryPermissionsMock.mockResolvedValue(deniedPermissionResponse());
+    launchImageLibraryMock.mockResolvedValue({
+      assets: [
+        {
+          uri: 'file:///photo.jpg',
+          fileName: 'photo.jpg',
+          mimeType: 'image/jpeg',
+          fileSize: 42,
+          height: 100,
+          width: 100,
+        },
+      ],
+      canceled: false,
+    });
 
     const result = await pickLibraryImages();
 
-    expect(result).toEqual([]);
-    expect(launchImageLibraryMock).not.toHaveBeenCalled();
-    expect(reactNativeMock.alert).toHaveBeenCalledWith(
-      'Photos Access Disabled',
-      'Allow photo library access in Settings to attach images.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open Settings', onPress: expect.any(Function) },
-      ]
-    );
+    expect(requestMediaLibraryPermissionsMock).not.toHaveBeenCalled();
+    expect(launchImageLibraryMock).toHaveBeenCalledWith({
+      mediaTypes: ['images'],
+      quality: 1,
+      allowsMultipleSelection: true,
+    });
+    expect(reactNativeMock.alert).not.toHaveBeenCalled();
+    expect(result).toEqual([
+      {
+        blob: expect.objectContaining({ name: 'photo.jpg', size: 12, type: 'image/jpeg' }),
+        filename: 'photo.jpg',
+        mimeType: 'image/jpeg',
+      },
+    ]);
   });
 });

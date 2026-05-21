@@ -70,15 +70,6 @@ export async function pickCameraImage(): Promise<AddFileInput[]> {
 }
 
 export async function pickLibraryImages(): Promise<AddFileInput[]> {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!permission.granted) {
-    showPermissionSettingsAlert({
-      title: 'Photos Access Disabled',
-      message: 'Allow photo library access in Settings to attach images.',
-    });
-    return [];
-  }
-
   const result = await ImagePicker.launchImageLibraryAsync({
     ...IMAGE_PICKER_OPTIONS,
     allowsMultipleSelection: true,

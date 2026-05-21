@@ -47,11 +47,12 @@ import {
 } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
+  getAccessGrantingOrphanVolumeContexts,
   getKiloClawPricingCatalogEntry,
-  isAccessGrantingSubscription,
   isKiloClawPriceVersion,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
   ORPHAN_VOLUME_GRACE_PERIOD_MS,
+  orphanVolumeSubscriptionContextKey,
   type KiloClawPriceVersion,
   type KiloClawSubscriptionChangeActor,
 } from '@kilocode/db';
@@ -59,7 +60,6 @@ import {
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_instances,
-  kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
@@ -4026,27 +4026,24 @@ platform.post('/admin/orphan-volume-destroy', async c => {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
   }
 
-  // Resolve the instance row — with its destroyed status and subscription —
-  // and re-enforce every DB-side safety gate here. The web router applies
-  // the same gates, but this is a destructive endpoint reachable by any
-  // internal-API-key caller, so it must fail closed on its own rather than
-  // trust the caller to have checked.
+  // Resolve the instance row and re-enforce every DB-side safety gate here.
+  // The web router applies the same gates, but this is a destructive
+  // endpoint reachable by any internal-API-key caller, so it must fail
+  // closed on its own rather than trust the caller to have checked.
   const connectionString = c.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
     return c.json({ error: 'Database connection is not configured' }, 503);
   }
-  const [instance] = await getWorkerDb(connectionString)
+  const workerDb = getWorkerDb(connectionString);
+  const [instance] = await workerDb
     .select({
       id: kiloclaw_instances.id,
       userId: kiloclaw_instances.user_id,
       sandboxId: kiloclaw_instances.sandbox_id,
+      organizationId: kiloclaw_instances.organization_id,
       destroyedAt: kiloclaw_instances.destroyed_at,
-      subscriptionStatus: kiloclaw_subscriptions.status,
-      subscriptionSuspendedAt: kiloclaw_subscriptions.suspended_at,
-      subscriptionTrialEndsAt: kiloclaw_subscriptions.trial_ends_at,
     })
     .from(kiloclaw_instances)
-    .leftJoin(kiloclaw_subscriptions, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
     .where(eq(kiloclaw_instances.id, instanceId))
     .limit(1);
 
@@ -4070,19 +4067,21 @@ platform.post('/admin/orphan-volume-destroy', async c => {
   if (Date.now() - new Date(instance.destroyedAt).getTime() <= ORPHAN_VOLUME_GRACE_PERIOD_MS) {
     return c.json({ error: 'Instance is still within the orphan-volume grace period' }, 409);
   }
-  // Gate C — never destroy data for a user who still has product access
-  // (active / unsuspended past_due / live trial).
-  if (
-    instance.subscriptionStatus !== null &&
-    isAccessGrantingSubscription(
-      {
-        status: instance.subscriptionStatus,
-        suspended_at: instance.subscriptionSuspendedAt,
-        trial_ends_at: instance.subscriptionTrialEndsAt,
-      },
-      new Date()
-    )
-  ) {
+  // Gate C — never destroy data while the owning context still has product
+  // access. Evaluated per (user, org) context, not per instance: a
+  // reprovision transfers the destroyed instance's subscription row to a
+  // current successor, so the destroyed row's own subscription no longer
+  // reflects whether the user has access.
+  const ownershipContext = {
+    user_id: instance.userId,
+    organization_id: instance.organizationId,
+  };
+  const accessGrantingContextKeys = await getAccessGrantingOrphanVolumeContexts(
+    workerDb,
+    [ownershipContext],
+    new Date()
+  );
+  if (accessGrantingContextKeys.has(orphanVolumeSubscriptionContextKey(ownershipContext))) {
     return c.json({ error: 'User has an access-granting subscription; volume preserved' }, 409);
   }
 

@@ -22,7 +22,12 @@ export {
   PersonalSubscriptionDestroyConflictError,
   type DestroyedInstanceRow,
 } from './kiloclaw-personal-subscription-collapse';
-export { ORPHAN_VOLUME_GRACE_PERIOD_MS } from './kiloclaw-orphan-volume';
+export {
+  getAccessGrantingOrphanVolumeContexts,
+  ORPHAN_VOLUME_GRACE_PERIOD_MS,
+  orphanVolumeSubscriptionContextKey,
+  type OrphanVolumeSubscriptionContext,
+} from './kiloclaw-orphan-volume';
 export { computeDatabaseUrl, getDatabaseClientConfig } from './database-url';
 export {
   countUnresolvedTerminalRenewalFailures,

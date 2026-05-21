@@ -1,6 +1,10 @@
 import { adminProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { insertKiloClawSubscriptionChangeLog, isAccessGrantingSubscription } from '@kilocode/db';
+import {
+  getAccessGrantingOrphanVolumeContexts,
+  insertKiloClawSubscriptionChangeLog,
+  orphanVolumeSubscriptionContextKey,
+} from '@kilocode/db';
 import { createHash } from 'crypto';
 import {
   kiloclaw_instances,
@@ -139,54 +143,6 @@ const FindOrphanVolumesSchema = z.object({
   /** ISO date string — only check instances destroyed on or before this date. */
   destroyedBefore: z.string().datetime(),
 });
-
-type OrphanVolumeSubscriptionContext = {
-  user_id: string;
-  organization_id: string | null;
-};
-
-function orphanVolumeSubscriptionContextKey(context: OrphanVolumeSubscriptionContext): string {
-  return JSON.stringify([context.user_id, context.organization_id]);
-}
-
-async function getAccessGrantingOrphanVolumeContexts(
-  contexts: OrphanVolumeSubscriptionContext[],
-  now: Date
-): Promise<Set<string>> {
-  const requestedContextKeys = new Set(contexts.map(orphanVolumeSubscriptionContextKey));
-  const userIds = [...new Set(contexts.map(context => context.user_id))];
-  if (userIds.length === 0) {
-    return new Set();
-  }
-
-  const currentSubscriptions = await db
-    .select({
-      user_id: kiloclaw_subscriptions.user_id,
-      organization_id: kiloclaw_instances.organization_id,
-      status: kiloclaw_subscriptions.status,
-      suspended_at: kiloclaw_subscriptions.suspended_at,
-      trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
-    })
-    .from(kiloclaw_subscriptions)
-    .innerJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
-    .where(
-      and(
-        inArray(kiloclaw_subscriptions.user_id, userIds),
-        eq(kiloclaw_instances.user_id, kiloclaw_subscriptions.user_id),
-        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
-      )
-    );
-
-  const accessGrantingContextKeys = new Set<string>();
-  for (const subscription of currentSubscriptions) {
-    const contextKey = orphanVolumeSubscriptionContextKey(subscription);
-    if (requestedContextKeys.has(contextKey) && isAccessGrantingSubscription(subscription, now)) {
-      accessGrantingContextKeys.add(contextKey);
-    }
-  }
-
-  return accessGrantingContextKeys;
-}
 
 const GetInstanceSchema = z.object({
   id: z.string().uuid(),
@@ -3954,6 +3910,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     const now = new Date();
     const accessGrantingContextKeys = await getAccessGrantingOrphanVolumeContexts(
+      db,
       toScan.map(instance => ({
         user_id: instance.user_id,
         organization_id: instance.organization_id,
@@ -4108,6 +4065,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       //    row and move access to a current successor row, so this lookup must
       //    evaluate the context rather than only the destroyed instance.
       const accessGrantingContextKeys = await getAccessGrantingOrphanVolumeContexts(
+        db,
         [{ user_id: row.user_id, organization_id: row.organization_id }],
         now
       );

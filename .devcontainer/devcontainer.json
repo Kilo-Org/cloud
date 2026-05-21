@@ -6,7 +6,7 @@
   },
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
-      "version": "latest",
+      "version": "3.0.1",
       "moby": true,
       "dockerDashComposeVersion": "v2",
       "installDockerBuildx": true

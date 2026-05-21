@@ -7,14 +7,10 @@
  * module owns the single safety decision: is a volume reapable?
  */
 
-/**
- * A Fly volume is only reaper-eligible once its owning instance has been
- * destroyed for at least this long. The grace period gives Fly's own
- * background reaping and the DO's `tryDeleteOrphanVolumes` sweep time to
- * act first — a week of volume cost is cheap; a wrongly-deleted volume is
- * not.
- */
-export const ORPHAN_VOLUME_GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+// The grace-period constant lives in `@kilocode/db` so the kiloclaw worker's
+// destroy endpoint and this web router share one definition. Re-exported here
+// so web callers still get all orphan-volume helpers from one module.
+export { ORPHAN_VOLUME_GRACE_PERIOD_MS } from '@kilocode/db';
 
 /**
  * Classification of a name-matched Fly volume found in a destroyed

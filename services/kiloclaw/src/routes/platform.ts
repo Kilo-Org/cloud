@@ -48,8 +48,10 @@ import {
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
   getKiloClawPricingCatalogEntry,
+  isAccessGrantingSubscription,
   isKiloClawPriceVersion,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  ORPHAN_VOLUME_GRACE_PERIOD_MS,
   type KiloClawPriceVersion,
   type KiloClawSubscriptionChangeActor,
 } from '@kilocode/db';
@@ -57,6 +59,7 @@ import {
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_instances,
+  kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
@@ -4023,30 +4026,64 @@ platform.post('/admin/orphan-volume-destroy', async c => {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
   }
 
-  // Verify the caller-supplied identity tuple is internally consistent
-  // before touching anything. The Fly resources are derived from
-  // userId/sandboxId while the DO check keys off instanceId — if those
-  // referred to different instances, the name-match guard and the DO guard
-  // would protect different resources. Resolve the row by instanceId and
-  // confirm userId + sandboxId match it, then derive everything from the
-  // resolved row so all guards are anchored to one instance.
+  // Resolve the instance row — with its destroyed status and subscription —
+  // and re-enforce every DB-side safety gate here. The web router applies
+  // the same gates, but this is a destructive endpoint reachable by any
+  // internal-API-key caller, so it must fail closed on its own rather than
+  // trust the caller to have checked.
   const connectionString = c.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
     return c.json({ error: 'Database connection is not configured' }, 503);
   }
-  const instance = await getInstanceByIdIncludingDestroyed(
-    getWorkerDb(connectionString),
-    instanceId,
-    { includeDestroyed: true }
-  );
+  const [instance] = await getWorkerDb(connectionString)
+    .select({
+      id: kiloclaw_instances.id,
+      userId: kiloclaw_instances.user_id,
+      sandboxId: kiloclaw_instances.sandbox_id,
+      destroyedAt: kiloclaw_instances.destroyed_at,
+      subscriptionStatus: kiloclaw_subscriptions.status,
+      subscriptionSuspendedAt: kiloclaw_subscriptions.suspended_at,
+      subscriptionTrialEndsAt: kiloclaw_subscriptions.trial_ends_at,
+    })
+    .from(kiloclaw_instances)
+    .leftJoin(kiloclaw_subscriptions, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(eq(kiloclaw_instances.id, instanceId))
+    .limit(1);
+
   if (!instance) {
     return c.json({ error: 'Instance not found' }, 404);
   }
+  // Identity — the caller-supplied tuple must be internally consistent so the
+  // Fly-side name guard and the DO-side guard both anchor to one instance.
   if (instance.userId !== userId || instance.sandboxId !== sandboxId) {
     return c.json(
       { error: 'Instance identity mismatch: userId/sandboxId do not match instanceId' },
       409
     );
+  }
+  // Gate A — the instance must be destroyed. A live instance still owns its
+  // volume; this endpoint only reaps orphans of destroyed instances.
+  if (instance.destroyedAt === null) {
+    return c.json({ error: 'Instance is not destroyed; its volume is not an orphan' }, 409);
+  }
+  // Gate B — grace period. Give Fly's reaper and the DO sweep time to act.
+  if (Date.now() - new Date(instance.destroyedAt).getTime() <= ORPHAN_VOLUME_GRACE_PERIOD_MS) {
+    return c.json({ error: 'Instance is still within the orphan-volume grace period' }, 409);
+  }
+  // Gate C — never destroy data for a user who still has product access
+  // (active / unsuspended past_due / live trial).
+  if (
+    instance.subscriptionStatus !== null &&
+    isAccessGrantingSubscription(
+      {
+        status: instance.subscriptionStatus,
+        suspended_at: instance.subscriptionSuspendedAt,
+        trial_ends_at: instance.subscriptionTrialEndsAt,
+      },
+      new Date()
+    )
+  ) {
+    return c.json({ error: 'User has an access-granting subscription; volume preserved' }, 409);
   }
 
   const flyApp = await resolveOrphanVolumeFlyAppName(c.env, {

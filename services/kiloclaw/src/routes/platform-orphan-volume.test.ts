@@ -3,7 +3,7 @@ import { platform } from './platform';
 import * as fly from '../fly/client';
 import type * as FlyClient from '../fly/client';
 import { FlyApiError } from '../fly/client';
-import { getInstanceByIdIncludingDestroyed } from '../db';
+import { getWorkerDb } from '../db';
 import type * as DbModule from '../db';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { volumeNameFromSandboxId } from '../durable-objects/machine-config';
@@ -23,16 +23,14 @@ vi.mock('../fly/client', async () => {
   };
 });
 
-// The destroy endpoint resolves the instance row to verify the
-// userId/sandboxId/instanceId tuple is consistent. Mock the DB layer so the
-// identity check (and the DO-key resolution it feeds) is exercised without
-// a real Postgres connection.
+// The destroy endpoint runs a gated instance+subscription lookup through
+// `getWorkerDb`. Mock the DB layer so that query can be driven without a
+// real Postgres connection (see `mockDestroyLookup`).
 vi.mock('../db', async () => {
   const actual = await vi.importActual<typeof DbModule>('../db');
   return {
     ...actual,
-    getWorkerDb: vi.fn(() => ({}) as never),
-    getInstanceByIdIncludingDestroyed: vi.fn(),
+    getWorkerDb: vi.fn(),
   };
 });
 
@@ -51,16 +49,30 @@ const USER_ID = 'user-1';
 const SANDBOX_ID = 'ki_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const VOLUME_NAME = volumeNameFromSandboxId(SANDBOX_ID);
 
-/** The instance row the DB resolves for INSTANCE_ID — a consistent tuple. */
-const CONSISTENT_INSTANCE = {
+/**
+ * Joined instance+subscription row for INSTANCE_ID that passes every
+ * DB-side destroy gate: identity matches, destroyed long ago (past the
+ * grace period), and no subscription.
+ */
+const DEFAULT_DESTROY_ROW = {
   id: INSTANCE_ID,
-  sandboxId: SANDBOX_ID,
   userId: USER_ID,
-  orgId: null,
-  inboundEmailEnabled: true,
-  provider: 'fly',
-  instanceType: null,
+  sandboxId: SANDBOX_ID,
+  destroyedAt: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+  subscriptionStatus: null,
+  subscriptionSuspendedAt: null,
+  subscriptionTrialEndsAt: null,
 };
+
+/** Drive the destroy endpoint's gated `getWorkerDb` lookup to resolve `row`. */
+function mockDestroyLookup(row: Record<string, unknown> | null): void {
+  const builder: Record<string, unknown> = {};
+  for (const method of ['select', 'from', 'leftJoin', 'where']) {
+    builder[method] = () => builder;
+  }
+  builder.limit = () => Promise.resolve(row === null ? [] : [row]);
+  vi.mocked(getWorkerDb).mockReturnValue(builder as never);
+}
 
 /** A finalized DO: storage wiped, every field null. */
 const FINALIZED_DO_STATE = {
@@ -150,8 +162,8 @@ const validDestroyBody = {
 beforeEach(() => {
   vi.mocked(fly.listVolumes).mockReset();
   vi.mocked(fly.deleteVolume).mockReset();
-  vi.mocked(getInstanceByIdIncludingDestroyed).mockReset();
-  vi.mocked(getInstanceByIdIncludingDestroyed).mockResolvedValue(CONSISTENT_INSTANCE as never);
+  vi.mocked(getWorkerDb).mockReset();
+  mockDestroyLookup(DEFAULT_DESTROY_ROW);
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
   vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -263,7 +275,7 @@ describe('POST /admin/orphan-volume-destroy', () => {
 
   it('returns 404 when the instance row does not exist', async () => {
     const { env } = makeEnv();
-    vi.mocked(getInstanceByIdIncludingDestroyed).mockResolvedValue(null);
+    mockDestroyLookup(null);
 
     const response = await platform.request(
       '/admin/orphan-volume-destroy',
@@ -278,10 +290,10 @@ describe('POST /admin/orphan-volume-destroy', () => {
   it('refuses (409) when userId/sandboxId do not match the resolved instanceId', async () => {
     const { env } = makeEnv();
     // The row for INSTANCE_ID belongs to a different sandbox than the body claims.
-    vi.mocked(getInstanceByIdIncludingDestroyed).mockResolvedValue({
-      ...CONSISTENT_INSTANCE,
+    mockDestroyLookup({
+      ...DEFAULT_DESTROY_ROW,
       sandboxId: 'ki_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    } as never);
+    });
 
     const response = await platform.request(
       '/admin/orphan-volume-destroy',
@@ -295,9 +307,9 @@ describe('POST /admin/orphan-volume-destroy', () => {
 
   it('reads the correct user-keyed DO for a legacy (non-ki_) sandbox', async () => {
     // Regression: the DO key must be derived from the sandbox ID, not the
-    // raw instanceId. For a legacy sandbox the real DO is user-keyed; a
-    // fallback to instanceId would read an unrelated empty DO and let the
-    // destroy guards pass against the wrong instance.
+    // raw instanceId. For a legacy sandbox the real DO is user-keyed; keying
+    // off instanceId would read an unrelated empty DO and let the destroy
+    // guards pass against the wrong instance.
     const legacyUserId = 'legacy-user-1';
     const legacySandbox = sandboxIdFromUserId(legacyUserId); // base64url, not ki_
     const legacyInstanceId = '22222222-2222-4222-8222-222222222222';
@@ -335,20 +347,15 @@ describe('POST /admin/orphan-volume-destroy', () => {
       },
     } as never;
 
-    // The identity-check lookup succeeds; any *second* lookup fails. The
-    // fixed endpoint does exactly one lookup and derives the DO key from
-    // the sandbox ID — it must not fall back to an instanceId-keyed DO.
-    vi.mocked(getInstanceByIdIncludingDestroyed)
-      .mockResolvedValueOnce({
-        id: legacyInstanceId,
-        sandboxId: legacySandbox,
-        userId: legacyUserId,
-        orgId: null,
-        inboundEmailEnabled: true,
-        provider: 'fly',
-        instanceType: null,
-      } as never)
-      .mockRejectedValue(new Error('transient db failure'));
+    mockDestroyLookup({
+      id: legacyInstanceId,
+      userId: legacyUserId,
+      sandboxId: legacySandbox,
+      destroyedAt: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+      subscriptionStatus: null,
+      subscriptionSuspendedAt: null,
+      subscriptionTrialEndsAt: null,
+    });
     vi.mocked(fly.listVolumes).mockResolvedValue([
       flyVolume({ id: legacyVolumeId, name: volumeNameFromSandboxId(legacySandbox) }),
     ]);
@@ -364,11 +371,10 @@ describe('POST /admin/orphan-volume-destroy', () => {
       env
     );
 
-    // The live legacy DO must block the delete, and the endpoint must not
-    // re-resolve the DO key via a second (failure-prone) DB lookup.
+    // The live legacy DO must block the delete — proving the user-keyed DO
+    // (not an instanceId-keyed one) was the DO actually consulted.
     expect(response.status).toBe(409);
     expect(fly.deleteVolume).not.toHaveBeenCalled();
-    expect(getInstanceByIdIncludingDestroyed).toHaveBeenCalledTimes(1);
   });
 
   it('returns 404 when the volume is not in the Fly app', async () => {
@@ -470,6 +476,66 @@ describe('POST /admin/orphan-volume-destroy', () => {
     );
     expect(response.status).toBe(502);
     expect(fly.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('refuses (409) when the instance is not destroyed', async () => {
+    const { env } = makeEnv();
+    mockDestroyLookup({ ...DEFAULT_DESTROY_ROW, destroyedAt: null });
+
+    const response = await platform.request(
+      '/admin/orphan-volume-destroy',
+      destroyInit(validDestroyBody),
+      env
+    );
+    expect(response.status).toBe(409);
+    expect(fly.listVolumes).not.toHaveBeenCalled();
+    expect(fly.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('refuses (409) while the instance is within the grace period', async () => {
+    const { env } = makeEnv();
+    mockDestroyLookup({
+      ...DEFAULT_DESTROY_ROW,
+      destroyedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+    });
+
+    const response = await platform.request(
+      '/admin/orphan-volume-destroy',
+      destroyInit(validDestroyBody),
+      env
+    );
+    expect(response.status).toBe(409);
+    expect(fly.listVolumes).not.toHaveBeenCalled();
+    expect(fly.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('refuses (409) when the user has an access-granting subscription', async () => {
+    const { env } = makeEnv();
+    mockDestroyLookup({ ...DEFAULT_DESTROY_ROW, subscriptionStatus: 'active' });
+
+    const response = await platform.request(
+      '/admin/orphan-volume-destroy',
+      destroyInit(validDestroyBody),
+      env
+    );
+    expect(response.status).toBe(409);
+    expect(fly.listVolumes).not.toHaveBeenCalled();
+    expect(fly.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('allows destroy when the subscription is canceled (positive guard case)', async () => {
+    const { env } = makeEnv();
+    mockDestroyLookup({ ...DEFAULT_DESTROY_ROW, subscriptionStatus: 'canceled' });
+    vi.mocked(fly.listVolumes).mockResolvedValue([flyVolume()]);
+    vi.mocked(fly.deleteVolume).mockResolvedValue(undefined);
+
+    const response = await platform.request(
+      '/admin/orphan-volume-destroy',
+      destroyInit(validDestroyBody),
+      env
+    );
+    expect(response.status).toBe(200);
+    expect(fly.deleteVolume).toHaveBeenCalledTimes(1);
   });
 
   it('destroys from the App DO stored Fly app name when present', async () => {

@@ -288,20 +288,8 @@ function ClawOnboardingFlowInner({
   const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
   const mutations = organizationId ? orgMutations : personalMutations;
 
-  const { data: currentUser, isPending: isUserPending } = useUser();
-  // Calendar OAuth is admin-only — both `/api/integrations/google/connect` and
-  // `/disconnect` require `adminOnly: true`. Hide the calendar step from
-  // non-admins so the wizard advances identity → email directly.
-  //
-  // While `useUser` is loading we default to `true` (admin assumption). This
-  // matters most for admins returning from the OAuth round-trip on a full
-  // page reload: defaulting to `false` would briefly flip the wizard into
-  // the 3-step non-admin layout and — if they race-clicked Continue before
-  // the query resolved — silently skip the calendar step entirely. The
-  // theoretical inverse (a non-admin race-clicking Continue and seeing one
-  // frame of the calendar UI before the state machine redirects to email)
-  // is harmless: the connect endpoint enforces admin too.
-  const hasCalendarStep = isUserPending ? true : currentUser?.is_admin === true;
+  const { data: currentUser } = useUser();
+  const hasCalendarStep = true;
   // Morning briefing is generally available — the Interests step shows for
   // all users (it still gates on controller version below).
   // Gate on controller version. The plugin route that backs
@@ -349,7 +337,7 @@ function ClawOnboardingFlowInner({
     composioStatusPolling
   );
   const composioStatus = organizationId ? orgComposioStatus : personalComposioStatus;
-  const hasToolsStep = hasCalendarStep && composioStatus.data?.enabled !== false;
+  const hasToolsStep = true;
   const configQuery = useClawConfig(status !== undefined && status.status !== null);
   const composioManualConfigured = composioStatus.data?.sandboxConfigSource === 'manual';
   const composioConfigPending =
@@ -708,12 +696,9 @@ function ClawOnboardingFlowInner({
   }, [flowState.instanceStatus, botIdentity]);
 
   // Resume the wizard at a specific step when returning from a flow that
-  // leaves the page (e.g. the Google OAuth round-trip on the calendar step
-  // posts the user back to /claw/new?step=calendar). The effect only acts
-  // when stepParam === 'calendar' — otherwise stale `?error=` or `?success=`
-  // params from elsewhere would fire calendar-specific toasts on the wrong
-  // screen. Also waits until botIdentity has been hydrated before consuming
-  // `step`, otherwise the state machine would override us with identity.
+  // leaves the page. The current Composio flow uses `?step=tools`; legacy
+  // `?step=calendar` callbacks are cleanup-only so stale OAuth URLs do not
+  // emit misleading calendar toasts or analytics.
   const hasResumedFromQuery = useRef(false);
 
   // Allowlist of known OAuth error codes that the callback route can emit.
@@ -741,19 +726,7 @@ function ClawOnboardingFlowInner({
     if (hasResumedFromQuery.current) return;
     const stepParam = searchParams?.get('step');
     if (stepParam !== 'calendar' && stepParam !== 'tools') return;
-    // The OAuth round-trip is a full-page reload, so `useUser` starts fresh
-    // and the query is in-flight on the first render(s). Gate on `isPending`
-    // (not `currentUser === undefined`) so that a `/api/user` fetch that
-    // settles in error after retries — `data` stays undefined, `isPending`
-    // flips to false — still falls through to the cleanup branch below
-    // instead of stranding the URL params forever.
-    if (isUserPending) return;
-    // Calendar is admin-only; a non-admin (or any user we couldn't classify
-    // as admin, e.g. /api/user errored after retries) landing here shouldn't
-    // trigger calendar-specific toasts or set onboardingStep to 'calendar'.
-    // Strip the params and move on. An admin who just completed OAuth but
-    // had /api/user error can re-verify the connection in settings.
-    if (stepParam === 'calendar' && !hasCalendarStep) {
+    if (stepParam === 'calendar') {
       hasResumedFromQuery.current = true;
       cleanupResumeQueryParams();
       return;
@@ -791,24 +764,16 @@ function ClawOnboardingFlowInner({
       toast.error('Could not connect calendar. Try again or skip for now.');
     }
     cleanupResumeQueryParams();
-  }, [
-    searchParams,
-    botIdentity,
-    posthog,
-    cleanupResumeQueryParams,
-    hasCalendarStep,
-    isUserPending,
-  ]);
+  }, [searchParams, botIdentity, posthog, cleanupResumeQueryParams]);
 
-  // Watchdog: if `?step=calendar` is in the URL but botIdentity hydration
-  // never completes (e.g. patchBotIdentity hadn't propagated to the DB
-  // before the OAuth round-trip), don't silently strand the user on the
-  // identity step with stale params lingering in the URL. After a short
-  // grace period, clean the URL and surface a soft warning.
+  // Watchdog: if a Composio callback has `?step=tools` but botIdentity
+  // hydration never completes, don't silently strand the user on the identity
+  // step with stale params lingering in the URL. After a short grace period,
+  // clean the URL and surface a soft warning.
   useEffect(() => {
     if (hasResumedFromQuery.current) return;
     const stepParam = searchParams?.get('step');
-    if (stepParam !== 'calendar' && stepParam !== 'tools') return;
+    if (stepParam !== 'tools') return;
     const timeoutId = window.setTimeout(() => {
       if (hasResumedFromQuery.current) return;
       if (botIdentity !== null) return;

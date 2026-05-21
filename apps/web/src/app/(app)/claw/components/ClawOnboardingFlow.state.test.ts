@@ -177,11 +177,10 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('complete');
   });
 
-  test('the active wizard has five steps when all admin-gated steps are visible', () => {
-    // Channels and pairing were removed from the active wizard. The
-    // counter is 5 with all admin-gated steps visible: identity,
-    // calendar, email, interests, provisioning. Non-admins skip the
-    // calendar and interests steps (see the describe block below).
+  test('the active wizard has five steps when all optional steps are visible', () => {
+    // Channels and pairing were removed from the active wizard. The counter
+    // is 5 with all optional steps visible: identity, calendar, email,
+    // interests, provisioning.
     const defaultState = getClawOnboardingFlowState(createInput());
     expect(defaultState.totalSteps).toBe(5);
     expect(defaultState.currentStep).toBe(1);
@@ -331,11 +330,9 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('provisioning');
   });
 
-  describe('when admin-gated steps are hidden (non-admin user)', () => {
-    // A real non-admin has BOTH calendar and interests hidden (they share
-    // the same admin gate). Each test passes both flags as `false` so the
-    // total step count reflects the actual non-admin wizard: identity,
-    // email, provisioning = 3 steps.
+  describe('when optional calendar and interests steps are hidden', () => {
+    // Each test passes both flags as `false` so the total step count reflects
+    // the shortened wizard: identity, email, provisioning = 3 steps.
     test('drops calendar and interests from total step count', () => {
       const nonAdmin = getClawOnboardingFlowState(
         createInput({ hasCalendarStep: false, hasInterestsStep: false })
@@ -376,9 +373,9 @@ describe('ClawOnboardingFlow state machine', () => {
     });
 
     test('reports email as step 2 of 3 even when stored onboardingStep is calendar', () => {
-      // A non-admin briefly sitting on onboardingStep='calendar' (e.g. via a
-      // stale URL) gets normalized for both the rendered step and the
-      // progress indicator so the header doesn't read "Step 0 of 3".
+      // A user briefly sitting on onboardingStep='calendar' (e.g. via a stale
+      // URL) gets normalized for both the rendered step and the progress
+      // indicator so the header doesn't read "Step 0 of 3".
       const state = getClawOnboardingFlowState(
         createInput({
           createSetupStarted: true,

@@ -82,6 +82,7 @@ export class EventServiceClient {
   private authRecoveryAttempts = 0;
   private hasConnectedBefore = false;
   private reconnectHandlers = new Set<() => void>();
+  private connectedHandlers = new Set<() => void>();
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private handshakeTimer: ReturnType<typeof setTimeout> | null = null;
   private abortHandshake: ((err: Error) => void) | null = null;
@@ -202,6 +203,9 @@ export class EventServiceClient {
             handler();
           }
         }
+        for (const handler of this.connectedHandlers) {
+          handler();
+        }
         settleResolve();
         this.startPing();
       });
@@ -305,6 +309,26 @@ export class EventServiceClient {
     this.reconnectHandlers.add(handler);
     return () => {
       this.reconnectHandlers.delete(handler);
+    };
+  }
+
+  /**
+   * Registers a handler that fires every time the underlying WebSocket
+   * transitions to OPEN — including the very first successful connect.
+   *
+   * If the socket is already connected at call time, the handler is called
+   * synchronously before this method returns, then added to the set so it
+   * also fires on future connect transitions.
+   *
+   * Returns an unsubscribe function. Calling it removes the handler.
+   */
+  onConnected(handler: () => void): () => void {
+    this.connectedHandlers.add(handler);
+    if (this.isConnected()) {
+      handler();
+    }
+    return () => {
+      this.connectedHandlers.delete(handler);
     };
   }
 

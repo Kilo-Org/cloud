@@ -1,7 +1,11 @@
 import type { Context } from 'hono';
 import type { z } from 'zod';
 import type { AuthContext } from '../auth';
-import { sandboxIdSchema, type OkResponse, type chatWebhookRpcSchema } from '@kilocode/kilo-chat';
+import {
+  sandboxIdSchema,
+  type RequestBotStatusResponse,
+  type chatWebhookRpcSchema,
+} from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import { userOwnsSandbox } from './sandbox-ownership';
@@ -9,17 +13,26 @@ import { pushBotStatus } from './event-push';
 
 type HonoCtx = Context<{ Bindings: Env; Variables: AuthContext }>;
 
-// Skip the upstream webhook if the cached status is fresher than this — keeps
+// Skip the upstream webhook if the cached status is within this window — keeps
 // per-sandbox QPS bounded when multiple clients (tabs, devices) poll in
 // parallel. Slightly less than the 15s client poll interval so a single
 // client's individual ticks always reach the bot.
-const FRESH_STATUS_TTL_MS = 10_000;
+const DEDUP_WINDOW_MS = 10_000;
+
+// Return cached status as the immediate response payload when it is no older
+// than this, so the UI can paint something while waiting for the fresh WS
+// event. Records older than this are treated as too stale to render (matches
+// the 90s staleness heuristic in the mobile bot-send-state component).
+const TRUST_WINDOW_MS = 90_000;
 
 /**
  * Client-driven bot-status nudge. The web/mobile client POSTs this every ~15s
  * while subscribed to a chat surface. Server side:
  *   1. authz: caller must own the sandbox,
- *   2. dedupe: skip if `SandboxStatusDO` has a fresh entry,
+ *   2. decision table (by cached record age):
+ *      - within DEDUP_WINDOW_MS  → return cached, skip webhook (fresh enough)
+ *      - within TRUST_WINDOW_MS  → return cached, trigger webhook (paint now + refresh)
+ *      - older / absent          → return cached: null, trigger webhook (UI waits)
  *   3. fan out: tell the bot to push a fresh `bot.status` via the existing
  *      `KILOCLAW.deliverChatWebhook` rpc,
  *   4. failure escalation: on definitive bot-unreachable signals (no routing
@@ -41,16 +54,19 @@ export async function handleRequestBotStatus(c: HonoCtx): Promise<Response> {
     'SandboxStatusDO.getBotStatus'
   );
   const now = Date.now();
-  if (cached && now - cached.updatedAt < FRESH_STATUS_TTL_MS) {
+  const age = cached ? now - cached.updatedAt : Infinity;
+
+  if (age <= DEDUP_WINDOW_MS) {
     // Cached status is fresh enough — another tab/device just nudged the bot.
     // The fan-out already pushed the event to all of this user's connections;
     // skipping here keeps webhook QPS at ~1 per 15s per sandbox regardless of
     // how many clients are subscribed.
-    return c.json({ ok: true } satisfies OkResponse);
+    return c.json({ ok: true, cached } satisfies RequestBotStatusResponse);
   }
 
+  const cachedToReturn = age <= TRUST_WINDOW_MS ? cached : null;
   c.executionCtx.waitUntil(triggerBotStatusWebhook(c.env, sandboxId));
-  return c.json({ ok: true } satisfies OkResponse);
+  return c.json({ ok: true, cached: cachedToReturn } satisfies RequestBotStatusResponse);
 }
 
 /**

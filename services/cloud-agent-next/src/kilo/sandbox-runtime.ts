@@ -44,6 +44,15 @@ export function dockerSocketEnv(socketPath: string): Record<string, string> {
   };
 }
 
+/** Build the Kilo-owned XDG paths rooted in a session home. */
+export function buildKiloSessionXdgEnv(sessionHome: string): Record<string, string> {
+  return {
+    XDG_DATA_HOME: `${sessionHome}/.local/share`,
+    XDG_CONFIG_HOME: `${sessionHome}/.config`,
+    XDG_CACHE_HOME: `${sessionHome}/.cache`,
+  };
+}
+
 /**
  * Poll `docker version` inside the sandbox until dockerd is reachable.
  *

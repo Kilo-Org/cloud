@@ -31,7 +31,11 @@ import {
 } from '../kilo/devcontainer.js';
 import { findWrapperContainerForSession } from '../kilo/wrapper-manager.js';
 import { randomPort } from '../kilo/ports.js';
-import { dockerSocketEnv, resolveDockerSocketPath } from '../kilo/sandbox-runtime.js';
+import {
+  buildKiloSessionXdgEnv,
+  dockerSocketEnv,
+  resolveDockerSocketPath,
+} from '../kilo/sandbox-runtime.js';
 import { shellQuote } from '../kilo/utils.js';
 import type { PreparingStep } from '../shared/protocol.js';
 import type { PreparationInput } from './schemas.js';
@@ -308,12 +312,18 @@ export async function executePreparationSteps(
           }
           await sandbox.writeFile(importFilePath, minimalSessionJson);
 
+          const restoreRuntimeEnv = devContainerHandle
+            ? {
+                ...runtimeEnv,
+                ...buildKiloSessionXdgEnv(sessionHome),
+              }
+            : runtimeEnv;
           const restoreCommand = buildRestoreCommand({
             kiloSessionId: input.kiloSessionId,
             importFilePath,
             runtimeWorkspacePath: devContainerHandle?.innerWorkspaceFolder ?? workspacePath,
             devContainer: devContainerHandle,
-            runtimeEnv,
+            runtimeEnv: restoreRuntimeEnv,
           });
           const restoreResult = await session.exec(restoreCommand, {
             cwd: dirname(workspacePath),

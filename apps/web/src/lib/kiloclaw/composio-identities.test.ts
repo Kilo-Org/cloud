@@ -7,12 +7,6 @@ jest.mock('@/lib/encryption', () => ({
   decryptWithSymmetricKey: jest.fn((value: string) => value.replace(/^encrypted:/, '')),
 }));
 
-jest.mock('@/lib/kiloclaw/provision-lock', () => ({
-  withKiloclawProvisionContextLock: jest.fn(async (_key: string, work: () => Promise<unknown>) => {
-    return await work();
-  }),
-}));
-
 jest.mock('@/lib/kiloclaw/composio-client', () => ({
   getComposioAgentIdentity: jest.fn(),
   resolveComposioConsumerProject: jest.fn(),
@@ -35,7 +29,9 @@ jest.mock('@/lib/drizzle', () => ({
     })),
     insert: jest.fn(() => ({
       values: jest.fn(() => ({
-        returning: jest.fn(async () => insertedRows.shift() ?? []),
+        onConflictDoNothing: jest.fn(() => ({
+          returning: jest.fn(async () => insertedRows.shift() ?? []),
+        })),
       })),
     })),
     update: jest.fn(() => ({
@@ -164,6 +160,37 @@ describe('ensureManagedComposioIdentity', () => {
       composio_project_id: 'project-1',
       composio_consumer_user_id: 'consumer-user-1',
       status: 'active',
+    });
+  });
+
+  it('uses the current identity row when a concurrent reservation wins the unique constraint', async () => {
+    selectedRows.push(
+      [],
+      [
+        identityRow({
+          id: 'identity-from-race',
+          status: 'pending',
+          composio_agent_key_encrypted: null,
+          composio_user_api_key_encrypted: null,
+          composio_org_id: null,
+          composio_project_id: null,
+          composio_consumer_user_id: null,
+        }),
+      ]
+    );
+    insertedRows.push([]);
+    mockedSignupComposioAgentIdentity.mockResolvedValue(upstreamIdentity());
+    resolveProject();
+    updatedRows.push(
+      [identityRow({ id: 'identity-from-race', status: 'pending', composio_project_id: null })],
+      [identityRow({ id: 'identity-from-race' })]
+    );
+
+    const identity = await ensureManagedComposioIdentity(scope);
+
+    expect(identity.row.id).toBe('identity-from-race');
+    expect(mockedSignupComposioAgentIdentity).toHaveBeenCalledWith({
+      idempotencyKey: 'identity-from-race',
     });
   });
 });

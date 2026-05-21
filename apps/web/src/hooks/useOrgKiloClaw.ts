@@ -328,14 +328,14 @@ export function useOrgKiloClawMutations(
   );
   const rawCreateComposioGoogleCalendarLink = useMutation(
     trpc.organizations.kiloclaw.createComposioGoogleCalendarLink.mutationOptions({
-      onSuccess: async () => {
-        await invalidateStatus();
-        await queryClient.invalidateQueries({
+      onSuccess: () => {
+        void invalidateStatus();
+        void queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryKey({
             organizationId,
           }),
         });
-        await queryClient.invalidateQueries({
+        void queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.getConfig.queryKey({ organizationId }),
         });
       },

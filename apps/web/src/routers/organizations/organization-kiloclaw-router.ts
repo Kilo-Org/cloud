@@ -834,16 +834,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   getComposioOnboardingStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-    let sandboxHasComposioSecrets = false;
-    if (instance) {
-      const token = generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
-      const client = new KiloClawUserClient(token);
-      const config = await client.getConfig({
-        userId: ctx.user.id,
-        instanceId: workerInstanceId(instance),
-      });
-      sandboxHasComposioSecrets = config.configuredSecrets.composio === true;
-    }
     return await getManagedComposioGoogleCalendarStatus({
       scope: {
         ownerType: 'organization_user',
@@ -851,41 +841,35 @@ export const organizationKiloclawRouter = createTRPCRouter({
         organizationId: input.organizationId,
       },
       instance,
-      sandboxHasComposioSecrets,
     });
   }),
 
   createComposioGoogleCalendarLink: organizationMemberMutationProcedure
     .input(composioConnectLinkSchema)
     .mutation(async ({ ctx, input }) => {
-      return await withKiloclawProvisionContextLock(
-        getOrganizationProvisionLockKey(ctx.user.id, input.organizationId),
-        async () => {
-          const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-          const sandboxConfigSource = instance
-            ? await getComposioInstanceConfigSource(instance.id)
-            : null;
-          if (sandboxConfigSource === 'manual') {
-            throw new TRPCError({
-              code: 'CONFLICT',
-              message: 'This sandbox already uses your own Composio credentials.',
-            });
-          }
+      const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+      const sandboxConfigSource = instance
+        ? await getComposioInstanceConfigSource(instance.id)
+        : null;
+      if (sandboxConfigSource === 'manual') {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This sandbox already uses your own Composio credentials.',
+        });
+      }
 
-          return await createManagedComposioGoogleCalendarLink({
-            userId: ctx.user.id,
-            scope: {
-              ownerType: 'organization_user',
-              userId: ctx.user.id,
-              organizationId: input.organizationId,
-            },
-            organizationId: input.organizationId,
-            returnTo: input.returnTo,
-            popup: input.popup,
-            attemptId: input.attemptId,
-          });
-        }
-      );
+      return await createManagedComposioGoogleCalendarLink({
+        userId: ctx.user.id,
+        scope: {
+          ownerType: 'organization_user',
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+        },
+        organizationId: input.organizationId,
+        returnTo: input.returnTo,
+        popup: input.popup,
+        attemptId: input.attemptId,
+      });
     }),
 
   getChannelCatalog: organizationMemberProcedure.query(async ({ ctx, input }) => {

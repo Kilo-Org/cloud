@@ -35,7 +35,6 @@ export function InboundEmailStepView({
 }: InboundEmailStepViewProps) {
   const [copied, setCopied] = useState(false);
   const ready = Boolean(address) && enabled;
-  const canContinue = !loading;
 
   // Track the "reset Copied state after 2s" timer so we can clear it on
   // unmount (or when the user clicks Copy again before the previous timer
@@ -123,13 +122,8 @@ export function InboundEmailStepView({
         </div>
 
         <div className="flex items-center justify-end gap-3 pt-2">
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => onContinue()}
-            disabled={!canContinue}
-          >
-            {loading ? 'Setting up your instance…' : 'Continue →'}
+          <Button type="button" variant="primary" onClick={() => onContinue()}>
+            Continue →
           </Button>
         </div>
       </div>

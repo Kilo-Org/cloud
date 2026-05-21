@@ -241,12 +241,12 @@ export function useKiloClawMutations() {
     ),
     createComposioGoogleCalendarLink: useMutation(
       trpc.kiloclaw.createComposioGoogleCalendarLink.mutationOptions({
-        onSuccess: async () => {
-          await invalidateStatus();
-          await queryClient.invalidateQueries({
+        onSuccess: () => {
+          void invalidateStatus();
+          void queryClient.invalidateQueries({
             queryKey: trpc.kiloclaw.getComposioOnboardingStatus.queryKey(),
           });
-          await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
+          void queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
         },
       })
     ),

@@ -210,8 +210,8 @@ export async function completeManagedComposioGoogleCalendarConnection(params: {
   }
 
   // Blocks callbacks after manual mode is recorded. The worker secret write
-  // below is cross-service, so a manual save starting concurrently still races
-  // until these writes share a common lock or transaction boundary.
+  // below is cross-service, so the persisted source marker remains the final
+  // arbiter for later status/provision decisions.
   const sandboxConfigSource = await getComposioInstanceConfigSource(params.instance.id);
   if (sandboxConfigSource === 'manual') return false;
 
@@ -266,7 +266,6 @@ export async function createManagedComposioGoogleCalendarLink(params: {
 export async function getManagedComposioGoogleCalendarStatus(params: {
   scope: ComposioOwnerScope;
   instance: ActiveKiloClawInstance | null;
-  sandboxHasComposioSecrets: boolean;
 }): Promise<{
   enabled: boolean;
   status: ComposioConnectionStatus;
@@ -298,8 +297,8 @@ export async function getManagedComposioGoogleCalendarStatus(params: {
     );
     if (
       active &&
-      ((!params.instance && knownConnectedAccountId !== null) ||
-        (params.instance && params.sandboxHasComposioSecrets && sandboxConfigSource === 'managed'))
+      knownConnectedAccountId !== null &&
+      (!params.instance || sandboxConfigSource === 'managed')
     ) {
       return {
         enabled: true,

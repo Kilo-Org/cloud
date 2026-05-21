@@ -601,12 +601,33 @@ Version capability hint rules:
    specific endpoint exists when a named capability is available.
 2. `capabilities`, when present, MUST be a sorted, duplicate-free array
    of stable lowercase dot/kebab strings.
-3. A capability MUST only be advertised when the corresponding route or
+3. Capability names MUST be derived from the controller behavior they
+   expose, not from UI labels or release names. Names MUST use dots to
+   separate stable resource/behavior hierarchy and kebab-case inside a
+   segment when a concept is multiple words. For route-backed
+   capabilities, derive the leading segments from the `/_kilo/` route
+   namespace and the final segment from the operation or behavior. For
+   example: `/_kilo/config/read` -> `config.read`,
+   `/_kilo/config/tools-md/google-workspace` ->
+   `config.tools-md.google-workspace`,
+   `/_kilo/morning-briefing/interests` ->
+   `morning-briefing.interests`, and the Kilo Chat attachment routes ->
+   `kilo-chat.attachments`.
+4. A capability MAY cover multiple routes only when those routes are one
+   inseparable behavior for clients, such as start/status/cancel for one
+   async operation or init/url routes for one attachment flow. It MUST NOT
+   combine independent read, update, create, repair, or delete behaviors
+   under one broad name when clients may need to gate those behaviors
+   separately.
+5. Capability names MUST be additive and stable. Renaming or removing a
+   capability is a breaking behavior change; add a new capability instead
+   when a new implementation has meaningfully different semantics.
+6. A capability MUST only be advertised when the corresponding route or
    behavior is registered in the running controller build.
-4. Capability hints are advisory. Clients MUST keep normal mutation-time
+7. Capability hints are advisory. Clients MUST keep normal mutation-time
    handling for old routes, auth failures, validation failures,
    conflicts, and runtime errors.
-5. Missing `capabilities` on a controller with a non-null version means
+8. Missing `capabilities` on a controller with a non-null version means
    capability support is unknown and SHOULD fail closed for newly
    capability-gated features.
 

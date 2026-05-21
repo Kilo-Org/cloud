@@ -358,6 +358,10 @@ export const getBotStatusResponseSchema = z.object({
   status: botStatusRecordSchema.nullable(),
 });
 
+export const requestBotStatusResponseSchema = okResponseSchema.extend({
+  cached: botStatusRecordSchema.nullable(),
+});
+
 export const getConversationStatusResponseSchema = z.object({
   status: conversationStatusRecordSchema.nullable(),
 });

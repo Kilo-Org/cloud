@@ -1354,6 +1354,14 @@ export const organizationKiloclawRouter = createTRPCRouter({
       return client.runMorningBriefing(ctx.user.id, workerInstanceId(instance));
     }),
 
+  startOnboardingBriefing: organizationMemberMutationProcedure
+    .input(z.object({ organizationId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.startOnboardingBriefing(ctx.user.id, workerInstanceId(instance));
+    }),
+
   updateBriefingInterests: organizationMemberMutationProcedure
     .input(
       z.object({

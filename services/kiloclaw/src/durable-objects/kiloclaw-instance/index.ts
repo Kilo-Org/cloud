@@ -3907,6 +3907,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   /**
+   * Create (or return) the "Today's briefing" conversation and start the
+   * in-chat onboarding briefing. Returns fast — generation runs in the
+   * plugin background.
+   */
+  async startOnboardingBriefing() {
+    await this.loadState();
+    return gateway.startOnboardingBriefing(this.s, this.env);
+  }
+
+  /**
    * Post-provisioning user-location update from the Settings UI. Mirrors
    * the shape of `updateBriefingInterests`: a focused mutation that
    * bypasses the heavy `provision()` lock + envvar rebuild path. The

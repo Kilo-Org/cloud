@@ -14,10 +14,13 @@ type SdkWebSearchRuntime = OpenClawPluginApi['runtime']['webSearch'];
 import {
   buildBriefingMarkdown,
   type BriefingDocumentSection,
+  type BriefingSourceStatus,
   offsetDateKey,
   resolveBriefingPath,
   wrapBriefingMarkdownForAgent,
 } from './briefing-utils';
+import { buildBriefingMessage } from './briefing-message';
+import { createKiloChatWriteClient } from './kilo-chat-write-client';
 import {
   type BriefingDeliveryResult,
   deliverBriefingToConfiguredChannels,
@@ -161,6 +164,43 @@ type StoredStatus = {
   lastReconcileAction: 'enable' | 'disable' | null;
 };
 
+/**
+ * Persisted record of the one-shot onboarding briefing (PR-6). Written
+ * when the `/onboarding-briefing` route first creates the "Today's
+ * briefing" conversation; its presence makes a repeat call idempotent
+ * (the route returns the existing `conversationId` instead of creating a
+ * second conversation).
+ */
+type StoredOnboardingBriefing = {
+  conversationId: string;
+  loadingMessageId: string;
+  startedAt: string;
+  state: 'generating' | 'delivered' | 'failed';
+};
+
+/** Title of the conversation the onboarding briefing is posted into. */
+const ONBOARDING_BRIEFING_TITLE = "Today's briefing";
+/**
+ * First (loading) bubble. Written so it still reads acceptably if a
+ * gateway restart strands it before generation finishes.
+ */
+const ONBOARDING_BRIEFING_LOADING_TEXT =
+  'Putting your first briefing together. Ask me anything in the meantime.';
+/** Replaces the loading bubble when generation fails. */
+const ONBOARDING_BRIEFING_FALLBACK_TEXT =
+  'I could not put your briefing together just now. Ask me anything to get started.';
+/**
+ * Re-ping cadence for the bot typing indicator while the briefing
+ * generates. Typing events are ephemeral — the chat client only catches
+ * one once its SSE subscription is live, which is a beat after the
+ * post-onboarding redirect, so the first ping (and any before the
+ * subscription) is missed. A tight cadence means the user catches a ping
+ * within ~1.5s of landing rather than waiting a full interval. Well under
+ * the chat UI's ~5s typing-display timeout (`TYPING_DISPLAY_TIMEOUT` in
+ * `useTyping.ts`).
+ */
+const ONBOARDING_BRIEFING_TYPING_PING_MS = 1_500;
+
 type SourceCollectionResult = {
   source: 'calendar' | 'github' | 'kilo-chat' | 'linear' | 'local-news' | 'web';
   configured: boolean;
@@ -234,6 +274,7 @@ function getStatePaths(api: { runtime: { state: { resolveStateDir: () => string 
   briefingsDir: string;
   configPath: string;
   statusPath: string;
+  onboardingBriefingPath: string;
 } {
   const stateDir = api.runtime.state.resolveStateDir();
   const rootDir = path.join(stateDir, 'morning-briefing');
@@ -242,6 +283,7 @@ function getStatePaths(api: { runtime: { state: { resolveStateDir: () => string 
     briefingsDir: path.join(rootDir, 'briefings'),
     configPath: path.join(rootDir, 'config.json'),
     statusPath: path.join(rootDir, 'status.json'),
+    onboardingBriefingPath: path.join(rootDir, 'onboarding-briefing.json'),
   };
 }
 
@@ -1454,7 +1496,8 @@ async function generateBriefing(
     };
     logger: { info?: (message: string) => void; warn?: (message: string) => void };
   },
-  dateKey: string
+  dateKey: string,
+  options?: { includeKiloChat?: boolean }
 ): Promise<{
   dateKey: string;
   filePath: string;
@@ -1462,6 +1505,12 @@ async function generateBriefing(
   sources: SourceCollectionResult[];
   failures: string[];
   delivery: BriefingDeliveryResult[];
+  // Structured briefing pieces, kept so callers (PR-6's in-chat onboarding
+  // briefing) can build per-section chat bubbles without re-parsing the
+  // flattened Markdown blob.
+  sections: BriefingDocumentSection[];
+  statuses: BriefingSourceStatus[];
+  tldr: string;
 }> {
   const paths = getStatePaths(api);
   await ensureStorage(paths);
@@ -1506,15 +1555,18 @@ async function generateBriefing(
       ? configuredTimezone
       : DEFAULT_TIMEZONE;
 
+  // The onboarding briefing skips Kilo Chat stats: a brand-new user has no
+  // chat history, and the onboarding briefing itself is their first chat
+  // activity. Defaults to included for the normal (cron / on-demand) brief.
+  const includeKiloChat = options?.includeKiloChat !== false;
   const generatedAt = new Date();
-  const corePromises = [
+  const [calendar, kiloChat, github, linear, web] = await Promise.all([
     collectCalendar(generatedAt, briefingTimezone),
-    collectKiloChatSummary(generatedAt, briefingTimezone),
+    includeKiloChat ? collectKiloChatSummary(generatedAt, briefingTimezone) : Promise.resolve(null),
     collectGithub(api),
     collectLinear(api),
     collectWebSearch(api, webSearchTopics),
-  ];
-  const [calendar, kiloChat, github, linear, web] = await Promise.all(corePromises);
+  ]);
   // Local News slots between Linear and Web Search — interest-gated so
   // users who haven't opted in pay no search cost and see no
   // local-news entry in the source-status footer.
@@ -1532,7 +1584,7 @@ async function generateBriefing(
     github,
     ...(localNews ? [localNews] : []),
     web,
-    kiloChat,
+    ...(kiloChat ? [kiloChat] : []),
   ];
   const successes = sources.filter(source => source.ok);
 
@@ -1573,24 +1625,26 @@ async function generateBriefing(
   const debug = ['1', 'true', 'yes'].includes(
     (process.env.BRIEFING_DEBUG ?? '').trim().toLowerCase()
   );
+  const statuses: BriefingSourceStatus[] = sources.map(source => ({
+    source: source.source,
+    configured: source.configured,
+    ok: source.ok,
+    summary: source.summary,
+  }));
+  const sections: BriefingDocumentSection[] = sources.flatMap(
+    source =>
+      source.sections ?? [
+        {
+          title: source.sectionTitle ?? DEFAULT_SECTION_TITLE[source.source],
+          lines: source.sectionLines,
+        },
+      ]
+  );
   const markdown = buildBriefingMarkdown({
     dateKey,
     generatedAt,
-    statuses: sources.map(source => ({
-      source: source.source,
-      configured: source.configured,
-      ok: source.ok,
-      summary: source.summary,
-    })),
-    sections: sources.flatMap(
-      source =>
-        source.sections ?? [
-          {
-            title: source.sectionTitle ?? DEFAULT_SECTION_TITLE[source.source],
-            lines: source.sectionLines,
-          },
-        ]
-    ),
+    statuses,
+    sections,
     failures,
     tldr,
     debug,
@@ -1617,12 +1671,7 @@ async function generateBriefing(
     lastGeneratedDate: dateKey,
     lastGeneratedAt: generatedAt.toISOString(),
     lastPath: filePath,
-    sourceSummary: sources.map(source => ({
-      source: source.source,
-      configured: source.configured,
-      ok: source.ok,
-      summary: source.summary,
-    })),
+    sourceSummary: statuses,
     failures,
     lastDelivery: delivery,
   });
@@ -1634,6 +1683,9 @@ async function generateBriefing(
     sources,
     failures,
     delivery,
+    sections,
+    statuses,
+    tldr,
   };
 }
 
@@ -1682,6 +1734,126 @@ async function resolveDateKeyForOffset(
   const config = await readStoredConfig(api, paths);
   const timezone = resolveEffectiveTimezone(api, config.timezone, 'date');
   return offsetDateKey(new Date(), offset, timezone);
+}
+
+/** `api` shape accepted by the onboarding-briefing entrypoints. */
+type OnboardingBriefingApi = Parameters<typeof generateBriefing>[0] &
+  Parameters<typeof resolveDateKeyForOffset>[0];
+
+/**
+ * Generate the briefing and post it into the onboarding conversation.
+ *
+ * Runs fire-and-forget after `startOnboardingBriefing` has already created
+ * the conversation and a loading bubble: the loading bubble is edited into
+ * the full briefing — one message. On failure it is replaced with a
+ * friendly fallback instead.
+ *
+ * While generation runs, a bot typing indicator is kept alive so the chat
+ * shows "<bot> is typing..." rather than a static wait. Posts directly as
+ * the bot via the Kilo Chat write client — no agent in the loop — so the
+ * message content is exactly what `buildBriefingMessage` produced.
+ */
+async function runOnboardingBriefingDelivery(
+  api: Parameters<typeof generateBriefing>[0],
+  dateKey: string,
+  record: StoredOnboardingBriefing,
+  onboardingBriefingPath: string
+): Promise<void> {
+  const writeClient = createKiloChatWriteClient();
+  const { conversationId, loadingMessageId } = record;
+
+  // Keep a "<bot> is typing..." indicator alive while the slow briefing
+  // generation runs. The chat UI clears a typing indicator ~5s after the
+  // last ping, so re-ping under that interval. Every typing call is
+  // best-effort — a failed ping is cosmetic, never a reason to fail
+  // delivery.
+  await writeClient.sendTyping(conversationId).catch(() => {});
+  const typingTimer = setInterval(() => {
+    void writeClient.sendTyping(conversationId).catch(() => {});
+  }, ONBOARDING_BRIEFING_TYPING_PING_MS);
+
+  try {
+    // Skip the Kilo Chat stats section: this is a brand-new user's first
+    // ever chat activity, so there is nothing meaningful to summarize.
+    const result = await generateBriefing(api, dateKey, { includeKiloChat: false });
+    clearInterval(typingTimer);
+    await writeClient.stopTyping(conversationId).catch(() => {});
+    const message = buildBriefingMessage({
+      sections: result.sections,
+      statuses: result.statuses,
+      tldr: result.tldr,
+    });
+    // The loading bubble is edited into the full briefing — a single bubble.
+    await writeClient.editTextMessage(conversationId, loadingMessageId, message);
+    await writeJsonFile(onboardingBriefingPath, { ...record, state: 'delivered' });
+  } catch (error) {
+    clearInterval(typingTimer);
+    await writeClient.stopTyping(conversationId).catch(() => {});
+    const errorText = error instanceof Error ? error.message : String(error);
+    api.logger.warn?.(`Onboarding briefing delivery failed: ${errorText}`);
+    try {
+      await writeClient.editTextMessage(
+        conversationId,
+        loadingMessageId,
+        ONBOARDING_BRIEFING_FALLBACK_TEXT
+      );
+    } catch (editError) {
+      const editText = editError instanceof Error ? editError.message : String(editError);
+      api.logger.warn?.(`Onboarding briefing fallback edit failed: ${editText}`);
+    }
+    await writeJsonFile(onboardingBriefingPath, { ...record, state: 'failed' }).catch(() => {});
+  }
+}
+
+/**
+ * Create (or return the existing) "Today's briefing" conversation for the
+ * post-onboarding chat landing, and kick off briefing generation.
+ *
+ * Synchronous part: create the conversation, post the loading bubble,
+ * persist the record, return the conversation id fast so the worker
+ * mutation does not block. The slow generation runs fire-and-forget via
+ * `runOnboardingBriefingDelivery`.
+ *
+ * Idempotent: a persisted record makes a repeat call return the existing
+ * `conversationId` instead of creating a second conversation.
+ */
+async function startOnboardingBriefing(
+  api: OnboardingBriefingApi
+): Promise<{ conversationId: string; alreadyStarted: boolean }> {
+  const paths = getStatePaths(api);
+  await ensureStorage(paths);
+
+  const existing = await readJsonFile<StoredOnboardingBriefing>(paths.onboardingBriefingPath);
+  if (existing?.conversationId) {
+    return { conversationId: existing.conversationId, alreadyStarted: true };
+  }
+
+  const writeClient = createKiloChatWriteClient();
+  if (!writeClient.configured) {
+    throw new Error(
+      `Kilo Chat is not available for the onboarding briefing: ${writeClient.reason}`
+    );
+  }
+
+  const conversationId = await writeClient.createConversation(ONBOARDING_BRIEFING_TITLE);
+  const loadingMessageId = await writeClient.sendTextMessage(
+    conversationId,
+    ONBOARDING_BRIEFING_LOADING_TEXT
+  );
+  const record: StoredOnboardingBriefing = {
+    conversationId,
+    loadingMessageId,
+    startedAt: new Date().toISOString(),
+    state: 'generating',
+  };
+  await writeJsonFile(paths.onboardingBriefingPath, record);
+
+  const dateKey = await resolveDateKeyForOffset(api, 0);
+  // Fire-and-forget: generation is slow (web search, calendar); the loading
+  // bubble covers the gap until the section bubbles stream in.
+  void runOnboardingBriefingDelivery(api, dateKey, record, paths.onboardingBriefingPath);
+
+  return { conversationId, alreadyStarted: false };
 }
 
 async function getStatusSnapshot(api: {
@@ -2497,6 +2669,27 @@ export default definePluginEntry({
           sendJson(res, 200, {
             ok: true,
             ...result,
+          });
+        } catch (error) {
+          sendJson(res, 500, {
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      },
+    });
+
+    api.registerHttpRoute({
+      path: '/api/plugins/kiloclaw-morning-briefing/onboarding-briefing',
+      auth: 'gateway',
+      match: 'exact',
+      handler: async (_req, res) => {
+        try {
+          const result = await startOnboardingBriefing(api);
+          sendJson(res, 200, {
+            ok: true,
+            conversationId: result.conversationId,
+            alreadyStarted: result.alreadyStarted,
           });
         } catch (error) {
           sendJson(res, 500, {

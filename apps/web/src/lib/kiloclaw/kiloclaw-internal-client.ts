@@ -42,6 +42,7 @@ import type {
   OpenclawConfigResponse,
   MorningBriefingStatusResponse,
   MorningBriefingActionResponse,
+  OnboardingBriefingResponse,
   MorningBriefingInterestsResponse,
   MorningBriefingUserLocationResponse,
   MorningBriefingReadResponse,
@@ -423,6 +424,21 @@ export class KiloClawInternalClient {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/morning-briefing/run${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async startOnboardingBriefing(
+    userId: string,
+    instanceId?: string
+  ): Promise<OnboardingBriefingResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/onboarding-briefing${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId }),

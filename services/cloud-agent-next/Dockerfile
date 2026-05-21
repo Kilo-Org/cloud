@@ -1,4 +1,4 @@
-FROM docker.io/cloudflare/sandbox:0.9.2
+FROM docker.io/cloudflare/sandbox:0.10.1
 
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""

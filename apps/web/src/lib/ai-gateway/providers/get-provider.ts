@@ -11,47 +11,43 @@ import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
-import type { BYOKResult, GatewayChatApiKind, Provider } from '@/lib/ai-gateway/providers/types';
+import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
+import { CustomLlmDefinitionSchema } from '@kilocode/db';
 import {
-  CustomLlmDefinitionSchema,
-  type OpenClawApiAdapter,
-  type CustomLlmProvider,
-} from '@kilocode/db';
-import {
-  addCacheBreakpoints,
-  injectReasoningIntoContent,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+  buildDirectProvider,
+  inferSupportedChatApis,
+} from '@/lib/ai-gateway/experiments/build-direct-provider';
 
-function inferSupportedChatApis(
-  aiSdkProvider: CustomLlmProvider | undefined,
-  openClawApiAdapter: OpenClawApiAdapter | undefined
-): ReadonlyArray<GatewayChatApiKind> {
-  const result = new Array<GatewayChatApiKind>();
-  if (aiSdkProvider === 'openai' || openClawApiAdapter === 'openai-responses') {
-    result.push('responses');
-  }
-  if (aiSdkProvider === 'anthropic' || openClawApiAdapter === 'anthropic-messages') {
-    result.push('messages');
-  }
-  if (
-    aiSdkProvider === 'openai-compatible' ||
-    aiSdkProvider === 'alibaba' ||
-    aiSdkProvider === 'openrouter' ||
-    openClawApiAdapter === 'openai-completions' ||
-    result.length === 0
-  ) {
-    result.push('chat_completions');
-  }
-  return result;
-}
+export type GetProviderProviderResult = {
+  kind: 'provider';
+  provider: Provider;
+  userByok: BYOKResult[] | null;
+  /** Skip balance, paid-auth, and organization policy checks entirely. Used
+   *  by direct-byok and custom_llm2 because both already require explicit
+   *  admin opt-in. */
+  bypassAccessCheck: boolean;
+};
+
+/**
+ * Discriminated routing result. `not-found` maps to the local
+ * model-unavailable response; `unavailable` maps to a 503
+ * temporarily-unavailable response. Today only the `provider` shape is
+ * produced; the other kinds are scaffolding for upcoming model-experiment
+ * routing (PR #3325) where paused/unreachable experiments need to
+ * short-circuit without falling through to default routing.
+ */
+export type GetProviderResult =
+  | GetProviderProviderResult
+  | { kind: 'not-found' }
+  | { kind: 'unavailable' };
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
   requestedModel: string,
   organizationId: string | undefined
-) {
+): Promise<GetProviderProviderResult | null> {
   const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
   if (!directByok || !directByokModel) {
     return null;
@@ -63,6 +59,7 @@ async function checkDirectBYOK(
     return null;
   }
   return {
+    kind: 'provider',
     provider: {
       id: 'direct-byok',
       apiUrl: directByok.base_url,
@@ -81,7 +78,7 @@ async function checkDirectBYOK(
 async function checkCustomLlm(
   requestedModel: string,
   organizationId: string
-): Promise<{ provider: Provider; userByok: null; bypassAccessCheck: true } | null> {
+): Promise<GetProviderProviderResult | null> {
   const [row] = await db
     .select()
     .from(custom_llm2)
@@ -95,32 +92,23 @@ async function checkCustomLlm(
     return null;
   }
   return {
-    provider: {
-      id: 'custom',
-      apiUrl: customLlm.base_url,
-      apiKey: customLlm.api_key,
-      supportedChatApis: inferSupportedChatApis(
-        customLlm.opencode_settings?.ai_sdk_provider,
-        customLlm.openclaw_settings?.api_adapter
-      ),
-      transformRequest(context) {
-        if (customLlm.remove_from_body) {
-          const body = context.request.body as Record<string, unknown>;
-          for (const key of customLlm.remove_from_body ?? []) {
-            delete body[key];
-          }
-        }
-        Object.assign(context.request.body, customLlm.extra_body ?? {});
-        Object.assign(context.extraHeaders, customLlm.extra_headers ?? {});
-        context.request.body.model = customLlm.internal_id;
-        if (customLlm.add_cache_breakpoints) {
-          addCacheBreakpoints(context.request);
-        }
-        if (customLlm.inject_reasoning_into_content) {
-          injectReasoningIntoContent(context.request);
-        }
-      },
-    },
+    kind: 'provider',
+    provider: buildDirectProvider({
+      internal_id: customLlm.internal_id,
+      base_url: customLlm.base_url,
+      api_key: customLlm.api_key,
+      opencode_settings: customLlm.opencode_settings
+        ? { ai_sdk_provider: customLlm.opencode_settings.ai_sdk_provider }
+        : undefined,
+      openclaw_settings: customLlm.openclaw_settings
+        ? { api_adapter: customLlm.openclaw_settings.api_adapter }
+        : undefined,
+      extra_body: customLlm.extra_body,
+      extra_headers: customLlm.extra_headers,
+      remove_from_body: customLlm.remove_from_body,
+      add_cache_breakpoints: customLlm.add_cache_breakpoints,
+      inject_reasoning_into_content: customLlm.inject_reasoning_into_content,
+    }),
     userByok: null,
     bypassAccessCheck: true,
   };
@@ -146,13 +134,17 @@ async function checkVercelBYOK(
     : getBYOKforUser(db, user.id, modelProviders);
 }
 
-export async function getProvider(
-  requestedModel: string,
-  request: GatewayRequest,
-  user: User | AnonymousUserContext,
-  organizationId: string | undefined,
-  taskId: string | undefined
-): Promise<{ provider: Provider; userByok: BYOKResult[] | null; bypassAccessCheck: boolean }> {
+export type GetProviderInput = {
+  requestedModel: string;
+  request: GatewayRequest;
+  user: User | AnonymousUserContext;
+  organizationId: string | undefined;
+  taskId: string | undefined;
+};
+
+export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
+  const { requestedModel, request, user, organizationId, taskId } = input;
+
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {
     return directByokByok;
@@ -161,6 +153,7 @@ export async function getProvider(
   const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
   if (vercelByok) {
     return {
+      kind: 'provider',
       provider: PROVIDERS.VERCEL_AI_GATEWAY,
       userByok: vercelByok,
       bypassAccessCheck: false,
@@ -182,10 +175,16 @@ export async function getProvider(
     eligibleForVercelRouting &&
     (await shouldRouteToVercel(requestedModel, request, taskId || user.id))
   ) {
-    return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, bypassAccessCheck: false };
+    return {
+      kind: 'provider',
+      provider: PROVIDERS.VERCEL_AI_GATEWAY,
+      userByok: null,
+      bypassAccessCheck: false,
+    };
   }
 
   return {
+    kind: 'provider',
     provider:
       Object.values(PROVIDERS).find(p => p.id === kiloExclusiveModel?.gateway) ??
       PROVIDERS.OPENROUTER,
@@ -206,5 +205,12 @@ export async function getEmbeddingProvider(
   }
 
   // 2. All non-BYOK embedding requests go through OpenRouter
+  return { provider: PROVIDERS.OPENROUTER, userByok: null };
+}
+
+export async function getTranscriptionProvider(): Promise<{
+  provider: Provider;
+  userByok: BYOKResult[] | null;
+}> {
   return { provider: PROVIDERS.OPENROUTER, userByok: null };
 }

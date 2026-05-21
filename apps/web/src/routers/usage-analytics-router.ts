@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import { readDb } from '@/lib/drizzle';
 import { getEnvVariable } from '@/lib/dotenvx';
@@ -9,7 +9,8 @@ import {
   resolveSnowflakeConfig,
   type SnowflakeBinding,
 } from '@/lib/snowflake';
-import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
+import { kilocode_users, organization_memberships, user_auth_provider } from '@kilocode/db/schema';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 export const GranularitySchema = z.enum(['hour', 'day', 'week', 'month']);
@@ -41,7 +42,7 @@ const FiltersShape = {
   organizationId: z.uuid().optional(),
   /**
    * Personal-scope narrowing:
-   * - 'personal-only' (default) → organization_id IS NULL
+   * - 'personal-only' (default) → organization_id = '' in Snowflake rollups
    * - 'include-orgs'            → any organization (including personal)
    * Ignored when `organizationId` is set (org scope always filters by that org).
    */
@@ -340,7 +341,7 @@ function buildWhereClause(
 // Metric SQL expression
 // ---------------------------------------------------------------------------
 
-function metricExprSql(metric: Metric): string {
+function metricExprSql(metric: Metric, tier: GranularityTier): string {
   switch (metric) {
     case 'cost':
       return 'COALESCE(SUM(total_cost_microdollars), 0)';
@@ -351,22 +352,34 @@ function metricExprSql(metric: Metric): string {
     case 'outputTokens':
       return 'COALESCE(SUM(total_output_tokens), 0)';
     case 'tokens':
-      return 'COALESCE(SUM(total_input_tokens + total_output_tokens), 0)';
+      return 'COALESCE(SUM(total_tokens), 0)';
     case 'errorRate':
       return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(error_count), 0)::FLOAT / SUM(request_count)::FLOAT END';
     case 'avgLatencyMs':
       return 'CASE WHEN COALESCE(SUM(latency_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_latency_ms), 0)::FLOAT / SUM(latency_count)::FLOAT END';
-    case 'avgGenerationTimeMs':
-      return 'CASE WHEN COALESCE(SUM(latency_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_generation_time_ms), 0)::FLOAT / SUM(latency_count)::FLOAT END';
+    case 'avgGenerationTimeMs': {
+      const countExpr = generationTimeCountExprSql(tier);
+      return `CASE WHEN COALESCE(SUM(${countExpr}), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_generation_time_ms), 0)::FLOAT / SUM(${countExpr})::FLOAT END`;
+    }
     case 'costPerRequest':
       return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_cost_microdollars), 0)::FLOAT / SUM(request_count)::FLOAT END';
     case 'tokensPerRequest':
-      return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_input_tokens + total_output_tokens), 0)::FLOAT / SUM(request_count)::FLOAT END';
+      return 'CASE WHEN COALESCE(SUM(request_count), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_tokens), 0)::FLOAT / SUM(request_count)::FLOAT END';
     case 'cacheHitRatio':
       return 'CASE WHEN COALESCE(SUM(total_input_tokens + total_cache_hit_tokens), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_cache_hit_tokens), 0)::FLOAT / SUM(total_input_tokens + total_cache_hit_tokens)::FLOAT END';
     case 'outputInputRatio':
       return 'CASE WHEN COALESCE(SUM(total_input_tokens), 0) = 0 THEN 0 ELSE COALESCE(SUM(total_output_tokens), 0)::FLOAT / SUM(total_input_tokens)::FLOAT END';
   }
+}
+
+function generationTimeCountExprSql(tier: GranularityTier): string {
+  if (tier === 'hourly') {
+    return 'IFF(total_generation_time_ms IS NOT NULL, 1, 0)';
+  }
+  // Daily rollups do not currently carry a generation-time observation count.
+  // Derive one only for the window backed by hourly rollups so older daily
+  // history does not reuse latency_count as an incorrect denominator.
+  return 'IFF(total_generation_time_ms IS NOT NULL AND usage_date >= DATEADD(day, -7, CURRENT_DATE), 1, 0)';
 }
 
 // ---------------------------------------------------------------------------
@@ -515,6 +528,8 @@ const SummaryOutputSchema = z.object({
   totalLatencyMs: z.number(),
   totalGenerationTimeMs: z.number(),
   latencyCount: z.number(),
+  generationTimeCount: z.number(),
+  totalTokens: z.number(),
   distinctUsers: z.number(),
   errorRate: z.number(),
   avgLatencyMs: z.number(),
@@ -637,6 +652,37 @@ const UserListOutputSchema = z.object({
   ),
 });
 
+function parseLegacyOAuthUserId(
+  userId: string
+): { provider: AuthProviderId; providerAccountId: string } | null {
+  if (!userId.startsWith('oauth/')) return null;
+  const separatorIndex = userId.indexOf(':');
+  if (separatorIndex <= 'oauth/'.length) return null;
+
+  const provider = userId.slice('oauth/'.length, separatorIndex);
+  const providerAccountId = userId.slice(separatorIndex + 1);
+  if (providerAccountId === '') return null;
+
+  switch (provider) {
+    case 'apple':
+    case 'email':
+    case 'google':
+    case 'github':
+    case 'gitlab':
+    case 'linkedin':
+    case 'discord':
+    case 'fake-login':
+    case 'workos':
+      return { provider, providerAccountId };
+    default:
+      return null;
+  }
+}
+
+function legacyOAuthProviderKey(provider: AuthProviderId, providerAccountId: string): string {
+  return `${provider}:${providerAccountId}`;
+}
+
 // ---------------------------------------------------------------------------
 // Router definition
 // ---------------------------------------------------------------------------
@@ -665,6 +711,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
           totalLatencyMs: 0,
           totalGenerationTimeMs: 0,
           latencyCount: 0,
+          generationTimeCount: 0,
+          totalTokens: 0,
           distinctUsers: 0,
           errorRate: 0,
           avgLatencyMs: 0,
@@ -678,6 +726,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       }
       const table = getTableName(meta.tier);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
+      const generationTimeCountExpr = generationTimeCountExprSql(meta.tier);
 
       const statement = `
         SELECT
@@ -694,6 +743,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
           COALESCE(SUM(total_latency_ms), 0),
           COALESCE(SUM(total_generation_time_ms), 0),
           COALESCE(SUM(latency_count), 0),
+          COALESCE(SUM(${generationTimeCountExpr}), 0),
+          COALESCE(SUM(total_tokens), 0),
           COUNT(DISTINCT kilo_user_id)
         FROM ${table}
         WHERE ${where.sql()}
@@ -733,7 +784,9 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const totalLatencyMs = toSafeNumber(row[10]);
       const totalGenerationTimeMs = toSafeNumber(row[11]);
       const latencyCount = toSafeNumber(row[12]);
-      const distinctUsers = toSafeNumber(row[13]);
+      const generationTimeCount = toSafeNumber(row[13]);
+      const totalTokens = toSafeNumber(row[14]);
+      const distinctUsers = toSafeNumber(row[15]);
 
       return {
         costMicrodollars,
@@ -749,12 +802,14 @@ export const usageAnalyticsRouter = createTRPCRouter({
         totalLatencyMs,
         totalGenerationTimeMs,
         latencyCount,
+        generationTimeCount,
+        totalTokens,
         distinctUsers,
         errorRate: ratioSafe(errorCount, requestCount),
         avgLatencyMs: ratioSafe(totalLatencyMs, latencyCount),
-        avgGenerationTimeMs: ratioSafe(totalGenerationTimeMs, latencyCount),
+        avgGenerationTimeMs: ratioSafe(totalGenerationTimeMs, generationTimeCount),
         costPerRequest: ratioSafe(costMicrodollars, requestCount),
-        tokensPerRequest: ratioSafe(inputTokens + outputTokens, requestCount),
+        tokensPerRequest: ratioSafe(totalTokens, requestCount),
         cacheHitRatio: ratioSafe(cacheHitTokens, inputTokens + cacheHitTokens),
         outputInputRatio: ratioSafe(outputTokens, inputTokens),
         effectiveGranularity: meta.effectiveGranularity,
@@ -774,7 +829,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       }
       const table = getTableName(meta.tier);
       const bucketExpr = bucketExprSql(meta.effectiveGranularity, meta.tier);
-      const metricExpr = metricExprSql(input.metric);
+      const metricExpr = metricExprSql(input.metric, meta.tier);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
 
       let statement: string;
@@ -844,7 +899,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       }
       const table = getTableName(meta.tier);
       const dimCol = dimensionColumn(input.dimension);
-      const metricExpr = metricExprSql(input.metric);
+      const metricExpr = metricExprSql(input.metric, meta.tier);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
 
       const statement = `
@@ -1044,12 +1099,77 @@ export const usageAnalyticsRouter = createTRPCRouter({
         )
         .where(inArray(kilocode_users.id, allowedIds));
 
+      const usersById = new Map(
+        rows.map(r => [
+          r.id,
+          {
+            id: r.id,
+            name: r.name,
+            email: r.email,
+          },
+        ])
+      );
+
+      const legacyLookups = allowedIds
+        .filter(id => !usersById.has(id))
+        .map(id => ({ id, parsed: parseLegacyOAuthUserId(id) }))
+        .filter((lookup): lookup is { id: string; parsed: NonNullable<typeof lookup.parsed> } =>
+          Boolean(lookup.parsed)
+        );
+
+      if (legacyLookups.length > 0) {
+        const legacyIdsByProviderKey = new Map(
+          legacyLookups.map(lookup => [
+            legacyOAuthProviderKey(lookup.parsed.provider, lookup.parsed.providerAccountId),
+            lookup.id,
+          ])
+        );
+        const legacyConditions = legacyLookups.map(lookup =>
+          and(
+            eq(user_auth_provider.provider, lookup.parsed.provider),
+            eq(user_auth_provider.provider_account_id, lookup.parsed.providerAccountId)
+          )
+        );
+        const legacyWhere = or(...legacyConditions);
+
+        if (legacyWhere) {
+          const legacyRows = await readDb
+            .select({
+              provider: user_auth_provider.provider,
+              providerAccountId: user_auth_provider.provider_account_id,
+              name: kilocode_users.google_user_name,
+              email: kilocode_users.google_user_email,
+            })
+            .from(user_auth_provider)
+            .innerJoin(kilocode_users, eq(user_auth_provider.kilo_user_id, kilocode_users.id))
+            .innerJoin(
+              organization_memberships,
+              and(
+                eq(organization_memberships.kilo_user_id, user_auth_provider.kilo_user_id),
+                eq(organization_memberships.organization_id, input.organizationId)
+              )
+            )
+            .where(legacyWhere);
+
+          for (const row of legacyRows) {
+            const id = legacyIdsByProviderKey.get(
+              legacyOAuthProviderKey(row.provider, row.providerAccountId)
+            );
+            if (!id) continue;
+            usersById.set(id, {
+              id,
+              name: row.name,
+              email: row.email,
+            });
+          }
+        }
+      }
+
       return {
-        users: rows.map(r => ({
-          id: r.id,
-          name: r.name,
-          email: r.email,
-        })),
+        users: allowedIds.flatMap(id => {
+          const user = usersById.get(id);
+          return user ? [user] : [];
+        }),
       };
     }),
 });

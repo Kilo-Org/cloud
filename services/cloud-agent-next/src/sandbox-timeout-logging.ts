@@ -89,6 +89,7 @@ export function timedExec(
   options?: {
     timeoutMs?: number;
     cwd?: string;
+    env?: Record<string, string>;
   }
 ): Promise<ExecResult> {
   const timeoutMs = options?.timeoutMs ?? FAST_SANDBOX_COMMAND_TIMEOUT_MS;
@@ -96,6 +97,7 @@ export function timedExec(
     executor.exec(command, {
       timeout: timeoutMs,
       ...(options?.cwd !== undefined && { cwd: options.cwd }),
+      ...(options?.env !== undefined && { env: options.env }),
     }),
     { operation, timeoutMs, timeoutLayer: 'exec' }
   );

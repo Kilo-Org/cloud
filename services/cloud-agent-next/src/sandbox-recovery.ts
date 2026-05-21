@@ -1,4 +1,5 @@
 import { logger } from './logger.js';
+import { WorkspaceFilesystemPreparationError } from './workspace-errors.js';
 
 type DestroyableSandbox = {
   destroy(): Promise<void>;
@@ -10,6 +11,18 @@ type RecoveryContext = {
   sessionId?: string;
   phase: string;
 };
+
+type PreparationInfrastructureFailure =
+  | {
+      type: 'sandbox_internal_server_error';
+      error: unknown;
+      message: 'Sandbox returned 500 during workspace preparation';
+    }
+  | {
+      type: 'workspace_filesystem_preparation_error';
+      error: WorkspaceFilesystemPreparationError;
+      message: string;
+    };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -107,6 +120,63 @@ export function isSandboxInternalServerError(error: unknown): boolean {
   return isSandboxInternalServerErrorWithSeen(error, new WeakSet());
 }
 
+function getWorkspaceFilesystemPreparationErrorWithSeen(
+  error: unknown,
+  seen: WeakSet<object>
+): WorkspaceFilesystemPreparationError | undefined {
+  if (!isRecord(error)) {
+    return undefined;
+  }
+
+  if (seen.has(error)) {
+    return undefined;
+  }
+  seen.add(error);
+
+  if (error instanceof WorkspaceFilesystemPreparationError) {
+    return error;
+  }
+
+  const cause = getNestedProperty(error, 'cause');
+  return getWorkspaceFilesystemPreparationErrorWithSeen(cause, seen);
+}
+
+function getWorkspaceFilesystemPreparationError(
+  error: unknown
+): WorkspaceFilesystemPreparationError | undefined {
+  return getWorkspaceFilesystemPreparationErrorWithSeen(error, new WeakSet());
+}
+
+export function getPreparationInfrastructureFailure(
+  error: unknown
+): PreparationInfrastructureFailure | undefined {
+  const cause = getNestedProperty(error, 'cause');
+  const sandboxError = isSandboxInternalServerError(cause)
+    ? cause
+    : isSandboxInternalServerError(error)
+      ? error
+      : undefined;
+
+  if (sandboxError !== undefined) {
+    return {
+      type: 'sandbox_internal_server_error',
+      error: sandboxError,
+      message: 'Sandbox returned 500 during workspace preparation',
+    };
+  }
+
+  const workspaceError = getWorkspaceFilesystemPreparationError(error);
+  if (workspaceError) {
+    return {
+      type: 'workspace_filesystem_preparation_error',
+      error: workspaceError,
+      message: workspaceError.message,
+    };
+  }
+
+  return undefined;
+}
+
 export async function destroySandboxAfterInternalServerError(
   context: RecoveryContext,
   error: unknown
@@ -152,16 +222,67 @@ export async function destroySandboxAfterInternalServerError(
   }
 }
 
-export async function withSandboxInternalServerErrorRecovery<T>(
+export async function destroySandboxAfterPreparationInfrastructureFailure(
+  context: RecoveryContext,
+  error: unknown
+): Promise<boolean> {
+  const failure = getPreparationInfrastructureFailure(error);
+  if (!failure) {
+    return false;
+  }
+
+  if (failure.type === 'sandbox_internal_server_error') {
+    return destroySandboxAfterInternalServerError(context, failure.error);
+  }
+
+  const errorMessage = getErrorMessage(failure.error);
+  logger
+    .withFields({
+      sandboxId: context.sandboxId,
+      sessionId: context.sessionId,
+      phase: context.phase,
+      target: failure.error.target,
+      error: errorMessage,
+      logTag: 'workspace_filesystem_preparation_failed',
+    })
+    .error('Workspace filesystem preparation failed; destroying sandbox');
+
+  try {
+    await context.sandbox.destroy();
+    logger
+      .withFields({
+        sandboxId: context.sandboxId,
+        sessionId: context.sessionId,
+        phase: context.phase,
+        target: failure.error.target,
+        logTag: 'workspace_filesystem_preparation_destroyed',
+      })
+      .info('Destroyed sandbox after workspace filesystem preparation failure');
+    return true;
+  } catch (destroyError) {
+    logger
+      .withFields({
+        sandboxId: context.sandboxId,
+        sessionId: context.sessionId,
+        phase: context.phase,
+        target: failure.error.target,
+        originalError: errorMessage,
+        destroyError: getErrorMessage(destroyError),
+        logTag: 'workspace_filesystem_preparation_destroy_failed',
+      })
+      .error('Failed to destroy sandbox after workspace filesystem preparation failure');
+    return false;
+  }
+}
+
+export async function withPreparationInfrastructureRecovery<T>(
   context: RecoveryContext,
   operation: () => Promise<T>
 ): Promise<T> {
   try {
     return await operation();
   } catch (error) {
-    const cause = getNestedProperty(error, 'cause');
-    const recoveryError = isSandboxInternalServerError(cause) ? cause : error;
-    await destroySandboxAfterInternalServerError(context, recoveryError);
+    await destroySandboxAfterPreparationInfrastructureFailure(context, error);
     throw error;
   }
 }

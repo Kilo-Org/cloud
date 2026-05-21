@@ -25,20 +25,20 @@
     "@kilocode/encryption": "workspace:*",
     "@kilocode/kilo-chat": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
-    "croner": "^10.0.1",
+    "croner": "10.0.1",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.21",
-    "@types/node": ">=24 <25",
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "@vitest/ui": "^3.2.4",
+    "@vitest/ui": "catalog:",
     "drizzle-kit": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^3.2.4",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

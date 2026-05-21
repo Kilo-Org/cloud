@@ -15,6 +15,7 @@ import {
 } from './types';
 import type { FilePart } from './types';
 import { PartRenderer } from './PartRenderer';
+import type { OpenChildSession } from './ChildSessionSection';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { stripImageContext } from '@/lib/app-builder/message-utils';
 
@@ -148,6 +149,7 @@ type MessageBubbleProps = {
   isStreaming?: boolean;
   /** Function to get messages for a child session ID */
   getChildMessages?: (sessionId: string) => StoredMessage[];
+  onOpenChildSession?: OpenChildSession;
 };
 
 /**
@@ -160,6 +162,7 @@ export function MessageBubble({
   message,
   isStreaming: isStreamingProp,
   getChildMessages,
+  onOpenChildSession,
 }: MessageBubbleProps) {
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
   const timestamp = message.info.time.created;
@@ -233,6 +236,7 @@ export function MessageBubble({
               part={part}
               isStreaming={isStreaming}
               getChildMessages={getChildMessages}
+              onOpenChildSession={onOpenChildSession}
             />
           ))}
         </div>

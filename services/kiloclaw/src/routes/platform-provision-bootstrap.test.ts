@@ -3,21 +3,26 @@ import type * as DbModule from '../db';
 import type * as ProvisionBootstrapModule from './provision-bootstrap';
 import type * as AnalyticsModule from '../utils/analytics';
 
-const { mockGetWorkerDb, mockBootstrapProvisionedSubscriptionWithFallback, mockWriteEvent } =
-  vi.hoisted(() => ({
-    mockGetWorkerDb: vi.fn(),
-    mockBootstrapProvisionedSubscriptionWithFallback: vi.fn(),
-    mockWriteEvent: vi.fn<
-      (
-        env: unknown,
-        data: {
-          event: string;
-          userId?: string;
-          instanceId?: string;
-        }
-      ) => void
-    >(),
-  }));
+const {
+  mockGetWorkerDb,
+  mockBootstrapProvisionedSubscriptionWithFallback,
+  mockResolveProvisionEntitlementWithFallback,
+  mockWriteEvent,
+} = vi.hoisted(() => ({
+  mockGetWorkerDb: vi.fn(),
+  mockBootstrapProvisionedSubscriptionWithFallback: vi.fn(),
+  mockResolveProvisionEntitlementWithFallback: vi.fn(),
+  mockWriteEvent: vi.fn<
+    (
+      env: unknown,
+      data: {
+        event: string;
+        userId?: string;
+        instanceId?: string;
+      }
+    ) => void
+  >(),
+}));
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {},
@@ -39,6 +44,7 @@ vi.mock('./provision-bootstrap', async importOriginal => {
   return {
     ...actual,
     bootstrapProvisionedSubscriptionWithFallback: mockBootstrapProvisionedSubscriptionWithFallback,
+    resolveProvisionEntitlementWithFallback: mockResolveProvisionEntitlementWithFallback,
   };
 });
 
@@ -236,6 +242,11 @@ function makeEnv() {
 describe('platform provision bootstrap quarantine', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveProvisionEntitlementWithFallback.mockResolvedValue({
+      mode: 'rpc',
+      priceVersion: '2026-05-10',
+      selfServiceInstanceType: 'perf-1-3',
+    });
   });
 
   it('forwards user location to the instance provision config', async () => {
@@ -296,7 +307,7 @@ describe('platform provision bootstrap quarantine', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'post-provision bootstrap failed',
     });
-    expect(destroy).not.toHaveBeenCalled();
+    expect(destroy).toHaveBeenCalledWith({ reason: 'bootstrap_cleanup_failure' });
     const destroyUpdate = workerDb.updateSets.find(
       update => typeof update.destroyed_at === 'string'
     );
@@ -315,11 +326,21 @@ describe('platform provision bootstrap quarantine', () => {
 describe('platform /provision: instanceType defaulting', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveProvisionEntitlementWithFallback.mockResolvedValue({
+      mode: 'rpc',
+      priceVersion: '2026-05-10',
+      selfServiceInstanceType: 'perf-1-3',
+    });
   });
 
-  it('defaults instanceType to perf-1-3 on FRESH insert when caller omits it', async () => {
+  it('defaults instanceType from the billing entitlement preflight on FRESH insert when caller omits it', async () => {
     const { env, provision } = makeEnv();
     mockGetWorkerDb.mockReturnValue(createWorkerDb());
+    mockResolveProvisionEntitlementWithFallback.mockResolvedValueOnce({
+      mode: 'rpc',
+      priceVersion: '2026-05-10',
+      selfServiceInstanceType: 'perf-1-3',
+    });
     mockBootstrapProvisionedSubscriptionWithFallback.mockResolvedValueOnce({ mode: 'rpc' });
 
     const response = await platform.request(
@@ -338,11 +359,203 @@ describe('platform /provision: instanceType defaulting', () => {
     );
 
     expect(response.status).toBe(201);
+    expect(mockResolveProvisionEntitlementWithFallback).toHaveBeenCalledWith({
+      env,
+      input: { userId: 'user-1', orgId: null },
+    });
     expect(provision).toHaveBeenCalledWith(
       'user-1',
       expect.objectContaining({ instanceType: 'perf-1-3' }),
       expect.anything()
     );
+    expect(mockBootstrapProvisionedSubscriptionWithFallback).toHaveBeenCalledOnce();
+    expect(
+      JSON.stringify(mockBootstrapProvisionedSubscriptionWithFallback.mock.calls[0]?.[0])
+    ).toContain('"expectedPriceVersion":"2026-05-10"');
+  });
+
+  it('rejects current fresh self-service provisioning above the billing entitlement cap', async () => {
+    const { env, provision } = makeEnv();
+    mockGetWorkerDb.mockReturnValue(createWorkerDb());
+    mockResolveProvisionEntitlementWithFallback.mockResolvedValue({
+      mode: 'rpc',
+      priceVersion: '2026-05-10',
+      selfServiceInstanceType: 'perf-1-3',
+    });
+    mockBootstrapProvisionedSubscriptionWithFallback.mockResolvedValue({ mode: 'rpc' });
+
+    for (const instanceType of ['perf-4-8', 'perf-4-16']) {
+      const response = await platform.request(
+        '/provision',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            userId: 'user-1',
+            provider: 'fly',
+            instanceType,
+          }),
+        },
+        env
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: 'instanceType exceeds self-service entitlement',
+      });
+    }
+
+    expect(provision).not.toHaveBeenCalled();
+    expect(mockBootstrapProvisionedSubscriptionWithFallback).not.toHaveBeenCalled();
+  });
+
+  it('uses the canonical perf entitlement tier for live legacy successor provisioning', async () => {
+    const { env, provision } = makeEnv();
+    mockGetWorkerDb.mockReturnValue(createWorkerDb());
+    mockResolveProvisionEntitlementWithFallback.mockResolvedValueOnce({
+      mode: 'rpc',
+      priceVersion: '2026-03-19',
+      selfServiceInstanceType: 'perf-1-3',
+    });
+    mockBootstrapProvisionedSubscriptionWithFallback.mockResolvedValueOnce({ mode: 'rpc' });
+
+    const response = await platform.request(
+      '/provision',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          provider: 'fly',
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(201);
+    expect(provision).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ instanceType: 'perf-1-3' }),
+      expect.anything()
+    );
+    expect(mockBootstrapProvisionedSubscriptionWithFallback).toHaveBeenCalledOnce();
+    expect(
+      JSON.stringify(mockBootstrapProvisionedSubscriptionWithFallback.mock.calls[0]?.[0])
+    ).toContain('"expectedPriceVersion":"2026-03-19"');
+  });
+
+  it('rejects legacy fresh self-service provisioning above the billing entitlement cap', async () => {
+    const { env, provision } = makeEnv();
+    mockGetWorkerDb.mockReturnValue(createWorkerDb());
+    mockResolveProvisionEntitlementWithFallback.mockResolvedValue({
+      mode: 'rpc',
+      priceVersion: '2026-03-19',
+      selfServiceInstanceType: 'perf-1-3',
+    });
+    mockBootstrapProvisionedSubscriptionWithFallback.mockResolvedValue({ mode: 'rpc' });
+
+    for (const instanceType of ['perf-4-8', 'perf-4-16']) {
+      const response = await platform.request(
+        '/provision',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            userId: 'user-1',
+            provider: 'fly',
+            instanceType,
+          }),
+        },
+        env
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: 'instanceType exceeds self-service entitlement',
+      });
+    }
+
+    expect(provision).not.toHaveBeenCalled();
+    expect(mockBootstrapProvisionedSubscriptionWithFallback).not.toHaveBeenCalled();
+  });
+
+  it('fails closed before provisioning when entitlement or price version cannot be resolved', async () => {
+    const scenarios = [
+      {
+        name: 'entitlement lookup failure',
+        arrange: () =>
+          mockResolveProvisionEntitlementWithFallback.mockRejectedValueOnce(
+            new Error('billing down')
+          ),
+      },
+      {
+        name: 'unknown price version',
+        arrange: () =>
+          mockResolveProvisionEntitlementWithFallback.mockResolvedValueOnce({
+            mode: 'rpc',
+            priceVersion: '2099-01-01',
+            selfServiceInstanceType: 'perf-1-3',
+          }),
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      vi.clearAllMocks();
+      const { env, provision } = makeEnv();
+      mockGetWorkerDb.mockReturnValue(createWorkerDb());
+      mockBootstrapProvisionedSubscriptionWithFallback.mockResolvedValue({ mode: 'rpc' });
+      scenario.arrange();
+
+      const response = await platform.request(
+        '/provision',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            userId: 'user-1',
+            provider: 'fly',
+          }),
+        },
+        env
+      );
+
+      expect(response.status, scenario.name).toBe(500);
+      await expect(response.json()).resolves.toEqual({ error: 'provision failed' });
+      expect(provision, scenario.name).not.toHaveBeenCalled();
+      expect(
+        mockBootstrapProvisionedSubscriptionWithFallback,
+        scenario.name
+      ).not.toHaveBeenCalled();
+    }
+  });
+
+  it('fails closed before provisioning when entitlement tier disagrees with the price-version catalog', async () => {
+    const { env, provision } = makeEnv();
+    mockGetWorkerDb.mockReturnValue(createWorkerDb());
+    mockResolveProvisionEntitlementWithFallback.mockResolvedValueOnce({
+      mode: 'rpc',
+      priceVersion: '2026-03-19',
+      selfServiceInstanceType: 'shared-2-3',
+    });
+    mockBootstrapProvisionedSubscriptionWithFallback.mockResolvedValue({ mode: 'rpc' });
+
+    const response = await platform.request(
+      '/provision',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          provider: 'fly',
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: 'provision failed' });
+    expect(provision).not.toHaveBeenCalled();
+    expect(mockBootstrapProvisionedSubscriptionWithFallback).not.toHaveBeenCalled();
   });
 
   it('passes instanceType=undefined to the DO on RE-PROVISION (instanceId provided, no tier)', async () => {

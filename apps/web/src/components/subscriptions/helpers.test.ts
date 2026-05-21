@@ -1,10 +1,22 @@
 import {
+  formatKiloclawPrice,
   getKiloclawDisplayStatus,
   getKiloclawStatusNote,
   isKiloclawPendingSettlement,
 } from './helpers';
 
 describe('KiloClaw subscription helpers', () => {
+  it('formats KiloClaw prices from subscription row price versions', () => {
+    expect(formatKiloclawPrice({ plan: 'standard', priceVersion: '2026-03-19' })).toBe('$9/month');
+    expect(formatKiloclawPrice({ plan: 'commit', priceVersion: '2026-03-19' })).toBe(
+      '$48/6-month commit'
+    );
+    expect(formatKiloclawPrice({ plan: 'standard', priceVersion: '2026-05-10' })).toBe('$55/month');
+    expect(formatKiloclawPrice({ plan: 'commit', priceVersion: '2026-05-10' })).toBe(
+      '$306/6-month commit'
+    );
+  });
+
   it('marks pending settlement rows explicitly for display', () => {
     expect(
       getKiloclawDisplayStatus({

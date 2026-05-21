@@ -38,6 +38,19 @@ import type { MCPSecretValue } from './router/schemas.js';
 import type { SessionProfileBundle } from './session-profile.js';
 import { readProfileBundle } from './session-profile.js';
 import { destroySandboxAfterInternalServerError } from './sandbox-recovery.js';
+import {
+  bringUpDevContainer,
+  buildRestoreCommand,
+  KILO_AGENT_SESSION_LABEL,
+  KILO_CLI_VERSION,
+  type DevContainerHandle,
+} from './kilo/devcontainer.js';
+import {
+  buildKiloSessionXdgEnv,
+  dockerSocketEnv,
+  resolveDockerSocketPath,
+} from './kilo/sandbox-runtime.js';
+import { shellQuote, validShellEnvEntries } from './kilo/utils.js';
 
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
 const SANDBOX_RETRY_DEFAULTS = {
@@ -57,18 +70,71 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'pwd',
   'find',
   'grep',
+  'wc',
+  'sort',
+  'uniq',
+  'cut',
+  'tr',
+  'nl',
+  'jq',
   'git',
   'gh',
   'whoami',
   'date',
+  'stat',
+  'file',
   'head',
   'tail',
+  'sed',
   'cd',
   'mkdir',
   'touch',
 ];
 
 const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
+  'bash',
+  'sh',
+  'zsh',
+  'fish',
+  'sed -i',
+  'sed -*i',
+  'sed --in-place',
+  'sed --in-place*',
+  'sed * -i',
+  'sed * -*i',
+  'sed * --in-place',
+  'sed * --in-place*',
+  'sort -o',
+  'sort -o*',
+  'sort -*o',
+  'sort --output',
+  'sort --output*',
+  'sort * -o',
+  'sort * -o*',
+  'sort * -*o',
+  'sort * --output',
+  'sort * --output*',
+  'uniq * *',
+  'python',
+  'python3',
+  'node',
+  'irb',
+  'php -a',
+  'rails console',
+  'vi',
+  'vim',
+  'nvim',
+  'nano',
+  'emacs',
+  'less',
+  'more',
+  'top',
+  'htop',
+  'watch',
+  'tail -f',
+  'ssh',
+  'tmux',
+  'screen',
   'git add',
   'git commit',
   'git push',
@@ -88,6 +154,9 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'gh pr create',
   'gh pr close',
   'gh pr edit',
+  'gh pr checkout',
+  'gh auth login',
+  'gh auth refresh',
   'gh issue',
   'gh repo create',
   'gh repo fork',
@@ -129,6 +198,19 @@ class SessionSnapshotRestoreError extends Error {
 
 export function determineBranchName(sessionId: string, upstreamBranch?: string): string {
   return upstreamBranch ?? `session/${sessionId}`;
+}
+
+export function backendUrlForSandbox(workerBackendUrl: string): string {
+  try {
+    const url = new URL(workerBackendUrl);
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      url.hostname = 'host.docker.internal';
+      return url.toString().replace(/\/$/, '');
+    }
+  } catch {
+    // Non-URL value: leave untouched.
+  }
+  return workerBackendUrl;
 }
 
 type SandboxRetryConfig = {
@@ -284,58 +366,130 @@ export class InvalidSessionMetadataError extends Error {
  * @param setupCommands - Array of setup commands to execute
  * @param failFast - Whether to stop on first failure (default: false)
  */
+type RunSetupCommandsOptions = {
+  devcontainer?: DevContainerHandle;
+  dockerEnv?: Record<string, string>;
+  runtimeEnv?: Record<string, string | undefined>;
+};
+
+function buildSetupEnvFileContent(env: Record<string, string | undefined>): string {
+  return `${validShellEnvEntries(env)
+    .map(([key, value]) => `export ${key}=${shellQuote(value)}`)
+    .join('\n')}\n`;
+}
+
+function buildDevContainerSetupCommand(
+  devcontainer: DevContainerHandle,
+  command: string,
+  envFilePath: string | undefined
+): string {
+  const workspaceCommand = `cd ${shellQuote(devcontainer.innerWorkspaceFolder)} && ${command}`;
+  const innerCommand = envFilePath
+    ? `. ${shellQuote(envFilePath)} && ${workspaceCommand}`
+    : workspaceCommand;
+  return [
+    'devcontainer exec',
+    `--workspace-folder ${shellQuote(devcontainer.workspacePath)}`,
+    `--config ${shellQuote(devcontainer.overrideConfigPath)}`,
+    `--id-label ${shellQuote(`${KILO_AGENT_SESSION_LABEL}=${devcontainer.agentSessionId}`)}`,
+    '--',
+    'sh -c',
+    shellQuote(innerCommand),
+  ].join(' ');
+}
+
 export async function runSetupCommands(
   session: ExecutionSession,
   context: SessionContext,
   setupCommands: string[],
-  failFast: boolean = false
+  failFast: boolean = false,
+  options: RunSetupCommandsOptions = {}
 ): Promise<void> {
   if (!setupCommands || setupCommands.length === 0) {
     return;
   }
 
+  const dockerEnv = options.devcontainer
+    ? (options.dockerEnv ?? dockerSocketEnv(await resolveDockerSocketPath(session)))
+    : undefined;
+  const setupEnvFilePath =
+    options.devcontainer && options.runtimeEnv
+      ? `${context.sessionHome}/tmp/kilo-setup-env-${options.devcontainer.agentSessionId}-${Date.now()}.sh`
+      : undefined;
+
+  if (setupEnvFilePath && options.runtimeEnv) {
+    await session.writeFile(setupEnvFilePath, buildSetupEnvFileContent(options.runtimeEnv));
+  }
+
   logger.setTags({ setupCommandsCount: setupCommands.length });
   logger.info('Running setup commands');
 
-  for (const command of setupCommands) {
-    try {
-      // Run command in workspace directory
-      const result = await timedExec(session, command, 'session.runSetupCommand', {
-        timeoutMs: SETUP_COMMAND_TIMEOUT_SECONDS * 1000,
-        cwd: context.workspacePath,
-      });
+  try {
+    for (const command of setupCommands) {
+      try {
+        const setupCommand = options.devcontainer
+          ? buildDevContainerSetupCommand(options.devcontainer, command, setupEnvFilePath)
+          : command;
+        const result = await timedExec(session, setupCommand, 'session.runSetupCommand', {
+          timeoutMs: SETUP_COMMAND_TIMEOUT_SECONDS * 1000,
+          cwd: context.workspacePath,
+          env: dockerEnv,
+        });
 
-      if (result.exitCode !== 0) {
+        if (result.exitCode !== 0) {
+          logger
+            .withFields({
+              command,
+              exitCode: result.exitCode,
+              stdout: result.stdout,
+              stderr: result.stderr,
+            })
+            .warn('Setup command failed');
+
+          if (failFast) {
+            throw new SetupCommandFailedError(
+              command,
+              result.exitCode,
+              result.stderr,
+              result.stdout
+            );
+          }
+        }
+      } catch (error) {
         logger
           .withFields({
             command,
-            exitCode: result.exitCode,
-            stdout: result.stdout,
-            stderr: result.stderr,
+            error: error instanceof Error ? error.message : String(error),
           })
-          .warn('Setup command failed');
+          .error('Error executing setup command');
 
         if (failFast) {
-          throw new SetupCommandFailedError(command, result.exitCode, result.stderr, result.stdout);
+          if (error instanceof SetupCommandFailedError) {
+            throw error;
+          }
+          throw new SetupCommandFailedError(
+            command,
+            -1,
+            error instanceof Error ? error.message : String(error)
+          );
         }
       }
-    } catch (error) {
-      logger
-        .withFields({
-          command,
-          error: error instanceof Error ? error.message : String(error),
-        })
-        .error('Error executing setup command');
-
-      if (failFast) {
-        if (error instanceof SetupCommandFailedError) {
-          throw error;
-        }
-        throw new SetupCommandFailedError(
-          command,
-          -1,
-          error instanceof Error ? error.message : String(error)
+    }
+  } finally {
+    if (setupEnvFilePath) {
+      try {
+        await timedExec(
+          session,
+          `rm -f ${shellQuote(setupEnvFilePath)}`,
+          'session.runSetupCommand.cleanup'
         );
+      } catch (error) {
+        logger
+          .withFields({
+            setupEnvFilePath,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          .warn('Failed to clean up setup command env file');
       }
     }
   }
@@ -362,6 +516,43 @@ export async function writeAuthFile(
   await sandbox.writeFile(authPath, authContent);
 
   logger.info('Wrote kilo auth file for session ingest');
+}
+
+function getRestoreTokenFilePath(sessionHome: string): string {
+  return `${sessionHome}/.local/share/kilo/session-restore-token`;
+}
+
+async function writeRestoreTokenFile(
+  sandbox: SandboxInstance,
+  session: ExecutionSession,
+  sessionHome: string,
+  kilocodeToken: string
+): Promise<string> {
+  const tokenPath = getRestoreTokenFilePath(sessionHome);
+  const tokenDir = dirname(tokenPath);
+
+  await timedExec(session, `mkdir -p ${shellQuote(tokenDir)}`, 'session.restoreTokenFile.mkdir');
+  await sandbox.writeFile(tokenPath, kilocodeToken);
+  await timedExec(session, `chmod 600 ${shellQuote(tokenPath)}`, 'session.restoreTokenFile.chmod');
+
+  return tokenPath;
+}
+
+async function cleanupRestoreTokenFile(
+  session: ExecutionSession,
+  tokenPath: string,
+  sessionId: string
+): Promise<void> {
+  try {
+    await timedExec(session, `rm -f ${shellQuote(tokenPath)}`, 'session.restoreTokenFile.cleanup');
+  } catch (error) {
+    logger
+      .withFields({
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      .warn('Failed to clean up restore token file');
+  }
 }
 
 /**
@@ -513,7 +704,7 @@ export function buildAgentEntryFromRuntimeAgent(agent: RuntimeAgent): Record<str
   };
   if (config.prompt !== undefined) entry.prompt = config.prompt;
   if (config.description !== undefined) entry.description = config.description;
-  if (config.model !== undefined) entry.model = normalizeKilocodeModel(config.model);
+  if (config.model != null) entry.model = normalizeKilocodeModel(config.model);
   if (config.variant !== undefined) entry.variant = config.variant;
   if (config.temperature !== undefined) entry.temperature = config.temperature;
   if (config.top_p !== undefined) entry.top_p = config.top_p;
@@ -730,6 +921,34 @@ export class SessionService {
     };
   }
 
+  buildRuntimeEnv(opts: BuildRuntimeEnvOptions): Record<string, string> {
+    const { context, profile } = opts;
+    const { sessionId, sessionHome, workspacePath, envVars: contextEnvVars } = context;
+
+    const effectiveProfile: SessionProfileBundle | undefined =
+      profile === undefined && contextEnvVars === undefined
+        ? undefined
+        : { ...profile, envVars: profile?.envVars ?? contextEnvVars };
+
+    return this.getSaferEnvVars({
+      sessionHome,
+      sessionId,
+      workspacePath,
+      env: opts.env,
+      originalToken: opts.originalToken,
+      kilocodeModel: opts.kilocodeModel,
+      originalOrgId: opts.originalOrgId,
+      githubToken: context.githubToken,
+      githubRepo: context.githubRepo,
+      createdOnPlatform: opts.createdOnPlatform,
+      appendSystemPrompt: opts.appendSystemPrompt,
+      gitUrl: context.gitUrl,
+      gitToken: context.gitToken,
+      platform: context.platform,
+      profile: effectiveProfile,
+    });
+  }
+
   private getSaferEnvVars(opts: GetSaferEnvVarsOptions): Record<string, string> {
     const {
       sessionHome,
@@ -752,6 +971,7 @@ export class SessionService {
     const encryptedSecrets = profile?.encryptedSecrets;
     const mcpServers = profile?.mcpServers;
     const runtimeAgents = profile?.runtimeAgents;
+    const kiloCommands = profile?.kiloCommands;
 
     // Use override if available, otherwise use original values from API
     const kilocodeToken = env.KILOCODE_TOKEN_OVERRIDE ?? originalToken;
@@ -798,10 +1018,21 @@ export class SessionService {
       providerOptions.kilocodeOrganizationId = kilocodeOrganizationId;
     }
     if (env.KILO_OPENROUTER_BASE) {
-      providerOptions.baseURL = env.KILO_OPENROUTER_BASE;
+      providerOptions.baseURL = backendUrlForSandbox(env.KILO_OPENROUTER_BASE);
     }
     const isInteractive = createdOnPlatform == 'cloud-agent-web';
     const commandGuardPolicy = getCommandGuardPolicy(createdOnPlatform);
+
+    if (commandGuardPolicy) {
+      Object.assign(envVars, {
+        CI: 'true',
+        GIT_TERMINAL_PROMPT: '0',
+        GH_PROMPT_DISABLED: '1',
+        PAGER: 'cat',
+        GIT_PAGER: 'cat',
+        TERM: 'dumb',
+      });
+    }
 
     const permission: Record<string, unknown> = {
       external_directory: {
@@ -825,19 +1056,21 @@ export class SessionService {
       skill: 'allow',
       todowrite: 'allow',
       todoread: 'allow',
+      suggest: 'deny',
     };
 
     if (commandGuardPolicy) {
-      // Build bash permission rules from guard policy.
-      // Denied patterns (e.g. "git add *") are more specific than allowed patterns
-      // (e.g. "git *"); the CLI resolves overlapping globs most-specific-first,
-      // so denied sub-commands correctly override broader allows.
+      // Build bash permission rules from guard policy. Denies are inserted after
+      // allows so exact duplicates still fail closed; more-specific denied
+      // sub-commands also override broader allowed commands in the CLI matcher.
       const bashPermissions: Record<string, string> = {};
-      for (const cmd of commandGuardPolicy.denied) {
-        bashPermissions[`${cmd} *`] = 'deny';
-      }
       for (const cmd of commandGuardPolicy.allowed) {
+        bashPermissions[cmd] = 'allow';
         bashPermissions[`${cmd} *`] = 'allow';
+      }
+      for (const cmd of commandGuardPolicy.denied) {
+        bashPermissions[cmd] = 'deny';
+        bashPermissions[`${cmd} *`] = 'deny';
       }
 
       // Parity with old autoApproval config:
@@ -874,6 +1107,7 @@ export class SessionService {
         },
       },
       autoupdate: false,
+      snapshot: false,
     };
     // Decrypt each env/header envelope into its plaintext value and emit the
     // CLI-native shape the runtime consumes under `KILO_CONFIG_CONTENT.mcp`.
@@ -886,10 +1120,7 @@ export class SessionService {
       });
     }
     if (kilocodeModel && kilocodeModel.trim()) {
-      const normalizedModel = kilocodeModel.startsWith('kilo/')
-        ? kilocodeModel
-        : `kilo/${kilocodeModel}`;
-      configContent.model = normalizedModel;
+      configContent.model = normalizeKilocodeModel(kilocodeModel);
     }
     // Merge custom-prompt (appendSystemPrompt) and profile-provided runtimeAgents
     // under a single `agent` map keyed by slug. The CLI looks up the mode by
@@ -909,6 +1140,24 @@ export class SessionService {
     }
     if (Object.keys(agentConfig).length > 0) {
       configContent.agent = agentConfig;
+    }
+    if (kiloCommands && kiloCommands.length > 0) {
+      configContent.command = Object.fromEntries(
+        kiloCommands.map(cmd => [
+          cmd.name,
+          {
+            template: cmd.template,
+            ...(cmd.description && { description: cmd.description }),
+            ...(cmd.agent && { agent: cmd.agent }),
+            ...(cmd.model && { model: normalizeKilocodeModel(cmd.model) }),
+            subtask: cmd.subtask ?? false,
+          },
+        ])
+      );
+      logger.info('Kilo commands merged into KILO_CONFIG_CONTENT', {
+        kiloCommandNames: kiloCommands.map(c => c.name),
+        kiloCommandCount: kiloCommands.length,
+      });
     }
     const configJson = JSON.stringify(configContent);
     envVars.OPENCODE_CONFIG_CONTENT = configJson;
@@ -963,9 +1212,10 @@ export class SessionService {
     }
 
     if (env.KILOCODE_BACKEND_BASE_URL) {
-      envVars.KILOCODE_BACKEND_BASE_URL = env.KILOCODE_BACKEND_BASE_URL;
+      const sandboxUrl = backendUrlForSandbox(env.KILOCODE_BACKEND_BASE_URL);
+      envVars.KILOCODE_BACKEND_BASE_URL = sandboxUrl;
       // Used by kilo server to check user auth to send to ingest
-      envVars.KILO_API_URL = env.KILOCODE_BACKEND_BASE_URL;
+      envVars.KILO_API_URL = sandboxUrl;
     }
 
     if (env.KILO_SESSION_INGEST_URL) {
@@ -998,34 +1248,16 @@ export class SessionService {
       appendSystemPrompt,
       profile,
     } = opts;
-    const { sessionId, sessionHome, workspacePath, envVars: contextEnvVars } = context;
-
-    // The pre-refactor code threaded `context.envVars` into `getSaferEnvVars`
-    // (set by callers from metadata on resume, profile on prepare). Merge
-    // with the profile bundle's envVars — profile wins when both are set
-    // since the bundle is the authoritative snapshot during prepare/initiate.
-    const effectiveProfile: SessionProfileBundle | undefined =
-      profile === undefined && contextEnvVars === undefined
-        ? undefined
-        : { ...profile, envVars: profile?.envVars ?? contextEnvVars };
-
-    // Decrypt secrets and merge with env vars (just-in-time decryption)
-    const saferEnvVars = this.getSaferEnvVars({
-      sessionHome,
-      sessionId,
-      workspacePath,
+    const { sessionId, sessionHome, workspacePath } = context;
+    const saferEnvVars = this.buildRuntimeEnv({
+      context,
       env,
       originalToken,
       kilocodeModel,
       originalOrgId,
-      githubToken: context.githubToken,
-      githubRepo: context.githubRepo,
       createdOnPlatform,
       appendSystemPrompt,
-      gitUrl: context.gitUrl,
-      gitToken: context.gitToken,
-      platform: context.platform,
-      profile: effectiveProfile,
+      profile,
     });
 
     const session = await sandbox.createSession({
@@ -1139,6 +1371,15 @@ export class SessionService {
       createdOnPlatform,
       profile,
     });
+    const runtimeEnv = this.buildRuntimeEnv({
+      context,
+      env,
+      originalToken: kilocodeToken,
+      kilocodeModel,
+      originalOrgId: orgId,
+      createdOnPlatform,
+      profile,
+    });
 
     // Clone repository using appropriate method
     // Shallow clone (depth: 1) can be enabled for faster checkout and reduced disk usage
@@ -1207,6 +1448,7 @@ export class SessionService {
     return {
       context,
       session,
+      runtimeEnv,
     };
   }
 
@@ -1307,10 +1549,21 @@ export class SessionService {
       mcpServers: profile?.mcpServers,
       runtimeSkills: profile?.runtimeSkills ?? existingProfile?.runtimeSkills,
       runtimeAgents: profile?.runtimeAgents ?? existingProfile?.runtimeAgents,
+      kiloCommands: profile?.kiloCommands ?? existingProfile?.kiloCommands,
     };
 
     const session = await this.getOrCreateSession({
       sandbox,
+      context,
+      env,
+      originalToken: kilocodeToken,
+      kilocodeModel,
+      originalOrgId: orgId,
+      createdOnPlatform: options.createdOnPlatform ?? existingMetadata?.createdOnPlatform,
+      appendSystemPrompt: existingMetadata?.appendSystemPrompt,
+      profile: mergedProfile,
+    });
+    const runtimeEnv = this.buildRuntimeEnv({
       context,
       env,
       originalToken: kilocodeToken,
@@ -1398,6 +1651,7 @@ export class SessionService {
     return {
       context,
       session,
+      runtimeEnv,
     };
   }
 
@@ -1503,6 +1757,16 @@ export class SessionService {
       appendSystemPrompt: metadata?.appendSystemPrompt,
       profile: resumeProfile,
     });
+    const runtimeEnv = this.buildRuntimeEnv({
+      context,
+      env,
+      originalToken: kilocodeToken,
+      kilocodeModel,
+      originalOrgId: orgId,
+      createdOnPlatform: metadata?.createdOnPlatform,
+      appendSystemPrompt: metadata?.appendSystemPrompt,
+      profile: resumeProfile,
+    });
 
     // Check if workspace repo exists - if not, we may need to reclone
     const repoCheck = await timedExec(
@@ -1514,8 +1778,9 @@ export class SessionService {
     const isColdStart = !repoExists;
 
     // Only re-run setup if we had to reclone (cold start)
+    let devcontainer: DevContainerHandle | undefined;
     if (isColdStart) {
-      await this.handleColdStartResume({
+      devcontainer = await this.handleColdStartResume({
         session,
         sessionId,
         userId,
@@ -1526,13 +1791,18 @@ export class SessionService {
         kilocodeToken,
         freshGithubToken,
         freshGitToken,
+        runtimeEnv,
         onProgress: options.onProgress,
       });
+    } else if (metadata?.upstreamBranch) {
+      await manageBranch(session, context.workspacePath, metadata.upstreamBranch, true);
     }
 
     return {
       context,
       session,
+      runtimeEnv,
+      devcontainer,
     };
   }
 
@@ -1547,6 +1817,7 @@ export class SessionService {
     kilocodeToken,
     freshGithubToken,
     freshGitToken,
+    runtimeEnv,
     onProgress,
   }: {
     session: ExecutionSession;
@@ -1559,8 +1830,9 @@ export class SessionService {
     kilocodeToken: string;
     freshGithubToken?: string;
     freshGitToken?: string;
+    runtimeEnv: Record<string, string>;
     onProgress?: (step: string, message: string) => void;
-  }): Promise<void> {
+  }): Promise<DevContainerHandle | undefined> {
     if (!metadata) {
       throw new Error(
         `Session ${sessionId} workspace is missing and metadata could not be retrieved. Please re-initiate the session.`
@@ -1577,6 +1849,7 @@ export class SessionService {
     // workspace directory. Without this, `.git` survives and the next retry
     // sees `isColdStart = false`, skipping the full restore flow — leaving
     // the session in a broken half-initialized state.
+    let devContainerHandle: DevContainerHandle | undefined;
     try {
       // Clone first so .git exists when `kilo import` runs — the CLI derives
       // the project ID from the repo's root commit hash; without a repo the
@@ -1596,19 +1869,57 @@ export class SessionService {
       await writeAuthFile(sandbox, context.sessionHome, kilocodeToken);
       await writeGlobalRules(sandbox, context.sessionHome, sessionId);
 
+      let dockerEnv: Record<string, string> | undefined;
+      if (metadata.devcontainer) {
+        dockerEnv = dockerSocketEnv(await resolveDockerSocketPath(session));
+        devContainerHandle = await bringUpDevContainer(session, {
+          workspacePath: metadata.devcontainer.workspacePath,
+          sessionHome: context.sessionHome,
+          agentSessionId: sessionId,
+          wrapperPort: metadata.devcontainer.wrapperPort,
+          kiloCliVersion: KILO_CLI_VERSION,
+          configPath: metadata.devcontainer.configPath,
+          onProgress: message => onProgress?.('devcontainer_setup', message),
+        });
+      }
+
       // Single restore script handles download, import, and diff application inside
       // the sandbox — the snapshot never enters worker memory.
       onProgress?.('kilo_session', 'Restoring session…');
       logger.info('Starting cold-start session restore');
 
-      const escapedId = metadata.kiloSessionId.replaceAll("'", "'\\''");
-      const escapedWorkspace = context.workspacePath.replaceAll("'", "'\\''");
-      const restoreResult = await timedExec(
-        session,
-        `bun /usr/local/bin/kilo-restore-session.js '${escapedId}' '${escapedWorkspace}'`,
-        'session.coldStart.restore',
-        { timeoutMs: GIT_COMMAND_TIMEOUT_MS, cwd: dirname(context.workspacePath) }
-      );
+      const restoreTokenFilePath = devContainerHandle
+        ? await writeRestoreTokenFile(sandbox, session, context.sessionHome, kilocodeToken)
+        : undefined;
+      const restoreCommand = buildRestoreCommand({
+        kiloSessionId: metadata.kiloSessionId,
+        runtimeWorkspacePath: devContainerHandle?.innerWorkspaceFolder ?? context.workspacePath,
+        runtimeEnv: devContainerHandle
+          ? {
+              KILOCODE_TOKEN_FILE: restoreTokenFilePath,
+              KILO_SESSION_INGEST_URL: env.KILO_SESSION_INGEST_URL,
+              ...buildKiloSessionXdgEnv(context.sessionHome),
+              ...(env.KILOCODE_BACKEND_BASE_URL && {
+                KILOCODE_BACKEND_BASE_URL: env.KILOCODE_BACKEND_BASE_URL,
+                KILO_API_URL: env.KILOCODE_BACKEND_BASE_URL,
+              }),
+            }
+          : undefined,
+        devContainer: devContainerHandle,
+      });
+      const restoreResult = await (async () => {
+        try {
+          return await timedExec(session, restoreCommand, 'session.coldStart.restore', {
+            timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+            cwd: dirname(context.workspacePath),
+            env: devContainerHandle ? dockerEnv : undefined,
+          });
+        } finally {
+          if (restoreTokenFilePath) {
+            await cleanupRestoreTokenFile(session, restoreTokenFilePath, sessionId);
+          }
+        }
+      })();
 
       if (restoreResult.exitCode !== 0) {
         logger
@@ -1675,12 +1986,28 @@ export class SessionService {
       if (coldStartSetupCommands && coldStartSetupCommands.length > 0) {
         onProgress?.('setup_commands', 'Running setup commands…');
         logger.info('Re-running setup commands after fresh clone');
-        await runSetupCommands(session, context, coldStartSetupCommands, false); // lenient
+        await runSetupCommands(session, context, coldStartSetupCommands, false, {
+          devcontainer: devContainerHandle,
+          dockerEnv,
+          runtimeEnv,
+        }); // lenient
       }
 
       // Wrapper will be (re)started by the orchestrator after we return
       onProgress?.('kilo_server', 'Starting Kilo…');
+      return devContainerHandle;
     } catch (error) {
+      if (devContainerHandle) {
+        await devContainerHandle.teardown().catch(teardownError => {
+          logger
+            .withFields({
+              sessionId,
+              error: teardownError instanceof Error ? teardownError.message : String(teardownError),
+            })
+            .warn('Failed to tear down devcontainer after cold-start restore failure');
+        });
+      }
+
       const sandboxDestroyed = await destroySandboxAfterInternalServerError(
         {
           sandbox,
@@ -2133,6 +2460,8 @@ function getGitAuthorEnv(
 export interface PreparedSession {
   context: SessionContext;
   session: Awaited<ReturnType<SessionService['getOrCreateSession']>>;
+  runtimeEnv: Record<string, string>;
+  devcontainer?: DevContainerHandle;
 }
 
 /**
@@ -2153,6 +2482,8 @@ export type GetOrCreateSessionOptions = {
   appendSystemPrompt?: string;
   profile?: SessionProfileBundle;
 };
+
+export type BuildRuntimeEnvOptions = Omit<GetOrCreateSessionOptions, 'sandbox'>;
 
 /**
  * Options for the private `getSaferEnvVars` helper. Kept as a named type so

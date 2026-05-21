@@ -72,7 +72,7 @@ case "$OPENCLAW_TARBALL" in
     ;;
 esac
 
-for path in "$DOCKERFILE" .dockerignore controller container plugins/kiloclaw-customizer plugins/kilo-chat plugins/kiloclaw-morning-briefing skills \
+for path in "$DOCKERFILE" .dockerignore ../../pnpm-workspace.yaml ../../pnpm-lock.yaml ../../patches controller container plugins/kiloclaw-customizer plugins/kilo-chat plugins/kiloclaw-morning-briefing skills \
             openclaw-pairing-list.js openclaw-device-pairing-list.js; do
   if [ ! -e "$path" ]; then
     echo "Required image hash path not found: $path" >&2
@@ -86,7 +86,7 @@ fi
 
 list_image_inputs() {
   {
-    find "$DOCKERFILE" .dockerignore controller container plugins/kiloclaw-customizer plugins/kilo-chat plugins/kiloclaw-morning-briefing skills \
+    find "$DOCKERFILE" .dockerignore ../../pnpm-workspace.yaml ../../pnpm-lock.yaml ../../patches controller container plugins/kiloclaw-customizer plugins/kilo-chat plugins/kiloclaw-morning-briefing skills \
          openclaw-pairing-list.js openclaw-device-pairing-list.js \
       \( -type d \( -name node_modules -o -path 'plugins/*/dist' \) -prune \) -o \
       -type f -print

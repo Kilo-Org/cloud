@@ -17,8 +17,9 @@ import { TodoReadToolCard } from './TodoReadToolCard';
 import { TodoWriteToolCard } from './TodoWriteToolCard';
 import { QuestionToolStatus } from './QuestionToolStatus';
 import { SuggestToolCard } from './SuggestToolCard';
+import { SkillToolCard } from './SkillToolCard';
 import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
-import type { RenderPartFn } from './ChildSessionSection';
+import type { OpenChildSession, RenderPartFn } from './ChildSessionSection';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
@@ -39,14 +40,15 @@ import {
 // Types
 // ============================================================================
 
-export interface PartRendererProps {
+export type PartRendererProps = {
   part: Part;
   isStreaming?: boolean;
   /** Messages for child sessions (task tools) - keyed by session ID */
   childSessionMessages?: Map<string, StoredMessage[]>;
   /** Function to get messages for a child session ID (for nested sessions) */
   getChildMessages?: (sessionId: string) => StoredMessage[];
-}
+  onOpenChildSession?: OpenChildSession;
+};
 
 // ============================================================================
 // Shared Components
@@ -117,6 +119,7 @@ function hasRequiredInput(part: Extract<Part, { type: 'tool' }>): boolean {
     case 'todowrite':
     case 'question':
     case 'suggest':
+    case 'skill':
       // These tools can render without specific input or handle empty arrays gracefully
       return true;
     default:
@@ -140,10 +143,6 @@ function StreamingToolPlaceholder({ toolName }: { toolName: string }) {
   );
 }
 
-/**
- * Adapter that delegates to the exported PartRenderer component,
- * used as a callback prop in ChildSessionSection to break the circular dependency.
- */
 const renderPartFn: RenderPartFn = props => <PartRenderer {...props} />;
 
 /**
@@ -155,10 +154,12 @@ function ToolPartRenderer({
   part,
   childSessionMessages,
   getChildMessages,
+  onOpenChildSession,
 }: {
   part: Extract<Part, { type: 'tool' }>;
   childSessionMessages?: Map<string, StoredMessage[]>;
   getChildMessages?: (sessionId: string) => StoredMessage[];
+  onOpenChildSession?: OpenChildSession;
 }) {
   // plan_enter / plan_exit are internal mode-switching tools with no user-visible output
   if (part.tool === 'plan_exit' || part.tool === 'plan_enter') {
@@ -184,6 +185,7 @@ function ToolPartRenderer({
         childMessages={childMessages}
         getChildMessages={getChildMessages}
         renderPart={renderPartFn}
+        onOpenChildSession={onOpenChildSession}
       />
     );
   }
@@ -247,6 +249,11 @@ function ToolPartRenderer({
   // input stays available for the user to send messages in parallel.
   if (part.tool === 'suggest') {
     return <SuggestToolCard toolPart={part} />;
+  }
+
+  // Skill tool — show the skill name being loaded
+  if (part.tool === 'skill') {
+    return <SkillToolCard toolPart={part} />;
   }
 
   return <GenericToolCard toolPart={part} />;
@@ -431,6 +438,7 @@ export function PartRenderer({
   isStreaming,
   childSessionMessages,
   getChildMessages,
+  onOpenChildSession,
 }: PartRendererProps) {
   // Text parts -> render markdown
   if (isTextPart(part)) {
@@ -449,6 +457,7 @@ export function PartRenderer({
           part={part}
           childSessionMessages={childSessionMessages}
           getChildMessages={getChildMessages}
+          onOpenChildSession={onOpenChildSession}
         />
       </MessageErrorBoundary>
     );

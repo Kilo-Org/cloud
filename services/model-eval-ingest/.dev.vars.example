@@ -1,0 +1,4 @@
+# Shared secret required for local manual sync; secrets store is unavailable in wrangler dev.
+# Copy repo-root .env.local INTERNAL_API_SECRET so apps/web and this Worker agree.
+# @from INTERNAL_API_SECRET
+INTERNAL_API_SECRET=

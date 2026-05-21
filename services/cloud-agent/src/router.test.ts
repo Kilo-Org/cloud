@@ -894,6 +894,10 @@ describe('router sessionId validation', () => {
             },
             preparedAt: 1700000000000,
             initiatedAt: 1700000001000,
+            callbackTarget: {
+              url: 'https://callback.example.com/finalize',
+              headers: { 'X-Internal-Secret': 'super-secret' },
+            },
           };
 
           mockGetMetadata.mockResolvedValue(metadata);
@@ -927,6 +931,10 @@ describe('router sessionId validation', () => {
           expect(result).not.toHaveProperty('envVars');
           expect(result).not.toHaveProperty('setupCommands');
           expect(result).not.toHaveProperty('mcpServers');
+          // callbackTarget can carry service-to-service auth headers
+          // (e.g. X-Internal-Secret) and must never be returned to the
+          // session's owning user via this surface.
+          expect(result).not.toHaveProperty('callbackTarget');
 
           // Verify DO was accessed with correct key
           expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);

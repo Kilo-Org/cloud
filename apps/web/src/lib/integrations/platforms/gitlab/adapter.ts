@@ -84,6 +84,10 @@ export function buildGitLabOAuthUrl(
   instanceUrl: string = DEFAULT_GITLAB_URL,
   customCredentials?: GitLabOAuthCredentials
 ): string {
+  if (instanceUrl !== DEFAULT_GITLAB_URL && !customCredentials) {
+    throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
+  }
+
   const clientId = customCredentials?.clientId || GITLAB_CLIENT_ID;
 
   if (!clientId || !GITLAB_REDIRECT_URI) {
@@ -113,6 +117,10 @@ export async function exchangeGitLabOAuthCode(
   instanceUrl: string = DEFAULT_GITLAB_URL,
   customCredentials?: GitLabOAuthCredentials
 ): Promise<GitLabOAuthTokens> {
+  if (instanceUrl !== DEFAULT_GITLAB_URL && !customCredentials) {
+    throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
+  }
+
   const clientId = customCredentials?.clientId || GITLAB_CLIENT_ID;
   const clientSecret = customCredentials?.clientSecret || GITLAB_CLIENT_SECRET;
 
@@ -164,6 +172,10 @@ export async function refreshGitLabOAuthToken(
   instanceUrl: string = DEFAULT_GITLAB_URL,
   customCredentials?: GitLabOAuthCredentials
 ): Promise<GitLabOAuthTokens> {
+  if (instanceUrl !== DEFAULT_GITLAB_URL && !customCredentials) {
+    throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
+  }
+
   const clientId = customCredentials?.clientId || GITLAB_CLIENT_ID;
   const clientSecret = customCredentials?.clientSecret || GITLAB_CLIENT_SECRET;
 
@@ -498,6 +510,46 @@ export async function fetchGitLabBranches(
   logExceptInTest('GitLab branches fetched', { projectId, count: branches.length });
 
   return branches;
+}
+
+/**
+ * Fetches a repository root text file at a specific ref.
+ * Returns null for missing files and throws for non-404 API failures.
+ */
+export async function fetchGitLabRootTextFileAtRef(
+  accessToken: string,
+  projectPath: string,
+  filePath: string,
+  ref: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<string | null> {
+  const encodedProjectPath = encodeURIComponent(projectPath);
+  const encodedFilePath = encodeURIComponent(filePath);
+  const baseUrl = instanceUrl.replace(/\/$/, '');
+  const response = await fetch(
+    `${baseUrl}/api/v4/projects/${encodedProjectPath}/repository/files/${encodedFilePath}/raw?ref=${encodeURIComponent(ref)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    logExceptInTest('GitLab repository file fetch failed:', {
+      status: response.status,
+      projectPath,
+      filePath,
+      ref,
+    });
+    throw new Error(`GitLab repository file fetch failed: ${response.status}`);
+  }
+
+  return await response.text();
 }
 
 /**

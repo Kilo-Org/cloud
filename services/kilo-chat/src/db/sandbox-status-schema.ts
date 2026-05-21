@@ -9,6 +9,7 @@ export const botStatus = sqliteTable(
     online: integer('online', { mode: 'boolean' }).notNull(),
     at: integer('at').notNull(),
     updatedAt: integer('updated_at').notNull(),
+    capabilities: text('capabilities'),
   },
   table => ({
     singletonCheck: check('bot_status_singleton_check', sql`${table.id} = 1`),

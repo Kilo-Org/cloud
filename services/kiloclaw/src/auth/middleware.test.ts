@@ -228,14 +228,14 @@ describe('internalApiMiddleware', () => {
     app = createTestApp();
   });
 
-  it('rejects when no KILOCLAW_INTERNAL_API_SECRET configured', async () => {
+  it('rejects when no INTERNAL_API_SECRET configured', async () => {
     const res = await app.request('/internal/status', {}, {} as never);
     expect(res.status).toBe(500);
   });
 
   it('rejects when no api key header provided', async () => {
     const res = await app.request('/internal/status', {}, {
-      KILOCLAW_INTERNAL_API_SECRET: 'secret-123',
+      INTERNAL_API_SECRET: 'secret-123',
     } as never);
     expect(res.status).toBe(403);
   });
@@ -245,8 +245,7 @@ describe('internalApiMiddleware', () => {
       '/internal/status',
       { headers: { 'x-internal-api-key': 'wrong-key' } },
       {
-        INTERNAL_API_SECRET: 'next-internal-api-secret',
-        KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
+        INTERNAL_API_SECRET: 'claw-secret',
       } as never
     );
     expect(res.status).toBe(403);
@@ -257,8 +256,7 @@ describe('internalApiMiddleware', () => {
       '/internal/status',
       { headers: { 'x-internal-api-key': 'claw-secret' } },
       {
-        INTERNAL_API_SECRET: 'next-internal-api-secret',
-        KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
+        INTERNAL_API_SECRET: 'claw-secret',
       } as never
     );
     expect(res.status).toBe(200);

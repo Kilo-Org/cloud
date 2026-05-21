@@ -51,7 +51,10 @@ export function createMayorTools(client: MayorGastownClient) {
         metadata: tool.schema
           .record(tool.schema.string(), tool.schema.unknown())
           .describe(
-            'Metadata object for additional context (e.g. { pr_url, branch, target_branch })'
+            'Metadata object for additional context (e.g. { pr_url, branch, target_branch }). ' +
+              'When the work originates from a wasteland claim, you MUST include the `wasteland` ' +
+              'origin tag returned by gt_wasteland_claim, e.g. ' +
+              '`{ wasteland: <planning.wasteland_origin> }`, so the bead links back to the wanted item.'
           )
           .optional(),
         labels: tool.schema
@@ -194,6 +197,15 @@ export function createMayorTools(client: MayorGastownClient) {
               'Default: false (dispatch immediately).'
           )
           .optional(),
+        metadata: tool.schema
+          .record(tool.schema.string(), tool.schema.unknown())
+          .describe(
+            'Metadata stamped onto BOTH the convoy bead AND every task bead. Use this to propagate ' +
+              'cross-cutting context like the `wasteland` origin tag returned by gt_wasteland_claim ' +
+              '(pass `{ wasteland: <planning.wasteland_origin> }`) so every descendant bead links back ' +
+              'to its source.'
+          )
+          .optional(),
       },
       async execute(args) {
         const result = await client.slingBatch({
@@ -203,6 +215,7 @@ export function createMayorTools(client: MayorGastownClient) {
           merge_mode: args.merge_mode,
           parallel: args.parallel,
           staged: args.staged,
+          metadata: args.metadata,
         });
 
         const beadLines = result.beads.map(
@@ -511,6 +524,130 @@ export function createMayorTools(client: MayorGastownClient) {
           mode: args.mode ?? 'wait-idle',
         });
         return `Nudge queued: ${result.nudge_id} (mode: ${args.mode ?? 'wait-idle'})`;
+      },
+    }),
+
+    // ── Wasteland tools ─────────────────────────────────────────────────
+
+    gt_wasteland_browse: tool({
+      description:
+        'Browse the wanted board of the Wasteland this town is connected to. ' +
+        'Returns a list of wanted items (tasks/bugs/features) posted to the board. ' +
+        'Optionally filter by status and limit the number of results.',
+      args: {
+        status: tool.schema
+          .enum(['open', 'claimed', 'done'])
+          .describe('Filter by item status')
+          .optional(),
+        limit: tool.schema
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .describe('Maximum number of items to return (default: 50)')
+          .optional(),
+      },
+      async execute(args) {
+        const items = await client.wastelandBrowse({
+          status: args.status,
+          limit: args.limit,
+        });
+        if (items.length === 0) {
+          const statusNote = args.status ? ` with status "${args.status}"` : '';
+          return `No wanted items found${statusNote} in this wasteland.`;
+        }
+        return JSON.stringify(items, null, 2);
+      },
+    }),
+
+    gt_wasteland_claim: tool({
+      description:
+        'Claim an open wanted item from the Wasteland this town is connected to. ' +
+        'Marks the item upstream as claimed and returns:\n' +
+        '  - `item`: the full wanted-item record (title, description, priority, type) so you can plan.\n' +
+        "  - `planning.suggested_rig_id`: the local rig that maps to this wasteland's upstream rig handle.\n" +
+        '  - `planning.wasteland_origin`: an opaque origin tag you MUST forward verbatim as `metadata.wasteland` ' +
+        'on whatever bead(s) you create next via gt_sling or gt_sling_batch. This links every descendant bead ' +
+        'back to the wanted item so progress is tracked end-to-end.\n' +
+        'After claiming, decide whether the work is one bead (gt_sling) or several (gt_sling_batch), then ' +
+        'create them with the wasteland_origin tag attached.',
+      args: {
+        item_id: tool.schema.string().describe('The ID of the wanted item to claim'),
+      },
+      async execute(args) {
+        const result = await client.wastelandClaim({
+          item_id: args.item_id,
+        });
+        const preamble = result.item
+          ? 'Claim succeeded. Plan the work using the item context below; forward `planning.wasteland_origin` verbatim as `metadata.wasteland` on every bead you create (single via gt_sling, or multi via gt_sling_batch).'
+          : 'Claim succeeded but the wanted-item details lookup failed (network or container cold start). The `planning` fields below are still valid; consider re-running gt_wasteland_browse to fetch the title/description before slinging the work.';
+        return `${preamble}\n${JSON.stringify(result, null, 2)}`;
+      },
+    }),
+
+    gt_wasteland_post: tool({
+      description:
+        'Post a new wanted item to the Wasteland this town is connected to. ' +
+        'Creates a new task, bug report, or feature request on the wanted board.',
+      args: {
+        title: tool.schema.string().describe('Short title for the wanted item'),
+        description: tool.schema.string().describe('Detailed description of what is needed'),
+        priority: tool.schema
+          .enum(['low', 'medium', 'high', 'critical'])
+          .describe('Priority level')
+          .optional(),
+        type: tool.schema
+          .enum(['feature', 'bug', 'docs', 'other'])
+          .describe('Type of wanted item')
+          .optional(),
+      },
+      async execute(args) {
+        const result = await client.wastelandPost({
+          title: args.title,
+          description: args.description,
+          priority: args.priority,
+          type: args.type,
+        });
+        if (!result.success) return `Failed to post wanted item.`;
+        return [
+          `Posted new wanted item: "${args.title}".`,
+          `Wanted item ID: ${result.wantedId}`,
+          result.pr_url ? `Pull request: ${result.pr_url}` : null,
+        ]
+          .filter(line => line !== null)
+          .join('\n');
+      },
+    }),
+
+    gt_wasteland_done: tool({
+      description:
+        'Mark a claimed wanted item as done with evidence. ' +
+        'A DoltHub pull request is opened automatically against the upstream wasteland.',
+      args: {
+        item_id: tool.schema.string().describe('The ID of the wanted item to mark done'),
+        evidence: tool.schema
+          .string()
+          .describe(
+            'A single URL pointing at the proof of completion (typically a GitHub PR ' +
+              'URL like https://github.com/owner/repo/pull/123, but a commit URL or ' +
+              'artifact URL is also fine). Pass ONLY the URL — no surrounding prose, ' +
+              'no "PR submitted:" prefix, no description. The URL is rendered as a ' +
+              'clickable link in the wasteland review UI, so any extra text breaks ' +
+              "reviewers' ability to navigate to the evidence."
+          ),
+      },
+      async execute(args) {
+        const result = await client.wastelandDone({
+          item_id: args.item_id,
+          evidence: args.evidence,
+        });
+        if (!result.success) return `Failed to mark item ${args.item_id} as done.`;
+        return [
+          `Marked item ${args.item_id} as done.`,
+          result.pr_url
+            ? `Pull request: ${result.pr_url}`
+            : 'Pull request: pending — open later from the wasteland UI.',
+        ].join('\n');
       },
     }),
 

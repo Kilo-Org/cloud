@@ -1,7 +1,11 @@
-process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
+process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID ||= 'price_legacy_standard_intro';
+process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID ||= 'price_legacy_standard';
+process.env.STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID ||= 'price_legacy_commit';
+process.env.STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID ||= 'price_current_standard';
+process.env.STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID ||= 'price_current_commit';
 
 import { and, eq } from 'drizzle-orm';
-import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import { CURRENT_KILOCLAW_PRICE_VERSION, insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
   credit_transactions,
   kiloclaw_email_log,
@@ -877,6 +881,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
         instance_id: instance.id,
         stripe_subscription_id: params.stripeSubscriptionId,
         payment_source: 'stripe',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
         plan: params.plan,
         status: params.status,
         trial_started_at:
@@ -923,6 +928,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
     await db.insert(kiloclaw_subscriptions).values({
       user_id: userId,
       instance_id: instance.id,
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
       plan: 'trial',
       status: 'trialing',
       trial_started_at: new Date().toISOString(),
@@ -947,6 +953,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -958,7 +965,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
   });
 
   test('trialing trial -> credit enrollment sends one subscription-started email and writes the log row', async () => {
-    const user = await insertTestUser({ total_microdollars_acquired: 50_000_000 });
+    const user = await insertTestUser({ total_microdollars_acquired: 60_000_000 });
     const instance = await seedCreditEnrollmentAnchor(user.id);
 
     await enrollWithCredits({
@@ -1007,6 +1014,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -1033,6 +1041,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -1059,6 +1068,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `in_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 0,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -1087,6 +1097,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_first_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date(Date.now() - 60 * 86_400_000).toISOString(),
       periodEnd: new Date(Date.now() - 30 * 86_400_000).toISOString(),
@@ -1108,6 +1119,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_second_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -1155,6 +1167,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart,
       periodEnd,
@@ -1181,6 +1194,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -1208,6 +1222,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
         stripeSubscriptionId,
         stripePaymentId: `ch_${crypto.randomUUID()}`,
         plan: 'standard',
+        priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
         amountMicrodollars: 9_000_000,
         periodStart: new Date().toISOString(),
         periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -1252,6 +1267,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -1281,6 +1297,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart,
       periodEnd,
@@ -1296,6 +1313,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart,
       periodEnd,
@@ -1324,6 +1342,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart,
       periodEnd,
@@ -1348,6 +1367,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart,
       periodEnd,
@@ -1374,6 +1394,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
@@ -1401,6 +1422,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
       stripePaymentId: `ch_${crypto.randomUUID()}`,
       plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 9_000_000,
       periodStart: new Date().toISOString(),
       periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),

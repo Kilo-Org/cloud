@@ -13,7 +13,7 @@ export function ProfileAvatarButton() {
     <Pressable
       onPress={() => {
         void Haptics.selectionAsync();
-        router.push('/(app)/profile');
+        router.navigate('/(app)/profile');
       }}
       accessibilityRole="button"
       accessibilityLabel="Open profile"

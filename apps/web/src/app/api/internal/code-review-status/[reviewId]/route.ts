@@ -13,7 +13,7 @@
  * The reviewId is passed in the URL path.
  *
  * URL: POST /api/internal/code-review-status/{reviewId}
- * Protected by internal API secret
+ * Protected by scoped callback token
  */
 
 import type { NextRequest } from 'next/server';
@@ -23,8 +23,12 @@ import {
   updateCodeReviewUsage,
   getCodeReviewById,
   getSessionUsageFromBilling,
+  updateCodeReviewAttemptForCallback,
+  getLatestCodeReviewAttempt,
+  createInfraRetryAttemptIfMissing,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
+import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import {
@@ -51,11 +55,13 @@ import {
   getStoredProjectAccessToken,
 } from '@/lib/integrations/gitlab-service';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
+import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { appendUsageFooter } from '@/lib/code-reviews/summary/usage-footer';
+import { appendReviewSummaryFooter } from '@/lib/code-reviews/summary/usage-footer';
 import { APP_URL } from '@/lib/constants';
 import type { CloudAgentCodeReview, PlatformIntegration } from '@kilocode/db/schema';
+import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import {
   CODE_REVIEW_TERMINAL_REASONS,
   type CodeReviewTerminalReason,
@@ -165,6 +171,40 @@ function isBillingCodeReviewTerminalReason(
   );
 }
 
+function isRetryableInfraFailure(
+  status: 'running' | 'completed' | 'failed' | 'cancelled',
+  terminalReason?: CodeReviewTerminalReason,
+  errorMessage?: string
+): boolean {
+  if (status !== 'failed') return false;
+  if (terminalReason === 'billing') return false;
+  if (isBillingCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
+
+  const message = errorMessage?.toLowerCase();
+  if (!message) return false;
+
+  if (message.includes('execution exceeded maximum runtime')) return false;
+  if (message.includes('cancelled') || message.includes('canceled')) return false;
+  if (message.includes('superseded')) return false;
+  if (message.includes('user interrupted')) return false;
+
+  return (
+    message.includes('container shutdown: sigterm') ||
+    message.includes('execution timeout - no heartbeat received') ||
+    ((message.includes('sandbox') ||
+      message.includes('container') ||
+      message.includes('cloudflare')) &&
+      (message.includes('http 500') ||
+        message.includes('status: 500') ||
+        message.includes('internal server error') ||
+        message.includes('internal_server_error')))
+  );
+}
+
+function isSupersededReview(review: CloudAgentCodeReview): boolean {
+  return review.terminal_reason === 'superseded';
+}
+
 const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
 
 const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
@@ -229,6 +269,14 @@ async function getReviewUsageData(reviewId: string) {
   }
 
   return { model: null, tokensIn: null, tokensOut: null };
+}
+
+function getReviewGuidanceFooterData(review: CloudAgentCodeReview) {
+  return {
+    used: review.repository_review_instructions_used,
+    ref: review.repository_review_instructions_ref,
+    truncated: review.repository_review_instructions_truncated,
+  };
 }
 
 /**
@@ -452,16 +500,26 @@ export async function POST(
   { params }: { params: Promise<{ reviewId: string }> }
 ) {
   try {
-    // Validate internal API secret
-    const secret = req.headers.get('X-Internal-Secret');
-    if (!INTERNAL_API_SECRET || secret !== INTERNAL_API_SECRET) {
+    const { reviewId } = await params;
+    const callbackAttemptId = req.nextUrl.searchParams.get('attemptId') ?? '';
+    const callbackToken = req.headers.get('X-Callback-Token');
+    const validCallbackToken =
+      !!CALLBACK_TOKEN_SECRET &&
+      (await verifyCallbackToken({
+        token: callbackToken,
+        secret: CALLBACK_TOKEN_SECRET,
+        scope: 'code-review-status-callback',
+        resourceParts: [reviewId, callbackAttemptId],
+      }));
+    if (!validCallbackToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { reviewId } = await params;
     const rawPayload: StatusUpdatePayload = await req.json();
+    const attemptId = callbackAttemptId || undefined;
     const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult } =
       normalizePayload(rawPayload);
+    const executionId = 'executionId' in rawPayload ? rawPayload.executionId : undefined;
 
     // Validate payload
     if (!status) {
@@ -478,6 +536,7 @@ export async function POST(
 
     logExceptInTest('[code-review-status] Received status update', {
       reviewId,
+      attemptId,
       sessionId,
       cliSessionId,
       status,
@@ -493,12 +552,43 @@ export async function POST(
       return NextResponse.json({ error: 'Review not found' }, { status: 404 });
     }
 
+    const attempt = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      attemptId: attemptId ?? undefined,
+      status,
+      sessionId,
+      cliSessionId,
+      executionId,
+      errorMessage,
+      terminalReason,
+      startedAt: status === 'running' ? new Date() : undefined,
+      completedAt:
+        status === 'completed' || status === 'failed' || status === 'cancelled'
+          ? new Date()
+          : undefined,
+    });
+
+    const latestAttempt = await getLatestCodeReviewAttempt(reviewId);
+    const isStaleAttempt = !!latestAttempt && attempt.id !== latestAttempt.id;
+    if (isStaleAttempt) {
+      logExceptInTest('[code-review-status] Stale callback updated old attempt, skipping parent', {
+        reviewId,
+        attemptId: attempt.id,
+        latestAttemptId: latestAttempt?.id,
+        requestedStatus: status,
+      });
+      return NextResponse.json({
+        success: true,
+        message: 'Stale callback from superseded attempt',
+      });
+    }
+
     // Determine valid transitions based on incoming status
     const isTerminalState =
       review.status === 'completed' || review.status === 'failed' || review.status === 'cancelled';
 
     if (isTerminalState) {
-      // Already in terminal state - skip update
+      // Already in terminal state - skip parent update, but attempt history above is still recorded.
       logExceptInTest('[code-review-status] Review already in terminal state, skipping update', {
         reviewId,
         currentStatus: review.status,
@@ -518,7 +608,14 @@ export async function POST(
     // may arrive and corrupt the new review's state.  If the review already
     // has a session_id and the callback carries a different sessionId, the
     // callback belongs to a previous (superseded) session — ignore it.
-    if (sessionId && review.session_id && sessionId !== review.session_id) {
+    const updatesLatestAttemptSession =
+      sessionId && latestAttempt?.id === attempt.id && attempt.session_id === sessionId;
+    if (
+      sessionId &&
+      review.session_id &&
+      sessionId !== review.session_id &&
+      !updatesLatestAttemptSession
+    ) {
       logExceptInTest(
         '[code-review-status] Stale callback from superseded session, skipping update',
         {
@@ -532,6 +629,105 @@ export async function POST(
         success: true,
         message: 'Stale callback from superseded session',
       });
+    }
+
+    if (isRetryableInfraFailure(status, terminalReason, errorMessage)) {
+      const retryableReview = await getCodeReviewById(reviewId);
+      if (!retryableReview || isSupersededReview(retryableReview)) {
+        logExceptInTest('[code-review-status] Skipping infra retry for superseded review', {
+          reviewId,
+          status: retryableReview?.status,
+          terminalReason: retryableReview?.terminal_reason,
+        });
+        return NextResponse.json({ success: true, retried: false, skipped: 'superseded' });
+      }
+
+      const retryAttemptResult = await createInfraRetryAttemptIfMissing({
+        codeReviewId: reviewId,
+        retryOfAttemptId: attempt.id,
+      });
+
+      if (retryAttemptResult.outcome === 'created') {
+        const retryAttempt = retryAttemptResult.attempt;
+
+        try {
+          const latestReview = await getCodeReviewById(reviewId);
+          if (!latestReview || isSupersededReview(latestReview)) {
+            await updateCodeReviewAttemptForCallback({
+              codeReviewId: reviewId,
+              attemptId: retryAttempt.id,
+              status: 'cancelled',
+              errorMessage: 'Superseded by new push',
+              terminalReason: 'superseded',
+              completedAt: new Date(),
+            });
+            logExceptInTest('[code-review-status] Skipping fresh retry for superseded review', {
+              reviewId,
+              retryAttemptId: retryAttempt.id,
+              status: latestReview?.status,
+              terminalReason: latestReview?.terminal_reason,
+            });
+            return NextResponse.json({ success: true, retried: false, skipped: 'superseded' });
+          }
+
+          const retryResult = await codeReviewWorkerClient.retryReviewFresh(reviewId, {
+            sessionId,
+            reason: errorMessage ?? terminalReason ?? 'retryable infra failure',
+            failedAttemptId: attempt.id,
+            retryAttemptId: retryAttempt.id,
+          });
+
+          if (retryResult.success) {
+            logExceptInTest('[code-review-status] Started fresh retry after infra failure', {
+              reviewId,
+              failedAttemptId: attempt.id,
+              retryAttemptId: retryAttempt.id,
+              sessionId,
+            });
+            return NextResponse.json({ success: true, retried: true });
+          }
+
+          await updateCodeReviewAttemptForCallback({
+            codeReviewId: reviewId,
+            attemptId: retryAttempt.id,
+            status: 'failed',
+            errorMessage: 'Worker declined fresh retry after infra failure',
+            terminalReason: 'sandbox_error',
+            completedAt: new Date(),
+          });
+        } catch (retryError) {
+          await updateCodeReviewAttemptForCallback({
+            codeReviewId: reviewId,
+            attemptId: retryAttempt.id,
+            status: 'failed',
+            errorMessage: retryError instanceof Error ? retryError.message : String(retryError),
+            terminalReason: 'sandbox_error',
+            completedAt: new Date(),
+          });
+          logExceptInTest('[code-review-status] Fresh retry startup failed, falling through', {
+            reviewId,
+            failedAttemptId: attempt.id,
+            retryAttemptId: retryAttempt.id,
+            error: retryError instanceof Error ? retryError.message : String(retryError),
+          });
+        }
+      } else if (retryAttemptResult.outcome === 'existing-for-attempt') {
+        logExceptInTest('[code-review-status] Fresh retry already queued for failed attempt', {
+          reviewId,
+          failedAttemptId: attempt.id,
+          retryAttemptId: retryAttemptResult.attempt.id,
+          sessionId,
+        });
+        return NextResponse.json({ success: true, retried: true });
+      } else if (retryAttemptResult.outcome === 'skipped-inactive') {
+        logExceptInTest('[code-review-status] Skipping infra retry for inactive review', {
+          reviewId,
+          failedAttemptId: attempt.id,
+          reviewStatus: retryAttemptResult.reviewStatus,
+          terminalReason: retryAttemptResult.terminalReason,
+        });
+        return NextResponse.json({ success: true, retried: false, skipped: 'inactive' });
+      }
     }
 
     // Valid transitions:
@@ -593,7 +789,12 @@ export async function POST(
       cliSessionId,
       errorMessage,
       terminalReason,
-      startedAt: status === 'running' ? new Date() : undefined,
+      startedAt:
+        status === 'running'
+          ? review.started_at
+            ? new Date(review.started_at)
+            : new Date()
+          : undefined,
       completedAt:
         status === 'completed' || status === 'failed' || status === 'cancelled'
           ? new Date()
@@ -610,7 +811,7 @@ export async function POST(
     // Only trigger dispatch for terminal states (completed/failed/cancelled)
     // This frees up a slot for the next pending review
     if (status === 'completed' || status === 'failed' || status === 'cancelled') {
-      let owner;
+      let owner: Parameters<typeof tryDispatchPendingReviews>[0] | undefined;
       if (review.owned_by_organization_id) {
         const botUserId = await getBotUserId(review.owned_by_organization_id, 'code-review');
         if (botUserId) {
@@ -668,6 +869,7 @@ export async function POST(
 
             if (platform === 'github' && integration.platform_installation_id) {
               const [repoOwner, repoName] = review.repo_full_name.split('/');
+              const appType: GitHubAppType = integration.github_app_type || 'standard';
 
               // Reaction
               const reaction = status === 'completed' ? 'hooray' : 'confused';
@@ -676,7 +878,8 @@ export async function POST(
                 repoOwner,
                 repoName,
                 review.pr_number,
-                reaction
+                reaction,
+                appType
               );
               logExceptInTest(
                 `[code-review-status] Added ${reaction} reaction to ${review.repo_full_name}#${review.pr_number}`
@@ -692,7 +895,8 @@ export async function POST(
                   repoOwner,
                   repoName,
                   review.pr_number,
-                  BILLING_NOTICE_MARKER
+                  BILLING_NOTICE_MARKER,
+                  appType
                 );
                 if (!alreadyPosted) {
                   await createPRComment(
@@ -700,7 +904,8 @@ export async function POST(
                     repoOwner,
                     repoName,
                     review.pr_number,
-                    BILLING_NOTICE_BODY
+                    BILLING_NOTICE_BODY,
+                    appType
                   );
                   logExceptInTest(
                     `[code-review-status] Posted billing notice on ${review.repo_full_name}#${review.pr_number}`
@@ -711,30 +916,35 @@ export async function POST(
               // Usage footer (completed only)
               if (status === 'completed') {
                 const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
+                const usage =
+                  model && tokensIn != null && tokensOut != null
+                    ? { model, tokensIn, tokensOut }
+                    : undefined;
+                const reviewGuidance = getReviewGuidanceFooterData(review);
 
-                if (model && tokensIn != null && tokensOut != null) {
+                if (usage || reviewGuidance.used) {
                   const existing = await findKiloReviewComment(
                     integration.platform_installation_id,
                     repoOwner,
                     repoName,
-                    review.pr_number
+                    review.pr_number,
+                    appType
                   );
                   if (existing) {
-                    const updatedBody = appendUsageFooter(
-                      existing.body,
-                      model,
-                      tokensIn,
-                      tokensOut
-                    );
+                    const updatedBody = appendReviewSummaryFooter(existing.body, {
+                      usage,
+                      reviewGuidance,
+                    });
                     await updateKiloReviewComment(
                       integration.platform_installation_id,
                       repoOwner,
                       repoName,
                       existing.commentId,
-                      updatedBody
+                      updatedBody,
+                      appType
                     );
                     logExceptInTest(
-                      `[code-review-status] Updated summary comment with usage footer on ${review.repo_full_name}#${review.pr_number}`
+                      `[code-review-status] Updated summary comment footer on ${review.repo_full_name}#${review.pr_number}`
                     );
                   }
                 } else {
@@ -797,8 +1007,13 @@ export async function POST(
               // Usage footer (completed only)
               if (status === 'completed') {
                 const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
+                const usage =
+                  model && tokensIn != null && tokensOut != null
+                    ? { model, tokensIn, tokensOut }
+                    : undefined;
+                const reviewGuidance = getReviewGuidanceFooterData(review);
 
-                if (model && tokensIn != null && tokensOut != null) {
+                if (usage || reviewGuidance.used) {
                   const existing = await findKiloReviewNote(
                     accessToken,
                     review.repo_full_name,
@@ -806,12 +1021,10 @@ export async function POST(
                     instanceUrl
                   );
                   if (existing) {
-                    const updatedBody = appendUsageFooter(
-                      existing.body,
-                      model,
-                      tokensIn,
-                      tokensOut
-                    );
+                    const updatedBody = appendReviewSummaryFooter(existing.body, {
+                      usage,
+                      reviewGuidance,
+                    });
                     await updateKiloReviewNote(
                       accessToken,
                       review.repo_full_name,
@@ -821,7 +1034,7 @@ export async function POST(
                       instanceUrl
                     );
                     logExceptInTest(
-                      `[code-review-status] Updated summary note with usage footer on GitLab MR ${review.repo_full_name}!${review.pr_number}`
+                      `[code-review-status] Updated summary note footer on GitLab MR ${review.repo_full_name}!${review.pr_number}`
                     );
                   }
                 } else {

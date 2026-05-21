@@ -157,6 +157,44 @@ export const mcpServerConfigNextSchema = z.discriminatedUnion('type', [
   mcpRemoteServerConfigSchema,
 ]);
 
+/**
+ * Mode field for sendMessage. Built-in enum slugs plus any custom slug —
+ * cloud-agent-next cross-validates against the session's stored runtimeAgents.
+ * The reserved slug `custom` is still rejected here (requires prepare).
+ */
+export const agentModeSendMessageSchema = z
+  .string()
+  .min(1)
+  .max(50)
+  .regex(/^[a-z][a-z0-9-]*$/, 'Mode must be a slug')
+  .refine(mode => mode !== 'custom', {
+    message: 'Custom mode requires prepareSession/updateSession, not sendMessage',
+  });
+
+/**
+ * Discriminated execution payload for follow-up messages and prepared-session
+ * initialization. Mirrors the worker's SendMessageV2Payload schema; both
+ * variants ride the same execution pipeline on the cloud-agent-next side.
+ */
+export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('prompt'),
+    prompt: z.string().min(1),
+    mode: agentModeSendMessageSchema,
+    model: z.string().min(1),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
+  }),
+  z.object({
+    type: z.literal('command'),
+    command: z.string().min(1),
+    arguments: z.string().default(''),
+  }),
+]);
+
 // Schema for preparing a session
 export const basePrepareSessionNextSchema = z
   .object({
@@ -200,7 +238,9 @@ export const basePrepareSessionNextSchema = z
     autoCommit: z.boolean().optional(),
     autoInitiate: z.boolean().optional(),
     initialMessageId: z.string().startsWith('msg_').length(30).optional(),
+    initialPayload: sendMessageNextPayloadSchema.optional(),
     images: cloudAgentImagesSchema,
+    devcontainer: z.boolean().optional(),
   })
   .refine(
     data => (data.githubRepo || data.gitlabProject) && !(data.githubRepo && data.gitlabProject),
@@ -221,31 +261,10 @@ export const baseInitiateFromPreparedSessionNextSchema = z.object({
   cloudAgentSessionId: z.string(),
 });
 
-/**
- * Mode field for sendMessage. Built-in enum slugs plus any custom slug —
- * cloud-agent-next cross-validates against the session's stored runtimeAgents.
- * The reserved slug `custom` is still rejected here (requires prepare).
- */
-export const agentModeSendMessageSchema = z
-  .string()
-  .min(1)
-  .max(50)
-  .regex(/^[a-z][a-z0-9-]*$/, 'Mode must be a slug')
-  .refine(mode => mode !== 'custom', {
-    message: 'Custom mode requires prepareSession/updateSession, not sendMessage',
-  });
-
 // Schema for sending a message (V2 - uses cloudAgentSessionId)
 export const baseSendMessageNextSchema = z.object({
   cloudAgentSessionId: z.string(),
-  prompt: z.string().min(1),
-  mode: agentModeSendMessageSchema,
-  model: z.string().min(1),
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
+  payload: sendMessageNextPayloadSchema,
   autoCommit: z.boolean().optional(),
   messageId: z.string().startsWith('msg_').length(30).optional(),
   images: cloudAgentImagesSchema,
@@ -261,6 +280,75 @@ export const baseGetSessionNextSchema = z.object({
   cloudAgentSessionId: z.string(),
 });
 
+export const cloudAgentTerminalSizeSchema = z.object({
+  cols: z.number().int().min(2).max(500),
+  rows: z.number().int().min(2).max(200),
+});
+
+export const cloudAgentTerminalPtyIdSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[a-zA-Z0-9_-]+$/);
+
+export const cloudAgentTerminalPtySchema = z.object({
+  id: cloudAgentTerminalPtyIdSchema,
+  title: z.string(),
+  command: z.string(),
+  args: z.array(z.string()),
+  cwd: z.string(),
+  status: z.enum(['running', 'exited']),
+  pid: z.number().int(),
+});
+
+export const baseCreateTerminalNextSchema = z
+  .object({
+    cloudAgentSessionId: z.string(),
+  })
+  .extend(cloudAgentTerminalSizeSchema.partial().shape)
+  .refine(data => (data.cols === undefined) === (data.rows === undefined), {
+    message: 'cols and rows must be provided together',
+  });
+
+export const baseResizeTerminalNextSchema = z
+  .object({
+    cloudAgentSessionId: z.string(),
+    ptyId: cloudAgentTerminalPtyIdSchema,
+  })
+  .extend(cloudAgentTerminalSizeSchema.shape);
+
+export const baseCloseTerminalNextSchema = z.object({
+  cloudAgentSessionId: z.string(),
+  ptyId: cloudAgentTerminalPtyIdSchema,
+});
+
+export const baseCreateTerminalNextOutputSchema = z.object({
+  pty: cloudAgentTerminalPtySchema,
+  ptyId: cloudAgentTerminalPtyIdSchema,
+  wsUrl: z.string().min(1),
+  ticket: z.string().min(1),
+  expiresAt: z.number().int().positive(),
+});
+
+export const baseRefreshTerminalTicketNextSchema = z.object({
+  cloudAgentSessionId: z.string(),
+  ptyId: cloudAgentTerminalPtyIdSchema,
+});
+
+export const baseRefreshTerminalTicketNextOutputSchema = z.object({
+  wsUrl: z.string().min(1),
+  ticket: z.string().min(1),
+  expiresAt: z.number().int().positive(),
+});
+
+export const baseResizeTerminalNextOutputSchema = z.object({
+  pty: cloudAgentTerminalPtySchema,
+});
+
+export const baseCloseTerminalNextOutputSchema = z.object({
+  success: z.boolean(),
+});
+
 // Execution status schema for getSession response
 export const executionStatusNextSchema = z
   .object({
@@ -273,12 +361,6 @@ export const executionStatusNextSchema = z
     health: z.enum(['healthy', 'stale', 'unknown']),
   })
   .nullable();
-
-// Callback target configuration
-export const callbackTargetNextSchema = z.object({
-  url: z.string().url(),
-  headers: z.record(z.string(), z.string()).optional(),
-});
 
 // Output schema for getSession (sanitized, no secrets)
 export const baseGetSessionNextOutputSchema = z.object({
@@ -323,8 +405,10 @@ export const baseGetSessionNextOutputSchema = z.object({
   preparedAt: z.number().optional(),
   initiatedAt: z.number().optional(),
 
-  // Callback configuration
-  callbackTarget: callbackTargetNextSchema.optional(),
+  // Callback configuration is intentionally NOT exposed: the stored target
+  // may carry service-to-service auth headers (e.g. X-Internal-Secret used
+  // by Worker callback ingresses), and `getSession` is reachable by the
+  // session's owning user. Mirrors cloud-agent-next/router/schemas.ts.
 
   // Initial message ID for correlation
   initialMessageId: z.string().startsWith('msg_').length(30).optional(),

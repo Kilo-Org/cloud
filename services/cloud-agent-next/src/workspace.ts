@@ -1,7 +1,10 @@
 import type { SandboxInstance, ExecutionSession, SystemSandboxUsageEvent } from './types.js';
 import type { ExecResult, ExecOptions } from '@cloudflare/sandbox';
 import { logger } from './logger.js';
-import { findWrapperForSessionInProcesses } from './kilo/wrapper-manager.js';
+import {
+  isWrapperLiveInProcessesOrContainers,
+  listWrapperContainers,
+} from './kilo/wrapper-manager.js';
 import {
   DISK_CHECK_TIMEOUT_MS,
   FAST_SANDBOX_COMMAND_TIMEOUT_MS,
@@ -13,6 +16,7 @@ import {
 } from './sandbox-timeout-logging.js';
 import { withTimeout } from '@kilocode/worker-utils';
 import { isSandboxInternalServerError } from './sandbox-recovery.js';
+import { WorkspaceFilesystemPreparationError } from './workspace-errors.js';
 
 /**
  * Minimal interface for running shell commands.
@@ -221,18 +225,20 @@ export async function setupWorkspace(
   try {
     await sandbox.mkdir(sessionWorkspacePath, { recursive: true });
   } catch (error) {
-    throw new Error(
+    throw new WorkspaceFilesystemPreparationError(
+      'workspace_directory',
       `Failed to create workspace directory: ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error }
+      error
     );
   }
 
   try {
     await sandbox.mkdir(sessionHome, { recursive: true });
   } catch (error) {
-    throw new Error(
+    throw new WorkspaceFilesystemPreparationError(
+      'session_home',
       `Failed to prepare session home: ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error }
+      error
     );
   }
 
@@ -344,6 +350,10 @@ export async function cleanupStaleWorkspaces(
     return;
   }
 
+  // Also fetch wrapper containers (devcontainer flow). Best-effort — on the
+  // non-DIND outer image `docker ps` simply returns empty, which is fine.
+  const wrapperContainers = await listWrapperContainers(sandbox);
+
   // Get current epoch once so we can age-check directories without re-shelling per candidate
   const nowSeconds = Math.floor(Date.now() / 1000);
 
@@ -392,8 +402,7 @@ export async function cleanupStaleWorkspaces(
         continue;
       }
 
-      const wrapperInfo = findWrapperForSessionInProcesses(processes, candidateSessionId);
-      if (wrapperInfo !== null) {
+      if (isWrapperLiveInProcessesOrContainers(processes, wrapperContainers, candidateSessionId)) {
         logger.withFields({ candidateSessionId }).info('Skipping session: wrapper is running');
         skipped++;
         continue;
@@ -895,6 +904,16 @@ export async function manageBranch(
   // Fetch latest refs from remote
   await gitFetch(session, workspacePath);
 
+  if (
+    isUpstreamBranch &&
+    (GITHUB_PULL_REF_PATTERN.test(branchName) || GITLAB_MR_REF_PATTERN.test(branchName))
+  ) {
+    await fetchPullRefAndCheckout(session, workspacePath, branchName);
+    logger.withTags({ pullRef: branchName }).info('Checked out pull/merge-request ref');
+    logger.debug('Successfully on branch');
+    return branchName;
+  }
+
   // Check branch existence in parallel
   const [existsLocally, existsRemotely] = await Promise.all([
     branchExistsLocally(session, workspacePath, branchName),
@@ -922,13 +941,6 @@ export async function manageBranch(
   } else {
     // Case 4: Doesn't exist anywhere
     if (isUpstreamBranch) {
-      if (GITHUB_PULL_REF_PATTERN.test(branchName) || GITLAB_MR_REF_PATTERN.test(branchName)) {
-        await fetchPullRefAndCheckout(session, workspacePath, branchName);
-        logger.withTags({ pullRef: branchName }).info('Checked out pull/merge-request ref');
-        logger.debug('Successfully on branch');
-        return branchName;
-      }
-
       throw new BranchNotFoundError(branchName);
     }
     await createNewBranch(session, workspacePath, branchName);

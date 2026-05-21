@@ -8,8 +8,10 @@ import type {
   ApiResponse,
   GroupByDimension,
   GroupedData,
+  TimeWindow,
   UsageForTableDisplay,
 } from '../../api/users/heuristic-analysis/types';
+import { DEFAULT_TIME_WINDOW, TIME_WINDOW_OPTIONS } from '../../api/users/heuristic-analysis/types';
 import { CopyJsonButton } from '@/components/admin/CopyJsonButton';
 import {
   DropdownMenu,
@@ -302,6 +304,7 @@ const createMicrodollarUsageColumns = (): TableColumn<UsageForTableDisplay>[] =>
 
 export function UserAdminHeuristicAbuse({ id }: Pick<UserDetailProps, 'id'>) {
   const [timeGrouping, setTimeGrouping] = useState<'day' | 'week' | 'month'>('day');
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>(DEFAULT_TIME_WINDOW);
   const [includeUserAgent, setIncludeUserAgent] = useState(false);
   const [includeModel, setIncludeModel] = useState(false);
   const [showRawData, setShowRawData] = useState(false);
@@ -318,11 +321,19 @@ export function UserAdminHeuristicAbuse({ id }: Pick<UserDetailProps, 'id'>) {
   };
 
   const { data, error, isLoading } = useQuery<ApiResponse>({
-    queryKey: ['admin-user-heuristic-analysis', id, buildGroupBy(), showRawData, onlyAbuse, page],
+    queryKey: [
+      'admin-user-heuristic-analysis',
+      id,
+      buildGroupBy(),
+      showRawData,
+      onlyAbuse,
+      page,
+      timeWindow,
+    ],
     queryFn: async (): Promise<ApiResponse> => {
       const endpoint = showRawData
-        ? `/admin/api/users/heuristic-analysis/raw?userId=${id}&page=${page}&limit=40&onlyAbuse=${onlyAbuse}`
-        : `/admin/api/users/heuristic-analysis/grouped?userId=${id}&groupBy=${buildGroupBy()}`;
+        ? `/admin/api/users/heuristic-analysis/raw?userId=${id}&page=${page}&limit=40&onlyAbuse=${onlyAbuse}&since=${timeWindow}`
+        : `/admin/api/users/heuristic-analysis/grouped?userId=${id}&groupBy=${buildGroupBy()}&since=${timeWindow}`;
 
       const response = await fetch(endpoint);
       if (!response.ok) {
@@ -490,12 +501,33 @@ export function UserAdminHeuristicAbuse({ id }: Pick<UserDetailProps, 'id'>) {
       </label>
     </div>
   );
+  const timeWindowControls = (
+    <label className="flex items-center gap-2">
+      <span className="text-sm font-medium">Time window:</span>
+      <select
+        value={timeWindow}
+        onChange={e => {
+          setTimeWindow(e.target.value as TimeWindow);
+          setPage(1);
+        }}
+        className="rounded border px-2 py-1 text-sm"
+      >
+        {TIME_WINDOW_OPTIONS.map(option => (
+          <option key={option} value={option}>
+            {option === 'all' ? 'All time' : `Last ${option}`}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-xl font-semibold">
         Analysis of usage patterns for potential abuse detection
       </h2>
-      <div className="flex gap-4">
+      <div className="flex items-center gap-4">
+        {timeWindowControls}
         <Button
           variant={showRawData ? 'default' : 'outline'}
           size="sm"
@@ -608,8 +640,7 @@ export function UserAdminHeuristicAbuse({ id }: Pick<UserDetailProps, 'id'>) {
             {paginatedData && (
               <div className="mt-4 flex">
                 <p className="text-muted-foreground text-sm">
-                  Showing page {paginatedData.pagination.page} of{' '}
-                  {paginatedData.pagination.totalPages}
+                  Page {paginatedData.pagination.page}
                 </p>
                 <div className="flex gap-2">
                   <Button
@@ -624,7 +655,7 @@ export function UserAdminHeuristicAbuse({ id }: Pick<UserDetailProps, 'id'>) {
                     size="sm"
                     variant="outline"
                     onClick={() => setPage(p => p + 1)}
-                    disabled={paginatedData.pagination.page >= paginatedData.pagination.totalPages}
+                    disabled={!paginatedData.pagination.hasMore}
                   >
                     Next
                   </Button>

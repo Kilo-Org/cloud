@@ -1,6 +1,11 @@
-process.env.STRIPE_KILOCLAW_COMMIT_PRICE_ID ||= 'price_commit';
-process.env.STRIPE_KILOCLAW_STANDARD_PRICE_ID ||= 'price_standard';
-process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
+process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID ||= 'price_legacy_standard_intro';
+process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID ||= 'price_legacy_standard';
+process.env.STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID ||= 'price_legacy_commit';
+process.env.STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID ||= 'price_current_standard';
+process.env.STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID ||= 'price_current_commit';
+
+const CURRENT_KILOCLAW_STANDARD_PRICE_ID =
+  process.env.STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID ?? 'price_current_standard';
 
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import type * as creditsModule from '@/lib/credits';
@@ -697,7 +702,7 @@ describe('processStripePaymentEventHook', () => {
       impact_action_id: '1000.2000.3000',
     });
 
-    const retrieveSpy = await mockChargeRetrieveForKiloClaw('price_test_kiloclaw_standard');
+    const retrieveSpy = await mockChargeRetrieveForKiloClaw(CURRENT_KILOCLAW_STANDARD_PRICE_ID);
 
     const event: Stripe.Event = {
       ...baseStripeEvent(),
@@ -735,7 +740,7 @@ describe('processStripePaymentEventHook', () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
 
-    const retrieveSpy = await mockChargeRetrieveForKiloClaw('price_test_kiloclaw_standard');
+    const retrieveSpy = await mockChargeRetrieveForKiloClaw(CURRENT_KILOCLAW_STANDARD_PRICE_ID);
 
     const event: Stripe.Event = {
       ...baseStripeEvent(),
@@ -823,7 +828,7 @@ describe('processStripePaymentEventHook', () => {
       stripe_charge_id: 'ch_legacy_missing_mapping',
     });
 
-    const retrieveSpy = await mockChargeRetrieveForKiloClaw('price_test_kiloclaw_standard');
+    const retrieveSpy = await mockChargeRetrieveForKiloClaw(CURRENT_KILOCLAW_STANDARD_PRICE_ID);
 
     const event: Stripe.Event = {
       ...baseStripeEvent(),
@@ -933,6 +938,7 @@ describe('processStripePaymentEventHook', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: testUser.id,
+        provider_subscription_id: stripeSubscriptionId,
         stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Yearly,
@@ -994,6 +1000,7 @@ describe('processStripePaymentEventHook', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: testUser.id,
+        provider_subscription_id: stripeSubscriptionId,
         stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
@@ -1048,6 +1055,7 @@ describe('processStripePaymentEventHook', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: testUser.id,
+        provider_subscription_id: stripeSubscriptionId,
         stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Monthly,
@@ -1102,6 +1110,7 @@ describe('processStripePaymentEventHook', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: testUser.id,
+        provider_subscription_id: stripeSubscriptionId,
         stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
@@ -1187,6 +1196,7 @@ describe('releaseScheduledChangeForSubscription', () => {
 
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
+      provider_subscription_id: stripeSubId,
       stripe_subscription_id: stripeSubId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,
@@ -1249,6 +1259,7 @@ describe('releaseScheduledChangeForSubscription', () => {
 
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
+      provider_subscription_id: stripeSubId,
       stripe_subscription_id: stripeSubId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,
@@ -1965,7 +1976,9 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
             data: [
               {
                 pricing: {
-                  price_details: { price: process.env.STRIPE_KILOCLAW_STANDARD_PRICE_ID },
+                  price_details: {
+                    price: process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID,
+                  },
                 },
                 period: {
                   start: Math.floor(new Date('2026-04-01T00:00:00.000Z').getTime() / 1000),

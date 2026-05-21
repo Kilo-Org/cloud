@@ -1,18 +1,21 @@
-import { Bot, Search } from 'lucide-react-native';
+import { Bot, Plus, Search } from 'lucide-react-native';
 import { useCallback, useMemo } from 'react';
-import { RefreshControl, SectionList, TextInput, View } from 'react-native';
+import { Platform, RefreshControl, SectionList, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { type SessionItem, type SessionSection } from '@/components/agents/session-list-helpers';
 import { RemoteSessionRow, StoredSessionRow } from '@/components/agents/session-row';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 
 // Height of the hidden-by-default search bar (mt-3 12 + border 1 + py-14 28 + line-20 + border 1 + mb-14 14 = 76).
 const SEARCH_BAR_HEIGHT = 76;
@@ -26,6 +29,7 @@ type AgentSessionListContentProps = {
   refetch: () => Promise<void>;
   onSessionPress: (sessionId: string, organizationId?: string | null) => void;
   onSearchChange: (text: string) => void;
+  onCreateSession: () => void;
 };
 
 export function AgentSessionListContent({
@@ -37,9 +41,15 @@ export function AgentSessionListContent({
   refetch,
   onSessionPress,
   onSearchChange,
+  onCreateSession,
 }: Readonly<AgentSessionListContentProps>) {
   const colors = useThemeColors();
+  const { bottom } = useSafeAreaInsets();
   const { deleteSession, renameSession } = useSessionMutations();
+  const emptyStateContainerStyle = useMemo(
+    () => ({ paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS) }),
+    [bottom]
+  );
 
   const listHeader = useMemo(
     () => (
@@ -59,17 +69,28 @@ export function AgentSessionListContent({
     [colors.mutedForeground, onSearchChange]
   );
 
+  const emptyStateAction = useMemo(
+    () => (
+      <Button variant="outline" onPress={onCreateSession}>
+        <Plus size={16} color={colors.foreground} />
+        <Text>New coding task</Text>
+      </Button>
+    ),
+    [colors.foreground, onCreateSession]
+  );
+
   const listEmptyComponent = useMemo(
     () => (
       <View className="items-center justify-center pt-16">
         <EmptyState
           icon={Bot}
           title="No sessions yet"
-          description="Your agent sessions will appear here"
+          description="Start a coding task from your phone. Your sessions will appear here."
+          action={emptyStateAction}
         />
       </View>
     ),
-    []
+    [emptyStateAction]
   );
 
   const organizationIdBySessionId = useMemo(
@@ -154,11 +175,16 @@ export function AgentSessionListContent({
   // list with only a ListEmptyComponent would leave the search bar fully visible.
   if (!hasAnySessions) {
     return (
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1 items-center justify-center">
+      <Animated.View
+        entering={FadeIn.duration(200)}
+        className="flex-1 items-center justify-center"
+        style={emptyStateContainerStyle}
+      >
         <EmptyState
           icon={Bot}
           title="No sessions yet"
-          description="Your agent sessions will appear here"
+          description="Start a coding task from your phone. Your sessions will appear here."
+          action={emptyStateAction}
         />
       </Animated.View>
     );

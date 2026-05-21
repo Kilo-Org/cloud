@@ -1,6 +1,7 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 
 /**
  * HMAC-signed OAuth state parameter.
@@ -31,7 +32,7 @@ import { NEXTAUTH_SECRET } from '@/lib/config.server';
 const HMAC_ALGORITHM = 'sha256';
 
 /** Maximum age of a state token in seconds (10 minutes). */
-const STATE_TTL_SECONDS = 10 * 60;
+export const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 
 /** Number of random bytes for the nonce (16 bytes = 128 bits). */
 const NONCE_BYTES = 16;
@@ -46,12 +47,19 @@ function sign(data: string): string {
  * @param owner  – owner string, e.g. `user_abc123` or `org_xyz789`
  * @param userId – the ID of the currently-authenticated user initiating the flow
  */
-export function createOAuthState(owner: string, userId: string): string {
+export function createOAuthState(owner: string, userId: string, returnTo?: string): string {
   const iat = Math.floor(Date.now() / 1000);
   const nonce = crypto.randomBytes(NONCE_BYTES).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({ owner, uid: userId, iat, nonce })).toString(
-    'base64url'
-  );
+  const safeReturnTo = returnTo ? validateReturnPath(returnTo) : null;
+  const payload = Buffer.from(
+    JSON.stringify({
+      owner,
+      uid: userId,
+      iat,
+      nonce,
+      ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
+    })
+  ).toString('base64url');
   const signature = sign(payload);
   return `${payload}.${signature}`;
 }
@@ -61,6 +69,8 @@ export type VerifiedOAuthState = {
   owner: string;
   /** The user ID that initiated the OAuth flow */
   userId: string;
+  /** Optional relative path to return to after the OAuth callback. */
+  returnTo?: string;
 };
 
 /**
@@ -80,9 +90,11 @@ export function verifyOAuthState(state: string | null): VerifiedOAuthState | nul
 
   // Constant-time comparison to prevent timing attacks
   const expectedSig = sign(payload);
+  const providedSigBytes = Buffer.from(providedSig);
+  const expectedSigBytes = Buffer.from(expectedSig);
   if (
-    providedSig.length !== expectedSig.length ||
-    !crypto.timingSafeEqual(Buffer.from(providedSig), Buffer.from(expectedSig))
+    providedSigBytes.length !== expectedSigBytes.length ||
+    !crypto.timingSafeEqual(providedSigBytes, expectedSigBytes)
   ) {
     return null;
   }
@@ -93,18 +105,21 @@ export function verifyOAuthState(state: string | null): VerifiedOAuthState | nul
       uid?: string;
       iat?: number;
       nonce?: string;
+      returnTo?: string;
     };
     if (typeof data.owner !== 'string' || typeof data.uid !== 'string') return null;
 
     // Enforce TTL: reject tokens that are too old or have no timestamp
     if (typeof data.iat !== 'number') return null;
     const ageSeconds = Math.floor(Date.now() / 1000) - data.iat;
-    if (ageSeconds < 0 || ageSeconds > STATE_TTL_SECONDS) return null;
+    if (ageSeconds < 0 || ageSeconds > OAUTH_STATE_TTL_SECONDS) return null;
 
     // Require nonce to be present (guards against old-format tokens)
     if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;
 
-    return { owner: data.owner, userId: data.uid };
+    const returnTo = typeof data.returnTo === 'string' ? validateReturnPath(data.returnTo) : null;
+
+    return { owner: data.owner, userId: data.uid, ...(returnTo ? { returnTo } : {}) };
   } catch {
     return null;
   }

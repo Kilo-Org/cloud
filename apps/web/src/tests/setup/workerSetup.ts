@@ -2,6 +2,8 @@ import { getEnvVariable } from '@/lib/dotenvx';
 import 'tsconfig-paths/register';
 
 import { cleanupDbForTest, closeAllDrizzleConnections, Pool, Client } from '@/lib/drizzle';
+import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
+import { kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
@@ -18,6 +20,12 @@ const markSetupCompleted = (workerId: string) => {
   mkdirSync(join(process.cwd(), '.tmp'), { recursive: true });
   writeFileSync(flagPath, 'completed');
 };
+
+// Existing tests use direct Drizzle inserts as fixtures. Default those fixtures to
+// legacy pricing while keeping the database column default-free, so raw SQL and
+// production writers still fail unless they set the price version explicitly.
+(kiloclaw_subscriptions.kiloclaw_price_version as { defaultFn: () => string }).defaultFn = () =>
+  LEGACY_KILOCLAW_PRICE_VERSION;
 
 beforeAll(async () => {
   const workerId = getEnvVariable('JEST_WORKER_ID');

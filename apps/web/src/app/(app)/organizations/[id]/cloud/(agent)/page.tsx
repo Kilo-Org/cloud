@@ -1,8 +1,7 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
+import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import { NewSessionPanel } from '@/components/cloud-agent-next/NewSessionPanel';
-import { CloudSessionsPage } from '@/components/cloud-agent/CloudSessionsPage';
 
 export default async function OrganizationCloudPage({
   params,
@@ -11,22 +10,23 @@ export default async function OrganizationCloudPage({
 }) {
   const { id } = await params;
   const organizationId = decodeURIComponent(id);
-  const user = await getUserFromAuthOrRedirect(
+  await getUserFromAuthOrRedirect(
     `/users/sign_in?callbackPath=${encodeURIComponent(`/organizations/${organizationId}/cloud`)}`
   );
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  const useNextAgent = isDevelopment || (await isFeatureFlagEnabled('cloud-agent-next', user.id));
+  const isDevcontainerAvailable = await isFeatureFlagEnabledOrDevelopment(
+    'cloud-agent-devcontainer',
+    organizationId
+  );
 
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization }) =>
-        useNextAgent ? (
-          <NewSessionPanel organizationId={organization.id} />
-        ) : (
-          <CloudSessionsPage organizationId={organization.id} />
-        )
-      }
+      render={({ organization }) => (
+        <NewSessionPanel
+          organizationId={organization.id}
+          isDevcontainerAvailable={isDevcontainerAvailable}
+        />
+      )}
     />
   );
 }

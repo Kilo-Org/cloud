@@ -359,9 +359,12 @@ async function sendToExistingCloudAgentNextSession(
   const client = createAppBuilderCloudAgentNextClient(authToken);
   const result = await client.sendMessage({
     cloudAgentSessionId: sessionId,
-    prompt: message + imageContext,
-    mode: 'code',
-    model,
+    payload: {
+      type: 'prompt',
+      prompt: message + imageContext,
+      mode: 'code',
+      model,
+    },
     autoCommit: true,
     gitToken,
     images,

@@ -64,7 +64,9 @@ yarn-error.log*
 
 # local plans & prototypes
 /plans/
-/.plans/
+/.plans/*
+!/.plans/experimental-models-1.md
+!/.plans/experimental-models-2.md
 /.plan/
 .kilo/plans
 .superpowers/
@@ -112,3 +114,5 @@ TMP_CI_commit_msg.txt
 run-milvus-test.sh
 
 .beads/
+.env*.local
+.tests/

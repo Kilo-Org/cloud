@@ -185,13 +185,6 @@ export const byokRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
       }
 
-      if (!BYOK_ENCRYPTION_KEY) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'BYOK encryption is not configured',
-        });
-      }
-
       // Encrypt the API key
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
 
@@ -241,13 +234,6 @@ export const byokRouter = createTRPCRouter({
       // If organizationId provided, verify owner/billing access
       if (organizationId) {
         await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
-      }
-
-      if (!BYOK_ENCRYPTION_KEY) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'BYOK encryption is not configured',
-        });
       }
 
       // Verify key exists and belongs to the organization or user

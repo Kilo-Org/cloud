@@ -5,7 +5,7 @@ import { badgeBucketForConversation } from '@kilocode/notifications';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
 import { postCommitFanOut } from '../services/messages';
-import { makeApp } from './helpers';
+import { makeApp, putUploadedAttachmentObject, unwrap } from './helpers';
 
 function getConvStub(convId: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(convId));
@@ -216,6 +216,71 @@ describe('POST /v1/messages', () => {
     expect(res.status).toBe(201);
     const body = await res.json<{ messageId: string }>();
     expect(body.messageId).toBeTruthy();
+  });
+
+  it('returns 400 when an attachment block references an unknown attachment', async () => {
+    const { conversationId, userApp } = await createConversation('msg-create-missing-att');
+
+    const res = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [
+            {
+              type: 'attachment',
+              attachmentId: ulid(),
+              mimeType: 'text/plain',
+              size: 1,
+              filename: 'missing.txt',
+            },
+          ],
+        }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: 'Attachment not found' });
+  });
+
+  it('returns 409 when an attachment upload is not complete', async () => {
+    const { conversationId, userApp, userId } = await createConversation('msg-create-no-upload');
+    const convStub = getConvStub(conversationId);
+    const attachment = await unwrap(
+      convStub.initAttachment({
+        uploaderId: userId,
+        mimeType: 'text/plain',
+        size: 1,
+        filename: 'not-uploaded.txt',
+      })
+    );
+
+    const res = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [
+            {
+              type: 'attachment',
+              attachmentId: attachment.attachmentId,
+              mimeType: 'text/plain',
+              size: 1,
+              filename: 'not-uploaded.txt',
+            },
+          ],
+        }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ error: 'Attachment upload is missing' });
   });
 });
 
@@ -520,6 +585,89 @@ describe('PATCH /v1/messages/:id', () => {
     );
 
     expect(editRes.status).toBe(403);
+  });
+
+  it('returns 409 when an edit tries to add a new attachment', async () => {
+    const { conversationId, userApp, userId } = await createConversation('msg-edit-add-att');
+    const convStub = getConvStub(conversationId);
+
+    const originalAttachment = await unwrap(
+      convStub.initAttachment({
+        uploaderId: userId,
+        mimeType: 'text/plain',
+        size: 1,
+        filename: 'original.txt',
+      })
+    );
+    await putUploadedAttachmentObject({
+      r2Key: originalAttachment.r2Key,
+      size: 1,
+      mimeType: 'text/plain',
+    });
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [
+            {
+              type: 'attachment',
+              attachmentId: originalAttachment.attachmentId,
+              mimeType: 'text/plain',
+              size: 1,
+              filename: 'original.txt',
+            },
+          ],
+        }),
+      },
+      env
+    );
+    expect(createRes.status).toBe(201);
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const addedAttachment = await unwrap(
+      convStub.initAttachment({
+        uploaderId: userId,
+        mimeType: 'text/plain',
+        size: 1,
+        filename: 'added.txt',
+      })
+    );
+
+    const editRes = await userApp.request(
+      `/v1/messages/${messageId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [
+            {
+              type: 'attachment',
+              attachmentId: originalAttachment.attachmentId,
+              mimeType: 'text/plain',
+              size: 1,
+              filename: 'original.txt',
+            },
+            {
+              type: 'attachment',
+              attachmentId: addedAttachment.attachmentId,
+              mimeType: 'text/plain',
+              size: 1,
+              filename: 'added.txt',
+            },
+          ],
+          timestamp: Date.now(),
+        }),
+      },
+      env
+    );
+
+    expect(editRes.status).toBe(409);
+    await expect(editRes.json()).resolves.toMatchObject({ error: 'Cannot add attachments' });
   });
 });
 

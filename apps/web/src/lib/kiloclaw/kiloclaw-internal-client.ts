@@ -5,7 +5,7 @@ import type {
   KiloclawStartReason,
   KiloclawStopReason,
 } from '@kilocode/worker-utils';
-import { KILOCLAW_API_URL, KILOCLAW_INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET, KILOCLAW_API_URL } from '@/lib/config.server';
 import type {
   ImageVersionEntry,
   ProvisionInput,
@@ -43,6 +43,7 @@ import type {
   MorningBriefingStatusResponse,
   MorningBriefingActionResponse,
   MorningBriefingInterestsResponse,
+  MorningBriefingUserLocationResponse,
   MorningBriefingReadResponse,
   GoogleCredentialsInput,
   GoogleCredentialsResponse,
@@ -103,11 +104,11 @@ export class KiloClawInternalClient {
     if (!KILOCLAW_API_URL) {
       throw new Error('KILOCLAW_API_URL is not configured');
     }
-    if (!KILOCLAW_INTERNAL_API_SECRET) {
-      throw new Error('KILOCLAW_INTERNAL_API_SECRET is not configured');
+    if (!INTERNAL_API_SECRET) {
+      throw new Error('INTERNAL_API_SECRET is not configured');
     }
     this.baseUrl = KILOCLAW_API_URL;
-    this.apiSecret = KILOCLAW_INTERNAL_API_SECRET;
+    this.apiSecret = INTERNAL_API_SECRET;
   }
 
   private async request<T>(path: string, options?: RequestInit, ctx?: RequestContext): Promise<T> {
@@ -441,6 +442,22 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId, topics }),
+      },
+      { userId }
+    );
+  }
+
+  async updateUserLocation(
+    userId: string,
+    userLocation: string | null,
+    instanceId?: string
+  ): Promise<MorningBriefingUserLocationResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/user-location${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, userLocation }),
       },
       { userId }
     );

@@ -92,7 +92,7 @@ function parseProvisionResponse(payload: unknown): ProvisionResponse {
   };
 }
 
-function requireEnv(name: 'KILOCLAW_API_URL' | 'KILOCLAW_INTERNAL_API_SECRET'): string {
+function requireEnv(name: 'KILOCLAW_API_URL' | 'INTERNAL_API_SECRET'): string {
   const value = process.env[name]?.trim();
   if (!value) {
     throw new Error(`${name} is required to seed ${SEED_SCOPE}`);
@@ -119,11 +119,11 @@ async function destroySeedInstancesBestEffort(): Promise<void> {
     );
 
   const apiUrl = process.env.KILOCLAW_API_URL?.trim();
-  const apiSecret = process.env.KILOCLAW_INTERNAL_API_SECRET?.trim();
+  const apiSecret = process.env.INTERNAL_API_SECRET?.trim();
   if (!apiUrl || !apiSecret) {
     if (activeInstances.length > 0) {
       console.warn(
-        `[${SEED_SCOPE}] Skipping worker cleanup because KILOCLAW_API_URL or KILOCLAW_INTERNAL_API_SECRET is missing`
+        `[${SEED_SCOPE}] Skipping worker cleanup because KILOCLAW_API_URL or INTERNAL_API_SECRET is missing`
       );
     }
     return;
@@ -225,7 +225,7 @@ async function insertSeedUsers(): Promise<void> {
 
 async function provisionEligibleTrialFixture(): Promise<ProvisionResponse> {
   const apiUrl = requireEnv('KILOCLAW_API_URL');
-  const apiSecret = requireEnv('KILOCLAW_INTERNAL_API_SECRET');
+  const apiSecret = requireEnv('INTERNAL_API_SECRET');
 
   const response = await fetch(new URL('/api/platform/provision', apiUrl), {
     method: 'POST',

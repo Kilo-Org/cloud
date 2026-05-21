@@ -32,6 +32,7 @@ const DEVICE_PAIRED_PATH = '/root/.openclaw/devices/paired.json';
 const DEVICE_PENDING_PATH = '/root/.openclaw/devices/pending.json';
 const WORKSPACE_DIR = '/root/clawd';
 const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
+const OPENCLAW_PLUGIN_STAGE_DIR = '/usr/local/share/openclaw-plugin-runtime-deps';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
 const TOOLS_MD_DEST = '/root/.openclaw/workspace/TOOLS.md';
 const WEATHER_SKILL_SOURCE = '/usr/local/share/kiloclaw/skills/weather/SKILL.md';
@@ -273,6 +274,13 @@ export function setupDirectories(env: EnvLike, deps: BootstrapDeps = defaultDeps
   // GOG_KEYRING_PASSWORD is NOT a secret — see gog-credentials.ts for context.
   env.GOG_KEYRING_PASSWORD = 'kiloclaw';
 
+  // Keep bundled OpenClaw plugin runtime deps in the image-baked stage dir
+  // instead of mutating each bundled plugin directory or the persistent /root
+  // volume during doctor/gateway startup.
+  if (!env.OPENCLAW_PLUGIN_STAGE_DIR?.trim()) {
+    env.OPENCLAW_PLUGIN_STAGE_DIR = OPENCLAW_PLUGIN_STAGE_DIR;
+  }
+
   // Derive the API origin for the Kilo CLI from the full base URL.
   if (env.KILOCODE_API_BASE_URL) {
     env.KILO_API_URL = new URL(env.KILOCODE_API_BASE_URL).origin;
@@ -330,6 +338,19 @@ export function applyFeatureFlags(env: EnvLike, deps: BootstrapDeps = defaultDep
   if (env.KILOCLAW_KILO_CLI === 'true' && env.KILOCODE_API_KEY) {
     env.KILO_API_KEY = env.KILOCODE_API_KEY;
     console.log('Kilo CLI auto-configuration enabled');
+  }
+}
+
+export function cleanNpmCache(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
+  try {
+    deps.execFileSync('npm', ['cache', 'clean', '--force'], {
+      env: { ...process.env, ...env },
+      stdio: 'pipe',
+    });
+    console.log('[controller] npm cache clean completed');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn('[controller] npm cache clean failed, continuing:', message);
   }
 }
 
@@ -1147,6 +1168,24 @@ You can interact with the \`Linear\` MCP server using your \`mcporter\` skill.
   <!-- END:linear -->`,
 };
 
+export const COMPOSIO_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: 'Composio',
+  beginMarker: '<!-- BEGIN:composio -->',
+  endMarker: '<!-- END:composio -->',
+  section: `
+<!-- BEGIN:composio -->
+## Composio
+
+The \`composio\` CLI is configured for this sandbox. Use it to discover and run Composio tools, or to create connection links for external services.
+
+- Check account: \`composio whoami\`
+- Search tools: \`composio search "send email"\`
+- List connections: \`composio connections list\`
+- Connect a toolkit: \`composio link <toolkit>\`
+- Run \`composio --help\` and \`composio <command> --help\` for all available commands.
+<!-- END:composio -->`,
+};
+
 // Additional KiloClaw-mitigated OpenClaw audit findings beyond the
 // gateway.control_ui.insecure_auth one already documented in the base
 // TOOLS.md. Mirrors the list in apps/web/src/lib/shell-security/
@@ -1303,6 +1342,11 @@ export async function bootstrapNonCritical(
         updateToolsMdSection(googleWorkspaceToolsEnabled, GOG_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.OP_SERVICE_ACCOUNT_TOKEN, OP_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.LINEAR_API_KEY, LINEAR_SECTION_CONFIG, deps);
+        updateToolsMdSection(
+          !!env.COMPOSIO_USER_API_KEY && !!env.COMPOSIO_ORG,
+          COMPOSIO_SECTION_CONFIG,
+          deps
+        );
         // Always-on: agent context about KiloClaw-mitigated audit findings
         // and how to keep plugins.allow in sync on plugin installs.
         updateToolsMdSection(true, KILOCLAW_MITIGATIONS_SECTION_CONFIG, deps);
@@ -1345,4 +1389,5 @@ export async function bootstrap(
   if (!result.ok) {
     throw new Error(result.error);
   }
+  cleanNpmCache(env, deps);
 }

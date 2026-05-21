@@ -1,0 +1,297 @@
+'use client';
+
+import { useState } from 'react';
+import { AlertCircle, Check, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import KiloLogo from '@/components/KiloLogo';
+import { useTRPC } from '@/lib/trpc/utils';
+import { useUser } from '@/hooks/useUser';
+import { getPlatform, type PlatformId, type PlatformOption } from '../../_components/platforms';
+
+type ProgressListProps = {
+  count: number;
+  activeIndex: number;
+};
+
+type AuthorizeFlowProps = {
+  serviceIds: PlatformId[];
+  organizationId?: string;
+  initialIndex: number;
+  initialError?: string;
+};
+
+export function AuthorizeFlow(props: AuthorizeFlowProps) {
+  const { serviceIds, organizationId, initialIndex, initialError } = props;
+  const router = useRouter();
+  const trpc = useTRPC();
+  const { data: user } = useUser();
+  const [index, setIndex] = useState(initialIndex);
+  const [done, setDone] = useState(initialIndex >= serviceIds.length);
+  const [connectionError, setConnectionError] = useState<string | null>(initialError ?? null);
+
+  const services = serviceIds.map(id => getPlatform(id)).filter(p => p !== undefined);
+  const current = services[index];
+  const isLast = index === services.length - 1;
+  const returnTo = buildReturnToPath({ serviceIds, organizationId, step: index });
+  const oauthInput = {
+    ...(organizationId ? { organizationId } : {}),
+    returnTo,
+  };
+
+  const { refetch: refetchSlackOAuthUrl, isFetching: isFetchingSlackOAuthUrl } = useQuery(
+    trpc.slack.getOAuthUrl.queryOptions(oauthInput, { enabled: false })
+  );
+  const { refetch: refetchDiscordOAuthUrl, isFetching: isFetchingDiscordOAuthUrl } = useQuery(
+    trpc.discord.getOAuthUrl.queryOptions(oauthInput, { enabled: false })
+  );
+  const { refetch: refetchLinearOAuthUrl, isFetching: isFetchingLinearOAuthUrl } = useQuery(
+    trpc.linear.getOAuthUrl.queryOptions(oauthInput, { enabled: false })
+  );
+
+  const isLoadingGitHubUser = current?.id === 'github' && !organizationId && !user;
+  const isStartingOAuth =
+    isFetchingSlackOAuthUrl || isFetchingDiscordOAuthUrl || isFetchingLinearOAuthUrl;
+
+  const advance = () => {
+    setConnectionError(null);
+    if (isLast) {
+      setDone(true);
+      return;
+    }
+    setIndex(i => i + 1);
+  };
+
+  const handleAuthorize = async () => {
+    if (!current || isStartingOAuth || isLoadingGitHubUser) return;
+    setConnectionError(null);
+
+    try {
+      const oauthUrl = await getOAuthUrl(current.id, {
+        organizationId,
+        returnTo,
+        userId: user?.id,
+        getSlackOAuthUrl: refetchSlackOAuthUrl,
+        getDiscordOAuthUrl: refetchDiscordOAuthUrl,
+        getLinearOAuthUrl: refetchLinearOAuthUrl,
+      });
+
+      if (!oauthUrl) {
+        setConnectionError(`${current.name} setup is not available from this flow yet.`);
+        return;
+      }
+
+      window.location.href = oauthUrl;
+    } catch (error) {
+      setConnectionError(
+        error instanceof Error ? error.message : `Couldn't start ${current.name}.`
+      );
+    }
+  };
+
+  const handleSkip = () => {
+    advance();
+  };
+
+  if (done || !current) {
+    return (
+      <div className="flex w-full flex-col items-center gap-12">
+        <Completed hasSelectedServices={services.length > 0} onContinue={() => router.push('/')} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-full flex-col items-center gap-12">
+      <ProgressList count={services.length} activeIndex={index} />
+
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.section
+          key={current.id}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+          className="flex w-full max-w-sm flex-col items-center gap-12"
+        >
+          <ConnectionBadge service={current} />
+
+          <div className="flex w-full flex-col gap-4 text-center">
+            <h1 className="text-2xl font-bold tracking-tight">
+              Kilo wants to connect with {current.name}
+            </h1>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              You'll be redirected to {current.name} to grant access. Kilo only requests the
+              permissions it needs.
+            </p>
+          </div>
+
+          <div className="flex w-full flex-col items-center gap-4">
+            {connectionError && (
+              <p className="text-destructive flex items-center gap-2 text-sm" role="alert">
+                <AlertCircle className="size-4" />
+                {connectionError}
+              </p>
+            )}
+            <Button
+              onClick={handleAuthorize}
+              size="lg"
+              className="w-full"
+              disabled={isStartingOAuth || isLoadingGitHubUser}
+            >
+              {isStartingOAuth || isLoadingGitHubUser
+                ? 'Starting authorization...'
+                : `Authorize on ${current.name}`}
+              <ChevronRight className="size-4" />
+            </Button>
+            <button
+              type="button"
+              onClick={handleSkip}
+              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+            >
+              Skip for now
+            </button>
+          </div>
+        </motion.section>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function buildReturnToPath({
+  serviceIds,
+  organizationId,
+  step,
+}: {
+  serviceIds: PlatformId[];
+  organizationId?: string;
+  step: number;
+}): string {
+  const params = new URLSearchParams({ services: serviceIds.join(','), step: step.toString() });
+  if (organizationId) params.set('organizationId', organizationId);
+  return `/collab/authorize?${params.toString()}`;
+}
+
+async function getOAuthUrl(
+  platformId: PlatformId,
+  options: {
+    organizationId?: string;
+    returnTo: string;
+    userId?: string;
+    getSlackOAuthUrl: () => Promise<{ data?: { url: string } }>;
+    getDiscordOAuthUrl: () => Promise<{ data?: { url: string } }>;
+    getLinearOAuthUrl: () => Promise<{ data?: { url: string } }>;
+  }
+): Promise<string | null> {
+  if (platformId === 'slack') {
+    return (await options.getSlackOAuthUrl()).data?.url ?? null;
+  }
+  if (platformId === 'discord') {
+    return (await options.getDiscordOAuthUrl()).data?.url ?? null;
+  }
+  if (platformId === 'linear') {
+    return (await options.getLinearOAuthUrl()).data?.url ?? null;
+  }
+  if (platformId === 'gitlab') {
+    const params = new URLSearchParams({ returnTo: options.returnTo });
+    if (options.organizationId) params.set('organizationId', options.organizationId);
+    return `/api/integrations/gitlab/connect?${params.toString()}`;
+  }
+  if (platformId === 'github') {
+    const ownerToken = options.organizationId
+      ? `org_${options.organizationId}`
+      : options.userId
+        ? `user_${options.userId}`
+        : null;
+    if (!ownerToken) return null;
+    const githubAppName = process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';
+    const state = `${ownerToken}|return=${encodeURIComponent(options.returnTo)}`;
+    return `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(state)}`;
+  }
+  return null;
+}
+
+function ConnectionBadge({ service }: { service: PlatformOption }) {
+  const Icon = service.icon;
+  return (
+    <div className="flex items-center gap-3" aria-hidden="true">
+      <div className="bg-card border-border grid size-20 place-items-center rounded-2xl border">
+        <span className="text-primary size-10">
+          <KiloLogo />
+        </span>
+      </div>
+      <ConnectorDots />
+      <div className="bg-card border-border grid size-20 place-items-center rounded-2xl border shadow-[0_0_24px_-4px_rgba(237,255,0,0.18)]">
+        <Icon className="size-10" />
+      </div>
+    </div>
+  );
+}
+
+function ConnectorDots() {
+  return (
+    <span className="flex items-center gap-1">
+      <span className="bg-muted-foreground/40 size-1 rounded-full" />
+      <span className="bg-muted-foreground/60 size-1 rounded-full" />
+      <span className="bg-muted-foreground/40 size-1 rounded-full" />
+    </span>
+  );
+}
+
+function ProgressList({ count, activeIndex }: ProgressListProps) {
+  return (
+    <div
+      className="flex w-full max-w-sm items-center gap-2"
+      role="progressbar"
+      aria-valuemin={1}
+      aria-valuemax={count}
+      aria-valuenow={activeIndex + 1}
+      aria-label="Authorization progress"
+    >
+      {Array.from({ length: count }).map((_, i) => (
+        <span
+          key={i}
+          className={cn(
+            'h-1 flex-1 rounded-full transition-colors duration-200',
+            i <= activeIndex ? 'bg-primary' : 'bg-border'
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Completed({
+  hasSelectedServices,
+  onContinue,
+}: {
+  hasSelectedServices: boolean;
+  onContinue: () => void;
+}) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+      className="flex w-full max-w-sm flex-col items-center gap-12"
+    >
+      <div className="bg-primary/10 ring-primary/30 grid size-16 place-items-center rounded-full ring-1">
+        <Check className="text-primary size-7" strokeWidth={3} />
+      </div>
+      <div className="flex w-full flex-col gap-4 text-center">
+        <h1 className="text-2xl font-bold tracking-tight">Kilo is ready</h1>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          {hasSelectedServices
+            ? 'Setup is complete. You can connect more services or fine-tune access from settings later.'
+            : 'No services were connected. You can connect chat, code, and issue tools from settings later.'}
+        </p>
+      </div>
+      <Button onClick={onContinue} size="lg" className="w-full">
+        Open Kilo
+      </Button>
+    </motion.section>
+  );
+}

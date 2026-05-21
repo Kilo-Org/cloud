@@ -44,6 +44,7 @@ export interface CodeReviewEvent {
 
 export interface CodeReview {
   reviewId: string;
+  attemptId?: string;
   authToken: string;
   sessionInput: SessionInput;
   owner: Owner;
@@ -75,6 +76,7 @@ export interface CodeReview {
 
 export interface CodeReviewStatusResponse {
   reviewId: string;
+  attemptId?: string;
   status: CodeReviewStatus;
   sessionId?: string; // Cloud agent session ID (agent_xxx)
   cliSessionId?: string; // CLI session UUID
@@ -118,6 +120,7 @@ export type InternalStatusResponse = z.infer<typeof InternalStatusResponseSchema
 
 export interface CodeReviewRequest {
   reviewId: string;
+  attemptId?: string;
   authToken: string;
   sessionInput: SessionInput;
   owner: Owner;
@@ -130,6 +133,7 @@ export interface CodeReviewRequest {
 
 export interface CodeReviewResponse {
   reviewId: string;
+  attemptId?: string;
   status: CodeReviewStatus;
 }
 
@@ -143,6 +147,7 @@ export interface Env {
   // Environment variables
   API_URL: string;
   INTERNAL_API_SECRET: string;
+  CALLBACK_TOKEN_SECRET: string;
   CLOUD_AGENT_URL: string;
   /** cloud-agent-next URL (used when useCloudAgentNext feature flag is enabled) */
   CLOUD_AGENT_NEXT_URL: string;

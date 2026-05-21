@@ -9,7 +9,7 @@ import {
 import { createCloudAgentSession } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import type { AssistantMessage, UserMessage } from '@/types/opencode.gen';
-import { kiloId, cloudAgentId, stubUserMessage, stubTextPart } from './test-helpers';
+import { kiloId, cloudAgentId, stubUserMessage, stubTextPart, makeSnapshot } from './test-helpers';
 import type { CloudStatus, ResolvedSession, SessionActivity } from './types';
 
 // ---------------------------------------------------------------------------
@@ -588,7 +588,9 @@ describe('createSessionManager', () => {
       await mgr.switchSession(kiloId('ses-1'));
 
       mockSession.send.mockImplementation(() => new Promise(() => {}));
-      void mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
+      void mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
 
       const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
       expect(messages).toHaveLength(1);
@@ -600,10 +602,7 @@ describe('createSessionManager', () => {
       expect(optimisticMessage?.parts[0]?.messageID).toBe(optimisticMessage?.info.id);
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
-        variant: undefined,
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
         images: undefined,
       });
     });
@@ -619,7 +618,9 @@ describe('createSessionManager', () => {
       if (!latestStorage) throw new Error('expected session storage');
 
       mockSession.send.mockImplementation(() => new Promise(() => {}));
-      void mgr.send({ prompt, mode: 'code', model: 'claude-3-5-sonnet' });
+      void mgr.send({
+        payload: { type: 'prompt', prompt, mode: 'code', model: 'claude-3-5-sonnet' },
+      });
 
       const [optimisticMessage] = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
       const messageId = optimisticMessage?.info.id;
@@ -659,13 +660,13 @@ describe('createSessionManager', () => {
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
 
       mockSession.send.mockResolvedValue(undefined);
-      await mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
 
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
       });
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
     });
@@ -678,9 +679,7 @@ describe('createSessionManager', () => {
 
       mockSession.send.mockRejectedValue(new Error('ECONNREFUSED'));
       const accepted = await mgr.send({
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
       });
 
       expect(accepted).toBe(false);
@@ -705,7 +704,9 @@ describe('createSessionManager', () => {
 
       const error = new Error('fail');
       mockSession.send.mockRejectedValue(error);
-      await mgr.send({ prompt: 'My prompt', mode: 'code', model: 'claude-3-5-sonnet' });
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'My prompt', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
 
       expect(onSendFailed).toHaveBeenCalledWith(
         'My prompt',
@@ -736,9 +737,7 @@ describe('createSessionManager', () => {
 
       mockSession.send.mockRejectedValue(new Error('Transport disconnected'));
       const accepted = await mgr.send({
-        prompt: 'My prompt',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
+        payload: { type: 'prompt', prompt: 'My prompt', mode: 'code', model: 'claude-3-5-sonnet' },
       });
 
       expect(accepted).toBe(false);
@@ -763,18 +762,24 @@ describe('createSessionManager', () => {
 
       mockSession.send.mockResolvedValue(undefined);
       await mgr.send({
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
-        variant: 'high',
+        payload: {
+          type: 'prompt',
+          prompt: 'Hello',
+          mode: 'code',
+          model: 'claude-3-5-sonnet',
+          variant: 'high',
+        },
       });
 
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
-        variant: 'high',
+        payload: {
+          type: 'prompt',
+          prompt: 'Hello',
+          mode: 'code',
+          model: 'claude-3-5-sonnet',
+          variant: 'high',
+        },
         images: undefined,
       });
     });
@@ -788,19 +793,14 @@ describe('createSessionManager', () => {
 
       mockSession.send.mockResolvedValue(undefined);
       const accepted = await mgr.send({
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
         images,
       });
 
       expect(accepted).toBe(true);
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
-        variant: undefined,
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
         images,
       });
     });
@@ -812,14 +812,13 @@ describe('createSessionManager', () => {
       await mgr.switchSession(kiloId('ses-1'));
 
       mockSession.send.mockResolvedValue(undefined);
-      await mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
 
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
-        variant: undefined,
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
       });
     });
 
@@ -829,9 +828,7 @@ describe('createSessionManager', () => {
 
       // No switchSession — no active session
       const accepted = await mgr.send({
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
       });
 
       expect(accepted).toBe(false);
@@ -922,6 +919,181 @@ describe('createSessionManager', () => {
       );
 
       expect(childMessages('child-1')).toEqual([childOneFirst, childOneSecond]);
+    });
+  });
+
+  describe('child session hydration', () => {
+    it('hydrates child snapshots while preserving root transcript filtering', async () => {
+      const rootMessage = createStoredMessage('msg-root', 'ses-root', 'assistant');
+      const childMessage = createStoredMessage('msg-child-history', 'child-1', 'assistant');
+      const childPart = stubTextPart({
+        id: 'part-child-history',
+        sessionID: 'child-1',
+        messageID: childMessage.info.id,
+        text: 'Historical child message',
+      });
+      const config = createMockConfig({
+        fetchSnapshot: jest
+          .fn()
+          .mockResolvedValue(
+            makeSnapshot({ id: 'child-1', parentID: 'ses-root' }, [
+              { info: childMessage.info, parts: [childPart] },
+            ])
+          ),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(rootMessage.info);
+
+      await mgr.hydrateChildSession(kiloId('child-1'));
+
+      expect(config.fetchSnapshot).toHaveBeenCalledWith(kiloId('child-1'));
+      const childMessages = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(childMessages('child-1')).toEqual([{ info: childMessage.info, parts: [childPart] }]);
+      expect(atomValue(config.store, mgr.atoms.messagesList)).toEqual([rootMessage]);
+      const childHydrationState = atomValue<(childSessionId: string) => { status: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      expect(childHydrationState('child-1')).toEqual({ status: 'ready' });
+    });
+
+    it('merges fetched history into live child messages without duplicating them', async () => {
+      const childMessage = createStoredMessage('msg-child-live', 'child-live', 'assistant');
+      const livePart = stubTextPart({
+        id: 'part-child-live',
+        sessionID: 'child-live',
+        messageID: childMessage.info.id,
+        text: 'Partial live text',
+      });
+      const historicalPart = stubTextPart({
+        ...livePart,
+        text: 'Complete historical text',
+      });
+      const config = createMockConfig({
+        fetchSnapshot: jest
+          .fn()
+          .mockResolvedValue(
+            makeSnapshot({ id: 'child-live', parentID: 'ses-root' }, [
+              { info: childMessage.info, parts: [historicalPart] },
+            ])
+          ),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(childMessage.info);
+      latestStorage.upsertPart(childMessage.info.id, livePart);
+
+      await mgr.hydrateChildSession(kiloId('child-live'));
+
+      const childMessages = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(childMessages('child-live')).toEqual([
+        { info: childMessage.info, parts: [historicalPart] },
+      ]);
+    });
+
+    it('deduplicates concurrent child snapshot hydration requests', async () => {
+      let resolveSnapshot: ((snapshot: ReturnType<typeof makeSnapshot>) => void) | undefined;
+      const childSnapshot = new Promise<ReturnType<typeof makeSnapshot>>(resolve => {
+        resolveSnapshot = resolve;
+      });
+      const config = createMockConfig({
+        fetchSnapshot: jest.fn().mockReturnValue(childSnapshot),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+
+      const firstHydration = mgr.hydrateChildSession(kiloId('child-deduped'));
+      const secondHydration = mgr.hydrateChildSession(kiloId('child-deduped'));
+
+      expect(config.fetchSnapshot).toHaveBeenCalledTimes(1);
+      const childHydrationState = atomValue<(childSessionId: string) => { status: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      expect(childHydrationState('child-deduped')).toEqual({ status: 'loading' });
+
+      resolveSnapshot?.(makeSnapshot({ id: 'child-deduped', parentID: 'ses-root' }));
+      await Promise.all([firstHydration, secondHydration]);
+
+      const updatedChildHydrationState = atomValue<(childSessionId: string) => { status: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      expect(updatedChildHydrationState('child-deduped')).toEqual({ status: 'ready' });
+    });
+
+    it('ignores stale child snapshots after the active root session changes', async () => {
+      let resolveSnapshot: ((snapshot: ReturnType<typeof makeSnapshot>) => void) | undefined;
+      const childSnapshot = new Promise<ReturnType<typeof makeSnapshot>>(resolve => {
+        resolveSnapshot = resolve;
+      });
+      const staleMessage = createStoredMessage('msg-child-stale', 'child-stale', 'assistant');
+      const config = createMockConfig({
+        fetchSnapshot: jest.fn().mockReturnValue(childSnapshot),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root-a'));
+      const staleHydration = mgr.hydrateChildSession(kiloId('child-stale'));
+
+      await mgr.switchSession(kiloId('ses-root-b'));
+      resolveSnapshot?.(
+        makeSnapshot({ id: 'child-stale', parentID: 'ses-root-a' }, [
+          { info: staleMessage.info, parts: [] },
+        ])
+      );
+      await staleHydration;
+
+      const childMessages = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(childMessages('child-stale')).toEqual([]);
+      const childHydrationState = atomValue<(childSessionId: string) => { status: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      expect(childHydrationState('child-stale')).toEqual({ status: 'idle' });
+    });
+
+    it('allows retrying child history hydration after a snapshot fetch fails', async () => {
+      const config = createMockConfig({
+        fetchSnapshot: jest
+          .fn()
+          .mockRejectedValueOnce(new Error('fetch failed'))
+          .mockResolvedValueOnce(makeSnapshot({ id: 'child-retry', parentID: 'ses-root' })),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-retry'));
+
+      const childHydrationState = atomValue<
+        (childSessionId: string) => { status: string; message?: string }
+      >(config.store, mgr.atoms.childSessionHydrationState);
+      expect(childHydrationState('child-retry')).toEqual(
+        expect.objectContaining({ status: 'error' })
+      );
+
+      await mgr.hydrateChildSession(kiloId('child-retry'));
+
+      expect(config.fetchSnapshot).toHaveBeenCalledTimes(2);
+      const retriedChildHydrationState = atomValue<
+        (childSessionId: string) => { status: string; message?: string }
+      >(config.store, mgr.atoms.childSessionHydrationState);
+      expect(retriedChildHydrationState('child-retry')).toEqual({ status: 'ready' });
     });
   });
 
@@ -1138,7 +1310,14 @@ describe('createSessionManager', () => {
       // After interrupt, send should NOT throw — transport should still be alive
       mockSession.send.mockResolvedValue({});
       await expect(
-        mgr.send({ prompt: 'follow-up message', mode: 'code', model: 'claude-3-5-sonnet' })
+        mgr.send({
+          payload: {
+            type: 'prompt',
+            prompt: 'follow-up message',
+            mode: 'code',
+            model: 'claude-3-5-sonnet',
+          },
+        })
       ).resolves.not.toThrow();
       expect(mockSession.send).toHaveBeenCalledTimes(1);
     });
@@ -1383,6 +1562,37 @@ describe('createSessionManager', () => {
 
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
       expect(atomValue(config.store, mgr.atoms.activePermission)).toBeNull();
+    });
+
+    it('switchSession clears availableCommands immediately', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // Simulate a commands.available event from session A
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+      const sessionConfig = mockedCreate.mock.calls[0][0];
+      sessionConfig.onEvent?.({
+        type: 'commands.available',
+        commands: [{ name: 'review', description: 'Review code', hints: [] }],
+      });
+      expect(
+        atomValue<{ name: string; description: string }[]>(
+          config.store,
+          mgr.atoms.availableCommands
+        )
+      ).toHaveLength(1);
+
+      // Switch to session B — commands should be cleared before any new event arrives
+      const switchPromise = mgr.switchSession(kiloId('ses-2'));
+      expect(
+        atomValue<{ name: string; description: string }[]>(
+          config.store,
+          mgr.atoms.availableCommands
+        )
+      ).toHaveLength(0);
+
+      await switchPromise;
     });
   });
 

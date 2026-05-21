@@ -46,22 +46,45 @@ export async function withKiloclawProvisionContextLock<T>(
 ): Promise<T> {
   const client = await provisionLockClient.pool.connect();
   let lockAcquired = false;
+  let discardClient = false;
 
   try {
-    await client.query('SELECT pg_advisory_lock(hashtext($1))', [lockKey]);
-    lockAcquired = true;
+    try {
+      await client.query('SELECT pg_advisory_lock(hashtext($1))', [lockKey]);
+      lockAcquired = true;
+    } catch (error) {
+      discardClient = true;
+      throw error;
+    }
+
     return await work();
   } finally {
     if (lockAcquired) {
       try {
-        await client.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]);
+        const unlockResult = await client.query<{ unlocked: boolean }>(
+          'SELECT pg_advisory_unlock(hashtext($1)) AS unlocked',
+          [lockKey]
+        );
+        if (unlockResult.rows[0]?.unlocked !== true) {
+          discardClient = true;
+          console.error('[kiloclaw] Failed to release provision context lock', {
+            lockKey,
+            error: 'PostgreSQL did not confirm provision context lock release',
+          });
+        }
       } catch (error) {
+        discardClient = true;
         console.error('[kiloclaw] Failed to release provision context lock', {
           lockKey,
           error: error instanceof Error ? error.message : String(error),
         });
       }
     }
-    client.release();
+
+    if (discardClient) {
+      client.release(true);
+    } else {
+      client.release();
+    }
   }
 }

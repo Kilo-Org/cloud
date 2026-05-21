@@ -1,3 +1,10 @@
+import {
+  CURRENT_KILOCLAW_PRICE_VERSION,
+  KILOCLAW_PRICE_VERSIONS,
+  getKiloClawPlanCostMicrodollars,
+  getKiloClawPricingCatalogEntry,
+} from '@kilocode/db/kiloclaw-pricing-catalog';
+
 // ── Shared utilities ─────────────────────────────────────────────────
 
 export function formatBillingDate(iso: string): string {
@@ -13,15 +20,31 @@ export function formatMicrodollars(microdollars: number): string {
 }
 
 export type ClawPlan = 'commit' | 'standard';
+export type KiloPassUpsellTier = '19' | '49' | '199';
+export type KiloPassUpsellCadence = 'monthly' | 'yearly';
+export type KiloPassUpsellActivationPreview = {
+  eligible: boolean;
+  costMicrodollars: number;
+  projectedKiloPassBaseMicrodollars: number;
+  projectedKiloPassBonusMicrodollars: number;
+  effectiveBalanceMicrodollars: number;
+  shortfallMicrodollars: number;
+};
+
+const CURRENT_KILOCLAW_PRICING = getKiloClawPricingCatalogEntry(CURRENT_KILOCLAW_PRICE_VERSION);
+const LEGACY_STANDARD_INTRO_MICRODOLLARS = KILOCLAW_PRICE_VERSIONS.map(version =>
+  getKiloClawPricingCatalogEntry(version)
+).find(entry => entry.standardIntroMicrodollars !== undefined)?.standardIntroMicrodollars;
 
 export const PLAN_COST_MICRODOLLARS: Record<ClawPlan, number> = {
-  standard: 9_000_000,
-  commit: 48_000_000,
+  standard: CURRENT_KILOCLAW_PRICING.standardRecurringMicrodollars,
+  commit: CURRENT_KILOCLAW_PRICING.commitSixMonthMicrodollars,
 };
 
 export const COMMIT_PERIOD_MONTHS = 6;
 
-// Display prices derived from PLAN_COST_MICRODOLLARS
+// Current-price defaults. Version-aware UI should prefer createKiloClawSignupDisplay or
+// formatKiloClawPlanPrice with row/status data.
 export const PLAN_DISPLAY = {
   commit: {
     totalDollars: PLAN_COST_MICRODOLLARS.commit / 1_000_000,
@@ -32,22 +55,157 @@ export const PLAN_DISPLAY = {
   },
 };
 
-// Must match the Stripe-configured first-month coupon for the standard plan.
-export const STANDARD_FIRST_MONTH_DOLLARS = 4;
-export const STANDARD_FIRST_MONTH_MICRODOLLARS = STANDARD_FIRST_MONTH_DOLLARS * 1_000_000;
+export const STANDARD_FIRST_MONTH_MICRODOLLARS = LEGACY_STANDARD_INTRO_MICRODOLLARS ?? 0;
+export const STANDARD_FIRST_MONTH_DOLLARS = STANDARD_FIRST_MONTH_MICRODOLLARS / 1_000_000;
 
-/** e.g. "Commit ($8/mo)" or "Standard ($9/mo)" */
-export function planLabel(plan: ClawPlan): string {
-  return plan === 'commit'
-    ? `Commit ($${PLAN_DISPLAY.commit.monthlyDollars}/mo)`
-    : `Standard ($${PLAN_DISPLAY.standard.monthlyDollars}/mo)`;
+type KiloClawPlanPriceParams = {
+  plan: ClawPlan | 'trial';
+  priceVersion?: string;
+  useStandardIntro?: boolean;
+  costMicrodollars?: number | null;
+};
+
+type KiloClawSignupPlanDisplay = {
+  primaryPrice: string;
+  priceDetail: string;
+  introDetail: string | null;
+  accessoryDetail: string;
+};
+
+export type KiloClawSignupDisplay = {
+  priceVersion: string;
+  selfServiceInstanceType: string;
+  standard: KiloClawSignupPlanDisplay;
+  commit: KiloClawSignupPlanDisplay & { monthlyEquivalent: string };
+};
+
+function formatWholeDollarMicrodollars(microdollars: number): string {
+  const dollars = microdollars / 1_000_000;
+  return Number.isInteger(dollars) ? `$${dollars}` : `$${dollars.toFixed(2)}`;
 }
 
-/** e.g. "$48.00 for 6 months" or "$9.00/month" */
-export function planPriceLabel(plan: ClawPlan): string {
-  return plan === 'commit'
-    ? `$${PLAN_DISPLAY.commit.totalDollars.toFixed(2)} for ${COMMIT_PERIOD_MONTHS} months`
-    : `$${PLAN_DISPLAY.standard.monthlyDollars.toFixed(2)}/month`;
+function findPricingEntryForSignupCosts(params: {
+  standardCostMicrodollars: number;
+  commitCostMicrodollars: number;
+}) {
+  return (
+    KILOCLAW_PRICE_VERSIONS.map(version => getKiloClawPricingCatalogEntry(version)).find(entry => {
+      const standardMatches =
+        entry.standardRecurringMicrodollars === params.standardCostMicrodollars ||
+        entry.standardIntroMicrodollars === params.standardCostMicrodollars;
+      return standardMatches && entry.commitSixMonthMicrodollars === params.commitCostMicrodollars;
+    }) ?? CURRENT_KILOCLAW_PRICING
+  );
+}
+
+export function isKiloClawStandardIntroCost(params: {
+  costMicrodollars: number;
+  priceVersion?: string;
+}): boolean {
+  const entries = params.priceVersion
+    ? [getKiloClawPricingCatalogEntry(params.priceVersion)]
+    : KILOCLAW_PRICE_VERSIONS.map(version => getKiloClawPricingCatalogEntry(version));
+  return entries.some(entry => entry.standardIntroMicrodollars === params.costMicrodollars);
+}
+
+export function createKiloClawSignupDisplay(params: {
+  standardCostMicrodollars: number;
+  commitCostMicrodollars: number;
+}): KiloClawSignupDisplay {
+  const pricing = findPricingEntryForSignupCosts(params);
+  const isStandardIntro = pricing.standardIntroMicrodollars === params.standardCostMicrodollars;
+  const standardPrice = formatWholeDollarMicrodollars(params.standardCostMicrodollars);
+  const standardRecurringPrice = formatWholeDollarMicrodollars(
+    pricing.standardRecurringMicrodollars
+  );
+  const commitPrice = formatWholeDollarMicrodollars(params.commitCostMicrodollars);
+
+  return {
+    priceVersion: pricing.priceVersion,
+    selfServiceInstanceType: pricing.selfServiceInstanceType,
+    standard: {
+      primaryPrice: standardPrice,
+      priceDetail: isStandardIntro ? 'first month' : '/month',
+      introDetail: isStandardIntro ? `then ${standardRecurringPrice}/month` : null,
+      accessoryDetail: isStandardIntro
+        ? `Billed at ${standardRecurringPrice}/month after the intro month.`
+        : `${standardPrice}/month with no long-term commitment.`,
+    },
+    commit: {
+      primaryPrice: commitPrice,
+      priceDetail: '/6-month commit',
+      introDetail: null,
+      monthlyEquivalent: `${formatWholeDollarMicrodollars(params.commitCostMicrodollars / COMMIT_PERIOD_MONTHS)}/month effective`,
+      accessoryDetail: `${commitPrice} billed upfront for a 6-month commit.`,
+    },
+  };
+}
+
+function findPricingEntryForPlanCost(params: { plan: ClawPlan; costMicrodollars: number }) {
+  return (
+    KILOCLAW_PRICE_VERSIONS.map(version => getKiloClawPricingCatalogEntry(version)).find(entry => {
+      if (params.plan === 'commit') {
+        return entry.commitSixMonthMicrodollars === params.costMicrodollars;
+      }
+      return (
+        entry.standardRecurringMicrodollars === params.costMicrodollars ||
+        entry.standardIntroMicrodollars === params.costMicrodollars
+      );
+    }) ?? CURRENT_KILOCLAW_PRICING
+  );
+}
+
+export function formatKiloClawPlanPrice(input: KiloClawPlanPriceParams): string {
+  if (input.plan === 'trial') {
+    return 'Free trial';
+  }
+
+  const priceVersion = input.priceVersion ?? CURRENT_KILOCLAW_PRICE_VERSION;
+  const costMicrodollars =
+    input.costMicrodollars ??
+    getKiloClawPlanCostMicrodollars({
+      priceVersion,
+      plan: input.plan,
+      useStandardIntro: input.useStandardIntro,
+    });
+  const price = formatWholeDollarMicrodollars(costMicrodollars);
+
+  return input.plan === 'commit' ? `${price}/6-month commit` : `${price}/month`;
+}
+
+export function formatKiloClawFirstChargeLabel(params: {
+  plan: ClawPlan;
+  costMicrodollars: number;
+}): string {
+  const price = formatWholeDollarMicrodollars(params.costMicrodollars);
+  if (params.plan === 'commit') {
+    return `${price}/6-month commit`;
+  }
+
+  const pricing = findPricingEntryForPlanCost(params);
+  if (pricing.standardIntroMicrodollars === params.costMicrodollars) {
+    return `${price} first month, then ${formatWholeDollarMicrodollars(pricing.standardRecurringMicrodollars)}/month`;
+  }
+
+  return `${price}/month`;
+}
+
+/** e.g. "Commit ($51/mo)" or "Standard ($55/mo)" */
+export function planLabel(plan: ClawPlan, priceVersion?: string): string {
+  if (plan === 'commit') {
+    const costMicrodollars = getKiloClawPlanCostMicrodollars({
+      priceVersion: priceVersion ?? CURRENT_KILOCLAW_PRICE_VERSION,
+      plan,
+    });
+    return `Commit (${formatWholeDollarMicrodollars(costMicrodollars / COMMIT_PERIOD_MONTHS)}/mo)`;
+  }
+
+  return `Standard (${formatKiloClawPlanPrice({ plan, priceVersion })})`;
+}
+
+/** e.g. "$306/6-month commit" or "$55/month" */
+export function planPriceLabel(plan: ClawPlan, priceVersion?: string): string {
+  return formatKiloClawPlanPrice({ plan, priceVersion });
 }
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -64,6 +222,10 @@ export type ClawBillingStatus = {
   creditIntroEligible: boolean;
   /** True when the user has a non-ended Kilo Pass subscription. */
   hasActiveKiloPass: boolean;
+  /** Price version that fresh signup/enrollment UI should use. */
+  intendedPriceVersion: string;
+  /** Self-service instance entitlement for the intended price version. */
+  intendedSelfServiceInstanceType: string;
   creditEnrollmentPreview: Record<
     ClawPlan,
     {
@@ -71,6 +233,10 @@ export type ClawBillingStatus = {
       projectedKiloPassBonusMicrodollars: number;
       effectiveBalanceMicrodollars: number;
     }
+  >;
+  kiloPassUpsellPreview: Record<
+    ClawPlan,
+    Record<KiloPassUpsellCadence, Record<KiloPassUpsellTier, KiloPassUpsellActivationPreview>>
   >;
 
   trial: {
@@ -84,6 +250,8 @@ export type ClawBillingStatus = {
     plan: 'commit' | 'standard';
     status: 'active' | 'past_due' | 'canceled' | 'unpaid';
     activationState: 'pending_settlement' | 'activated';
+    priceVersion: string;
+    selfServiceInstanceType: string;
     cancelAtPeriodEnd: boolean;
     currentPeriodEnd: string;
     commitEndsAt: string | null;
@@ -97,6 +265,8 @@ export type ClawBillingStatus = {
     creditRenewalAt: string | null;
     /** Cost of the next renewal period in microdollars. */
     renewalCostMicrodollars: number | null;
+    /** Whether the renewal amount is locally charged credits or a Stripe-billed approximation. */
+    renewalCostSource: 'credit_renewal' | 'stripe_approximation' | null;
     /** True when user has both Stripe-funded hosting and active Kilo Pass. */
     showConversionPrompt: boolean;
     /** True when Stripe subscription is being cancelled to convert to credit-funded billing. */

@@ -100,6 +100,47 @@ export const botMessageNotifications = sqliteTable(
   })
 );
 
+// NOTE: this table intentionally has no `conversation_id` column. The
+// ConversationDO *is* the conversation — each DO has its own SQLite — so
+// attachment rows are scoped by the DO that owns them. Callers route by
+// conversationId via `CONVERSATION_DO.idFromName(...)`; cross-conversation
+// isolation falls out for free. Don't add a column to "tidy this up": it
+// would break that invariant and let one conversation's attachment ids
+// appear in another's lookups.
+export const attachments = sqliteTable(
+  'attachments',
+  {
+    id: text('id').primaryKey(),
+    uploader_id: text('uploader_id').notNull(),
+    r2_key: text('r2_key').notNull().unique(),
+    mime_type: text('mime_type').notNull(),
+    size: integer('size').notNull(),
+    filename: text('filename').notNull(),
+    status: text('status').notNull(),
+    message_id: text('message_id'),
+    idempotency_key: text('idempotency_key'),
+    created_at: integer('created_at').notNull(),
+  },
+  table => ({
+    messageFk: foreignKey({
+      columns: [table.message_id],
+      foreignColumns: [messages.id],
+    }),
+    uploaderFk: foreignKey({
+      columns: [table.uploader_id],
+      foreignColumns: [members.id],
+    }),
+    statusCheck: check('attachments_status_check', sql`${table.status} IN ('pending', 'linked')`),
+    statusCreatedIdx: index('attachments_status_created').on(table.status, table.created_at),
+    messageIdIdx: index('attachments_message_id').on(table.message_id),
+    uploaderIdempotencyIdx: index('attachments_uploader_idempotency').on(
+      table.uploader_id,
+      table.idempotency_key,
+      table.created_at
+    ),
+  })
+);
+
 export const reactions = sqliteTable(
   'reactions',
   {

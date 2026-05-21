@@ -37,6 +37,7 @@ function createFakeDOContext(): IngestDOContext {
     updateHeartbeat: vi.fn().mockResolvedValue(undefined),
     updateLastEventAt: vi.fn().mockResolvedValue(undefined),
     updateExecutionStatus: vi.fn().mockResolvedValue(undefined),
+    setAvailableCommands: vi.fn().mockResolvedValue(undefined),
   };
 }
 

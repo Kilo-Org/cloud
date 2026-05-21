@@ -3,6 +3,7 @@ import type {
   CloudAgentSessionState,
   MCPServerConfig,
   RuntimeAgent,
+  RuntimeKiloCommand,
   RuntimeSkill,
 } from './persistence/types.js';
 
@@ -23,6 +24,7 @@ type ProfileCarrier = {
   mcpServers?: Record<string, MCPServerConfig>;
   runtimeSkills?: readonly RuntimeSkill[];
   runtimeAgents?: readonly RuntimeAgent[];
+  kiloCommands?: readonly RuntimeKiloCommand[];
 };
 
 /**
@@ -51,6 +53,7 @@ export function readProfileBundle(record: ProfileCarrier): SessionProfileBundle 
     mcpServers: record.mcpServers,
     runtimeSkills: record.runtimeSkills ? [...record.runtimeSkills] : undefined,
     runtimeAgents: record.runtimeAgents ? [...record.runtimeAgents] : undefined,
+    kiloCommands: record.kiloCommands ? [...record.kiloCommands] : undefined,
   };
 }
 

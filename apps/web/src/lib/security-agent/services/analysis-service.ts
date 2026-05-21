@@ -20,6 +20,7 @@ import type {
 import type { AnalysisErrorCode } from '../core/error-classification';
 import { classifyAnalysisError, isUserActionableError } from '../core/error-classification';
 import type { User, SecurityFinding } from '@kilocode/db/schema';
+import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 import {
   trackSecurityAgentAnalysisStarted,
   trackSecurityAgentAnalysisCompleted,
@@ -30,7 +31,7 @@ import { extractSandboxAnalysis } from './extraction-service';
 import { maybeAutoDismissAnalysis } from './auto-dismiss-service';
 import { sentryLogger } from '@/lib/utils.server';
 import { APP_URL } from '@/lib/constants';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { extractLastAssistantText } from '@/lib/cloud-agent-next/session-result';
 
 import {
@@ -430,6 +431,11 @@ export async function startSecurityAnalysis(params: {
     const client = createCloudAgentNextClient(authToken);
 
     const callbackUrl = `${APP_URL}/api/internal/security-analysis-callback/${findingId}`;
+    const callbackToken = await deriveCallbackToken({
+      secret: CALLBACK_TOKEN_SECRET,
+      scope: 'security-analysis-callback',
+      resourceParts: [findingId],
+    });
 
     const { cloudAgentSessionId, kiloSessionId } = await client.prepareSession({
       prompt,
@@ -441,7 +447,7 @@ export async function startSecurityAnalysis(params: {
       createdOnPlatform: 'security-agent',
       callbackTarget: {
         url: callbackUrl,
-        headers: { 'X-Internal-Secret': INTERNAL_API_SECRET },
+        headers: { 'X-Callback-Token': callbackToken },
       },
     });
 

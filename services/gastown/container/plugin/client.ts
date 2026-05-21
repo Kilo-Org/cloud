@@ -16,6 +16,7 @@ import type {
   SlingBatchResult,
   SlingResult,
   UiActionInput,
+  WastelandClaimResult,
 } from './types';
 
 function isApiResponse(
@@ -420,6 +421,13 @@ export class MayorGastownClient {
     merge_mode?: 'review-then-land' | 'review-and-merge';
     parallel?: boolean;
     staged?: boolean;
+    /**
+     * Metadata stamped onto BOTH the convoy bead AND every task bead. Use
+     * this to propagate cross-cutting context like the `wasteland` origin
+     * tag returned by gt_wasteland_claim so every descendant bead links
+     * back to its source.
+     */
+    metadata?: Record<string, unknown>;
   }): Promise<SlingBatchResult> {
     return this.request<SlingBatchResult>(this.mayorPath('/sling-batch'), {
       method: 'POST',
@@ -567,6 +575,62 @@ export class MayorGastownClient {
       method: 'POST',
       body: JSON.stringify({ action }),
     });
+  }
+
+  // -- Wasteland tool endpoints --
+  // The wasteland is auto-resolved by the worker from the town's connection.
+
+  async wastelandBrowse(input: {
+    status?: 'open' | 'claimed' | 'done';
+    limit?: number;
+  }): Promise<Array<Record<string, unknown>>> {
+    const params = new URLSearchParams();
+    if (input.status) params.set('status', input.status);
+    if (input.limit !== undefined) params.set('limit', String(input.limit));
+    const qs = params.toString();
+    return this.request<Array<Record<string, unknown>>>(
+      this.mayorPath(`/wasteland/browse${qs ? `?${qs}` : ''}`)
+    );
+  }
+
+  async wastelandClaim(input: { item_id: string }): Promise<WastelandClaimResult> {
+    return this.request<WastelandClaimResult>(this.mayorPath(`/wasteland/claim`), {
+      method: 'POST',
+      body: JSON.stringify({ item_id: input.item_id }),
+    });
+  }
+
+  async wastelandPost(input: {
+    title: string;
+    description: string;
+    priority?: string;
+    type?: string;
+  }): Promise<{ success: boolean; wantedId: string; pr_url: string | null }> {
+    return this.request<{ success: boolean; wantedId: string; pr_url: string | null }>(
+      this.mayorPath(`/wasteland/post`),
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          title: input.title,
+          description: input.description,
+          priority: input.priority,
+          type: input.type,
+        }),
+      }
+    );
+  }
+
+  async wastelandDone(input: {
+    item_id: string;
+    evidence: string;
+  }): Promise<{ success: boolean; pr_url: string | null }> {
+    return this.request<{ success: boolean; pr_url: string | null }>(
+      this.mayorPath(`/wasteland/done`),
+      {
+        method: 'POST',
+        body: JSON.stringify({ item_id: input.item_id, evidence: input.evidence }),
+      }
+    );
   }
 }
 

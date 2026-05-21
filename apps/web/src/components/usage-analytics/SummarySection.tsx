@@ -20,7 +20,6 @@ type SummarySectionProps = {
  * "{input} in / {output} out" subtext.
  */
 export function SummarySection({ summary, loading, showActiveUsers }: SummarySectionProps) {
-  const totalTokens = summary ? summary.inputTokens + summary.outputTokens : 0;
   const tokensSubtext = summary
     ? `${formatLargeNumber(summary.inputTokens, true)} in / ${formatLargeNumber(summary.outputTokens, true)} out`
     : undefined;
@@ -51,7 +50,7 @@ export function SummarySection({ summary, loading, showActiveUsers }: SummarySec
       />
       <MetricCard
         title="Tokens"
-        value={summary ? formatMetric('tokens', totalTokens) : '—'}
+        value={summary ? formatMetric('tokens', summary.totalTokens) : '—'}
         icon={Hash}
         loading={loading}
         subtext={tokensSubtext}

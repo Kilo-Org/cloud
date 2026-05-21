@@ -1,5 +1,6 @@
+/* eslint-disable max-lines -- message bubble grows with each new content-block type */
 import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
-import { AlertCircle, CheckCircle2, Reply, XCircle } from 'lucide-react-native';
+import { AlertCircle, CheckCircle2, Paperclip, Reply, XCircle } from 'lucide-react-native';
 import { memo } from 'react';
 import { Pressable, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -235,6 +236,20 @@ function MessageBubbleComponent({
                 {message.content.map((block, index) => {
                   if (block.type === 'text') {
                     return <MessageMarkdown key={index} text={block.text} isFromMe={isFromMe} />;
+                  }
+
+                  if (block.type === 'attachment') {
+                    return (
+                      <View key={block.attachmentId} className="mt-1 flex-row items-center gap-1.5">
+                        <Paperclip
+                          size={12}
+                          color={isFromMe ? colors.primaryForeground : colors.mutedForeground}
+                        />
+                        <Text className={cn('text-xs italic opacity-80', textColor)}>
+                          {block.filename}
+                        </Text>
+                      </View>
+                    );
                   }
 
                   // block.type === 'actions'

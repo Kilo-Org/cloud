@@ -9,6 +9,30 @@ describe('isDefiniteUnreachable', () => {
     );
   });
 
+  // Regression: deliverChatWebhook refuses to fetch() against a non-running
+  // instance to prevent Fly Proxy autostart on suspended/stopped machines.
+  // The classifier must treat that throw as definitive so chat dispatchers
+  // immediately publish online: false instead of retrying forever and
+  // showing a stale "online" indicator.
+  it('classifies non-running instance errors as definitive', () => {
+    expect(
+      isDefiniteUnreachable(new Error('Instance for sandbox-foo is not running (status=stopped)'))
+    ).toBe(true);
+    expect(
+      isDefiniteUnreachable(
+        new Error('Instance for instance abc-123 is not running (status=provisioned)')
+      )
+    ).toBe(true);
+    // The match is on the prefix "is not running" so additional status
+    // values introduced later in the worker still classify correctly
+    // without requiring a lock-step update here.
+    expect(
+      isDefiniteUnreachable(
+        new Error('Instance for sandbox-foo is not running (status=some_future_state)')
+      )
+    ).toBe(true);
+  });
+
   it('classifies upstream 4xx as definitive', () => {
     expect(isDefiniteUnreachable(new Error('Webhook forward failed: 401 Unauthorized'))).toBe(true);
     expect(isDefiniteUnreachable(new Error('Webhook forward failed: 404 Not Found'))).toBe(true);

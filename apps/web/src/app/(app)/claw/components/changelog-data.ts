@@ -11,6 +11,27 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-05-20',
+    description:
+      'Morning Briefing is now generally available to all KiloClaw users. Enable it in Settings → Morning Briefing for a daily briefing covering your calendar, open GitHub and Linear issues, news on the topics you choose, local news, and a summary of your recent KiloClaw chat activity. It is delivered each morning, or on demand with Run Now.',
+    category: 'feature',
+    deployHint: null,
+  },
+  {
+    date: '2026-05-13',
+    description:
+      'Baked bundled OpenClaw plugin runtime dependencies into the KiloClaw image so doctor and gateway startup no longer need to install them one plugin at a time. This reduces cold-start delays on shared-CPU instances and only affects bundled OpenClaw plugins; custom user-installed plugins keep their normal install behavior.',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
+    date: '2026-05-13',
+    description:
+      'Optimized the KiloClaw image and startup path by cleaning npm and Bun package caches. Build-time cleanup reduces deployed image size, and runtime npm cache cleanup now runs after bootstrap finishes so it reduces persistent storage growth without delaying readiness.',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
     date: '2026-05-07',
     description:
       "Stopped agents from hallucinating fixes that rely on systemd. The base container image ships systemd packages as transitive apt dependencies (so `which systemctl` finds the binary), but systemd is never PID 1 and the daemon is never running. `openclaw`, the gateway, and other background processes are managed by KiloClaw's own controller supervisor. TOOLS.md now documents this explicitly so the agent stops recommending `systemctl`, `journalctl`, or unit files. Existing instances pick up the new TOOLS.md section automatically on redeploy.",

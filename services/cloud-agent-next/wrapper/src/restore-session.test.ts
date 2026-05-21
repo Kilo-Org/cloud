@@ -8,8 +8,16 @@ import { restoreSession, extractDiffs } from './restore-session';
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Real session-ingest exports always carry a top-level `info` block with at
+// least `id`. The orchestrator's malformed-snapshot guardrail keys off that
+// field, so test fixtures must match real shape.
+function snapshotInfo(): { id: string; version: string } {
+  return { id: 'ses_test_fixture', version: '2' };
+}
+
 function makeSnapshot(diffs: Array<{ file: string; after: string; status: string }>): string {
   return JSON.stringify({
+    info: snapshotInfo(),
     messages: [{ info: { summary: { diffs } } }],
   });
 }
@@ -18,6 +26,7 @@ function makeMultiMessageSnapshot(
   ...messageDiffs: Array<Array<{ file: string; after: string; status: string }>>
 ): string {
   return JSON.stringify({
+    info: snapshotInfo(),
     messages: messageDiffs.map(diffs => ({ info: { summary: { diffs } } })),
   });
 }
@@ -73,11 +82,13 @@ describe('restoreSession', () => {
     savedEnv = {
       KILO_SESSION_INGEST_URL: process.env.KILO_SESSION_INGEST_URL,
       KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
+      KILOCODE_TOKEN_FILE: process.env.KILOCODE_TOKEN_FILE,
       PATH: process.env.PATH,
     };
 
     process.env.KILO_SESSION_INGEST_URL = 'http://localhost:9999';
     process.env.KILOCODE_TOKEN = 'test-token';
+    delete process.env.KILOCODE_TOKEN_FILE;
     process.env.PATH = `${binDir}:${process.env.PATH}`;
 
     originalFetch = globalThis.fetch;
@@ -131,6 +142,42 @@ describe('restoreSession', () => {
     }
   });
 
+  it('reads KILOCODE_TOKEN_FILE when KILOCODE_TOKEN is missing', async () => {
+    const tokenPath = path.join(tmpDir, 'restore-token');
+    fs.writeFileSync(tokenPath, 'file-token\n');
+    delete process.env.KILOCODE_TOKEN;
+    process.env.KILOCODE_TOKEN_FILE = tokenPath;
+
+    const authorization: { value: string | null } = { value: null };
+    globalThis.fetch = asFetch((_, init) => {
+      authorization.value = new Headers(init?.headers).get('Authorization');
+      return Promise.resolve(
+        new Response(makeSnapshot([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+    });
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(true);
+    expect(authorization.value).toBe('Bearer file-token');
+  });
+
+  it('returns download error when KILOCODE_TOKEN_FILE cannot be read', async () => {
+    delete process.env.KILOCODE_TOKEN;
+    process.env.KILOCODE_TOKEN_FILE = path.join(tmpDir, 'missing-token');
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('failed to read KILOCODE_TOKEN_FILE');
+      expect(result.step).toBe('download');
+    }
+  });
+
   it('returns error mentioning both vars when both are missing', async () => {
     delete process.env.KILO_SESSION_INGEST_URL;
     delete process.env.KILOCODE_TOKEN;
@@ -174,6 +221,71 @@ describe('restoreSession', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain('network failure');
+      expect(result.code).toBeNull();
+      expect(result.step).toBe('download');
+    }
+  });
+
+  it('returns download error when the snapshot lacks top-level info.id', async () => {
+    mockFetchOk(JSON.stringify({ detail: 'upstream error body' }));
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('snapshot missing info.id');
+      expect(result.code).toBeNull();
+      expect(result.step).toBe('download');
+    }
+  });
+
+  it('returns download error when the snapshot metadata is not JSON', async () => {
+    mockFetchOk('not valid JSON {{{');
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('snapshot is not valid JSON');
+      expect(result.code).toBeNull();
+      expect(result.step).toBe('download');
+    }
+  });
+
+  it('returns download error when JSON after info.id is malformed', async () => {
+    mockFetchOk('{"info":{"id":"ses_test_fixture"},"messages":[not-json]}');
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('snapshot is not valid JSON');
+      expect(result.code).toBeNull();
+      expect(result.step).toBe('download');
+    }
+  });
+
+  it('returns download error when bytes follow the JSON document', async () => {
+    mockFetchOk('{"info":{"id":"ses_test_fixture"},"messages":[]} trailing');
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('snapshot is not valid JSON');
+      expect(result.code).toBeNull();
+      expect(result.step).toBe('download');
+    }
+  });
+
+  it('returns download error when info.id starts with malformed JSON', async () => {
+    mockFetchOk('{"info":{"id":not-json},"messages":[]}');
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('snapshot is not valid JSON');
       expect(result.code).toBeNull();
       expect(result.step).toBe('download');
     }
@@ -225,7 +337,7 @@ describe('restoreSession', () => {
   });
 
   it('succeeds with zero diffs when messages array is empty', async () => {
-    mockFetchOk(JSON.stringify({ messages: [] }));
+    mockFetchOk(JSON.stringify({ info: snapshotInfo(), messages: [] }));
 
     const result = await restoreSession(SESSION_ID, workspace);
 
@@ -238,7 +350,7 @@ describe('restoreSession', () => {
   });
 
   it('succeeds with zero diffs when messages have no diffs field', async () => {
-    mockFetchOk(JSON.stringify({ messages: [{ info: {} }] }));
+    mockFetchOk(JSON.stringify({ info: snapshotInfo(), messages: [{ info: {} }] }));
 
     const result = await restoreSession(SESSION_ID, workspace);
 

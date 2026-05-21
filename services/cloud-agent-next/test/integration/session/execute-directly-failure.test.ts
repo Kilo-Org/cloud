@@ -7,19 +7,14 @@
  * startExecutionV2 outer catch which returns { success: false }.
  */
 
-import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { env, runInDurableObject } from 'cloudflare:test';
+import { describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { ExecutionId } from '../../../src/types/ids.js';
 import type { StartExecutionV2Request } from '../../../src/execution/types.js';
 
 describe('executeDirectly failure handling', () => {
-  beforeEach(async () => {
-    const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    expect(ids).toHaveLength(0);
-  });
-
   it('orchestrator failure marks execution as failed with callback and stream event', async () => {
     const userId = 'user_exec_direct_fail';
     const sessionId = 'agent_exec_direct_fail';
@@ -33,8 +28,6 @@ describe('executeDirectly failure handling', () => {
           throw new Error('Sandbox connect failed');
         },
       };
-
-      const now = Date.now();
 
       // Prepare the session (required before followup)
       await instance.prepare({
@@ -56,7 +49,7 @@ describe('executeDirectly failure handling', () => {
       const request: StartExecutionV2Request = {
         kind: 'followup',
         userId,
-        prompt: 'do some work',
+        payload: { type: 'prompt', prompt: 'do some work' },
       };
 
       const startResult = await instance.startExecutionV2(request);

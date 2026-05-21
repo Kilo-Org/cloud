@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useUser } from '@/hooks/useUser';
@@ -18,7 +18,6 @@ import {
   Eye,
   EyeOff,
   Save,
-  Settings,
   GitBranch,
   GitPullRequest,
   Bot,
@@ -35,6 +34,7 @@ import {
   X,
   Bug,
   Copy,
+  Globe,
 } from 'lucide-react';
 import {
   Accordion,
@@ -60,12 +60,23 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button as UiButton } from '@/components/ui/button';
+import { WastelandSettingsSection } from './WastelandSettingsSection';
+import {
+  SettingsSection,
+  FieldGroup,
+  SettingsStickyHeader,
+  SettingsScrollspyNav,
+  useScrollSpy,
+  type SettingsNavItem,
+} from '@/components/settings';
 
 type Props = { townId: string; readOnly?: boolean; organizationId?: string };
 
 type EnvVarEntry = { key: string; value: string; isNew?: boolean };
 
-// Section definitions for the scrollspy nav
+// Section definitions for the scrollspy nav. The `wasteland` entry is
+// filtered out for org-context settings via `buildSections(organizationId)`
+// below — wastelands are personal-scoped only.
 const SECTIONS = [
   { id: 'git-auth', label: 'Git Authentication', icon: GitBranch },
   { id: 'github-cli', label: 'GitHub CLI', icon: Key },
@@ -76,58 +87,15 @@ const SECTIONS = [
   { id: 'merge-strategy', label: 'Merge Strategy', icon: GitPullRequest },
   { id: 'refinery', label: 'Refinery', icon: Shield },
   { id: 'container', label: 'Container', icon: Container },
+  { id: 'wasteland', label: 'Wasteland', icon: Globe },
   { id: 'custom-instructions', label: 'Custom Instructions', icon: MessageSquareText },
   { id: 'debug', label: 'Debug', icon: Bug },
   { id: 'danger-zone', label: 'Danger Zone', icon: Trash2 },
 ] as const;
 
-function useScrollSpy(sectionIds: readonly string[]) {
-  const [activeId, setActiveId] = useState<string>(sectionIds[0]);
-  const suppressRef = useRef(false);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      entries => {
-        if (suppressRef.current) return;
-        // Find the topmost visible section
-        const visible = entries
-          .filter(e => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible.length > 0) {
-          setActiveId(visible[0].target.id);
-        }
-      },
-      { rootMargin: '-56px 0px -60% 0px', threshold: 0 }
-    );
-
-    for (const id of sectionIds) {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
-    }
-
-    return () => observer.disconnect();
-  }, [sectionIds]);
-
-  function scrollTo(id: string) {
-    const el = document.getElementById(id);
-    const header = document.getElementById('settings-sticky-header');
-    if (!el) return;
-
-    // Immediately highlight the target and suppress observer during scroll
-    setActiveId(id);
-    suppressRef.current = true;
-
-    const headerHeight = header?.getBoundingClientRect().height ?? 0;
-    const top = el.getBoundingClientRect().top + window.scrollY - headerHeight - 24;
-    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-
-    // Re-enable observer after scroll settles
-    setTimeout(() => {
-      suppressRef.current = false;
-    }, 1000);
-  }
-
-  return { activeId, scrollTo };
+function buildSections(organizationId: string | undefined) {
+  if (organizationId) return SECTIONS.filter(s => s.id !== 'wasteland');
+  return SECTIONS;
 }
 
 export function TownSettingsPageClient({ townId, readOnly = false, organizationId }: Props) {
@@ -337,8 +305,10 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     setInitialized(true);
   }
 
+  const sections = useMemo(() => buildSections(organizationId), [organizationId]);
   const { activeId: activeSection, scrollTo: scrollToSection } = useScrollSpy(
-    SECTIONS.map(s => s.id)
+    sections.map(s => s.id),
+    { stickyHeaderId: 'settings-sticky-header' }
   );
 
   function handleSave() {
@@ -519,35 +489,28 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   return (
     <div>
       <AdminViewingBanner townId={townId} />
-      {/* Top bar */}
-      <div
-        id="settings-sticky-header"
-        className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3"
-      >
-        <div className="flex items-center gap-2.5">
-          <SidebarTrigger className="-ml-3" />
-          <Settings className="size-4 text-white/40" />
-          <h1 className="text-lg font-semibold tracking-tight text-white/90">Settings</h1>
-          <span className="text-sm text-white/30">{townQuery.data?.name}</span>
-        </div>
-        {!effectiveReadOnly && (
-          <Button
-            onClick={handleSave}
-            disabled={updateConfig.isPending}
-            variant="primary"
-            size="sm"
-            className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
-          >
-            <Save className="size-3.5" />
-            {updateConfig.isPending ? 'Saving...' : 'Save'}
-          </Button>
-        )}
-        {effectiveReadOnly && (
-          <span className="text-xs text-white/30">
-            View only — only town creators and org owners can edit
-          </span>
-        )}
-      </div>
+      <SettingsStickyHeader
+        subtitle={townQuery.data?.name}
+        leading={<SidebarTrigger className="-ml-3" />}
+        actions={
+          !effectiveReadOnly ? (
+            <Button
+              onClick={handleSave}
+              disabled={updateConfig.isPending}
+              variant="primary"
+              size="sm"
+              className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+            >
+              <Save className="size-3.5" />
+              {updateConfig.isPending ? 'Saving...' : 'Save'}
+            </Button>
+          ) : (
+            <span className="text-xs text-white/30">
+              View only — only town creators and org owners can edit
+            </span>
+          )
+        }
+      />
 
       {/* Two-column body — viewport scrolls so sticky works */}
       <div className="scroll-smooth">
@@ -1215,6 +1178,27 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                 </div>
               </SettingsSection>
 
+              {/* ── Wasteland ────────────────────────────────────────
+                  Wastelands are personal-scoped only — the standalone
+                  /wasteland routes filter to user-owned wastelands and
+                  the org sidebar no longer surfaces wastelands at all.
+                  Hiding the connect-to-wasteland affordance for
+                  org-context towns keeps the surface consistent: an
+                  org member can't connect their org's town to a
+                  personal wasteland, and there's no org-wasteland
+                  surface to connect to either. */}
+              {!organizationId && (
+                <SettingsSection
+                  id="wasteland"
+                  title="Wasteland"
+                  description="Connect this town to a Wasteland for shared bounties and community contributions."
+                  icon={Globe}
+                  index={9}
+                >
+                  <WastelandSettingsSection townId={townId} readOnly={effectiveReadOnly} />
+                </SettingsSection>
+              )}
+
               {/* ── Custom Instructions ────────────────────────────────── */}
               <SettingsSection
                 id="custom-instructions"
@@ -1336,129 +1320,33 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
             </div>
           </div>
 
-          {/* Right sidebar — sticky scrollspy nav */}
-          <div className="hidden w-52 shrink-0 lg:sticky lg:top-[53px] lg:self-start lg:block">
-            <nav className="px-4 pt-6">
-              <div className="mb-3 text-[10px] font-medium tracking-wide text-white/25 uppercase">
-                On this page
-              </div>
-              <ul className="space-y-0.5">
-                {SECTIONS.map(section => {
-                  const isActive = activeSection === section.id;
-                  const SectionIcon = section.icon;
-
-                  return (
-                    <li key={section.id}>
-                      <button
-                        onClick={() => scrollToSection(section.id)}
-                        className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs whitespace-nowrap overflow-hidden text-ellipsis transition-colors ${
-                          isActive
-                            ? 'bg-white/[0.06] text-white/80'
-                            : 'text-white/35 hover:bg-white/[0.03] hover:text-white/55'
-                        }`}
-                      >
-                        <SectionIcon className="size-3 shrink-0" />
-                        <span className="truncate">{section.label}</span>
-                        {isActive && (
-                          <motion.div
-                            layoutId="settings-nav-indicator"
-                            className="ml-auto size-1 rounded-full bg-[color:oklch(95%_0.15_108)]"
-                            transition={{
-                              type: 'spring',
-                              stiffness: 350,
-                              damping: 30,
-                            }}
-                          />
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-
-              {/* Save button mirrored in sidebar */}
-              {!effectiveReadOnly && (
-                <div className="mt-6 border-t border-white/[0.06] pt-4">
-                  <Button
-                    onClick={handleSave}
-                    disabled={updateConfig.isPending}
-                    variant="primary"
-                    size="sm"
-                    className="w-full gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
-                  >
-                    <Save className="size-3" />
-                    {updateConfig.isPending ? 'Saving...' : 'Save'}
-                  </Button>
-                </div>
-              )}
-            </nav>
-          </div>
+          <SettingsScrollspyNav
+            items={sections as readonly SettingsNavItem[]}
+            activeId={activeSection}
+            onNavigate={scrollToSection}
+            stickyTopPx={53}
+            footer={
+              !effectiveReadOnly ? (
+                <Button
+                  onClick={handleSave}
+                  disabled={updateConfig.isPending}
+                  variant="primary"
+                  size="sm"
+                  className="w-full gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+                >
+                  <Save className="size-3" />
+                  {updateConfig.isPending ? 'Saving...' : 'Save'}
+                </Button>
+              ) : null
+            }
+          />
         </div>
       </div>
     </div>
   );
 }
 
-// ── Shared sub-components ────────────────────────────────────────────────
-
-function SettingsSection({
-  id,
-  title,
-  description,
-  icon: Icon,
-  index,
-  action,
-  children,
-}: {
-  id: string;
-  title: string;
-  description: string;
-  icon: typeof Settings;
-  index: number;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <motion.section
-      id={id}
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.06, duration: 0.35 }}
-    >
-      <div className="mb-4 flex items-start justify-between">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex size-8 items-center justify-center rounded-lg bg-white/[0.04] ring-1 ring-white/[0.06]">
-            <Icon className="size-4 text-white/40" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-white/85">{title}</h2>
-            <p className="mt-0.5 text-xs text-white/35">{description}</p>
-          </div>
-        </div>
-        {action}
-      </div>
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">{children}</div>
-    </motion.section>
-  );
-}
-
-function FieldGroup({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-xs text-white/55">{label}</Label>
-      {children}
-      {hint && <p className="text-[11px] text-white/25">{hint}</p>}
-    </div>
-  );
-}
+// ── Local sub-components ─────────────────────────────────────────────────
 
 function MergeStrategyOption({
   selected,

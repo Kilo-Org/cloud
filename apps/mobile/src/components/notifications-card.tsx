@@ -6,6 +6,7 @@ import { toast } from 'sonner-native';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useAuth } from '@/lib/auth/auth-context';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import * as Notifications from 'expo-notifications';
@@ -25,6 +26,8 @@ export function NotificationsCard() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
+  const { token: authToken } = useAuth();
+  const isAuthenticated = authToken != null;
 
   const { data: permissionGranted = false, isLoading: permissionLoading } = useQuery({
     queryKey: permissionQueryKey,
@@ -40,9 +43,10 @@ export function NotificationsCard() {
     enabled: permissionGranted,
   });
 
-  const { data: pushTokens, isLoading: tokensLoading } = useQuery(
-    trpc.user.getMyPushTokens.queryOptions()
-  );
+  const { data: pushTokens, isLoading: tokensLoading } = useQuery({
+    ...trpc.user.getMyPushTokens.queryOptions(),
+    enabled: isAuthenticated,
+  });
 
   const pushTokensQueryKey = trpc.user.getMyPushTokens.queryOptions().queryKey;
   const serverRegistered =

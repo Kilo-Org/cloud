@@ -28,6 +28,10 @@ import { bot } from '@/lib/bot';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { botPlatforms } from '@/lib/bot/platforms';
+import { APP_URL } from '@/lib/constants';
+
+const appendQueryParam = (path: string, queryParam: string): string =>
+  `${path}${path.includes('?') ? '&' : '?'}${queryParam}`;
 
 function htmlPage(title: string, message: string, status = 200): Response {
   return new Response(
@@ -119,7 +123,7 @@ export async function GET(request: NextRequest) {
     if (authFailedResponse) {
       // If user is not authenticated (e.g., GitHub admin approving installation),
       // redirect to homepage instead of showing "Unauthorized"
-      return NextResponse.redirect(new URL('/', request.url));
+      return NextResponse.redirect(new URL('/', APP_URL));
     }
 
     // 2. Extract parameters
@@ -155,7 +159,7 @@ export async function GET(request: NextRequest) {
         tags: { endpoint: 'github/callback', source: 'github_app_installation' },
         extra: { installationId, rawState, allParams: Object.fromEntries(searchParams.entries()) },
       });
-      return NextResponse.redirect(new URL('/', request.url));
+      return NextResponse.redirect(new URL('/', APP_URL));
     }
 
     // 4. Verify user has access to the owner
@@ -164,9 +168,15 @@ export async function GET(request: NextRequest) {
     } else {
       // For user-owned integrations, verify it's the same user
       if (user.id !== owner.id) {
-        return NextResponse.redirect(new URL('/', request.url));
+        return NextResponse.redirect(new URL('/', APP_URL));
       }
     }
+
+    const integrationPath =
+      owner.type === 'org'
+        ? `/organizations/${owner.id}/integrations/github`
+        : `/integrations/github`;
+    const redirectPath = returnTo || integrationPath;
 
     // 5. Determine which GitHub App to use based on organization settings
     const appType = await getGitHubAppTypeForOrganization(owner.type === 'org' ? owner.id : null);
@@ -176,12 +186,9 @@ export async function GET(request: NextRequest) {
     if (setupAction === 'delete' || setupAction === 'suspend') {
       console.log(`GitHub App ${setupAction} action detected, skipping installation fetch`);
 
-      const redirectPath =
-        owner.type === 'org'
-          ? `/organizations/${owner.id}/integrations/github?action=${setupAction}`
-          : `/integrations/github?action=${setupAction}`;
-
-      return NextResponse.redirect(new URL(redirectPath, request.url));
+      return NextResponse.redirect(
+        new URL(appendQueryParam(redirectPath, `github_action=${setupAction}`), APP_URL)
+      );
     }
 
     // Handle pending approval - store requester info for webhook matching
@@ -221,12 +228,14 @@ export async function GET(request: NextRequest) {
               githubRequesterId: githubRequester.id,
             });
 
-            const redirectPath =
+            const queryParam =
               owner.type === 'org'
-                ? `/organizations/${owner.id}/integrations/github?error=pending_installation_exists&org=${existingOwnerId}`
-                : `/integrations/github?error=pending_installation_exists`;
+                ? `error=pending_installation_exists&org=${existingOwnerId}`
+                : 'error=pending_installation_exists';
 
-            return NextResponse.redirect(new URL(redirectPath, request.url));
+            return NextResponse.redirect(
+              new URL(appendQueryParam(redirectPath, queryParam), APP_URL)
+            );
           }
         }
 
@@ -245,22 +254,16 @@ export async function GET(request: NextRequest) {
         });
 
         // Redirect back to integrations page with pending approval status
-        const redirectPath =
-          owner.type === 'org'
-            ? `/organizations/${owner.id}/integrations/github?pending_approval=true`
-            : `/integrations/github?pending_approval=true`;
+        const queryParam = returnTo ? 'github_pending_approval=true' : 'pending_approval=true';
 
-        return NextResponse.redirect(new URL(redirectPath, request.url));
+        return NextResponse.redirect(new URL(appendQueryParam(redirectPath, queryParam), APP_URL));
       } catch (error) {
         console.error('Error creating pending installation:', error);
         captureException(error);
 
-        const redirectPath =
-          owner.type === 'org'
-            ? `/organizations/${owner.id}/integrations/github?error=pending_setup_failed`
-            : `/integrations/github?error=pending_setup_failed`;
-
-        return NextResponse.redirect(new URL(redirectPath, request.url));
+        return NextResponse.redirect(
+          new URL(appendQueryParam(redirectPath, 'error=pending_setup_failed'), APP_URL)
+        );
       }
     }
 
@@ -272,12 +275,9 @@ export async function GET(request: NextRequest) {
         extra: { setupAction, rawState, allParams: Object.fromEntries(searchParams.entries()) },
       });
 
-      const redirectPath =
-        owner.type === 'org'
-          ? `/organizations/${owner.id}/integrations/github?error=missing_installation_id`
-          : `/integrations/github?error=missing_installation_id`;
-
-      return NextResponse.redirect(new URL(redirectPath, request.url));
+      return NextResponse.redirect(
+        new URL(appendQueryParam(redirectPath, 'error=missing_installation_id'), APP_URL)
+      );
     }
 
     // 6. Fetch installation details from GitHub
@@ -323,12 +323,17 @@ export async function GET(request: NextRequest) {
 
       // If installation not found, it might have been deleted or belongs to a different app
       if (err.status === 404) {
-        const redirectPath =
-          owner.type === 'org'
-            ? `/organizations/${owner.id}/integrations/github?error=installation_not_found&id=${installationId}`
-            : `/integrations/github?error=installation_not_found&id=${installationId}`;
+        const encodedInstallationId = encodeURIComponent(installationId);
 
-        return NextResponse.redirect(new URL(redirectPath, request.url));
+        return NextResponse.redirect(
+          new URL(
+            appendQueryParam(
+              redirectPath,
+              `error=installation_not_found&id=${encodedInstallationId}`
+            ),
+            APP_URL
+          )
+        );
       }
 
       throw error;
@@ -388,13 +393,11 @@ export async function GET(request: NextRequest) {
     }
 
     // 9. Redirect to success page
-    const successPath = returnTo
-      ? `${returnTo}${returnTo.includes('?') ? '&' : '?'}github_install=success`
-      : owner.type === 'org'
-        ? `/organizations/${owner.id}/integrations/github?success=installed`
-        : `/integrations/github?success=installed`;
+    const successQueryParam = returnTo ? 'github_install=success' : 'success=installed';
 
-    return NextResponse.redirect(new URL(successPath, request.url));
+    return NextResponse.redirect(
+      new URL(appendQueryParam(redirectPath, successQueryParam), APP_URL)
+    );
   } catch (error) {
     console.error('Error handling GitHub App callback:', error);
 
@@ -414,17 +417,19 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const { ownerToken: errorOwnerToken } = parseStateReturn(rawState);
+    const { ownerToken: errorOwnerToken, returnTo } = parseStateReturn(rawState);
 
-    let redirectPath = '/?error=installation_failed';
+    let redirectPath = returnTo || '/';
 
-    if (errorOwnerToken.startsWith('org_')) {
+    if (!returnTo && errorOwnerToken.startsWith('org_')) {
       const orgId = errorOwnerToken.slice(4);
-      redirectPath = `/organizations/${orgId}/integrations/github?error=installation_failed`;
-    } else if (errorOwnerToken.startsWith('user_')) {
-      redirectPath = `/integrations/github?error=installation_failed`;
+      redirectPath = `/organizations/${orgId}/integrations/github`;
+    } else if (!returnTo && errorOwnerToken.startsWith('user_')) {
+      redirectPath = `/integrations/github`;
     }
 
-    return NextResponse.redirect(new URL(redirectPath, request.url));
+    return NextResponse.redirect(
+      new URL(appendQueryParam(redirectPath, 'error=installation_failed'), APP_URL)
+    );
   }
 }

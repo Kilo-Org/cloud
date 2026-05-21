@@ -207,6 +207,14 @@ const ONBOARDING_BRIEFING_FALLBACK_TEXT =
  * `useTyping.ts`).
  */
 const ONBOARDING_BRIEFING_TYPING_PING_MS = 1_500;
+/**
+ * A `generating` onboarding-briefing record older than this is assumed
+ * stranded — the gateway likely restarted mid-generation before the
+ * fire-and-forget delivery finished — so a later trigger resumes it.
+ * Comfortably longer than a full briefing generation (web search +
+ * calendar, well under two minutes).
+ */
+const ONBOARDING_BRIEFING_STALE_MS = 5 * 60_000;
 
 type SourceCollectionResult = {
   source: 'calendar' | 'github' | 'kilo-chat' | 'linear' | 'local-news' | 'web';
@@ -1826,7 +1834,19 @@ async function runOnboardingBriefingDelivery(
 }
 
 /**
- * Create (or return the existing) "Today's briefing" conversation for the
+ * In-process serialization for `startOnboardingBriefing`. Without it two
+ * overlapping calls (a React StrictMode double-invoke, a retry, a second
+ * tab) could both observe no persisted record and create duplicate
+ * "Today's briefing" conversations. While one call is in flight, others
+ * await it and receive the same result.
+ */
+let onboardingBriefingInFlight: Promise<{
+  conversationId: string;
+  alreadyStarted: boolean;
+}> | null = null;
+
+/**
+ * Create (or resume) the "Today's briefing" conversation for the
  * post-onboarding chat landing, and kick off briefing generation.
  *
  * Synchronous part: create the conversation, post the loading bubble,
@@ -1834,10 +1854,31 @@ async function runOnboardingBriefingDelivery(
  * mutation does not block. The slow generation runs fire-and-forget via
  * `runOnboardingBriefingDelivery`.
  *
- * Idempotent: a persisted record makes a repeat call return the existing
- * `conversationId` instead of creating a second conversation.
+ * Idempotency with recovery, keyed off the persisted record's state:
+ *  - `delivered`  → done; return the conversation.
+ *  - `failed`     → a transient failure; resume delivery.
+ *  - `generating` and stale (older than `ONBOARDING_BRIEFING_STALE_MS`, or
+ *    an unparseable timestamp) → the gateway likely restarted mid-run and
+ *    stranded the loading bubble; resume delivery.
+ *  - `generating` and fresh → generation is still in flight; do nothing.
  */
 async function startOnboardingBriefing(
+  api: OnboardingBriefingApi,
+  options?: { settingsHref?: string }
+): Promise<{ conversationId: string; alreadyStarted: boolean }> {
+  if (onboardingBriefingInFlight) {
+    return onboardingBriefingInFlight;
+  }
+  const work = startOnboardingBriefingUnguarded(api, options);
+  onboardingBriefingInFlight = work;
+  try {
+    return await work;
+  } finally {
+    onboardingBriefingInFlight = null;
+  }
+}
+
+async function startOnboardingBriefingUnguarded(
   api: OnboardingBriefingApi,
   options?: { settingsHref?: string }
 ): Promise<{ conversationId: string; alreadyStarted: boolean }> {
@@ -1846,6 +1887,24 @@ async function startOnboardingBriefing(
 
   const existing = await readJsonFile<StoredOnboardingBriefing>(paths.onboardingBriefingPath);
   if (existing?.conversationId) {
+    if (existing.state !== 'delivered') {
+      const startedAtMs = Date.parse(existing.startedAt);
+      const staleGenerating =
+        existing.state === 'generating' &&
+        (!Number.isFinite(startedAtMs) || Date.now() - startedAtMs > ONBOARDING_BRIEFING_STALE_MS);
+      if (existing.state === 'failed' || staleGenerating) {
+        // Re-stamp `startedAt` so a subsequent call sees this as a fresh
+        // in-flight run rather than resuming it again.
+        const resumed: StoredOnboardingBriefing = {
+          ...existing,
+          state: 'generating',
+          startedAt: new Date().toISOString(),
+        };
+        await writeJsonFile(paths.onboardingBriefingPath, resumed);
+        const dateKey = await resolveDateKeyForOffset(api, 0);
+        void runOnboardingBriefingDelivery(api, dateKey, resumed, paths.onboardingBriefingPath);
+      }
+    }
     return { conversationId: existing.conversationId, alreadyStarted: true };
   }
 
@@ -1872,7 +1931,7 @@ async function startOnboardingBriefing(
 
   const dateKey = await resolveDateKeyForOffset(api, 0);
   // Fire-and-forget: generation is slow (web search, calendar); the loading
-  // bubble covers the gap until the section bubbles stream in.
+  // bubble covers the gap until the briefing replaces it.
   void runOnboardingBriefingDelivery(api, dateKey, record, paths.onboardingBriefingPath);
 
   return { conversationId, alreadyStarted: false };

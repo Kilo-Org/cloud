@@ -16,7 +16,34 @@
 const DEFAULT_CONTROLLER_BASE_URL = 'http://127.0.0.1:18789';
 const DEFAULT_TIMEOUT_MS = 20_000;
 
+/**
+ * Per-text-block character cap in Kilo Chat. Keep in sync with
+ * `MESSAGE_TEXT_MAX_CHARS` in `packages/kilo-chat/src/schemas.ts` — the
+ * plugin is across the service boundary so it cannot import the constant.
+ * A message accepts up to 20 such blocks; the chat UI concatenates a
+ * message's text blocks back into one rendered bubble, so splitting here
+ * respects the per-block cap without changing what the user sees.
+ */
+const KILO_CHAT_TEXT_BLOCK_MAX = 8000;
+
 type FetchImpl = typeof fetch;
+
+/**
+ * Split text into Kilo Chat text content blocks no larger than the
+ * per-block cap. Most messages fit in a single block; a long briefing
+ * spills into a few. The chat client re-joins a message's text blocks
+ * with no separator, so the split point does not affect rendering.
+ */
+export function toTextContentBlocks(text: string): Array<{ type: 'text'; text: string }> {
+  if (text.length <= KILO_CHAT_TEXT_BLOCK_MAX) {
+    return [{ type: 'text', text }];
+  }
+  const blocks: Array<{ type: 'text'; text: string }> = [];
+  for (let i = 0; i < text.length; i += KILO_CHAT_TEXT_BLOCK_MAX) {
+    blocks.push({ type: 'text', text: text.slice(i, i + KILO_CHAT_TEXT_BLOCK_MAX) });
+  }
+  return blocks;
+}
 
 export type KiloChatWriteClientOptions = {
   baseUrl?: string;
@@ -149,7 +176,7 @@ export function createKiloChatWriteClient(
         fetchImpl,
         `${baseUrl}/_kilo/kilo-chat/send`,
         gatewayToken,
-        { conversationId, content: [{ type: 'text', text }] },
+        { conversationId, content: toTextContentBlocks(text) },
         timeoutMs
       )
     );
@@ -169,7 +196,7 @@ export function createKiloChatWriteClient(
       fetchImpl,
       `${baseUrl}/_kilo/kilo-chat/messages/${encodeURIComponent(messageId)}`,
       gatewayToken,
-      { conversationId, content: [{ type: 'text', text }], timestamp: Date.now() },
+      { conversationId, content: toTextContentBlocks(text), timestamp: Date.now() },
       timeoutMs,
       'PATCH'
     );

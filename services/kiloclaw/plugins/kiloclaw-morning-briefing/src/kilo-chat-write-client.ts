@@ -14,6 +14,13 @@
  */
 
 const DEFAULT_CONTROLLER_BASE_URL = 'http://127.0.0.1:18789';
+/**
+ * Per-call timeout for a controller proxy hop. Only one such call —
+ * `createConversation` — sits in the synchronous onboarding route path
+ * that the worker awaits (the loading message and the briefing itself are
+ * sent from the fire-and-forget delivery), so this stays comfortably
+ * under the worker-to-controller request budget.
+ */
 const DEFAULT_TIMEOUT_MS = 20_000;
 
 /**
@@ -26,6 +33,18 @@ const DEFAULT_TIMEOUT_MS = 20_000;
  */
 const KILO_CHAT_TEXT_BLOCK_MAX = 8000;
 
+/**
+ * Max text content blocks Kilo Chat accepts per message. Keep in sync with
+ * the message-content limit in `packages/kilo-chat/src/schemas.ts`.
+ */
+const KILO_CHAT_MAX_TEXT_BLOCKS = 20;
+
+/** Largest text a single message can carry: 20 blocks of 8000 chars. */
+const KILO_CHAT_MESSAGE_TEXT_MAX = KILO_CHAT_TEXT_BLOCK_MAX * KILO_CHAT_MAX_TEXT_BLOCKS;
+
+/** Appended when text is truncated to fit the per-message limit. */
+const KILO_CHAT_TRUNCATION_MARKER = '\n\n[Briefing truncated.]';
+
 type FetchImpl = typeof fetch;
 
 /**
@@ -33,14 +52,25 @@ type FetchImpl = typeof fetch;
  * per-block cap. Most messages fit in a single block; a long briefing
  * spills into a few. The chat client re-joins a message's text blocks
  * with no separator, so the split point does not affect rendering.
+ *
+ * Kilo Chat also caps a message at 20 text blocks. A briefing should
+ * never approach 160k characters, but a runaway upstream payload would
+ * otherwise produce >20 blocks and fail Kilo Chat's message validation —
+ * dropping the whole briefing. Guard that by truncating with a marker so
+ * the result always fits in a single valid message.
  */
 export function toTextContentBlocks(text: string): Array<{ type: 'text'; text: string }> {
-  if (text.length <= KILO_CHAT_TEXT_BLOCK_MAX) {
-    return [{ type: 'text', text }];
+  const safeText =
+    text.length > KILO_CHAT_MESSAGE_TEXT_MAX
+      ? text.slice(0, KILO_CHAT_MESSAGE_TEXT_MAX - KILO_CHAT_TRUNCATION_MARKER.length) +
+        KILO_CHAT_TRUNCATION_MARKER
+      : text;
+  if (safeText.length <= KILO_CHAT_TEXT_BLOCK_MAX) {
+    return [{ type: 'text', text: safeText }];
   }
   const blocks: Array<{ type: 'text'; text: string }> = [];
-  for (let i = 0; i < text.length; i += KILO_CHAT_TEXT_BLOCK_MAX) {
-    blocks.push({ type: 'text', text: text.slice(i, i + KILO_CHAT_TEXT_BLOCK_MAX) });
+  for (let i = 0; i < safeText.length; i += KILO_CHAT_TEXT_BLOCK_MAX) {
+    blocks.push({ type: 'text', text: safeText.slice(i, i + KILO_CHAT_TEXT_BLOCK_MAX) });
   }
   return blocks;
 }

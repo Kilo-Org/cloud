@@ -173,7 +173,15 @@ type StoredStatus = {
  */
 type StoredOnboardingBriefing = {
   conversationId: string;
-  loadingMessageId: string;
+  /**
+   * Id of the loading bubble the briefing is edited into. Optional and
+   * filled in by the delivery run, not the synchronous start: the record
+   * is persisted as soon as the conversation exists so a crash before the
+   * loading message is sent cannot strand an unrecorded conversation and
+   * leak a duplicate on the next trigger. A resume with no id sends a
+   * fresh loading bubble.
+   */
+  loadingMessageId?: string;
   startedAt: string;
   state: 'generating' | 'delivered' | 'failed';
   /**
@@ -1766,10 +1774,10 @@ type OnboardingBriefingApi = Parameters<typeof generateBriefing>[0] &
 /**
  * Generate the briefing and post it into the onboarding conversation.
  *
- * Runs fire-and-forget after `startOnboardingBriefing` has already created
- * the conversation and a loading bubble: the loading bubble is edited into
- * the full briefing — one message. On failure it is replaced with a
- * friendly fallback instead.
+ * Runs fire-and-forget after `startOnboardingBriefing` has created the
+ * conversation. Posts the loading bubble (unless a prior interrupted run
+ * already did), then edits it into the full briefing — one message. On
+ * failure it is replaced with a friendly fallback instead.
  *
  * While generation runs, a bot typing indicator is kept alive so the chat
  * shows "<bot> is typing..." rather than a static wait. Posts directly as
@@ -1783,19 +1791,35 @@ async function runOnboardingBriefingDelivery(
   onboardingBriefingPath: string
 ): Promise<void> {
   const writeClient = createKiloChatWriteClient();
-  const { conversationId, loadingMessageId } = record;
-
-  // Keep a "<bot> is typing..." indicator alive while the slow briefing
-  // generation runs. The chat UI clears a typing indicator ~5s after the
-  // last ping, so re-ping under that interval. Every typing call is
-  // best-effort — a failed ping is cosmetic, never a reason to fail
-  // delivery.
-  await writeClient.sendTyping(conversationId).catch(() => {});
-  const typingTimer = setInterval(() => {
-    void writeClient.sendTyping(conversationId).catch(() => {});
-  }, ONBOARDING_BRIEFING_TYPING_PING_MS);
+  const { conversationId } = record;
+  let storedRecord = record;
+  let loadingMessageId = record.loadingMessageId;
+  let typingTimer: ReturnType<typeof setInterval> | undefined;
 
   try {
+    // Post the loading bubble if the start (or a prior interrupted run)
+    // has not already. Persist its id right away so a crash before
+    // generation finishes lets a resume edit this same bubble rather than
+    // leaving a second one behind.
+    if (!loadingMessageId) {
+      loadingMessageId = await writeClient.sendTextMessage(
+        conversationId,
+        ONBOARDING_BRIEFING_LOADING_TEXT
+      );
+      storedRecord = { ...storedRecord, loadingMessageId };
+      await writeJsonFile(onboardingBriefingPath, storedRecord);
+    }
+
+    // Keep a "<bot> is typing..." indicator alive while the slow briefing
+    // generation runs. The chat UI clears a typing indicator ~5s after the
+    // last ping, so re-ping under that interval. Every typing call is
+    // best-effort — a failed ping is cosmetic, never a reason to fail
+    // delivery.
+    await writeClient.sendTyping(conversationId).catch(() => {});
+    typingTimer = setInterval(() => {
+      void writeClient.sendTyping(conversationId).catch(() => {});
+    }, ONBOARDING_BRIEFING_TYPING_PING_MS);
+
     // Skip the Kilo Chat stats section (a brand-new user has no chat
     // history) and channel delivery (this is a chat-only first message,
     // not something to fan out to Telegram/Discord/Slack).
@@ -1809,27 +1833,35 @@ async function runOnboardingBriefingDelivery(
       sections: result.sections,
       statuses: result.statuses,
       tldr: result.tldr,
-      settingsHref: record.settingsHref,
+      settingsHref: storedRecord.settingsHref,
     });
     // The loading bubble is edited into the full briefing — a single bubble.
     await writeClient.editTextMessage(conversationId, loadingMessageId, message);
-    await writeJsonFile(onboardingBriefingPath, { ...record, state: 'delivered' });
+    await writeJsonFile(onboardingBriefingPath, { ...storedRecord, state: 'delivered' });
   } catch (error) {
-    clearInterval(typingTimer);
+    if (typingTimer) clearInterval(typingTimer);
     await writeClient.stopTyping(conversationId).catch(() => {});
     const errorText = error instanceof Error ? error.message : String(error);
     api.logger.warn?.(`Onboarding briefing delivery failed: ${errorText}`);
     try {
-      await writeClient.editTextMessage(
-        conversationId,
-        loadingMessageId,
-        ONBOARDING_BRIEFING_FALLBACK_TEXT
-      );
+      // Edit the fallback into the loading bubble if one exists; otherwise
+      // the loading-message send itself failed, so post the fallback fresh.
+      if (loadingMessageId) {
+        await writeClient.editTextMessage(
+          conversationId,
+          loadingMessageId,
+          ONBOARDING_BRIEFING_FALLBACK_TEXT
+        );
+      } else {
+        await writeClient.sendTextMessage(conversationId, ONBOARDING_BRIEFING_FALLBACK_TEXT);
+      }
     } catch (editError) {
       const editText = editError instanceof Error ? editError.message : String(editError);
       api.logger.warn?.(`Onboarding briefing fallback edit failed: ${editText}`);
     }
-    await writeJsonFile(onboardingBriefingPath, { ...record, state: 'failed' }).catch(() => {});
+    await writeJsonFile(onboardingBriefingPath, { ...storedRecord, state: 'failed' }).catch(
+      () => {}
+    );
   }
 }
 
@@ -1849,10 +1881,10 @@ let onboardingBriefingInFlight: Promise<{
  * Create (or resume) the "Today's briefing" conversation for the
  * post-onboarding chat landing, and kick off briefing generation.
  *
- * Synchronous part: create the conversation, post the loading bubble,
- * persist the record, return the conversation id fast so the worker
- * mutation does not block. The slow generation runs fire-and-forget via
- * `runOnboardingBriefingDelivery`.
+ * Synchronous part: create the conversation, persist the record, return
+ * the conversation id fast so the worker mutation does not block — a
+ * single controller round trip. Posting the loading bubble and the slow
+ * generation both run fire-and-forget via `runOnboardingBriefingDelivery`.
  *
  * Idempotency with recovery, keyed off the persisted record's state:
  *  - `delivered`  → done; return the conversation.
@@ -1915,14 +1947,16 @@ async function startOnboardingBriefingUnguarded(
     );
   }
 
+  // Persist the record the moment the conversation exists, before sending
+  // the loading message. A crash between conversation creation and this
+  // write is the only remaining duplicate window — one local file write,
+  // far tighter than also waiting on the loading-message round trip — and
+  // is unavoidable without a transaction across a remote call. The loading
+  // message is sent from the fire-and-forget delivery, which also keeps
+  // the synchronous route path down to a single controller round trip.
   const conversationId = await writeClient.createConversation(ONBOARDING_BRIEFING_TITLE);
-  const loadingMessageId = await writeClient.sendTextMessage(
-    conversationId,
-    ONBOARDING_BRIEFING_LOADING_TEXT
-  );
   const record: StoredOnboardingBriefing = {
     conversationId,
-    loadingMessageId,
     startedAt: new Date().toISOString(),
     state: 'generating',
     settingsHref: options?.settingsHref,
@@ -1930,8 +1964,8 @@ async function startOnboardingBriefingUnguarded(
   await writeJsonFile(paths.onboardingBriefingPath, record);
 
   const dateKey = await resolveDateKeyForOffset(api, 0);
-  // Fire-and-forget: generation is slow (web search, calendar); the loading
-  // bubble covers the gap until the briefing replaces it.
+  // Fire-and-forget: generation is slow (web search, calendar); delivery
+  // posts the loading bubble first, then edits the briefing into it.
   void runOnboardingBriefingDelivery(api, dateKey, record, paths.onboardingBriefingPath);
 
   return { conversationId, alreadyStarted: false };

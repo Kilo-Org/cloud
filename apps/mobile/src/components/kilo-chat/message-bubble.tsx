@@ -1,6 +1,5 @@
-/* eslint-disable max-lines -- message bubble grows with each new content-block type */
 import { type ExecApprovalDecision, type KiloChatClient, type Message } from '@kilocode/kilo-chat';
-import { AlertCircle, CheckCircle2, Reply, XCircle } from 'lucide-react-native';
+import { Reply } from 'lucide-react-native';
 import { memo } from 'react';
 import { Pressable, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -13,7 +12,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -24,14 +22,8 @@ import {
   SWIPE_REPLY_DISTANCE,
   SWIPE_REPLY_MAX_TRANSLATE,
 } from './message-gesture-state';
-import { MessageMarkdown } from './message-markdown';
-import {
-  getDeliveryFailureLabel,
-  getReplyPreviewText,
-  isMessageEdited,
-  type ReplyPreviewSource,
-} from './message-presentation';
-import { MessageAttachment } from './message-attachment';
+import { MessageBubbleContent } from './message-bubble-content';
+import { isMessageEdited, type ReplyPreviewSource } from './message-presentation';
 import { MessageReactionPills } from './message-reaction-pills';
 
 type Props = {
@@ -52,18 +44,6 @@ type Props = {
 
 function formatTimestamp(ms: number): string {
   return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
-function actionStyleToVariant(
-  style: 'primary' | 'danger' | 'secondary'
-): 'default' | 'destructive' | 'secondary' {
-  if (style === 'danger') {
-    return 'destructive';
-  }
-  if (style === 'secondary') {
-    return 'secondary';
-  }
-  return 'default';
 }
 
 function MessageBubbleComponent({
@@ -91,10 +71,6 @@ function MessageBubbleComponent({
   const longPressHighlight = useSharedValue(0);
   const canSwipeReply =
     onSwipeReply !== undefined && !isPending && !message.deleted && !message.deliveryFailed;
-
-  function handleExecuteAction(groupId: string, value: ExecApprovalDecision) {
-    onExecuteAction(message, groupId, value);
-  }
 
   function handleSwipeReply() {
     onSwipeReply?.(message);
@@ -169,9 +145,6 @@ function MessageBubbleComponent({
     opacity: longPressHighlight.value,
   }));
 
-  const textColor = isFromMe ? 'text-primary-foreground' : 'text-foreground';
-  const deliveryFailureLabel = getDeliveryFailureLabel(message);
-
   return (
     <GestureDetector gesture={swipeGesture}>
       <Pressable
@@ -222,85 +195,15 @@ function MessageBubbleComponent({
               )}
               style={longPressHighlightStyle}
             />
-            {message.deleted ? (
-              <Text className={cn('text-sm italic opacity-50', textColor)}>[deleted message]</Text>
-            ) : (
-              <>
-                {replyToMessage && (
-                  <View
-                    className={cn(
-                      'mb-2 border-l-2 py-1 pl-2',
-                      isFromMe ? 'border-primary-foreground' : 'border-muted-foreground'
-                    )}
-                  >
-                    <Text numberOfLines={2} className={cn('text-xs opacity-80', textColor)}>
-                      {getReplyPreviewText(replyToMessage)}
-                    </Text>
-                  </View>
-                )}
-                {message.content.map((block, index) => {
-                  if (block.type === 'text') {
-                    return <MessageMarkdown key={index} text={block.text} isFromMe={isFromMe} />;
-                  }
-
-                  if (block.type === 'attachment') {
-                    return (
-                      <MessageAttachment
-                        key={block.attachmentId}
-                        client={client}
-                        conversationId={conversationId}
-                        block={block}
-                        isFromMe={isFromMe}
-                      />
-                    );
-                  }
-
-                  // block.type === 'actions'
-                  if (block.resolved) {
-                    const resolvedAction = block.actions.find(
-                      action => action.value === block.resolved?.value
-                    );
-                    const label = resolvedAction?.label ?? block.resolved.value;
-                    const Icon = block.resolved.value.startsWith('allow') ? CheckCircle2 : XCircle;
-                    return (
-                      <View key={block.groupId} className="mt-2 flex-row items-center gap-1.5">
-                        <Icon
-                          size={14}
-                          color={isFromMe ? colors.primaryForeground : colors.mutedForeground}
-                        />
-                        <Text className={cn('text-xs opacity-70', textColor)}>{label}</Text>
-                      </View>
-                    );
-                  }
-
-                  return (
-                    <View key={block.groupId} className="mt-2 flex-row flex-wrap gap-2">
-                      {block.actions.map(action => (
-                        <Button
-                          key={action.value}
-                          variant={actionStyleToVariant(action.style)}
-                          size="sm"
-                          disabled={pendingActionGroupId === block.groupId}
-                          onPress={() => {
-                            handleExecuteAction(block.groupId, action.value);
-                          }}
-                        >
-                          <Text>{action.label}</Text>
-                        </Button>
-                      ))}
-                    </View>
-                  );
-                })}
-                {deliveryFailureLabel && (
-                  <View className="mt-2 flex-row items-center gap-1.5">
-                    <AlertCircle size={14} color={colors.destructive} />
-                    <Text className="text-xs font-medium text-red-600 dark:text-red-400">
-                      {deliveryFailureLabel}
-                    </Text>
-                  </View>
-                )}
-              </>
-            )}
+            <MessageBubbleContent
+              client={client}
+              conversationId={conversationId}
+              message={message}
+              isFromMe={isFromMe}
+              pendingActionGroupId={pendingActionGroupId}
+              replyToMessage={replyToMessage}
+              onExecuteAction={onExecuteAction}
+            />
 
             {!showAuthor && timestamp !== null && (
               <Text

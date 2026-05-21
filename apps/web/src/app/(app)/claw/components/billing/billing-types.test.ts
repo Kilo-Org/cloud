@@ -187,6 +187,28 @@ describe('BillingBanner credit renewal recovery', () => {
     expect(html).toContain('href="/credits"');
     expect(html).not.toContain('Update Payment');
   });
+
+  it('keeps Stripe-funded hybrid past-due subscriptions on payment recovery', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(BillingBanner, {
+        billing: createBillingStatus({
+          subscription: {
+            status: 'past_due',
+            hasStripeFunding: true,
+            paymentSource: 'credits',
+          },
+        }),
+        onSubscribeClick: () => undefined,
+        onReactivateClick: () => undefined,
+        onUpdatePaymentClick: () => undefined,
+      })
+    );
+
+    expect(html).toContain('Your subscription payment failed.');
+    expect(html).toContain('Update Payment');
+    expect(html).not.toContain('href="/credits"');
+    expect(html).not.toContain('Add Credits');
+  });
 });
 
 describe('billing-types pending settlement compatibility', () => {

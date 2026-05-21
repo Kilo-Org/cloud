@@ -273,12 +273,19 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
-  // For FREE models: check rate limit, log at start.
-  // Server-side products (cloud-agent, code-review, app-builder) rate-limit
-  // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
-  // All other products rate-limit per IP (fast pre-auth path).
+  // Experimented public ids are treated as free models for the rest of this
+  // request: anonymous access allowed, free-model rate limit applied, balance
+  // check skipped. Resolved once via the in-process Redis-backed cache.
+  const isExperimentedModel = await isPublicIdExperimented(originalModelIdLowerCased);
+
+  // For FREE models (including experimented public ids): check rate limit, log
+  // at start. Server-side products (cloud-agent, code-review, app-builder)
+  // rate-limit per user when the request comes from Cloudflare IPs (Kilo
+  // infrastructure). All other products rate-limit per IP (fast pre-auth path).
   const isRateLimitedFreeModelRequest =
-    isKiloExclusiveFreeModel(originalModelIdLowerCased) || autoModel === KILO_AUTO_FREE_MODEL.id;
+    isKiloExclusiveFreeModel(originalModelIdLowerCased) ||
+    autoModel === KILO_AUTO_FREE_MODEL.id ||
+    isExperimentedModel;
   if (isRateLimitedFreeModelRequest) {
     const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
     if (rateLimit instanceof NextResponse) return rateLimit;
@@ -316,11 +323,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
-    // No valid auth
-    const allowsAnonymousAccess =
-      isFreeModel(originalModelIdLowerCased) ||
-      (await isPublicIdExperimented(originalModelIdLowerCased));
-    if (!allowsAnonymousAccess) {
+    // No valid auth. Experimented public ids are treated as free models here
+    // so anonymous traffic can reach the experiment-routing branch in
+    // `getProvider`.
+    if (!isFreeModel(originalModelIdLowerCased) && !isExperimentedModel) {
       // Paid model requires authentication
       return NextResponse.json(
         {
@@ -406,7 +412,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     provider,
     userByok,
     bypassAccessCheck,
-    skipBalanceCheck,
     skipProviderPin,
     skipKiloExclusiveModelSettings,
     experiment,
@@ -500,7 +505,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user) && !bypassAccessCheck) {
     const { balance, settings, plan } = await balanceAndSettingsPromise;
 
-    if (balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok && !skipBalanceCheck) {
+    if (
+      balance <= 0 &&
+      !isFreeModel(originalModelIdLowerCased) &&
+      !isExperimentedModel &&
+      !userByok
+    ) {
       return await usageLimitExceededResponse(user, balance);
     }
 

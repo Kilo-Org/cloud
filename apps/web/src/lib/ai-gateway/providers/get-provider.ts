@@ -45,9 +45,6 @@ export type GetProviderProviderResult = {
    *  by direct-byok and custom_llm2 because both already require explicit
    *  admin opt-in. */
   bypassAccessCheck: boolean;
-  /** Skip only the balance check while still enforcing organization model/
-   *  provider policy. Set for experiment traffic (preview/provider-funded). */
-  skipBalanceCheck?: boolean;
   /** Skip pinning `body.provider` from the organization-determined config.
    *  Set for direct experiment upstreams where the partner endpoint is
    *  selected by the variant, not by gateway routing. */
@@ -218,7 +215,6 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
         provider: buildDirectProvider(selection.upstream),
         userByok: null,
         bypassAccessCheck: false,
-        skipBalanceCheck: true,
         skipProviderPin: true,
         skipKiloExclusiveModelSettings: true,
         experiment: {

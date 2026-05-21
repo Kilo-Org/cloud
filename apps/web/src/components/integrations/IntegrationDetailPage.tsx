@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { Suspense } from 'react';
+import { Suspense, type ReactNode } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -19,64 +19,126 @@ export type IntegrationDetailSearchParams = Promise<{
   org?: string;
 }>;
 
-const INTEGRATION_DETAIL_PLATFORMS = [
-  PLATFORM.GITHUB,
-  PLATFORM.GITLAB,
-  PLATFORM.SLACK,
-  PLATFORM.DISCORD,
-  PLATFORM.LINEAR,
-  PLATFORM.DOLTHUB,
-] as const;
-
-type IntegrationDetailPlatform = (typeof INTEGRATION_DETAIL_PLATFORMS)[number];
-
 type DetailRenderProps = {
   organizationId?: string;
   search: Awaited<IntegrationDetailSearchParams>;
 };
 
-type IntegrationDetailConfig = {
+type IntegrationDetailRegistryEntry = {
   title: string;
   userSubtitle: string;
   organizationSubtitle: (organizationName: string) => string;
+  render: (props: DetailRenderProps) => Promise<ReactNode>;
 };
 
-const integrationDetailPlatformSet: ReadonlySet<string> = new Set(INTEGRATION_DETAIL_PLATFORMS);
-
-const integrationDetailConfigs: Record<IntegrationDetailPlatform, IntegrationDetailConfig> = {
+const integrationDetailRegistry = {
   [PLATFORM.GITHUB]: {
     title: 'GitHub Integration',
     userSubtitle: 'Manage your personal GitHub App installation',
     organizationSubtitle: organizationName =>
       `Manage GitHub App installation for ${organizationName}`,
+    render: async ({ organizationId, search }) => {
+      const { GitHubIntegrationDetails } =
+        await import('@/components/integrations/GitHubIntegrationDetails');
+      return (
+        <GitHubIntegrationDetails
+          organizationId={organizationId}
+          success={search.success === 'installed'}
+          error={search.error}
+          pendingApproval={search.pending_approval === 'true'}
+          existingPendingOrg={search.org}
+        />
+      );
+    },
   },
   [PLATFORM.GITLAB]: {
     title: 'GitLab Integration',
     userSubtitle: 'Manage your personal GitLab integration',
     organizationSubtitle: organizationName =>
       `Manage GitLab OAuth integration for ${organizationName}`,
+    render: async ({ organizationId, search }) => {
+      const { GitLabIntegrationDetails } =
+        await import('@/components/integrations/GitLabIntegrationDetails');
+      return (
+        <GitLabIntegrationDetails
+          organizationId={organizationId}
+          success={search.success === 'connected'}
+          error={search.error}
+        />
+      );
+    },
   },
   [PLATFORM.SLACK]: {
     title: 'Slack Integration',
     userSubtitle: 'Connect your Slack workspace to receive notifications',
     organizationSubtitle: organizationName => `Manage Slack integration for ${organizationName}`,
+    render: async ({ organizationId, search }) => {
+      const { SlackIntegrationDetails } =
+        await import('@/components/integrations/SlackIntegrationDetails');
+      return (
+        <SlackIntegrationDetails
+          organizationId={organizationId}
+          success={search.success === 'installed'}
+          error={search.error}
+        />
+      );
+    },
   },
   [PLATFORM.DISCORD]: {
     title: 'Discord Integration',
     userSubtitle: 'Connect your Discord server to interact with Kilo',
     organizationSubtitle: organizationName => `Manage Discord integration for ${organizationName}`,
+    render: async ({ organizationId, search }) => {
+      const { DiscordIntegrationDetails } =
+        await import('@/components/integrations/DiscordIntegrationDetails');
+      return (
+        <DiscordIntegrationDetails
+          organizationId={organizationId}
+          success={search.success === 'installed'}
+          error={search.error}
+        />
+      );
+    },
   },
   [PLATFORM.LINEAR]: {
     title: 'Linear Integration',
     userSubtitle: 'Connect your Linear workspace so Kilo can respond to @-mentions on issues',
     organizationSubtitle: organizationName => `Manage Linear integration for ${organizationName}`,
+    render: async ({ organizationId, search }) => {
+      const { LinearIntegrationDetails } =
+        await import('@/components/integrations/LinearIntegrationDetails');
+      return (
+        <LinearIntegrationDetails
+          organizationId={organizationId}
+          success={search.success === 'installed'}
+          error={search.error}
+        />
+      );
+    },
   },
   [PLATFORM.DOLTHUB]: {
     title: 'DoltHub Integration',
     userSubtitle: 'Connect your DoltHub account to query versioned data',
     organizationSubtitle: organizationName => `Manage DoltHub integration for ${organizationName}`,
+    render: async ({ organizationId, search }) => {
+      const { DoltHubIntegrationDetails } =
+        await import('@/components/integrations/DoltHubIntegrationDetails');
+      return (
+        <DoltHubIntegrationDetails
+          organizationId={organizationId}
+          success={search.success === 'installed'}
+          error={search.error}
+        />
+      );
+    },
   },
-};
+} satisfies Record<string, IntegrationDetailRegistryEntry>;
+
+type IntegrationDetailPlatform = keyof typeof integrationDetailRegistry;
+
+const integrationDetailPlatformSet: ReadonlySet<string> = new Set(
+  Object.keys(integrationDetailRegistry)
+);
 
 function isIntegrationDetailPlatform(platform: string): platform is IntegrationDetailPlatform {
   return integrationDetailPlatformSet.has(platform);
@@ -90,8 +152,10 @@ function getIntegrationDetailPlatform(platform: string): IntegrationDetailPlatfo
   return platform;
 }
 
-function getIntegrationDetailConfig(platform: IntegrationDetailPlatform): IntegrationDetailConfig {
-  return integrationDetailConfigs[platform];
+function getIntegrationDetailEntry(
+  platform: IntegrationDetailPlatform
+): IntegrationDetailRegistryEntry {
+  return integrationDetailRegistry[platform];
 }
 
 function BackToIntegrationsLink({ href }: { href: string }) {
@@ -123,76 +187,7 @@ async function PlatformIntegrationDetails({
   organizationId,
   search,
 }: DetailRenderProps & { platform: IntegrationDetailPlatform }) {
-  switch (platform) {
-    case PLATFORM.GITHUB: {
-      const { GitHubIntegrationDetails } =
-        await import('@/components/integrations/GitHubIntegrationDetails');
-      return (
-        <GitHubIntegrationDetails
-          organizationId={organizationId}
-          success={search.success === 'installed'}
-          error={search.error}
-          pendingApproval={search.pending_approval === 'true'}
-          existingPendingOrg={search.org}
-        />
-      );
-    }
-    case PLATFORM.GITLAB: {
-      const { GitLabIntegrationDetails } =
-        await import('@/components/integrations/GitLabIntegrationDetails');
-      return (
-        <GitLabIntegrationDetails
-          organizationId={organizationId}
-          success={search.success === 'connected'}
-          error={search.error}
-        />
-      );
-    }
-    case PLATFORM.SLACK: {
-      const { SlackIntegrationDetails } =
-        await import('@/components/integrations/SlackIntegrationDetails');
-      return (
-        <SlackIntegrationDetails
-          organizationId={organizationId}
-          success={search.success === 'installed'}
-          error={search.error}
-        />
-      );
-    }
-    case PLATFORM.DISCORD: {
-      const { DiscordIntegrationDetails } =
-        await import('@/components/integrations/DiscordIntegrationDetails');
-      return (
-        <DiscordIntegrationDetails
-          organizationId={organizationId}
-          success={search.success === 'installed'}
-          error={search.error}
-        />
-      );
-    }
-    case PLATFORM.LINEAR: {
-      const { LinearIntegrationDetails } =
-        await import('@/components/integrations/LinearIntegrationDetails');
-      return (
-        <LinearIntegrationDetails
-          organizationId={organizationId}
-          success={search.success === 'installed'}
-          error={search.error}
-        />
-      );
-    }
-    case PLATFORM.DOLTHUB: {
-      const { DoltHubIntegrationDetails } =
-        await import('@/components/integrations/DoltHubIntegrationDetails');
-      return (
-        <DoltHubIntegrationDetails
-          organizationId={organizationId}
-          success={search.success === 'installed'}
-          error={search.error}
-        />
-      );
-    }
-  }
+  return getIntegrationDetailEntry(platform).render({ organizationId, search });
 }
 
 function SuspendedIntegrationDetails(
@@ -213,14 +208,14 @@ export async function UserIntegrationDetailPage({
   searchParams: IntegrationDetailSearchParams;
 }) {
   const detailPlatform = getIntegrationDetailPlatform(platform);
-  const config = getIntegrationDetailConfig(detailPlatform);
+  const entry = getIntegrationDetailEntry(detailPlatform);
   await getUserFromAuthOrRedirect('/users/sign_in');
   const search = await searchParams;
 
   return (
     <PageLayout
-      title={config.title}
-      subtitle={config.userSubtitle}
+      title={entry.title}
+      subtitle={entry.userSubtitle}
       headerActions={<BackToIntegrationsLink href="/integrations" />}
     >
       <SuspendedIntegrationDetails platform={detailPlatform} search={search} />
@@ -238,7 +233,7 @@ export async function OrganizationIntegrationDetailPage({
   searchParams: IntegrationDetailSearchParams;
 }) {
   const detailPlatform = getIntegrationDetailPlatform(platform);
-  const config = getIntegrationDetailConfig(detailPlatform);
+  const entry = getIntegrationDetailEntry(detailPlatform);
   const search = await searchParams;
 
   return (
@@ -248,10 +243,8 @@ export async function OrganizationIntegrationDetailPage({
         <>
           <div className="space-y-4">
             <BackToIntegrationsLink href={`/organizations/${organization.id}/integrations`} />
-            <SetPageTitle title={config.title} />
-            <p className="text-muted-foreground">
-              {config.organizationSubtitle(organization.name)}
-            </p>
+            <SetPageTitle title={entry.title} />
+            <p className="text-muted-foreground">{entry.organizationSubtitle(organization.name)}</p>
           </div>
 
           <SuspendedIntegrationDetails

@@ -95,11 +95,11 @@ export function formatPaymentSummary(params: {
   paymentSource: string | null;
   hasStripeFunding?: boolean;
 }): string {
-  if (params.paymentSource === 'credits') {
-    return 'Credits';
-  }
   if (params.hasStripeFunding) {
     return 'Stripe';
+  }
+  if (params.paymentSource === 'credits') {
+    return 'Credits';
   }
   return '—';
 }

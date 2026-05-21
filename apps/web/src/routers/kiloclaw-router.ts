@@ -3462,12 +3462,24 @@ export const kiloclawRouter = createTRPCRouter({
 
   getComposioOnboardingStatus: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
+    let sandboxHasComposioSecrets = false;
+    if (instance) {
+      const client = new KiloClawUserClient(
+        generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
+      );
+      const config = await client.getConfig({
+        userId: ctx.user.id,
+        instanceId: workerInstanceId(instance),
+      });
+      sandboxHasComposioSecrets = config.configuredSecrets.composio === true;
+    }
     return await getManagedComposioGoogleCalendarStatus({
       scope: {
         ownerType: 'user',
         userId: ctx.user.id,
       },
       instance,
+      sandboxHasComposioSecrets,
     });
   }),
 

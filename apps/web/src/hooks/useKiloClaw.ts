@@ -17,12 +17,11 @@ export function useKiloClawConfig() {
   return useQuery(trpc.kiloclaw.getConfig.queryOptions());
 }
 
-export function useKiloClawComposioOnboardingStatus(enabled = true, pollingEnabled = enabled) {
+export function useKiloClawComposioOnboardingStatus(enabled = true) {
   const trpc = useTRPC();
   return useQuery(
     trpc.kiloclaw.getComposioOnboardingStatus.queryOptions(undefined, {
       enabled,
-      refetchInterval: enabled && pollingEnabled ? 15_000 : false,
     })
   );
 }

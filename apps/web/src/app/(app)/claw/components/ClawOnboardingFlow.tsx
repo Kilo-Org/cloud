@@ -233,17 +233,10 @@ function ClawOnboardingFlowInner({
     if (initialStep === 'tools') return 'tools';
     return initialStep === 'calendar' ? 'calendar' : 'identity';
   });
-  // The popup can only be launched from the tools step. Once open, the popup
-  // hook still refetches status on focus, visibility, and callback delivery.
-  const composioStatusPolling = onboardingStep === 'tools';
-  const personalComposioStatus = useKiloClawComposioOnboardingStatus(
-    !organizationId,
-    composioStatusPolling
-  );
+  const personalComposioStatus = useKiloClawComposioOnboardingStatus(!organizationId);
   const orgComposioStatus = useOrgKiloClawComposioOnboardingStatus(
     organizationId ?? '',
-    !!organizationId,
-    composioStatusPolling
+    !!organizationId
   );
   const composioStatus = organizationId ? orgComposioStatus : personalComposioStatus;
   const hasToolsStep = true;

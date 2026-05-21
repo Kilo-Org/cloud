@@ -118,12 +118,50 @@ beforeEach(() => {
 });
 
 describe('getManagedComposioGoogleCalendarStatus', () => {
-  it('reports connected when identity has a stored connected account id', async () => {
+  it('does not report connected when the Composio account exists but sandbox secrets are missing', async () => {
     selectedRows.push([{ source: 'managed' }]);
 
     const status = await getManagedComposioGoogleCalendarStatus({
       scope,
       instance,
+      sandboxHasComposioSecrets: false,
+    });
+
+    expect(status).toEqual({
+      enabled: true,
+      status: 'disconnected',
+      connectedAccountId: null,
+      sandboxConfigSource: 'managed',
+    });
+    expect(mockedListComposioConnectedAccounts).not.toHaveBeenCalled();
+  });
+
+  it('does not report connected when the current sandbox is not marked managed', async () => {
+    selectedRows.push([{ source: null }]);
+
+    const status = await getManagedComposioGoogleCalendarStatus({
+      scope,
+      instance,
+      sandboxHasComposioSecrets: true,
+    });
+
+    expect(status).toEqual({
+      enabled: true,
+      status: 'disconnected',
+      connectedAccountId: null,
+      sandboxConfigSource: null,
+    });
+    expect(mockedGetActiveManagedComposioIdentity).not.toHaveBeenCalled();
+    expect(mockedListComposioConnectedAccounts).not.toHaveBeenCalled();
+  });
+
+  it('reports connected when identity has a stored connected account id and the sandbox has managed secrets', async () => {
+    selectedRows.push([{ source: 'managed' }]);
+
+    const status = await getManagedComposioGoogleCalendarStatus({
+      scope,
+      instance,
+      sandboxHasComposioSecrets: true,
     });
 
     expect(status).toEqual({
@@ -139,6 +177,7 @@ describe('getManagedComposioGoogleCalendarStatus', () => {
     const status = await getManagedComposioGoogleCalendarStatus({
       scope,
       instance: null,
+      sandboxHasComposioSecrets: false,
     });
 
     expect(status).toEqual({
@@ -156,6 +195,7 @@ describe('getManagedComposioGoogleCalendarStatus', () => {
     const status = await getManagedComposioGoogleCalendarStatus({
       scope,
       instance: null,
+      sandboxHasComposioSecrets: false,
     });
 
     expect(status).toEqual({
@@ -173,6 +213,7 @@ describe('getManagedComposioGoogleCalendarStatus', () => {
     const status = await getManagedComposioGoogleCalendarStatus({
       scope,
       instance,
+      sandboxHasComposioSecrets: true,
     });
 
     expect(status).toEqual({

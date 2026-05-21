@@ -834,6 +834,16 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   getComposioOnboardingStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+    let sandboxHasComposioSecrets = false;
+    if (instance) {
+      const token = generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
+      const client = new KiloClawUserClient(token);
+      const config = await client.getConfig({
+        userId: ctx.user.id,
+        instanceId: workerInstanceId(instance),
+      });
+      sandboxHasComposioSecrets = config.configuredSecrets.composio === true;
+    }
     return await getManagedComposioGoogleCalendarStatus({
       scope: {
         ownerType: 'organization_user',
@@ -841,6 +851,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
         organizationId: input.organizationId,
       },
       instance,
+      sandboxHasComposioSecrets,
     });
   }),
 

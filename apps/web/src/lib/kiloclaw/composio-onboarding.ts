@@ -335,6 +335,7 @@ export async function createManagedComposioGoogleCalendarLink(params: {
 export async function getManagedComposioGoogleCalendarStatus(params: {
   scope: ComposioOwnerScope;
   instance: ActiveKiloClawInstance | null;
+  sandboxHasComposioSecrets: boolean;
 }): Promise<{
   enabled: boolean;
   status: ComposioConnectionStatus;
@@ -349,6 +350,10 @@ export async function getManagedComposioGoogleCalendarStatus(params: {
     return { enabled: true, status: 'disconnected', connectedAccountId: null, sandboxConfigSource };
   }
 
+  if (params.instance && sandboxConfigSource !== 'managed') {
+    return { enabled: true, status: 'disconnected', connectedAccountId: null, sandboxConfigSource };
+  }
+
   const identity = await getActiveManagedComposioIdentity(params.scope);
   if (!identity) {
     return { enabled: true, status: 'disconnected', connectedAccountId: null, sandboxConfigSource };
@@ -356,6 +361,10 @@ export async function getManagedComposioGoogleCalendarStatus(params: {
 
   const connectedAccountId = identity.row.google_calendar_connected_account_id;
   if (!connectedAccountId) {
+    return { enabled: true, status: 'disconnected', connectedAccountId: null, sandboxConfigSource };
+  }
+
+  if (params.instance && !params.sandboxHasComposioSecrets) {
     return { enabled: true, status: 'disconnected', connectedAccountId: null, sandboxConfigSource };
   }
 

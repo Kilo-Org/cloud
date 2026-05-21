@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
   // slight replication lag, and provides lower latency for US users
   const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
-  if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
+  if (balance <= 0 && !(await isFreeModel(requestBody.model)) && !userByok) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },

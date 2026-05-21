@@ -1,5 +1,6 @@
 import { type ComponentProps, useEffect, useState } from 'react';
 import { AppState, Keyboard, type KeyboardEvent, Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { resolveAppAwareKeyboardPadding } from './app-aware-keyboard-padding-state';
 
@@ -9,6 +10,7 @@ function keyboardPaddingFromEvent(event: KeyboardEvent): number {
 
 export function AppAwareKeyboardPaddingView({ style, ...props }: ComponentProps<typeof View>) {
   const [keyboardPadding, setKeyboardPadding] = useState(0);
+  const { bottom: safeBottom } = useSafeAreaInsets();
 
   useEffect(() => {
     if (Platform.OS !== 'ios') {
@@ -51,7 +53,10 @@ export function AppAwareKeyboardPaddingView({ style, ...props }: ComponentProps<
     };
   }, []);
 
-  return (
-    <View {...props} style={[style, Platform.OS === 'ios' && { paddingBottom: keyboardPadding }]} />
-  );
+  // When the keyboard is up, its height already covers the bottom safe area.
+  // When it's dismissed, fall back to the safe-area inset so trailing content
+  // (e.g. the typing indicator) clears the home indicator / rounded screen edge.
+  const paddingBottom = Math.max(keyboardPadding, safeBottom);
+
+  return <View {...props} style={[style, Platform.OS === 'ios' && { paddingBottom }]} />;
 }

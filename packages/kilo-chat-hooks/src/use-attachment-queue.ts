@@ -16,10 +16,7 @@ export type QueuedAttachment = {
 
 type XhrUploadResult = { status: number; aborted: boolean };
 
-export type XhrUploadOutcome =
-  | { kind: 'ok' }
-  | { kind: 'aborted' }
-  | { kind: 'error'; message: string };
+type XhrUploadOutcome = { kind: 'ok' } | { kind: 'aborted' } | { kind: 'error'; message: string };
 
 export type AttachmentQueueState = { rows: QueuedAttachment[] };
 
@@ -135,7 +132,7 @@ export type PerformUpload = (
   opts: { onProgress: (fraction: number) => void; signal: AbortSignal }
 ) => Promise<void>;
 
-export function mapXhrUploadResultToOutcome(result: XhrUploadResult): XhrUploadOutcome {
+function mapXhrUploadResultToOutcome(result: XhrUploadResult): XhrUploadOutcome {
   if (result.aborted) {
     return { kind: 'aborted' };
   }

@@ -6,8 +6,8 @@ import {
   model_experiment_variant_version,
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { redisGet, redisSet } from '@/lib/redis';
-import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, modelExperimentRedisKey } from '@/lib/redis-keys';
+import { redisGet } from '@/lib/redis';
+import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { decryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -15,20 +15,14 @@ import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import { ExperimentUpstreamSchema } from '@/lib/ai-gateway/experiments/upstream-schema';
 import type {
   AllocationSubject,
-  CachedExperiment,
-  CachedVariant,
   ExperimentStatus,
   PickVariantInput,
   PickVariantResult,
   ResolveResult,
-  SerializedCacheEntry,
-  SerializedCachedExperiment,
+  RoutingVariant,
 } from '@/lib/ai-gateway/experiments/pick-variant.types';
 
-/** Shared Redis cache TTL. Cached experiment rows hold ciphertext only;
- *  plaintext keys are decrypted per-pick and never stored in Redis. */
-const EXPERIMENT_REDIS_CACHE_TTL_SECONDS = 600;
-const EXPERIMENTED_PUBLIC_IDS_LOCAL_CACHE_TTL_MS = 60_000;
+const EXPERIMENTED_PUBLIC_IDS_LOCAL_CACHE_TTL_MS = process.env.NODE_ENV === 'test' ? 0 : 60_000;
 
 const getExperimentedPublicIds = createCachedFetch<string[]>(
   async () => {
@@ -71,83 +65,19 @@ function parseStringArray(raw: string): string[] | null {
 /**
  * Returns the routing-relevant experiment for `publicId` (status active or
  * paused) with all variants resolved to their current
- * `model_experiment_variant_version`. The cached payload holds CIPHERTEXT
- * for partner-issued api keys; decryption is deferred to
- * `pickModelExperimentVariant`. Returns `none` only after Postgres has
- * proven there is no routing-relevant experiment for this id.
- *
- * Cached per-publicId for ~10 minutes. The cache is invalidated by every
- * admin mutation that affects routing.
+ * `model_experiment_variant_version`. This only runs after the Redis-backed
+ * membership pre-check says the public id is experiment-routed, so preview
+ * traffic pays the Postgres lookup while normal models avoid it.
  */
 export async function getRoutingExperimentForPublicId(publicId: string): Promise<ResolveResult> {
-  const cacheKey = modelExperimentRedisKey(publicId);
   try {
-    const cached = await redisGet(cacheKey);
-    if (cached !== null) {
-      const parsed = tryParseCachedExperiment(cached);
-      if (parsed === 'none' || parsed === null) {
-        // null = corrupt; fall through to DB rebuild.
-        if (parsed === 'none') return { kind: 'none' };
-      } else {
-        return { kind: 'experiment', experiment: parsed };
-      }
-    }
-  } catch {
-    // captured by redis helper; fall through to DB
-  }
-
-  let resolved: ResolveResult;
-  try {
-    resolved = await loadExperimentFromDb(publicId);
+    return await loadExperimentFromDb(publicId);
   } catch (err) {
     captureException(err, {
       tags: { source: 'model-experiments', operation: 'getRoutingExperimentForPublicId' },
       extra: { publicId },
     });
     return { kind: 'unavailable' };
-  }
-
-  // Best-effort cache write. A failure here does not affect routing.
-  try {
-    if (resolved.kind === 'experiment') {
-      await redisSet(
-        cacheKey,
-        JSON.stringify(serializeCachedExperiment(resolved.experiment)),
-        EXPERIMENT_REDIS_CACHE_TTL_SECONDS
-      );
-    } else if (resolved.kind === 'none') {
-      await redisSet(
-        cacheKey,
-        JSON.stringify({ kind: 'none' }),
-        EXPERIMENT_REDIS_CACHE_TTL_SECONDS
-      );
-    }
-  } catch {
-    // already captured
-  }
-
-  return resolved;
-}
-
-function serializeCachedExperiment(exp: CachedExperiment): SerializedCachedExperiment {
-  return { kind: 'experiment', ...exp };
-}
-
-function tryParseCachedExperiment(raw: string): CachedExperiment | 'none' | null {
-  try {
-    const parsed = JSON.parse(raw) as SerializedCacheEntry;
-    if (parsed.kind === 'none') return 'none';
-    if (parsed.kind === 'experiment') {
-      return {
-        experimentId: parsed.experimentId,
-        publicModelId: parsed.publicModelId,
-        status: parsed.status,
-        variants: parsed.variants,
-      };
-    }
-    return null;
-  } catch {
-    return null;
   }
 }
 
@@ -242,10 +172,9 @@ async function loadExperimentFromDb(publicId: string): Promise<ResolveResult> {
     }
   }
 
-  // We deliberately DO NOT call decryptApiKey here. The cache should only
-  // hold encrypted blobs; decryption happens per-pick so key rotation takes
-  // effect on the next request.
-  const variants: CachedVariant[] = [];
+  // We deliberately DO NOT call decryptApiKey here. Decryption happens
+  // per-pick so key rotation takes effect on the next request.
+  const variants: RoutingVariant[] = [];
   for (const v of variantRows) {
     const ver = versionByVariantId.get(v.id);
     if (!ver) {

@@ -5,16 +5,7 @@ import type { ExperimentUpstream } from '@/lib/ai-gateway/experiments/upstream-s
 
 export type ExperimentStatus = 'active' | 'paused';
 
-/**
- * Per-variant payload cached in Redis.
- *
- * The api key is stored ENCRYPTED — the cache never holds plaintext.
- * Decryption happens once per request, only on the chosen variant, inside
- * `pickModelExperimentVariant`. This keeps `BYOK_ENCRYPTION_KEY` rotation
- * effective immediately (no 10-minute "plaintext lives in Redis" window)
- * and limits the blast radius of a Redis dump.
- */
-export type CachedVariant = {
+export type RoutingVariant = {
   variantId: string;
   weight: number;
   variantVersionId: string;
@@ -22,15 +13,15 @@ export type CachedVariant = {
   encryptedApiKey: EncryptedData;
 };
 
-export type CachedExperiment = {
+export type RoutingExperiment = {
   experimentId: string;
   publicModelId: string;
   status: ExperimentStatus;
-  variants: CachedVariant[];
+  variants: RoutingVariant[];
 };
 
 export type ResolveResult =
-  | { kind: 'experiment'; experiment: CachedExperiment }
+  | { kind: 'experiment'; experiment: RoutingExperiment }
   | { kind: 'none' }
   | { kind: 'unavailable' };
 
@@ -54,15 +45,5 @@ export type PickVariantResult =
     }
   | { status: 'not-found' }
   | { status: 'unavailable' };
-
-export type SerializedCachedExperiment = {
-  kind: 'experiment';
-  experimentId: string;
-  publicModelId: string;
-  status: ExperimentStatus;
-  variants: CachedVariant[];
-};
-
-export type SerializedCacheEntry = SerializedCachedExperiment | { kind: 'none' };
 
 export type { ModelExperiment };

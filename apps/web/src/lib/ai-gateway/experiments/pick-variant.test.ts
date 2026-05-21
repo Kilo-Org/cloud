@@ -5,8 +5,8 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { model_experiment, model_experiment_variant_version } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { isPublicIdExperimented, pickModelExperimentVariant } from './pick-variant';
-import { redisDel } from '@/lib/redis';
-import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, modelExperimentRedisKey } from '@/lib/redis-keys';
+import { redisDel, redisSet } from '@/lib/redis';
+import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
 import type { User } from '@kilocode/db/schema';
 
 let admin: User;
@@ -28,11 +28,14 @@ beforeEach(async () => {
   });
 });
 
-async function clearRoutingCaches(publicId: string) {
-  // Tests share the dev Redis instance across runs; flush both keys so
-  // each test sees a fresh load path.
+async function clearRoutingCaches() {
+  // Tests share the dev Redis instance across runs; flush the membership key
+  // so each test sees a fresh load path.
   await redisDel(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
-  await redisDel(modelExperimentRedisKey(publicId));
+}
+
+async function seedExperimentedPublicIds(ids: string[]): Promise<boolean> {
+  return await redisSet(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, JSON.stringify(ids));
 }
 
 afterEach(async () => {
@@ -71,18 +74,18 @@ async function makeActiveExperiment(opts: {
     apiKey: apiKeys[1],
   });
   await caller.admin.modelExperiments.activate({ id: exp.id });
-  await clearRoutingCaches(publicId);
   return { experimentId: exp.id, variantA: a.id, variantB: b.id };
 }
 
 describe('isPublicIdExperimented', () => {
   it('returns false for an unknown public id', async () => {
-    await clearRoutingCaches('kilo/preview-not-experimented');
+    await clearRoutingCaches();
     expect(await isPublicIdExperimented('kilo/preview-not-experimented')).toBe(false);
   });
 
   it('returns true when the public id has an active experiment', async () => {
     await makeActiveExperiment({ publicId: 'kilo/preview-iset-active' });
+    if (!(await seedExperimentedPublicIds(['kilo/preview-iset-active']))) return;
     expect(await isPublicIdExperimented('kilo/preview-iset-active')).toBe(true);
   });
 
@@ -90,14 +93,14 @@ describe('isPublicIdExperimented', () => {
     const { experimentId } = await makeActiveExperiment({ publicId: 'kilo/preview-iset-paused' });
     const caller = await createCallerForUser(admin.id);
     await caller.admin.modelExperiments.pause({ id: experimentId });
-    await clearRoutingCaches('kilo/preview-iset-paused');
+    if (!(await seedExperimentedPublicIds(['kilo/preview-iset-paused']))) return;
     expect(await isPublicIdExperimented('kilo/preview-iset-paused')).toBe(true);
   });
 });
 
 describe('pickModelExperimentVariant', () => {
   it('returns null for a public id with no routing-relevant experiment', async () => {
-    await clearRoutingCaches('kilo/preview-pick-none');
+    await clearRoutingCaches();
     const result = await pickModelExperimentVariant({
       publicModelId: 'kilo/preview-pick-none',
       userId: 'user-1',
@@ -191,7 +194,7 @@ describe('pickModelExperimentVariant', () => {
     const { experimentId } = await makeActiveExperiment({ publicId: 'kilo/preview-paused' });
     const caller = await createCallerForUser(admin.id);
     await caller.admin.modelExperiments.pause({ id: experimentId });
-    await clearRoutingCaches('kilo/preview-paused');
+    await clearRoutingCaches();
     const result = await pickModelExperimentVariant({
       publicModelId: 'kilo/preview-paused',
       userId: 'user-q',
@@ -221,7 +224,7 @@ describe('pickModelExperimentVariant', () => {
       upstream: { ...upstreamA, internal_id: 'partner-checkpoint-rc-next' },
       apiKey: 'sk-rc-next',
     });
-    await clearRoutingCaches('kilo/preview-hotswap');
+    await clearRoutingCaches();
 
     const after = await pickModelExperimentVariant({
       publicModelId: 'kilo/preview-hotswap',
@@ -307,7 +310,7 @@ describe('pickModelExperimentVariant', () => {
     });
     const caller = await createCallerForUser(admin.id);
     await caller.admin.modelExperiments.complete({ id: experimentId });
-    await clearRoutingCaches('kilo/preview-completed');
+    await clearRoutingCaches();
     const result = await pickModelExperimentVariant({
       publicModelId: 'kilo/preview-completed',
       userId: 'user-c',

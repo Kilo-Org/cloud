@@ -44,6 +44,7 @@ import {
   malformedJsonResponse,
   makeErrorReadable,
   modelDoesNotExistResponse,
+  modelNotAllowedResponse,
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
   temporarilyUnavailableResponse,
@@ -517,6 +518,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     // here rather than routing through and silently capturing prompts.
     if (experiment && settings?.data_collection === 'deny') {
       return dataCollectionRequiredResponse();
+    }
+
+    // Enterprise `provider_allow_list` is enforced via OpenRouter's
+    // `body.provider.only` field, which doesn't reach a direct partner
+    // upstream. Refuse the experimented public id rather than routing
+    // around the org's allow-list.
+    if (experiment && providerConfig?.only !== undefined) {
+      return modelNotAllowedResponse();
     }
 
     // Direct experiment upstreams must not have a Vercel/OpenRouter

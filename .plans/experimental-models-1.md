@@ -600,6 +600,38 @@ These constraints exist because of how the gateway is built today. The spec must
 - Partner trace export, redaction, HMAC webhooks, partner auth, and warehouse coordination (see [Part 2](./experimental-models-2.md)).
 - Replay bundles, SWE-bench/OpenHands adapters, and held-out replay-eval service (see [Part 2](./experimental-models-2.md)).
 
+## Followup: unify direct-upstream routing abstraction
+
+Three routing paths now bypass parts of the OpenRouter policy machinery:
+`custom_llm2`, `direct-byok`, and experiments. Each does so through different
+flags on `GetProviderProviderResult` (`bypassAccessCheck`, `skipProviderPin`,
+`skipKiloExclusiveModelSettings`) and ad-hoc `if (experiment && ...)` policy
+refusals in `route.ts` (data collection, provider allow-list).
+
+The proliferation is a symptom of treating each direct-upstream caller as a
+special case rather than as instances of one abstraction. A followup PR
+should:
+
+- Collapse the per-caller flags into a single notion (e.g. `routingMode:
+'gateway' | 'direct'`) on the provider result. `gateway` flows through
+  OpenRouter/Vercel and accepts the full `body.provider` policy machinery;
+  `direct` does not.
+- Move the policy-refusal points (currently `if (experiment && settings?.data_collection === 'deny')`,
+  `if (experiment && providerConfig?.only !== undefined)`) into a single
+  `checkPolicyEnforcableOnDirect` step that runs for every `direct`-mode
+  request and returns the appropriate refusal when the org has explicit
+  policy that the gateway can't enforce on a direct partner endpoint.
+- Reconsider `custom_llm2`'s `bypassAccessCheck: true`. Today it skips the
+  whole org-restrictions block (per the AI Gateway `AGENTS.md`: "enabling
+  requires explicit admin action, so the org allow-list doesn't apply").
+  That justification holds for per-org admin-enabled custom LLMs but not
+  for globally-routed experiment public ids; the unified abstraction
+  should make that distinction explicit rather than burying it in flag
+  combinations.
+
+This refactor is out of scope for the experiment-routing PR and is tracked
+here so the next PR touching the gateway routing surface can address it.
+
 ## Files Touched
 
 Core experiment implementation:

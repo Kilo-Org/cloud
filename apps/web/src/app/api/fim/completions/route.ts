@@ -5,7 +5,7 @@ import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { isFreeModel } from '@/lib/ai-gateway/models';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import { getUserFromAuth } from '@/lib/user.server';
 import {

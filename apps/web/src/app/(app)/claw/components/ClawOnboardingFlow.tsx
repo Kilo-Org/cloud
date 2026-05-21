@@ -289,7 +289,11 @@ function ClawOnboardingFlowInner({
   const mutations = organizationId ? orgMutations : personalMutations;
 
   const { data: currentUser } = useUser();
-  const hasCalendarStep = true;
+  // TEMPORARY: managed Composio onboarding is broken; hide the tools step and
+  // the legacy calendar step until the flow is fixed. Re-enable by flipping
+  // `hasToolsStep` back to true (and restoring `hasCalendarStep` if calendar
+  // is meant to come back too).
+  const hasCalendarStep = false;
   // Morning briefing is generally available — the Interests step shows for
   // all users (it still gates on controller version below).
   // Gate on controller version. The plugin route that backs
@@ -337,7 +341,11 @@ function ClawOnboardingFlowInner({
     composioStatusPolling
   );
   const composioStatus = organizationId ? orgComposioStatus : personalComposioStatus;
-  const hasToolsStep = true;
+  // See `hasCalendarStep` above — managed Composio onboarding is temporarily
+  // hidden. Identity completion now provisions directly and skips to email,
+  // passing `skipIncompleteManagedComposioConnection` so a stale managed
+  // identity from a prior broken attempt can't block provisioning.
+  const hasToolsStep = false;
   const configQuery = useClawConfig(status !== undefined && status.status !== null);
   const composioManualConfigured = composioStatus.data?.sandboxConfigSource === 'manual';
   const composioConfigPending =
@@ -894,10 +902,14 @@ function ClawOnboardingFlowInner({
             }
             setOnboardingStep('tools');
           } else if (hasCalendarStep) {
-            if (!flowState.instanceStatus) provisionInstance(weatherLocation?.location);
+            if (!flowState.instanceStatus) {
+              provisionInstance(weatherLocation?.location, undefined, true);
+            }
             setOnboardingStep('calendar');
           } else {
-            if (!flowState.instanceStatus) provisionInstance(weatherLocation?.location);
+            if (!flowState.instanceStatus) {
+              provisionInstance(weatherLocation?.location, undefined, true);
+            }
             setOnboardingStep('email');
           }
         }}

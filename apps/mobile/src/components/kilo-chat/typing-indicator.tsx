@@ -17,7 +17,7 @@ export function TypingIndicator({ botName, typingMembers }: Props) {
     typingMemberIds: [...typingMembers.keys()],
   });
   const keyboardVisible = useKeyboardVisible();
-  const horizontalPadding = keyboardVisible ? 0 : SCREEN_CORNER_RADIUS;
+  const horizontalPadding = keyboardVisible ? 0 : Math.round(SCREEN_CORNER_RADIUS * 0.4);
 
   return (
     <View className="h-5 justify-center" style={{ paddingHorizontal: horizontalPadding }}>

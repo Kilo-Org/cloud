@@ -137,6 +137,10 @@ function isPendingState(state: ComposioPopupState): boolean {
   );
 }
 
+function shouldListenForStoredResult(state: ComposioPopupState): boolean {
+  return isPendingState(state) || (state.kind === 'failed' && state.reason === 'popup_closed');
+}
+
 export function createComposioPopupStateMachine({
   transition,
   onConfirmed,
@@ -146,6 +150,7 @@ export function createComposioPopupStateMachine({
   clearConfirmationTimeout,
 }: ComposioPopupStateMachineOptions) {
   let state: ComposioPopupState = { kind: 'idle' };
+  let activeAttemptId: string | null = null;
   let handledAttemptId: string | null = null;
   let confirmationTimeoutId: number | null = null;
   let closedChecks = 0;
@@ -181,6 +186,7 @@ export function createComposioPopupStateMachine({
     open({ attemptId, popup }: { attemptId: string; popup: Window }) {
       closePopup();
       clearPendingConfirmationTimeout();
+      activeAttemptId = attemptId;
       handledAttemptId = null;
       closedChecks = 0;
       setMachineState({ kind: 'opening', attemptId, popup });
@@ -200,12 +206,18 @@ export function createComposioPopupStateMachine({
     handleResult(message: { result: 'success' | 'failed' | 'unknown'; attemptId: string }) {
       // Accept `opening` too: popup callbacks can theoretically arrive before
       // the mutation success handler transitions us to `awaiting-callback`.
-      if (state.kind !== 'opening' && state.kind !== 'awaiting-callback') return;
-      if (message.attemptId !== state.attemptId) return;
+      const acceptsResult =
+        (state.kind === 'opening' || state.kind === 'awaiting-callback') &&
+        message.attemptId === state.attemptId;
+      const acceptsLateClosedResult =
+        state.kind === 'failed' &&
+        state.reason === 'popup_closed' &&
+        message.attemptId === activeAttemptId;
+      if (!acceptsResult && !acceptsLateClosedResult) return;
       if (handledAttemptId === message.attemptId) return;
       handledAttemptId = message.attemptId;
       closedChecks = 0;
-      state.popup.close();
+      closePopup();
       void refetchStatus();
 
       if (message.result !== 'success') {
@@ -240,6 +252,7 @@ export function createComposioPopupStateMachine({
       if (state.kind !== 'awaiting-confirmation') return;
       clearPendingConfirmationTimeout();
       handledAttemptId = null;
+      activeAttemptId = null;
       closedChecks = 0;
       setMachineState({ kind: 'idle' });
       onConfirmed();
@@ -248,6 +261,7 @@ export function createComposioPopupStateMachine({
     cancel() {
       closePopup();
       clearPendingConfirmationTimeout();
+      activeAttemptId = null;
       handledAttemptId = null;
       closedChecks = 0;
       setMachineState({ kind: 'idle' });
@@ -314,6 +328,18 @@ export function useComposioPopup({
     [machine]
   );
 
+  const handleStoredResult = useCallback(() => {
+    try {
+      const raw = window.localStorage.getItem(COMPOSIO_POPUP_RESULT_STORAGE_KEY);
+      if (!raw) return;
+      const parsed: unknown = JSON.parse(raw);
+      if (!isComposioPopupMessage(parsed)) return;
+      handleResult(parsed);
+    } catch {
+      return;
+    }
+  }, [handleResult]);
+
   useEffect(() => {
     // React strict-mode runs the initial mount cleanup in dev; callers only
     // open popups from user actions, so the first cleanup cancels idle state.
@@ -368,9 +394,10 @@ export function useComposioPopup({
   }, [machine, state.kind]);
 
   useEffect(() => {
-    if (!isPendingState(state)) return;
+    if (!shouldListenForStoredResult(state)) return;
 
     function refetchComposioStatus() {
+      handleStoredResult();
       void refetchStatus();
     }
 
@@ -380,7 +407,7 @@ export function useComposioPopup({
       window.removeEventListener('focus', refetchComposioStatus);
       document.removeEventListener('visibilitychange', refetchComposioStatus);
     };
-  }, [refetchStatus, state]);
+  }, [handleStoredResult, refetchStatus, state]);
 
   useEffect(() => {
     if (state.kind !== 'awaiting-confirmation') return;

@@ -172,4 +172,24 @@ describe('createComposioPopupStateMachine', () => {
     expect(harness.machine.getState()).toEqual({ kind: 'failed', reason: 'popup_closed' });
     expect(popup.location.href).toBe('about:blank');
   });
+
+  it('accepts a late success callback after popup_closed for the same attempt', () => {
+    const harness = createHarness();
+    const popup = createPopup();
+
+    harness.machine.open({ attemptId: 'attempt-1', popup });
+    popup.closed = true;
+    harness.machine.observePopupClosed();
+    harness.machine.observePopupClosed();
+    harness.machine.observePopupClosed();
+
+    harness.machine.handleResult({ result: 'success', attemptId: 'attempt-1' });
+
+    expect(harness.machine.getState()).toEqual({
+      kind: 'awaiting-confirmation',
+      attemptId: 'attempt-1',
+    });
+    expect(harness.refetchStatus).toHaveBeenCalledTimes(2);
+    expect(harness.onFailed).toHaveBeenCalledWith('popup_closed');
+  });
 });

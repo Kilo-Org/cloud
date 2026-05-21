@@ -1,5 +1,6 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
 import { createCallerFactory } from '@/lib/trpc/init';
+import type * as TrpcInitModule from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 
 const ORGANIZATION_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
@@ -36,7 +37,7 @@ jest.mock('@/lib/posthog-feature-flags', () => ({
 }));
 
 jest.mock('@/routers/organizations/utils', () => {
-  const trpcInit = jest.requireActual<typeof import('@/lib/trpc/init')>('@/lib/trpc/init');
+  const trpcInit = jest.requireActual<typeof TrpcInitModule>('@/lib/trpc/init');
 
   return {
     organizationMemberProcedure: trpcInit.baseProcedure,

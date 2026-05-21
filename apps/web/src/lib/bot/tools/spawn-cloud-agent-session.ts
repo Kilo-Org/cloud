@@ -17,7 +17,7 @@ import {
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type { Images } from '@/lib/images-schema';
 import { APP_URL } from '@/lib/constants';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { resolveBotSessionProfile } from '@/lib/bot/tools/resolve-bot-session-profile';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
@@ -32,11 +32,11 @@ import type { PlatformIntegration } from '@kilocode/db';
 import z from 'zod';
 
 /**
- * Derive a per-request callback token so the shared INTERNAL_API_SECRET
+ * Derive a per-request callback token so the dedicated callback HMAC secret
  * is never stored in session metadata (which is visible via getSession).
  */
 function deriveBotCallbackToken(botRequestId: string): string {
-  return createHmac('sha256', INTERNAL_API_SECRET)
+  return createHmac('sha256', CALLBACK_TOKEN_SECRET)
     .update(`bot-callback:${botRequestId}`)
     .digest('hex');
 }
@@ -102,9 +102,9 @@ export default async function spawnCloudAgentSession(
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
 
-  if (!INTERNAL_API_SECRET) {
+  if (!CALLBACK_TOKEN_SECRET) {
     const error = new Error(
-      'INTERNAL_API_SECRET missing — bot callbacks would be silently dropped'
+      'CALLBACK_TOKEN_SECRET missing - bot callbacks would be silently dropped'
     );
     captureException(error, {
       tags: { component: 'kilo-bot', op: 'spawn-cloud-agent-session' },

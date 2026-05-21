@@ -14,6 +14,14 @@ export type FilterParams = {
   retryAccountingMode?: 'final_outcome' | 'all_attempts';
 };
 
+export function useCodeReviewQueueHealthStats(params: FilterParams) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.admin.codeReviews.getQueueHealthStats.queryOptions(params),
+    enabled: Boolean(params.startDate && params.endDate),
+  });
+}
+
 export function useCodeReviewOverviewStats(params: FilterParams) {
   const trpc = useTRPC();
   return useQuery({

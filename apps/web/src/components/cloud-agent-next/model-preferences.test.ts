@@ -1,9 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  getDevcontainerEnabledStorageKey,
   getLastUsedModelStorageKey,
   getLastUsedVariantsStorageKey,
   getPreferredInitialModel,
   getPreferredInitialVariant,
+  parseDevcontainerEnabled,
 } from './model-preferences';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 
@@ -69,6 +71,19 @@ describe('getLastUsedVariantsStorageKey', () => {
     expect(getLastUsedVariantsStorageKey('org_123')).toBe(
       'cloud-agent:last-used-variants:organization:org_123'
     );
+  });
+});
+
+describe('devcontainer preference', () => {
+  it('uses one browser-wide storage key', () => {
+    expect(getDevcontainerEnabledStorageKey()).toBe('cloud-agent:devcontainer-enabled');
+  });
+
+  it('enables only the stored boolean true value', () => {
+    expect(parseDevcontainerEnabled('true')).toBe(true);
+    expect(parseDevcontainerEnabled('false')).toBe(false);
+    expect(parseDevcontainerEnabled('1')).toBe(false);
+    expect(parseDevcontainerEnabled(null)).toBe(false);
   });
 });
 

@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET, INTERNAL_API_SECRET } from '@/lib/config.server';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { db } from '@/lib/drizzle';
 import {
@@ -782,17 +782,22 @@ export async function POST(
     const { botRequestId } = await params;
     const token = req.headers.get('X-Bot-Callback-Token');
 
-    if (!INTERNAL_API_SECRET || !token) {
+    if ((!CALLBACK_TOKEN_SECRET && !INTERNAL_API_SECRET) || !token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const expectedToken = createHmac('sha256', INTERNAL_API_SECRET)
-      .update(`bot-callback:${botRequestId}`)
-      .digest('hex');
     const tokenBuf = Buffer.from(token);
-    const expectedBuf = Buffer.from(expectedToken);
+    const validCallbackToken = [CALLBACK_TOKEN_SECRET, INTERNAL_API_SECRET]
+      .filter(Boolean)
+      .some(secret => {
+        const expectedToken = createHmac('sha256', secret)
+          .update(`bot-callback:${botRequestId}`)
+          .digest('hex');
+        const expectedBuf = Buffer.from(expectedToken);
+        return tokenBuf.length === expectedBuf.length && timingSafeEqual(tokenBuf, expectedBuf);
+      });
 
-    if (tokenBuf.length !== expectedBuf.length || !timingSafeEqual(tokenBuf, expectedBuf)) {
+    if (!validCallbackToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -3,6 +3,10 @@ import {
   buildGithubEmptySectionLines,
   buildGithubEmptySummary,
   classifyGithubToken,
+  formatGithubTldr,
+  type GithubEmptyResultContext,
+  GITHUB_EMPTY_LINE,
+  isCleanGithubEmptyResult,
   missingBriefingScopes,
   parseOAuthScopesHeader,
   readGithubTokenFromEnv,
@@ -211,5 +215,56 @@ describe('readGithubTokenFromEnv', () => {
       'ghp_github'
     );
     expect(readGithubTokenFromEnv({ GH_TOKEN: '  ghp_gh  ' })).toBe('ghp_gh');
+  });
+});
+
+describe('isCleanGithubEmptyResult', () => {
+  it('is true for a classic PAT with no missing scopes', () => {
+    const ctx: GithubEmptyResultContext = {
+      tokenType: 'classic',
+      login: 'octocat',
+      scopes: ['repo'],
+      missingScopes: [],
+    };
+    expect(isCleanGithubEmptyResult(ctx)).toBe(true);
+  });
+
+  it('is false when the classic PAT is missing scopes', () => {
+    const ctx: GithubEmptyResultContext = {
+      tokenType: 'classic',
+      login: 'octocat',
+      scopes: [],
+      missingScopes: ['repo'],
+    };
+    expect(isCleanGithubEmptyResult(ctx)).toBe(false);
+  });
+
+  it('is false for fine-grained and unknown token types', () => {
+    expect(
+      isCleanGithubEmptyResult({
+        tokenType: 'fine-grained',
+        login: 'octocat',
+        accessibleRepoCount: 3,
+      })
+    ).toBe(false);
+    expect(isCleanGithubEmptyResult({ tokenType: 'unknown', login: null })).toBe(false);
+  });
+});
+
+describe('formatGithubTldr', () => {
+  it('pluralizes the issue count', () => {
+    expect(formatGithubTldr(3)).toBe('3 GitHub issues to review');
+    expect(formatGithubTldr(1)).toBe('1 GitHub issue to review');
+  });
+
+  it('returns an empty string when there is nothing to count', () => {
+    expect(formatGithubTldr(0)).toBe('');
+  });
+});
+
+describe('GITHUB_EMPTY_LINE', () => {
+  it('is an italic-wrapped one-liner', () => {
+    expect(GITHUB_EMPTY_LINE.startsWith('_')).toBe(true);
+    expect(GITHUB_EMPTY_LINE.endsWith('_')).toBe(true);
   });
 });

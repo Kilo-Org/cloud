@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildCalendarMissingScopeLines,
-  buildCalendarNoConnectionLines,
   buildCalendarSectionLines,
   buildCalendarSectionTitle,
   buildCalendarTimeWindow,
   formatAllDayEventLine,
+  formatCalendarTldr,
   formatEventTitle,
   formatTimedEventLine,
   isAllDayEvent,
@@ -242,9 +241,9 @@ describe('buildCalendarSectionLines', () => {
     ]);
   });
 
-  it('emits a single "no events" line when calendar is empty', () => {
+  it('emits a single italic "no events" line when calendar is empty', () => {
     expect(buildCalendarSectionLines([], now, tz)).toEqual([
-      'No events on your calendar for today or tomorrow morning.',
+      '_No events on your calendar for today or tomorrow morning._',
     ]);
   });
 
@@ -279,25 +278,49 @@ describe('buildCalendarSectionLines', () => {
 });
 
 describe('buildCalendarSectionTitle', () => {
-  it('formats "{email} daily calendar"', () => {
+  it('formats "🗓 {email} daily calendar"', () => {
     expect(buildCalendarSectionTitle('storms@kilocode.ai')).toBe(
-      'storms@kilocode.ai daily calendar'
+      '🗓 storms@kilocode.ai daily calendar'
     );
   });
 });
 
-describe('buildCalendarNoConnectionLines', () => {
-  it('emits the connect-your-google nudge', () => {
-    expect(buildCalendarNoConnectionLines()).toEqual([
-      "Connect your Google account in Settings to see today's events.",
-    ]);
-  });
-});
+describe('formatCalendarTldr', () => {
+  const now = new Date('2026-05-19T15:00:00Z');
+  const tz = 'America/Los_Angeles';
 
-describe('buildCalendarMissingScopeLines', () => {
-  it('emits the reconnect-with-calendar-scope nudge', () => {
-    expect(buildCalendarMissingScopeLines()).toEqual([
-      "Your Google account is connected, but it's missing calendar permission. Reconnect from Settings and include calendar access to see today's events.",
-    ]);
+  it("counts only today's events", () => {
+    const events: CalendarEvent[] = [
+      event({
+        id: 'a',
+        summary: 'Standup',
+        start: { dateTime: '2026-05-19T16:00:00Z' },
+        end: { dateTime: '2026-05-19T16:30:00Z' },
+      }),
+      event({ id: 'b', summary: 'Today all-day', start: { date: '2026-05-19' } }),
+      event({
+        id: 'c',
+        summary: 'Tomorrow',
+        start: { dateTime: '2026-05-20T15:00:00Z' },
+        end: { dateTime: '2026-05-20T16:00:00Z' },
+      }),
+    ];
+    expect(formatCalendarTldr(events, now, tz)).toBe('2 events today');
+  });
+
+  it('uses the singular form for one event', () => {
+    const events: CalendarEvent[] = [
+      event({
+        id: 'a',
+        summary: 'Standup',
+        start: { dateTime: '2026-05-19T16:00:00Z' },
+        end: { dateTime: '2026-05-19T16:30:00Z' },
+      }),
+    ];
+    expect(formatCalendarTldr(events, now, tz)).toBe('1 event today');
+  });
+
+  it('returns an empty string when today is clear', () => {
+    expect(formatCalendarTldr([], now, tz)).toBe('');
   });
 });

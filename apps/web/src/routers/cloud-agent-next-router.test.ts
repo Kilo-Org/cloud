@@ -13,6 +13,9 @@ const mockCreateCloudAgentNextClient = jest.fn(() => ({
   prepareSession: mockPrepareSession,
 }));
 
+const mockIsFeatureFlagEnabledOrDevelopment =
+  jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
+
 jest.mock('@/lib/tokens', () => ({
   generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
 }));
@@ -20,6 +23,10 @@ jest.mock('@/lib/tokens', () => ({
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: mockCreateCloudAgentNextClient,
   rethrowAsPaymentRequired: jest.fn(),
+}));
+
+jest.mock('@/lib/posthog-feature-flags', () => ({
+  isFeatureFlagEnabledOrDevelopment: mockIsFeatureFlagEnabledOrDevelopment,
 }));
 
 let createCaller: (ctx: { user: User }) => {
@@ -50,9 +57,10 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     });
   });
 
-  it('rejects devcontainer sessions for non-admin users', async () => {
+  it('rejects devcontainer sessions when the feature flag is disabled', async () => {
+    mockIsFeatureFlagEnabledOrDevelopment.mockResolvedValue(false);
     const caller = createCaller({
-      user: { id: 'user-1', is_admin: false } as User,
+      user: { id: 'user-1', is_admin: true } as User,
     });
 
     await expect(
@@ -64,13 +72,18 @@ describe('cloudAgentNextRouter.prepareSession', () => {
         autoInitiate: true,
         devcontainer: true,
       })
-    ).rejects.toThrow('Admin access required for devcontainer sessions');
+    ).rejects.toThrow('Dev container sessions are not available');
+    expect(mockIsFeatureFlagEnabledOrDevelopment).toHaveBeenCalledWith(
+      'cloud-agent-devcontainer',
+      'user-1'
+    );
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
 
-  it('forwards devcontainer sessions for admin users', async () => {
+  it('forwards devcontainer sessions when the feature flag is enabled', async () => {
+    mockIsFeatureFlagEnabledOrDevelopment.mockResolvedValue(true);
     const caller = createCaller({
-      user: { id: 'admin-1', is_admin: true } as User,
+      user: { id: 'user-2', is_admin: false } as User,
     });
 
     await expect(
@@ -86,6 +99,10 @@ describe('cloudAgentNextRouter.prepareSession', () => {
       cloudAgentSessionId: 'agent_123',
       kiloSessionId: 'ses_12345678901234567890123456',
     });
+    expect(mockIsFeatureFlagEnabledOrDevelopment).toHaveBeenCalledWith(
+      'cloud-agent-devcontainer',
+      'user-2'
+    );
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({
         githubRepo: 'acme/repo',

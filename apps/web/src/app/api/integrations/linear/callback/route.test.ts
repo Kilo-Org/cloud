@@ -263,6 +263,20 @@ describe('verifyOAuthState (self-check, to keep tests honest)', () => {
   test('rejects a tampered signature', () => {
     expect(verifyOAuthState('payload.badsig')).toBeNull();
   });
+
+  test('round-trips a safe return path', () => {
+    const state = createOAuthState(
+      `user_${USER_ID}`,
+      USER_ID,
+      '/collab/authorize?services=linear&step=0'
+    );
+
+    expect(verifyOAuthState(state)).toMatchObject({
+      owner: `user_${USER_ID}`,
+      returnTo: '/collab/authorize?services=linear&step=0',
+      userId: USER_ID,
+    });
+  });
 });
 
 describe('GET /api/integrations/linear/callback bot-link flow', () => {

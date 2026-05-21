@@ -8,6 +8,11 @@ import {
 } from '@kilocode/db/schema';
 import * as z from 'zod';
 import { sql, and, gte, lt, eq, isNotNull, desc, ilike, or, inArray, type SQL } from 'drizzle-orm';
+import {
+  reconsiderableCodeReviewWorkCondition,
+  staleQueuedCodeReviewCutoffSql,
+  staleRunningCodeReviewCutoffSql,
+} from '@/lib/code-reviews/dispatch/dispatch-constants';
 
 /**
  * SQL condition that identifies billing/credits errors (402 Payment Required).
@@ -192,6 +197,76 @@ function buildBaseConditions(input: FilterInput): SQL[] {
 }
 
 export const adminCodeReviewsRouter = createTRPCRouter({
+  getQueueHealthStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
+    const ownershipFilter = buildOwnershipFilter(
+      input.userId,
+      input.organizationId,
+      input.ownershipType
+    );
+    const staleQueuedCutoff = staleQueuedCodeReviewCutoffSql();
+    const staleRunningCutoff = staleRunningCodeReviewCutoffSql();
+    const waitingOwnerCondition = reconsiderableCodeReviewWorkCondition(staleQueuedCutoff);
+    const liveQueueCondition = sql`(
+      ${waitingOwnerCondition}
+      OR (
+        ${cloud_agent_code_reviews.status} = 'running'
+        AND COALESCE(
+          ${cloud_agent_code_reviews.started_at},
+          ${cloud_agent_code_reviews.updated_at},
+          ${cloud_agent_code_reviews.created_at}
+        ) < ${staleRunningCutoff}
+      )
+    )`;
+
+    const query = db
+      .select({
+        pending_review_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'pending')`,
+        pending_over_five_minutes_count: sql<number>`COUNT(*) FILTER (
+          WHERE ${cloud_agent_code_reviews.status} = 'pending'
+            AND ${cloud_agent_code_reviews.created_at} < ${staleQueuedCutoff}
+        )`,
+        oldest_pending_age_seconds: sql<number>`COALESCE(
+          MAX(EXTRACT(EPOCH FROM (now() - ${cloud_agent_code_reviews.created_at}))) FILTER (
+            WHERE ${cloud_agent_code_reviews.status} = 'pending'
+          ),
+          0
+        )`,
+        stale_queued_claim_count: sql<number>`COUNT(*) FILTER (
+          WHERE ${cloud_agent_code_reviews.status} = 'queued'
+            AND ${cloud_agent_code_reviews.updated_at} < ${staleQueuedCutoff}
+        )`,
+        running_over_ninety_minutes_count: sql<number>`COUNT(*) FILTER (
+          WHERE ${cloud_agent_code_reviews.status} = 'running'
+            AND COALESCE(
+              ${cloud_agent_code_reviews.started_at},
+              ${cloud_agent_code_reviews.updated_at},
+              ${cloud_agent_code_reviews.created_at}
+            ) < ${staleRunningCutoff}
+        )`,
+        owners_with_waiting_reviews_count: sql<number>`COUNT(DISTINCT CASE
+          WHEN ${cloud_agent_code_reviews.owned_by_organization_id} IS NOT NULL
+            THEN CONCAT('org:', ${cloud_agent_code_reviews.owned_by_organization_id}::text)
+          ELSE CONCAT('user:', ${cloud_agent_code_reviews.owned_by_user_id})
+        END) FILTER (WHERE ${waitingOwnerCondition})`,
+      })
+      .from(cloud_agent_code_reviews);
+
+    const queueHealthCondition = ownershipFilter
+      ? and(liveQueueCondition, ownershipFilter)
+      : liveQueueCondition;
+    const result = await query.where(queueHealthCondition);
+    const stats = result[0];
+
+    return {
+      pendingReviewCount: Number(stats?.pending_review_count) || 0,
+      pendingOverFiveMinutesCount: Number(stats?.pending_over_five_minutes_count) || 0,
+      oldestPendingAgeSeconds: Number(stats?.oldest_pending_age_seconds) || 0,
+      staleQueuedClaimCount: Number(stats?.stale_queued_claim_count) || 0,
+      runningOverNinetyMinutesCount: Number(stats?.running_over_ninety_minutes_count) || 0,
+      ownersWithWaitingReviewsCount: Number(stats?.owners_with_waiting_reviews_count) || 0,
+    };
+  }),
+
   // Get overview KPIs
   getOverviewStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);

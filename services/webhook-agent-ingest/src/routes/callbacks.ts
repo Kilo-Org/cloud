@@ -1,9 +1,8 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { HonoContext } from '../index';
-import { internalApiMiddleware } from '../util/auth';
 import { logger } from '../util/logger';
-import { resError, resSuccess } from '@kilocode/worker-utils';
+import { resError, resSuccess, verifyCallbackToken } from '@kilocode/worker-utils';
 import { withDORetry } from '../util/do-retry';
 
 const callbacks = new Hono<HonoContext>();
@@ -18,8 +17,6 @@ const ExecutionCallbackPayloadSchema = z.object({
   kiloSessionId: z.string().optional(),
 });
 
-callbacks.use('*', internalApiMiddleware);
-
 callbacks.post('/execution', async c => {
   const namespace = c.req.header('x-webhook-namespace');
   const triggerId = c.req.header('x-webhook-trigger-id');
@@ -32,6 +29,24 @@ callbacks.post('/execution', async c => {
       hasRequestId: !!requestId,
     });
     return c.json(resError('Missing webhook identification headers'), 400);
+  }
+
+  const callbackTokenSecret = await c.env.CALLBACK_TOKEN_SECRET.get();
+  if (!callbackTokenSecret) {
+    logger.error('Callback authentication secret not configured');
+    return c.json(resError('Internal server error'), 500);
+  }
+
+  const callbackToken = c.req.header('X-Callback-Token');
+  const validCallbackToken = await verifyCallbackToken({
+    token: callbackToken,
+    secret: callbackTokenSecret,
+    scope: 'webhook-execution-callback',
+    resourceParts: [namespace, triggerId, requestId],
+  });
+  if (!validCallbackToken) {
+    logger.warn('Callback authentication failed', { requestId, namespace, triggerId });
+    return c.json(resError('Unauthorized'), 401);
   }
 
   let payload: z.infer<typeof ExecutionCallbackPayloadSchema>;

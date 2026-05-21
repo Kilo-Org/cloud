@@ -8,6 +8,7 @@ import type * as posthogModule from '@/lib/security-agent/posthog-tracking';
 import type * as tokensModule from '@/lib/tokens';
 import type { SecurityFinding, User } from '@kilocode/db/schema';
 import type { SecurityFindingAnalysis } from '@/lib/security-agent/core/types';
+import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 
 // --- Mock functions ---
 
@@ -59,6 +60,7 @@ async function flushAfterCallbacks() {
 
 jest.mock('@/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'test-internal-secret',
+  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
 jest.mock('@/lib/security-agent/db/security-findings', () => ({
@@ -125,17 +127,21 @@ jest.mock('drizzle-orm', () => ({
 
 // --- Helpers ---
 
-const VALID_SECRET = 'test-internal-secret';
+const CALLBACK_SECRET = 'test-callback-token-secret';
 const FINDING_ID = 'finding-abc-123';
+let defaultCallbackToken: string;
 
 function makeRequest(
   findingId: string,
   body: Record<string, unknown>,
-  secret = VALID_SECRET
+  callbackToken: string | null = defaultCallbackToken
 ): NextRequest {
   return {
     headers: {
-      get: (name: string) => (name === 'X-Internal-Secret' ? secret : null),
+      get: (name: string) => {
+        if (name === 'X-Callback-Token') return callbackToken;
+        return null;
+      },
     },
     json: () => Promise.resolve(body),
   } as unknown as NextRequest;
@@ -239,6 +245,11 @@ beforeEach(async () => {
   jest.clearAllMocks();
   jest.useFakeTimers();
   afterPromises = [];
+  defaultCallbackToken = await deriveCallbackToken({
+    secret: CALLBACK_SECRET,
+    scope: 'security-analysis-callback',
+    resourceParts: [FINDING_ID],
+  });
   mockUpdateAnalysisStatus.mockResolvedValue(true);
   mockTransitionAutoAnalysisQueueFromCallback.mockResolvedValue(undefined);
   mockFinalizeAnalysis.mockResolvedValue(undefined);
@@ -251,8 +262,8 @@ afterEach(() => {
 
 describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
   describe('authentication', () => {
-    it('returns 401 when X-Internal-Secret header is missing', async () => {
-      const req = makeRequest(FINDING_ID, completedPayload, '');
+    it('returns 401 when callback token header is missing', async () => {
+      const req = makeRequest(FINDING_ID, completedPayload, null);
       const response = await POST(req, makeParams(FINDING_ID));
 
       expect(response.status).toBe(401);
@@ -260,16 +271,39 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       expect(body.error).toBe('Unauthorized');
     });
 
-    it('returns 401 when X-Internal-Secret header is wrong', async () => {
-      const req = makeRequest(FINDING_ID, completedPayload, 'wrong-secret');
+    it('returns 401 when callback token header is wrong', async () => {
+      const req = makeRequest(FINDING_ID, completedPayload, 'wrong-token');
       const response = await POST(req, makeParams(FINDING_ID));
 
       expect(response.status).toBe(401);
     });
+
+    it('accepts token scoped to the finding', async () => {
+      mockGetSecurityFindingById.mockResolvedValue(null);
+      const response = await POST(
+        makeRequest(FINDING_ID, completedPayload, defaultCallbackToken),
+        makeParams(FINDING_ID)
+      );
+
+      expect(response.status).toBe(404);
+    });
+
+    it('rejects token scoped to a different finding', async () => {
+      const callbackToken = await deriveCallbackToken({
+        secret: CALLBACK_SECRET,
+        scope: 'security-analysis-callback',
+        resourceParts: ['different-finding'],
+      });
+      const req = makeRequest(FINDING_ID, completedPayload, callbackToken);
+      const response = await POST(req, makeParams(FINDING_ID));
+
+      expect(response.status).toBe(401);
+      expect(mockGetSecurityFindingById).not.toHaveBeenCalled();
+    });
   });
 
   describe('request validation', () => {
-    it('returns 400 when status field is missing', async () => {
+    it('returns 400 when callback payload is invalid', async () => {
       const req = makeRequest(FINDING_ID, { sessionId: 'x', cloudAgentSessionId: 'y' });
       mockGetSecurityFindingById.mockResolvedValue(createMockFinding());
 
@@ -277,7 +311,7 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
 
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body.error).toBe('Missing required field: status');
+      expect(body.error).toBe('Invalid callback payload');
     });
 
     it('returns 404 when finding does not exist', async () => {
@@ -511,12 +545,12 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       mockGenerateApiToken.mockReturnValue('fresh-token');
 
       const req = makeRequest(FINDING_ID, completedPayload);
-      const responsePromise = POST(req, makeParams(FINDING_ID));
+      const response = await POST(req, makeParams(FINDING_ID));
 
       // Advance past the retry delay
       await jest.advanceTimersByTimeAsync(5000);
+      await flushAfterCallbacks();
 
-      const response = await responsePromise;
       expect(response.status).toBe(200);
       expect(mockFetchSessionSnapshot).toHaveBeenCalledTimes(2);
       expect(mockFinalizeAnalysis).toHaveBeenCalled();
@@ -546,11 +580,11 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       mockGenerateApiToken.mockReturnValue('fresh-token');
 
       const req = makeRequest(FINDING_ID, completedPayload);
-      const responsePromise = POST(req, makeParams(FINDING_ID));
+      const response = await POST(req, makeParams(FINDING_ID));
 
       await jest.advanceTimersByTimeAsync(5000);
+      await flushAfterCallbacks();
 
-      const response = await responsePromise;
       expect(response.status).toBe(200);
       expect(mockFetchSessionSnapshot).toHaveBeenCalledTimes(2);
       expect(mockFinalizeAnalysis).toHaveBeenCalled();
@@ -564,12 +598,12 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       mockExtractLastAssistantMessage.mockReturnValue(null);
 
       const req = makeRequest(FINDING_ID, completedPayload);
-      const responsePromise = POST(req, makeParams(FINDING_ID));
+      const response = await POST(req, makeParams(FINDING_ID));
 
       // Advance past all retry delays (2 retries × 5s)
       await jest.advanceTimersByTimeAsync(10000);
+      await flushAfterCallbacks();
 
-      const response = await responsePromise;
       expect(response.status).toBe(200);
       expect(mockFetchSessionSnapshot).toHaveBeenCalledTimes(3);
       expect(mockUpdateAnalysisStatus).toHaveBeenCalledWith(FINDING_ID, 'failed', {

@@ -137,8 +137,7 @@ function createEnv(): BillingWorkerEnv {
     STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID: 'price_legacy_commit',
     STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID: 'price_current_standard',
     STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID: 'price_current_commit',
-    INTERNAL_API_SECRET: 'next-internal-api-secret',
-    KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
+    INTERNAL_API_SECRET: 'internal-api-secret',
   };
 }
 

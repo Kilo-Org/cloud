@@ -3,6 +3,7 @@ import { env, runDurableObjectAlarm, runInDurableObject, SELF } from 'cloudflare
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { CodeReviewOrchestrator } from '../../src/code-review-orchestrator';
 import type { CodeReview, SessionInput } from '../../src/types';
+import { deriveCallbackToken } from '@kilocode/worker-utils';
 
 function getReviewStub(name = `review-${crypto.randomUUID()}`) {
   const id = env.CODE_REVIEW_ORCHESTRATOR.idFromName(name);
@@ -173,7 +174,7 @@ describe('CodeReviewOrchestrator recovery', () => {
   });
 
   it('POST /review uses attempt-specific durable object names', async () => {
-    mockSuccessfulCloudAgentNextRun();
+    const fetchMock = mockSuccessfulCloudAgentNextRun();
     const reviewId = crypto.randomUUID();
     const attemptId = crypto.randomUUID();
 
@@ -203,6 +204,23 @@ describe('CodeReviewOrchestrator recovery', () => {
       attemptId,
       status: expect.stringMatching(/queued|running/),
     });
+
+    const prepareCall = getFetchCall(fetchMock, '/trpc/prepareSession');
+    const prepareBody = JSON.parse(String(prepareCall?.[1]?.body));
+    const expectedCallbackToken = await deriveCallbackToken({
+      secret: env.CALLBACK_TOKEN_SECRET,
+      scope: 'code-review-status-callback',
+      resourceParts: [reviewId, attemptId],
+    });
+    const statusUpdateCall = getFetchCall(fetchMock, '/api/internal/code-review-status/');
+    const statusUpdateInit = statusUpdateCall?.[1] as RequestInit | undefined;
+    expect(statusUpdateInit?.headers).toMatchObject({ 'X-Callback-Token': expectedCallbackToken });
+    expect(statusUpdateInit?.headers).not.toHaveProperty('X-Internal-Secret');
+    expect(prepareBody.callbackTarget).toMatchObject({
+      url: expect.stringContaining(`attemptId=${attemptId}`),
+      headers: { 'X-Callback-Token': expectedCallbackToken },
+    });
+    expect(prepareBody.callbackTarget.headers).not.toHaveProperty('X-Internal-Secret');
   });
 
   it('fresh attempt dispatch does not reuse failed state from an earlier attempt', async () => {
@@ -1224,8 +1242,10 @@ describe('CodeReviewOrchestrator recovery', () => {
       cloudAgentSessionId: previousSessionId,
       callbackTarget: {
         url: expect.stringContaining('/api/internal/code-review-status/'),
+        headers: { 'X-Callback-Token': expect.stringMatching(/^[0-9a-f]{64}$/) },
       },
     });
+    expect(updateBody.callbackTarget.headers).not.toHaveProperty('X-Internal-Secret');
   });
 
   it('retries with a fresh session when sendMessageV2 fails with a sandbox 500', async () => {

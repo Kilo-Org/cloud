@@ -39,6 +39,7 @@ export const OPENAI_API_KEY = getEnvVariable('OPENAI_API_KEY');
 export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
+export const CALLBACK_TOKEN_SECRET = getEnvVariable('CALLBACK_TOKEN_SECRET');
 export const CODE_REVIEW_WORKER_AUTH_TOKEN = getEnvVariable('CODE_REVIEW_WORKER_AUTH_TOKEN');
 export const IMPACT_ACCOUNT_SID = getEnvVariable('IMPACT_ACCOUNT_SID') || '';
 export const IMPACT_AUTH_TOKEN = getEnvVariable('IMPACT_AUTH_TOKEN') || '';
@@ -55,6 +56,7 @@ export const IMPACT_ADVOCATE_DEBUG_LOGGING =
 
 if (!NEXTAUTH_SECRET) throw new Error('NEXTAUTH_SECRET is required JWT signing');
 if (!TURNSTILE_SECRET_KEY) throw new Error('TURNSTILE_SECRET_KEY is required');
+if (!CALLBACK_TOKEN_SECRET) throw new Error('CALLBACK_TOKEN_SECRET is required');
 
 export const STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID = getEnvVariable(
   'STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID'
@@ -232,9 +234,12 @@ export const CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID = getEnvVariable(
 
 // KiloClaw Worker
 export const KILOCLAW_API_URL = getEnvVariable('KILOCLAW_API_URL') || '';
-export const KILOCLAW_INTERNAL_API_SECRET = getEnvVariable('KILOCLAW_INTERNAL_API_SECRET') || '';
 export const KILOCLAW_INBOUND_EMAIL_DOMAIN =
   getEnvVariable('KILOCLAW_INBOUND_EMAIL_DOMAIN') || 'kiloclaw.ai';
+export const COMPOSIO_AGENTS_API_BASE_URL =
+  getEnvVariable('COMPOSIO_AGENTS_API_BASE_URL') || 'https://agents.composio.dev';
+export const COMPOSIO_API_BASE_URL =
+  getEnvVariable('COMPOSIO_API_BASE_URL') || 'https://backend.composio.dev';
 
 /**
  * Per-instance worker URL template.

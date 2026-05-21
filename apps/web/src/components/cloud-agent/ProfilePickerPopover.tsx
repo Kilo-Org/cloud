@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useId } from 'react';
 import { Layers, ChevronDown, Check, Plus, FolderCog, X, ArrowLeft, Zap } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import {
   useProfiles,
@@ -13,12 +14,19 @@ import {
 import { resolveProfileLayers } from '@kilocode/cloud-agent-profile';
 import { ProfilesListDialog } from './ProfilesListDialog';
 
+type DevcontainerToggleControl = {
+  checked: boolean;
+  disabled?: boolean;
+  onCheckedChange: (checked: boolean) => void;
+};
+
 type ProfilePickerPopoverProps = {
   organizationId?: string;
   selectedOverrideProfileId: string | null;
   onOverrideProfileSelect: (id: string | null) => void;
   repoFullName?: string;
   platform?: 'github' | 'gitlab';
+  devcontainerToggle?: DevcontainerToggleControl;
 };
 
 export function ProfilePickerPopover({
@@ -27,7 +35,10 @@ export function ProfilePickerPopover({
   onOverrideProfileSelect,
   repoFullName,
   platform,
+  devcontainerToggle,
 }: ProfilePickerPopoverProps) {
+  const devcontainerToggleId = useId();
+  const devcontainerDescriptionId = `${devcontainerToggleId}-description`;
   const [open, setOpen] = useState(false);
   const [pickingOverride, setPickingOverride] = useState(false);
   const [showManageProfiles, setShowManageProfiles] = useState(false);
@@ -195,6 +206,42 @@ export function ProfilePickerPopover({
                 setOpen(false);
               }}
             />
+          )}
+
+          {devcontainerToggle && (
+            <section
+              className={cn(
+                'bg-accent/10 mt-3 rounded-lg border px-3 py-2.5',
+                devcontainerToggle.disabled && 'opacity-70'
+              )}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wider">
+                    Experimental runtime
+                  </p>
+                  <label
+                    htmlFor={devcontainerToggleId}
+                    className={cn(
+                      'block text-xs font-medium',
+                      devcontainerToggle.disabled ? 'cursor-not-allowed' : 'cursor-pointer'
+                    )}
+                  >
+                    Dev container support
+                  </label>
+                  <p id={devcontainerDescriptionId} className="text-muted-foreground mt-1 text-xs">
+                    Experimental. Remembered in this browser.
+                  </p>
+                </div>
+                <Switch
+                  id={devcontainerToggleId}
+                  checked={devcontainerToggle.checked}
+                  onCheckedChange={devcontainerToggle.onCheckedChange}
+                  disabled={devcontainerToggle.disabled}
+                  aria-describedby={devcontainerDescriptionId}
+                />
+              </div>
+            </section>
           )}
 
           <div className="my-3 border-t" />

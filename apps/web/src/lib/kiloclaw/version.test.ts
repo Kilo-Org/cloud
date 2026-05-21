@@ -1,4 +1,9 @@
-import { cleanVersion, calverAtLeast, getRunningVersionBadge } from './version';
+import {
+  cleanVersion,
+  calverAtLeast,
+  controllerCalverSupports,
+  getRunningVersionBadge,
+} from './version';
 
 describe('cleanVersion', () => {
   // Null / undefined / empty
@@ -72,6 +77,32 @@ describe('calverAtLeast', () => {
     expect(calverAtLeast('abc.def.ghi', '2026.1.1')).toBe(false));
   it('returns false for non-numeric minVersion segment', () =>
     expect(calverAtLeast('2026.1.1', 'abc.1.1')).toBe(false));
+});
+
+describe('controllerCalverSupports', () => {
+  // Explicit `null` is the worker's positive old-controller signal — gate OFF.
+  it('returns false for null (worker old-controller signal)', () =>
+    expect(controllerCalverSupports(null, '2026.5.12')).toBe(false));
+
+  // Fails OPEN — genuinely unknown / unparseable input is treated as supported.
+  it('returns true for undefined', () =>
+    expect(controllerCalverSupports(undefined, '2026.5.12')).toBe(true));
+  it('returns true for empty string', () =>
+    expect(controllerCalverSupports('', '2026.5.12')).toBe(true));
+  it('returns true for a non-calver string (e.g. dev build)', () =>
+    expect(controllerCalverSupports('dev', '2026.5.12')).toBe(true));
+  it('returns true for a malformed version', () =>
+    expect(controllerCalverSupports('abc.def.ghi', '2026.5.12')).toBe(true));
+
+  // Parseable versions still gate normally.
+  it('returns true when the version is newer', () =>
+    expect(controllerCalverSupports('2026.5.20.0900', '2026.5.12')).toBe(true));
+  it('returns true when the version equals the minimum', () =>
+    expect(controllerCalverSupports('2026.5.12', '2026.5.12')).toBe(true));
+  it('returns false only when the version is positively parsed as older', () =>
+    expect(controllerCalverSupports('2026.5.11.2359', '2026.5.12')).toBe(false));
+  it('handles quoted / prefixed version strings', () =>
+    expect(controllerCalverSupports('"2026.5.20.0900"', '2026.5.12')).toBe(true));
 });
 
 describe('getRunningVersionBadge', () => {

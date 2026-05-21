@@ -9,7 +9,7 @@ process.env.STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID ||= 'price_legacy_commit'
 process.env.STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID ||= 'price_current_standard';
 process.env.STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID ||= 'price_current_commit';
 process.env.KILOCLAW_API_URL ||= 'https://claw.test';
-process.env.KILOCLAW_INTERNAL_API_SECRET ||= 'test-secret';
+process.env.INTERNAL_API_SECRET ||= 'test-secret';
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
@@ -100,7 +100,7 @@ jest.mock('@/lib/config.server', () => {
   return {
     ...actual,
     KILOCLAW_API_URL: 'https://claw.test',
-    KILOCLAW_INTERNAL_API_SECRET: 'test-secret',
+    INTERNAL_API_SECRET: 'test-secret',
   };
 });
 

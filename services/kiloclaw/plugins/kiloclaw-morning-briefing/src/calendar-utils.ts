@@ -206,7 +206,18 @@ function timedEventComparator(a: CalendarEvent, b: CalendarEvent): number {
 }
 
 export function buildCalendarSectionTitle(accountEmail: string): string {
-  return `${accountEmail} daily calendar`;
+  return `🗓 ${accountEmail} daily calendar`;
+}
+
+/**
+ * Short TL;DR fragment: count of events on today's calendar. Returns an
+ * empty string when today is clear so the caller can drop it.
+ */
+export function formatCalendarTldr(events: CalendarEvent[], now: Date, timezone: string): string {
+  const { todayTimed, todayAllDay } = partitionEventsByDay(events, now, timezone);
+  const count = todayTimed.length + todayAllDay.length;
+  if (count <= 0) return '';
+  return count === 1 ? '1 event today' : `${count} events today`;
 }
 
 export function buildCalendarSectionLines(
@@ -230,7 +241,7 @@ export function buildCalendarSectionLines(
   ];
 
   if (todayLines.length === 0 && tomorrowLines.length === 0) {
-    return ['No events on your calendar for today or tomorrow morning.'];
+    return ['_No events on your calendar for today or tomorrow morning._'];
   }
 
   const lines: string[] = [];
@@ -247,14 +258,4 @@ export function buildCalendarSectionLines(
   }
 
   return lines;
-}
-
-export function buildCalendarNoConnectionLines(): string[] {
-  return ["Connect your Google account in Settings to see today's events."];
-}
-
-export function buildCalendarMissingScopeLines(): string[] {
-  return [
-    "Your Google account is connected, but it's missing calendar permission. Reconnect from Settings and include calendar access to see today's events.",
-  ];
 }

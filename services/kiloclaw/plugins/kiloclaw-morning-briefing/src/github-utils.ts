@@ -161,6 +161,33 @@ export function buildGithubEmptySummary(ctx: GithubEmptyResultContext): string {
 }
 
 /**
+ * Italic one-line empty state for the `## 🐙 GitHub` section when the
+ * token is authenticated, correctly scoped, and simply has no issues
+ * involving the user. The scope / token-misconfiguration cases keep the
+ * verbose diagnostic from `buildGithubEmptySectionLines` instead — only
+ * the genuinely-clean empty case uses this friendly line.
+ */
+export const GITHUB_EMPTY_LINE = '_GitHub is connected and nothing needs your attention._';
+
+/**
+ * True when the empty-result context represents a cleanly-configured
+ * token with nothing to surface (classic PAT, no missing scopes), as
+ * opposed to a misconfiguration the user should act on.
+ */
+export function isCleanGithubEmptyResult(ctx: GithubEmptyResultContext): boolean {
+  return ctx.tokenType === 'classic' && ctx.missingScopes.length === 0;
+}
+
+/**
+ * Short TL;DR fragment for the briefing header. Returns an empty string
+ * when there is nothing to count so the caller can drop it.
+ */
+export function formatGithubTldr(count: number): string {
+  if (count <= 0) return '';
+  return count === 1 ? '1 GitHub issue to review' : `${count} GitHub issues to review`;
+}
+
+/**
  * Read the configured GitHub token from the environment. Matches `gh`'s
  * own preference order: `GH_TOKEN` wins over `GITHUB_TOKEN` when both are
  * set (https://cli.github.com/manual/gh_help_environment).

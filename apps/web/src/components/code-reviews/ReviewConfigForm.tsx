@@ -24,6 +24,7 @@ import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 
 import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
@@ -105,6 +106,9 @@ export function ReviewConfigForm({
   const isGitLab = platform === 'gitlab';
   const platformLabel = isGitLab ? 'GitLab' : 'GitHub';
   const prLabel = isGitLab ? 'merge requests' : 'pull requests';
+  const reviewMdGuideHref = organizationId
+    ? `/organizations/${organizationId}/code-reviews/review-md`
+    : '/code-reviews/review-md';
 
   // Fetch current config
   const {
@@ -632,6 +636,12 @@ export function ReviewConfigForm({
                   Load REVIEW.md from the base branch when present and use it for
                   repository-specific review guidance.
                 </p>
+                <Link
+                  href={reviewMdGuideHref}
+                  className="inline-flex text-sm text-blue-400 hover:text-blue-300"
+                >
+                  Learn about REVIEW.md
+                </Link>
               </div>
               <Switch
                 id="use-review-md"

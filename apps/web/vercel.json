@@ -49,6 +49,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/dispatch-pending-code-reviews",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/exa-partition-maintenance",
       "schedule": "0 0 1 * *"
     },

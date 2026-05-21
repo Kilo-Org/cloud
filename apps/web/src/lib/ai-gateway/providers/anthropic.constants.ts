@@ -1,4 +1,8 @@
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import type {
+  KiloExclusiveModel,
+  Pricing,
+  Usage,
+} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
 export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.7';
@@ -9,6 +13,19 @@ export const CLAUDE_OPUS_4_7_OPTIMIZED_MODEL_ID = 'anthropic/claude-opus-4-7:opt
 export const CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID = CLAUDE_SONNET_CURRENT_MODEL_ID;
 export const CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID = CLAUDE_OPUS_CURRENT_MODEL_ID;
 export const CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID = CLAUDE_HAIKU_CURRENT_MODEL_ID;
+
+// Anthropic list price for Claude Opus 4.7, minus 20% Kilo discount.
+const OPUS_4_7_OPTIMIZED_PRICING: Pricing = {
+  prompt_per_million: 4, // $5 list * 0.8
+  completion_per_million: 20, // $25 list * 0.8
+  input_cache_read_per_million: 0.4, // $0.50 list * 0.8
+  input_cache_write_per_million: 5, // $6.25 list * 0.8
+  calculate_mUsd: (usage: Usage) =>
+    usage.uncachedInputTokens * 4 +
+    usage.totalOutputTokens * 20 +
+    usage.cacheHitTokens * 0.4 +
+    usage.cacheWriteTokens * 5,
+};
 
 export const claude_opus_4_7_optimized_model: KiloExclusiveModel = {
   public_id: CLAUDE_OPUS_4_7_OPTIMIZED_MODEL_ID,
@@ -21,7 +38,7 @@ export const claude_opus_4_7_optimized_model: KiloExclusiveModel = {
   status: 'public',
   flags: ['reasoning', 'vision'],
   gateway: 'martian',
-  pricing: null,
+  pricing: OPUS_4_7_OPTIMIZED_PRICING,
   exclusive_to: [],
   inference_provider_restriction: [],
 };

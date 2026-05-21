@@ -25,7 +25,7 @@ export function MessageAttachmentPreviewChip({ row, localUri, onRemove, onRetry 
     <View
       className={cn(
         'relative mr-2 overflow-hidden rounded-md border border-border bg-card',
-        isImage ? 'h-16 w-20' : 'h-12 max-w-48 flex-row items-center gap-2 px-2'
+        isImage ? 'h-16 w-20' : 'h-12 w-48 flex-row items-center gap-2 px-2'
       )}
       accessibilityLabel={`${row.filename}, ${row.status}`}
     >

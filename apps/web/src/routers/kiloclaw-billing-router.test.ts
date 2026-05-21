@@ -2232,6 +2232,101 @@ describe('createKiloPassUpsellCheckout', () => {
     expect(stripeMock.checkout.sessions.create).toHaveBeenCalled();
   });
 
+  it('uses empty affiliateTrackingId in Kilo Pass upsell metadata when attribution is absent', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+      kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+    });
+    stripeMock.checkout.sessions.create.mockResolvedValue({
+      url: 'https://checkout.stripe.com/test',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await caller.kiloclaw.createKiloPassUpsellCheckout({
+      instanceId: instance.id,
+      tier: '19',
+      cadence: 'monthly',
+      hostingPlan: 'standard',
+    });
+
+    expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscription_data: {
+          metadata: {
+            type: 'kilo-pass',
+            kiloUserId: user.id,
+            tier: 'tier_19',
+            cadence: 'monthly',
+            affiliateTrackingId: '',
+          },
+        },
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: user.id,
+          tier: 'tier_19',
+          cadence: 'monthly',
+          affiliateTrackingId: '',
+        },
+      })
+    );
+  });
+
+  it('includes affiliateTrackingId in Kilo Pass upsell metadata when attribution exists', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+      kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+    });
+    await db.insert(user_affiliate_attributions).values({
+      user_id: user.id,
+      provider: 'impact',
+      tracking_id: 'impact-click-123',
+    });
+    stripeMock.checkout.sessions.create.mockResolvedValue({
+      url: 'https://checkout.stripe.com/test',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await caller.kiloclaw.createKiloPassUpsellCheckout({
+      instanceId: instance.id,
+      tier: '19',
+      cadence: 'monthly',
+      hostingPlan: 'standard',
+    });
+
+    expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscription_data: {
+          metadata: {
+            type: 'kilo-pass',
+            kiloUserId: user.id,
+            tier: 'tier_19',
+            cadence: 'monthly',
+            affiliateTrackingId: 'impact-click-123',
+          },
+        },
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: user.id,
+          tier: 'tier_19',
+          cadence: 'monthly',
+          affiliateTrackingId: 'impact-click-123',
+        },
+      })
+    );
+  });
+
   it('allows current Standard hosting when balance plus selected tier projection covers the first charge', async () => {
     const instance = await createKiloclawInstance(user.id);
     await db

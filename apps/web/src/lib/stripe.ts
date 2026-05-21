@@ -73,6 +73,12 @@ type KiloClawChargeContext = {
   invoiceId: string;
 };
 
+type AffiliateDisputeSaleKind = 'kiloclaw' | 'kilo-pass';
+
+type AffiliateDisputeChargeContext = KiloClawChargeContext & {
+  saleKind: AffiliateDisputeSaleKind;
+};
+
 async function getKiloClawChargeContext(chargeId: string): Promise<KiloClawChargeContext | null> {
   const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } =
     await client.charges.retrieve(chargeId, { expand: ['invoice'] });
@@ -84,6 +90,40 @@ async function getKiloClawChargeContext(chargeId: string): Promise<KiloClawCharg
   return {
     chargeId,
     invoiceId: invoice.id,
+  };
+}
+
+function getAffiliateDisputeSaleKind(invoice: Stripe.Invoice): AffiliateDisputeSaleKind | null {
+  if (invoiceLooksLikeKiloClawByPriceId(invoice)) {
+    return 'kiloclaw';
+  }
+
+  if (invoiceLooksLikeKiloPassByPriceId(invoice)) {
+    return 'kilo-pass';
+  }
+
+  return null;
+}
+
+async function getAffiliateDisputeChargeContext(
+  chargeId: string
+): Promise<AffiliateDisputeChargeContext | null> {
+  const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } =
+    await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+  const invoice = charge.invoice;
+  if (!invoice || typeof invoice === 'string') {
+    return null;
+  }
+
+  const saleKind = getAffiliateDisputeSaleKind(invoice);
+  if (!saleKind) {
+    return null;
+  }
+
+  return {
+    chargeId,
+    invoiceId: invoice.id,
+    saleKind,
   };
 }
 
@@ -829,14 +869,14 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
-      const kiloClawCharge = await getKiloClawChargeContext(chargeId);
-      if (!kiloClawCharge) {
+      const affiliateDisputeCharge = await getAffiliateDisputeChargeContext(chargeId);
+      if (!affiliateDisputeCharge) {
         break;
       }
 
       try {
         await enqueueImpactSaleReversalForCharge({
-          stripeChargeId: kiloClawCharge.chargeId,
+          stripeChargeId: affiliateDisputeCharge.chargeId,
           disputeId: dispute.id,
           amount: dispute.amount / 100,
           currency: dispute.currency,
@@ -844,20 +884,22 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         });
       } catch (error) {
         sentryLogger('stripe', 'warning')(
-          'Impact sale reversal enqueue failed for KiloClaw dispute',
+          'Impact sale reversal enqueue failed for eligible sale dispute',
           {
-            stripe_charge_id: kiloClawCharge.chargeId,
-            stripe_invoice_id: kiloClawCharge.invoiceId,
+            stripe_charge_id: affiliateDisputeCharge.chargeId,
+            stripe_invoice_id: affiliateDisputeCharge.invoiceId,
             dispute_id: dispute.id,
             error: error instanceof Error ? error.message : String(error),
           }
         );
       }
-      await markPersonalKiloClawReferralPaymentAdverse({
-        sourcePaymentId: kiloClawCharge.invoiceId,
-        reason: 'chargeback',
-        occurredAt: new Date(dispute.created * 1000),
-      });
+      if (affiliateDisputeCharge.saleKind === 'kiloclaw') {
+        await markPersonalKiloClawReferralPaymentAdverse({
+          sourcePaymentId: affiliateDisputeCharge.invoiceId,
+          reason: 'chargeback',
+          occurredAt: new Date(dispute.created * 1000),
+        });
+      }
       break;
     }
 

@@ -58,15 +58,6 @@ export const preferredModels = [
   GLM_CURRENT_MODEL_ID,
 ];
 
-/**
- * "Is this model free for the requesting user this request?"
- *
- * Async because future implementations need to consult external state
- * (e.g. a Redis-backed membership set) to answer for models that are
- * conditionally provider-funded. The current body resolves synchronously;
- * `Promise<boolean>` is the contract we want every caller to commit to so
- * follow-ups can extend the function without a new round of caller churn.
- */
 export async function isFreeModel(model: string): Promise<boolean> {
   return (
     isKiloExclusiveFreeModel(model) ||

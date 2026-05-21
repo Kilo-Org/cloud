@@ -52,6 +52,7 @@ import {
   type ClawOnboardingMode,
   type OnboardingStep,
 } from './ClawOnboardingFlow.state';
+import { createComposioConnectAttemptId, useComposioPopup } from './useComposioPopup';
 
 function MaybeBillingWrapper({
   skip,
@@ -77,99 +78,6 @@ function getBrowserTimeZone(): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-function writeComposioPopupLoadingPage(popup: Window) {
-  popup.document.write(`<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Preparing Google Calendar connection</title>
-    <style>
-      :root { color-scheme: dark; }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        background: oklch(0.145 0 0);
-        color: oklch(0.985 0 0);
-        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-      }
-      main {
-        width: min(360px, calc(100vw - 48px));
-        border: 1px solid oklch(1 0 0 / 0.1);
-        border-radius: 14px;
-        background: oklch(0.205 0 0);
-        padding: 24px;
-      }
-      .eyebrow {
-        color: oklch(0.95 0.15 108);
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-      h1 {
-        margin: 10px 0 8px;
-        font-size: 20px;
-        line-height: 1.25;
-      }
-      p {
-        margin: 0;
-        color: oklch(0.708 0 0);
-        font-size: 14px;
-        line-height: 1.5;
-      }
-      .dot {
-        width: 8px;
-        height: 8px;
-        margin-top: 18px;
-        border-radius: 999px;
-        background: oklch(0.95 0.15 108);
-        animation: pulse 1s ease-out infinite;
-      }
-      @keyframes pulse {
-        0%, 100% { opacity: 0.35; transform: scale(0.85); }
-        50% { opacity: 1; transform: scale(1); }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .dot { animation: none; }
-      }
-    </style>
-  </head>
-  <body>
-    <main>
-      <div class="eyebrow">KiloClaw</div>
-      <h1>Preparing Google Calendar connection</h1>
-      <p>Keep this window open. Google approval will load here, then Kilo will return you to onboarding.</p>
-      <div class="dot" aria-hidden="true"></div>
-    </main>
-  </body>
-</html>`);
-  popup.document.close();
-}
-
-function isComposioPopupMessage(value: unknown): value is {
-  type: 'kiloclaw:composio-connect';
-  result: 'success' | 'failed' | 'unknown';
-  attemptId: string;
-} {
-  if (typeof value !== 'object' || value === null) return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    candidate.type === 'kiloclaw:composio-connect' &&
-    (candidate.result === 'success' ||
-      candidate.result === 'failed' ||
-      candidate.result === 'unknown') &&
-    typeof candidate.attemptId === 'string' &&
-    candidate.attemptId.length > 0
-  );
-}
-
-function createComposioConnectAttemptId(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 const ONBOARDING_DRAFT_STORAGE_PREFIX = 'kiloclaw:onboarding-draft:';
@@ -325,8 +233,9 @@ function ClawOnboardingFlowInner({
     if (initialStep === 'tools') return 'tools';
     return initialStep === 'calendar' ? 'calendar' : 'identity';
   });
-  const [composioPopupPending, setComposioPopupPending] = useState(false);
-  const composioStatusPolling = onboardingStep === 'tools' || composioPopupPending;
+  // The popup can only be launched from the tools step. Once open, the popup
+  // hook still refetches status on focus, visibility, and callback delivery.
+  const composioStatusPolling = onboardingStep === 'tools';
   const personalComposioStatus = useKiloClawComposioOnboardingStatus(
     !organizationId,
     composioStatusPolling
@@ -363,12 +272,6 @@ function ClawOnboardingFlowInner({
   const hasCapturedEmailView = useRef(false);
   const hasCapturedInterestsView = useRef(false);
   const hasCapturedDoneView = useRef(false);
-  const composioPopupRef = useRef<Window | null>(null);
-  const composioPopupPendingRef = useRef(false);
-  const composioPopupResultHandledRef = useRef(false);
-  const composioPopupAwaitingConfirmationRef = useRef(false);
-  const composioPopupConfirmationTimeoutRef = useRef<number | null>(null);
-  const composioPopupAttemptIdRef = useRef<string | null>(null);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
 
   useEffect(() => {
@@ -420,6 +323,37 @@ function ClawOnboardingFlowInner({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const composioPopup = useComposioPopup({
+    connectionStatus: composioStatus.data?.status,
+    refetchStatus: async () => {
+      await composioStatus.refetch();
+    },
+    onConfirmed: () => {
+      posthog?.capture('claw_setup_tools_composio_completed', { source: 'status_refetch' });
+      toast.success('Google Calendar connected');
+    },
+    onFailed: reason => {
+      if (reason === 'popup_closed') {
+        posthog?.capture('claw_setup_tools_connect_failed', {
+          toolkit: 'googlecalendar',
+          reason: 'popup_closed',
+        });
+        return;
+      }
+
+      posthog?.capture('claw_setup_tools_connect_failed', {
+        toolkit: 'googlecalendar',
+        ...(reason === 'confirmation_timeout'
+          ? { reason: 'status_confirmation_timeout' }
+          : undefined),
+      });
+      toast.error(
+        reason === 'confirmation_timeout'
+          ? 'Could not confirm Google Calendar. Try again or skip for now.'
+          : 'Could not connect Google Calendar. Try again or skip for now.'
+      );
+    },
+  });
 
   // Save bot identity and exec preset as soon as the instance row exists.
   // This closes the tab-close window where customizations entered during the
@@ -437,175 +371,6 @@ function ClawOnboardingFlowInner({
     }`,
     mutations,
   });
-
-  const clearComposioPopupConfirmationTimeout = useCallback(() => {
-    if (composioPopupConfirmationTimeoutRef.current === null) return;
-    window.clearTimeout(composioPopupConfirmationTimeoutRef.current);
-    composioPopupConfirmationTimeoutRef.current = null;
-  }, []);
-
-  const setComposioPopupPendingState = useCallback(
-    (pending: boolean) => {
-      composioPopupPendingRef.current = pending;
-      if (pending) {
-        composioPopupResultHandledRef.current = false;
-        composioPopupAwaitingConfirmationRef.current = false;
-        clearComposioPopupConfirmationTimeout();
-      }
-      setComposioPopupPending(pending);
-    },
-    [clearComposioPopupConfirmationTimeout]
-  );
-
-  useEffect(() => {
-    return () => clearComposioPopupConfirmationTimeout();
-  }, [clearComposioPopupConfirmationTimeout]);
-
-  const handleComposioPopupResult = useCallback(
-    (message: { result: 'success' | 'failed' | 'unknown'; attemptId: string }) => {
-      if (!composioPopupPendingRef.current || composioPopupResultHandledRef.current) return;
-      if (message.attemptId !== composioPopupAttemptIdRef.current) return;
-      composioPopupResultHandledRef.current = true;
-      composioPopupRef.current?.close();
-      composioPopupRef.current = null;
-      composioPopupAttemptIdRef.current = null;
-      setOnboardingStep('tools');
-      void composioStatus.refetch();
-
-      if (message.result === 'success') {
-        composioPopupAwaitingConfirmationRef.current = true;
-        clearComposioPopupConfirmationTimeout();
-        composioPopupConfirmationTimeoutRef.current = window.setTimeout(() => {
-          if (!composioPopupAwaitingConfirmationRef.current) return;
-          composioPopupAwaitingConfirmationRef.current = false;
-          composioPopupConfirmationTimeoutRef.current = null;
-          setComposioPopupPendingState(false);
-          posthog?.capture('claw_setup_tools_connect_failed', {
-            toolkit: 'googlecalendar',
-            reason: 'status_confirmation_timeout',
-          });
-          toast.error('Could not confirm Google Calendar. Try again or skip for now.');
-        }, 45_000);
-        return;
-      }
-
-      clearComposioPopupConfirmationTimeout();
-      setComposioPopupPendingState(false);
-      posthog?.capture('claw_setup_tools_connect_failed', {
-        toolkit: 'googlecalendar',
-      });
-      toast.error('Could not connect Google Calendar. Try again or skip for now.');
-    },
-    [clearComposioPopupConfirmationTimeout, composioStatus, posthog, setComposioPopupPendingState]
-  );
-
-  useEffect(() => {
-    function handleMessage(event: MessageEvent) {
-      if (event.origin !== window.location.origin) return;
-      if (!isComposioPopupMessage(event.data)) return;
-      handleComposioPopupResult(event.data);
-    }
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [handleComposioPopupResult]);
-
-  useEffect(() => {
-    function handleStorage(event: StorageEvent) {
-      if (event.key !== 'kiloclaw:composio-connect-result' || !event.newValue) return;
-      try {
-        const parsed: unknown = JSON.parse(event.newValue);
-        if (!isComposioPopupMessage(parsed)) return;
-        handleComposioPopupResult(parsed);
-      } catch {
-        return;
-      }
-    }
-
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, [handleComposioPopupResult]);
-
-  useEffect(() => {
-    if (typeof BroadcastChannel === 'undefined') return;
-    const channel = new BroadcastChannel('kiloclaw:composio-connect');
-    channel.onmessage = event => {
-      if (!isComposioPopupMessage(event.data)) return;
-      handleComposioPopupResult(event.data);
-    };
-    return () => channel.close();
-  }, [handleComposioPopupResult]);
-
-  useEffect(() => {
-    if (!composioPopupPending) return;
-
-    let closedChecks = 0;
-    const intervalId = window.setInterval(() => {
-      const popup = composioPopupRef.current;
-      if (!popup?.closed || composioPopupAwaitingConfirmationRef.current) {
-        closedChecks = 0;
-        return;
-      }
-
-      // Cross-origin popup navigation can transiently look closed during the
-      // handoff from our pre-opened window to Composio. Require consecutive
-      // closed observations before treating it as a user dismissal.
-      closedChecks += 1;
-      if (closedChecks < 3) return;
-
-      composioPopupRef.current = null;
-      composioPopupAttemptIdRef.current = null;
-      clearComposioPopupConfirmationTimeout();
-      setComposioPopupPendingState(false);
-      void composioStatus.refetch();
-      posthog?.capture('claw_setup_tools_connect_failed', {
-        toolkit: 'googlecalendar',
-        reason: 'popup_closed',
-      });
-    }, 700);
-
-    return () => window.clearInterval(intervalId);
-  }, [
-    clearComposioPopupConfirmationTimeout,
-    composioPopupPending,
-    composioStatus,
-    posthog,
-    setComposioPopupPendingState,
-  ]);
-
-  useEffect(() => {
-    if (!composioPopupPending || composioStatus.data?.status !== 'connected') return;
-
-    composioPopupRef.current?.close();
-    composioPopupRef.current = null;
-    composioPopupAttemptIdRef.current = null;
-    composioPopupAwaitingConfirmationRef.current = false;
-    clearComposioPopupConfirmationTimeout();
-    setComposioPopupPendingState(false);
-    posthog?.capture('claw_setup_tools_composio_completed', { source: 'status_refetch' });
-    toast.success('Google Calendar connected');
-  }, [
-    clearComposioPopupConfirmationTimeout,
-    composioPopupPending,
-    composioStatus.data?.status,
-    posthog,
-    setComposioPopupPendingState,
-  ]);
-
-  useEffect(() => {
-    if (!composioPopupPending) return;
-
-    function refetchComposioStatus() {
-      void composioStatus.refetch();
-    }
-
-    window.addEventListener('focus', refetchComposioStatus);
-    document.addEventListener('visibilitychange', refetchComposioStatus);
-    return () => {
-      window.removeEventListener('focus', refetchComposioStatus);
-      document.removeEventListener('visibilitychange', refetchComposioStatus);
-    };
-  }, [composioPopupPending, composioStatus]);
 
   useEffect(() => {
     if (flowState.renderStep !== 'identity' || hasCapturedIdentityView.current) return;
@@ -965,7 +730,7 @@ function ClawOnboardingFlowInner({
         totalSteps={flowState.totalSteps}
         status={composioStatus.data?.status ?? 'disconnected'}
         loading={composioStatus.isPending || composioConfigPending}
-        connecting={mutations.createComposioGoogleCalendarLink.isPending || composioPopupPending}
+        connecting={mutations.createComposioGoogleCalendarLink.isPending || composioPopup.isPending}
         savingManual={mutations.patchSecrets.isPending}
         readyToConnect={botIdentity !== null && !composioConfigPending}
         readyToSaveManualCredentials={
@@ -976,33 +741,23 @@ function ClawOnboardingFlowInner({
         onConnect={() => {
           const returnTo = `${basePath}/new?step=tools`;
           posthog?.capture('claw_setup_tools_connect_clicked', { toolkit: 'googlecalendar' });
-          const popup = window.open(
-            'about:blank',
-            'kiloclaw-composio-connect',
-            'popup,width=520,height=720'
-          );
-          composioPopupRef.current = popup;
-          const attemptId = popup ? createComposioConnectAttemptId() : undefined;
-          composioPopupAttemptIdRef.current = attemptId ?? null;
-          if (popup) {
-            setComposioPopupPendingState(true);
-            writeComposioPopupLoadingPage(popup);
-          }
+          const attemptId = createComposioConnectAttemptId();
+          const popup = composioPopup.open({ attemptId });
           mutations.createComposioGoogleCalendarLink.mutate(
-            { returnTo, popup: popup !== null, attemptId },
+            { returnTo, popup: popup !== null, attemptId: popup ? attemptId : undefined },
             {
               onSuccess: result => {
                 if (popup) {
-                  popup.location.href = result.redirectUrl;
+                  composioPopup.setRedirect(result.redirectUrl);
                 } else {
                   window.location.href = result.redirectUrl;
                 }
               },
               onError: err => {
-                popup?.close();
-                composioPopupRef.current = null;
-                composioPopupAttemptIdRef.current = null;
-                setComposioPopupPendingState(false);
+                composioPopup.cancel();
+                // Link-creation failures happen before the popup receives a
+                // callback, so this path owns analytics/toast reporting. The
+                // hook's onFailed covers callback, close, and timeout failures.
                 posthog?.capture('claw_setup_tools_connect_failed', {
                   toolkit: 'googlecalendar',
                 });

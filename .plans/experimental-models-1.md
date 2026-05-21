@@ -31,6 +31,7 @@
 
 - ~~`ExperimentUpstreamSchema` zod schema (lives in app code, not in `packages/db`).~~ Landed with Phase 5 admin work in `apps/web/src/lib/ai-gateway/experiments/upstream-schema.ts`.
 - The `model_experiment_request_stats` reporting view (Phase 4).
+- Convert `model_experiment_request` to a declarative-partitioned table (range on `created_at`, monthly). Phase 1 landed it as a plain table; partitioning is a follow-up — see "Partitioning (follow-up)" under the schema definition for rationale and conversion mechanics.
 
 **Phase 5 — concrete output (in PR — see status table for branch/PR):**
 
@@ -246,6 +247,22 @@ Experiment- and variant-level reports go through join: `request → variant_vers
 `model_experiment_request` stores **only hashes or reserved sentinel values** for prompts, never prompt content. The bodies live in R2 (see Prompt Storage below), keyed by sha256. Storing only hashes keeps the Postgres row tiny (~80 bytes overhead beyond the existing attribution columns), keeps PG TOAST out of the picture entirely, and lets the experiment data wipe cleanly without coordinating with the primary datastore.
 
 No backfill is required because pre-experiment traffic has no side-table row.
+
+**Partitioning (follow-up).** `model_experiment_request` should be a Postgres declarative-partitioned table partitioned by range on `created_at` (monthly partitions). Phase 1 landed it as a plain table for simplicity; converting it to partitioned is tracked as a follow-up because:
+
+- Volume scales with experimented preview traffic, not gated by billing — once a partner experiment runs at production volume, the table grows fastest of any new schema added by this plan.
+- Retention drops become `DETACH PARTITION` + `DROP TABLE` (O(1), no bloat) instead of large `DELETE`/`UPDATE` sweeps; the prompt-wipe sentinel update path stays the same but operates on much smaller per-partition working sets.
+- The existing access patterns are partition-pruning friendly: every reporting query and the `(variant_version_id, created_at)` index include `created_at`, and the `usage_id` PK / `client_request_id` partial index can be enforced as partitioned indexes (the PK becomes `(usage_id, created_at)` to satisfy the partition-key-in-PK rule, with the FK to `microdollar_usage(id)` retained on `usage_id`).
+- The `usage_id → microdollar_usage(id) on delete cascade` FK still works against a partitioned child as long as the PK includes `created_at`; verify with the same migration.
+
+Mechanics for the conversion migration (do **not** hand-write — generate via `pnpm drizzle generate` after the schema change, then append any one-shot data move as a backfill statement under `--> statement-breakpoint`):
+
+1. Rename existing `model_experiment_request` to `model_experiment_request_legacy`.
+2. Create new partitioned `model_experiment_request` (`PARTITION BY RANGE (created_at)`) with PK `(usage_id, created_at)` and the same CHECKs/indexes redeclared as partitioned indexes.
+3. Create monthly partitions covering historical range + a small forward window; wire a scheduled job (or pg_partman, if we adopt it elsewhere) for ongoing partition creation. Out of scope here whether to lean on pg_partman vs a small in-repo cron.
+4. `INSERT INTO model_experiment_request SELECT * FROM model_experiment_request_legacy;` and drop the legacy table once verified. Volume at conversion time is expected to be small enough for a single-statement copy; if not, do it in `created_at` chunks.
+
+Out of scope for v1 because: (a) Phase 1 traffic is bounded by partner pilots, (b) declarative partitioning interacts with the FK from `microdollar_usage` and the CHECK constraints in ways that are easier to validate once the routing path is in production, and (c) the retention/wipe machinery (`UPDATE … SET system_prompt_sha256 = '__deleted__'` + R2 GC) works correctly on a non-partitioned table. Add the conversion migration before the table grows past ~50M rows or before any retention policy that needs partition-drop semantics is enforced, whichever comes first.
 
 ### Prompt Storage (R2)
 

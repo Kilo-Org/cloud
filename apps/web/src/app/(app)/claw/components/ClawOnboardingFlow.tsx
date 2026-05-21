@@ -696,12 +696,9 @@ function ClawOnboardingFlowInner({
   }, [flowState.instanceStatus, botIdentity]);
 
   // Resume the wizard at a specific step when returning from a flow that
-  // leaves the page (e.g. the Google OAuth round-trip on the calendar step
-  // posts the user back to /claw/new?step=calendar). The effect only acts
-  // when stepParam === 'calendar' — otherwise stale `?error=` or `?success=`
-  // params from elsewhere would fire calendar-specific toasts on the wrong
-  // screen. Also waits until botIdentity has been hydrated before consuming
-  // `step`, otherwise the state machine would override us with identity.
+  // leaves the page. The current Composio flow uses `?step=tools`; legacy
+  // `?step=calendar` callbacks are cleanup-only so stale OAuth URLs do not
+  // emit misleading calendar toasts or analytics.
   const hasResumedFromQuery = useRef(false);
 
   // Allowlist of known OAuth error codes that the callback route can emit.
@@ -729,6 +726,11 @@ function ClawOnboardingFlowInner({
     if (hasResumedFromQuery.current) return;
     const stepParam = searchParams?.get('step');
     if (stepParam !== 'calendar' && stepParam !== 'tools') return;
+    if (stepParam === 'calendar') {
+      hasResumedFromQuery.current = true;
+      cleanupResumeQueryParams();
+      return;
+    }
     if (botIdentity === null) return;
     const successParam = searchParams?.get('success');
     const errorParamRaw = searchParams?.get('error');
@@ -764,15 +766,14 @@ function ClawOnboardingFlowInner({
     cleanupResumeQueryParams();
   }, [searchParams, botIdentity, posthog, cleanupResumeQueryParams]);
 
-  // Watchdog: if `?step=calendar` is in the URL but botIdentity hydration
-  // never completes (e.g. patchBotIdentity hadn't propagated to the DB
-  // before the OAuth round-trip), don't silently strand the user on the
-  // identity step with stale params lingering in the URL. After a short
-  // grace period, clean the URL and surface a soft warning.
+  // Watchdog: if a Composio callback has `?step=tools` but botIdentity
+  // hydration never completes, don't silently strand the user on the identity
+  // step with stale params lingering in the URL. After a short grace period,
+  // clean the URL and surface a soft warning.
   useEffect(() => {
     if (hasResumedFromQuery.current) return;
     const stepParam = searchParams?.get('step');
-    if (stepParam !== 'calendar' && stepParam !== 'tools') return;
+    if (stepParam !== 'tools') return;
     const timeoutId = window.setTimeout(() => {
       if (hasResumedFromQuery.current) return;
       if (botIdentity !== null) return;

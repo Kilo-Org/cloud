@@ -64,6 +64,9 @@ export { redactSensitiveHeaders } from './redact-headers.js';
 
 export { normalizeGitUrl } from './normalize-git-url.js';
 
+export { deriveCallbackToken, verifyCallbackToken } from './callback-token.js';
+export type { CallbackTokenParams, VerifyCallbackTokenParams } from './callback-token.js';
+
 export {
   BILLING_FLOW,
   BILLING_HEADER_NAMES,

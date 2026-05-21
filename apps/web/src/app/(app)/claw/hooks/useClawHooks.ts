@@ -16,18 +16,40 @@ import { useClawContext } from '../components/ClawContext';
 
 // Config
 
-export function useClawConfig() {
+export function useClawConfig(enabled = true) {
   const trpc = useTRPC();
   const { organizationId } = useClawContext();
 
   const personal = useQuery({
     ...trpc.kiloclaw.getConfig.queryOptions(),
-    enabled: !organizationId,
+    enabled: enabled && !organizationId,
   });
 
   const org = useQuery({
     ...trpc.organizations.kiloclaw.getConfig.queryOptions({ organizationId: organizationId ?? '' }),
-    enabled: !!organizationId,
+    enabled: enabled && !!organizationId,
+  });
+
+  return organizationId ? org : personal;
+}
+
+export function useClawComposioOnboardingStatus(enabled = true) {
+  const trpc = useTRPC();
+  const { organizationId } = useClawContext();
+
+  const personal = useQuery({
+    ...trpc.kiloclaw.getComposioOnboardingStatus.queryOptions(undefined, {
+      refetchOnWindowFocus: true,
+    }),
+    enabled: enabled && !organizationId,
+  });
+
+  const org = useQuery({
+    ...trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryOptions(
+      { organizationId: organizationId ?? '' },
+      { refetchOnWindowFocus: true }
+    ),
+    enabled: enabled && !!organizationId,
   });
 
   return organizationId ? org : personal;

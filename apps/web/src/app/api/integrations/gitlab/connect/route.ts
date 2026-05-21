@@ -10,6 +10,7 @@ import {
 } from '@/lib/integrations/platforms/gitlab/oauth-state';
 import type { Owner } from '@/lib/integrations/core/types';
 import { storeGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
+import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 
 /**
  * GitLab OAuth Connect
@@ -35,6 +36,8 @@ export async function GET(request: NextRequest) {
     const instanceUrl = searchParams.get('instanceUrl') || undefined;
     const clientId = searchParams.get('clientId') || undefined;
     const clientSecret = searchParams.get('clientSecret') || undefined;
+    const returnToParam = searchParams.get('returnTo') || undefined;
+    const returnTo = returnToParam ? validateReturnPath(returnToParam) : null;
 
     let owner: Owner;
 
@@ -65,6 +68,7 @@ export async function GET(request: NextRequest) {
         owner,
         ...(usesCustomInstance ? { instanceUrl } : {}),
         ...(customCredentialsRef ? { customCredentialsRef } : {}),
+        ...(returnTo ? { returnTo } : {}),
       },
       user.id
     );

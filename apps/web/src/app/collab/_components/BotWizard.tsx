@@ -52,8 +52,11 @@ export function BotWizard() {
 
   const proceedToAuthorize = () => {
     setMissingPlatformWarning(null);
-    const services = Array.from(selected).join(',');
-    router.push(`/collab/authorize?services=${encodeURIComponent(services)}`);
+    const params = new URLSearchParams({ services: Array.from(selected).join(',') });
+    if (workspace?.type === 'org') {
+      params.set('organizationId', workspace.id);
+    }
+    router.push(`/collab/authorize?${params.toString()}`);
   };
 
   const handleContinueWithoutRecommendedPlatform = () => {

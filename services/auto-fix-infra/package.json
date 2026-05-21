@@ -8,12 +8,14 @@
     "dev": "wrangler dev",
     "tail": "wrangler tail",
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/auto-fix-infra/src"
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/auto-fix-infra/src",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   },
   "dependencies": {

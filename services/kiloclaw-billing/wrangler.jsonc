@@ -84,8 +84,7 @@
   // - STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID: legacy recognized Stripe Commit price ID for settlement, plan detection, and reporting
   // - STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID: current checkout Stripe Standard recurring price ID for settlement, plan detection, and reporting
   // - STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID: current checkout Stripe Commit price ID for settlement, plan detection, and reporting
-  // - INTERNAL_API_SECRET: auth for the Next.js billing side-effect endpoint
-  // - KILOCLAW_INTERNAL_API_SECRET: auth for /api/platform/* on the kiloclaw worker
+  // - INTERNAL_API_SECRET: auth for the Next.js billing side-effect endpoint and /api/platform/* on the kiloclaw worker
   // - SNOWFLAKE_PRIVATE_KEY_PEM: Snowflake JWT private key in raw PEM format
   // - SNOWFLAKE_PUBLIC_KEY_FINGERPRINT: Snowflake JWT public key fingerprint
 }

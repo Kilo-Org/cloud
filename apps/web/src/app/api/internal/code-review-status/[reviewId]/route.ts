@@ -13,7 +13,7 @@
  * The reviewId is passed in the URL path.
  *
  * URL: POST /api/internal/code-review-status/{reviewId}
- * Protected by internal API secret
+ * Protected by scoped callback token
  */
 
 import type { NextRequest } from 'next/server';
@@ -55,7 +55,8 @@ import {
   getStoredProjectAccessToken,
 } from '@/lib/integrations/gitlab-service';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
+import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendReviewSummaryFooter } from '@/lib/code-reviews/summary/usage-footer';
 import { APP_URL } from '@/lib/constants';
@@ -70,7 +71,6 @@ import {
  * Payload from the orchestrator DO (legacy format).
  */
 type OrchestratorPayload = {
-  attemptId?: string;
   sessionId?: string;
   cliSessionId?: string;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
@@ -83,7 +83,6 @@ type OrchestratorPayload = {
  * Payload from cloud-agent-next callback (ExecutionCallbackPayload).
  */
 type CloudAgentNextCallbackPayload = {
-  attemptId?: string;
   sessionId?: string;
   cloudAgentSessionId?: string;
   executionId?: string;
@@ -501,15 +500,23 @@ export async function POST(
   { params }: { params: Promise<{ reviewId: string }> }
 ) {
   try {
-    // Validate internal API secret
-    const secret = req.headers.get('X-Internal-Secret');
-    if (!INTERNAL_API_SECRET || secret !== INTERNAL_API_SECRET) {
+    const { reviewId } = await params;
+    const callbackAttemptId = req.nextUrl.searchParams.get('attemptId') ?? '';
+    const callbackToken = req.headers.get('X-Callback-Token');
+    const validCallbackToken =
+      !!CALLBACK_TOKEN_SECRET &&
+      (await verifyCallbackToken({
+        token: callbackToken,
+        secret: CALLBACK_TOKEN_SECRET,
+        scope: 'code-review-status-callback',
+        resourceParts: [reviewId, callbackAttemptId],
+      }));
+    if (!validCallbackToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { reviewId } = await params;
     const rawPayload: StatusUpdatePayload = await req.json();
-    const attemptId = req.nextUrl.searchParams.get('attemptId') ?? rawPayload.attemptId;
+    const attemptId = callbackAttemptId || undefined;
     const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult } =
       normalizePayload(rawPayload);
     const executionId = 'executionId' in rawPayload ? rawPayload.executionId : undefined;
@@ -804,7 +811,7 @@ export async function POST(
     // Only trigger dispatch for terminal states (completed/failed/cancelled)
     // This frees up a slot for the next pending review
     if (status === 'completed' || status === 'failed' || status === 'cancelled') {
-      let owner;
+      let owner: Parameters<typeof tryDispatchPendingReviews>[0] | undefined;
       if (review.owned_by_organization_id) {
         const botUserId = await getBotUserId(review.owned_by_organization_id, 'code-review');
         if (botUserId) {

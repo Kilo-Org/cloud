@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { getSecurityFindingById } from '@/lib/security-agent/db/security-findings';
 import {
@@ -19,6 +19,8 @@ import { generateApiToken } from '@/lib/tokens';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
+import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
 import type { SecurityFindingAnalysis, SecurityReviewOwner } from '@/lib/security-agent/core/types';
 import {
@@ -34,15 +36,17 @@ const log = sentryLogger('security-agent:callback', 'info');
 const warn = sentryLogger('security-agent:callback', 'warning');
 const logError = sentryLogger('security-agent:callback', 'error');
 
-type ExecutionCallbackPayload = {
-  sessionId: string;
-  cloudAgentSessionId: string;
-  executionId: string;
-  status: 'completed' | 'failed' | 'interrupted';
-  errorMessage?: string;
-  kiloSessionId?: string;
-  lastSeenBranch?: string;
-};
+const ExecutionCallbackPayloadSchema = z.object({
+  sessionId: z.string(),
+  cloudAgentSessionId: z.string(),
+  executionId: z.string(),
+  status: z.enum(['completed', 'failed', 'interrupted']),
+  errorMessage: z.string().optional(),
+  kiloSessionId: z.string().optional(),
+  lastSeenBranch: z.string().optional(),
+});
+
+type ExecutionCallbackPayload = z.infer<typeof ExecutionCallbackPayloadSchema>;
 
 function mapCallbackFailure(params: { status: 'failed' | 'interrupted'; errorMessage?: string }): {
   errorMessage: string;
@@ -77,17 +81,26 @@ export async function POST(
   { params }: { params: Promise<{ findingId: string }> }
 ) {
   try {
-    const secret = req.headers.get('X-Internal-Secret');
-    if (!INTERNAL_API_SECRET || secret !== INTERNAL_API_SECRET) {
+    const { findingId } = await params;
+    const callbackToken = req.headers.get('X-Callback-Token');
+    const validCallbackToken =
+      !!CALLBACK_TOKEN_SECRET &&
+      (await verifyCallbackToken({
+        token: callbackToken,
+        secret: CALLBACK_TOKEN_SECRET,
+        scope: 'security-analysis-callback',
+        resourceParts: [findingId],
+      }));
+    if (!validCallbackToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { findingId } = await params;
-    const payload: ExecutionCallbackPayload = await req.json();
-
-    if (!payload.status) {
-      return NextResponse.json({ error: 'Missing required field: status' }, { status: 400 });
+    const rawPayload: unknown = await req.json();
+    const parsedPayload = ExecutionCallbackPayloadSchema.safeParse(rawPayload);
+    if (!parsedPayload.success) {
+      return NextResponse.json({ error: 'Invalid callback payload' }, { status: 400 });
     }
+    const payload = parsedPayload.data;
 
     log('Received callback', {
       findingId,

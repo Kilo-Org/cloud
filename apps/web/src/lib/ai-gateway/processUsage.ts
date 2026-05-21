@@ -109,6 +109,12 @@ const extractMessageTextContent = (m: Message) =>
 
 export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
 
+export type UsageRecordInsertResult = {
+  usageId: string;
+  createdAt: string;
+  newMicrodollarsUsed: number | null;
+};
+
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {
     kilo_user_id: usageContext.kiloUserId,
@@ -260,6 +266,11 @@ export async function logMicrodollarUsage(
   // `insertUsageRecord` swallows DB errors and returns null; surface that
   // failure to callers so dependent FK writes don't dangle on a row that
   // was never persisted.
+  // Use the JS-side identity values we constructed in toInsertableDbUsageRecord
+  // rather than the DB-returned ones. The DB round-trip for created_at returns a
+  // Postgres timestamp string (e.g. "2026-04-29 01:16:12.945+00") which is not
+  // strict ISO 8601 and will fail downstream datetime validators. core.created_at
+  // is always new Date().toISOString() so the format is guaranteed.
   return inserted ? { usageId: core.id, createdAt: core.created_at } : null;
 }
 
@@ -268,21 +279,24 @@ async function saveUsageRelatedData(
   metadataFields: UsageMetaData,
   prior_microdollar_usage: number,
   posthog_distinct_id: string | null
-): Promise<BalanceUpdateResult> {
+): Promise<UsageRecordInsertResult | null> {
   const isFirst = await isFirstUsage(coreUsageFields, prior_microdollar_usage);
   if (isFirst && posthog_distinct_id)
     await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
-  const balanceUpdateResult = await insertUsageRecord(coreUsageFields, metadataFields);
+  const inserted = await insertUsageRecord(coreUsageFields, metadataFields);
+  if (!inserted) return null;
   if (posthog_distinct_id) {
     await sendFirstMicrodollarUsageEventIfNeeded(
-      balanceUpdateResult,
+      inserted.newMicrodollarsUsed === null
+        ? null
+        : { newMicrodollarsUsed: inserted.newMicrodollarsUsed },
       coreUsageFields,
       posthog_distinct_id,
       isFirst
     );
   }
   await ingestOrganizationTokenUsage(coreUsageFields);
-  return balanceUpdateResult;
+  return inserted;
 }
 
 async function isFirstUsage(
@@ -389,7 +403,7 @@ ${metaDataKindName}_cte AS (
 export async function insertUsageRecord(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData
-): Promise<BalanceUpdateResult> {
+): Promise<UsageRecordInsertResult | null> {
   try {
     const result = await startSpan(
       {
@@ -428,7 +442,7 @@ export async function insertUsageRecord(
 async function insertUsageAndMetadataWithBalanceUpdate(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData
-): Promise<BalanceUpdateResult> {
+): Promise<UsageRecordInsertResult> {
   // Pick the matching partial unique index for the daily-rollup upsert. The
   // microdollar_usage_daily table has two partial unique indexes; the upsert
   // must target the one corresponding to this row's scope.
@@ -440,7 +454,9 @@ async function insertUsageAndMetadataWithBalanceUpdate(
   // Use a single SQL statement with CTEs to insert usage, upsert all lookup values, metadata, and update user balance in one roundtrip
   // This ensures atomicity: microdollar_usage insert and kilocode_users.microdollars_used update happen together
   const result = await db.execute<{
-    new_microdollars_used: number;
+    usage_id: string;
+    usage_created_at: string;
+    new_microdollars_used: number | null;
     kilo_pass_threshold: number | null;
   }>(sql`
           WITH microdollar_usage_ins AS (
@@ -468,6 +484,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${coreUsageFields.inference_provider},
               ${coreUsageFields.project_id}
             )
+            RETURNING id, created_at
           )
           , ${createUpsertCTE(sql`http_user_agent`, metadataFields.http_user_agent)}
           , ${createUpsertCTE(sql`http_ip`, metadataFields.http_x_forwarded_for)}
@@ -574,55 +591,76 @@ async function insertUsageAndMetadataWithBalanceUpdate(
                 microdollar_usage_daily.total_cost_microdollars + EXCLUDED.total_cost_microdollars,
               updated_at = NOW()
           )
-          UPDATE kilocode_users
-          SET microdollars_used = microdollars_used + ${coreUsageFields.cost}
-          WHERE id = ${coreUsageFields.kilo_user_id}
-            AND ${coreUsageFields.organization_id}::uuid IS NULL
-            AND ${coreUsageFields.cost} > 0
-          RETURNING microdollars_used AS new_microdollars_used, kilo_pass_threshold
+          , balance_update AS (
+            UPDATE kilocode_users
+            SET microdollars_used = microdollars_used + ${coreUsageFields.cost}
+            WHERE id = ${coreUsageFields.kilo_user_id}
+              AND ${coreUsageFields.organization_id}::uuid IS NULL
+              AND ${coreUsageFields.cost} > 0
+            RETURNING microdollars_used AS new_microdollars_used, kilo_pass_threshold
+          )
+          SELECT
+            microdollar_usage_ins.id AS usage_id,
+            microdollar_usage_ins.created_at AS usage_created_at,
+            balance_update.new_microdollars_used,
+            balance_update.kilo_pass_threshold
+          FROM microdollar_usage_ins
+          LEFT JOIN balance_update ON true
         `);
 
-  // No rows returned means either: org usage (no user balance update), zero cost, or missing user
-  if (!result.rows[0]) {
-    // Only log error if we expected an update (non-org, positive cost)
-    if (!coreUsageFields.organization_id && coreUsageFields.cost && coreUsageFields.cost > 0) {
-      captureMessage('impossible: missing user', {
-        level: 'fatal',
-        tags: { source: 'insertUsageAndUpdateBalance' },
-        extra: { coreUsageFields },
-      });
-    }
-    return null;
+  const inserted = result.rows[0];
+  if (!inserted) {
+    throw new Error('microdollar_usage insert returned no identity');
   }
 
-  // Convert BigInt to number (microdollars_used is a bigint column)
-  const newMicrodollarsUsed = Number(result.rows[0].new_microdollars_used);
-
-  const kiloPassThreshold =
-    result.rows[0].kilo_pass_threshold == null ? null : Number(result.rows[0].kilo_pass_threshold);
-
-  const effectiveKiloPassThreshold = getEffectiveKiloPassThreshold(kiloPassThreshold);
-
-  if (effectiveKiloPassThreshold !== null && newMicrodollarsUsed >= effectiveKiloPassThreshold) {
-    // Trigger this async to avoid blocking
-    void maybeIssueKiloPassBonusFromUsageThreshold({
-      kiloUserId: coreUsageFields.kilo_user_id,
-      nowIso: coreUsageFields.created_at,
-    }).catch(async error => {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      await appendKiloPassAuditLog(db, {
-        action: KiloPassAuditLogAction.BonusCreditsIssued,
-        result: KiloPassAuditLogResult.Failed,
-        kiloUserId: coreUsageFields.kilo_user_id,
-        payload: {
-          source: 'usage_threshold',
-          error: errorMessage,
-        },
-      });
+  // Missing balance update is expected for org usage and zero-cost rows, but
+  // suspicious for positive-cost personal usage.
+  if (
+    inserted.new_microdollars_used === null &&
+    !coreUsageFields.organization_id &&
+    coreUsageFields.cost > 0
+  ) {
+    captureMessage('impossible: missing user', {
+      level: 'fatal',
+      tags: { source: 'insertUsageAndUpdateBalance' },
+      extra: { coreUsageFields },
     });
   }
 
-  return { newMicrodollarsUsed };
+  const newMicrodollarsUsed =
+    inserted.new_microdollars_used === null ? null : Number(inserted.new_microdollars_used);
+
+  const kiloPassThreshold =
+    inserted.kilo_pass_threshold == null ? null : Number(inserted.kilo_pass_threshold);
+
+  if (newMicrodollarsUsed !== null) {
+    const effectiveKiloPassThreshold = getEffectiveKiloPassThreshold(kiloPassThreshold);
+
+    if (effectiveKiloPassThreshold !== null && newMicrodollarsUsed >= effectiveKiloPassThreshold) {
+      // Trigger this async to avoid blocking
+      void maybeIssueKiloPassBonusFromUsageThreshold({
+        kiloUserId: coreUsageFields.kilo_user_id,
+        nowIso: coreUsageFields.created_at,
+      }).catch(async error => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        await appendKiloPassAuditLog(db, {
+          action: KiloPassAuditLogAction.BonusCreditsIssued,
+          result: KiloPassAuditLogResult.Failed,
+          kiloUserId: coreUsageFields.kilo_user_id,
+          payload: {
+            source: 'usage_threshold',
+            error: errorMessage,
+          },
+        });
+      });
+    }
+  }
+
+  return {
+    usageId: inserted.usage_id,
+    createdAt: inserted.usage_created_at,
+    newMicrodollarsUsed,
+  };
 }
 
 export function countAndStoreUsage(

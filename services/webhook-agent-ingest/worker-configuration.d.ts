@@ -14,6 +14,7 @@ declare namespace Cloudflare {
     KILOCLAW_API_URL: string;
     TRIGGER_DO: DurableObjectNamespace<import('./src/index').TriggerDO>;
     INTERNAL_API_SECRET: SecretsStoreSecret;
+    CALLBACK_TOKEN_SECRET: SecretsStoreSecret;
     NEXTAUTH_SECRET: SecretsStoreSecret;
     CLOUD_AGENT: Fetcher /* cloud-agent */;
     KILO_CHAT: Service /* entrypoint KiloChatService from kilo-chat */;

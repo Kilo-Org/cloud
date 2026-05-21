@@ -1,5 +1,5 @@
 {
-  "id": "1d4bea60-6610-4377-bffe-9d01dc3e2fd1",
+  "id": "d7add1a8-ff40-4683-9703-8fb11992861a",
   "prevId": "ece7cdb4-4f74-46b6-b51a-566e54033ee3",
   "version": "7",
   "dialect": "postgresql",
@@ -4639,12 +4639,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'pending'"
-        },
-        "dispatch_reservation_id": {
-          "name": "dispatch_reservation_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "error_message": {
           "name": "error_message",
@@ -11264,6 +11258,238 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.kiloclaw_composio_identities": {
+      "name": "kiloclaw_composio_identities",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "owner_type": {
+          "name": "owner_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "composio_agent_key_encrypted": {
+          "name": "composio_agent_key_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "composio_user_api_key_encrypted": {
+          "name": "composio_user_api_key_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "composio_api_key_encrypted": {
+          "name": "composio_api_key_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "composio_org_id": {
+          "name": "composio_org_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "composio_org_name": {
+          "name": "composio_org_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "composio_project_id": {
+          "name": "composio_project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "composio_consumer_user_id": {
+          "name": "composio_consumer_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "google_calendar_connected_account_id": {
+          "name": "google_calendar_connected_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "composio_agent_email": {
+          "name": "composio_agent_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "UQ_kiloclaw_composio_identities_current_user": {
+          "name": "UQ_kiloclaw_composio_identities_current_user",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"kiloclaw_composio_identities\".\"owner_type\" = 'user' AND \"kiloclaw_composio_identities\".\"revoked_at\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_kiloclaw_composio_identities_current_org_user": {
+          "name": "UQ_kiloclaw_composio_identities_current_org_user",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"kiloclaw_composio_identities\".\"owner_type\" = 'organization_user' AND \"kiloclaw_composio_identities\".\"revoked_at\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_composio_identities_user": {
+          "name": "IDX_kiloclaw_composio_identities_user",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_composio_identities_organization": {
+          "name": "IDX_kiloclaw_composio_identities_organization",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "kiloclaw_composio_identities_user_id_kilocode_users_id_fk": {
+          "name": "kiloclaw_composio_identities_user_id_kilocode_users_id_fk",
+          "tableFrom": "kiloclaw_composio_identities",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "kiloclaw_composio_identities_organization_id_organizations_id_fk": {
+          "name": "kiloclaw_composio_identities_organization_id_organizations_id_fk",
+          "tableFrom": "kiloclaw_composio_identities",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "kiloclaw_composio_identities_owner_type_check": {
+          "name": "kiloclaw_composio_identities_owner_type_check",
+          "value": "\"kiloclaw_composio_identities\".\"owner_type\" IN ('user', 'organization_user')"
+        },
+        "kiloclaw_composio_identities_status_check": {
+          "name": "kiloclaw_composio_identities_status_check",
+          "value": "\"kiloclaw_composio_identities\".\"status\" IN ('pending', 'active', 'revoked')"
+        },
+        "kiloclaw_composio_identities_owner_scope_check": {
+          "name": "kiloclaw_composio_identities_owner_scope_check",
+          "value": "(\"kiloclaw_composio_identities\".\"owner_type\" = 'user' AND \"kiloclaw_composio_identities\".\"organization_id\" IS NULL) OR (\"kiloclaw_composio_identities\".\"owner_type\" = 'organization_user' AND \"kiloclaw_composio_identities\".\"organization_id\" IS NOT NULL)"
+        },
+        "kiloclaw_composio_identities_active_complete_check": {
+          "name": "kiloclaw_composio_identities_active_complete_check",
+          "value": "\"kiloclaw_composio_identities\".\"status\" <> 'active' OR (\"kiloclaw_composio_identities\".\"composio_agent_key_encrypted\" IS NOT NULL AND \"kiloclaw_composio_identities\".\"composio_user_api_key_encrypted\" IS NOT NULL AND \"kiloclaw_composio_identities\".\"composio_org_id\" IS NOT NULL AND \"kiloclaw_composio_identities\".\"composio_project_id\" IS NOT NULL AND \"kiloclaw_composio_identities\".\"composio_consumer_user_id\" IS NOT NULL AND \"kiloclaw_composio_identities\".\"revoked_at\" IS NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.kiloclaw_earlybird_purchases": {
       "name": "kiloclaw_earlybird_purchases",
       "schema": "",
@@ -12092,6 +12318,12 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
+        },
+        "composio_config_source": {
+          "name": "composio_config_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -12260,6 +12492,10 @@
         "CHK_kiloclaw_instances_instance_type": {
           "name": "CHK_kiloclaw_instances_instance_type",
           "value": "\"kiloclaw_instances\".\"instance_type\" IS NULL OR \"kiloclaw_instances\".\"instance_type\" IN ('perf-1-3', 'perf-4-8', 'perf-4-16', 'shared-2-3', 'shared-2-4', 'custom')"
+        },
+        "kiloclaw_instances_composio_config_source_check": {
+          "name": "kiloclaw_instances_composio_config_source_check",
+          "value": "\"kiloclaw_instances\".\"composio_config_source\" IS NULL OR \"kiloclaw_instances\".\"composio_config_source\" IN ('managed', 'manual')"
         }
       },
       "isRLSEnabled": false

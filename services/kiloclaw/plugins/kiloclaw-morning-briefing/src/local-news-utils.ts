@@ -111,9 +111,9 @@ export function resolveLocationContextWithOverride(
 export function buildLocalNewsSectionTitle(ctx: LocationContext): string {
   switch (ctx.kind) {
     case 'explicit':
-      return `Local News (${ctx.displayLabel})`;
+      return `📰 Local News (${ctx.displayLabel})`;
     case 'none':
-      return 'Local News';
+      return '📰 Local News';
   }
 }
 
@@ -181,21 +181,22 @@ export function formatLocalNewsLine(item: LocalNewsItem): string {
 }
 
 /**
- * Build the section body shown when there's no explicit location set.
- * Used by `collectLocalNews` to nudge the user toward the Settings →
- * Morning Briefing card. When a timezone is available, the message
- * mentions it as context so the user knows we're not flying blind
- * — but we still don't query off it.
+ * Italic one-line empty state for the Local News section when a
+ * location is set but no nearby news turned up. Wrapped in `_..._` so
+ * it renders italic and survives the channel flattener.
  */
-export function buildNoLocationSectionLines(timezone: string | null): string[] {
-  const base = 'Set a location in Settings → Morning Briefing to enable local news.';
-  if (timezone) {
-    return [
-      base,
-      `Your timezone is \`${timezone}\`, but a city or address gives much better results.`,
-    ];
-  }
-  return [base];
+export function buildLocalNewsEmptyLine(ctx: LocationContext): string {
+  const where = ctx.kind === 'explicit' ? ctx.displayLabel : 'your area';
+  return `_No notable news near ${where} from the last 24h._`;
+}
+
+/**
+ * Short TL;DR fragment for the briefing header. Returns an empty string
+ * when there is nothing to count so the caller can drop it.
+ */
+export function formatLocalNewsTldr(count: number): string {
+  if (count <= 0) return '';
+  return count === 1 ? '1 local headline' : `${count} local headlines`;
 }
 
 /** Source-status footer summary when no explicit location is set. */

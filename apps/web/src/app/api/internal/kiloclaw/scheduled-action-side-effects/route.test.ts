@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { send as sendEmail, RawHtml } from '@/lib/email';
 
 jest.mock('@/lib/config.server', () => ({
-  KILOCLAW_INTERNAL_API_SECRET: 'kc-internal-secret',
+  INTERNAL_API_SECRET: 'kc-internal-secret',
 }));
 
 jest.mock('@/lib/email', () => ({

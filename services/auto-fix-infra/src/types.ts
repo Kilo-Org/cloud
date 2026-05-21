@@ -112,6 +112,7 @@ export interface Env {
   // Environment variables
   API_URL: string;
   INTERNAL_API_SECRET: string;
+  CALLBACK_TOKEN_SECRET: string;
   BACKEND_AUTH_TOKEN: string;
   CLOUD_AGENT_URL: string;
 

@@ -1472,8 +1472,16 @@ export async function handleKiloClawInvoicePaid(params: {
 
   // Stripe can emit paid $0 invoices with no charge. Use charge ID when present,
   // otherwise fall back to invoice ID so settlement still runs idempotently.
+  const invoiceCharge = 'charge' in invoice ? invoice.charge : null;
   const chargeId =
-    'charge' in invoice && typeof invoice.charge === 'string' ? invoice.charge : null;
+    typeof invoiceCharge === 'string'
+      ? invoiceCharge
+      : invoiceCharge &&
+          typeof invoiceCharge === 'object' &&
+          'id' in invoiceCharge &&
+          typeof invoiceCharge.id === 'string'
+        ? invoiceCharge.id
+        : null;
   const stripePaymentId = chargeId ?? invoice.id;
 
   // Resolve stripeSubscriptionId from parent subscription details
@@ -1581,7 +1589,7 @@ export async function handleKiloClawInvoicePaid(params: {
     amount_paid: invoice.amount_paid,
   });
 
-  if (invoice.amount_paid > 0 && chargeId) {
+  if (invoice.amount_paid > 0) {
     try {
       const reportingFields = getStripeFundedKiloClawReportingFields({
         plan,
@@ -1617,7 +1625,7 @@ export async function handleKiloClawInvoicePaid(params: {
           currencyCode: invoice.currency ?? 'usd',
           eventDate,
           ...reportingFields,
-          stripeChargeId: chargeId,
+          stripeChargeId: chargeId ?? undefined,
         });
       }
     } catch (error) {

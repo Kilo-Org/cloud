@@ -11,9 +11,10 @@ import {
   type ImpactAdvocateRegisterParticipantPayload,
 } from '@/lib/impact-advocate';
 import { logImpactReferralDebug } from '@/lib/impact-debug';
-import type {
-  ParsedImpactAffiliateTouch,
-  ParsedImpactReferralTouch,
+import {
+  redactLandingPathForLogs,
+  type ParsedImpactAffiliateTouch,
+  type ParsedImpactReferralTouch,
 } from '@/lib/impact-referral-utils';
 import {
   deleted_user_email_tombstones,
@@ -137,7 +138,7 @@ export async function recordImpactAffiliateTouch(params: {
       userId: params.userId ?? null,
       anonymousIdPresent: Boolean(params.anonymousId?.trim()),
       touchId: insertedTouch?.id ?? null,
-      landingPath: params.touch.landingPath,
+      landingPath: redactLandingPathForLogs(params.touch.landingPath),
       trackingValueLength: params.touch.trackingValueLength,
       isTrackingValueAccepted: params.touch.isTrackingValueAccepted,
     }
@@ -195,7 +196,7 @@ export async function recordImpactReferralTouch(params: {
       userId: params.userId ?? null,
       anonymousIdPresent: Boolean(params.anonymousId?.trim()),
       touchId: insertedTouch?.id ?? null,
-      landingPath: params.touch.landingPath,
+      landingPath: redactLandingPathForLogs(params.touch.landingPath),
       rsCodePresent: Boolean(params.touch.rsCode?.trim()),
       trackingValueLength: params.touch.trackingValueLength,
       isTrackingValueAccepted: params.touch.isTrackingValueAccepted,
@@ -273,7 +274,7 @@ export async function queueImpactAdvocateParticipantRegistration(params: {
       'Skipped Impact Advocate participant registration queue; missing referral cookie value',
       {
         userId: params.user.id,
-        landingPath: params.referralTouch.landingPath,
+        landingPath: redactLandingPathForLogs(params.referralTouch.landingPath),
       }
     );
     return;

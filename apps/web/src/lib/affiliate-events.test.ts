@@ -199,13 +199,18 @@ describe('affiliate-events', () => {
       recordAffiliateAttributionAndQueueParentEvent,
     } = await import('@/lib/affiliate-events');
 
-    await recordAffiliateAttributionAndQueueParentEvent({
+    const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
       userId: user.id,
       provider: 'impact',
       trackingId: 'impact-click-123',
       customerEmail: user.google_user_email,
       eventDate: new Date('2026-04-09T10:00:00.000Z'),
     });
+
+    if (!parentEvent) {
+      throw new Error('Expected affiliate parent event');
+    }
+
     await enqueueAffiliateEventForUser({
       userId: user.id,
       provider: 'impact',
@@ -219,7 +224,14 @@ describe('affiliate-events', () => {
       orderId: 'IR_AN_64_TS',
     });
 
-    const fetchMock: typeof fetch = jest.fn(async () => new Response('', { status: 200 }));
+    const fetchMock: typeof fetch = jest.fn(async () => {
+      // Move claim time back mid-request; successful delivery must restart parent delay clock.
+      await db
+        .update(user_affiliate_events)
+        .set({ claimed_at: new Date(Date.now() - 6 * 60 * 1000).toISOString() })
+        .where(eq(user_affiliate_events.id, parentEvent.id));
+      return new Response('', { status: 200 });
+    });
     global.fetch = fetchMock;
 
     const summary = await dispatchQueuedAffiliateEvents();
@@ -651,7 +663,7 @@ describe('affiliate-events', () => {
     );
   });
 
-  it('fails queued sale reversal permanently when submission resolution is unconfigured', async () => {
+  it('keeps queued sale reversal retryable when submission resolution is unconfigured', async () => {
     const { user } = await createDeliveredSaleEvent({ saleResponse: 'queued' });
 
     delete process.env.IMPACT_ACCOUNT_SID;
@@ -675,11 +687,11 @@ describe('affiliate-events', () => {
       row => row.event_type === 'sale_reversal'
     );
 
-    expect(summary.failed).toBe(1);
-    expect(summary.retried).toBe(0);
-    expect(reversalEvent?.delivery_state).toBe('failed');
+    expect(summary.failed).toBe(0);
+    expect(summary.retried).toBe(1);
+    expect(reversalEvent?.delivery_state).toBe('queued');
     expect(reversalEvent?.attempt_count).toBe(1);
-    expect(reversalEvent?.next_retry_at).toBeNull();
+    expect(reversalEvent?.next_retry_at).not.toBeNull();
   });
 
   it('retries sale reversal on retryable upstream failure', async () => {

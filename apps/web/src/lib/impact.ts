@@ -642,7 +642,7 @@ export async function resolveImpactSubmissionUri(
   if (result.skipped === 'unconfigured') {
     return {
       ok: false,
-      failureKind: 'submission_failed',
+      failureKind: 'network',
       error: 'Impact is unconfigured; cannot resolve queued submission',
     };
   }

@@ -834,13 +834,25 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
-      await enqueueImpactSaleReversalForCharge({
-        stripeChargeId: kiloClawCharge.chargeId,
-        disputeId: dispute.id,
-        amount: dispute.amount / 100,
-        currency: dispute.currency,
-        eventDate: new Date(dispute.created * 1000),
-      });
+      try {
+        await enqueueImpactSaleReversalForCharge({
+          stripeChargeId: kiloClawCharge.chargeId,
+          disputeId: dispute.id,
+          amount: dispute.amount / 100,
+          currency: dispute.currency,
+          eventDate: new Date(dispute.created * 1000),
+        });
+      } catch (error) {
+        sentryLogger('stripe', 'warning')(
+          'Impact sale reversal enqueue failed for KiloClaw dispute',
+          {
+            stripe_charge_id: kiloClawCharge.chargeId,
+            stripe_invoice_id: kiloClawCharge.invoiceId,
+            dispute_id: dispute.id,
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
+      }
       await markPersonalKiloClawReferralPaymentAdverse({
         sourcePaymentId: kiloClawCharge.invoiceId,
         reason: 'chargeback',

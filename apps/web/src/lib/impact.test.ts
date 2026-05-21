@@ -144,7 +144,7 @@ describe('impact', () => {
     });
   });
 
-  it('fails queued submission resolution when impact is unconfigured', async () => {
+  it('keeps queued submission resolution retryable when impact is unconfigured', async () => {
     delete process.env.IMPACT_ACCOUNT_SID;
     delete process.env.IMPACT_AUTH_TOKEN;
     delete process.env.IMPACT_CAMPAIGN_ID;
@@ -160,7 +160,7 @@ describe('impact', () => {
 
     expect(result).toEqual({
       ok: false,
-      failureKind: 'submission_failed',
+      failureKind: 'network',
       error: 'Impact is unconfigured; cannot resolve queued submission',
     });
     expect(fetchMock).not.toHaveBeenCalled();

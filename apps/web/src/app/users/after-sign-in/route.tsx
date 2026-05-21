@@ -20,6 +20,7 @@ import {
 import {
   parseImpactAffiliateTouchFromUrl,
   parseImpactReferralTouchFromUrl,
+  redactLandingPathForLogs,
 } from '@/lib/impact-referral-utils';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -179,21 +180,21 @@ export async function GET(request: NextRequest) {
 
   logImpactReferralDebug('After sign-in resolved Impact tracking context', {
     userId: user?.id ?? null,
-    responsePath,
+    responsePath: redactLandingPathForLogs(responsePath),
     affiliateTrackingIdPresent: Boolean(affiliateTrackingId?.trim()),
     impactCookieValuePresent: Boolean(impactCookieValue?.trim()),
     affiliateTouchPresent: Boolean(affiliateTouch),
     referralTouchPresent: Boolean(referralTouch),
     referralCookieValuePresent: Boolean(referralTouch?.opaqueTrackingValue),
     ignoredUrlImRefForReferralTouch: ignoreUrlImRefForReferralTouch,
-    callbackPath: url.searchParams.get('callbackPath') ?? null,
+    callbackPath: redactLandingPathForLogs(url.searchParams.get('callbackPath')),
   });
 
   if (user && affiliateTouch) {
     try {
       logImpactReferralDebug('After sign-in recording Impact affiliate touch', {
         userId: user.id,
-        landingPath: affiliateTouch.landingPath,
+        landingPath: redactLandingPathForLogs(affiliateTouch.landingPath),
         trackingValueLength: affiliateTouch.trackingValueLength,
         isTrackingValueAccepted: affiliateTouch.isTrackingValueAccepted,
       });
@@ -213,7 +214,7 @@ export async function GET(request: NextRequest) {
     try {
       logImpactReferralDebug('After sign-in recording Impact Advocate referral touch', {
         userId: user.id,
-        landingPath: referralTouch.landingPath,
+        landingPath: redactLandingPathForLogs(referralTouch.landingPath),
         rsCodePresent: Boolean(referralTouch.rsCode?.trim()),
         trackingValueLength: referralTouch.trackingValueLength,
         isTrackingValueAccepted: referralTouch.isTrackingValueAccepted,
@@ -232,7 +233,7 @@ export async function GET(request: NextRequest) {
     try {
       logImpactReferralDebug('After sign-in queueing Impact Advocate participant registration', {
         userId: user.id,
-        landingPath: referralTouch.landingPath,
+        landingPath: redactLandingPathForLogs(referralTouch.landingPath),
         localePresent: Boolean(localeFromHeaders(request.headers)?.trim()),
         countryCode: countryCodeFromHeaders(request.headers),
       });

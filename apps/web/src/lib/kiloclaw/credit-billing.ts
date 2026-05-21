@@ -1358,17 +1358,26 @@ export async function enrollWithCredits(params: {
     throw new Error('Enrollment already processed for this billing period.');
   }
 
-  await enqueueCreditEnrollmentAffiliateEvents({
-    userId,
-    plan,
-    saleEntityId: saleDedupeKeyEntityId,
-    saleOrderId: deductionCategory,
-    saleAmountMicrodollars: costMicrodollars,
-    eventDate: now,
-    saleItemSku,
-    priceVersion: kiloclawPriceVersion,
-    trialEndEntityId,
-  });
+  try {
+    await enqueueCreditEnrollmentAffiliateEvents({
+      userId,
+      plan,
+      saleEntityId: saleDedupeKeyEntityId,
+      saleOrderId: deductionCategory,
+      saleAmountMicrodollars: costMicrodollars,
+      eventDate: now,
+      saleItemSku,
+      priceVersion: kiloclawPriceVersion,
+      trialEndEntityId,
+    });
+  } catch (error) {
+    logWarning('Affiliate enqueue failed after credit enrollment', {
+      user_id: userId,
+      instanceId,
+      deductionCategory,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   // Step 4: Post-transaction bonus evaluation (spec rule 6)
   try {

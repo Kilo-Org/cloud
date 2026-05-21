@@ -294,21 +294,20 @@ async function markAffiliateEventDelivered(
           mapping.impactSubmissionUri ?? event.payload_json.impactSubmissionUri ?? null,
       } satisfies AffiliateEventPayloadJson)
     : event.payload_json;
+  const completionTimestamp = params?.clearClaimedAt ? null : new Date().toISOString();
 
   const updateValues: {
     delivery_state: 'delivered';
     next_retry_at: null;
-    claimed_at?: null;
+    claimed_at: string | null;
     impact_action_id?: string | null;
     impact_submission_uri?: string | null;
     payload_json?: AffiliateEventPayloadJson;
   } = {
     delivery_state: 'delivered',
     next_retry_at: null,
+    claimed_at: completionTimestamp,
   };
-  if (params?.clearClaimedAt) {
-    updateValues.claimed_at = null;
-  }
   if (mapping) {
     updateValues.impact_action_id = mapping.impactActionId ?? event.impact_action_id ?? null;
     updateValues.impact_submission_uri =
@@ -343,7 +342,7 @@ async function markAffiliateEventDelivered(
       ...event,
       delivery_state: 'delivered',
       next_retry_at: null,
-      claimed_at: params?.clearClaimedAt ? null : event.claimed_at,
+      claimed_at: completionTimestamp,
       impact_action_id: mapping
         ? (mapping.impactActionId ?? event.impact_action_id ?? null)
         : event.impact_action_id,

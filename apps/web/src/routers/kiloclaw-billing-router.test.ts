@@ -3363,6 +3363,90 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
     );
   });
 
+  it('enqueues sale affiliate events for positive attributed invoices without a charge id', async () => {
+    const paidAt = new Date('2026-04-09T10:00:00.000Z');
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email, paidAt);
+
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({ user_id: user.id, sandbox_id: sandboxIdFromUserId(user.id) })
+      .returning();
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      stripe_subscription_id: 'sub_invoice_paid_without_charge',
+      payment_source: 'stripe',
+      plan: 'standard',
+      status: 'active',
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+      cancel_at_period_end: false,
+    });
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      metadata: {
+        type: 'kiloclaw',
+        plan: 'standard',
+        kiloUserId: user.id,
+      },
+      schedule: null,
+      items: { data: [{ price: { id: 'price_standard' } }] },
+    });
+
+    await handleKiloClawInvoicePaid({
+      eventId: 'evt_invoice_paid_affiliate_without_charge',
+      invoice: {
+        id: 'in_affiliate_sale_without_charge',
+        amount_paid: 900,
+        currency: 'usd',
+        charge: null,
+        parent: {
+          subscription_details: {
+            subscription: 'sub_invoice_paid_without_charge',
+          },
+        },
+        lines: {
+          data: [
+            {
+              pricing: {
+                price_details: {
+                  price: 'price_standard',
+                },
+              },
+              period: {
+                start: Math.floor(new Date('2026-04-01T00:00:00.000Z').getTime() / 1000),
+                end: Math.floor(new Date('2026-05-01T00:00:00.000Z').getTime() / 1000),
+              },
+            },
+          ],
+        },
+        status_transitions: {
+          paid_at: Math.floor(paidAt.getTime() / 1000),
+        },
+      } as unknown as Stripe.Invoice,
+    });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+
+    expect(events.map(event => event.event_type).sort()).toEqual(['sale', 'signup']);
+    expect(events.find(event => event.event_type === 'sale')).toEqual(
+      expect.objectContaining({
+        delivery_state: 'queued',
+        stripe_charge_id: null,
+        payload_json: expect.objectContaining({
+          amount: 9,
+          currencyCode: 'usd',
+          orderId: 'in_affiliate_sale_without_charge',
+          stripeChargeId: null,
+        }),
+      })
+    );
+  });
+
   it('settles pre-deploy invoice.paid without instanceId metadata onto current personal row', async () => {
     const instance = await createKiloclawInstance(user.id);
     await db.insert(kiloclaw_subscriptions).values({

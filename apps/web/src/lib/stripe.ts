@@ -47,6 +47,7 @@ import {
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import { maybeMapStripeScheduleStatusToDb } from '@/lib/kilo-pass/scheduled-change-release';
 import { invoiceLooksLikeKiloPassByPriceId } from '@/lib/kilo-pass/stripe-invoice-classifier.server';
+import { getKiloPassMetadataFromStripeMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
 import {
   handleKiloClawSubscriptionCreated,
   handleKiloClawSubscriptionUpdated,
@@ -713,8 +714,11 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       // Kilo Pass invoice.paid events should be routed to the Kilo Pass handler first.
       // If it is a Kilo Pass invoice, no other invoice.paid handler should run.
       const isKiloPassByPriceId = invoiceLooksLikeKiloPassByPriceId(invoice);
+      const isKiloPassByInvoiceMetadata =
+        getKiloPassMetadataFromStripeMetadata(invoice.parent?.subscription_details?.metadata) !==
+        null;
 
-      if (isKiloPassByPriceId) {
+      if (isKiloPassByPriceId || isKiloPassByInvoiceMetadata) {
         await handleKiloPassInvoicePaid({ eventId: event.id, invoice, stripe: client });
         break;
       }

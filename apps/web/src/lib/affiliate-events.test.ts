@@ -9,9 +9,21 @@ import {
 import { and, eq, sql } from 'drizzle-orm';
 
 const originalFetch = global.fetch;
+const mockInfoLogger = jest.fn();
+const mockWarningLogger = jest.fn();
+const mockErrorLogger = jest.fn();
+
+jest.mock('@/lib/utils.server', () => ({
+  sentryLogger: (_scope: string, level: string) => {
+    if (level === 'error') return mockErrorLogger;
+    if (level === 'warning') return mockWarningLogger;
+    return mockInfoLogger;
+  },
+}));
 
 describe('affiliate-events', () => {
   beforeEach(() => {
+    jest.clearAllMocks();
     jest.resetModules();
     process.env.IMPACT_ACCOUNT_SID = 'impact-account-sid';
     process.env.IMPACT_AUTH_TOKEN = 'impact-auth-token';
@@ -429,8 +441,9 @@ describe('affiliate-events', () => {
       eventDate: new Date('2026-04-09T10:00:00.000Z'),
     });
 
+    const sensitiveProviderBody = 'ClickId=impact-click-123 buyer@example.com auth=secret';
     const fetchMock: typeof fetch = jest.fn(
-      async () => new Response('bad request', { status: 400 })
+      async () => new Response(sensitiveProviderBody, { status: 400 })
     );
     global.fetch = fetchMock;
 
@@ -449,6 +462,15 @@ describe('affiliate-events', () => {
     expect(row?.delivery_state).toBe('failed');
     expect(row?.attempt_count).toBe(1);
     expect(row?.claimed_at).toBeNull();
+    expect(mockErrorLogger).toHaveBeenCalledWith(
+      'Affiliate event delivery failed permanently',
+      expect.objectContaining({
+        failure_kind: 'http_4xx',
+        status_code: 400,
+        error: undefined,
+      })
+    );
+    expect(JSON.stringify(mockErrorLogger.mock.calls)).not.toContain(sensitiveProviderBody);
   });
 
   it('reclaims stale sending rows before dispatching', async () => {
@@ -694,6 +716,45 @@ describe('affiliate-events', () => {
     expect(reversalEvent?.next_retry_at).not.toBeNull();
   });
 
+  it('omits provider response bodies from permanent queued-sale reversal resolution logs', async () => {
+    const { user } = await createDeliveredSaleEvent({ saleResponse: 'queued' });
+    const { dispatchQueuedAffiliateEvents, enqueueImpactSaleReversalForCharge } =
+      await import('@/lib/affiliate-events');
+
+    await enqueueImpactSaleReversalForCharge({
+      stripeChargeId: 'ch_sale_test_123',
+      disputeId: 'dp_resolution_fail',
+      amount: 29,
+      currency: 'usd',
+      eventDate: new Date('2026-04-10T10:00:00.000Z'),
+    });
+
+    const sensitiveProviderBody = 'ClickId=queued-sale-click buyer@example.com auth=secret';
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(
+        new Response(sensitiveProviderBody, { status: 400 })
+      ) as jest.MockedFunction<typeof fetch>;
+
+    const summary = await dispatchQueuedAffiliateEvents();
+    const reversalEvent = (await getUserAffiliateEvents(user.id)).find(
+      row => row.event_type === 'sale_reversal'
+    );
+
+    expect(summary.failed).toBe(1);
+    expect(reversalEvent?.delivery_state).toBe('failed');
+    expect(reversalEvent?.attempt_count).toBe(1);
+    expect(mockErrorLogger).toHaveBeenCalledWith(
+      'Affiliate event delivery failed permanently',
+      expect.objectContaining({
+        failure_kind: 'submission_failed',
+        status_code: 400,
+        error: undefined,
+      })
+    );
+    expect(JSON.stringify(mockErrorLogger.mock.calls)).not.toContain(sensitiveProviderBody);
+  });
+
   it('retries sale reversal on retryable upstream failure', async () => {
     const { user } = await createDeliveredSaleEvent({ saleResponse: 'immediate' });
     const { dispatchQueuedAffiliateEvents, enqueueImpactSaleReversalForCharge } =
@@ -737,11 +798,12 @@ describe('affiliate-events', () => {
       eventDate: new Date('2026-04-10T10:00:00.000Z'),
     });
 
+    const sensitiveProviderBody = 'ClickId=reversal-click buyer@example.com auth=secret';
     global.fetch = jest
       .fn()
-      .mockResolvedValue(new Response('bad request', { status: 400 })) as jest.MockedFunction<
-      typeof fetch
-    >;
+      .mockResolvedValue(
+        new Response(sensitiveProviderBody, { status: 400 })
+      ) as jest.MockedFunction<typeof fetch>;
 
     const summary = await dispatchQueuedAffiliateEvents();
     const reversalEvent = (await getUserAffiliateEvents(user.id)).find(
@@ -751,6 +813,15 @@ describe('affiliate-events', () => {
     expect(summary.failed).toBe(1);
     expect(reversalEvent?.delivery_state).toBe('failed');
     expect(reversalEvent?.attempt_count).toBe(1);
+    expect(mockErrorLogger).toHaveBeenCalledWith(
+      'Affiliate event delivery failed permanently',
+      expect.objectContaining({
+        failure_kind: 'http_4xx',
+        status_code: 400,
+        error: undefined,
+      })
+    );
+    expect(JSON.stringify(mockErrorLogger.mock.calls)).not.toContain(sensitiveProviderBody);
   });
 
   it('fails blocked sale reversal when parent sale fails permanently', async () => {

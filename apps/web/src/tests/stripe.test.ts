@@ -87,6 +87,7 @@ import {
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
 import type * as kiloclawStripeHandlersModule from '@/lib/kiloclaw/stripe-handlers';
+import type * as kiloPassStripeHandlersModule from '@/lib/kilo-pass/stripe-handlers';
 import { cleanupDbForTest } from '@/lib/drizzle';
 import { processTopUp } from '@/lib/credits';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
@@ -2176,6 +2177,73 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       });
     } finally {
       jest.dontMock('@/lib/kiloclaw/stripe-handlers');
+      jest.resetModules();
+    }
+  });
+
+  test('invoice.paid dispatches metadata-resolved Kilo Pass invoices without price SKU lines', async () => {
+    const handleKiloPassInvoicePaid = jest.fn<
+      Promise<void>,
+      [{ eventId: string; invoice: Stripe.Invoice; stripe: Stripe }]
+    >();
+    handleKiloPassInvoicePaid.mockResolvedValue(undefined);
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_kilo_pass_metadata_dispatch',
+      type: 'invoice.paid',
+      data: {
+        object: {
+          id: 'in_kilo_pass_metadata_dispatch',
+          object: 'invoice',
+          amount_paid: 1900,
+          currency: 'usd',
+          parent: {
+            subscription_details: {
+              subscription: 'sub_kilo_pass_metadata_dispatch',
+              metadata: {
+                type: 'kilo-pass',
+                kiloUserId: 'user_kilo_pass_metadata_dispatch',
+                tier: KiloPassTier.Tier19,
+                cadence: KiloPassCadence.Monthly,
+              },
+            },
+          },
+          lines: {
+            data: [],
+          },
+        } as unknown as Stripe.Invoice,
+        previous_attributes: {},
+      },
+    };
+
+    try {
+      jest.resetModules();
+      jest.doMock('@/lib/kilo-pass/stripe-handlers', () => {
+        const actual = jest.requireActual<typeof kiloPassStripeHandlersModule>(
+          '@/lib/kilo-pass/stripe-handlers'
+        );
+        return {
+          __esModule: true,
+          ...actual,
+          handleKiloPassInvoicePaid,
+        };
+      });
+
+      await jest.isolateModulesAsync(async () => {
+        const { processStripePaymentEventHook: isolatedProcessStripePaymentEventHook } =
+          await import('@/lib/stripe');
+        await isolatedProcessStripePaymentEventHook(event);
+      });
+
+      expect(handleKiloPassInvoicePaid).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventId: 'evt_kilo_pass_metadata_dispatch',
+          invoice: event.data.object,
+        })
+      );
+    } finally {
+      jest.dontMock('@/lib/kilo-pass/stripe-handlers');
       jest.resetModules();
     }
   });

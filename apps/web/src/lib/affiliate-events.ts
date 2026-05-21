@@ -1217,9 +1217,7 @@ async function dispatchSaleReversalEvent(
       return 'retried';
     } else {
       await handlePermanentFailure(database, event, 'submission_failed', {
-        error: resolution.ok
-          ? 'Impact submission resolved without action ID'
-          : (resolution.error ?? resolution.responseBody),
+        error: resolution.ok ? 'Impact submission resolved without action ID' : resolution.error,
         statusCode: resolution.ok ? undefined : resolution.statusCode,
       });
       logWarning('Impact sale reversal requires manual follow-up because action mapping failed', {
@@ -1273,7 +1271,7 @@ async function dispatchSaleReversalEvent(
   ) {
     await handlePermanentFailure(database, event, reversalResult.failureKind, {
       statusCode: reversalResult.statusCode,
-      error: reversalResult.error ?? reversalResult.responseBody,
+      error: reversalResult.error,
     });
     logWarning('Impact sale reversal requires manual follow-up after permanent failure', {
       ...buildAffiliateEventLogFields(event),
@@ -1449,7 +1447,7 @@ export async function dispatchQueuedAffiliateEvents(params?: {
         });
         await handlePermanentFailure(database, event, result.failureKind, {
           statusCode: result.statusCode,
-          error: result.error ?? result.responseBody,
+          error: result.error,
         });
         summary.failed += 1;
         continue;

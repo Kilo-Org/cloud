@@ -3874,6 +3874,27 @@ function liveDoVolumeIds(debug: {
   ].filter((id): id is string => id !== null);
 }
 
+/**
+ * Build a DO stub factory for the orphan-volume endpoints, deriving the DO
+ * key deterministically from the sandbox ID via `doKeyFromActiveInstance`.
+ *
+ * Deliberately NOT `withResolvedDORetry`: that resolver does a second,
+ * best-effort Postgres lookup and falls back to the raw instanceId on any
+ * hiccup. For a legacy (non-`ki_`) sandbox the real DO is user-keyed, so
+ * that fallback would read an unrelated, empty instanceId-keyed DO —
+ * `getDebugState()` would report `status: null` and no tracked volumes,
+ * silently passing the destroy guards against the wrong instance. The key
+ * derivation runs inside the returned factory so a malformed sandbox
+ * surfaces as a DO-call failure (fail closed) rather than a sync throw.
+ */
+function orphanVolumeDoStubFactory(
+  env: AppEnv['Bindings'],
+  identity: { id: string; sandboxId: string }
+): () => KiloClawInstanceStub {
+  return () =>
+    env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(doKeyFromActiveInstance(identity)));
+}
+
 // GET /api/platform/admin/orphan-volume-scan?userId=&instanceId=&sandboxId=
 // Lists the Fly volumes in the instance's app and annotates each with whether
 // it belongs to this instance (exact name match) and whether a live DO still
@@ -3905,7 +3926,11 @@ platform.get('/admin/orphan-volume-scan', async c => {
   // failure would otherwise read as a false negative.
   const [volumesResult, debugResult] = await Promise.allSettled([
     fly.listVolumes({ apiToken, appName: flyApp }),
-    withResolvedDORetry(c.env, userId, instanceId, stub => stub.getDebugState(), 'getDebugState'),
+    withDORetry(
+      orphanVolumeDoStubFactory(c.env, { id: instanceId, sandboxId }),
+      stub => stub.getDebugState(),
+      'getDebugState'
+    ),
   ]);
 
   let volumes: FlyVolume[] = [];
@@ -4062,10 +4087,8 @@ platform.post('/admin/orphan-volume-destroy', async c => {
   //    cannot confirm DO state. "Cannot confirm" fails closed.
   let debug: Awaited<ReturnType<KiloClawInstanceStub['getDebugState']>>;
   try {
-    debug = await withResolvedDORetry(
-      c.env,
-      instance.userId,
-      instance.id,
+    debug = await withDORetry(
+      orphanVolumeDoStubFactory(c.env, instance),
       stub => stub.getDebugState(),
       'getDebugState'
     );

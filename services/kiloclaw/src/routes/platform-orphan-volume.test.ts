@@ -5,6 +5,7 @@ import type * as FlyClient from '../fly/client';
 import { FlyApiError } from '../fly/client';
 import { getInstanceByIdIncludingDestroyed } from '../db';
 import type * as DbModule from '../db';
+import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { volumeNameFromSandboxId } from '../durable-objects/machine-config';
 import type { FlyVolume } from '../fly/types';
 
@@ -266,6 +267,80 @@ describe('POST /admin/orphan-volume-destroy', () => {
     expect(response.status).toBe(409);
     expect(fly.listVolumes).not.toHaveBeenCalled();
     expect(fly.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('reads the correct user-keyed DO for a legacy (non-ki_) sandbox', async () => {
+    // Regression: the DO key must be derived from the sandbox ID, not the
+    // raw instanceId. For a legacy sandbox the real DO is user-keyed; a
+    // fallback to instanceId would read an unrelated empty DO and let the
+    // destroy guards pass against the wrong instance.
+    const legacyUserId = 'legacy-user-1';
+    const legacySandbox = sandboxIdFromUserId(legacyUserId); // base64url, not ki_
+    const legacyInstanceId = '22222222-2222-4222-8222-222222222222';
+    const legacyVolumeId = 'vol_legacy0000000000';
+
+    // The real (user-keyed) legacy DO is alive; every other key resolves to
+    // a finalized/empty DO. If the endpoint keyed off instanceId it would
+    // see the empty DO and wrongly permit the delete.
+    const env = {
+      FLY_API_TOKEN: 'test-token',
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      KILOCLAW_INSTANCE: {
+        idFromName: (id: string) => id,
+        get: (key: string) => ({
+          getDebugState: vi
+            .fn()
+            .mockResolvedValue(
+              key === legacyUserId
+                ? { ...FINALIZED_DO_STATE, status: 'running' }
+                : FINALIZED_DO_STATE
+            ),
+        }),
+      },
+      KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      KV_CLAW_CACHE: {
+        get: vi.fn().mockResolvedValue(null),
+        put: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        list: vi.fn().mockResolvedValue({ keys: [], list_complete: true }),
+        getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+      },
+    } as never;
+
+    // The identity-check lookup succeeds; any *second* lookup fails. The
+    // fixed endpoint does exactly one lookup and derives the DO key from
+    // the sandbox ID — it must not fall back to an instanceId-keyed DO.
+    vi.mocked(getInstanceByIdIncludingDestroyed)
+      .mockResolvedValueOnce({
+        id: legacyInstanceId,
+        sandboxId: legacySandbox,
+        userId: legacyUserId,
+        orgId: null,
+        inboundEmailEnabled: true,
+        provider: 'fly',
+        instanceType: null,
+      } as never)
+      .mockRejectedValue(new Error('transient db failure'));
+    vi.mocked(fly.listVolumes).mockResolvedValue([
+      flyVolume({ id: legacyVolumeId, name: volumeNameFromSandboxId(legacySandbox) }),
+    ]);
+
+    const response = await platform.request(
+      '/admin/orphan-volume-destroy',
+      destroyInit({
+        userId: legacyUserId,
+        instanceId: legacyInstanceId,
+        sandboxId: legacySandbox,
+        volumeId: legacyVolumeId,
+      }),
+      env
+    );
+
+    // The live legacy DO must block the delete, and the endpoint must not
+    // re-resolve the DO key via a second (failure-prone) DB lookup.
+    expect(response.status).toBe(409);
+    expect(fly.deleteVolume).not.toHaveBeenCalled();
+    expect(getInstanceByIdIncludingDestroyed).toHaveBeenCalledTimes(1);
   });
 
   it('returns 404 when the volume is not in the Fly app', async () => {

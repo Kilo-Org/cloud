@@ -273,19 +273,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
-  // Experimented public ids are treated as free models for the rest of this
-  // request: anonymous access allowed, free-model rate limit applied, balance
-  // check skipped. Resolved once via the in-process Redis-backed cache.
-  const isExperimentedModel = await isPublicIdExperimented(originalModelIdLowerCased);
-
-  // For FREE models (including experimented public ids): check rate limit, log
-  // at start. Server-side products (cloud-agent, code-review, app-builder)
+  // For FREE models (including experimented public ids): check rate limit,
+  // log at start. Server-side products (cloud-agent, code-review, app-builder)
   // rate-limit per user when the request comes from Cloudflare IPs (Kilo
   // infrastructure). All other products rate-limit per IP (fast pre-auth path).
+  // The rate limiter checks `isKiloExclusiveFreeModel` (not `isFreeModel`)
+  // because we don't want to rate-limit OpenRouter `:free` and stealth models;
+  // experimented public ids get the same rate limiter treatment.
   const isRateLimitedFreeModelRequest =
     isKiloExclusiveFreeModel(originalModelIdLowerCased) ||
     autoModel === KILO_AUTO_FREE_MODEL.id ||
-    isExperimentedModel;
+    (await isPublicIdExperimented(originalModelIdLowerCased));
   if (isRateLimitedFreeModelRequest) {
     const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
     if (rateLimit instanceof NextResponse) return rateLimit;
@@ -323,10 +321,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
-    // No valid auth. Experimented public ids are treated as free models here
+    // No valid auth. `isFreeModel` returns true for experimented public ids
     // so anonymous traffic can reach the experiment-routing branch in
     // `getProvider`.
-    if (!(await isFreeModel(originalModelIdLowerCased)) && !isExperimentedModel) {
+    if (!(await isFreeModel(originalModelIdLowerCased))) {
       // Paid model requires authentication
       return NextResponse.json(
         {
@@ -505,12 +503,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user) && !bypassAccessCheck) {
     const { balance, settings, plan } = await balanceAndSettingsPromise;
 
-    if (
-      balance <= 0 &&
-      !(await isFreeModel(originalModelIdLowerCased)) &&
-      !isExperimentedModel &&
-      !userByok
-    ) {
+    if (balance <= 0 && !(await isFreeModel(originalModelIdLowerCased)) && !userByok) {
       return await usageLimitExceededResponse(user, balance);
     }
 
@@ -543,11 +536,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (experiment) {
     usageContext.modelExperimentVariantVersionId = experiment.variantVersionId;
     usageContext.modelExperimentAllocationSubject = experiment.allocationSubject;
-    // Preview experiment traffic is partner/Kilo-funded for v1. Zero the
-    // billable cost in `processTokenData` while preserving `market_cost`
-    // for reporting. Without this flag the microdollar insert CTE still
-    // increments `microdollars_used` by the upstream cost.
-    usageContext.provider_funded = true;
+    // Cost zeroing for experiment traffic is handled by `isFreeModel`, which
+    // returns true for experimented public ids.
   }
 
   sentryRootSpan()?.setAttribute(

@@ -34,6 +34,7 @@ import {
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
+import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/pick-variant';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
@@ -64,7 +65,8 @@ export async function isFreeModel(model: string): Promise<boolean> {
     model === KILO_AUTO_FREE_MODEL.id ||
     (model ?? '').endsWith(':free') ||
     model === 'openrouter/free' ||
-    isOpenRouterStealthModel(model ?? '')
+    isOpenRouterStealthModel(model ?? '') ||
+    (await isPublicIdExperimented(model ?? ''))
   );
 }
 

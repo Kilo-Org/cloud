@@ -323,10 +323,10 @@ export class EventServiceClient {
    * Returns an unsubscribe function. Calling it removes the handler.
    */
   onConnected(handler: () => void): () => void {
+    this.connectedHandlers.add(handler);
     if (this.isConnected()) {
       handler();
     }
-    this.connectedHandlers.add(handler);
     return () => {
       this.connectedHandlers.delete(handler);
     };

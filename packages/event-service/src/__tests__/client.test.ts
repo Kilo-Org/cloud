@@ -766,5 +766,34 @@ describe('EventServiceClient', () => {
       // Still only one call
       expect(calls).toHaveLength(1);
     });
+
+    it('handler registered before synchronous fire — still fires on reconnect even if first call throws', async () => {
+      vi.useFakeTimers();
+      try {
+        const client = makeClient();
+        await client.connect();
+        expect(client.isConnected()).toBe(true);
+
+        let callCount = 0;
+        // Subscribe while already connected — the handler throws on its first (synchronous) call.
+        expect(() => {
+          client.onConnected(() => {
+            callCount++;
+            if (callCount === 1) throw new Error('first call throws');
+          });
+        }).toThrow('first call throws');
+
+        // The handler must have been added to the set before the synchronous fire,
+        // so it should still fire when the connection drops and recovers.
+        lastMockWs.triggerClose();
+        await vi.advanceTimersByTimeAsync(2000);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(allMockWs).toHaveLength(2);
+        expect(callCount).toBe(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });

@@ -8,6 +8,7 @@ const SAFE = {
   doStatus: null,
   doStatusError: null,
   hasAccessGrantingSubscription: false,
+  destructionScheduled: false,
   graceElapsed: true,
 } as const;
 
@@ -54,6 +55,12 @@ describe('classifyOrphanVolume', () => {
     );
   });
 
+  it('refuses while a billing destruction deadline is still pending', () => {
+    expect(classifyOrphanVolume({ ...SAFE, destructionScheduled: true })).toBe(
+      'destruction_scheduled'
+    );
+  });
+
   it('refuses while the instance is still inside the grace period', () => {
     expect(classifyOrphanVolume({ ...SAFE, graceElapsed: false })).toBe('within_grace');
   });
@@ -68,6 +75,7 @@ describe('classifyOrphanVolume', () => {
           doStatus: 'running',
           doStatusError: 'unreachable',
           hasAccessGrantingSubscription: true,
+          destructionScheduled: true,
           graceElapsed: false,
         })
       ).toBe('do_check_failed');
@@ -103,14 +111,25 @@ describe('classifyOrphanVolume', () => {
       );
     });
 
-    it('subscription_active outranks within_grace', () => {
+    it('subscription_active outranks destruction_scheduled and within_grace', () => {
       expect(
         classifyOrphanVolume({
           ...SAFE,
           hasAccessGrantingSubscription: true,
+          destructionScheduled: true,
           graceElapsed: false,
         })
       ).toBe('subscription_active');
+    });
+
+    it('destruction_scheduled outranks within_grace', () => {
+      expect(
+        classifyOrphanVolume({
+          ...SAFE,
+          destructionScheduled: true,
+          graceElapsed: false,
+        })
+      ).toBe('destruction_scheduled');
     });
   });
 });

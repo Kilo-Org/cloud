@@ -47,12 +47,11 @@ import {
 } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
-  getAccessGrantingOrphanVolumeContexts,
+  getOrphanVolumeUserProtections,
   getKiloClawPricingCatalogEntry,
   isKiloClawPriceVersion,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
   ORPHAN_VOLUME_GRACE_PERIOD_MS,
-  orphanVolumeSubscriptionContextKey,
   type KiloClawPriceVersion,
   type KiloClawSubscriptionChangeActor,
 } from '@kilocode/db';
@@ -4067,22 +4066,25 @@ platform.post('/admin/orphan-volume-destroy', async c => {
   if (Date.now() - new Date(instance.destroyedAt).getTime() <= ORPHAN_VOLUME_GRACE_PERIOD_MS) {
     return c.json({ error: 'Instance is still within the orphan-volume grace period' }, 409);
   }
-  // Gate C — never destroy data while the owning context still has product
-  // access. Evaluated per (user, org) context, not per instance: a
-  // reprovision transfers the destroyed instance's subscription row to a
-  // current successor, so the destroyed row's own subscription no longer
-  // reflects whether the user has access.
-  const ownershipContext = {
-    user_id: instance.userId,
-    organization_id: instance.organizationId,
-  };
-  const accessGrantingContextKeys = await getAccessGrantingOrphanVolumeContexts(
+  // Gate C — never destroy data while the owning user still has product
+  // access, or while the billing lifecycle reaper is still scheduled to
+  // destroy it (a future `destruction_deadline`). Checked per-user, not
+  // per-instance: a reprovision transfer moves access to a current
+  // successor subscription, and a subscription may have no `instance_id`
+  // link at all.
+  const { accessGrantingUserIds, pendingDestructionUserIds } = await getOrphanVolumeUserProtections(
     workerDb,
-    [ownershipContext],
+    [instance.userId],
     new Date()
   );
-  if (accessGrantingContextKeys.has(orphanVolumeSubscriptionContextKey(ownershipContext))) {
+  if (accessGrantingUserIds.has(instance.userId)) {
     return c.json({ error: 'User has an access-granting subscription; volume preserved' }, 409);
+  }
+  if (pendingDestructionUserIds.has(instance.userId)) {
+    return c.json(
+      { error: 'A billing destruction deadline is still pending; volume preserved' },
+      409
+    );
   }
 
   const flyApp = await resolveOrphanVolumeFlyAppName(c.env, {

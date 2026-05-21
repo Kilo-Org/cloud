@@ -220,6 +220,11 @@ const VOLUME_CLASSIFICATION_DISPLAY: Record<
     tone: 'warn',
     help: 'User still has an access-granting subscription — data preserved.',
   },
+  destruction_scheduled: {
+    label: 'Destruction scheduled',
+    tone: 'muted',
+    help: 'A billing destruction deadline is still pending — the lifecycle reaper will reap this instance and its volume. Only a true orphan if that reaper fails.',
+  },
   within_grace: {
     label: 'Within 7-day grace',
     tone: 'muted',
@@ -495,6 +500,8 @@ function OrphanVolumesSection() {
                       <TableCell>
                         <Link
                           href={`/admin/users/${encodeURIComponent(volume.user_id)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="text-blue-600 hover:underline"
                         >
                           {volume.user_email || volume.user_id}
@@ -822,6 +829,8 @@ export function KiloclawOrphansTab() {
                       <TableCell>
                         <Link
                           href={`/admin/users/${encodeURIComponent(orphan.user_id)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="text-blue-600 hover:underline"
                         >
                           {orphan.user_email || orphan.user_id}

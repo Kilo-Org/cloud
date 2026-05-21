@@ -1,5 +1,4 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { File } from 'expo-file-system';
 import { useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -13,7 +12,12 @@ import {
   getAttachmentActionSheetConfig,
   MESSAGE_ATTACHMENT_MAX_COUNT,
 } from './message-attachment-state';
-import { pickCameraImage, pickFiles, pickLibraryImages } from './message-attachment-picker';
+import {
+  pickCameraImage,
+  type PickedAttachment,
+  pickFiles,
+  pickLibraryImages,
+} from './message-attachment-picker';
 import { MessageInputContent } from './message-input-content';
 import {
   type AttachmentEnabledProps,
@@ -47,16 +51,15 @@ export function MessageInputWithAttachmentQueue({
   const { bottom } = useSafeAreaInsets();
 
   const addFiles = useCallback(
-    (inputs: AddFileInput[]) => {
+    (picked: PickedAttachment[]) => {
       const capacity = Math.max(MESSAGE_ATTACHMENT_MAX_COUNT - queue.rows.length, 0);
       addFilesWithinAttachmentCapacity({
-        inputs,
+        inputs: picked,
         capacity,
-        addFile: queue.addFile,
-        onAcceptedFile: (input, tempId) => {
-          const localUri = localUriFromInput(input);
-          if (tempId && localUri) {
-            localUrisRef.current.set(tempId, localUri);
+        addFile: (item: PickedAttachment) => queue.addFile(item.input),
+        onAcceptedFile: (item, tempId) => {
+          if (tempId) {
+            localUrisRef.current.set(tempId, item.localUri);
           }
         },
         onLimitExceeded: () => {
@@ -124,19 +127,15 @@ export function MessageInputWithAttachmentQueue({
   );
 }
 
-function localUriFromInput(input: AddFileInput): string | null {
-  return input.blob instanceof File ? input.blob.uri : null;
-}
-
-async function pickAttachmentsFromSource(source: 'camera' | 'library' | 'files') {
+// eslint-disable-next-line typescript-eslint/promise-function-async -- thin pass-through; making it async only to satisfy this rule conflicts with `require-await`.
+function pickAttachmentsFromSource(
+  source: 'camera' | 'library' | 'files'
+): Promise<PickedAttachment[]> {
   if (source === 'camera') {
-    const inputs = await pickCameraImage();
-    return inputs;
+    return pickCameraImage();
   }
   if (source === 'library') {
-    const inputs = await pickLibraryImages();
-    return inputs;
+    return pickLibraryImages();
   }
-  const inputs = await pickFiles();
-  return inputs;
+  return pickFiles();
 }

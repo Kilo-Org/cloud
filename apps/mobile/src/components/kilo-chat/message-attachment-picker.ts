@@ -11,12 +11,17 @@ import {
 
 type LocalAttachmentAsset = NativeAttachmentSelection;
 
+export type PickedAttachment = {
+  input: AddFileInput;
+  localUri: string;
+};
+
 const IMAGE_PICKER_OPTIONS = {
   mediaTypes: ['images'],
   quality: 1,
 } satisfies ImagePicker.ImagePickerOptions;
 
-async function assetToAddFileInput(asset: LocalAttachmentAsset): Promise<AddFileInput> {
+async function assetToPickedAttachment(asset: LocalAttachmentAsset): Promise<PickedAttachment> {
   const file = new File(asset.uri);
   const attachment = normalizeAttachmentSelection({
     uri: asset.uri,
@@ -34,9 +39,12 @@ async function assetToAddFileInput(asset: LocalAttachmentAsset): Promise<AddFile
   const blob = await response.blob();
 
   return {
-    blob,
-    filename: attachment.filename,
-    mimeType: attachment.mimeType,
+    input: {
+      blob,
+      filename: attachment.filename,
+      mimeType: attachment.mimeType,
+    },
+    localUri: asset.uri,
   };
 }
 
@@ -47,7 +55,7 @@ function showPermissionSettingsAlert({ message, title }: { message: string; titl
   ]);
 }
 
-export async function pickCameraImage(): Promise<AddFileInput[]> {
+export async function pickCameraImage(): Promise<PickedAttachment[]> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) {
     showPermissionSettingsAlert({
@@ -63,10 +71,10 @@ export async function pickCameraImage(): Promise<AddFileInput[]> {
     return [];
   }
 
-  return Promise.all(result.assets.map(imageAssetToInput));
+  return Promise.all(result.assets.map(imageAssetToPicked));
 }
 
-export async function pickLibraryImages(): Promise<AddFileInput[]> {
+export async function pickLibraryImages(): Promise<PickedAttachment[]> {
   const result = await ImagePicker.launchImageLibraryAsync({
     ...IMAGE_PICKER_OPTIONS,
     allowsMultipleSelection: true,
@@ -76,10 +84,10 @@ export async function pickLibraryImages(): Promise<AddFileInput[]> {
     return [];
   }
 
-  return Promise.all(result.assets.map(imageAssetToInput));
+  return Promise.all(result.assets.map(imageAssetToPicked));
 }
 
-export async function pickFiles(): Promise<AddFileInput[]> {
+export async function pickFiles(): Promise<PickedAttachment[]> {
   const result = await DocumentPicker.getDocumentAsync({
     copyToCacheDirectory: true,
     multiple: true,
@@ -90,17 +98,17 @@ export async function pickFiles(): Promise<AddFileInput[]> {
     return [];
   }
 
-  return Promise.all(result.assets.map(documentAssetToInput));
+  return Promise.all(result.assets.map(documentAssetToPicked));
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- thin pass-through; making it async only to satisfy this rule conflicts with `require-await`.
-function imageAssetToInput(asset: {
+function imageAssetToPicked(asset: {
   uri: string;
   fileName?: string | null;
   mimeType?: string | null;
   fileSize?: number | null;
-}): Promise<AddFileInput> {
-  return assetToAddFileInput({
+}): Promise<PickedAttachment> {
+  return assetToPickedAttachment({
     uri: asset.uri,
     fileName: asset.fileName,
     mimeType: asset.mimeType,
@@ -109,13 +117,13 @@ function imageAssetToInput(asset: {
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- thin pass-through; making it async only to satisfy this rule conflicts with `require-await`.
-function documentAssetToInput(asset: {
+function documentAssetToPicked(asset: {
   uri: string;
   name: string;
   mimeType?: string;
   size?: number;
-}): Promise<AddFileInput> {
-  return assetToAddFileInput({
+}): Promise<PickedAttachment> {
+  return assetToPickedAttachment({
     uri: asset.uri,
     name: asset.name,
     mimeType: asset.mimeType,

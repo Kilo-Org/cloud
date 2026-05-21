@@ -1,6 +1,6 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
-import { useBotStatus } from '@kilocode/kilo-chat-hooks';
+import { useBotStatus, useEventServiceClient } from '@kilocode/kilo-chat-hooks';
 import { type ConversationDetailResponse } from '@kilocode/kilo-chat';
 import { useCallback } from 'react';
 import { Alert, View } from 'react-native';
@@ -54,6 +54,7 @@ export function ConversationScreen({
   conversationMembers,
 }: Props) {
   const client = useKiloChatClient();
+  const eventClient = useEventServiceClient();
   const router = useRouter();
   const currentUserId = useCurrentUserId();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -66,7 +67,7 @@ export function ConversationScreen({
   const { data: instances } = useAllKiloClawInstances();
   const currentInstance = instances?.find(instance => instance.sandboxId === sandboxId);
   const instanceStatus = instanceStatusQuery.data?.status ?? currentInstance?.status ?? null;
-  const botStatus = useBotStatus(client, sandboxId);
+  const botStatus = useBotStatus(client, eventClient, sandboxId);
   const botPresence = botStatus ? { online: botStatus.online, lastAt: botStatus.at } : undefined;
   const hasAttachmentsCapability = botStatus?.capabilities?.includes('attachments') ?? false;
   const now = useNowTicker(10_000);

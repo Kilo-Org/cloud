@@ -58,7 +58,7 @@ export const preferredModels = [
   GLM_CURRENT_MODEL_ID,
 ];
 
-export function isFreeModel(model: string): boolean {
+export async function isFreeModel(model: string): Promise<boolean> {
   return (
     isKiloExclusiveFreeModel(model) ||
     model === KILO_AUTO_FREE_MODEL.id ||

@@ -81,11 +81,9 @@ export type ClawOnboardingFlowStateInput = {
   hasBotIdentity: boolean;
   gatewayState?: GatewayProcessStatusOkResponse['state'] | null;
   /**
-   * Whether the calendar step is available in the wizard. Calendar OAuth is
-   * gated to Kilo Code admins (the `/api/integrations/google/connect` and
-   * `/disconnect` routes both require `adminOnly: true`), so non-admins skip
-   * the step entirely. When false, the wizard advances identity → email
-   * and `'calendar'` is mapped to `'email'` in the render decision.
+   * Whether the calendar step is available in the wizard. When false, the
+   * wizard advances identity -> email and `'calendar'` is mapped to `'email'`
+   * in the render decision.
    */
   hasCalendarStep?: boolean;
   hasToolsStep?: boolean;
@@ -159,10 +157,9 @@ export function getClawOnboardingStepProgress(
     return { currentStep: totalSteps, totalSteps };
   }
 
-  // A non-admin sitting briefly on `onboardingStep === 'calendar'` (e.g. via
-  // a stale `?step=calendar` URL) gets normalized to email for progress
-  // display, matching the renderStep redirect in getRenderStepDecision.
-  // Same treatment for `'interests'` → `'provisioning'`.
+  // A user sitting briefly on an unavailable step (e.g. via a stale URL) gets
+  // normalized to the next available step for progress display, matching the
+  // renderStep redirect in getRenderStepDecision.
   let lookupStep: OnboardingStep = step;
   if (lookupStep === 'tools' && !hasToolsStep) lookupStep = hasCalendarStep ? 'calendar' : 'email';
   if (lookupStep === 'calendar' && hasToolsStep) lookupStep = 'tools';
@@ -347,8 +344,7 @@ function getRenderStepDecision({
       if (!hasCalendarStep) {
         return {
           renderStep: 'email',
-          reason:
-            'calendar step is admin-only and the current user is not an admin; advance to email',
+          reason: 'calendar step is unavailable; advance to email',
         };
       }
       return {
@@ -366,8 +362,7 @@ function getRenderStepDecision({
       if (!hasInterestsStep) {
         return {
           renderStep: 'provisioning',
-          reason:
-            'interests step is admin-only and the current user is not an admin; advance to provisioning',
+          reason: 'interests step is unavailable; advance to provisioning',
         };
       }
       return {
@@ -443,8 +438,7 @@ function getRenderStepDecision({
     if (!hasCalendarStep) {
       return {
         renderStep: 'email',
-        reason:
-          'calendar step is admin-only and the current user is not an admin; advance to email',
+        reason: 'calendar step is unavailable; advance to email',
       };
     }
     return {
@@ -464,8 +458,7 @@ function getRenderStepDecision({
     if (!hasInterestsStep) {
       return {
         renderStep: 'provisioning',
-        reason:
-          'interests step is admin-only and the current user is not an admin; advance to provisioning',
+        reason: 'interests step is unavailable; advance to provisioning',
       };
     }
     return {

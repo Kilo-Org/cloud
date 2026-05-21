@@ -136,8 +136,8 @@ If the user asks you to analyze or act on an attached image, you must use the sp
 ${conversationContext}`;
 }
 
-function pickSummaryModel(modelSlug: string): string {
-  return isFreeModel(modelSlug) ? modelSlug : SUMMARY_MODEL;
+async function pickSummaryModel(modelSlug: string): Promise<string> {
+  return (await isFreeModel(modelSlug)) ? modelSlug : SUMMARY_MODEL;
 }
 
 async function summarizePrompt(
@@ -146,7 +146,7 @@ async function summarizePrompt(
   prompt: string
 ): Promise<string> {
   const result = await generateText({
-    model: provider.chatModel(pickSummaryModel(modelSlug)),
+    model: provider.chatModel(await pickSummaryModel(modelSlug)),
     prompt: `Summarize the following task in at most 10 words. Output only the summary, nothing else.\n\n${prompt}`,
   });
   return result.text.trim();

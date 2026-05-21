@@ -45,7 +45,11 @@ import {
   KILO_CLI_VERSION,
   type DevContainerHandle,
 } from './kilo/devcontainer.js';
-import { dockerSocketEnv, resolveDockerSocketPath } from './kilo/sandbox-runtime.js';
+import {
+  buildKiloSessionXdgEnv,
+  dockerSocketEnv,
+  resolveDockerSocketPath,
+} from './kilo/sandbox-runtime.js';
 import { shellQuote, validShellEnvEntries } from './kilo/utils.js';
 
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
@@ -1894,6 +1898,7 @@ export class SessionService {
           ? {
               KILOCODE_TOKEN_FILE: restoreTokenFilePath,
               KILO_SESSION_INGEST_URL: env.KILO_SESSION_INGEST_URL,
+              ...buildKiloSessionXdgEnv(context.sessionHome),
               ...(env.KILOCODE_BACKEND_BASE_URL && {
                 KILOCODE_BACKEND_BASE_URL: env.KILOCODE_BACKEND_BASE_URL,
                 KILO_API_URL: env.KILOCODE_BACKEND_BASE_URL,

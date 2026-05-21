@@ -314,7 +314,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (authFailedResponse) {
     // No valid auth
-    if (!isFreeModel(originalModelIdLowerCased)) {
+    if (!(await isFreeModel(originalModelIdLowerCased))) {
       // Paid model requires authentication
       return NextResponse.json(
         {
@@ -469,7 +469,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user) && !bypassAccessCheck) {
     const { balance, settings, plan } = await balanceAndSettingsPromise;
 
-    if (balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok) {
+    if (balance <= 0 && !(await isFreeModel(originalModelIdLowerCased)) && !userByok) {
       return await usageLimitExceededResponse(user, balance);
     }
 

@@ -225,9 +225,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
-  // Per-message id from the kilocode client. Used as the join key for
-  // PostHog feedback (`Feedback Submitted.parentMessageID`) and persisted to
-  // `model_experiment_request.client_request_id` when an experiment is applied.
+  // Per-message id from the kilocode client. Joinable to PostHog
+  // `Feedback Submitted.parentMessageID`.
   const clientRequestId = extractHeaderAndLimitLength(request, 'x-kilo-request');
   // Fallback session id used when `x-kilocode-taskid` is absent (e.g.
   // non-kilocode clients). `taskId` still wins when both are present.
@@ -273,13 +272,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
-  // For FREE models (including experimented public ids): check rate limit,
-  // log at start. Server-side products (cloud-agent, code-review, app-builder)
-  // rate-limit per user when the request comes from Cloudflare IPs (Kilo
-  // infrastructure). All other products rate-limit per IP (fast pre-auth path).
-  // The rate limiter checks `isKiloExclusiveFreeModel` (not `isFreeModel`)
-  // because we don't want to rate-limit OpenRouter `:free` and stealth models;
-  // experimented public ids get the same rate limiter treatment.
+  // For FREE models: check rate limit, log at start.
+  // Server-side products (cloud-agent, code-review, app-builder) rate-limit
+  // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
+  // All other products rate-limit per IP (fast pre-auth path).
   const isRateLimitedFreeModelRequest =
     isKiloExclusiveFreeModel(originalModelIdLowerCased) ||
     autoModel === KILO_AUTO_FREE_MODEL.id ||
@@ -321,9 +317,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
-    // No valid auth. `isFreeModel` returns true for experimented public ids
-    // so anonymous traffic can reach the experiment-routing branch in
-    // `getProvider`.
+    // No valid auth
     if (!(await isFreeModel(originalModelIdLowerCased))) {
       // Paid model requires authentication
       return NextResponse.json(
@@ -362,7 +356,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       );
     }
 
-    // Anonymous access for free/provider-funded model (already rate-limited above when applicable)
+    // Anonymous access for free model (already rate-limited above)
     user = createAnonymousContext(ipAddress);
     organizationId = undefined;
     botId = undefined;

@@ -11,7 +11,7 @@ import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { getPlatformOAuthCallbackPath } from '@/lib/integrations/oauth/paths';
+import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import {
   appendIntegrationOAuthRedirectQuery,
   buildIntegrationOAuthRedirectPath,
@@ -19,7 +19,7 @@ import {
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
 
-const SLACK_REDIRECT_URI = `${APP_URL}${getPlatformOAuthCallbackPath(PLATFORM.SLACK)}`;
+const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
 
 /**
  * Slack OAuth Callback

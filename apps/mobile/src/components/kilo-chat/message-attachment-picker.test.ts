@@ -1,6 +1,6 @@
 import { type AlertButton } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { pickCameraImage, pickLibraryImages } from './message-attachment-picker';
 
@@ -55,8 +55,18 @@ function deniedPermissionResponse(): ImagePicker.PermissionResponse {
 }
 
 describe('message attachment picker permissions', () => {
+  const originalFetch = globalThis.fetch;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    // eslint-disable-next-line require-await, typescript-eslint/require-await -- canonical fetch stub: async signature with sync body
+    globalThis.fetch = vi.fn(
+      async () => new Response(new Blob(['x'], { type: 'image/jpeg' }))
+    ) as typeof globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
   });
 
   it('shows settings alert and skips camera launch when camera permission is denied', async () => {
@@ -107,9 +117,12 @@ describe('message attachment picker permissions', () => {
     expect(reactNativeMock.alert).not.toHaveBeenCalled();
     expect(result).toEqual([
       {
-        blob: expect.objectContaining({ name: 'photo.jpg', size: 12, type: 'image/jpeg' }),
-        filename: 'photo.jpg',
-        mimeType: 'image/jpeg',
+        input: {
+          blob: expect.objectContaining({ type: 'image/jpeg' }),
+          filename: 'photo.jpg',
+          mimeType: 'image/jpeg',
+        },
+        localUri: 'file:///photo.jpg',
       },
     ]);
   });

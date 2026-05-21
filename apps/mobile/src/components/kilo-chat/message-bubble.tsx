@@ -169,7 +169,7 @@ function MessageBubbleComponent({
           </Animated.View>
         )}
 
-        <Animated.View style={swipeStyle}>
+        <Animated.View className={isFromMe ? 'items-end' : 'items-start'} style={swipeStyle}>
           {showAuthor && (
             <View className="mb-0.5 flex-row items-baseline gap-2 px-1">
               <Text className="text-xs font-medium text-muted-foreground">{authorLabel}</Text>

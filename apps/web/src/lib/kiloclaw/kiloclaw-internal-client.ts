@@ -434,6 +434,7 @@ export class KiloClawInternalClient {
 
   async startOnboardingBriefing(
     userId: string,
+    settingsHref: string,
     instanceId?: string
   ): Promise<OnboardingBriefingResponse> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
@@ -441,7 +442,7 @@ export class KiloClawInternalClient {
       `/api/platform/morning-briefing/onboarding-briefing${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, settingsHref }),
       },
       { userId }
     );

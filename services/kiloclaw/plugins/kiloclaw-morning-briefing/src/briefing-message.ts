@@ -5,16 +5,6 @@ import {
 } from './briefing-utils';
 
 /**
- * In-app Settings page that each "Connect more" source links to. Relative
- * so it resolves against the chat origin.
- *
- * NOTE: this is the personal-instance path. Org instances live under
- * `/organizations/<id>/claw/settings`; making the onboarding briefing
- * org-aware would mean threading the href down from the trigger mutation.
- */
-const SETTINGS_HREF = '/claw/settings';
-
-/**
  * Welcome intro for the user's very first briefing. This is the in-chat
  * onboarding briefing, so it greets the user and sets the daily rhythm
  * rather than leading with a dated header like the recurring brief.
@@ -32,6 +22,11 @@ const ONBOARDING_BRIEFING_WELCOME =
  * source is unconfigured. Sections with no lines are skipped, matching
  * `buildBriefingMarkdown`.
  *
+ * `settingsHref` links each "Connect more" source to the instance's Settings
+ * page. It is org-aware — the worker derives `/claw/settings` for a personal
+ * instance and `/organizations/<id>/claw/settings` for an org instance and
+ * threads it down. When absent, the items render as plain text.
+ *
  * Posted directly as a bot message — no agent in the loop — so the content
  * here is exactly what the user sees, modulo the chat client's Markdown
  * rendering.
@@ -40,6 +35,7 @@ export function buildBriefingMessage(params: {
   sections: BriefingDocumentSection[];
   statuses: BriefingSourceStatus[];
   tldr: string;
+  settingsHref?: string;
 }): string {
   const blocks: string[] = [];
 
@@ -58,7 +54,7 @@ export function buildBriefingMessage(params: {
     blocks.push([`## ${section.title}`, ...section.lines].join('\n'));
   }
 
-  const connectMore = buildConnectMoreLines(params.statuses, { itemHref: SETTINGS_HREF });
+  const connectMore = buildConnectMoreLines(params.statuses, { itemHref: params.settingsHref });
   if (connectMore.length > 0) {
     blocks.push(connectMore.join('\n'));
   }

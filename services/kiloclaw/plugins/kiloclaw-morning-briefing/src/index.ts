@@ -176,6 +176,13 @@ type StoredOnboardingBriefing = {
   loadingMessageId: string;
   startedAt: string;
   state: 'generating' | 'delivered' | 'failed';
+  /**
+   * Settings-page link for the "Connect more" items, org-aware: the worker
+   * derives `/claw/settings` or `/organizations/<id>/claw/settings` and
+   * threads it down. Optional — a direct gateway call may omit it, in which
+   * case the items render as plain text.
+   */
+  settingsHref?: string;
 };
 
 /** Title of the conversation the onboarding briefing is posted into. */
@@ -1782,6 +1789,7 @@ async function runOnboardingBriefingDelivery(
       sections: result.sections,
       statuses: result.statuses,
       tldr: result.tldr,
+      settingsHref: record.settingsHref,
     });
     // The loading bubble is edited into the full briefing — a single bubble.
     await writeClient.editTextMessage(conversationId, loadingMessageId, message);
@@ -1818,7 +1826,8 @@ async function runOnboardingBriefingDelivery(
  * `conversationId` instead of creating a second conversation.
  */
 async function startOnboardingBriefing(
-  api: OnboardingBriefingApi
+  api: OnboardingBriefingApi,
+  options?: { settingsHref?: string }
 ): Promise<{ conversationId: string; alreadyStarted: boolean }> {
   const paths = getStatePaths(api);
   await ensureStorage(paths);
@@ -1845,6 +1854,7 @@ async function startOnboardingBriefing(
     loadingMessageId,
     startedAt: new Date().toISOString(),
     state: 'generating',
+    settingsHref: options?.settingsHref,
   };
   await writeJsonFile(paths.onboardingBriefingPath, record);
 
@@ -2683,9 +2693,21 @@ export default definePluginEntry({
       path: '/api/plugins/kiloclaw-morning-briefing/onboarding-briefing',
       auth: 'gateway',
       match: 'exact',
-      handler: async (_req, res) => {
+      handler: async (req, res) => {
         try {
-          const result = await startOnboardingBriefing(api);
+          const body = asObject(await readRequestBody(req));
+          // Settings link for the "Connect more" items, supplied by the
+          // worker (org-aware: `/claw/settings` or
+          // `/organizations/<id>/claw/settings`). Accept only a single-slash
+          // relative path so a direct authenticated gateway call cannot
+          // inject an absolute or protocol-relative URL into the rendered
+          // markdown link.
+          const rawHref = body.settingsHref;
+          const settingsHref =
+            typeof rawHref === 'string' && rawHref.startsWith('/') && !rawHref.startsWith('//')
+              ? rawHref
+              : undefined;
+          const result = await startOnboardingBriefing(api, { settingsHref });
           sendJson(res, 200, {
             ok: true,
             conversationId: result.conversationId,

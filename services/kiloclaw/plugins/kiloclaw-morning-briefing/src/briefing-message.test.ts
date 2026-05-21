@@ -43,19 +43,46 @@ describe('buildBriefingMessage', () => {
     expect(message).not.toContain('📈 Linear');
   });
 
-  it('appends a Connect more block linking each source to Settings', () => {
+  it('links each Connect more source to the given settingsHref', () => {
+    const statuses: BriefingSourceStatus[] = [
+      { source: 'calendar', configured: true, ok: true, summary: '' },
+      { source: 'linear', configured: false, ok: false, summary: '' },
+      { source: 'github', configured: false, ok: false, summary: '' },
+    ];
+    const sections = [{ title: '🗓 Calendar', lines: ['- 09:00 Standup'] }];
+
+    const personal = buildBriefingMessage({
+      sections,
+      statuses,
+      tldr: '',
+      settingsHref: '/claw/settings',
+    });
+    expect(personal).toContain('## ⚙️ Connect more');
+    expect(personal).toContain('- [Linear](/claw/settings)');
+    expect(personal).toContain('- [GitHub](/claw/settings)');
+
+    // Org instances get the org-scoped Settings path.
+    const org = buildBriefingMessage({
+      sections,
+      statuses,
+      tldr: '',
+      settingsHref: '/organizations/org-1/claw/settings',
+    });
+    expect(org).toContain('- [Linear](/organizations/org-1/claw/settings)');
+  });
+
+  it('renders Connect more items as plain text when no settingsHref is given', () => {
     const message = buildBriefingMessage({
       sections: [{ title: '🗓 Calendar', lines: ['- 09:00 Standup'] }],
       statuses: [
         { source: 'calendar', configured: true, ok: true, summary: '' },
         { source: 'linear', configured: false, ok: false, summary: '' },
-        { source: 'github', configured: false, ok: false, summary: '' },
       ],
       tldr: '',
     });
     expect(message).toContain('## ⚙️ Connect more');
-    expect(message).toContain('- [Linear](/claw/settings)');
-    expect(message).toContain('- [GitHub](/claw/settings)');
+    expect(message).toContain('- Linear');
+    expect(message).not.toContain('](/');
   });
 
   it('omits the Connect more block when every source is configured', () => {

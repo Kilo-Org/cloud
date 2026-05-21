@@ -631,7 +631,8 @@ export async function runMorningBriefing(
 
 export async function startOnboardingBriefing(
   state: InstanceMutableState,
-  env: KiloClawEnv
+  env: KiloClawEnv,
+  settingsHref?: string
 ): Promise<z.infer<typeof OnboardingBriefingResponseSchema> | null> {
   try {
     // Returns fast: the plugin creates the conversation + loading bubble and
@@ -642,7 +643,7 @@ export async function startOnboardingBriefing(
       '/_kilo/morning-briefing/onboarding-briefing',
       'POST',
       OnboardingBriefingResponseSchema,
-      {}
+      settingsHref ? { settingsHref } : {}
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;

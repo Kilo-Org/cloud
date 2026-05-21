@@ -102,13 +102,14 @@ export function registerMorningBriefingRoutes(
     return response;
   });
 
-  app.post('/_kilo/morning-briefing/onboarding-briefing', async () => {
+  app.post('/_kilo/morning-briefing/onboarding-briefing', async c => {
+    const body = await readJsonBody(c);
     const response = await proxyMorningBriefingRoute({
       supervisor,
       gatewayToken: expectedToken,
       path: '/onboarding-briefing',
       method: 'POST',
-      body: {},
+      body,
     });
     return response;
   });

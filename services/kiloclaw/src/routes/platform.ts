@@ -2550,7 +2550,12 @@ platform.post('/morning-briefing/run', async c => {
 
 // POST /api/platform/morning-briefing/onboarding-briefing
 platform.post('/morning-briefing/onboarding-briefing', async c => {
-  const result = await parseBody(c, UserIdRequestSchema);
+  // `settingsHref` is the org-aware Settings link the web router derived for
+  // the briefing's "Connect more" items. The plugin re-validates it.
+  const result = await parseBody(
+    c,
+    UserIdRequestSchema.extend({ settingsHref: z.string().optional() })
+  );
   if ('error' in result) return result.error;
 
   const iidResult = parseInstanceIdQuery(c);
@@ -2563,7 +2568,7 @@ platform.post('/morning-briefing/onboarding-briefing', async c => {
           c.env,
           result.data.userId,
           iidResult.instanceId,
-          stub => stub.startOnboardingBriefing(),
+          stub => stub.startOnboardingBriefing(result.data.settingsHref),
           'startOnboardingBriefing'
         ),
       { includeTimeout: false }

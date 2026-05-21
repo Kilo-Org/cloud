@@ -3909,11 +3909,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   /**
    * Create (or return) the "Today's briefing" conversation and start the
    * in-chat onboarding briefing. Returns fast — generation runs in the
-   * plugin background.
+   * plugin background. `settingsHref` is the org-aware Settings link the
+   * worker derived for the "Connect more" items.
    */
-  async startOnboardingBriefing() {
+  async startOnboardingBriefing(settingsHref?: string) {
     await this.loadState();
-    return gateway.startOnboardingBriefing(this.s, this.env);
+    return gateway.startOnboardingBriefing(this.s, this.env, settingsHref);
   }
 
   /**

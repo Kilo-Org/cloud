@@ -3072,7 +3072,13 @@ export const kiloclawRouter = createTRPCRouter({
   startOnboardingBriefing: clawAccessProcedure.mutation(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    return client.startOnboardingBriefing(ctx.user.id, workerInstanceId(instance));
+    // Personal instances: "Connect more" links point at the personal
+    // Settings page.
+    return client.startOnboardingBriefing(
+      ctx.user.id,
+      '/claw/settings',
+      workerInstanceId(instance)
+    );
   }),
 
   updateBriefingInterests: clawAccessProcedure

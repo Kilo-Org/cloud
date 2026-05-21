@@ -1359,7 +1359,13 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
-      return client.startOnboardingBriefing(ctx.user.id, workerInstanceId(instance));
+      // Org instances: "Connect more" links point at the org-scoped Settings
+      // page so the user lands on the settings for the instance they created.
+      return client.startOnboardingBriefing(
+        ctx.user.id,
+        `/organizations/${input.organizationId}/claw/settings`,
+        workerInstanceId(instance)
+      );
     }),
 
   updateBriefingInterests: organizationMemberMutationProcedure

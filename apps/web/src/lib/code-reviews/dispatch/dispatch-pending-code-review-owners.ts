@@ -6,7 +6,11 @@ import {
   type DispatchableCodeReviewOwnerCandidate,
 } from '../db/code-reviews';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
-import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
+import {
+  tryDispatchPendingReviews,
+  type TryDispatchPendingReviewsOptions,
+} from './dispatch-pending-reviews';
+import { cronPendingCodeReviewCreatedAfterSql } from './dispatch-constants';
 import type { Owner } from '../core';
 
 const OWNER_SCAN_LIMIT = 100;
@@ -27,6 +31,8 @@ type OwnerDrainOutcome =
   | { status: 'skipped-missing-bot' }
   | { status: 'failed' };
 
+type DispatchPendingCodeReviewOwnersOptions = TryDispatchPendingReviewsOptions;
+
 async function resolveDispatchOwner(
   candidate: DispatchableCodeReviewOwnerCandidate
 ): Promise<Owner | null> {
@@ -39,7 +45,8 @@ async function resolveDispatchOwner(
 }
 
 async function drainOwner(
-  candidate: DispatchableCodeReviewOwnerCandidate
+  candidate: DispatchableCodeReviewOwnerCandidate,
+  options: DispatchPendingCodeReviewOwnersOptions
 ): Promise<OwnerDrainOutcome> {
   try {
     const owner = await resolveDispatchOwner(candidate);
@@ -47,7 +54,7 @@ async function drainOwner(
       return { status: 'skipped-missing-bot' };
     }
 
-    const result = await tryDispatchPendingReviews(owner);
+    const result = await tryDispatchPendingReviews(owner, options);
     return { status: 'processed', dispatched: result.dispatched };
   } catch (error) {
     errorExceptInTest('[dispatchPendingCodeReviewOwners] Owner drain failed', {
@@ -62,11 +69,18 @@ async function drainOwner(
   }
 }
 
-export async function dispatchPendingCodeReviewOwners(): Promise<DispatchPendingCodeReviewOwnersSummary> {
-  const candidates = await listDispatchableCodeReviewOwnerCandidates({ limit: OWNER_SCAN_LIMIT });
+export async function dispatchPendingCodeReviewOwners(
+  options: DispatchPendingCodeReviewOwnersOptions = {}
+): Promise<DispatchPendingCodeReviewOwnersSummary> {
+  const pendingCreatedAfter = options.pendingCreatedAfter ?? cronPendingCodeReviewCreatedAfterSql();
+  const dispatchOptions = { ...options, pendingCreatedAfter };
+  const candidates = await listDispatchableCodeReviewOwnerCandidates({
+    limit: OWNER_SCAN_LIMIT,
+    pendingCreatedAfter,
+  });
   const limit = pLimit(OWNER_DISPATCH_CONCURRENCY);
   const outcomes = await Promise.all(
-    candidates.owners.map(candidate => limit(() => drainOwner(candidate)))
+    candidates.owners.map(candidate => limit(() => drainOwner(candidate, dispatchOptions)))
   );
 
   const summary: DispatchPendingCodeReviewOwnersSummary = {

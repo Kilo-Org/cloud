@@ -37,6 +37,7 @@ import {
   cancelSupersededReviewsForPR,
   updateRepositoryReviewInstructionsMetadata,
 } from '../db/code-reviews';
+import { cronPendingCodeReviewCreatedAfterSql } from './dispatch-constants';
 
 const REPO = `test-org/dispatch-pending-${Date.now()}`;
 const FUNDED_BALANCE_MICRODOLLARS = 5_000_001;
@@ -446,6 +447,109 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockDispatchReview).toHaveBeenCalledTimes(1);
     expect(storedReview?.status).toBe('queued');
     expect(storedReview?.updated_at).not.toBe(staleQueuedTimestamp);
+  });
+
+  it('does not claim pending reviews older than the supplied cron cutoff', async () => {
+    const oldPendingTimestamp = minutesAgo(150);
+    const recentPendingTimestamp = minutesAgo(30);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+
+    const [oldPendingReview, recentPendingReview] = await db
+      .insert(cloud_agent_code_reviews)
+      .values([
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: oldPendingTimestamp,
+          updatedAt: oldPendingTimestamp,
+        }),
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentPendingTimestamp,
+          updatedAt: recentPendingTimestamp,
+        }),
+      ])
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!oldPendingReview || !recentPendingReview) {
+      throw new Error('Expected old and recent pending reviews to be inserted');
+    }
+
+    const result = await tryDispatchPendingReviews(
+      {
+        type: 'user',
+        id: testUser.id,
+        userId: testUser.id,
+      },
+      { pendingCreatedAfter: cronPendingCodeReviewCreatedAfterSql() }
+    );
+
+    const storedOldPendingReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, oldPendingReview.id),
+    });
+    const storedRecentPendingReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, recentPendingReview.id),
+    });
+
+    expect(result).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
+    expect(storedOldPendingReview?.status).toBe('pending');
+    expect(storedRecentPendingReview?.status).toBe('queued');
+    expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
+      reviewId: recentPendingReview.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { id: 'test-agent-config', config: {} },
+      platform: 'github',
+    });
+    expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(
+      expect.objectContaining({ reviewId: oldPendingReview.id })
+    );
+  });
+
+  it('recovers stale queued reviews older than the supplied pending cutoff', async () => {
+    const oldQueuedCreatedAt = minutesAgo(180);
+    const staleQueuedUpdatedAt = minutesAgo(10);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'queued',
+          createdAt: oldQueuedCreatedAt,
+          updatedAt: staleQueuedUpdatedAt,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected stale queued review to be inserted');
+    }
+
+    const result = await tryDispatchPendingReviews(
+      {
+        type: 'user',
+        id: testUser.id,
+        userId: testUser.id,
+      },
+      { pendingCreatedAfter: cronPendingCodeReviewCreatedAfterSql() }
+    );
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({ dispatched: 1, notDispatched: 0, activeCount: 1 });
+    expect(storedReview?.status).toBe('queued');
+    expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { id: 'test-agent-config', config: {} },
+      platform: 'github',
+    });
   });
 
   it('does not overwrite a review that becomes terminal after reservation', async () => {

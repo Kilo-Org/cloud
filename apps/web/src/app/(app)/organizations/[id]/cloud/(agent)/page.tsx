@@ -10,12 +10,12 @@ export default async function OrganizationCloudPage({
 }) {
   const { id } = await params;
   const organizationId = decodeURIComponent(id);
-  const user = await getUserFromAuthOrRedirect(
+  await getUserFromAuthOrRedirect(
     `/users/sign_in?callbackPath=${encodeURIComponent(`/organizations/${organizationId}/cloud`)}`
   );
   const isDevcontainerAvailable = await isFeatureFlagEnabledOrDevelopment(
     'cloud-agent-devcontainer',
-    user.id
+    organizationId
   );
 
   return (

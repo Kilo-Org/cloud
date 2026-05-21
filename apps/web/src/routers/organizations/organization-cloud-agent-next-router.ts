@@ -195,7 +195,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       if (
         input.devcontainer &&
-        !(await isFeatureFlagEnabledOrDevelopment('cloud-agent-devcontainer', ctx.user.id))
+        !(await isFeatureFlagEnabledOrDevelopment('cloud-agent-devcontainer', input.organizationId))
       ) {
         throw new TRPCError({
           code: 'FORBIDDEN',

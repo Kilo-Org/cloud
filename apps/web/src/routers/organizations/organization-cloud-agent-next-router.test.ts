@@ -93,7 +93,7 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     ).rejects.toThrow('Dev container sessions are not available');
     expect(mockIsFeatureFlagEnabledOrDevelopment).toHaveBeenCalledWith(
       'cloud-agent-devcontainer',
-      'user-1'
+      ORGANIZATION_ID
     );
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
@@ -120,7 +120,7 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     });
     expect(mockIsFeatureFlagEnabledOrDevelopment).toHaveBeenCalledWith(
       'cloud-agent-devcontainer',
-      'user-2'
+      ORGANIZATION_ID
     );
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({

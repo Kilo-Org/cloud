@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Keyboard, View } from 'react-native';
+import { Keyboard, Platform, View } from 'react-native';
 import { getCornerRadiusSync } from 'expo-screen-corner-radius';
 import { Text } from '@/components/ui/text';
 import { formatTypingIndicatorText } from './typing-indicator-text';
@@ -34,10 +34,12 @@ function useKeyboardVisible(): boolean {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardWillShow', () => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, () => {
       setVisible(true);
     });
-    const hide = Keyboard.addListener('keyboardWillHide', () => {
+    const hide = Keyboard.addListener(hideEvent, () => {
       setVisible(false);
     });
     return () => {

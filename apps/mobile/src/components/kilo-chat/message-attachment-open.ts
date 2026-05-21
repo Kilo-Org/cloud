@@ -1,3 +1,6 @@
+import { Directory, File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+
 type AttachmentImageRenderState = 'loading' | 'ready' | 'error';
 
 const MAX_CACHE_FILENAME_BYTES = 255;
@@ -51,7 +54,6 @@ async function materializeRemoteAttachment({
   attachmentId: string;
   filename: string;
 }): Promise<MaterializedAttachment> {
-  const { Directory, File, Paths } = await import('expo-file-system');
   const directory = new Directory(Paths.cache, 'kilo-chat-attachments');
   directory.create({ idempotent: true, intermediates: true });
 
@@ -66,7 +68,6 @@ async function materializeRemoteAttachment({
 }
 
 async function shareLocalFile(localUri: string): Promise<void> {
-  const Sharing = await import('expo-sharing');
   const available = await Sharing.isAvailableAsync();
   if (!available) {
     throw new Error(getAttachmentOpenErrorMessage());

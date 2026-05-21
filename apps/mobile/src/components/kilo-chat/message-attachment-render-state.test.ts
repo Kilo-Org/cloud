@@ -1,6 +1,5 @@
 import { attachmentMetadataSchema } from '@kilocode/kilo-chat';
-import { describe, expect, it } from 'vitest';
-
+import { describe, expect, it, vi } from 'vitest';
 import {
   getAttachmentCacheFilename,
   getAttachmentImageRenderState,
@@ -8,6 +7,26 @@ import {
   getFreshAttachmentPreviewUrl,
   shareMaterializedAttachment,
 } from './message-attachment-open';
+
+const expoFileSystemMock = vi.hoisted(() => {
+  const File = vi.fn();
+  return {
+    Directory: vi.fn(),
+    File: Object.assign(File, { downloadFileAsync: vi.fn() }),
+    Paths: { cache: 'file:///cache' },
+  };
+});
+
+vi.mock('expo-file-system', () => ({
+  Directory: expoFileSystemMock.Directory,
+  File: expoFileSystemMock.File,
+  Paths: expoFileSystemMock.Paths,
+}));
+
+vi.mock('expo-sharing', () => ({
+  isAvailableAsync: vi.fn(),
+  shareAsync: vi.fn(),
+}));
 
 describe('message attachment render state', () => {
   it('maps image query state to render states', () => {

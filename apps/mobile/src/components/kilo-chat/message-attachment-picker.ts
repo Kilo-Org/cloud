@@ -1,6 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
+import { Alert, Linking } from 'react-native';
 import { type AddFileInput } from '@kilocode/kilo-chat-hooks';
 
 import {
@@ -33,12 +34,21 @@ function assetToAddFileInput(asset: LocalAttachmentAsset): AddFileInput {
   };
 }
 
+function showPermissionSettingsAlert({ message, title }: { message: string; title: string }) {
+  Alert.alert(title, message, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+  ]);
+}
+
 export async function pickCameraImage(): Promise<AddFileInput[]> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) {
-    throw new Error(
-      'Camera access is required to take a photo. Enable it in Settings and try again.'
-    );
+    showPermissionSettingsAlert({
+      title: 'Camera Access Disabled',
+      message: 'Allow camera access in Settings to take a photo.',
+    });
+    return [];
   }
 
   const result = await ImagePicker.launchCameraAsync(IMAGE_PICKER_OPTIONS);
@@ -62,9 +72,11 @@ export async function pickCameraImage(): Promise<AddFileInput[]> {
 export async function pickLibraryImages(): Promise<AddFileInput[]> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
-    throw new Error(
-      'Photo library access is required to attach images. Enable it in Settings and try again.'
-    );
+    showPermissionSettingsAlert({
+      title: 'Photos Access Disabled',
+      message: 'Allow photo library access in Settings to attach images.',
+    });
+    return [];
   }
 
   const result = await ImagePicker.launchImageLibraryAsync({

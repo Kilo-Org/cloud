@@ -76,19 +76,25 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
 
   function renderImageThumbnail() {
     if (imageState === 'ready' && urlQuery.data) {
-      return <Image source={{ uri: urlQuery.data.url }} className="h-40 w-56" contentFit="cover" />;
+      return (
+        <Image
+          source={{ uri: urlQuery.data.url }}
+          className="aspect-[4/3] w-full"
+          contentFit="cover"
+        />
+      );
     }
 
     if (imageState === 'loading') {
       return (
-        <View className="h-40 w-56 items-center justify-center">
+        <View className="aspect-[4/3] w-full items-center justify-center">
           <ActivityIndicator size="small" color={colors.foreground} />
         </View>
       );
     }
 
     return (
-      <View className="h-40 w-56 items-center justify-center gap-2">
+      <View className="aspect-[4/3] w-full items-center justify-center gap-2">
         <AlertCircle size={18} color={colors.mutedForeground} />
         <Text className="text-xs text-muted-foreground">Image unavailable</Text>
       </View>
@@ -97,7 +103,7 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
 
   if (isImage) {
     return (
-      <View className="mt-2">
+      <View className="mt-2 w-64 max-w-full">
         <Pressable
           onPress={() => {
             void handleOpenImagePreview();

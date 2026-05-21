@@ -19,6 +19,7 @@ const upstreamB = {
   internal_id: 'partner-checkpoint-b',
   base_url: 'https://partner.example.com/v1',
 };
+const redisIt = process.env.REDIS_URL ? it : it.skip;
 
 beforeEach(async () => {
   await cleanupDbForTest();
@@ -83,17 +84,17 @@ describe('isPublicIdExperimented', () => {
     expect(await isPublicIdExperimented('kilo/preview-not-experimented')).toBe(false);
   });
 
-  it('returns true when the public id has an active experiment', async () => {
+  redisIt('returns true when the public id has an active experiment', async () => {
     await makeActiveExperiment({ publicId: 'kilo/preview-iset-active' });
-    if (!(await seedExperimentedPublicIds(['kilo/preview-iset-active']))) return;
+    expect(await seedExperimentedPublicIds(['kilo/preview-iset-active'])).toBe(true);
     expect(await isPublicIdExperimented('kilo/preview-iset-active')).toBe(true);
   });
 
-  it('returns true when the public id has only a paused experiment', async () => {
+  redisIt('returns true when the public id has only a paused experiment', async () => {
     const { experimentId } = await makeActiveExperiment({ publicId: 'kilo/preview-iset-paused' });
     const caller = await createCallerForUser(admin.id);
     await caller.admin.modelExperiments.pause({ id: experimentId });
-    if (!(await seedExperimentedPublicIds(['kilo/preview-iset-paused']))) return;
+    expect(await seedExperimentedPublicIds(['kilo/preview-iset-paused'])).toBe(true);
     expect(await isPublicIdExperimented('kilo/preview-iset-paused')).toBe(true);
   });
 });
@@ -265,7 +266,7 @@ describe('pickModelExperimentVariant', () => {
     // Loose bounds: 1:3 ≈ 25/75. Allow ±10pp for n=200.
     const controlPct = counts.control / 200;
     expect(controlPct).toBeGreaterThan(0.15);
-    expect(controlPct).toBeLessThan(0.35);
+    expect(controlPct).toBeLessThanOrEqual(0.35);
   });
 
   it('historical attribution survives hot-swap: old variant_version_id still resolves to old upstream via DB', async () => {

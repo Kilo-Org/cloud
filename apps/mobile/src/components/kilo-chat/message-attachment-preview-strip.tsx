@@ -20,6 +20,7 @@ export function MessageAttachmentPreviewStrip({ rows, getLocalUri, onRemove, onR
       horizontal
       showsHorizontalScrollIndicator={false}
       className="mb-2"
+      contentContainerClassName="items-center"
       keyboardShouldPersistTaps="handled"
     >
       {rows.map(row => (

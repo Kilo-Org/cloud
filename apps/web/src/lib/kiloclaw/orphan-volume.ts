@@ -1,6 +1,45 @@
 /**
  * Pure classification logic for the admin orphan-volume reaper.
  *
+ * ── What counts as an "orphaned volume" ──────────────────────────────────
+ *
+ * An orphaned volume is a Fly volume left behind by a destroyed KiloClaw
+ * instance that nothing will ever clean up on its own. A volume is only
+ * REAPER-ELIGIBLE (`safe_destroy`) when EVERY one of these holds:
+ *
+ *   1. Destroyed instance — it belongs to a `kiloclaw_instances` row whose
+ *      `destroyed_at` is set. Live instances are never scanned.
+ *   2. Exact name attribution — `volume.name` equals
+ *      `volumeNameFromSandboxId(sandbox_id)` for that instance. A volume is
+ *      attributed to ONE specific destroyed instance, never "any volume in
+ *      the app".
+ *   3. Quiescent + unattached — volume state is `created` or `detached`
+ *      with no `attached_machine_id`. `attached` means a machine still
+ *      backs it; `pending_destroy`/`destroying`/`destroyed` mean Fly is
+ *      already reaping it.
+ *   4. No live Durable Object — `getDebugState()` reports `status: null`
+ *      (the DO was finalized) AND the volume ID appears in none of the
+ *      DO's volume-tracking fields. A DO that is alive, or that still
+ *      references the volume, blocks reaping.
+ *   5. No access-granting subscription — the owning (user, organization)
+ *      context has no current access-granting subscription. This is
+ *      evaluated per ownership context, not per instance, because a
+ *      reprovision transfers the destroyed instance's subscription to a
+ *      successor row.
+ *   6. Past the grace period — destroyed more than
+ *      `ORPHAN_VOLUME_GRACE_PERIOD_MS` ago, so Fly's own reaper and the
+ *      DO's `tryDeleteOrphanVolumes` sweep have had time to act first.
+ *   7. DO state was confirmable — if `getDebugState()` failed, the volume
+ *      is `do_check_failed`, never `safe_destroy` (fail closed).
+ *
+ * Anything failing one of these is surfaced with a refusal reason (see
+ * `OrphanVolumeClassification`) and is NOT destroyable from the UI. The
+ * worker re-verifies all of the above server-side before deleting.
+ *
+ * Known coverage gap: detection is anchored on the `kiloclaw_instances`
+ * row, so a volume whose instance row was never inserted (provision
+ * crashed after volume creation) has no anchor and is not found here.
+ *
  * Kept free of server-only / DB imports so it can be unit-tested in
  * isolation and (if needed) shared with client components. The router
  * (`admin-kiloclaw-instances-router.ts`) owns the data-fetching; this

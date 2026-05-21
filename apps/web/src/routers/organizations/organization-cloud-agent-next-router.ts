@@ -6,7 +6,7 @@ import {
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { generateCloudAgentToken } from '@/lib/tokens';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
+import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -195,8 +195,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       if (
         input.devcontainer &&
-        process.env.NODE_ENV !== 'development' &&
-        !(await isFeatureFlagEnabled('cloud-agent-devcontainer', ctx.user.id))
+        !(await isFeatureFlagEnabledOrDevelopment('cloud-agent-devcontainer', ctx.user.id))
       ) {
         throw new TRPCError({
           code: 'FORBIDDEN',

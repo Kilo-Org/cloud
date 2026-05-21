@@ -82,7 +82,6 @@ export class EventServiceClient {
   private authRecoveryAttempts = 0;
   private hasConnectedBefore = false;
   private reconnectHandlers = new Set<() => void>();
-  private connectedHandlers = new Set<() => void>();
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private handshakeTimer: ReturnType<typeof setTimeout> | null = null;
   private abortHandshake: ((err: Error) => void) | null = null;
@@ -203,9 +202,6 @@ export class EventServiceClient {
             handler();
           }
         }
-        for (const handler of this.connectedHandlers) {
-          handler();
-        }
         settleResolve();
         this.startPing();
       });
@@ -309,19 +305,6 @@ export class EventServiceClient {
     this.reconnectHandlers.add(handler);
     return () => {
       this.reconnectHandlers.delete(handler);
-    };
-  }
-
-  // Fires on every successful WS open (first connect + every reconnect), and
-  // synchronously on subscribe if already connected — so callers don't need to
-  // race-check `isConnected()` themselves.
-  onConnected(handler: () => void): () => void {
-    this.connectedHandlers.add(handler);
-    if (this.isConnected()) {
-      handler();
-    }
-    return () => {
-      this.connectedHandlers.delete(handler);
     };
   }
 

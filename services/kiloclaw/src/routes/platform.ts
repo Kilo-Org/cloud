@@ -3982,9 +3982,35 @@ platform.post('/admin/orphan-volume-destroy', async c => {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
   }
 
+  // Verify the caller-supplied identity tuple is internally consistent
+  // before touching anything. The Fly resources are derived from
+  // userId/sandboxId while the DO check keys off instanceId — if those
+  // referred to different instances, the name-match guard and the DO guard
+  // would protect different resources. Resolve the row by instanceId and
+  // confirm userId + sandboxId match it, then derive everything from the
+  // resolved row so all guards are anchored to one instance.
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    return c.json({ error: 'Database connection is not configured' }, 503);
+  }
+  const instance = await getInstanceByIdIncludingDestroyed(
+    getWorkerDb(connectionString),
+    instanceId,
+    { includeDestroyed: true }
+  );
+  if (!instance) {
+    return c.json({ error: 'Instance not found' }, 404);
+  }
+  if (instance.userId !== userId || instance.sandboxId !== sandboxId) {
+    return c.json(
+      { error: 'Instance identity mismatch: userId/sandboxId do not match instanceId' },
+      409
+    );
+  }
+
   const prefix = c.env.WORKER_ENV === 'development' ? 'dev' : undefined;
-  const flyApp = await fallbackAppNameForRestore(userId, sandboxId, prefix);
-  const expectedVolumeName = volumeNameFromSandboxId(sandboxId);
+  const flyApp = await fallbackAppNameForRestore(instance.userId, instance.sandboxId, prefix);
+  const expectedVolumeName = volumeNameFromSandboxId(instance.sandboxId);
   const flyConfig = { apiToken, appName: flyApp };
 
   // 1. Re-list and locate the target volume by its immutable ID. We act on the
@@ -4038,8 +4064,8 @@ platform.post('/admin/orphan-volume-destroy', async c => {
   try {
     debug = await withResolvedDORetry(
       c.env,
-      userId,
-      instanceId,
+      instance.userId,
+      instance.id,
       stub => stub.getDebugState(),
       'getDebugState'
     );

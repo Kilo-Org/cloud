@@ -340,16 +340,22 @@ function OrphanVolumesSection() {
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-wrap items-end gap-4">
             <div className="flex min-w-[220px] flex-col gap-2">
-              <label className="text-sm font-medium">Destroyed After</label>
+              <label htmlFor="orphan-volumes-destroyed-after" className="text-sm font-medium">
+                Destroyed After
+              </label>
               <Input
+                id="orphan-volumes-destroyed-after"
                 type="datetime-local"
                 value={destroyedAfterInput}
                 onChange={e => setDestroyedAfterInput(e.target.value)}
               />
             </div>
             <div className="flex min-w-[220px] flex-col gap-2">
-              <label className="text-sm font-medium">Destroyed Before</label>
+              <label htmlFor="orphan-volumes-destroyed-before" className="text-sm font-medium">
+                Destroyed Before
+              </label>
               <Input
+                id="orphan-volumes-destroyed-before"
                 type="datetime-local"
                 value={destroyedBeforeInput}
                 onChange={e => setDestroyedBeforeInput(e.target.value)}

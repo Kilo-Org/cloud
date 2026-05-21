@@ -3,6 +3,8 @@ import { platform } from './platform';
 import * as fly from '../fly/client';
 import type * as FlyClient from '../fly/client';
 import { FlyApiError } from '../fly/client';
+import { getInstanceByIdIncludingDestroyed } from '../db';
+import type * as DbModule from '../db';
 import { volumeNameFromSandboxId } from '../durable-objects/machine-config';
 import type { FlyVolume } from '../fly/types';
 
@@ -20,6 +22,19 @@ vi.mock('../fly/client', async () => {
   };
 });
 
+// The destroy endpoint resolves the instance row to verify the
+// userId/sandboxId/instanceId tuple is consistent. Mock the DB layer so the
+// identity check (and the DO-key resolution it feeds) is exercised without
+// a real Postgres connection.
+vi.mock('../db', async () => {
+  const actual = await vi.importActual<typeof DbModule>('../db');
+  return {
+    ...actual,
+    getWorkerDb: vi.fn(() => ({}) as never),
+    getInstanceByIdIncludingDestroyed: vi.fn(),
+  };
+});
+
 /**
  * Coverage for the admin orphan-volume reaper endpoints in platform.ts:
  *   GET  /api/platform/admin/orphan-volume-scan
@@ -34,6 +49,17 @@ const INSTANCE_ID = '11111111-1111-4111-8111-111111111111';
 const USER_ID = 'user-1';
 const SANDBOX_ID = 'ki_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const VOLUME_NAME = volumeNameFromSandboxId(SANDBOX_ID);
+
+/** The instance row the DB resolves for INSTANCE_ID — a consistent tuple. */
+const CONSISTENT_INSTANCE = {
+  id: INSTANCE_ID,
+  sandboxId: SANDBOX_ID,
+  userId: USER_ID,
+  orgId: null,
+  inboundEmailEnabled: true,
+  provider: 'fly',
+  instanceType: null,
+};
 
 /** A finalized DO: storage wiped, every field null. */
 const FINALIZED_DO_STATE = {
@@ -55,6 +81,7 @@ function makeEnv(opts?: { flyApiToken?: string | null; debugState?: unknown }) {
   return {
     env: {
       FLY_API_TOKEN: flyApiToken ?? undefined,
+      HYPERDRIVE: { connectionString: 'postgres://test' },
       KILOCLAW_INSTANCE: {
         idFromName: (id: string) => id,
         get: () => ({ getDebugState }),
@@ -112,6 +139,8 @@ const validDestroyBody = {
 beforeEach(() => {
   vi.mocked(fly.listVolumes).mockReset();
   vi.mocked(fly.deleteVolume).mockReset();
+  vi.mocked(getInstanceByIdIncludingDestroyed).mockReset();
+  vi.mocked(getInstanceByIdIncludingDestroyed).mockResolvedValue(CONSISTENT_INSTANCE as never);
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
   vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -204,6 +233,38 @@ describe('POST /admin/orphan-volume-destroy', () => {
       env
     );
     expect(response.status).toBe(503);
+    expect(fly.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the instance row does not exist', async () => {
+    const { env } = makeEnv();
+    vi.mocked(getInstanceByIdIncludingDestroyed).mockResolvedValue(null);
+
+    const response = await platform.request(
+      '/admin/orphan-volume-destroy',
+      destroyInit(validDestroyBody),
+      env
+    );
+    expect(response.status).toBe(404);
+    expect(fly.listVolumes).not.toHaveBeenCalled();
+    expect(fly.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('refuses (409) when userId/sandboxId do not match the resolved instanceId', async () => {
+    const { env } = makeEnv();
+    // The row for INSTANCE_ID belongs to a different sandbox than the body claims.
+    vi.mocked(getInstanceByIdIncludingDestroyed).mockResolvedValue({
+      ...CONSISTENT_INSTANCE,
+      sandboxId: 'ki_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    } as never);
+
+    const response = await platform.request(
+      '/admin/orphan-volume-destroy',
+      destroyInit(validDestroyBody),
+      env
+    );
+    expect(response.status).toBe(409);
+    expect(fly.listVolumes).not.toHaveBeenCalled();
     expect(fly.deleteVolume).not.toHaveBeenCalled();
   });
 

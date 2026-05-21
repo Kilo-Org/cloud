@@ -10,6 +10,7 @@ import {
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import { KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockRestartMachine: jest.Mock<any, any> = jest.fn();
@@ -449,6 +450,18 @@ describe('kiloclaw.restartMachine pin consent gate', () => {
       .from(kiloclaw_version_pins)
       .where(eq(kiloclaw_version_pins.instance_id, userAInstanceId));
     expect(pins.length).toBe(1);
+  });
+
+  it('maps a missing Worker runtime to tRPC NOT_FOUND', async () => {
+    mockRestartMachine.mockRejectedValue(
+      new KiloClawApiError(404, '{"success":false,"error":"No machine exists"}')
+    );
+
+    const caller = await createCallerForUser(userA.id);
+    await expect(caller.kiloclaw.restartMachine()).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'No machine exists',
+    });
   });
 
   it('upgrade with no pin succeeds without acknowledgePinRemoval', async () => {

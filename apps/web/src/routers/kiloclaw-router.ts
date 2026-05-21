@@ -579,6 +579,20 @@ function getKiloClawApiErrorPayload(err: KiloClawApiError): { message?: string; 
   }
 }
 
+function handleRestartMachineError(err: unknown): never {
+  if (err instanceof KiloClawApiError && err.statusCode === 404) {
+    const { message } = getKiloClawApiErrorPayload(err);
+    if (message === 'No machine exists') {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message,
+      });
+    }
+  }
+
+  throw err;
+}
+
 /**
  * True when the user has ever had a paid (non-trial) subscription that is now
  * canceled. Used to gate intro pricing eligibility (spec Credit Enrollment rule 3).
@@ -3681,10 +3695,12 @@ export const kiloclawRouter = createTRPCRouter({
       const client = new KiloClawUserClient(
         generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
       );
-      const result = await client.restartMachine(
-        input?.imageTag ? { imageTag: input.imageTag } : undefined,
-        { userId: ctx.user.id, instanceId: workerInstanceId(instance) }
-      );
+      const result = await client
+        .restartMachine(input?.imageTag ? { imageTag: input.imageTag } : undefined, {
+          userId: ctx.user.id,
+          instanceId: workerInstanceId(instance),
+        })
+        .catch(handleRestartMachineError);
       if (result.success) {
         PostHogClient().capture({
           distinctId: ctx.user.google_user_email,

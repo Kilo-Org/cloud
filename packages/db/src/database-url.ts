@@ -31,7 +31,9 @@ export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {
 
   if (process.env.DATABASE_CA) {
     clientConfig.ssl = {
-      ca: process.env.DATABASE_CA,
+      ca: process.env.DATABASE_CA.replace(/\\n/g, '\n'),
+      rejectUnauthorized: true,
+      servername: databaseUrl.hostname,
     };
   } else {
     clientConfig.ssl = false;

@@ -137,14 +137,19 @@ function unconfigured(reason: string): KiloChatWriteClient {
 export function createKiloChatWriteClient(
   options: KiloChatWriteClientOptions = {}
 ): KiloChatWriteClient {
+  // The client itself only uses the gateway token and controller URL below.
+  // KILOCLAW_SANDBOX_ID and KILOCHAT_BASE_URL are not consumed here, but the
+  // controller's `/_kilo/kilo-chat/*` proxy only works when both are set on
+  // the instance — so their absence is checked up front to short-circuit
+  // with a clear reason instead of an opaque mid-operation HTTP failure.
   const token = options.token ?? process.env.OPENCLAW_GATEWAY_TOKEN;
   if (!token) return unconfigured(UNCONFIGURED_REASONS.token);
-
-  const sandboxId = options.sandboxId ?? process.env.KILOCLAW_SANDBOX_ID;
-  if (!sandboxId) return unconfigured(UNCONFIGURED_REASONS.sandbox);
-
-  const kiloChatBaseUrl = options.kiloChatBaseUrl ?? process.env.KILOCHAT_BASE_URL;
-  if (!kiloChatBaseUrl) return unconfigured(UNCONFIGURED_REASONS.kiloChat);
+  if (!(options.sandboxId ?? process.env.KILOCLAW_SANDBOX_ID)) {
+    return unconfigured(UNCONFIGURED_REASONS.sandbox);
+  }
+  if (!(options.kiloChatBaseUrl ?? process.env.KILOCHAT_BASE_URL)) {
+    return unconfigured(UNCONFIGURED_REASONS.kiloChat);
+  }
 
   // Re-bind the narrowed token so the closures below see `string`, not the
   // declared `string | undefined`. Mirrors `chat-summary-client.ts`.

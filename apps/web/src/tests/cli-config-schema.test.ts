@@ -32,6 +32,7 @@ describe('kilo config.json schema merge', () => {
   test('adds kilo-only top-level keys', () => {
     expect(props.commit_message).toBeDefined();
     expect(props.remote_control).toBeDefined();
+    expect(props.auto_expand_history).toBeDefined();
   });
 
   test('commit_message has a prompt string property', () => {

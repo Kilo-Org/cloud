@@ -6,7 +6,7 @@ import type { UserConfigResponse, PlatformStatusResponse, RestartMachineResponse
 
 type RequestContext = { userId: string; instanceId?: string };
 
-type SanitizedKiloClawErrorBody = {
+type SerializedKiloClawErrorBody = {
   success?: false;
   error?: string;
   code?: string;
@@ -26,12 +26,12 @@ function serializeSafeKiloClawErrorResponseBody(responseBody: string): string {
 
     if (!error && !code) return '';
 
-    const sanitized: SanitizedKiloClawErrorBody = {};
-    if ('success' in parsed && parsed.success === false) sanitized.success = false;
-    if (error) sanitized.error = error;
-    if (code) sanitized.code = code;
+    const serialized: SerializedKiloClawErrorBody = {};
+    if ('success' in parsed && parsed.success === false) serialized.success = false;
+    if (error) serialized.error = error;
+    if (code) serialized.code = code;
 
-    return JSON.stringify(sanitized);
+    return JSON.stringify(serialized);
   } catch {
     return '';
   }

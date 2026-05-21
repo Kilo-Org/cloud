@@ -73,12 +73,17 @@ const FINALIZED_DO_STATE = {
   pendingRestoreVolumeId: null,
 };
 
-function makeEnv(opts?: { flyApiToken?: string | null; debugState?: unknown }) {
+function makeEnv(opts?: {
+  flyApiToken?: string | null;
+  debugState?: unknown;
+  appName?: string | null;
+}) {
   const flyApiToken = opts?.flyApiToken === undefined ? 'test-token' : opts.flyApiToken;
   const getDebugState =
     opts?.debugState instanceof Error
       ? vi.fn().mockRejectedValue(opts.debugState)
       : vi.fn().mockResolvedValue(opts?.debugState ?? FINALIZED_DO_STATE);
+  const getAppName = vi.fn().mockResolvedValue(opts?.appName ?? null);
   return {
     env: {
       FLY_API_TOKEN: flyApiToken ?? undefined,
@@ -86,6 +91,10 @@ function makeEnv(opts?: { flyApiToken?: string | null; debugState?: unknown }) {
       KILOCLAW_INSTANCE: {
         idFromName: (id: string) => id,
         get: () => ({ getDebugState }),
+      },
+      KILOCLAW_APP: {
+        idFromName: (id: string) => id,
+        get: () => ({ getAppName }),
       },
       KILOCLAW_AE: { writeDataPoint: vi.fn() },
       KV_CLAW_CACHE: {
@@ -97,6 +106,7 @@ function makeEnv(opts?: { flyApiToken?: string | null; debugState?: unknown }) {
       },
     } as never,
     getDebugState,
+    getAppName,
   };
 }
 
@@ -185,6 +195,20 @@ describe('GET /admin/orphan-volume-scan', () => {
     expect(body.doStatus).toBeNull();
     expect(body.volumes.find(v => v.id === 'vol_orphan0000000000')?.nameMatchesInstance).toBe(true);
     expect(body.volumes.find(v => v.id === 'vol_other0000000000')?.nameMatchesInstance).toBe(false);
+  });
+
+  it('lists volumes from the App DO stored Fly app name when present', async () => {
+    const { env } = makeEnv({ appName: 'stored-fly-app' });
+    vi.mocked(fly.listVolumes).mockResolvedValue([flyVolume()]);
+
+    const response = await platform.request(scanPath(), {}, env);
+    expect(response.status).toBe(200);
+    expect(fly.listVolumes).toHaveBeenCalledWith({
+      apiToken: 'test-token',
+      appName: 'stored-fly-app',
+    });
+    const body = (await response.json()) as { flyApp: string };
+    expect(body.flyApp).toBe('stored-fly-app');
   });
 
   it('flags volumes a live DO still tracks', async () => {
@@ -296,6 +320,10 @@ describe('POST /admin/orphan-volume-destroy', () => {
                 : FINALIZED_DO_STATE
             ),
         }),
+      },
+      KILOCLAW_APP: {
+        idFromName: (id: string) => id,
+        get: () => ({ getAppName: vi.fn().mockResolvedValue(null) }),
       },
       KILOCLAW_AE: { writeDataPoint: vi.fn() },
       KV_CLAW_CACHE: {
@@ -442,6 +470,32 @@ describe('POST /admin/orphan-volume-destroy', () => {
     );
     expect(response.status).toBe(502);
     expect(fly.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('destroys from the App DO stored Fly app name when present', async () => {
+    const { env } = makeEnv({ appName: 'stored-fly-app' });
+    vi.mocked(fly.listVolumes).mockResolvedValue([flyVolume()]);
+    vi.mocked(fly.deleteVolume).mockResolvedValue(undefined);
+
+    const response = await platform.request(
+      '/admin/orphan-volume-destroy',
+      destroyInit(validDestroyBody),
+      env
+    );
+    expect(response.status).toBe(200);
+    expect(fly.listVolumes).toHaveBeenCalledWith({
+      apiToken: 'test-token',
+      appName: 'stored-fly-app',
+    });
+    expect(fly.deleteVolume).toHaveBeenCalledWith(
+      {
+        apiToken: 'test-token',
+        appName: 'stored-fly-app',
+      },
+      'vol_orphan0000000000'
+    );
+    const body = (await response.json()) as { flyApp: string };
+    expect(body.flyApp).toBe('stored-fly-app');
   });
 
   it('destroys the volume when every guard passes', async () => {

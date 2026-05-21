@@ -2904,6 +2904,40 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
     expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
   });
 
+  it('rejects when an access-granting successor subscription replaced the destroyed instance row', async () => {
+    const instanceId = await insertDestroyedInstance({ destroyedAt: daysAgo(30) });
+    const [successorInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    const [successorSubscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: regularUser.id,
+        instance_id: successorInstance.id,
+        plan: 'trial',
+        status: 'active',
+      })
+      .returning({ id: kiloclaw_subscriptions.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: regularUser.id,
+      instance_id: instanceId,
+      plan: 'trial',
+      status: 'canceled',
+      transferred_to_subscription_id: successorSubscription.id,
+    });
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(
+      caller.admin.kiloclawInstances.destroyOrphanVolume({ instanceId, volumeId: VOLUME_ID })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
+  });
+
   it('destroys the volume for a long-destroyed instance with no subscription', async () => {
     mockDestroyOrphanVolume.mockResolvedValue({
       ok: true,

@@ -278,18 +278,20 @@ function OrphanVolumesSection() {
 
   const destroyOrphanVolume = useMutation(
     trpc.admin.kiloclawInstances.destroyOrphanVolume.mutationOptions({
-      onSuccess: result => {
+      onSuccess: (result, variables) => {
         toast.success(
           result.alreadyGone
             ? 'Volume was already gone — removed from the list'
             : 'Orphan volume destroyed'
         );
-        if (scanResult && destroyTarget) {
-          setScanResult({
-            ...scanResult,
-            volumes: scanResult.volumes.filter(v => v.volume_id !== destroyTarget.volume_id),
-          });
-        }
+        setScanResult(current =>
+          current
+            ? {
+                ...current,
+                volumes: current.volumes.filter(volume => volume.volume_id !== variables.volumeId),
+              }
+            : current
+        );
         setDestroyTarget(null);
       },
       onError: err => {

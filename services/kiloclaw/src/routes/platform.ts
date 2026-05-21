@@ -77,6 +77,7 @@ import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from 
 import { and, eq, isNull } from 'drizzle-orm';
 import { volumeNameFromSandboxId } from '../durable-objects/machine-config';
 import { fallbackAppNameForRestore } from '../durable-objects/kiloclaw-instance/postgres';
+import { getAppKey } from '../durable-objects/kiloclaw-instance/types';
 import type { FlyVolume } from '../fly/types';
 import {
   BootstrapProvisionFallbackError,
@@ -3895,6 +3896,22 @@ function orphanVolumeDoStubFactory(
     env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(doKeyFromActiveInstance(identity)));
 }
 
+async function resolveOrphanVolumeFlyAppName(
+  env: AppEnv['Bindings'],
+  identity: { userId: string; sandboxId: string }
+): Promise<string> {
+  const appKey = getAppKey(identity);
+  const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
+  const prefix = env.WORKER_ENV === 'development' ? 'dev' : undefined;
+  const fallbackAppName = await fallbackAppNameForRestore(
+    identity.userId,
+    identity.sandboxId,
+    prefix
+  );
+
+  return (await appStub.getAppName()) ?? fallbackAppName;
+}
+
 // GET /api/platform/admin/orphan-volume-scan?userId=&instanceId=&sandboxId=
 // Lists the Fly volumes in the instance's app and annotates each with whether
 // it belongs to this instance (exact name match) and whether a live DO still
@@ -3916,8 +3933,7 @@ platform.get('/admin/orphan-volume-scan', async c => {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
   }
 
-  const prefix = c.env.WORKER_ENV === 'development' ? 'dev' : undefined;
-  const flyApp = await fallbackAppNameForRestore(userId, sandboxId, prefix);
+  const flyApp = await resolveOrphanVolumeFlyAppName(c.env, { userId, sandboxId });
   const expectedVolumeName = volumeNameFromSandboxId(sandboxId);
 
   // Fetch the volume list and the DO debug state concurrently. Either can fail
@@ -4033,8 +4049,10 @@ platform.post('/admin/orphan-volume-destroy', async c => {
     );
   }
 
-  const prefix = c.env.WORKER_ENV === 'development' ? 'dev' : undefined;
-  const flyApp = await fallbackAppNameForRestore(instance.userId, instance.sandboxId, prefix);
+  const flyApp = await resolveOrphanVolumeFlyAppName(c.env, {
+    userId: instance.userId,
+    sandboxId: instance.sandboxId,
+  });
   const expectedVolumeName = volumeNameFromSandboxId(instance.sandboxId);
   const flyConfig = { apiToken, appName: flyApp };
 

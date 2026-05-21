@@ -165,6 +165,18 @@ export const MorningBriefingActionResponseSchema = z.object({
   error: z.string().optional(),
 });
 
+/**
+ * Response from `POST /_kilo/morning-briefing/onboarding-briefing`. The plugin
+ * creates (or returns the existing) "Today's briefing" conversation and kicks
+ * off briefing generation in the background.
+ */
+export const OnboardingBriefingResponseSchema = z.object({
+  ok: z.boolean(),
+  conversationId: z.string().optional(),
+  alreadyStarted: z.boolean().optional(),
+  error: z.string().optional(),
+});
+
 export const MorningBriefingInterestsRequestSchema = z.object({
   topics: z.array(z.string()),
 });

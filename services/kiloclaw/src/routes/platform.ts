@@ -2551,6 +2551,51 @@ platform.post('/morning-briefing/run', async c => {
   }
 });
 
+// POST /api/platform/morning-briefing/onboarding-briefing
+platform.post('/morning-briefing/onboarding-briefing', async c => {
+  // `settingsHref` is the org-aware Settings link the web router derived for
+  // the briefing's "Connect more" items. The plugin re-validates it.
+  const result = await parseBody(
+    c,
+    UserIdRequestSchema.extend({ settingsHref: z.string().optional() })
+  );
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withMorningBriefingWarmupRetry(
+      () =>
+        withResolvedDORetry(
+          c.env,
+          result.data.userId,
+          iidResult.instanceId,
+          stub => stub.startOnboardingBriefing(result.data.settingsHref),
+          'startOnboardingBriefing'
+        ),
+      { includeTimeout: false }
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err, { includeTimeout: false })) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'morning-briefing/onboarding-briefing'
+    );
+    return jsonError(message, status, code);
+  }
+});
+
 // GET /api/platform/morning-briefing/read/{today|yesterday}?userId=...
 platform.get('/morning-briefing/read/:day', async c => {
   const userId = setValidatedQueryUserId(c);

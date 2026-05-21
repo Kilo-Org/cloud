@@ -3065,6 +3065,22 @@ export const kiloclawRouter = createTRPCRouter({
     return client.runMorningBriefing(ctx.user.id, workerInstanceId(instance));
   }),
 
+  // Creates the "Today's briefing" conversation and starts the in-chat
+  // onboarding briefing. Fired by the onboarding wizard once the gateway is
+  // ready; the returned conversationId is the post-onboarding chat redirect
+  // target.
+  startOnboardingBriefing: clawAccessProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    const client = new KiloClawInternalClient();
+    // Personal instances: "Connect more" links point at the personal
+    // Settings page.
+    return client.startOnboardingBriefing(
+      ctx.user.id,
+      '/claw/settings',
+      workerInstanceId(instance)
+    );
+  }),
+
   updateBriefingInterests: clawAccessProcedure
     .input(
       z.object({

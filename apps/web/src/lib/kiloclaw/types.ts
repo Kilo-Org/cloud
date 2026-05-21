@@ -602,6 +602,18 @@ export type MorningBriefingActionResponse = {
   error?: string;
 };
 
+/**
+ * Response from `POST /api/platform/morning-briefing/onboarding-briefing`.
+ * `conversationId` is the "Today's briefing" conversation the post-onboarding
+ * chat redirect routes the user into.
+ */
+export type OnboardingBriefingResponse = {
+  ok: boolean;
+  conversationId?: string;
+  alreadyStarted?: boolean;
+  error?: string;
+};
+
 export type MorningBriefingInterestsResponse = {
   ok: boolean;
   interestTopics?: string[];

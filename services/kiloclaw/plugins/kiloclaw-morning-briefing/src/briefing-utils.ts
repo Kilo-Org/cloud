@@ -63,6 +63,36 @@ const CONNECT_MORE_DISPLAY_NAMES: Partial<Record<BriefingSourceStatus['source'],
   web: 'Web news',
 };
 
+/**
+ * Build the `## ⚙️ Connect more` block for the sources the user has not
+ * connected yet. Returns an empty array when every source is configured.
+ * Shared by `buildBriefingMarkdown` (the saved file) and `buildBriefingBubbles`
+ * (the in-chat onboarding briefing) so the nudge is identical on both paths.
+ */
+export function buildConnectMoreLines(
+  statuses: BriefingSourceStatus[],
+  options?: { itemHref?: string }
+): string[] {
+  const names = statuses
+    .filter(status => !status.configured)
+    .map(status => CONNECT_MORE_DISPLAY_NAMES[status.source])
+    .filter((name): name is string => name !== undefined);
+  if (names.length === 0) {
+    return [];
+  }
+  // `itemHref` links each source to the Settings page — used by the in-chat
+  // onboarding briefing. The saved file / channel-delivered brief omits it:
+  // a relative link is meaningless once flattened into a Telegram/Slack
+  // message by `formatBriefingMarkdownForMessage`.
+  const href = options?.itemHref;
+  return [
+    '## ⚙️ Connect more',
+    ...names.map(name => (href ? `- [${name}](${href})` : `- ${name}`)),
+    '',
+    "Set these up in KiloClaw Settings to enrich tomorrow's briefing.",
+  ];
+}
+
 export function buildBriefingMarkdown(params: {
   dateKey: string;
   generatedAt: Date;
@@ -100,18 +130,10 @@ export function buildBriefingMarkdown(params: {
   // One consolidated nudge for every source the user hasn't connected
   // yet, in place of the per-source inline nudges sources used to
   // render in their own section body.
-  const connectMore = params.statuses
-    .filter(status => !status.configured)
-    .map(status => CONNECT_MORE_DISPLAY_NAMES[status.source])
-    .filter((name): name is string => name !== undefined);
-  if (connectMore.length > 0) {
+  const connectMoreLines = buildConnectMoreLines(params.statuses);
+  if (connectMoreLines.length > 0) {
     lines.push('');
-    lines.push('## ⚙️ Connect more');
-    for (const name of connectMore) {
-      lines.push(`- ${name}`);
-    }
-    lines.push('');
-    lines.push("Set these up in KiloClaw Settings to enrich tomorrow's briefing.");
+    lines.push(...connectMoreLines);
   }
 
   if (params.failures.length > 0) {

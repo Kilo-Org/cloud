@@ -24,12 +24,12 @@ import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
-  isFreeModel,
   isDeadFreeModel,
   isExcludedForFeature,
   isKiloExclusiveFreeModel,
   isKiloStealthModel,
 } from '@/lib/ai-gateway/models';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
   accountForMicrodollarUsage,
   captureProxyError,

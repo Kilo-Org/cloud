@@ -9,8 +9,14 @@ import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
 import type { Owner } from '../core';
 
-const OWNER_SCAN_LIMIT = 100;
-const OWNER_DISPATCH_CONCURRENCY = 4;
+// Tuned to limit the size of completion herds the drain can produce.
+// Each dispatched review eventually triggers a callback that may run a
+// fallback billing aggregation (`getSessionUsageFromBilling`), and large
+// per-tick fan-outs were saturating the DB connection pool. Keep these
+// conservative until v2 reviews persist usage on the review row and the
+// callback no longer falls back to billing-table aggregation.
+const OWNER_SCAN_LIMIT = 10;
+const OWNER_DISPATCH_CONCURRENCY = 1;
 
 export type DispatchPendingCodeReviewOwnersSummary = {
   ownersConsidered: number;

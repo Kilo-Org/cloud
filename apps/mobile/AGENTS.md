@@ -53,6 +53,22 @@ npx expo install --dev <package-name>   # devDependencies
 
 After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any issues it reports (version mismatches, duplicate deps, etc.).
 
+## Injected Workspace Packages
+
+Some workspace packages are listed under `dependenciesMeta` with `"injected": true` (currently `@kilocode/kilo-chat-hooks`). pnpm **copies** these into `apps/mobile/node_modules/.pnpm/.../node_modules/@kilocode/...` at install time instead of symlinking — so edits to the source under `packages/<pkg>/src/` are NOT picked up by Metro until you re-inject:
+
+```bash
+pnpm install --filter kilo-app...   # refreshes the injected copies
+```
+
+After re-injecting, also clear the Metro cache (it has the old bundled module hashed):
+
+```bash
+rm -rf "$TMPDIR/metro-cache" "$TMPDIR"/metro-file-map-*
+```
+
+…then restart Metro and force-kill the iOS app so the dev client pulls a fresh bundle. Symptom when you forget: edits to event-service, kilo-chat, etc. show up on device, but edits to an injected package don't — including `console.log` lines you just added.
+
 ## Implementation Principles
 
 - Implement features in the simplest boring way that preserves the requested behavior. Avoid speculative abstractions, defensive layers, and "just in case" code paths.

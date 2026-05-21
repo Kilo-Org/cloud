@@ -6,6 +6,7 @@ import {
   getAttachmentImageRenderState,
   getAttachmentOpenErrorMessage,
   getFreshAttachmentPreviewUrl,
+  shareMaterializedAttachment,
 } from './message-attachment-open';
 
 describe('message attachment render state', () => {
@@ -56,5 +57,47 @@ describe('message attachment render state', () => {
     expect(new TextEncoder().encode(cacheFilename).byteLength).toBeLessThanOrEqual(255);
     expect(cacheFilename.startsWith(`${attachmentId}-`)).toBe(true);
     expect(cacheFilename.endsWith('.png')).toBe(true);
+  });
+
+  it('deletes materialized attachment files after sharing', async () => {
+    const deleted: string[] = [];
+    const shared: string[] = [];
+
+    await shareMaterializedAttachment(
+      {
+        uri: 'file:///cache/kilo-chat-attachments/attachment.txt',
+        delete: () => {
+          deleted.push('file:///cache/kilo-chat-attachments/attachment.txt');
+        },
+      },
+      async uri => {
+        shared.push(uri);
+        await Promise.resolve();
+      }
+    );
+
+    expect(shared).toEqual(['file:///cache/kilo-chat-attachments/attachment.txt']);
+    expect(deleted).toEqual(['file:///cache/kilo-chat-attachments/attachment.txt']);
+  });
+
+  it('deletes materialized attachment files after share failures', async () => {
+    const deleted: string[] = [];
+
+    await expect(
+      shareMaterializedAttachment(
+        {
+          uri: 'file:///cache/kilo-chat-attachments/attachment.txt',
+          delete: () => {
+            deleted.push('file:///cache/kilo-chat-attachments/attachment.txt');
+          },
+        },
+        async () => {
+          await Promise.resolve();
+          throw new Error('share failed');
+        }
+      )
+    ).rejects.toThrow('share failed');
+
+    expect(deleted).toEqual(['file:///cache/kilo-chat-attachments/attachment.txt']);
   });
 });

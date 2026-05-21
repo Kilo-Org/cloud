@@ -7,6 +7,11 @@ const THREE_BYTE_CODE_POINT_MAX = 65_535;
 const ATTACHMENT_OPEN_ERROR_MESSAGE =
   "Couldn't open attachment. Check your connection and try again.";
 
+type MaterializedAttachment = {
+  uri: string;
+  delete: () => void;
+};
+
 export function getAttachmentImageRenderState({
   hasUrl,
   isError,
@@ -45,14 +50,19 @@ async function materializeRemoteAttachment({
   url: string;
   attachmentId: string;
   filename: string;
-}): Promise<string> {
+}): Promise<MaterializedAttachment> {
   const { Directory, File, Paths } = await import('expo-file-system');
   const directory = new Directory(Paths.cache, 'kilo-chat-attachments');
   directory.create({ idempotent: true, intermediates: true });
 
   const file = new File(directory, getAttachmentCacheFilename({ attachmentId, filename }));
   const downloaded = await File.downloadFileAsync(url, file, { idempotent: true });
-  return downloaded.uri;
+  return {
+    uri: downloaded.uri,
+    delete: () => {
+      downloaded.delete();
+    },
+  };
 }
 
 async function shareLocalFile(localUri: string): Promise<void> {
@@ -70,8 +80,19 @@ export async function shareRemoteAttachment(input: {
   attachmentId: string;
   filename: string;
 }): Promise<void> {
-  const localUri = await materializeRemoteAttachment(input);
-  await shareLocalFile(localUri);
+  const attachment = await materializeRemoteAttachment(input);
+  await shareMaterializedAttachment(attachment);
+}
+
+export async function shareMaterializedAttachment(
+  attachment: MaterializedAttachment,
+  shareFile: (uri: string) => Promise<void> = shareLocalFile
+): Promise<void> {
+  try {
+    await shareFile(attachment.uri);
+  } finally {
+    attachment.delete();
+  }
 }
 
 function safePathSegment(value: string): string {

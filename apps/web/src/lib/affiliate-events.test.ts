@@ -685,6 +685,115 @@ describe('affiliate-events', () => {
     );
   });
 
+  it('queues reversal when delivered sale identity remains recoverable from payload', async () => {
+    const { user, saleEvent } = await createDeliveredSaleEvent({ saleResponse: 'immediate' });
+    const { enqueueImpactSaleReversalForCharge } = await import('@/lib/affiliate-events');
+
+    await db
+      .update(user_affiliate_events)
+      .set({
+        impact_action_id: null,
+        impact_submission_uri: null,
+      })
+      .where(eq(user_affiliate_events.id, saleEvent.id));
+
+    await enqueueImpactSaleReversalForCharge({
+      stripeChargeId: 'ch_sale_test_123',
+      disputeId: 'dp_payload_mapping',
+      amount: 29,
+      currency: 'usd',
+      eventDate: new Date('2026-04-10T10:00:00.000Z'),
+    });
+
+    const reversalEvents = (await getUserAffiliateEvents(user.id)).filter(
+      row => row.event_type === 'sale_reversal'
+    );
+
+    expect(reversalEvents).toHaveLength(1);
+    expect(reversalEvents[0]).toMatchObject({
+      delivery_state: 'queued',
+      impact_action_id: '1000.2000.3000',
+      stripe_charge_id: 'ch_sale_test_123',
+    });
+  });
+
+  it('keeps unrecoverable delivered sale identity observable without speculative reversal', async () => {
+    const { user, saleEvent } = await createQueuedSaleEvent({
+      stripeChargeId: 'ch_unrecoverable_sale_mapping',
+    });
+    const { enqueueImpactSaleReversalForCharge } = await import('@/lib/affiliate-events');
+
+    await db
+      .update(user_affiliate_events)
+      .set({
+        delivery_state: 'delivered',
+        claimed_at: new Date('2026-04-09T10:10:00.000Z').toISOString(),
+        next_retry_at: null,
+      })
+      .where(eq(user_affiliate_events.id, saleEvent.id));
+
+    const reversal = await enqueueImpactSaleReversalForCharge({
+      stripeChargeId: 'ch_unrecoverable_sale_mapping',
+      disputeId: 'dp_unrecoverable_sale_mapping',
+      amount: 29,
+      currency: 'usd',
+      eventDate: new Date('2026-04-10T10:00:00.000Z'),
+    });
+
+    const reversalEvents = (await getUserAffiliateEvents(user.id)).filter(
+      row => row.event_type === 'sale_reversal'
+    );
+
+    expect(reversal).toBeNull();
+    expect(reversalEvents).toHaveLength(0);
+    expect(mockWarningLogger).toHaveBeenCalledWith(
+      'Impact sale reversal requires manual follow-up because delivered sale mapping is missing',
+      expect.objectContaining({
+        affiliate_event_type: 'sale_reversal',
+        stripe_charge_id: 'ch_unrecoverable_sale_mapping',
+        dispute_id: 'dp_unrecoverable_sale_mapping',
+      })
+    );
+  });
+
+  it('dispatches a full Impact action rejection for a partial sale dispute', async () => {
+    const { user } = await createDeliveredSaleEvent({ saleResponse: 'immediate' });
+    const { dispatchQueuedAffiliateEvents, enqueueImpactSaleReversalForCharge } =
+      await import('@/lib/affiliate-events');
+
+    await enqueueImpactSaleReversalForCharge({
+      stripeChargeId: 'ch_sale_test_123',
+      disputeId: 'dp_partial_dispute',
+      amount: 9,
+      currency: 'usd',
+      eventDate: new Date('2026-04-10T10:00:00.000Z'),
+    });
+
+    const fetchMock = jest.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          Status: 'QUEUED',
+          QueuedUri: '/Advertisers/impact-account-sid/APISubmissions/A-partial-reversal',
+        }),
+        { status: 200 }
+      )
+    ) as jest.MockedFunction<typeof fetch>;
+    global.fetch = fetchMock;
+
+    const summary = await dispatchQueuedAffiliateEvents();
+    const reversalEvent = (await getUserAffiliateEvents(user.id)).find(
+      row => row.event_type === 'sale_reversal'
+    );
+
+    expect(summary.delivered).toBe(1);
+    expect(reversalEvent?.delivery_state).toBe('delivered');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: 'DELETE' });
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('ActionId=1000.2000.3000');
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('DispositionCode=REJECTED');
+    expect(fetchMock.mock.calls[0]?.[1]?.body).not.toContain('Amount');
+  });
+
   it('keeps queued sale reversal retryable when submission resolution is unconfigured', async () => {
     const { user } = await createDeliveredSaleEvent({ saleResponse: 'queued' });
 

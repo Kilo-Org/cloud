@@ -248,7 +248,7 @@ function computeNextRetryAt(attemptCount: number): string {
 }
 
 function eventHasImpactMapping(event: AffiliateEventRow): boolean {
-  return Boolean(event.impact_action_id || event.impact_submission_uri);
+  return Boolean(getImpactActionId(event) || getImpactSubmissionUri(event));
 }
 
 function getImpactActionId(event: AffiliateEventRow): string | null {

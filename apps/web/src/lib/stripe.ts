@@ -99,7 +99,10 @@ function getAffiliateDisputeSaleKind(invoice: Stripe.Invoice): AffiliateDisputeS
     return 'kiloclaw';
   }
 
-  if (invoiceLooksLikeKiloPassByPriceId(invoice)) {
+  const kiloPassMetadata = getKiloPassMetadataFromStripeMetadata(
+    invoice.parent?.subscription_details?.metadata
+  );
+  if (invoiceLooksLikeKiloPassByPriceId(invoice) || kiloPassMetadata !== null) {
     return 'kilo-pass';
   }
 

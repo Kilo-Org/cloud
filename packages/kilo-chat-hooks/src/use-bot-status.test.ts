@@ -1,7 +1,11 @@
 import type * as ReactModule from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type EventServiceClient } from '@kilocode/event-service';
-import { type BotStatusEvent, type BotStatusRecord, type KiloChatClient } from '@kilocode/kilo-chat';
+import {
+  type BotStatusEvent,
+  type BotStatusRecord,
+  type KiloChatClient,
+} from '@kilocode/kilo-chat';
 
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 

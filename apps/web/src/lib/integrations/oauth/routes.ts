@@ -2,6 +2,63 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import {
+  handleStatefulPlatformOAuthConnect,
+  type HandleStatefulOAuthConnectOptions,
+} from '@/lib/integrations/oauth/common';
+import type { StandardOAuthPlatform } from '@/lib/integrations/oauth/paths';
+
+type StatefulOAuthConnectRouteConfig = Omit<
+  HandleStatefulOAuthConnectOptions,
+  'platform' | 'buildOAuthUrl'
+> & {
+  loadBuildOAuthUrl: () => Promise<HandleStatefulOAuthConnectOptions['buildOAuthUrl']>;
+};
+
+const statefulOAuthConnectRouteConfigEntries = [
+  [
+    PLATFORM.DISCORD,
+    {
+      source: 'discord_oauth',
+      loadBuildOAuthUrl: async () =>
+        (await import('@/lib/integrations/discord-service')).getDiscordOAuthUrl,
+    },
+  ],
+  [
+    PLATFORM.DOLTHUB,
+    {
+      source: 'dolthub_oauth',
+      loadBuildOAuthUrl: async () =>
+        (await import('@/lib/integrations/dolthub-service')).getDoltHubOAuthUrl,
+    },
+  ],
+  [
+    PLATFORM.LINEAR,
+    {
+      source: 'linear_oauth',
+      loadBuildOAuthUrl: async () =>
+        (await import('@/lib/integrations/linear-service')).getLinearOAuthUrl,
+      organizationRoles: ['owner', 'billing_manager'],
+      requireActiveOrganizationSubscription: true,
+    },
+  ],
+  [
+    PLATFORM.SLACK,
+    {
+      source: 'slack_oauth',
+      loadBuildOAuthUrl: async () =>
+        (await import('@/lib/integrations/slack-service')).getSlackOAuthUrl,
+    },
+  ],
+] as const satisfies readonly (readonly [StandardOAuthPlatform, StatefulOAuthConnectRouteConfig])[];
+
+const statefulOAuthConnectRouteConfigs = new Map<string, StatefulOAuthConnectRouteConfig>(
+  statefulOAuthConnectRouteConfigEntries
+);
+
+function isStatefulOAuthConnectPlatform(platform: string): platform is StandardOAuthPlatform {
+  return statefulOAuthConnectRouteConfigs.has(platform);
+}
 
 function unsupportedOAuthRoute(platform: string, action: 'connect' | 'callback'): Response {
   return NextResponse.json(
@@ -14,30 +71,28 @@ export async function handlePlatformOAuthConnect(
   request: NextRequest,
   platform: string
 ): Promise<Response> {
-  switch (platform) {
-    case PLATFORM.DISCORD:
-      return (
-        await import('@/lib/integrations/oauth/platforms/discord-connect')
-      ).handleDiscordOAuthConnect(request);
-    case PLATFORM.DOLTHUB:
-      return (
-        await import('@/lib/integrations/oauth/platforms/dolthub-connect')
-      ).handleDoltHubOAuthConnect(request);
-    case PLATFORM.GITLAB:
-      return (
-        await import('@/lib/integrations/oauth/platforms/gitlab-connect')
-      ).handleGitLabOAuthConnect(request);
-    case PLATFORM.LINEAR:
-      return (
-        await import('@/lib/integrations/oauth/platforms/linear-connect')
-      ).handleLinearOAuthConnect(request);
-    case PLATFORM.SLACK:
-      return (
-        await import('@/lib/integrations/oauth/platforms/slack-connect')
-      ).handleSlackOAuthConnect(request);
-    default:
-      return unsupportedOAuthRoute(platform, 'connect');
+  if (platform === PLATFORM.GITLAB) {
+    return (
+      await import('@/lib/integrations/oauth/platforms/gitlab-connect')
+    ).handleGitLabOAuthConnect(request);
   }
+
+  if (!isStatefulOAuthConnectPlatform(platform)) {
+    return unsupportedOAuthRoute(platform, 'connect');
+  }
+
+  const config = statefulOAuthConnectRouteConfigs.get(platform);
+  if (!config) {
+    return unsupportedOAuthRoute(platform, 'connect');
+  }
+
+  const { loadBuildOAuthUrl, ...connectOptions } = config;
+  const buildOAuthUrl = await loadBuildOAuthUrl();
+  return handleStatefulPlatformOAuthConnect(request, {
+    ...connectOptions,
+    platform,
+    buildOAuthUrl,
+  });
 }
 
 export async function handlePlatformOAuthConnectPost(

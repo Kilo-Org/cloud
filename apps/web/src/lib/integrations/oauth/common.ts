@@ -13,12 +13,12 @@ import type { StandardOAuthPlatform } from '@/lib/integrations/oauth/paths';
 
 type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
 
-type ResolveConnectOwnerOptions = {
+export type ResolveConnectOwnerOptions = {
   organizationRoles?: Parameters<typeof ensureOrganizationAccess>[2];
   requireActiveOrganizationSubscription?: boolean;
 };
 
-type HandleStatefulOAuthConnectOptions = ResolveConnectOwnerOptions & {
+export type HandleStatefulOAuthConnectOptions = ResolveConnectOwnerOptions & {
   platform: StandardOAuthPlatform;
   source: string;
   buildOAuthUrl: (state: string) => string;

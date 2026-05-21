@@ -1,4 +1,8 @@
-import { isClaudeModel, isOpusModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import {
+  isClaudeModel,
+  isOpusModel,
+  CLAUDE_OPUS_4_7_OPTIMIZED_MODEL_ID,
+} from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
@@ -36,6 +40,17 @@ export const REASONING_VARIANTS_NONE_LOW_MEDIUM_HIGH = {
 } as const;
 
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
+  if (model === CLAUDE_OPUS_4_7_OPTIMIZED_MODEL_ID) {
+    // Default to 'high' reasoning for this Martian-optimized variant
+    return {
+      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
+      xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
+      max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
+      medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
+      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+      none: { reasoning: { enabled: false, effort: 'none' } },
+    };
+  }
   if (isOpusModel(model) && model.includes('4.7')) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },

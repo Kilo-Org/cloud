@@ -10,6 +10,7 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
+  claude_opus_4_7_optimized_model,
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
@@ -91,6 +92,7 @@ export const kiloExclusiveModels = [
   ...alibabaDirectModels,
   claude_sonnet_clawsetup_model,
   stepfun_35_flash_free_model,
+  claude_opus_4_7_optimized_model,
 ] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {

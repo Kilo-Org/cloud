@@ -4,9 +4,27 @@ export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
 export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.7';
 export const CLAUDE_HAIKU_CURRENT_MODEL_ID = 'anthropic/claude-haiku-4.5';
 
+export const CLAUDE_OPUS_4_7_OPTIMIZED_MODEL_ID = 'anthropic/claude-opus-4-7:optimized';
+
 export const CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID = CLAUDE_SONNET_CURRENT_MODEL_ID;
 export const CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID = CLAUDE_OPUS_CURRENT_MODEL_ID;
 export const CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID = CLAUDE_HAIKU_CURRENT_MODEL_ID;
+
+export const claude_opus_4_7_optimized_model: KiloExclusiveModel = {
+  public_id: CLAUDE_OPUS_4_7_OPTIMIZED_MODEL_ID,
+  internal_id: CLAUDE_OPUS_4_7_OPTIMIZED_MODEL_ID,
+  display_name: 'Claude Opus 4.7 Optimized',
+  description:
+    'A custom-optimized variant of Claude Opus 4.7, exclusively available on Kilo Code and hosted by [Martian](https://withmartian.com). **Note:** This is a third-party optimized model and your prompts and completions may be used to train or improve the provider\'s services.',
+  context_length: 200_000,
+  max_completion_tokens: 32_000,
+  status: 'public',
+  flags: ['reasoning', 'vision'],
+  gateway: 'martian',
+  pricing: null,
+  exclusive_to: [],
+  inference_provider_restriction: [],
+};
 
 export const claude_sonnet_clawsetup_model: KiloExclusiveModel = {
   public_id: CLAUDE_SONNET_CURRENT_MODEL_ID + ':clawsetup',

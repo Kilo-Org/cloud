@@ -1504,7 +1504,7 @@ async function generateBriefing(
     logger: { info?: (message: string) => void; warn?: (message: string) => void };
   },
   dateKey: string,
-  options?: { includeKiloChat?: boolean }
+  options?: { includeKiloChat?: boolean; deliverToChannels?: boolean }
 ): Promise<{
   dateKey: string;
   filePath: string;
@@ -1659,20 +1659,28 @@ async function generateBriefing(
 
   const filePath = resolveBriefingPath(paths.briefingsDir, dateKey);
   await fs.writeFile(filePath, markdown, 'utf8');
-  let delivery: BriefingDeliveryResult[];
-  try {
-    delivery = await deliverBriefingToConfiguredChannels(api, markdown);
-  } catch (error) {
-    const errorText = error instanceof Error ? error.message : String(error);
-    api.logger.warn?.(`Morning briefing delivery failed unexpectedly: ${errorText}`);
-    delivery = DELIVERY_CHANNELS.map(channel => ({
-      channel,
-      status: 'failed',
-      reason: 'config_unavailable',
-      error: errorText,
-    }));
+
+  // Channel delivery (Telegram/Discord/Slack) is on by default for the
+  // cron and manual `/briefing run` paths. The onboarding briefing opts
+  // out: it is a chat-only first message, and fanning it out to external
+  // channels would be a surprising, out-of-context duplicate.
+  const shouldDeliver = options?.deliverToChannels !== false;
+  let delivery: BriefingDeliveryResult[] = [];
+  if (shouldDeliver) {
+    try {
+      delivery = await deliverBriefingToConfiguredChannels(api, markdown);
+    } catch (error) {
+      const errorText = error instanceof Error ? error.message : String(error);
+      api.logger.warn?.(`Morning briefing delivery failed unexpectedly: ${errorText}`);
+      delivery = DELIVERY_CHANNELS.map(channel => ({
+        channel,
+        status: 'failed',
+        reason: 'config_unavailable',
+        error: errorText,
+      }));
+    }
+    logDeliveryOutcomeEvents(api, delivery);
   }
-  logDeliveryOutcomeEvents(api, delivery);
 
   await patchStoredStatus(paths, {
     lastGeneratedDate: dateKey,
@@ -1780,9 +1788,13 @@ async function runOnboardingBriefingDelivery(
   }, ONBOARDING_BRIEFING_TYPING_PING_MS);
 
   try {
-    // Skip the Kilo Chat stats section: this is a brand-new user's first
-    // ever chat activity, so there is nothing meaningful to summarize.
-    const result = await generateBriefing(api, dateKey, { includeKiloChat: false });
+    // Skip the Kilo Chat stats section (a brand-new user has no chat
+    // history) and channel delivery (this is a chat-only first message,
+    // not something to fan out to Telegram/Discord/Slack).
+    const result = await generateBriefing(api, dateKey, {
+      includeKiloChat: false,
+      deliverToChannels: false,
+    });
     clearInterval(typingTimer);
     await writeClient.stopTyping(conversationId).catch(() => {});
     const message = buildBriefingMessage({

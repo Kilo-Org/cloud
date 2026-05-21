@@ -143,6 +143,33 @@ describe('CloudAgentTransport event routing', () => {
     transport.destroy();
   });
 
+  it('routes cached command catalogs emitted without an execution ID', async () => {
+    const { transport, serviceEvents } = createTransportWithSinks();
+    const commands = [
+      {
+        name: 'deploy-prod',
+        description: 'Deploy production',
+        hints: ['$ARGUMENTS'],
+        source: 'command',
+      },
+    ];
+
+    transport.connect();
+    await flushPromises();
+    sendRaw({
+      eventId: 0,
+      executionId: null,
+      sessionId: 'ses-1',
+      streamEventType: 'commands.available',
+      timestamp: new Date().toISOString(),
+      data: { commands },
+    });
+
+    expect(serviceEvents).toContainEqual({ type: 'commands.available', commands });
+
+    transport.destroy();
+  });
+
   it('routes mixed events to correct sinks', async () => {
     const { transport, chatEvents, serviceEvents } = createTransportWithSinks();
 

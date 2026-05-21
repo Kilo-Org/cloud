@@ -17,6 +17,7 @@ export {
 export {
   collapseOrphanPersonalSubscriptionsOnDestroy,
   FundedRowDemotionRefusedError,
+  isAccessGrantingSubscription,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
   PersonalSubscriptionDestroyConflictError,
   type DestroyedInstanceRow,

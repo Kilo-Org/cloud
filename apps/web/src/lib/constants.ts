@@ -1,3 +1,5 @@
+import { requireEnv } from '@/lib/dotenvx';
+
 export const FIRST_TOPUP_BONUS_AMOUNT: number = 0;
 
 export const REFERRAL_BONUS_AMOUNT = 10;
@@ -43,16 +45,6 @@ export const CLOUD_AGENT_NEXT_WS_URL = process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_
 // Used by the CLI live transport for real-time event streaming
 export const SESSION_INGEST_WS_URL = process.env.NEXT_PUBLIC_SESSION_INGEST_WS_URL ?? '';
 
-// Next.js inlines NEXT_PUBLIC_* at build time. Fail loudly when required
-// public URLs are missing so misconfiguration surfaces at startup instead of
-// producing relative URLs against the app origin.
-function requireEnv(name: string, value: string | undefined): string {
-  if (!value) {
-    throw new Error(`Missing required environment variable ${name}`);
-  }
-  return value;
-}
-
 // Gastown worker URL (client-side, inlined at build time)
 // The browser talks directly to the gastown Cloudflare Worker for tRPC + WS.
 // Must use NEXT_PUBLIC_ prefix so Next.js exposes it to the browser bundle.
@@ -71,6 +63,14 @@ export const KILO_CHAT_URL = requireEnv(
 export const EVENT_SERVICE_URL = requireEnv(
   'NEXT_PUBLIC_EVENT_SERVICE_URL',
   process.env.NEXT_PUBLIC_EVENT_SERVICE_URL
+);
+
+// Wasteland worker URL (client-side, inlined at build time)
+// The browser talks directly to the Wasteland Cloudflare Worker for tRPC.
+// Must use NEXT_PUBLIC_ prefix so Next.js exposes it to the browser bundle.
+export const WASTELAND_URL = requireEnv(
+  'NEXT_PUBLIC_WASTELAND_URL',
+  process.env.NEXT_PUBLIC_WASTELAND_URL
 );
 
 // Free model rate limits: per-IP for client-side products, per-user for server-side products

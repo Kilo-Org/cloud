@@ -22,27 +22,87 @@ export type SCMContext = {
   platformIntegrationId?: string;
 };
 
+export type GitHubTokenResolution =
+  | { ok: true; token: string; source: string }
+  | { ok: false; tried: string[] };
+
 /**
  * Resolve a GitHub API token from the town config.
- * Fallback chain: github_token → github_cli_pat → town platform integration → rig platform integration.
+ *
+ * Priority chain (most to least preferred):
+ *   1. `github_cli_pat` — user-supplied long-lived PAT, never expires.
+ *   2. Platform integration (GitHub App installation) — minted fresh by
+ *      git-token-service with KV-backed caching that auto-invalidates
+ *      before each token's 1h TTL elapses. This is the authoritative
+ *      live source whenever an integration is configured.
+ *   3. `git_auth.github_token` — stored installation token from a past
+ *      `refreshGitCredentials()` write. Kept as a fallback for towns that
+ *      never had an integration wired up. NOT preferred over the integration
+ *      because the stored value is typically stale (1h TTL, never updated
+ *      by anything in the request path).
+ *
+ * Historically this preferred the stored token over the integration,
+ * which made every consumer (PR poller, /refresh-git-token, agent
+ * dispatch's `GIT_TOKEN`) hand out an expired token whenever the rig
+ * had been registered more than ~1 hour ago. See ce15a6fe7 for the fix.
+ *
+ * Returns a `GitHubTokenResolution`: `ok: true` with the token + source on
+ * success, or `ok: false` with the `tried` chain on failure. Used by
+ * `checkPRStatus`'s `no_token` failure path to surface a specific message.
  */
-export async function resolveGitHubToken(ctx: SCMContext): Promise<string | null> {
+export async function resolveGitHubToken(ctx: SCMContext): Promise<GitHubTokenResolution> {
+  const tried: string[] = [];
   const townConfig = await ctx.getTownConfig();
-  let token = townConfig.git_auth?.github_token ?? townConfig.github_cli_pat;
-  if (!token) {
-    const integrationId = townConfig.git_auth?.platform_integration_id ?? ctx.platformIntegrationId;
-    if (integrationId && ctx.env.GIT_TOKEN_SERVICE) {
-      try {
-        token = await ctx.env.GIT_TOKEN_SERVICE.getToken(integrationId);
-      } catch (err) {
-        console.warn(
-          `${TOWN_LOG} resolveGitHubToken: platform integration token lookup failed for ${integrationId}`,
-          err
-        );
-      }
-    }
+
+  // 1. github_cli_pat — long-lived user PAT
+  if (townConfig.github_cli_pat) {
+    return { ok: true, token: townConfig.github_cli_pat, source: 'town.github_cli_pat' };
   }
-  return token ?? null;
+  tried.push('town.github_cli_pat');
+
+  // 2. Platform integration — fresh App installation token
+  const integrationId = townConfig.git_auth?.platform_integration_id ?? ctx.platformIntegrationId;
+  const sourceLabel = townConfig.git_auth?.platform_integration_id
+    ? 'town platform integration'
+    : 'rig platform integration';
+  if (integrationId && ctx.env.GIT_TOKEN_SERVICE) {
+    tried.push(sourceLabel);
+    try {
+      const fresh = await ctx.env.GIT_TOKEN_SERVICE.getToken(integrationId);
+      if (typeof fresh === 'string' && fresh.length > 0) {
+        return { ok: true, token: fresh, source: sourceLabel };
+      }
+      console.warn(
+        `${TOWN_LOG} resolveGitHubToken: platform integration ${integrationId} returned empty token; falling back to stored github_token`
+      );
+    } catch (err) {
+      console.warn(
+        `${TOWN_LOG} resolveGitHubToken: platform integration token lookup failed for ${integrationId}; falling back to stored github_token`,
+        err
+      );
+    }
+  } else if (!integrationId) {
+    tried.push('platform integration (none configured)');
+  } else {
+    tried.push(`${sourceLabel} (GIT_TOKEN_SERVICE not bound)`);
+  }
+
+  // 3. Stored git_auth.github_token — last-resort fallback
+  if (townConfig.git_auth?.github_token) {
+    return {
+      ok: true,
+      token: townConfig.git_auth.github_token,
+      source: 'town.git_auth.github_token',
+    };
+  }
+  tried.push('town.git_auth.github_token');
+
+  return { ok: false, tried };
+}
+
+export async function resolveGitHubTokenString(ctx: SCMContext): Promise<string | null> {
+  const r = await resolveGitHubToken(ctx);
+  return r.ok ? r.token : null;
 }
 
 export type PRStatusResult = {
@@ -50,32 +110,58 @@ export type PRStatusResult = {
   mergeable_state?: string;
 };
 
+export type PRStatusError =
+  | { kind: 'no_token'; provider: 'github' | 'gitlab'; resolutionChain: string[] }
+  | { kind: 'unrecognized_url'; url: string }
+  | {
+      kind: 'http_error';
+      provider: 'github' | 'gitlab';
+      status: number;
+      statusText: string;
+      transient: boolean;
+    }
+  | {
+      kind: 'invalid_response';
+      provider: 'github' | 'gitlab';
+      reason: 'json_parse' | 'schema_mismatch';
+      sampleKeys?: string[];
+    }
+  | { kind: 'host_mismatch'; provider: 'gitlab'; expected: string; got: string };
+
+export type PRStatusOutcome =
+  | { ok: true; result: PRStatusResult }
+  | { ok: false; error: PRStatusError };
+
+function isTransientHttpStatus(status: number): boolean {
+  return status >= 500 || status === 429;
+}
+
 /**
  * Check the status of a PR/MR via its URL.
- * Returns a PRStatusResult with status and optional mergeable_state (GitHub only),
- * or null if the status cannot be determined.
+ * Returns a PRStatusOutcome discriminated union — { ok: true, result } on success,
+ * or { ok: false, error } with a structured PRStatusError describing why.
  */
-export async function checkPRStatus(
-  ctx: SCMContext,
-  prUrl: string
-): Promise<PRStatusResult | null> {
+export async function checkPRStatus(ctx: SCMContext, prUrl: string): Promise<PRStatusOutcome> {
   const townConfig = await ctx.getTownConfig();
 
   // GitHub PR URL format: https://github.com/{owner}/{repo}/pull/{number}
   const ghMatch = prUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
   if (ghMatch) {
     const [, owner, repo, numberStr] = ghMatch;
-    const token = await resolveGitHubToken(ctx);
-    if (!token) {
+    const resolution = await resolveGitHubToken(ctx);
+    if (!resolution.ok) {
       console.warn(`${TOWN_LOG} checkPRStatus: no GitHub token available, cannot poll ${prUrl}`);
-      return null;
+      return {
+        ok: false,
+        error: { kind: 'no_token', provider: 'github', resolutionChain: resolution.tried },
+      };
     }
 
     const response = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/pulls/${numberStr}`,
       {
         headers: {
-          Authorization: `token ${token}`,
+          Authorization: `token ${resolution.token}`,
           Accept: 'application/vnd.github.v3+json',
           'User-Agent': 'Gastown-Refinery/1.0',
         },
@@ -85,17 +171,41 @@ export async function checkPRStatus(
       console.warn(
         `${TOWN_LOG} checkPRStatus: GitHub API returned ${response.status} for ${prUrl}`
       );
-      return null;
+      return {
+        ok: false,
+        error: {
+          kind: 'http_error',
+          provider: 'github',
+          status: response.status,
+          statusText: response.statusText,
+          transient: isTransientHttpStatus(response.status),
+        },
+      };
     }
 
     const json = await response.json().catch(() => null);
-    if (!json) return null;
+    if (!json) {
+      return {
+        ok: false,
+        error: { kind: 'invalid_response', provider: 'github', reason: 'json_parse' },
+      };
+    }
     const data = GitHubPRStatusSchema.safeParse(json);
-    if (!data.success) return null;
+    if (!data.success) {
+      return {
+        ok: false,
+        error: {
+          kind: 'invalid_response',
+          provider: 'github',
+          reason: 'schema_mismatch',
+          sampleKeys: Object.keys(json).slice(0, 8),
+        },
+      };
+    }
 
-    if (data.data.merged) return { status: 'merged' };
-    if (data.data.state === 'closed') return { status: 'closed' };
-    return { status: 'open', mergeable_state: data.data.mergeable_state };
+    if (data.data.merged) return { ok: true, result: { status: 'merged' } };
+    if (data.data.state === 'closed') return { ok: true, result: { status: 'closed' } };
+    return { ok: true, result: { status: 'open', mergeable_state: data.data.mergeable_state } };
   }
 
   // GitLab MR URL format: https://{host}/{path}/-/merge_requests/{iid}
@@ -105,7 +215,14 @@ export async function checkPRStatus(
     const token = townConfig.git_auth?.gitlab_token;
     if (!token) {
       console.warn(`${TOWN_LOG} checkPRStatus: no gitlab_token configured, cannot poll ${prUrl}`);
-      return null;
+      return {
+        ok: false,
+        error: {
+          kind: 'no_token',
+          provider: 'gitlab',
+          resolutionChain: ['town.git_auth.gitlab_token'],
+        },
+      };
     }
 
     // Validate the host against known GitLab hosts to prevent SSRF/token leak.
@@ -117,7 +234,15 @@ export async function checkPRStatus(
       console.warn(
         `${TOWN_LOG} checkPRStatus: refusing to send gitlab_token to unknown host: ${prHost}`
       );
-      return null;
+      return {
+        ok: false,
+        error: {
+          kind: 'host_mismatch',
+          provider: 'gitlab',
+          expected: configuredHost ?? 'gitlab.com',
+          got: prHost,
+        },
+      };
     }
 
     const encodedPath = encodeURIComponent(projectPath);
@@ -131,21 +256,45 @@ export async function checkPRStatus(
       console.warn(
         `${TOWN_LOG} checkPRStatus: GitLab API returned ${response.status} for ${prUrl}`
       );
-      return null;
+      return {
+        ok: false,
+        error: {
+          kind: 'http_error',
+          provider: 'gitlab',
+          status: response.status,
+          statusText: response.statusText,
+          transient: isTransientHttpStatus(response.status),
+        },
+      };
     }
 
     const glJson = await response.json().catch(() => null);
-    if (!glJson) return null;
+    if (!glJson) {
+      return {
+        ok: false,
+        error: { kind: 'invalid_response', provider: 'gitlab', reason: 'json_parse' },
+      };
+    }
     const data = GitLabMRStatusSchema.safeParse(glJson);
-    if (!data.success) return null;
+    if (!data.success) {
+      return {
+        ok: false,
+        error: {
+          kind: 'invalid_response',
+          provider: 'gitlab',
+          reason: 'schema_mismatch',
+          sampleKeys: Object.keys(glJson).slice(0, 8),
+        },
+      };
+    }
 
-    if (data.data.state === 'merged') return { status: 'merged' };
-    if (data.data.state === 'closed') return { status: 'closed' };
-    return { status: 'open' };
+    if (data.data.state === 'merged') return { ok: true, result: { status: 'merged' } };
+    if (data.data.state === 'closed') return { ok: true, result: { status: 'closed' } };
+    return { ok: true, result: { status: 'open' } };
   }
 
   console.warn(`${TOWN_LOG} checkPRStatus: unrecognized PR URL format: ${prUrl}`);
-  return null;
+  return { ok: false, error: { kind: 'unrecognized_url', url: prUrl } };
 }
 
 /**
@@ -261,11 +410,11 @@ export async function checkPRFeedback(
   }
 
   const [, owner, repo, numberStr] = ghMatch;
-  const token = await resolveGitHubToken(ctx);
-  if (!token) return null;
+  const resolution = await resolveGitHubToken(ctx);
+  if (!resolution.ok) return null;
 
   const headers = {
-    Authorization: `token ${token}`,
+    Authorization: `token ${resolution.token}`,
     Accept: 'application/vnd.github.v3+json',
     'User-Agent': 'Gastown-Refinery/1.0',
   };
@@ -481,15 +630,15 @@ export async function mergePR(ctx: SCMContext, prUrl: string): Promise<boolean> 
   }
 
   const [, owner, repo, numberStr] = ghMatch;
-  const token = await resolveGitHubToken(ctx);
-  if (!token) {
+  const resolution = await resolveGitHubToken(ctx);
+  if (!resolution.ok) {
     console.warn(`${TOWN_LOG} mergePR: no GitHub token available`);
     return false;
   }
 
   const mergeUrl = `https://api.github.com/repos/${owner}/${repo}/pulls/${numberStr}/merge`;
   const mergeHeaders = {
-    Authorization: `token ${token}`,
+    Authorization: `token ${resolution.token}`,
     Accept: 'application/vnd.github.v3+json',
     'Content-Type': 'application/json',
     'User-Agent': 'Gastown-Refinery/1.0',
@@ -538,8 +687,8 @@ export async function createConvoyBranch(
     featureBranch: string;
   }
 ): Promise<void> {
-  const token = await resolveGitHubToken(ctx);
-  if (!token) {
+  const resolution = await resolveGitHubToken(ctx);
+  if (!resolution.ok) {
     console.warn(
       `${TOWN_LOG} createConvoyBranch: no GitHub token available — skipping branch creation for ${opts.featureBranch}`
     );
@@ -548,15 +697,13 @@ export async function createConvoyBranch(
 
   const coords = parseGitUrl(opts.gitUrl);
   if (!coords || coords.platform !== 'github') {
-    // Non-GitHub repos or unparseable URLs: skip silently (GitLab uses a
-    // different flow; nothing breaks if the branch doesn't pre-exist there).
     return;
   }
 
   const { owner, repo } = coords;
   const apiBase = `https://api.github.com/repos/${owner}/${repo}`;
   const headers = {
-    Authorization: `token ${token}`,
+    Authorization: `token ${resolution.token}`,
     Accept: 'application/vnd.github.v3+json',
     'User-Agent': 'Gastown/1.0',
     'Content-Type': 'application/json',

@@ -2,14 +2,37 @@ import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { eq, sql } from 'drizzle-orm';
-import type {
-  BotStatusRecord,
-  ConversationStatusRecord,
-  BotStatusRequest,
-  ConversationStatusRequest,
+import { z } from 'zod';
+import {
+  capabilitySchema,
+  type BotStatusRecord,
+  type ConversationStatusRecord,
+  type BotStatusRequest,
+  type ConversationStatusRequest,
+  type Capability,
 } from '@kilocode/kilo-chat';
 import { botStatus, conversationStatus } from '../db/sandbox-status-schema';
 import migrations from '../../drizzle/sandbox-status/migrations';
+
+const storedCapabilitiesSchema = z.array(capabilitySchema).nonempty();
+
+// Defensive parser: the column stores a JSON-encoded Capability[] (or NULL).
+// Malformed JSON, unknown capability strings, or non-array shapes return
+// undefined so a corrupt row never breaks bot status reads.
+export const storedCapabilitiesColumnSchema = z.preprocess(raw => {
+  if (raw === null || raw === '') return undefined;
+  if (typeof raw !== 'string') return raw;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed;
+  } catch {
+    return undefined;
+  }
+}, storedCapabilitiesSchema.optional().catch(undefined));
+
+function parseCapabilities(raw: string | null): Capability[] | undefined {
+  return storedCapabilitiesColumnSchema.parse(raw);
+}
 
 // Internal RPC input shapes derived from the shared zod schemas. The
 // conversation-status request body has no conversationId (it lives in the
@@ -31,12 +54,16 @@ export class SandboxStatusDO extends DurableObject<Env> {
   // where the incoming `at` is strictly newer.
   putBotStatus(input: PutBotStatusInput): void {
     const updatedAt = Date.now();
+    const capabilities =
+      input.capabilities && input.capabilities.length > 0
+        ? JSON.stringify(input.capabilities)
+        : null;
     this.db
       .insert(botStatus)
-      .values({ id: 1, online: input.online, at: input.at, updatedAt })
+      .values({ id: 1, online: input.online, at: input.at, updatedAt, capabilities })
       .onConflictDoUpdate({
         target: botStatus.id,
-        set: { online: input.online, at: input.at, updatedAt },
+        set: { online: input.online, at: input.at, updatedAt, capabilities },
         setWhere: sql`${botStatus.at} < excluded.at`,
       })
       .run();
@@ -45,7 +72,13 @@ export class SandboxStatusDO extends DurableObject<Env> {
   getBotStatus(): BotStatusRecord | null {
     const row = this.db.select().from(botStatus).where(eq(botStatus.id, 1)).get();
     if (!row) return null;
-    return { online: row.online, at: row.at, updatedAt: row.updatedAt };
+    const capabilities = parseCapabilities(row.capabilities);
+    return {
+      online: row.online,
+      at: row.at,
+      updatedAt: row.updatedAt,
+      ...(capabilities !== undefined ? { capabilities } : {}),
+    };
   }
 
   putConversationStatus(input: PutConversationStatusInput): void {

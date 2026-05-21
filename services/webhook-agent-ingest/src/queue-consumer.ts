@@ -8,6 +8,7 @@ import { classifyInitiateResponse } from './initiate-response';
 import { findActiveSandboxIdForInstance, getWorkerDb } from './db/queries';
 import { getKiloChat } from './kilo-chat-binding';
 import type { PostMessageAsUserResult } from '@kilocode/kilo-chat';
+import { deriveCallbackToken } from '@kilocode/worker-utils';
 import { z } from 'zod';
 
 // Token cache TTL: 30 minutes. Token validity is 1 hour, so 30 min gives safety margin.
@@ -353,8 +354,11 @@ async function processWebhookMessage(
 
     const { token } = await getOrMintToken(env, triggerConfig);
 
-    // Fetch internalApiSecret once and reuse for both prepare/initiate calls
-    const internalApiSecret = await env.INTERNAL_API_SECRET.get();
+    // Fetch callback signing and internal API credentials once for Cloud Agent calls.
+    const [internalApiSecret, callbackTokenSecret] = await Promise.all([
+      env.INTERNAL_API_SECRET.get(),
+      env.CALLBACK_TOKEN_SECRET.get(),
+    ]);
 
     if (!cloudAgentSessionId) {
       const renderedPrompt = renderPromptTemplate(triggerConfig.promptTemplate, {
@@ -374,10 +378,15 @@ async function processWebhookMessage(
 
       // Build callback target for completion notifications
       const callbackUrl = `${env.WEBHOOK_AGENT_URL}/api/callbacks/execution`;
+      const callbackToken = await deriveCallbackToken({
+        secret: callbackTokenSecret,
+        scope: 'webhook-execution-callback',
+        resourceParts: [webhook.namespace, webhook.triggerId, webhook.requestId],
+      });
       const callbackTarget = {
         url: callbackUrl,
         headers: {
-          'x-internal-api-key': internalApiSecret,
+          'X-Callback-Token': callbackToken,
           'x-webhook-namespace': webhook.namespace,
           'x-webhook-trigger-id': webhook.triggerId,
           'x-webhook-request-id': webhook.requestId,

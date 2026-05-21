@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { BeadEventTimeline, extractPrUrl } from '@/components/gastown/ActivityFeed';
 import type { ResourceRef } from '@/components/gastown/DrawerStack';
+import { WastelandOriginLink } from './WastelandOriginLink';
 
 import { format, formatDistanceToNow } from 'date-fns';
 import {
@@ -79,6 +81,7 @@ export function BeadPanel({
 }) {
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
+  const pathname = usePathname();
   const beadsQuery = useQuery(trpc.gastown.listBeads.queryOptions({ rigId }));
   const agentsQuery = useQuery(trpc.gastown.listAgents.queryOptions({ rigId }));
   const rigQuery = useQuery(trpc.gastown.getRig.queryOptions({ rigId }));
@@ -513,6 +516,10 @@ export function BeadPanel({
           </a>
         </div>
       )}
+
+      {/* Wasteland origin link — present when this bead was created in
+          response to a wasteland event (e.g. a wanted-item claim). */}
+      <WastelandOriginLink metadata={bead.metadata} pathname={pathname} />
 
       {/* Related Beads DAG */}
       {relatedBeads.length > 0 && (

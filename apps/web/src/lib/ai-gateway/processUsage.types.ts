@@ -144,6 +144,13 @@ export type MicrodollarUsageContext = {
   auto_model: string | null;
   /** Time to first byte from the upstream provider, in milliseconds. Set after the upstream request returns. */
   ttfb_ms: number | null;
+  /**
+   * Client-supplied per-message id from the `x-kilo-request` header.
+   * Joinable to PostHog `Feedback Submitted.parentMessageID`. Optional
+   * because pre-existing construction sites (routes, tests, dev helpers)
+   * do not need to know about it.
+   */
+  clientRequestId?: string | null;
 };
 
 export type CoreUsageWithMetaData = {

@@ -49,6 +49,7 @@ export type SandboxId =
   | `bot-${string}`
   | `ubt-${string}`
   | `ses-${string}`
+  | `dind-${string}`
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
 
@@ -126,8 +127,10 @@ export type GitTokenService = {
 
 export type Env = {
   Sandbox: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for per-session sandbox containers (standard-2, experimental) */
+  /** Durable Object namespace for per-session sandbox containers (standard-2) */
   SandboxSmall: DurableObjectNamespace<Sandbox>;
+  /** Durable Object namespace for Docker-in-Docker per-session sandbox containers (standard-3) */
+  SandboxDIND: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Service binding for the session ingest worker */

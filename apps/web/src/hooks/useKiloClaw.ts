@@ -17,6 +17,16 @@ export function useKiloClawConfig() {
   return useQuery(trpc.kiloclaw.getConfig.queryOptions());
 }
 
+export function useKiloClawComposioOnboardingStatus(enabled = true, pollingEnabled = enabled) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.getComposioOnboardingStatus.queryOptions(undefined, {
+      enabled,
+      refetchInterval: enabled && pollingEnabled ? 15_000 : false,
+    })
+  );
+}
+
 export function useKiloClawPairing(enabled = true) {
   const trpc = useTRPC();
   return useQuery(
@@ -223,6 +233,20 @@ export function useKiloClawMutations() {
         onSuccess: async () => {
           await invalidateStatus();
           await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getComposioOnboardingStatus.queryKey(),
+          });
+        },
+      })
+    ),
+    createComposioGoogleCalendarLink: useMutation(
+      trpc.kiloclaw.createComposioGoogleCalendarLink.mutationOptions({
+        onSuccess: async () => {
+          await invalidateStatus();
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getComposioOnboardingStatus.queryKey(),
+          });
+          await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
         },
       })
     ),
@@ -394,6 +418,20 @@ export function useKiloClawMutations() {
             queryKey: trpc.kiloclaw.readMorningBriefing.queryKey({ day: 'today' }),
           });
         },
+      })
+    ),
+    updateBriefingInterests: useMutation(
+      trpc.kiloclaw.updateBriefingInterests.mutationOptions({
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey(),
+          });
+        },
+      })
+    ),
+    updateUserLocation: useMutation(
+      trpc.kiloclaw.updateUserLocation.mutationOptions({
+        onSuccess: invalidateStatus,
       })
     ),
     rename: useMutation(

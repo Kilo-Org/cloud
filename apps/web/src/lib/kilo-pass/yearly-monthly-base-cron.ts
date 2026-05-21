@@ -6,6 +6,7 @@ import {
   KiloPassCadence,
   KiloPassIssuanceSource,
   KiloPassAuditLogAction,
+  KiloPassPaymentProvider,
   type KiloPassTier,
 } from '@/lib/kilo-pass/enums';
 import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
@@ -44,7 +45,7 @@ export type RunYearlyMonthlyBaseCronResult = {
 type DueSubscription = {
   subscriptionId: string;
   kiloUserId: string;
-  stripeSubscriptionId: string;
+  stripeSubscriptionId: string | null;
   tier: KiloPassTier;
   nextYearlyIssueAt: string | null;
 };
@@ -190,6 +191,8 @@ export async function runKiloPassYearlyMonthlyBaseCron(
       and(
         eq(kilo_pass_subscriptions.cadence, KiloPassCadence.Yearly),
         inArray(kilo_pass_subscriptions.status, ['active', 'paused']),
+        eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.Stripe),
+        isNotNull(kilo_pass_subscriptions.stripe_subscription_id),
         isNotNull(kilo_pass_subscriptions.next_yearly_issue_at),
         lte(kilo_pass_subscriptions.next_yearly_issue_at, nowIso)
       )

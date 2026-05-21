@@ -1,4 +1,4 @@
-import type { GatewayProcessStatusResponse, KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import type { GatewayProcessStatusOkResponse, KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 
 export type PopulatedClawStatus = KiloClawDashboardStatus & {
   status: NonNullable<KiloClawDashboardStatus['status']>;
@@ -6,12 +6,21 @@ export type PopulatedClawStatus = KiloClawDashboardStatus & {
 
 export type ClawOnboardingMode = 'create-first' | 'post-provisioning';
 
-export type OnboardingStep = 'identity' | 'calendar' | 'email' | 'provisioning' | 'done';
+export type OnboardingStep =
+  | 'identity'
+  | 'tools'
+  | 'calendar'
+  | 'email'
+  | 'interests'
+  | 'provisioning'
+  | 'done';
 
 export const CLAW_ONBOARDING_WIZARD_STEPS = [
   'identity',
+  'tools',
   'calendar',
   'email',
+  'interests',
   'provisioning',
 ] as const satisfies OnboardingStep[];
 
@@ -19,8 +28,10 @@ export type ClawOnboardingWizardStep = (typeof CLAW_ONBOARDING_WIZARD_STEPS)[num
 
 export type ClawOnboardingRenderStep =
   | 'identity'
+  | 'tools'
   | 'calendar'
   | 'email'
+  | 'interests'
   | 'provisioning'
   | 'complete'
   | 'error';
@@ -34,8 +45,10 @@ export const FAKE_ONBOARDING_STEP_PARAM = 'fakeOnboardingStep';
 
 export const CLAW_ONBOARDING_FAKE_STEPS = [
   'identity',
+  'tools',
   'calendar',
   'email',
+  'interests',
   'provisioning',
   'complete',
   'error',
@@ -66,7 +79,7 @@ export type ClawOnboardingFlowStateInput = {
   setupFailed?: boolean;
   onboardingStep: OnboardingStep;
   hasBotIdentity: boolean;
-  gatewayState?: GatewayProcessStatusResponse['state'] | null;
+  gatewayState?: GatewayProcessStatusOkResponse['state'] | null;
   /**
    * Whether the calendar step is available in the wizard. Calendar OAuth is
    * gated to Kilo Code admins (the `/api/integrations/google/connect` and
@@ -75,6 +88,15 @@ export type ClawOnboardingFlowStateInput = {
    * and `'calendar'` is mapped to `'email'` in the render decision.
    */
   hasCalendarStep?: boolean;
+  hasToolsStep?: boolean;
+  /**
+   * Whether the morning-briefing Interests step is available in the wizard.
+   * Morning briefing is generally available; this is gated on controller
+   * version only (`controllerSupportsInterests` in `ClawOnboardingFlow.tsx`).
+   * When false, `'interests'` is mapped to `'provisioning'` in the render
+   * decision.
+   */
+  hasInterestsStep?: boolean;
   debugLogSource?: string;
 };
 
@@ -87,6 +109,8 @@ export type ClawOnboardingFlowState = {
   createSetupActive: boolean;
   postProvisioningReady: boolean;
   hasCalendarStep: boolean;
+  hasToolsStep: boolean;
+  hasInterestsStep: boolean;
   currentStep: number;
   totalSteps: number;
 };
@@ -108,18 +132,27 @@ export function isClawOnboardingErrorStatus(status: PopulatedClawStatus['status'
   return false;
 }
 
-function getActiveWizardSteps(hasCalendarStep: boolean): OnboardingStep[] {
+function getActiveWizardSteps(
+  hasToolsStep: boolean,
+  hasCalendarStep: boolean,
+  hasInterestsStep: boolean
+): OnboardingStep[] {
   const steps: OnboardingStep[] = ['identity'];
-  if (hasCalendarStep) steps.push('calendar');
-  steps.push('email', 'provisioning');
+  if (hasToolsStep) steps.push('tools');
+  else if (hasCalendarStep) steps.push('calendar');
+  steps.push('email');
+  if (hasInterestsStep) steps.push('interests');
+  steps.push('provisioning');
   return steps;
 }
 
 export function getClawOnboardingStepProgress(
   step: OnboardingStep,
-  hasCalendarStep: boolean = true
+  hasCalendarStep: boolean = true,
+  hasInterestsStep: boolean = true,
+  hasToolsStep: boolean = false
 ): { currentStep: number; totalSteps: number } {
-  const wizardSteps = getActiveWizardSteps(hasCalendarStep);
+  const wizardSteps = getActiveWizardSteps(hasToolsStep, hasCalendarStep, hasInterestsStep);
   const totalSteps = wizardSteps.length;
 
   if (step === 'done') {
@@ -129,7 +162,12 @@ export function getClawOnboardingStepProgress(
   // A non-admin sitting briefly on `onboardingStep === 'calendar'` (e.g. via
   // a stale `?step=calendar` URL) gets normalized to email for progress
   // display, matching the renderStep redirect in getRenderStepDecision.
-  const lookupStep: OnboardingStep = step === 'calendar' && !hasCalendarStep ? 'email' : step;
+  // Same treatment for `'interests'` → `'provisioning'`.
+  let lookupStep: OnboardingStep = step;
+  if (lookupStep === 'tools' && !hasToolsStep) lookupStep = hasCalendarStep ? 'calendar' : 'email';
+  if (lookupStep === 'calendar' && hasToolsStep) lookupStep = 'tools';
+  if (lookupStep === 'calendar' && !hasCalendarStep) lookupStep = 'email';
+  if (lookupStep === 'interests' && !hasInterestsStep) lookupStep = 'provisioning';
   const index = wizardSteps.indexOf(lookupStep);
   const currentStep = index === -1 ? 0 : index + 1;
 
@@ -145,6 +183,8 @@ export function getClawOnboardingFlowState({
   hasBotIdentity,
   gatewayState,
   hasCalendarStep = true,
+  hasToolsStep = false,
+  hasInterestsStep = true,
   debugLogSource = 'default',
 }: ClawOnboardingFlowStateInput): ClawOnboardingFlowState {
   const instanceStatus = hasPopulatedStatus(status) ? status : null;
@@ -156,7 +196,9 @@ export function getClawOnboardingFlowState({
     mode === 'create-first' && (createSetupStarted || instanceStatus !== null);
   const { currentStep, totalSteps } = getClawOnboardingStepProgress(
     onboardingStep,
-    hasCalendarStep
+    hasCalendarStep,
+    hasInterestsStep,
+    hasToolsStep
   );
   const renderStepDecision = getRenderStepDecision({
     mode,
@@ -166,7 +208,9 @@ export function getClawOnboardingFlowState({
     postProvisioningReady,
     onboardingStep,
     hasBotIdentity,
+    hasToolsStep,
     hasCalendarStep,
+    hasInterestsStep,
   });
   const flowState = {
     renderStep: renderStepDecision.renderStep,
@@ -177,6 +221,8 @@ export function getClawOnboardingFlowState({
     createSetupActive,
     postProvisioningReady,
     hasCalendarStep,
+    hasToolsStep,
+    hasInterestsStep,
     currentStep,
     totalSteps,
   } satisfies ClawOnboardingFlowState;
@@ -190,6 +236,8 @@ export function getClawOnboardingFlowState({
     hasBotIdentity,
     gatewayState,
     hasCalendarStep,
+    hasToolsStep,
+    hasInterestsStep,
     debugLogSource,
     instanceStatus,
     isRunning,
@@ -211,7 +259,9 @@ type RenderStepInput = Pick<
 > & {
   instanceStatus: PopulatedClawStatus | null;
   postProvisioningReady: boolean;
+  hasToolsStep: boolean;
   hasCalendarStep: boolean;
+  hasInterestsStep: boolean;
 };
 
 type RenderStepDecision = {
@@ -221,7 +271,9 @@ type RenderStepDecision = {
 
 type ClawOnboardingFlowDebugLogInput = ClawOnboardingFlowStateInput & {
   debugLogSource: string;
+  hasToolsStep: boolean;
   hasCalendarStep: boolean;
+  hasInterestsStep: boolean;
   instanceStatus: PopulatedClawStatus | null;
   isRunning: boolean;
   gatewayReady: boolean;
@@ -250,7 +302,9 @@ function getRenderStepDecision({
   postProvisioningReady,
   onboardingStep,
   hasBotIdentity,
+  hasToolsStep,
   hasCalendarStep,
+  hasInterestsStep,
 }: RenderStepInput): RenderStepDecision {
   if (instanceStatus && isClawOnboardingErrorStatus(instanceStatus.status)) {
     return {
@@ -271,7 +325,25 @@ function getRenderStepDecision({
     // wizard often remounts in post-provisioning mode because the instance
     // row is now visible — but the user is still mid-wizard. Honor any
     // explicit wizard step rather than auto-routing them past it.
+    if (onboardingStep === 'tools') {
+      if (!hasToolsStep) {
+        return {
+          renderStep: hasCalendarStep ? 'calendar' : 'email',
+          reason: 'tools step is unavailable; advance to the next configured setup step',
+        };
+      }
+      return {
+        renderStep: 'tools',
+        reason: 'tools resume requested; honor it even in post-provisioning mode',
+      };
+    }
     if (onboardingStep === 'calendar') {
+      if (hasToolsStep) {
+        return {
+          renderStep: 'tools',
+          reason: 'managed Composio tools step replaces calendar in this flow',
+        };
+      }
       if (!hasCalendarStep) {
         return {
           renderStep: 'email',
@@ -288,6 +360,19 @@ function getRenderStepDecision({
       return {
         renderStep: 'email',
         reason: 'wizard resume on email; honor it even in post-provisioning mode',
+      };
+    }
+    if (onboardingStep === 'interests') {
+      if (!hasInterestsStep) {
+        return {
+          renderStep: 'provisioning',
+          reason:
+            'interests step is admin-only and the current user is not an admin; advance to provisioning',
+        };
+      }
+      return {
+        renderStep: 'interests',
+        reason: 'wizard resume on interests; honor it even in post-provisioning mode',
       };
     }
     if (onboardingStep === 'provisioning') {
@@ -308,7 +393,11 @@ function getRenderStepDecision({
     };
   }
 
-  if (instanceStatus === null && !createSetupStarted) {
+  if (
+    instanceStatus === null &&
+    !createSetupStarted &&
+    (onboardingStep === 'identity' || !hasBotIdentity)
+  ) {
     return {
       renderStep: 'identity',
       reason: 'create-first mode starts with bot identity before setup is requested',
@@ -331,7 +420,26 @@ function getRenderStepDecision({
     };
   }
 
+  if (onboardingStep === 'tools') {
+    if (!hasToolsStep) {
+      return {
+        renderStep: hasCalendarStep ? 'calendar' : 'email',
+        reason: 'tools step is unavailable; advance to the next configured setup step',
+      };
+    }
+    return {
+      renderStep: 'tools',
+      reason: 'stored onboarding step is tools',
+    };
+  }
+
   if (onboardingStep === 'calendar') {
+    if (hasToolsStep) {
+      return {
+        renderStep: 'tools',
+        reason: 'managed Composio tools step replaces calendar in this flow',
+      };
+    }
     if (!hasCalendarStep) {
       return {
         renderStep: 'email',
@@ -349,6 +457,20 @@ function getRenderStepDecision({
     return {
       renderStep: 'email',
       reason: 'stored onboarding step is email',
+    };
+  }
+
+  if (onboardingStep === 'interests') {
+    if (!hasInterestsStep) {
+      return {
+        renderStep: 'provisioning',
+        reason:
+          'interests step is admin-only and the current user is not an admin; advance to provisioning',
+      };
+    }
+    return {
+      renderStep: 'interests',
+      reason: 'stored onboarding step is interests',
     };
   }
 
@@ -373,7 +495,9 @@ function logClawOnboardingFlowStateDecision({
   onboardingStep,
   hasBotIdentity,
   gatewayState,
+  hasToolsStep,
   hasCalendarStep,
+  hasInterestsStep,
   debugLogSource,
   instanceStatus,
   isRunning,
@@ -395,7 +519,9 @@ function logClawOnboardingFlowStateDecision({
       onboardingStep,
       hasBotIdentity,
       gatewayState: gatewayState ?? null,
+      hasToolsStep,
       hasCalendarStep,
+      hasInterestsStep,
       status: status?.status ?? null,
       hasStatusResponse: status !== undefined,
     },

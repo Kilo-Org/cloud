@@ -10,9 +10,11 @@
     "preinstall": "npx only-allow pnpm",
     "deploy": "wrangler deploy",
     "predev": "pnpm run build:wrapper",
-    "dev": "wrangler dev --env 'dev'",
+    "dev": "scripts/dev-with-docker-proxy.sh --env dev",
+    "dev:no-proxy": "wrangler dev --env 'dev'",
+    "dev:docker-proxy": "node scripts/docker-privileged-proxy.mjs",
     "prestart": "pnpm run build:wrapper",
-    "start": "wrangler dev",
+    "start": "scripts/dev-with-docker-proxy.sh",
     "types": "wrangler types",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/cloud-agent-next/src services/cloud-agent-next/wrapper/src",
     "format": "oxfmt src",
@@ -24,11 +26,12 @@
     "test:integration:watch": "vitest --config vitest.workers.config.ts",
     "test:wrapper": "pnpm -C wrapper run test",
     "test:all": "vitest run && vitest run --config vitest.workers.config.ts && pnpm run test:wrapper",
-    "typecheck": "tsgo --noEmit && pnpm -C wrapper run typecheck"
+    "typecheck": "tsgo --noEmit && pnpm -C wrapper run typecheck",
+    "update-default-slash-commands": "node scripts/update-default-slash-commands.mjs"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.9.2",
-    "@hono/trpc-server": "^0.4.2",
+    "@cloudflare/sandbox": "0.10.1",
+    "@hono/trpc-server": "0.4.2",
     "@kilocode/cloud-agent-profile": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
@@ -36,21 +39,22 @@
     "@trpc/server": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
+    "jsonc-parser": "3.3.1",
     "jsonwebtoken": "catalog:",
-    "ulid": "3.0.1",
+    "ulid": "catalog:",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/containers": "0.3.3",
-    "@cloudflare/vitest-pool-workers": "^0.12.21",
+    "@cloudflare/containers": "0.3.4",
+    "@cloudflare/vitest-pool-workers": "catalog:",
     "@types/jsonwebtoken": "catalog:",
-    "@types/node": ">=24 <25",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "@vitest/ui": "^3.2.4",
+    "@vitest/ui": "catalog:",
     "drizzle-kit": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^3.2.4",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

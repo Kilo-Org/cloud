@@ -138,7 +138,13 @@ export async function postMessageAsUser(
       error: result.error,
       ...correlation,
     });
-    return { ok: false, code: result.code, error: result.error };
+    if (result.code === 'forbidden') {
+      return { ok: false, code: 'forbidden', error: result.error };
+    }
+    if (result.code === 'invalid' || result.code === 'conflict') {
+      return { ok: false, code: 'invalid_request', error: result.error };
+    }
+    return { ok: false, code: 'internal', error: result.error };
   }
 
   logger.info('postMessageAsUser: delivered', {

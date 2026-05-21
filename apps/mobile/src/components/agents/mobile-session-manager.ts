@@ -9,6 +9,7 @@ import {
   type ResolvedSession,
   type SessionManager,
   type SessionSnapshot,
+  type TransportSendPayload,
 } from 'cloud-agent-sdk';
 import { normalizeAgentMode } from '@/components/agents/mode-options';
 import {
@@ -23,6 +24,7 @@ import {
   WEB_BASE_URL,
 } from '@/lib/config';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
+import { type SendMessagePayload } from '@/lib/cloud-agent-next/types';
 
 type CreateMobileAgentSessionManagerOptions = {
   store: JotaiStore;
@@ -32,6 +34,28 @@ type CreateMobileAgentSessionManagerOptions = {
 type AgentMode = 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
 
 const skipBatchOptions = { context: { skipBatch: true } };
+
+function normalizeTransportPayload(payload: TransportSendPayload): SendMessagePayload {
+  if (payload.type === 'prompt') {
+    if (!payload.model) {
+      throw new Error('Model is required');
+    }
+
+    return {
+      type: 'prompt',
+      prompt: payload.prompt,
+      mode: normalizeAgentMode(payload.mode),
+      model: payload.model,
+      variant: payload.variant,
+    };
+  }
+
+  return {
+    type: 'command',
+    command: payload.command,
+    arguments: payload.arguments,
+  };
+}
 
 export function createMobileAgentSessionManager({
   store,
@@ -114,28 +138,23 @@ export function createMobileAgentSessionManager({
       return result.token;
     },
     api: {
-      send: async payload => {
+      send: async input => {
         await withCloudAgentDiagnostics('send', organizationId, async () => {
-          if (!payload.model) {
-            throw new Error('Model is required');
-          }
-          const input = {
-            cloudAgentSessionId: payload.sessionId as string,
-            prompt: payload.prompt,
-            mode: normalizeAgentMode(payload.mode),
-            model: payload.model,
-            variant: payload.variant,
+          const payload = normalizeTransportPayload(input.payload);
+          const baseInput = {
+            cloudAgentSessionId: input.sessionId as string,
+            payload,
             autoCommit: true,
-            messageId: payload.messageId,
+            messageId: input.messageId,
           };
           if (organizationId) {
             await trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
-              { ...input, organizationId },
+              { ...baseInput, organizationId },
               skipBatchOptions
             );
             return;
           }
-          await trpcClient.cloudAgentNext.sendMessage.mutate(input, skipBatchOptions);
+          await trpcClient.cloudAgentNext.sendMessage.mutate(baseInput, skipBatchOptions);
         });
       },
       interrupt: async payload => {
@@ -208,6 +227,9 @@ export function createMobileAgentSessionManager({
       const prepared = await withCloudAgentDiagnostics('prepare', organizationId, async () => {
         const castInput = {
           ...input,
+          initialPayload: input.initialPayload
+            ? normalizeTransportPayload(input.initialPayload)
+            : undefined,
           mode: input.mode as AgentMode,
         };
         const result = organizationId

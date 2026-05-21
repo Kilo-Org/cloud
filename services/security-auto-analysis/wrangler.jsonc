@@ -42,7 +42,6 @@
         "max_retries": 3,
         "dead_letter_queue": "security-auto-analysis-owner-dlq",
         "max_concurrency": 50,
-        "type": "unbound",
       },
     ],
   },
@@ -62,6 +61,11 @@
       "binding": "INTERNAL_API_SECRET",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
+    {
+      "binding": "CALLBACK_TOKEN_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "CALLBACK_TOKEN_SECRET_PROD",
     },
     {
       "binding": "NEXTAUTH_SECRET",
@@ -98,7 +102,6 @@
             "max_retries": 3,
             "dead_letter_queue": "security-auto-analysis-owner-dlq-dev",
             "max_concurrency": 50,
-            "type": "unbound",
           },
         ],
       },
@@ -118,6 +121,11 @@
           "binding": "INTERNAL_API_SECRET",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
           "secret_name": "INTERNAL_API_SECRET_DEV",
+        },
+        {
+          "binding": "CALLBACK_TOKEN_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "CALLBACK_TOKEN_SECRET_DEV",
         },
         {
           "binding": "NEXTAUTH_SECRET",

@@ -18,6 +18,40 @@ type GitTokenService = {
 	getTokenForRepo(params: { githubRepo: string; userId: string; orgId?: string }): Promise<GetTokenForRepoResult>;
 	getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
 };
+// WASTELAND_SERVICE RPC types — corresponds to WastelandRPCEntrypoint in services/wasteland
+type WastelandRpcSuccess<T> = { success: true; data: T };
+type WastelandRpcFailure = {
+	success: false;
+	code: 'NOT_FOUND' | 'PRECONDITION_FAILED' | 'INTERNAL_SERVER_ERROR' | 'UPSTREAM_ERROR';
+	message: string;
+};
+type WastelandRpcResult<T> = WastelandRpcSuccess<T> | WastelandRpcFailure;
+type WastelandService = {
+	browseWantedBoard(params: {
+		wastelandId: string;
+		userId: string;
+	}): Promise<WastelandRpcResult<Array<Record<string, unknown>>>>;
+	claimWantedItem(params: {
+		wastelandId: string;
+		userId: string;
+		itemId: string;
+	}): Promise<WastelandRpcResult<{ success: true; pr_url: string | null }>>;
+	postWantedItem(params: {
+		wastelandId: string;
+		userId: string;
+		title: string;
+		description: string;
+		priority?: 'low' | 'medium' | 'high' | 'critical';
+		type?: 'feature' | 'bug' | 'docs' | 'other';
+		publish?: boolean;
+	}): Promise<WastelandRpcResult<{ success: true; wantedId: string; pr_url: string | null }>>;
+	markWantedItemDone(params: {
+		wastelandId: string;
+		userId: string;
+		itemId: string;
+		evidence: string;
+	}): Promise<WastelandRpcResult<{ success: true; pr_url: string | null }>>;
+};
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/gastown.worker");
@@ -32,6 +66,7 @@ declare namespace Cloudflare {
 		CF_ACCESS_AUD: "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be";
 		KILO_API_URL: "http://192.168.65.254:3000";
 		GASTOWN_API_URL: "http://192.168.65.254:8787";
+		WASTELAND_API_URL: "http://192.168.65.254:8787";
 		GASTOWN_USER: DurableObjectNamespace<import("./src/gastown.worker").GastownUserDO>;
 		GASTOWN_ORG: DurableObjectNamespace<import("./src/gastown.worker").GastownOrgDO>;
 		AGENT_IDENTITY: DurableObjectNamespace<import("./src/gastown.worker").AgentIdentityDO>;
@@ -39,6 +74,7 @@ declare namespace Cloudflare {
 		TOWN_CONTAINER: DurableObjectNamespace<import("./src/gastown.worker").TownContainerDO>;
 		AGENT: DurableObjectNamespace<import("./src/gastown.worker").AgentDO>;
 		GIT_TOKEN_SERVICE: GitTokenService;
+		WASTELAND_SERVICE: WastelandService;
 		AI: Ai;
 		AGENT_DB_SNAPSHOTS_KV: KVNamespace;
 	}
@@ -51,6 +87,7 @@ declare namespace Cloudflare {
 		CF_ACCESS_AUD: "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be";
 		KILO_API_URL: "http://192.168.65.254:3000" | "https://api.kilo.ai";
 		GASTOWN_API_URL: "http://192.168.65.254:8787" | "https://gastown.kiloapps.io";
+		WASTELAND_API_URL: "http://192.168.65.254:8787" | "https://wasteland.kiloapps.io";
 		GASTOWN_USER: DurableObjectNamespace<import("./src/gastown.worker").GastownUserDO>;
 		GASTOWN_ORG: DurableObjectNamespace<import("./src/gastown.worker").GastownOrgDO>;
 		AGENT_IDENTITY: DurableObjectNamespace<import("./src/gastown.worker").AgentIdentityDO>;
@@ -58,6 +95,7 @@ declare namespace Cloudflare {
 		TOWN_CONTAINER: DurableObjectNamespace<import("./src/gastown.worker").TownContainerDO>;
 		AGENT: DurableObjectNamespace<import("./src/gastown.worker").AgentDO>;
 		GIT_TOKEN_SERVICE: GitTokenService;
+		WASTELAND_SERVICE: WastelandService;
 		AI: Ai;
 		AGENT_DB_SNAPSHOTS_KV: KVNamespace;
 		HYPERDRIVE?: Hyperdrive;

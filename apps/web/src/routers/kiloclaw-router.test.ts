@@ -1,8 +1,15 @@
-process.env.STRIPE_KILOCLAW_COMMIT_PRICE_ID ||= 'price_commit';
-process.env.STRIPE_KILOCLAW_STANDARD_PRICE_ID ||= 'price_standard';
-process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
+process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID ||= 'price_legacy_standard_intro';
+process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID ||= 'price_legacy_standard';
+process.env.STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID ||= 'price_legacy_commit';
+process.env.STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID ||= 'price_current_standard';
+process.env.STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID ||= 'price_current_commit';
+process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID ||= 'price_legacy_standard_intro';
+process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID ||= 'price_legacy_standard';
+process.env.STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID ||= 'price_legacy_commit';
+process.env.STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID ||= 'price_current_standard';
+process.env.STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID ||= 'price_current_commit';
 process.env.KILOCLAW_API_URL ||= 'https://claw.test';
-process.env.KILOCLAW_INTERNAL_API_SECRET ||= 'test-secret';
+process.env.INTERNAL_API_SECRET ||= 'test-secret';
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
@@ -22,6 +29,10 @@ import {
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
+
+(kiloclaw_subscriptions.kiloclaw_price_version as { defaultFn: () => string }).defaultFn = () =>
+  LEGACY_KILOCLAW_PRICE_VERSION;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
@@ -60,6 +71,18 @@ jest.mock('@/lib/kiloclaw/stripe-price-ids.server', () => ({
     if (priceId === 'price_standard_intro') return 'standard';
     return null;
   }),
+  getStripePriceIdMetadata: jest.fn((priceId: string) => {
+    if (priceId === 'price_commit') {
+      return { plan: 'commit', priceVersion: '2026-03-19', isIntro: false };
+    }
+    if (priceId === 'price_standard') {
+      return { plan: 'standard', priceVersion: '2026-03-19', isIntro: false };
+    }
+    if (priceId === 'price_standard_intro') {
+      return { plan: 'standard', priceVersion: '2026-03-19', isIntro: true };
+    }
+    return null;
+  }),
   isIntroPriceId: jest.fn((priceId: string) => priceId === 'price_standard_intro'),
 }));
 
@@ -77,7 +100,7 @@ jest.mock('@/lib/config.server', () => {
   return {
     ...actual,
     KILOCLAW_API_URL: 'https://claw.test',
-    KILOCLAW_INTERNAL_API_SECRET: 'test-secret',
+    INTERNAL_API_SECRET: 'test-secret',
   };
 });
 
@@ -425,6 +448,8 @@ describe('kiloclawRouter getStatus', () => {
       botNature: null,
       botVibe: null,
       botEmoji: null,
+      userLocation: null,
+      userTimezone: null,
       workerUrl: 'https://claw.test',
       name: null,
       instanceId: null,

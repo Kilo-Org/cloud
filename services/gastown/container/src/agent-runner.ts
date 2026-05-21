@@ -85,7 +85,7 @@ export function buildKiloConfigContent(
   } satisfies Config);
 }
 
-function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
+export function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
   // Custom git identity: when GASTOWN_GIT_AUTHOR_NAME is set, the user becomes
   // the primary author and the AI agent name is used for co-authorship trailers.
   const customAuthorName = resolveEnv(request, 'GASTOWN_GIT_AUTHOR_NAME');
@@ -173,8 +173,29 @@ GASTOWN_TOWN_ID="${env.GASTOWN_TOWN_ID}"`);
     console.log(
       `[buildAgentEnv] KILO_CONFIG_CONTENT set (model=${request.model}, smallModel=${request.smallModel ?? '(default)'})`
     );
+
+    // Set KILO_AUTH_CONTENT so the kilo CLI's session-ingest path can
+    // authenticate. The CLI's Auth.all() reads this env var before
+    // falling back to the auth.json file. Without it, session deltas
+    // get "session bootstrap skipped: no client" and never reach
+    // cli_sessions_v2.
+    env.KILO_AUTH_CONTENT = JSON.stringify({
+      kilo: { type: 'api', key: kilocodeToken },
+    });
   } else {
     console.warn('[buildAgentEnv] No KILOCODE_TOKEN available — KILO_CONFIG_CONTENT not set');
+  }
+
+  // Set KILO_PLATFORM so session-ingest writes created_on_platform =
+  // 'gastown'. The /cloud/sessions page has a "Gastown" filter that
+  // matches this value.
+  env.KILO_PLATFORM = 'gastown';
+
+  // Set KILO_ORG_ID so session-ingest populates organization_id for
+  // org-scoped filtering. Falls back to the auth file's accountId
+  // inside the CLI if not set.
+  if (request.organizationId) {
+    env.KILO_ORG_ID = request.organizationId;
   }
 
   // Authenticate the gh CLI via GH_TOKEN. Prefer the user's GitHub CLI PAT
@@ -411,6 +432,19 @@ async function createLightweightWorkspace(label: string, rigId: string): Promise
  */
 async function createMayorWorkspace(rigId: string): Promise<string> {
   return createLightweightWorkspace('mayor', rigId);
+}
+
+/**
+ * Ensure the mayor workdir exists on disk for a given town, creating
+ * a lightweight git-initialized workspace if needed.
+ *
+ * Used by `prewarmMayorSDK`, which runs before `runAgent` and so cannot
+ * rely on `createMayorWorkspace` having been called yet — without this,
+ * `ensureSDKServer` would throw `ENOENT` from `process.chdir(workdir)`
+ * and the prewarm benefit would never materialize on cold containers.
+ */
+export async function ensureMayorWorkspaceForTown(townId: string): Promise<string> {
+  return createMayorWorkspace(`mayor-${townId}`);
 }
 
 /**

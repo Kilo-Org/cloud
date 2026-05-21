@@ -108,12 +108,16 @@ import {
   finalizeDestroyIfComplete,
   reconcileMachineMount,
   markRestartSuccessful,
+  emitDestroyPendingTelemetry,
+  maybeEmitDestroyStuckTelemetry,
 } from './reconcile';
 import {
   restoreFromPostgres,
   markDestroyedInPostgresHelper,
+  readMorningBriefingConfigFromPostgresHelper,
   syncAdminSizeOverrideToPostgresHelper,
   syncInstanceTypeToPostgresHelper,
+  syncMorningBriefingConfigToPostgresHelper,
   syncTrackedImageTagToPostgresHelper,
 } from './postgres';
 import {
@@ -173,6 +177,14 @@ const BRAVE_SEARCH_FIELD_KEY = 'braveSearchApiKey';
  * For null persisted state, falls back to live inference from machineSize +
  * volumeSizeGb, which returns null when there's nothing to infer from.
  */
+function shallowEqualStringArrays(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 function resolveInstanceTypeFromState(
   state: Pick<InstanceMutableState, 'instanceType' | 'machineSize' | 'volumeSizeGb'>
 ): InstanceType | null {
@@ -403,6 +415,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
   }
 
+  private providerErrorStatus(err: unknown): number | null {
+    if (typeof err !== 'object' || err === null || !('status' in err)) return null;
+    const status = err.status;
+    return typeof status === 'number' ? status : null;
+  }
+
   private async retryNonFlyDestroy(): Promise<void> {
     if (this.s.provider === 'fly') {
       throw new Error('retryNonFlyDestroy should not be used for Fly providers');
@@ -418,7 +436,29 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         await this.persistProviderResultWithPatch(result, {
           pendingDestroyMachineId: null,
         });
+        if (!this.s.pendingDestroyVolumeId) {
+          this.s.lastDestroyErrorOp = null;
+          this.s.lastDestroyErrorStatus = null;
+          this.s.lastDestroyErrorMessage = null;
+          this.s.lastDestroyErrorAt = null;
+          await this.persist({
+            lastDestroyErrorOp: null,
+            lastDestroyErrorStatus: null,
+            lastDestroyErrorMessage: null,
+            lastDestroyErrorAt: null,
+          });
+        }
       } catch (err) {
+        this.s.lastDestroyErrorOp = 'machine';
+        this.s.lastDestroyErrorStatus = this.providerErrorStatus(err);
+        this.s.lastDestroyErrorMessage = err instanceof Error ? err.message : String(err);
+        this.s.lastDestroyErrorAt = Date.now();
+        await this.persist({
+          lastDestroyErrorOp: 'machine',
+          lastDestroyErrorStatus: this.s.lastDestroyErrorStatus,
+          lastDestroyErrorMessage: this.s.lastDestroyErrorMessage,
+          lastDestroyErrorAt: this.s.lastDestroyErrorAt,
+        });
         doWarn(this.s, 'Non-Fly runtime destroy failed, alarm will retry', {
           provider: this.s.provider,
           runtimeId: this.s.pendingDestroyMachineId,
@@ -437,7 +477,29 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         await this.persistProviderResultWithPatch(result, {
           pendingDestroyVolumeId: null,
         });
+        if (!this.s.pendingDestroyMachineId) {
+          this.s.lastDestroyErrorOp = null;
+          this.s.lastDestroyErrorStatus = null;
+          this.s.lastDestroyErrorMessage = null;
+          this.s.lastDestroyErrorAt = null;
+          await this.persist({
+            lastDestroyErrorOp: null,
+            lastDestroyErrorStatus: null,
+            lastDestroyErrorMessage: null,
+            lastDestroyErrorAt: null,
+          });
+        }
       } catch (err) {
+        this.s.lastDestroyErrorOp = 'volume';
+        this.s.lastDestroyErrorStatus = this.providerErrorStatus(err);
+        this.s.lastDestroyErrorMessage = err instanceof Error ? err.message : String(err);
+        this.s.lastDestroyErrorAt = Date.now();
+        await this.persist({
+          lastDestroyErrorOp: 'volume',
+          lastDestroyErrorStatus: this.s.lastDestroyErrorStatus,
+          lastDestroyErrorMessage: this.s.lastDestroyErrorMessage,
+          lastDestroyErrorAt: this.s.lastDestroyErrorAt,
+        });
         doWarn(this.s, 'Non-Fly storage destroy failed, alarm will retry', {
           provider: this.s.provider,
           storageId: this.s.pendingDestroyVolumeId,
@@ -917,6 +979,28 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         userTimezone,
         userLocation,
       });
+      // Best-effort propagation to the morning-briefing plugin's
+      // config.json so the next brief picks up the new value without
+      // waiting for a container restart. `writeUserProfile` above
+      // already persisted the location in USER.md, and the plugin's
+      // KILOCLAW_USER_LOCATION env-var path picks it up on next deploy.
+      // Failures here (plugin restarting, write-queue contention, old
+      // controller image missing the route, gateway proxy hiccup) are
+      // logged but do NOT fail the user's save. Failing the whole
+      // tRPC mutation on a transient plugin-side issue means the user
+      // sees a 500 in the UI even though the location was accepted by
+      // the DO and persisted to USER.md.
+      if (userLocation !== previousUserLocation) {
+        try {
+          await gateway.updateMorningBriefingUserLocation(this.s, this.env, {
+            userLocation,
+          });
+        } catch (err) {
+          doWarn(this.s, 'updateMorningBriefingUserLocation failed', {
+            error: toLoggable(err),
+          });
+        }
+      }
     }
 
     if (isNew) {
@@ -2101,31 +2185,61 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.provider
     );
 
-    const startResult = await this.provider().startRuntime({
-      env: this.env,
-      state: this.s,
-      runtimeSpec,
-      minSecretsVersion,
-      preferredRegion: this.env.FLY_REGION,
-      onProviderResult: result => this.persistProviderResult(result),
-      onCapacityRecovery: async err => {
-        const code = err instanceof fly.FlyApiError ? err.status : 0;
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        this.emitStartCapacityRecovery(errorMessage, this.capacityRecoveryLabel(err));
-        doError(this.s, 'Insufficient resources, replacing stranded volume', {
-          statusCode: code,
-          region: this.s.flyRegion ?? 'unknown',
-        });
+    const startRuntime = () =>
+      this.provider().startRuntime({
+        env: this.env,
+        state: this.s,
+        runtimeSpec,
+        minSecretsVersion,
+        preferredRegion: this.env.FLY_REGION,
+        onProviderResult: result => this.persistProviderResult(result),
+        onCapacityRecovery: async err => {
+          const code = err instanceof fly.FlyApiError ? err.status : 0;
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          this.emitStartCapacityRecovery(errorMessage, this.capacityRecoveryLabel(err));
+          doError(this.s, 'Insufficient resources, replacing stranded volume', {
+            statusCode: code,
+            region: this.s.flyRegion ?? 'unknown',
+          });
 
-        if (code === 403 && this.s.flyRegion) {
-          await regionHelpers.evictCapacityRegionFromKV(
-            this.env.KV_CLAW_CACHE,
-            this.env,
-            this.s.flyRegion
-          );
-        }
-      },
-    });
+          if (code === 403 && this.s.flyRegion) {
+            await regionHelpers.evictCapacityRegionFromKV(
+              this.env.KV_CLAW_CACHE,
+              this.env,
+              this.s.flyRegion
+            );
+          }
+        },
+      });
+
+    let startResult: ProviderResult;
+    try {
+      startResult = await startRuntime();
+    } catch (err) {
+      if (!isFlyProvider || this.s.flyMachineId || !fly.isFlyMissingVolume(err)) {
+        throw err;
+      }
+
+      const flyState = getFlyProviderState(this.s);
+      doWarn(this.s, 'Volume not found during machine creation, clearing', {
+        volumeId: flyState.volumeId,
+      });
+      await this.persistProviderResult({
+        providerState: {
+          ...flyState,
+          volumeId: null,
+          region: null,
+        },
+      });
+      await this.persistProviderResult(
+        await this.provider().ensureStorage({
+          env: this.env,
+          state: this.s,
+          reason: 'start_missing_volume_recovery',
+        })
+      );
+      startResult = await startRuntime();
+    }
     await this.persistProviderResult(startResult);
 
     if (getRuntimeId(this.s)) {
@@ -2412,15 +2526,25 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const machineUptimeMs = this.s.lastStartedAt ? Date.now() - this.s.lastStartedAt : 0;
     const runtimeId = getRuntimeId(this.s);
     const storageId = getStorageId(this.s);
+    const destroyStartedAt = this.s.destroyStartedAt ?? Date.now();
 
     this.s.pendingDestroyMachineId = runtimeId;
     this.s.pendingDestroyVolumeId = storageId;
+    // Counter tracks "consecutive failures on the current pendingDestroyVolumeId".
+    // Reset on every fresh destroy() invocation so a previous failing cycle's
+    // count never bleeds into a new destroy attempt's cap window.
+    this.s.destroyVolumeAttempts = 0;
+    this.s.destroyStartedAt = destroyStartedAt;
+    this.s.lastDestroyPendingEventAt = null;
     this.s.status = 'destroying';
 
     await this.persist({
       status: 'destroying',
       pendingDestroyMachineId: this.s.pendingDestroyMachineId,
       pendingDestroyVolumeId: this.s.pendingDestroyVolumeId,
+      destroyVolumeAttempts: 0,
+      destroyStartedAt,
+      lastDestroyPendingEventAt: null,
     });
 
     this.emitEvent({
@@ -2521,10 +2645,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     if (!finalized.finalized) {
-      doWarn(this.s, 'Destroy incomplete, alarm will retry', {
-        pendingMachineId: this.s.pendingDestroyMachineId,
-        pendingVolumeId: this.s.pendingDestroyVolumeId,
-      });
+      emitDestroyPendingTelemetry(this.s, destroyRctx);
       await this.scheduleAlarm();
     }
 
@@ -2578,6 +2699,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     botNature: string | null;
     botVibe: string | null;
     botEmoji: string | null;
+    userLocation: string | null;
+    userTimezone: string | null;
     controllerCapabilitiesVersion: number | null;
   }> {
     await this.loadState();
@@ -2628,6 +2751,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       botNature: this.s.botNature,
       botVibe: this.s.botVibe,
       botEmoji: this.s.botEmoji,
+      userLocation: this.s.userLocation ?? null,
+      userTimezone: this.s.userTimezone ?? null,
       controllerCapabilitiesVersion: this.s.controllerCapabilitiesVersion,
     };
   }
@@ -2673,6 +2798,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     gmailNotificationsEnabled: boolean;
     pendingDestroyMachineId: string | null;
     pendingDestroyVolumeId: string | null;
+    destroyStartedAt: number | null;
+    lastDestroyPendingEventAt: number | null;
     pendingPostgresMarkOnFinalize: boolean;
     lastMetadataRecoveryAt: number | null;
     lastLiveCheckAt: number | null;
@@ -2764,6 +2891,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       gmailNotificationsEnabled: this.s.gmailNotificationsEnabled,
       pendingDestroyMachineId: this.s.pendingDestroyMachineId,
       pendingDestroyVolumeId: this.s.pendingDestroyVolumeId,
+      destroyStartedAt: this.s.destroyStartedAt,
+      lastDestroyPendingEventAt: this.s.lastDestroyPendingEventAt,
       pendingPostgresMarkOnFinalize: this.s.pendingPostgresMarkOnFinalize,
       lastMetadataRecoveryAt: this.s.lastMetadataRecoveryAt,
       lastLiveCheckAt: this.s.lastLiveCheckAt,
@@ -3640,22 +3769,221 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   async getMorningBriefingStatus() {
     await this.loadState();
-    return gateway.getMorningBriefingStatus(this.s, this.env);
+    // Plugin remains the source of truth for runtime state (reconcileState,
+    // lastGeneratedAt, observedEnabled). Postgres mirrors desired-state
+    // (enabled / cron / timezone / interest_topics). Read both, surface
+    // interest_topics from Postgres (the plugin response has no such field
+    // in PR-4a), and keep the plugin's own enabled/cron/timezone for the
+    // response — those agree under steady state, and the plugin is what
+    // actually drives the cron.
+    const [pg, pluginStatus] = await Promise.all([
+      readMorningBriefingConfigFromPostgresHelper(this.env, this.s),
+      gateway.getMorningBriefingStatus(this.s, this.env),
+    ]);
+
+    // Plugin not reachable (gateway warming, route missing, etc.) → return
+    // null to preserve the existing controller_route_unavailable behavior
+    // the route handler relies on. We could synthesize a response from
+    // Postgres here, but doing so would mask the warming state from
+    // callers that branch on it.
+    if (!pluginStatus) return null;
+
+    // Lazy backfill: plugin reports a configured briefing for an instance
+    // that has no Postgres row yet (legacy instance pre-dating PR-4a, or
+    // a post-PR instance whose previous best-effort waitUntil mirror
+    // write failed). Schedule the write via `waitUntil` so it doesn't
+    // add latency to the status response. Best-effort: matches the
+    // enable/disable paths.
+    //
+    // Forward `interestTopics` from the plugin response when present.
+    // Without this, an instance with valid topics in config.json but a
+    // missing Postgres row (e.g. transient Hyperdrive failure on the
+    // interests path) would have its topics silently reset to `[]` by
+    // the backfill row's column default. Falling back to "omit" when
+    // older controllers don't include the field keeps existing
+    // interests untouched via the upsert helper's patch semantics.
+    //
+    // `pg.instanceId` was just resolved by the parallel Postgres read;
+    // pass it through so the helper skips the redundant
+    // `getInstanceBySandboxId` lookup.
+    if (
+      pg &&
+      pg.row === null &&
+      typeof pluginStatus.enabled === 'boolean' &&
+      typeof pluginStatus.cron === 'string'
+    ) {
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(
+          this.env,
+          this.s,
+          {
+            enabled: pluginStatus.enabled,
+            cron: pluginStatus.cron,
+            timezone: pluginStatus.timezone,
+            ...(Array.isArray(pluginStatus.interestTopics) && {
+              interestTopics: pluginStatus.interestTopics,
+            }),
+          },
+          pg.instanceId
+        )
+      );
+    }
+
+    // Plugin is the source of truth for interestTopics — the Postgres
+    // row is a denormalized read cache. When the plugin reports topics
+    // and Postgres disagrees (e.g. a previous best-effort `waitUntil`
+    // mirror write failed after the plugin accepted a change), the
+    // plugin response wins on this read AND we schedule a repair so
+    // subsequent admin queries against Postgres see the fresh value.
+    // Without the repair, an existing-but-stale row would survive the
+    // lazy backfill check above (which only fires when `row === null`)
+    // and serve stale topics forever.
+    const pluginTopics = Array.isArray(pluginStatus.interestTopics)
+      ? pluginStatus.interestTopics
+      : null;
+    if (pg && pluginTopics !== null) {
+      const pgTopics = pg.row?.interest_topics ?? null;
+      const pgStale = pgTopics === null || !shallowEqualStringArrays(pgTopics, pluginTopics);
+      if (pgStale) {
+        this.ctx.waitUntil(
+          syncMorningBriefingConfigToPostgresHelper(
+            this.env,
+            this.s,
+            { interestTopics: pluginTopics },
+            pg.instanceId
+          )
+        );
+      }
+    }
+
+    // Merge: plugin wins for `interestTopics` when present (plugin is
+    // authoritative); fall back to Postgres mirror when the plugin
+    // response omits it (older controller image predating the field).
+    const responseInterestTopics = pluginTopics ?? pg?.row?.interest_topics;
+    if (responseInterestTopics !== undefined) {
+      return { ...pluginStatus, interestTopics: responseInterestTopics };
+    }
+    return pluginStatus;
   }
 
   async enableMorningBriefing(input: { cron?: string; timezone?: string }) {
     await this.loadState();
-    return gateway.enableMorningBriefing(this.s, this.env, input);
+    const response = await gateway.enableMorningBriefing(this.s, this.env, input);
+    if (response && response.ok !== false) {
+      // Mirror to Postgres after the plugin accepted. Best-effort via
+      // waitUntil — the user-facing success is gated on the plugin write,
+      // not the Postgres mirror. Pass through whichever cron/timezone
+      // the plugin resolved (it echoes them on success); fall back to the
+      // request input.
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(this.env, this.s, {
+          enabled: true,
+          cron: response.cron ?? input.cron,
+          timezone: response.timezone ?? input.timezone,
+        })
+      );
+    }
+    return response;
   }
 
   async disableMorningBriefing() {
     await this.loadState();
-    return gateway.disableMorningBriefing(this.s, this.env);
+    const response = await gateway.disableMorningBriefing(this.s, this.env);
+    if (response && response.ok !== false) {
+      // Only flip `enabled`; preserve the user's last cron/timezone so a
+      // future re-enable defaults to the same schedule.
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(this.env, this.s, {
+          enabled: false,
+        })
+      );
+    }
+    return response;
   }
 
   async runMorningBriefing() {
     await this.loadState();
     return gateway.runMorningBriefing(this.s, this.env);
+  }
+
+  /**
+   * Post-provisioning user-location update from the Settings UI. Mirrors
+   * the shape of `updateBriefingInterests`: a focused mutation that
+   * bypasses the heavy `provision()` lock + envvar rebuild path. The
+   * onboarding flow still routes userLocation through `provision()`
+   * because it's bundled with the rest of the initial config; this method
+   * is for edits after the instance is already running.
+   *
+   * Two gateway calls happen here:
+   *   - writeUserProfile (USER.md write — fast file I/O, must succeed)
+   *   - updateMorningBriefingUserLocation (plugin config.json — best-effort)
+   *
+   * The morning-briefing call is logged-and-swallowed because the env-var
+   * path (KILOCLAW_USER_LOCATION, set at container start from DO state)
+   * already covers the worst case: on next deploy the plugin reads the
+   * new value regardless. Failing the user-facing save on a transient
+   * plugin write-queue stall is worse than silently degrading to "takes
+   * effect on next deploy."
+   *
+   * Rejects when the instance is not running. The plugin reads
+   * `config.json.userLocation` first and a non-empty string there wins
+   * over the env var, so silently persisting a clear/update while
+   * stopped (or during a `starting`/`restarting` window after env vars
+   * were already built for the boot) can result in success toasts that
+   * never affect the next briefing. The Settings UI greys out the
+   * editor when the instance is not running.
+   *
+   * Ordering matters: do not persist the new location to DO state until
+   * the required gateway write has succeeded. If we persisted first and
+   * `writeUserProfile` failed, a retry would short-circuit on the
+   * `previous === input.userLocation` check and report success while
+   * USER.md remained stale.
+   */
+  async updateUserLocation(input: { userLocation: string | null }) {
+    await this.loadState();
+    if (this.s.status !== 'running') {
+      throw new Error('Instance is not running');
+    }
+    const previous = this.s.userLocation ?? null;
+    if (input.userLocation === previous) {
+      return { ok: true, userLocation: previous };
+    }
+
+    await gateway.writeUserProfile(this.s, this.env, {
+      userLocation: input.userLocation,
+    });
+
+    this.s.userLocation = input.userLocation;
+    await this.ctx.storage.put({ userLocation: input.userLocation });
+
+    try {
+      await gateway.updateMorningBriefingUserLocation(this.s, this.env, {
+        userLocation: input.userLocation,
+      });
+    } catch (err) {
+      doWarn(this.s, 'updateMorningBriefingUserLocation failed', {
+        error: toLoggable(err),
+      });
+    }
+
+    return { ok: true, userLocation: input.userLocation };
+  }
+
+  async updateBriefingInterests(input: { topics: string[] }) {
+    await this.loadState();
+    const response = await gateway.updateMorningBriefingInterests(this.s, this.env, input);
+    if (response && response.ok !== false) {
+      // Mirror to Postgres after the plugin accepted. Best-effort via
+      // waitUntil — the user-facing success is gated on the plugin write,
+      // not the Postgres mirror. Patch semantics: only interest_topics is
+      // touched; enabled/cron/timezone are preserved.
+      this.ctx.waitUntil(
+        syncMorningBriefingConfigToPostgresHelper(this.env, this.s, {
+          interestTopics: response.interestTopics ?? input.topics,
+        })
+      );
+    }
+    return response;
   }
 
   async readMorningBriefing(day: 'today' | 'yesterday') {
@@ -4071,13 +4399,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       if (this.s.provider !== 'fly') {
         if (this.s.status === 'destroying') {
           await this.retryNonFlyDestroy();
-          await finalizeDestroyIfComplete(
+          const destroyRctx = createReconcileContext(this.s, this.env, 'alarm_destroy');
+          const result = await finalizeDestroyIfComplete(
             this.ctx,
             this.s,
-            createReconcileContext(this.s, this.env, 'alarm_destroy'),
+            destroyRctx,
             (userId, sandboxId) =>
               markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
           );
+          if (!result.finalized) {
+            await maybeEmitDestroyStuckTelemetry(this.ctx, this.s, destroyRctx);
+          }
         } else {
           await this.reconcileNonFlyRuntimeFromAlarm();
         }

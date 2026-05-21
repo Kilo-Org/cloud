@@ -87,3 +87,17 @@ export async function redisSet(
     throw err;
   }
 }
+
+/** Returns false if Redis is not configured (REDIS_URL unset). */
+export async function redisDel(key: RedisKey): Promise<boolean> {
+  const c = getOrCreateClient();
+  if (!c) return false;
+  try {
+    await withTimeout(ensureConnected(c), CONNECT_TIMEOUT_MS);
+    await withTimeout(c.del(key), COMMAND_TIMEOUT_MS);
+    return true;
+  } catch (err) {
+    captureException(err, { tags: { service: 'redis', operation: 'del' }, extra: { key } });
+    throw err;
+  }
+}

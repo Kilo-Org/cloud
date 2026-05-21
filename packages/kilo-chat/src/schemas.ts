@@ -8,6 +8,8 @@ export const MESSAGE_TEXT_MAX_CHARS = 8000;
 export const CONVERSATION_TITLE_MAX_CHARS = 200;
 /** Maximum characters allowed in an action button label or group id. */
 export const ACTION_LABEL_MAX_CHARS = 200;
+/** Maximum bytes allowed for a single attachment upload (100 MiB). */
+export const ATTACHMENT_MAX_BYTES = 100 * 1024 * 1024;
 
 // ── Primitives ──────────────────────────────────────────────────────
 
@@ -91,14 +93,30 @@ export const textBlockSchema = z.object({
   text: trimmedNonEmptyString(MESSAGE_TEXT_MAX_CHARS),
 });
 
+const attachmentMetadataShape = {
+  attachmentId: ulidSchema,
+  mimeType: z.string().min(1).max(255),
+  size: z.number().int().nonnegative(),
+  filename: z.string().min(1).max(512),
+};
+
+export const attachmentMetadataSchema = z.object(attachmentMetadataShape);
+
+export const attachmentBlockSchema = z.object({
+  type: z.literal('attachment'),
+  ...attachmentMetadataShape,
+});
+
 export const contentBlockSchema = z.discriminatedUnion('type', [
   textBlockSchema,
   actionsBlockSchema,
+  attachmentBlockSchema,
 ]);
 
 export const inputContentBlockSchema = z.discriminatedUnion('type', [
   textBlockSchema,
   inputActionsBlockSchema,
+  attachmentBlockSchema,
 ]);
 
 // ── Reactions ───────────────────────────────────────────────────────
@@ -134,6 +152,9 @@ export const messageSchema = z.object({
 // ── Conversation members ────────────────────────────────────────────
 
 export const memberKindSchema = z.enum(['user', 'bot']);
+
+export const capabilitySchema = z.enum(['attachments']);
+export type Capability = z.infer<typeof capabilitySchema>;
 
 export const conversationMemberSchema = z.object({
   id: z.string(),
@@ -305,6 +326,7 @@ export const listMessagesQuerySchema = z.object({
 export const botStatusRequestSchema = z.object({
   online: z.boolean(),
   at: nonNegativeIntegerSchema,
+  capabilities: z.array(capabilitySchema).optional(),
 });
 
 export const conversationStatusRequestSchema = z.object({
@@ -319,6 +341,7 @@ export const botStatusRecordSchema = z.object({
   online: z.boolean(),
   at: nonNegativeIntegerSchema,
   updatedAt: nonNegativeIntegerSchema,
+  capabilities: z.array(capabilitySchema).optional(),
 });
 
 export const conversationStatusRecordSchema = z.object({
@@ -356,6 +379,42 @@ export const typingRequestSchema = z.object({
 export const createBotConversationRequestSchema = z.object({
   title: conversationTitleSchema.optional(),
   additionalMembers: z.array(z.string().min(1)).max(20).optional(),
+});
+
+// ── Attachments ─────────────────────────────────────────────────────
+
+export const attachmentInitRequestSchema = z.object({
+  conversationId: ulidSchema,
+  mimeType: z.string().min(1).max(255),
+  size: z.number().int().nonnegative().max(ATTACHMENT_MAX_BYTES),
+  filename: z.string().min(1).max(512),
+  /**
+   * Optional client-supplied idempotency key. When present, repeated inits
+   * from the same uploader with the same key (within the server's dedupe
+   * window) return the same attachment id. When absent, every init mints a
+   * fresh attachment — distinct files with identical metadata will not
+   * collide.
+   */
+  idempotencyKey: z.string().min(1).max(128).optional(),
+});
+
+export const attachmentInitResponseSchema = z.object({
+  attachmentId: ulidSchema,
+  putUrl: z.string().url(),
+  putHeaders: z.record(z.string(), z.string()),
+});
+
+export const attachmentGetUrlRequestSchema = z.object({
+  attachmentId: ulidSchema,
+  conversationId: ulidSchema,
+});
+
+export const attachmentGetUrlResponseSchema = z.object({
+  url: z.string().min(1),
+  mimeType: z.string().min(1),
+  size: z.number().int().nonnegative(),
+  filename: z.string(),
+  expiresAt: z.number().int().nonnegative(),
 });
 
 // ── Plugin client response schemas (controller-proxied bot endpoints) ───────

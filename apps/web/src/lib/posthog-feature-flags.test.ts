@@ -26,7 +26,10 @@ jest.mock('@sentry/nextjs', () => {
   };
 });
 
-import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
+import {
+  isFeatureFlagEnabledOrDevelopment,
+  isReleaseToggleEnabled,
+} from '@/lib/posthog-feature-flags';
 
 const posthogMock: {
   mockGetFeatureFlag: jest.Mock;
@@ -38,6 +41,45 @@ const sentryMock: {
 
 const { mockGetFeatureFlag } = posthogMock;
 const { mockCaptureException } = sentryMock;
+
+describe('isFeatureFlagEnabledOrDevelopment', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('returns true without querying PostHog in development', async () => {
+    const replacedEnv = jest.replaceProperty(process, 'env', {
+      ...process.env,
+      NODE_ENV: 'development',
+    });
+
+    try {
+      await expect(
+        isFeatureFlagEnabledOrDevelopment('cloud-agent-devcontainer', 'user-1')
+      ).resolves.toBe(true);
+      expect(mockGetFeatureFlag).not.toHaveBeenCalled();
+    } finally {
+      replacedEnv.restore();
+    }
+  });
+
+  test('queries PostHog outside development', async () => {
+    const replacedEnv = jest.replaceProperty(process, 'env', {
+      ...process.env,
+      NODE_ENV: 'production',
+    });
+    mockGetFeatureFlag.mockResolvedValueOnce(true);
+
+    try {
+      await expect(
+        isFeatureFlagEnabledOrDevelopment('cloud-agent-devcontainer', 'user-2')
+      ).resolves.toBe(true);
+      expect(mockGetFeatureFlag).toHaveBeenCalledWith('cloud-agent-devcontainer', 'user-2');
+    } finally {
+      replacedEnv.restore();
+    }
+  });
+});
 
 describe('isReleaseToggleEnabled', () => {
   beforeEach(() => {

@@ -239,7 +239,7 @@ export function parseStoredDelivery(entries: unknown): BriefingDeliveryResult[] 
 
   return entries
     .map(entry => asObject(entry))
-    .map(entry => {
+    .map((entry): BriefingDeliveryResult | null => {
       const channel =
         entry.channel === 'telegram' || entry.channel === 'discord' || entry.channel === 'slack'
           ? entry.channel
@@ -267,7 +267,7 @@ export function parseStoredDelivery(entries: unknown): BriefingDeliveryResult[] 
         accountId: typeof entry.accountId === 'string' ? entry.accountId : undefined,
         reason,
         error: typeof entry.error === 'string' ? entry.error : undefined,
-      } satisfies BriefingDeliveryResult;
+      };
     })
     .filter((entry): entry is BriefingDeliveryResult => entry !== null);
 }

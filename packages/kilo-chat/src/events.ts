@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   actionGroupIdSchema,
+  capabilitySchema,
   conversationListItemSchema,
   conversationTitleSchema,
   contentBlockSchema,
@@ -101,6 +102,7 @@ export const botStatusEventSchema = z.object({
   sandboxId: sandboxIdSchema,
   online: z.boolean(),
   at: nonNegativeIntegerSchema,
+  capabilities: z.array(capabilitySchema).optional(),
 });
 
 export const conversationStatusEventSchema = z.object({

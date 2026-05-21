@@ -20,21 +20,21 @@
     "@kilocode/encryption": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "zod": "catalog:",
-    "@sentry/cloudflare": "^10.43.0",
+    "@sentry/cloudflare": "10.43.0",
     "hono": "catalog:",
-    "tar-stream": "^3.1.8"
+    "tar-stream": "3.1.9"
   },
   "devDependencies": {
-    "@cloudflare/sandbox": "0.6.9",
+    "@cloudflare/sandbox": "0.6.11",
     "@cloudflare/workers-types": "catalog:",
     "@sentry/cli": "catalog:",
-    "@types/jest": "^29.5.14",
-    "@types/node": ">=24 <25",
-    "@types/tar-stream": "^3.1.4",
+    "@types/jest": "29.5.14",
+    "@types/node": "catalog:",
+    "@types/tar-stream": "3.1.4",
     "@typescript/native-preview": "catalog:",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.4.6",
-    "tsx": "^4.21.0",
+    "jest": "29.7.0",
+    "ts-jest": "29.4.9",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "wrangler": "catalog:"
   }

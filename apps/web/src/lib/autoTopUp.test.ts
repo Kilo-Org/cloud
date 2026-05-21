@@ -544,9 +544,11 @@ describe('maybePerformAutoTopUp with Kilo Pass', () => {
       disabled_reason: null,
     });
 
+    const stripeSubscriptionId = `sub_test_${Math.random()}`;
     await db.insert(kilo_pass_subscriptions).values({
       kilo_user_id: user.id,
-      stripe_subscription_id: `sub_test_${Math.random()}`,
+      provider_subscription_id: stripeSubscriptionId,
+      stripe_subscription_id: stripeSubscriptionId,
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,
       status: 'active',
@@ -584,6 +586,7 @@ describe('maybePerformAutoTopUp with Kilo Pass', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
+        provider_subscription_id: stripeSubscriptionId,
         stripe_subscription_id: stripeSubscriptionId,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,

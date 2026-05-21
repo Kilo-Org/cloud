@@ -21,6 +21,7 @@ export type ProfileSummary = {
   mcpServerCount: number;
   skillCount: number;
   agentCount: number;
+  kiloCommandCount: number;
 };
 
 // Profile summary with owner type for combined listings
@@ -78,6 +79,20 @@ export type ProfileAgent = {
   updatedAt: string;
 };
 
+export type ProfileKiloCommand = {
+  id: string;
+  name: string;
+  description: string | null;
+  template: string;
+  agent: string | null;
+  model: string | null;
+  subtask: boolean;
+  enabled: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ProfileDetails = {
   id: string;
   name: string;
@@ -90,6 +105,7 @@ export type ProfileDetails = {
   mcpServers: ProfileMcpServer[];
   skills: ProfileSkill[];
   agents: ProfileAgent[];
+  kiloCommands: ProfileKiloCommand[];
 };
 
 // Combined profiles result for org context
@@ -324,6 +340,42 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
     })
   );
 
+  const createKiloCommand = useMutation(
+    trpc.agentProfiles.createKiloCommand.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+  const updateKiloCommand = useMutation(
+    trpc.agentProfiles.updateKiloCommand.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+  const deleteKiloCommand = useMutation(
+    trpc.agentProfiles.deleteKiloCommand.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+  const setKiloCommandEnabled = useMutation(
+    trpc.agentProfiles.setKiloCommandEnabled.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+  const reorderKiloCommands = useMutation(
+    trpc.agentProfiles.reorderKiloCommands.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+
   return {
     createProfile,
     updateProfile,
@@ -344,6 +396,11 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
     createAgent,
     updateAgent,
     deleteAgent,
+    createKiloCommand,
+    updateKiloCommand,
+    deleteKiloCommand,
+    setKiloCommandEnabled,
+    reorderKiloCommands,
     /** Manually invalidate profiles list */
     invalidateProfiles,
     /** Manually invalidate specific profile */
@@ -579,6 +636,42 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
     })
   );
 
+  const createKiloCommand = useMutation(
+    trpc.agentProfiles.createKiloCommand.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+  const updateKiloCommand = useMutation(
+    trpc.agentProfiles.updateKiloCommand.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+  const deleteKiloCommand = useMutation(
+    trpc.agentProfiles.deleteKiloCommand.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+  const setKiloCommandEnabled = useMutation(
+    trpc.agentProfiles.setKiloCommandEnabled.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+  const reorderKiloCommands = useMutation(
+    trpc.agentProfiles.reorderKiloCommands.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+
   return {
     createProfile,
     updateProfile,
@@ -599,6 +692,11 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
     createAgent,
     updateAgent,
     deleteAgent,
+    createKiloCommand,
+    updateKiloCommand,
+    deleteKiloCommand,
+    setKiloCommandEnabled,
+    reorderKiloCommands,
     /** Manually invalidate combined profiles */
     invalidateCombinedProfiles,
     /** Manually invalidate specific profile */

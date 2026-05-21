@@ -588,7 +588,9 @@ describe('CliLiveTransport typed command methods', () => {
     openConnection();
     mockWs.send.mockClear();
 
-    const promise = transport.send!({ prompt: 'hello', mode: 'code', model: 'test-model' });
+    const promise = transport.send!({
+      payload: { type: 'prompt', prompt: 'hello', mode: 'code', model: 'test-model' },
+    });
 
     expect(mockWs.send).toHaveBeenCalledWith(
       JSON.stringify({
@@ -617,7 +619,7 @@ describe('CliLiveTransport typed command methods', () => {
     openConnection();
     mockWs.send.mockClear();
 
-    const promise = transport.send!({ prompt: 'hi' });
+    const promise = transport.send!({ payload: { type: 'prompt', prompt: 'hi' } });
 
     const sent = JSON.parse(mockWs.send.mock.calls[0][0]) as { data: Record<string, unknown> };
     expect(sent.data).toEqual({
@@ -754,7 +756,7 @@ describe('CliLiveTransport typed command methods', () => {
     transport.connect();
     openConnection();
 
-    const promise = transport.send!({ prompt: 'hello' });
+    const promise = transport.send!({ payload: { type: 'prompt', prompt: 'hello' } });
 
     const sentPayload = JSON.parse(mockWs.send.mock.calls.at(-1)[0]) as { id: string };
     sendInbound({ type: 'response', id: sentPayload.id, result: { ok: true } });
@@ -770,7 +772,7 @@ describe('CliLiveTransport typed command methods', () => {
     transport.connect();
     openConnection();
 
-    const promise = transport.send!({ prompt: 'fail' });
+    const promise = transport.send!({ payload: { type: 'prompt', prompt: 'fail' } });
 
     const sentPayload = JSON.parse(mockWs.send.mock.calls.at(-1)[0]) as { id: string };
     sendInbound({ type: 'response', id: sentPayload.id, error: 'bad request' });
@@ -783,7 +785,7 @@ describe('CliLiveTransport typed command methods', () => {
   it('rejects with "WebSocket is not connected" when not connected', async () => {
     const { transport } = createTransportWithSinks();
 
-    await expect(transport.send!({ prompt: 'hello' })).rejects.toThrow(
+    await expect(transport.send!({ payload: { type: 'prompt', prompt: 'hello' } })).rejects.toThrow(
       'WebSocket is not connected'
     );
   });
@@ -794,7 +796,7 @@ describe('CliLiveTransport typed command methods', () => {
     transport.connect();
     openConnection();
 
-    const promise = transport.send!({ prompt: 'hello' });
+    const promise = transport.send!({ payload: { type: 'prompt', prompt: 'hello' } });
 
     transport.disconnect();
 
@@ -807,7 +809,7 @@ describe('CliLiveTransport typed command methods', () => {
     transport.connect();
     openConnection();
 
-    const promise = transport.send!({ prompt: 'hello' });
+    const promise = transport.send!({ payload: { type: 'prompt', prompt: 'hello' } });
 
     transport.destroy();
 
@@ -834,7 +836,7 @@ describe('CliLiveTransport typed command methods', () => {
       transport.connect();
       openConnection();
 
-      const promise = transport.send!({ prompt: 'hello' });
+      const promise = transport.send!({ payload: { type: 'prompt', prompt: 'hello' } });
 
       jest.advanceTimersByTime(30_000);
 
@@ -854,7 +856,7 @@ describe('CliLiveTransport typed command methods', () => {
       transport.connect();
       openConnection();
 
-      const promise = transport.send!({ prompt: 'hello' });
+      const promise = transport.send!({ payload: { type: 'prompt', prompt: 'hello' } });
 
       const sentPayload = JSON.parse(mockWs.send.mock.calls.at(-1)[0]) as { id: string };
       sendInbound({

@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
     "target": "es2017",
-    "module": "commonjs",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "lib": ["dom", "dom.iterable", "esnext", "esnext.asynciterable"],
-    "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -15,7 +15,9 @@
       "@kilocode/cloud-agent-profile": ["../../packages/cloud-agent-profile/src/index.ts"],
       "@kilocode/encryption": ["../../packages/encryption/src/index.ts"],
       "@kilocode/worker-utils": ["../../packages/worker-utils/src/index.ts"],
-      "@kilocode/worker-utils/*": ["../../packages/worker-utils/src/*"]
+      "@kilocode/worker-utils/*": ["../../packages/worker-utils/src/*"],
+      "@cloud-agent-shared": ["../../services/cloud-agent-next/src/shared/slash-commands.ts"],
+      "@cloud-agent-shared/*": ["../../services/cloud-agent-next/src/shared/*"]
     },
     "allowJs": true,
     "noEmit": true,

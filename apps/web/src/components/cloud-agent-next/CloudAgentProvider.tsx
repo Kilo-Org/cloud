@@ -12,7 +12,9 @@ import {
   type FetchedSessionData,
   type KiloSessionId,
   type CloudAgentSessionId,
+  type TransportSendPayload,
 } from '@/lib/cloud-agent-sdk';
+import type { SendMessagePayload } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@/lib/constants';
 import { usePostHog } from 'posthog-js/react';
 
@@ -22,6 +24,29 @@ type CloudAgentProviderProps = {
   children: ReactNode;
   organizationId?: string;
 };
+
+function normalizeTransportPayload(payload: TransportSendPayload): SendMessagePayload {
+  // The transport-level SendPromptPayload makes mode/model optional (CLI
+  // live transport accepts them as optional). The cloud-agent worker schema
+  // requires them for prompts, so coerce here and fail loudly if missing.
+  if (payload.type === 'prompt') {
+    if (!payload.mode) throw new Error('Cloud Agent mode is required');
+    if (!payload.model) throw new Error('Cloud Agent model is required');
+    return {
+      type: 'prompt',
+      prompt: payload.prompt,
+      mode: payload.mode,
+      model: payload.model,
+      variant: payload.variant,
+    };
+  }
+
+  return {
+    type: 'command',
+    command: payload.command,
+    arguments: payload.arguments,
+  };
+}
 
 export function CloudAgentProvider({ children, organizationId }: CloudAgentProviderProps) {
   const storeRef = useRef(createStore());
@@ -109,37 +134,29 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       lifecycleHooks: createBrowserLifecycleHooks(),
 
       api: {
-        send: async payload => {
-          const mode = payload.mode ?? 'code';
-          if (payload.model === undefined) {
-            throw new Error('Cloud Agent model is required');
-          }
+        send: async input => {
+          const normalizedPayload = normalizeTransportPayload(input.payload);
+
           if (organizationId) {
             return trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
               {
-                cloudAgentSessionId: payload.sessionId,
-                prompt: payload.prompt,
-                mode,
-                model: payload.model,
-                variant: payload.variant,
+                cloudAgentSessionId: input.sessionId,
+                payload: normalizedPayload,
                 autoCommit: true,
                 organizationId,
-                messageId: payload.messageId,
-                images: payload.images,
+                messageId: input.messageId,
+                images: input.images,
               },
               { context: { skipBatch: true } }
             );
           }
           return trpcClient.cloudAgentNext.sendMessage.mutate(
             {
-              cloudAgentSessionId: payload.sessionId,
-              prompt: payload.prompt,
-              mode,
-              model: payload.model,
-              variant: payload.variant,
+              cloudAgentSessionId: input.sessionId,
+              payload: normalizedPayload,
               autoCommit: true,
-              messageId: payload.messageId,
-              images: payload.images,
+              messageId: input.messageId,
+              images: input.images,
             },
             { context: { skipBatch: true } }
           );
@@ -222,7 +239,13 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           | 'build'
           | 'architect'
           | 'custom';
-        const castInput = { ...input, mode: input.mode as AgentMode };
+        const castInput = {
+          ...input,
+          initialPayload: input.initialPayload
+            ? normalizeTransportPayload(input.initialPayload)
+            : undefined,
+          mode: input.mode as AgentMode,
+        };
         const result = organizationId
           ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
               ...castInput,

@@ -17,8 +17,16 @@ export enum KiloPassCadence {
   Yearly = 'yearly',
 }
 
+export enum KiloPassPaymentProvider {
+  Stripe = 'stripe',
+  AppStore = 'app_store',
+  GooglePlay = 'google_play',
+}
+
 export enum KiloPassIssuanceSource {
   StripeInvoice = 'stripe_invoice',
+  AppStoreTransaction = 'app_store_transaction',
+  GooglePlayTransaction = 'google_play_transaction',
   Cron = 'cron',
 }
 
@@ -31,6 +39,12 @@ export enum KiloPassIssuanceItemKind {
 export enum KiloPassAuditLogAction {
   StripeWebhookReceived = 'stripe_webhook_received',
   KiloPassInvoicePaidHandled = 'kilo_pass_invoice_paid_handled',
+  StorePurchaseCompleted = 'store_purchase_completed',
+  StoreNotificationReceived = 'store_notification_received',
+  StoreSubscriptionRenewed = 'store_subscription_renewed',
+  StoreSubscriptionCanceled = 'store_subscription_canceled',
+  StoreSubscriptionExpired = 'store_subscription_expired',
+  StoreSubscriptionRefunded = 'store_subscription_refunded',
   BaseCreditsIssued = 'base_credits_issued',
   BonusCreditsIssued = 'bonus_credits_issued',
   BonusCreditsSkippedIdempotent = 'bonus_credits_skipped_idempotent',
@@ -178,6 +192,41 @@ export const KiloClawSubscriptionChangeActorType = {
 
 export type KiloClawSubscriptionChangeActorType =
   (typeof KiloClawSubscriptionChangeActorType)[keyof typeof KiloClawSubscriptionChangeActorType];
+
+export const KiloClawTerminalRenewalFailureStatus = {
+  Unresolved: 'unresolved',
+  Resolved: 'resolved',
+  Waived: 'waived',
+  Superseded: 'superseded',
+} as const;
+
+export type KiloClawTerminalRenewalFailureStatus =
+  (typeof KiloClawTerminalRenewalFailureStatus)[keyof typeof KiloClawTerminalRenewalFailureStatus];
+
+// System failure codes for credit-renewal terminal failures. These are
+// recorded only after automatic retry is exhausted for a particular
+// (subscription, renewal_boundary). Expected business outcomes
+// (e.g. insufficient credits past-due, cancel-at-period-end, stale skip)
+// MUST NOT be recorded as terminal failures and so are not part of this set.
+export const KiloClawTerminalRenewalFailureCode = {
+  CreditBalanceReadFailed: 'credit_balance_read_failed',
+  RenewalTransactionFailed: 'renewal_transaction_failed',
+  AutoTopUpMarkerWriteFailed: 'auto_top_up_marker_write_failed',
+  WorkerTimeout: 'worker_timeout',
+  PoisonPayload: 'poison_payload',
+  QueueDeliveryExhausted: 'queue_delivery_exhausted',
+} as const;
+
+export type KiloClawTerminalRenewalFailureCode =
+  (typeof KiloClawTerminalRenewalFailureCode)[keyof typeof KiloClawTerminalRenewalFailureCode];
+
+export const KiloClawTerminalRenewalFailureResolutionActorType = {
+  Operator: 'operator',
+  System: 'system',
+} as const;
+
+export type KiloClawTerminalRenewalFailureResolutionActorType =
+  (typeof KiloClawTerminalRenewalFailureResolutionActorType)[keyof typeof KiloClawTerminalRenewalFailureResolutionActorType];
 
 export const KiloClawSubscriptionChangeAction = {
   Created: 'created',
@@ -680,6 +729,7 @@ export const GatewayApiKindSchema = z.enum([
   'fim_completions',
   'messages',
   'responses',
+  'audio_transcriptions',
 ]);
 
 export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
@@ -741,6 +791,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   selected_repository_ids: z.array(z.number()).optional(),
   // Manually added repositories (for GitLab where pagination limits results)
   manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
+  disable_review_md: z.boolean().optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.
   //   'off'      — gate only fails on system errors (timeout, crash)
@@ -1132,3 +1183,20 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
 ] as const;
 
 export type CodeReviewTerminalReason = (typeof CODE_REVIEW_TERMINAL_REASONS)[number];
+
+/**
+ * Subset of CODE_REVIEW_TERMINAL_REASONS that represent expected, non-system
+ * outcomes (user/billing-driven cancellations or supersession). Alerting
+ * detectors exclude these so they are not counted as system failures.
+ *
+ * KEEP IN SYNC with CODE_REVIEW_TERMINAL_REASONS — when adding a new reason
+ * above, decide whether it is a system failure or a benign outcome and
+ * include it here when it is the latter.
+ */
+export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
+  'billing',
+  'user_cancelled',
+  'superseded',
+] as const satisfies readonly CodeReviewTerminalReason[];
+
+export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];

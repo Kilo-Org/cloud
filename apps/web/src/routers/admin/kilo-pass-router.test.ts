@@ -67,6 +67,7 @@ async function insertActiveKiloPass(kiloUserId: string, stripeSubscriptionId: st
   const now = new Date().toISOString();
   await db.insert(kilo_pass_subscriptions).values({
     kilo_user_id: kiloUserId,
+    provider_subscription_id: stripeSubscriptionId,
     stripe_subscription_id: stripeSubscriptionId,
     tier: KiloPassTier.Tier19,
     cadence: KiloPassCadence.Monthly,
@@ -83,6 +84,7 @@ async function insertCanceledKiloPass(kiloUserId: string, stripeSubscriptionId: 
   const now = new Date().toISOString();
   await db.insert(kilo_pass_subscriptions).values({
     kilo_user_id: kiloUserId,
+    provider_subscription_id: stripeSubscriptionId,
     stripe_subscription_id: stripeSubscriptionId,
     tier: KiloPassTier.Tier19,
     cadence: KiloPassCadence.Monthly,

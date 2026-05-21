@@ -1,7 +1,7 @@
 'use client';
 
 import { Activity, Clock, HardDrive, Loader2, RotateCcw, TimerReset } from 'lucide-react';
-import type { KiloClawDashboardStatus, GatewayProcessStatusResponse } from '@/lib/kiloclaw/types';
+import type { KiloClawDashboardStatus, GatewayProcessStatusOkResponse } from '@/lib/kiloclaw/types';
 import { Badge } from '@/components/ui/badge';
 import {
   formatUptime,
@@ -13,7 +13,7 @@ import { formatTs } from './time';
 import { useClawDiskUsage } from '../hooks/useClawHooks';
 
 const GATEWAY_STATE_STYLES: Record<
-  GatewayProcessStatusResponse['state'],
+  GatewayProcessStatusOkResponse['state'],
   { label: string; className: string }
 > = {
   running: {
@@ -42,7 +42,7 @@ const GATEWAY_STATE_STYLES: Record<
   },
 };
 
-function formatLastExit(lastExit: NonNullable<GatewayProcessStatusResponse['lastExit']>): string {
+function formatLastExit(lastExit: NonNullable<GatewayProcessStatusOkResponse['lastExit']>): string {
   const code = lastExit.code ?? 'null';
   const signal = lastExit.signal ?? 'none';
   const at = new Date(lastExit.at);
@@ -61,7 +61,7 @@ export function InstanceTab({
   gatewayError,
 }: {
   status: KiloClawDashboardStatus;
-  gatewayStatus: GatewayProcessStatusResponse | undefined;
+  gatewayStatus: GatewayProcessStatusOkResponse | undefined;
   gatewayLoading: boolean;
   gatewayError: { message: string; data?: { code?: string } | null } | null;
 }) {

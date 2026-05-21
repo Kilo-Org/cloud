@@ -22,6 +22,20 @@ export function useOrgKiloClawConfig(organizationId: string) {
   return useQuery(trpc.organizations.kiloclaw.getConfig.queryOptions({ organizationId }));
 }
 
+export function useOrgKiloClawComposioOnboardingStatus(
+  organizationId: string,
+  enabled = true,
+  pollingEnabled = enabled
+) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryOptions(
+      { organizationId },
+      { enabled, refetchInterval: enabled && pollingEnabled ? 15_000 : false }
+    )
+  );
+}
+
 export function useOrgKiloClawPairing(organizationId: string, enabled = true) {
   const trpc = useTRPC();
   return useQuery(
@@ -304,6 +318,26 @@ export function useOrgKiloClawMutations(
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.getConfig.queryKey({ organizationId }),
         });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryKey({
+            organizationId,
+          }),
+        });
+      },
+    })
+  );
+  const rawCreateComposioGoogleCalendarLink = useMutation(
+    trpc.organizations.kiloclaw.createComposioGoogleCalendarLink.mutationOptions({
+      onSuccess: async () => {
+        await invalidateStatus();
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getComposioOnboardingStatus.queryKey({
+            organizationId,
+          }),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getConfig.queryKey({ organizationId }),
+        });
       },
     })
   );
@@ -497,6 +531,22 @@ export function useOrgKiloClawMutations(
       },
     })
   );
+  const rawUpdateBriefingInterests = useMutation(
+    trpc.organizations.kiloclaw.updateBriefingInterests.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({
+            organizationId,
+          }),
+        });
+      },
+    })
+  );
+  const rawUpdateUserLocation = useMutation(
+    trpc.organizations.kiloclaw.updateUserLocation.mutationOptions({
+      onSuccess: invalidateStatus,
+    })
+  );
 
   const mutations = {
     start: bindVoid(rawStart),
@@ -509,6 +559,7 @@ export function useOrgKiloClawMutations(
     updateKiloCodeConfig: bind(rawUpdateKiloCodeConfig),
     patchChannels: bind(rawPatchChannels),
     patchSecrets: bind(rawPatchSecrets),
+    createComposioGoogleCalendarLink: bind(rawCreateComposioGoogleCalendarLink),
     restartMachine: bind(rawRestartMachine),
     restartOpenClaw: bindVoid(rawRestartOpenClaw),
     approvePairingRequest: bind(rawApprovePairing),
@@ -528,6 +579,8 @@ export function useOrgKiloClawMutations(
     enableMorningBriefing: bind(rawEnableMorningBriefing),
     disableMorningBriefing: bindVoid(rawDisableMorningBriefing),
     runMorningBriefing: bindVoid(rawRunMorningBriefing),
+    updateBriefingInterests: bind(rawUpdateBriefingInterests),
+    updateUserLocation: bind(rawUpdateUserLocation),
     startKiloCliRun: bind(rawStartKiloCliRun),
     cancelKiloCliRun: bind(rawCancelKiloCliRun),
     rename: bind(rawRename),

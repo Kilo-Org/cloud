@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import * as schemas from './router/schemas.js';
 import * as schemaLimits from './schema.js';
 import type * as WorkspaceModule from './workspace.js';
@@ -29,6 +30,7 @@ const createMockSandbox = () => {
     createSession: vi.fn().mockResolvedValue(mockSession),
     listProcesses: vi.fn().mockResolvedValue([]),
     mkdir: vi.fn().mockResolvedValue(undefined),
+    writeFile: vi.fn().mockResolvedValue(undefined),
     destroy: vi.fn().mockResolvedValue(undefined),
   };
 };
@@ -55,6 +57,10 @@ vi.mock('./workspace.js', async importOriginal => {
   };
 });
 
+vi.mock('./utils/kilo-session-id.js', () => ({
+  generateKiloSessionId: () => generateKiloSessionIdMock(),
+}));
+
 // Mock WrapperClient.ensureWrapper (wrapper now starts kilo server in-process)
 vi.mock('./kilo/wrapper-client.js', () => ({
   WrapperClient: {
@@ -69,10 +75,12 @@ vi.mock('./kilo/wrapper-client.js', () => ({
 // vi.hoisted() ensures these are available when the mock factory runs
 const {
   generateSessionIdMock,
+  generateKiloSessionIdMock,
   createCliSessionViaSessionIngestMock,
   deleteCliSessionViaSessionIngestMock,
 } = vi.hoisted(() => ({
   generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
+  generateKiloSessionIdMock: vi.fn(() => 'ses_mock-kilo-session-id'),
   createCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
   deleteCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
 }));
@@ -98,6 +106,10 @@ vi.mock('./session-service.js', async importOriginal => {
       createCliSessionViaSessionIngest = createCliSessionViaSessionIngestMock;
       deleteCliSessionViaSessionIngest = deleteCliSessionViaSessionIngestMock;
       getOrCreateSession = vi.fn().mockResolvedValue(createMockExecutionSession());
+      buildRuntimeEnv = vi.fn().mockReturnValue({
+        SESSION_HOME: '/home/test',
+        KILO_SESSION_INGEST_URL: 'https://ingest.example',
+      });
       buildContext = vi.fn().mockReturnValue({
         sandboxId: 'test-sandbox',
         orgId: 'test-org',
@@ -118,21 +130,25 @@ import {
   GitRepositoryNotFoundError,
   cloneGitHubRepo as mockedCloneGitHubRepo,
   manageBranch as mockedManageBranch,
+  setupWorkspace as mockedSetupWorkspace,
 } from './workspace.js';
+import { WorkspaceFilesystemPreparationError } from './workspace-errors.js';
 import {
   SetupCommandFailedError,
   runSetupCommands as mockedRunSetupCommands,
 } from './session-service.js';
 
+type MockDOProcedure = Mock<(...args: unknown[]) => Promise<unknown>>;
+
 // Helper to create a mock DO stub
 function createMockDOStub(
   overrides: {
-    prepare?: ReturnType<typeof vi.fn>;
-    tryUpdate?: ReturnType<typeof vi.fn>;
-    tryInitiate?: ReturnType<typeof vi.fn>;
-    getMetadata?: ReturnType<typeof vi.fn>;
-    updateMetadata?: ReturnType<typeof vi.fn>;
-    deleteSession?: ReturnType<typeof vi.fn>;
+    prepare?: MockDOProcedure;
+    tryUpdate?: MockDOProcedure;
+    tryInitiate?: MockDOProcedure;
+    getMetadata?: MockDOProcedure;
+    updateMetadata?: MockDOProcedure;
+    deleteSession?: MockDOProcedure;
   } = {}
 ) {
   return {
@@ -317,12 +333,12 @@ describe('prepareSession endpoint', () => {
       });
 
       expect(result.cloudAgentSessionId).toMatch(/^agent_[0-9a-f-]+$/);
-      expect(result.kiloSessionId).toBe('cli-session-abc123');
+      expect(result.kiloSessionId).toBe('ses_mock-kilo-session-id');
       expect(doStub.prepare).toHaveBeenCalledWith(
         expect.objectContaining({
           sessionId: expect.stringMatching(/^agent_/) as unknown,
           userId: 'test-user-123',
-          kiloSessionId: 'cli-session-abc123',
+          kiloSessionId: 'ses_mock-kilo-session-id',
           prompt: 'Test prompt',
           mode: 'code',
           model: 'claude-3',
@@ -348,7 +364,7 @@ describe('prepareSession endpoint', () => {
       });
 
       expect(result.cloudAgentSessionId).toBeDefined();
-      expect(result.kiloSessionId).toBe('cli-session-abc123');
+      expect(result.kiloSessionId).toBe('ses_mock-kilo-session-id');
       expect(doStub.prepare).toHaveBeenCalledWith(
         expect.objectContaining({
           gitUrl: 'https://gitlab.com/org/repo.git',
@@ -457,6 +473,21 @@ describe('prepareSession endpoint', () => {
         })
       ).rejects.toThrow();
     });
+
+    it('should reject devcontainer without autoInitiate', async () => {
+      const ctx = createInternalApiContext({});
+      const caller = appRouter.createCaller(ctx);
+
+      await expect(
+        caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          devcontainer: true,
+        })
+      ).rejects.toThrow('devcontainer sessions must use autoInitiate');
+    });
   });
 
   describe('error handling', () => {
@@ -511,6 +542,51 @@ describe('prepareSession endpoint', () => {
         const trpcError = error as TRPCError;
         expect(trpcError.code).toBe('INTERNAL_SERVER_ERROR');
         expect(trpcError.message).toBe('Sandbox returned 500 during workspace preparation');
+        expect(trpcError.cause).toMatchObject({
+          error: 'sandbox_internal_server_error',
+          retryable: true,
+        });
+      }
+
+      expect(sandbox.destroy).toHaveBeenCalledOnce();
+      expect(doStub.prepare).not.toHaveBeenCalled();
+    });
+
+    it('marks workspace mkdir preparation failures as retryable', async () => {
+      const sandbox = createMockSandbox();
+      const cause = new Error('FileSystemError: mkdir operation failed with exit code NaN');
+      vi.mocked(mockedSetupWorkspace).mockRejectedValueOnce(
+        new WorkspaceFilesystemPreparationError(
+          'workspace_directory',
+          'Failed to create workspace directory: FileSystemError: mkdir operation failed with exit code NaN',
+          cause
+        )
+      );
+      const { getSandbox } = await import('@cloudflare/sandbox');
+      vi.mocked(getSandbox).mockReturnValueOnce(
+        sandbox as unknown as ReturnType<typeof getSandbox>
+      );
+
+      const doStub = createMockDOStub();
+      const ctx = createInternalApiContext({ doStub });
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          githubToken: 'ghp_test_token',
+        });
+        expect.unreachable('should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(TRPCError);
+        const trpcError = error as TRPCError;
+        expect(trpcError.code).toBe('INTERNAL_SERVER_ERROR');
+        expect(trpcError.message).toBe(
+          'Failed to create workspace directory: FileSystemError: mkdir operation failed with exit code NaN'
+        );
         expect(trpcError.cause).toMatchObject({
           error: 'sandbox_internal_server_error',
           retryable: true,

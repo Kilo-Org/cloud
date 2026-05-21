@@ -7,10 +7,19 @@ vi.mock('cloudflare:workers', () => ({
 }));
 
 function baseEnv(stub: Record<string, unknown>) {
+  // The /morning-briefing/status route now short-circuits if DO state isn't
+  // `running` (see services/kiloclaw/src/routes/platform.ts:shortCircuitIfNotRunning).
+  // Default `getStatus` to `running` here so existing tests that exercise the
+  // happy-path payloads keep passing; tests that want to exercise the
+  // not-running sentinel pass their own `getStatus` mock.
+  const stubWithDefaults = {
+    getStatus: vi.fn().mockResolvedValue({ status: 'running' }),
+    ...stub,
+  };
   return {
     KILOCLAW_INSTANCE: {
       idFromName: (id: string) => id,
-      get: () => stub,
+      get: () => stubWithDefaults,
     },
     KILOCLAW_AE: { writeDataPoint: vi.fn() },
     KV_CLAW_CACHE: {

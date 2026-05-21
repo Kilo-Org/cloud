@@ -12,11 +12,11 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/event-service/src"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.21",
-    "@types/node": "^25.5.0",
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "~3.2.4",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   },
   "dependencies": {

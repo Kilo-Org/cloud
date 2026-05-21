@@ -111,6 +111,11 @@ const createJobContext = (): JobContext => ({
   workerAuthToken: 'kilo_token_789',
 });
 
+const createCodeReviewJobContext = (): JobContext => ({
+  ...createJobContext(),
+  platform: 'code-review',
+});
+
 const createCallbacks = (): ConnectionCallbacks => ({
   onMessageComplete: vi.fn(),
   onTerminalError: vi.fn(),
@@ -135,6 +140,8 @@ function createMockKiloClient(overrides?: Partial<WrapperKiloClient>): WrapperKi
     getSessionStatuses: vi.fn().mockResolvedValue({}),
     getQuestions: vi.fn().mockResolvedValue([]),
     getPermissions: vi.fn().mockResolvedValue([]),
+    getNetworkWaits: vi.fn().mockResolvedValue([]),
+    resumeNetworkWait: vi.fn().mockResolvedValue(true),
     sdkClient: {
       event: {
         subscribe: vi.fn().mockResolvedValue({
@@ -296,10 +303,10 @@ describe('sendKiloSnapshot → sendKiloState', () => {
   });
 
   // -----------------------------------------------------------------------
-  // 4. replays pending question as kilocode event
+  // 4. replays pending question as kilocode event for interactive sessions
   // -----------------------------------------------------------------------
 
-  it('replays pending question as kilocode event', async () => {
+  it('replays pending question as kilocode event for interactive sessions', async () => {
     const pendingQuestion = {
       id: 'q_123',
       sessionID: 'kilo_sess_456',
@@ -327,6 +334,107 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       event: 'question.asked',
       properties: pendingQuestion,
     });
+  });
+
+  it('suppresses pending questions for code-review snapshots without rejecting them', async () => {
+    const pendingQuestion = {
+      id: 'q_123',
+      sessionID: 'kilo_sess_456',
+      tool: { messageID: 'msg_1', callID: 'call_1' },
+      questions: [
+        { question: 'Pick a color', header: 'Color', options: [{ label: 'Red', description: '' }] },
+      ],
+    };
+    const rejectQuestion = vi.fn().mockResolvedValue(true);
+
+    const kiloClient = createMockKiloClient({
+      getQuestions: vi.fn().mockResolvedValue([pendingQuestion]),
+      rejectQuestion,
+    });
+
+    state.startJob(createCodeReviewJobContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+    const questionEvents = messages.filter(
+      m => m.streamEventType === 'kilocode' && m.data.event === 'question.asked'
+    );
+
+    expect(questionEvents).toHaveLength(0);
+    expect(rejectQuestion).not.toHaveBeenCalled();
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+  });
+
+  it('suppresses pending permissions for code-review snapshots without rejecting them', async () => {
+    const pendingPermission = {
+      id: 'p_456',
+      sessionID: 'kilo_sess_456',
+      permission: 'file_write',
+      patterns: ['**/*.ts'],
+      metadata: {},
+      always: [],
+      tool: { messageID: 'msg_2', callID: 'call_2' },
+    };
+    const answerPermission = vi.fn().mockResolvedValue(true);
+
+    const kiloClient = createMockKiloClient({
+      getPermissions: vi.fn().mockResolvedValue([pendingPermission]),
+      answerPermission,
+    });
+
+    state.startJob(createCodeReviewJobContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+    const permissionEvents = messages.filter(
+      m => m.streamEventType === 'kilocode' && m.data.event === 'permission.asked'
+    );
+
+    expect(permissionEvents).toHaveLength(0);
+    expect(answerPermission).not.toHaveBeenCalled();
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+  });
+
+  it('suppresses code-review question status snapshots', async () => {
+    const kiloClient = createMockKiloClient({
+      getSessionStatuses: vi.fn().mockResolvedValue({
+        kilo_sess_456: { type: 'question' },
+      }),
+    });
+
+    state.startJob(createCodeReviewJobContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+    const statusEvents = messages.filter(
+      m => m.streamEventType === 'kilocode' && m.data.event === 'session.status'
+    );
+
+    expect(statusEvents).toHaveLength(0);
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+  });
+
+  it('suppresses code-review permission status snapshots', async () => {
+    const kiloClient = createMockKiloClient({
+      getSessionStatuses: vi.fn().mockResolvedValue({
+        kilo_sess_456: { type: 'permission' },
+      }),
+    });
+
+    state.startJob(createCodeReviewJobContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+    const statusEvents = messages.filter(
+      m => m.streamEventType === 'kilocode' && m.data.event === 'session.status'
+    );
+
+    expect(statusEvents).toHaveLength(0);
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------
@@ -362,6 +470,56 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       event: 'permission.asked',
       properties: pendingPermission,
     });
+  });
+
+  it('replays non-network snapshot state when no network waits are pending', async () => {
+    const pendingQuestion = {
+      id: 'q_123',
+      sessionID: 'kilo_sess_456',
+      tool: { messageID: 'msg_1', callID: 'call_1' },
+      questions: [
+        { question: 'Pick a color', header: 'Color', options: [{ label: 'Red', description: '' }] },
+      ],
+    };
+    const pendingPermission = {
+      id: 'p_456',
+      sessionID: 'kilo_sess_456',
+      permission: 'file_write',
+      patterns: ['**/*.ts'],
+      metadata: {},
+      always: [],
+      tool: { messageID: 'msg_2', callID: 'call_2' },
+    };
+
+    const kiloClient = createMockKiloClient({
+      getSessionStatuses: vi.fn().mockResolvedValue({
+        kilo_sess_456: { type: 'busy' },
+      }),
+      getQuestions: vi.fn().mockResolvedValue([pendingQuestion]),
+      getPermissions: vi.fn().mockResolvedValue([pendingPermission]),
+      getNetworkWaits: vi.fn().mockResolvedValue([]),
+    });
+
+    state.startJob(createJobContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+
+    expect(
+      messages.filter(m => m.streamEventType === 'kilocode' && m.data.event === 'session.status')
+    ).toHaveLength(1);
+    expect(
+      messages.filter(m => m.streamEventType === 'kilocode' && m.data.event === 'question.asked')
+    ).toHaveLength(1);
+    expect(
+      messages.filter(m => m.streamEventType === 'kilocode' && m.data.event === 'permission.asked')
+    ).toHaveLength(1);
+    expect(
+      messages.filter(
+        m => m.streamEventType === 'kilocode' && m.data.event === 'session.network.asked'
+      )
+    ).toHaveLength(0);
   });
 
   // -----------------------------------------------------------------------
@@ -404,6 +562,27 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     );
 
     expect(permissionEvents).toHaveLength(0);
+  });
+
+  it('does not resume restored network waits while sending a snapshot', async () => {
+    const resumeNetworkWait = vi.fn().mockResolvedValue(true);
+    const kiloClient = createMockKiloClient({
+      getNetworkWaits: vi.fn().mockResolvedValue([
+        {
+          id: 'net_req_restored',
+          sessionID: 'kilo_sess_456',
+          message: 'Network restored',
+          restored: true,
+        },
+      ]),
+      resumeNetworkWait,
+    });
+
+    state.startJob(createJobContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    await manager.sendKiloSnapshot();
+
+    expect(resumeNetworkWait).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------

@@ -230,6 +230,19 @@ export type PlatformStatusResponse = {
   botVibe: string | null;
   botEmoji: string | null;
   /**
+   * User-provided free-text location (e.g. "San Francisco, CA" or a
+   * "lat,lng" pair). Captured during onboarding via the weather-location
+   * step, editable from Settings → Morning Briefing. Used by the
+   * morning briefing's Local News source.
+   */
+  userLocation: string | null;
+  /**
+   * IANA timezone (e.g. "America/Los_Angeles"). Auto-detected during
+   * onboarding via `getBrowserTimeZone()`. Surfaced read-only in
+   * Settings as context next to userLocation.
+   */
+  userTimezone: string | null;
+  /**
    * Version of the controller-configuration contract the running machine
    * was started with. Bumped by the worker whenever the set of env vars /
    * config it writes into a machine changes in a way callers care about.
@@ -271,6 +284,8 @@ export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   adminMachineSizeOverrideMetadata: AdminMachineSizeOverrideMetadata | null;
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
+  destroyStartedAt: number | null;
+  lastDestroyPendingEventAt: number | null;
   pendingPostgresMarkOnFinalize: boolean;
   lastMetadataRecoveryAt: number | null;
   lastLiveCheckAt: number | null;
@@ -420,8 +435,48 @@ export type RestartMachineResponse = {
   error?: string;
 };
 
-/** Response from GET /api/platform/gateway/status */
-export type GatewayProcessStatusResponse = {
+// The sentinel type + predicate live in a dep-free module so apps/mobile
+// can pick them up via tsconfig path alias (mirroring the existing
+// `@/lib/images-schema` cross-package import pattern). Re-exported here so
+// existing imports from `@/lib/kiloclaw/types` keep working.
+import {
+  isInstanceNotRunningSentinel,
+  type InstanceNotRunningSentinel,
+} from './instance-not-running-sentinel';
+export { isInstanceNotRunningSentinel };
+export type { InstanceNotRunningSentinel };
+
+/**
+ * Narrowing helper: returns the OK-shape variant of a polling-endpoint
+ * response, or `undefined` if the worker short-circuited with the
+ * instance-not-running sentinel. Use this when a caller only cares about
+ * the "instance running" payload (e.g. computing a controller version
+ * gate). Caller pattern: `controllerVersionOk(data)?.version`.
+ */
+export function controllerVersionOk(
+  value: ControllerVersionResponse | undefined | null
+): Exclude<ControllerVersionResponse, InstanceNotRunningSentinel> | undefined {
+  if (!value || isInstanceNotRunningSentinel(value)) return undefined;
+  return value;
+}
+
+export function gatewayStatusOk(
+  value: GatewayProcessStatusResponse | undefined | null
+): GatewayProcessStatusOkResponse | undefined {
+  if (!value || isInstanceNotRunningSentinel(value)) return undefined;
+  return value;
+}
+
+export function morningBriefingStatusOk(
+  value: MorningBriefingStatusResponse | undefined | null
+): MorningBriefingStatusOkResponse | undefined {
+  if (!value || isInstanceNotRunningSentinel(value)) return undefined;
+  return value;
+}
+
+/** OK-shape payload of GET /api/platform/gateway/status (i.e. the worker
+ *  did not short-circuit with the not-running sentinel). */
+export type GatewayProcessStatusOkResponse = {
   state: 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed' | 'shutting_down';
   pid: number | null;
   uptime: number;
@@ -432,6 +487,11 @@ export type GatewayProcessStatusResponse = {
     at: string;
   } | null;
 };
+
+/** Response from GET /api/platform/gateway/status */
+export type GatewayProcessStatusResponse =
+  | GatewayProcessStatusOkResponse
+  | InstanceNotRunningSentinel;
 
 /** Response from POST /api/platform/gateway/{start|stop|restart} */
 export type GatewayProcessActionResponse = {
@@ -448,12 +508,14 @@ export type ConfigRestoreResponse = {
 export type GatewayReadyResponse = Record<string, unknown>;
 
 /** Response from GET /api/platform/controller-version. Null fields = old controller. */
-export type ControllerVersionResponse = {
-  version: string | null;
-  commit: string | null;
-  openclawVersion?: string | null;
-  openclawCommit?: string | null;
-};
+export type ControllerVersionResponse =
+  | {
+      version: string | null;
+      commit: string | null;
+      openclawVersion?: string | null;
+      openclawCommit?: string | null;
+    }
+  | InstanceNotRunningSentinel;
 
 /** Response from GET /api/platform/openclaw-config */
 export type OpenclawConfigResponse = {
@@ -476,7 +538,7 @@ export type MorningBriefingDeliveryResult = {
 };
 
 export type MorningBriefingStatusLite = Pick<
-  MorningBriefingStatusResponse,
+  MorningBriefingStatusOkResponse,
   | 'enabled'
   | 'desiredEnabled'
   | 'observedEnabled'
@@ -488,9 +550,14 @@ export type MorningBriefingStatusLite = Pick<
   | 'lastGeneratedDate'
   | 'sourceReadiness'
   | 'lastDelivery'
+  | 'interestTopics'
 >;
 
-export type MorningBriefingStatusResponse = {
+export type MorningBriefingStatusResponse =
+  | MorningBriefingStatusOkResponse
+  | InstanceNotRunningSentinel;
+
+export type MorningBriefingStatusOkResponse = {
   ok: boolean;
   enabled?: boolean;
   cron?: string;
@@ -510,6 +577,11 @@ export type MorningBriefingStatusResponse = {
     web: MorningBriefingSourceReadiness;
   };
   lastDelivery?: MorningBriefingDeliveryResult[];
+  // Selected morning-briefing interest topics, sourced from the
+  // `kiloclaw_morning_briefing_configs` Postgres row. Empty array when no
+  // topics are selected; omitted when the instance pre-dates the table or
+  // Postgres was unavailable for this request.
+  interestTopics?: string[];
   code?: string;
   retryAfterSec?: number;
   error?: string;
@@ -527,6 +599,20 @@ export type MorningBriefingActionResponse = {
   delivery?: MorningBriefingDeliveryResult[];
   code?: string;
   retryAfterSec?: number;
+  error?: string;
+};
+
+export type MorningBriefingInterestsResponse = {
+  ok: boolean;
+  interestTopics?: string[];
+  code?: string;
+  error?: string;
+};
+
+export type MorningBriefingUserLocationResponse = {
+  ok: boolean;
+  userLocation?: string | null;
+  code?: string;
   error?: string;
 };
 

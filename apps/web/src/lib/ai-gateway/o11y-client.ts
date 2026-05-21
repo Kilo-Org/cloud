@@ -30,7 +30,7 @@ function authHeaders(): HeadersInit {
 type FetchO11yJsonParams<T> = {
   path: string;
   schema: z.ZodSchema<T>;
-  method?: 'GET' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
   searchParams?: URLSearchParams;
   errorMessage: string;

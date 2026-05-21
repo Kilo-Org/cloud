@@ -6,6 +6,10 @@ API_URL=http://localhost:3000
 # @from INTERNAL_API_SECRET
 INTERNAL_API_SECRET=your-secret-here
 
+# HMAC secret for persisted callback tokens
+# @from CALLBACK_TOKEN_SECRET
+CALLBACK_TOKEN_SECRET=your-callback-secret-here
+
 # Backend auth token for authenticating incoming requests from backend
 # @from CODE_REVIEW_WORKER_AUTH_TOKEN
 BACKEND_AUTH_TOKEN=your-backend-auth-token

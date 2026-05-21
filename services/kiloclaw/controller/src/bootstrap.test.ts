@@ -4,6 +4,7 @@ import {
   decryptEnvVars,
   setupDirectories,
   applyFeatureFlags,
+  cleanNpmCache,
   generateHooksToken,
   configureGitHub,
   configureLinear,
@@ -23,6 +24,7 @@ import {
   KILO_CLI_SECTION_CONFIG,
   OP_SECTION_CONFIG,
   LINEAR_SECTION_CONFIG,
+  COMPOSIO_SECTION_CONFIG,
   KILOCLAW_MITIGATIONS_SECTION_CONFIG,
   PLUGIN_INSTALL_SECTION_CONFIG,
   PROCESS_MODEL_SECTION_CONFIG,
@@ -296,6 +298,18 @@ describe('setupDirectories', () => {
     expect(env.NODE_COMPILE_CACHE).toBe('/var/tmp/openclaw-compile-cache');
     expect(env.INVOCATION_ID).toBe('1');
     expect(env.GOG_KEYRING_PASSWORD).toBe('kiloclaw');
+    expect(env.OPENCLAW_PLUGIN_STAGE_DIR).toBe('/usr/local/share/openclaw-plugin-runtime-deps');
+  });
+
+  it('preserves an explicit OpenClaw plugin stage dir', () => {
+    const { deps } = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      OPENCLAW_PLUGIN_STAGE_DIR: '/custom/plugin-runtime-deps',
+    };
+
+    setupDirectories(env, deps);
+
+    expect(env.OPENCLAW_PLUGIN_STAGE_DIR).toBe('/custom/plugin-runtime-deps');
   });
 
   it('derives KILO_API_URL from KILOCODE_API_BASE_URL origin', () => {
@@ -414,6 +428,49 @@ describe('applyFeatureFlags', () => {
 
     expect(env.NPM_CONFIG_PREFIX).toBeUndefined();
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('failed to create npm-global'));
+    warnSpy.mockRestore();
+  });
+});
+
+// ---- cleanNpmCache ----
+
+describe('cleanNpmCache', () => {
+  it('runs npm cache clean with the runtime env', () => {
+    const { deps, execCalls } = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      NPM_CONFIG_PREFIX: '/root/.npm-global',
+    };
+
+    cleanNpmCache(env, deps);
+
+    expect(execCalls).toContainEqual({
+      cmd: 'npm',
+      args: ['cache', 'clean', '--force'],
+      input: undefined,
+    });
+    expect(deps.execFileSync).toHaveBeenCalledWith(
+      'npm',
+      ['cache', 'clean', '--force'],
+      expect.objectContaining({
+        env: expect.objectContaining({ NPM_CONFIG_PREFIX: '/root/.npm-global' }),
+        stdio: 'pipe',
+      })
+    );
+  });
+
+  it('logs and continues when npm cache clean fails', () => {
+    const { deps } = fakeDeps();
+    (deps.execFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('npm failed');
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() => cleanNpmCache({}, deps)).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[controller] npm cache clean failed, continuing:',
+      'npm failed'
+    );
+
     warnSpy.mockRestore();
   });
 });
@@ -1613,6 +1670,7 @@ describe('TOOLS.md section configs', () => {
     KILO_CLI_SECTION_CONFIG,
     OP_SECTION_CONFIG,
     LINEAR_SECTION_CONFIG,
+    COMPOSIO_SECTION_CONFIG,
     KILOCLAW_MITIGATIONS_SECTION_CONFIG,
     PLUGIN_INSTALL_SECTION_CONFIG,
     PROCESS_MODEL_SECTION_CONFIG,
@@ -1701,6 +1759,14 @@ describe('TOOLS.md section configs', () => {
     expect(GOG_SECTION_CONFIG.section).toContain('gog drive ls --account <email> --json');
     expect(GOG_SECTION_CONFIG.section).not.toContain('gog drive files list');
   });
+
+  it('Composio section references core CLI commands', () => {
+    const section = COMPOSIO_SECTION_CONFIG.section;
+    expect(section).toContain('composio whoami');
+    expect(section).toContain('composio search');
+    expect(section).toContain('composio connections list');
+    expect(section).toContain('composio link <toolkit>');
+  });
 });
 
 // ---- buildGatewayArgs ----
@@ -1758,6 +1824,23 @@ describe('bootstrapCritical', () => {
 
     expect(phases).toEqual(['decrypting', 'directories', 'feature-flags']);
     expect(JSON.parse(env.KILOCLAW_GATEWAY_ARGS ?? '[]')).toContain('gw-token');
+  });
+
+  it('does not clean npm cache before readiness-critical steps complete', async () => {
+    const harness = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      KILOCODE_API_KEY: 'api-key',
+      OPENCLAW_GATEWAY_TOKEN: 'gw-token',
+      AUTO_APPROVE_DEVICES: 'true',
+    };
+
+    await bootstrapCritical(env, () => {}, harness.deps);
+
+    expect(harness.execCalls).not.toContainEqual({
+      cmd: 'npm',
+      args: ['cache', 'clean', '--force'],
+      input: undefined,
+    });
   });
 
   it('throws before later steps when decryption fails', async () => {
@@ -1939,6 +2022,11 @@ describe('bootstrap', () => {
       'tools-md',
       'mcporter',
     ]);
+    expect(harness.execCalls.at(-1)).toEqual({
+      cmd: 'npm',
+      args: ['cache', 'clean', '--force'],
+      input: undefined,
+    });
   });
 
   it('reports doctor phase when config exists', async () => {

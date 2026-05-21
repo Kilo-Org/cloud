@@ -1274,6 +1274,40 @@ describe('normalize', () => {
     });
   });
 
+  describe('commands.available', () => {
+    it('normalizes a populated catalog', () => {
+      const result = normalize(
+        createRaw('commands.available', {
+          commands: [
+            { name: 'review', description: 'Review the diff', hints: [] },
+            { name: 'init', hints: ['$ARGUMENTS'], source: 'command' },
+          ],
+        })
+      );
+      expect(result).toEqual({
+        type: 'commands.available',
+        commands: [
+          { name: 'review', description: 'Review the diff', hints: [] },
+          { name: 'init', hints: ['$ARGUMENTS'], source: 'command' },
+        ],
+      });
+    });
+
+    it('normalizes an empty catalog', () => {
+      const result = normalize(createRaw('commands.available', { commands: [] }));
+      expect(result).toEqual({ type: 'commands.available', commands: [] });
+    });
+
+    it('returns null when commands array is missing', () => {
+      expect(normalize(createRaw('commands.available', {}))).toBeNull();
+    });
+
+    it('is not a chat event', () => {
+      const result = normalize(createRaw('commands.available', { commands: [] }));
+      expect(isChatEvent(result!)).toBe(false);
+    });
+  });
+
   describe('unknown events', () => {
     it('returns null for unknown event type', () => {
       expect(normalize(createRaw('some.unknown.event', { foo: 'bar' }))).toBeNull();

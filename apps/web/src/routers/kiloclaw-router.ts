@@ -18,9 +18,18 @@ import {
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
 import { KILOCLAW_API_URL, KILOCLAW_INSTANCE_URL_TEMPLATE } from '@/lib/config.server';
+import {
+  MORNING_BRIEFING_INTERESTS_MAX_TOPICS,
+  MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH,
+} from '@/lib/kiloclaw/morning-briefing-interests';
 import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import {
+  CURRENT_KILOCLAW_PRICE_VERSION,
+  getKiloClawPlanCostMicrodollars,
+  getKiloClawPricingCatalogEntry,
+  insertKiloClawSubscriptionChangeLog,
+} from '@kilocode/db';
 import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
@@ -65,6 +74,16 @@ import {
   getPersonalProvisionLockKey,
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
+import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
+import {
+  buildComposioProvisionSecrets,
+  composioSecretsPatchSource,
+  createManagedComposioGoogleCalendarLink,
+  clearComposioInstanceConfig,
+  getManagedComposioGoogleCalendarStatus,
+  getComposioInstanceConfigSource,
+  markComposioInstanceConfig,
+} from '@/lib/kiloclaw/composio-onboarding';
 import {
   clearSubscriptionLifecycleAfterInstanceDestroy,
   clearTrialInactivityStopAfterStart,
@@ -87,10 +106,10 @@ import {
   getStripePriceIdForClawPlanIntro,
 } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
-import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
-import { isKiloPassSelectionEligibleForKiloclawCommitUpsell } from '@/lib/kilo-pass/bonus';
+import { KiloPassTier, KiloPassCadence, KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
+import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
 import { ensureAutoIntroSchedule, resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
 import {
   getKiloClawEarlybirdStateForUser,
@@ -100,8 +119,6 @@ import {
 import {
   enrollWithCredits as enrollWithCreditsImpl,
   getEffectiveCreditBalancePreview,
-  KILOCLAW_PLAN_COST_MICRODOLLARS,
-  KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS,
 } from '@/lib/kiloclaw/credit-billing';
 import {
   logCreditEnrollmentAttempted,
@@ -810,11 +827,12 @@ const channelsSchema = z
 
 const updateConfigSchema = z.object({
   envVars: z.record(z.string(), z.string()).optional(),
-  secrets: z.record(z.string(), z.string()).optional(),
+  secrets: z.record(z.string(), z.string().max(MAX_CUSTOM_SECRET_VALUE_LENGTH)).optional(),
   channels: channelsSchema,
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
   userTimezone: userTimezoneSchema.nullable().optional(),
   userLocation: userLocationSchema.nullable().optional(),
+  skipIncompleteManagedComposioConnection: z.boolean().optional(),
 });
 
 const updateKiloCodeConfigSchema = z.object({
@@ -840,6 +858,18 @@ const patchBotIdentitySchema = z.object({
   botNature: z.string().trim().min(1).max(120).nullable().optional(),
   botVibe: z.string().trim().min(1).max(120).nullable().optional(),
   botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
+});
+
+const composioConnectLinkSchema = z.object({
+  returnTo: z
+    .string()
+    .min(1)
+    .max(500)
+    .refine(value => value.startsWith('/'), {
+      message: 'returnTo must be a relative path',
+    }),
+  popup: z.boolean().optional(),
+  attemptId: z.string().min(1).max(100).optional(),
 });
 
 /**
@@ -1011,6 +1041,8 @@ function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDash
     botNature: null,
     botVibe: null,
     botEmoji: null,
+    userLocation: null,
+    userTimezone: null,
     workerUrl,
     controllerCapabilitiesVersion: null,
     name: null,
@@ -1064,11 +1096,14 @@ async function provisionInstance(
   params: { instanceId: string | null; bootstrapSubscription: boolean },
   executor: typeof db | DrizzleTransaction = db
 ) {
-  const encryptedSecrets = input.secrets
-    ? Object.fromEntries(
-        Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
-      )
-    : undefined;
+  const composioProvision = await buildComposioProvisionSecrets({
+    scope: { ownerType: 'user', userId: user.id },
+    instanceId: params.instanceId,
+    secrets: input.secrets,
+    skipIncompleteManagedConnection: input.skipIncompleteManagedComposioConnection,
+  });
+
+  const encryptedSecrets = encryptProvisionSecretsForWorker(composioProvision.secrets);
 
   const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
   const kilocodeApiKey = generateApiToken(user, undefined, {
@@ -1087,7 +1122,7 @@ async function provisionInstance(
     : undefined;
 
   const client = new KiloClawInternalClient();
-  return client.provision(
+  const result = await client.provision(
     user.id,
     {
       envVars: input.envVars,
@@ -1107,6 +1142,17 @@ async function provisionInstance(
         }
       : undefined
   );
+
+  if (composioProvision.configToMark?.source === 'manual') {
+    await markComposioInstanceConfig({ instanceId: result.instanceId, source: 'manual' });
+  } else if (composioProvision.configToMark?.source === 'managed') {
+    await markComposioInstanceConfig({
+      instanceId: result.instanceId,
+      source: 'managed',
+    });
+  }
+
+  return result;
 }
 
 async function emitProvisionTrialStartSideEffects(params: {
@@ -1436,6 +1482,8 @@ const KiloclawPersonalSubscriptionSchema = z.object({
   plan: z.string(),
   status: z.string(),
   activationState: KiloclawActivationStateSchema,
+  priceVersion: z.string(),
+  selfServiceInstanceType: z.string(),
   cancelAtPeriodEnd: z.boolean(),
   pendingConversion: z.boolean(),
   scheduledPlan: z.string().nullable(),
@@ -1451,6 +1499,7 @@ const KiloclawPersonalSubscriptionSchema = z.object({
   paymentSource: z.string().nullable(),
   hasStripeFunding: z.boolean(),
   renewalCostMicrodollars: z.number().nullable(),
+  renewalCostSource: z.enum(['credit_renewal', 'stripe_approximation']).nullable(),
   showConversionPrompt: z.boolean(),
   referralRewards: KiloclawSubscriptionReferralRewardsSchema,
 });
@@ -1527,11 +1576,153 @@ async function getHasActiveKiloPassForUser(userId: string): Promise<boolean> {
   return !!kiloPassState && !isStripeSubscriptionEnded(kiloPassState.status);
 }
 
-function getKiloclawRenewalCostMicrodollars(plan: string): number | null {
+function getKiloclawRenewalCostMicrodollars(plan: string, priceVersion: string): number | null {
   if (plan === 'standard' || plan === 'commit') {
-    return KILOCLAW_PLAN_COST_MICRODOLLARS[plan];
+    return getKiloClawPlanCostMicrodollars({ priceVersion, plan });
   }
   return null;
+}
+
+type KiloclawRenewalCostSource = 'credit_renewal' | 'stripe_approximation';
+
+function getKiloclawRenewalCostSource(hasStripeFunding: boolean): KiloclawRenewalCostSource {
+  return hasStripeFunding ? 'stripe_approximation' : 'credit_renewal';
+}
+
+const KILO_PASS_UPSELL_TIER_MAP = {
+  '19': KiloPassTier.Tier19,
+  '49': KiloPassTier.Tier49,
+  '199': KiloPassTier.Tier199,
+} as const;
+const KILO_PASS_UPSELL_CADENCE_MAP = {
+  monthly: KiloPassCadence.Monthly,
+  yearly: KiloPassCadence.Yearly,
+} as const;
+type KiloPassUpsellTier = keyof typeof KILO_PASS_UPSELL_TIER_MAP;
+type KiloPassUpsellCadence = keyof typeof KILO_PASS_UPSELL_CADENCE_MAP;
+
+type KiloPassUpsellActivationPreview = {
+  eligible: boolean;
+  costMicrodollars: number;
+  projectedKiloPassBaseMicrodollars: number;
+  projectedKiloPassBonusMicrodollars: number;
+  effectiveBalanceMicrodollars: number;
+  shortfallMicrodollars: number;
+};
+type KiloPassUpsellPreviewMatrix = Record<
+  'commit' | 'standard',
+  Record<KiloPassUpsellCadence, Record<KiloPassUpsellTier, KiloPassUpsellActivationPreview>>
+>;
+
+function buildPendingKiloPassState(params: {
+  tier: KiloPassTier;
+  cadence: KiloPassCadence;
+}): KiloPassSubscriptionState {
+  return {
+    subscriptionId: 'pending-kilo-pass-upsell',
+    stripeSubscriptionId: 'pending-kilo-pass-upsell',
+    paymentProvider: KiloPassPaymentProvider.Stripe,
+    providerSubscriptionId: 'pending-kilo-pass-upsell',
+    tier: params.tier,
+    cadence: params.cadence,
+    status: 'active',
+    cancelAtPeriodEnd: false,
+    currentStreakMonths: params.cadence === KiloPassCadence.Yearly ? 0 : 1,
+    nextYearlyIssueAt: null,
+    startedAt: new Date().toISOString(),
+    resumesAt: null,
+  };
+}
+
+async function getKiloPassUpsellActivationPreview(params: {
+  userId: string;
+  tier: KiloPassTier;
+  cadence: KiloPassCadence;
+  balanceMicrodollars: number;
+  microdollarsUsed: number;
+  costMicrodollars: number;
+}): Promise<KiloPassUpsellActivationPreview> {
+  const projectedKiloPassBaseMicrodollars = getMonthlyPriceUsd(params.tier) * 1_000_000;
+  const creditPreview = await getEffectiveCreditBalancePreview({
+    userId: params.userId,
+    balanceMicrodollars: params.balanceMicrodollars + projectedKiloPassBaseMicrodollars,
+    microdollarsUsed: params.microdollarsUsed,
+    kiloPassThreshold: params.microdollarsUsed + projectedKiloPassBaseMicrodollars,
+    costMicrodollars: params.costMicrodollars,
+    subscription: buildPendingKiloPassState({ tier: params.tier, cadence: params.cadence }),
+  });
+  const shortfallMicrodollars = Math.max(
+    0,
+    params.costMicrodollars - creditPreview.effectiveBalanceMicrodollars
+  );
+
+  return {
+    eligible: shortfallMicrodollars === 0,
+    costMicrodollars: params.costMicrodollars,
+    projectedKiloPassBaseMicrodollars,
+    projectedKiloPassBonusMicrodollars: creditPreview.projectedKiloPassBonusMicrodollars,
+    effectiveBalanceMicrodollars: creditPreview.effectiveBalanceMicrodollars,
+    shortfallMicrodollars,
+  };
+}
+
+async function getKiloPassUpsellPreviewMatrix(params: {
+  userId: string;
+  balanceMicrodollars: number;
+  microdollarsUsed: number;
+  standardCostMicrodollars: number;
+  commitCostMicrodollars: number;
+}): Promise<KiloPassUpsellPreviewMatrix> {
+  async function getPreview(
+    plan: 'standard' | 'commit',
+    cadence: KiloPassUpsellCadence,
+    tier: KiloPassUpsellTier
+  ): Promise<KiloPassUpsellActivationPreview> {
+    return await getKiloPassUpsellActivationPreview({
+      userId: params.userId,
+      tier: KILO_PASS_UPSELL_TIER_MAP[tier],
+      cadence: KILO_PASS_UPSELL_CADENCE_MAP[cadence],
+      balanceMicrodollars: params.balanceMicrodollars,
+      microdollarsUsed: params.microdollarsUsed,
+      costMicrodollars:
+        plan === 'standard' ? params.standardCostMicrodollars : params.commitCostMicrodollars,
+    });
+  }
+
+  async function getTierPreviews(
+    plan: 'standard' | 'commit',
+    cadence: KiloPassUpsellCadence
+  ): Promise<Record<KiloPassUpsellTier, KiloPassUpsellActivationPreview>> {
+    return {
+      '19': await getPreview(plan, cadence, '19'),
+      '49': await getPreview(plan, cadence, '49'),
+      '199': await getPreview(plan, cadence, '199'),
+    };
+  }
+
+  async function getCadencePreviews(
+    plan: 'standard' | 'commit'
+  ): Promise<
+    Record<KiloPassUpsellCadence, Record<KiloPassUpsellTier, KiloPassUpsellActivationPreview>>
+  > {
+    return {
+      monthly: await getTierPreviews(plan, 'monthly'),
+      yearly: await getTierPreviews(plan, 'yearly'),
+    };
+  }
+
+  return {
+    standard: await getCadencePreviews('standard'),
+    commit: await getCadencePreviews('commit'),
+  };
+}
+
+function getKiloPassUpsellInsufficientMessage(plan: 'commit' | 'standard'): string {
+  if (plan === 'commit') {
+    return 'Selected Kilo Pass option does not include enough credits for commit hosting.';
+  }
+
+  return 'Selected Kilo Pass option cannot auto-activate Standard hosting. Choose a larger tier or add credits first.';
 }
 
 function normalizeTimestamp(value: string | null | undefined): string | null {
@@ -1585,10 +1776,12 @@ async function getPersonalBillingStatus(user: {
   const kiloPassState = await getKiloPassStateForUser(db, user.id);
   const hasActiveKiloPass = !!kiloPassState && !isStripeSubscriptionEnded(kiloPassState.status);
   const showConversionPrompt = hasStripeFunding && hasActiveKiloPass;
-  const renewalCostMicrodollars =
-    hasPaidSubscription && (sub.plan === 'standard' || sub.plan === 'commit')
-      ? KILOCLAW_PLAN_COST_MICRODOLLARS[sub.plan]
-      : null;
+  const renewalCostMicrodollars = hasPaidSubscription
+    ? getKiloclawRenewalCostMicrodollars(sub.plan, sub.kiloclaw_price_version)
+    : null;
+  const renewalCostSource: KiloclawRenewalCostSource | null = hasPaidSubscription
+    ? getKiloclawRenewalCostSource(hasStripeFunding)
+    : null;
   const referralRewards = hasPaidSubscription
     ? await getAppliedReferralRewardsForSubscription({
         userId: user.id,
@@ -1601,6 +1794,9 @@ async function getPersonalBillingStatus(user: {
         plan: sub.plan as 'commit' | 'standard',
         status: sub.status as 'active' | 'past_due' | 'canceled' | 'unpaid',
         activationState: getKiloClawSubscriptionActivationState(sub),
+        priceVersion: sub.kiloclaw_price_version,
+        selfServiceInstanceType: getKiloClawPricingCatalogEntry(sub.kiloclaw_price_version)
+          .selfServiceInstanceType,
         cancelAtPeriodEnd: sub.cancel_at_period_end,
         currentPeriodEnd: normalizeTimestamp(sub.current_period_end) ?? '',
         commitEndsAt: normalizeTimestamp(sub.commit_ends_at),
@@ -1610,6 +1806,7 @@ async function getPersonalBillingStatus(user: {
         paymentSource: sub.payment_source ?? null,
         creditRenewalAt: normalizeTimestamp(sub.credit_renewal_at),
         renewalCostMicrodollars,
+        renewalCostSource,
         showConversionPrompt,
         pendingConversion: sub.pending_conversion ?? false,
         referralRewards: referralRewards ?? { totalAppliedMonths: 0, applications: [] },
@@ -1663,27 +1860,44 @@ async function getPersonalBillingStatus(user: {
 
   const creditIntroEligible = !(await hadPriorPaidSubscription(user.id));
   const creditBalanceMicrodollars = user.total_microdollars_acquired - user.microdollars_used;
-  const standardCreditCostMicrodollars = creditIntroEligible
-    ? KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS
-    : KILOCLAW_PLAN_COST_MICRODOLLARS.standard;
-  const [standardCreditEnrollmentPreview, commitCreditEnrollmentPreview] = await Promise.all([
-    getEffectiveCreditBalancePreview({
-      userId: user.id,
-      balanceMicrodollars: creditBalanceMicrodollars,
-      microdollarsUsed: user.microdollars_used,
-      kiloPassThreshold: user.kilo_pass_threshold,
-      costMicrodollars: standardCreditCostMicrodollars,
-      subscription: kiloPassState,
-    }),
-    getEffectiveCreditBalancePreview({
-      userId: user.id,
-      balanceMicrodollars: creditBalanceMicrodollars,
-      microdollarsUsed: user.microdollars_used,
-      kiloPassThreshold: user.kilo_pass_threshold,
-      costMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
-      subscription: kiloPassState,
-    }),
-  ]);
+  const creditEnrollmentPriceVersion =
+    sub?.status === 'trialing' ? sub.kiloclaw_price_version : CURRENT_KILOCLAW_PRICE_VERSION;
+  const intendedPricing = getKiloClawPricingCatalogEntry(creditEnrollmentPriceVersion);
+  const standardCreditCostMicrodollars = getKiloClawPlanCostMicrodollars({
+    priceVersion: creditEnrollmentPriceVersion,
+    plan: 'standard',
+    useStandardIntro: sub?.status === 'trialing' && creditIntroEligible,
+  });
+  const commitCreditCostMicrodollars = getKiloClawPlanCostMicrodollars({
+    priceVersion: creditEnrollmentPriceVersion,
+    plan: 'commit',
+  });
+  const [standardCreditEnrollmentPreview, commitCreditEnrollmentPreview, kiloPassUpsellPreview] =
+    await Promise.all([
+      getEffectiveCreditBalancePreview({
+        userId: user.id,
+        balanceMicrodollars: creditBalanceMicrodollars,
+        microdollarsUsed: user.microdollars_used,
+        kiloPassThreshold: user.kilo_pass_threshold,
+        costMicrodollars: standardCreditCostMicrodollars,
+        subscription: kiloPassState,
+      }),
+      getEffectiveCreditBalancePreview({
+        userId: user.id,
+        balanceMicrodollars: creditBalanceMicrodollars,
+        microdollarsUsed: user.microdollars_used,
+        kiloPassThreshold: user.kilo_pass_threshold,
+        costMicrodollars: commitCreditCostMicrodollars,
+        subscription: kiloPassState,
+      }),
+      getKiloPassUpsellPreviewMatrix({
+        userId: user.id,
+        balanceMicrodollars: creditBalanceMicrodollars,
+        microdollarsUsed: user.microdollars_used,
+        standardCostMicrodollars: standardCreditCostMicrodollars,
+        commitCostMicrodollars: commitCreditCostMicrodollars,
+      }),
+    ]);
 
   return {
     hasAccess,
@@ -1692,16 +1906,19 @@ async function getPersonalBillingStatus(user: {
     creditBalanceMicrodollars,
     creditIntroEligible,
     hasActiveKiloPass,
+    intendedPriceVersion: creditEnrollmentPriceVersion,
+    intendedSelfServiceInstanceType: intendedPricing.selfServiceInstanceType,
     creditEnrollmentPreview: {
       standard: {
         costMicrodollars: standardCreditCostMicrodollars,
         ...standardCreditEnrollmentPreview,
       },
       commit: {
-        costMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
+        costMicrodollars: commitCreditCostMicrodollars,
         ...commitCreditEnrollmentPreview,
       },
     },
+    kiloPassUpsellPreview,
     trial: trialData,
     subscription: subscriptionData,
     earlybird: earlybirdData,
@@ -1734,6 +1951,7 @@ function summarizePersonalBillingStatus(billing: ClawBillingStatus) {
     creditIntroEligible: billing.creditIntroEligible,
     hasActiveKiloPass: billing.hasActiveKiloPass,
     creditEnrollmentPreview: billing.creditEnrollmentPreview,
+    kiloPassUpsellPreview: billing.kiloPassUpsellPreview,
   };
 }
 
@@ -1910,6 +2128,9 @@ async function serializeKiloclawPersonalSubscription(
     plan: row.subscription.plan,
     status: row.subscription.status,
     activationState,
+    priceVersion: row.subscription.kiloclaw_price_version,
+    selfServiceInstanceType: getKiloClawPricingCatalogEntry(row.subscription.kiloclaw_price_version)
+      .selfServiceInstanceType,
     cancelAtPeriodEnd: row.subscription.cancel_at_period_end,
     pendingConversion: row.subscription.pending_conversion,
     scheduledPlan: row.subscription.scheduled_plan ?? null,
@@ -1924,7 +2145,11 @@ async function serializeKiloclawPersonalSubscription(
     destructionDeadline: normalizeTimestamp(row.subscription.destruction_deadline),
     paymentSource: row.subscription.payment_source ?? null,
     hasStripeFunding,
-    renewalCostMicrodollars: getKiloclawRenewalCostMicrodollars(row.subscription.plan),
+    renewalCostMicrodollars: getKiloclawRenewalCostMicrodollars(
+      row.subscription.plan,
+      row.subscription.kiloclaw_price_version
+    ),
+    renewalCostSource: getKiloclawRenewalCostSource(hasStripeFunding),
     showConversionPrompt: hasStripeFunding && hasActiveKiloPass,
     referralRewards,
   };
@@ -2352,7 +2577,9 @@ async function switchKiloclawPlanForRow(params: {
       });
     }
 
-    const targetPriceId = getStripePriceIdForClawPlan(toPlan);
+    const targetPriceId = getStripePriceIdForClawPlan(toPlan, {
+      priceVersion: subscription.kiloclaw_price_version,
+    });
 
     if (effectiveScheduledBy === 'auto' && effectiveScheduleId) {
       try {
@@ -2838,6 +3065,36 @@ export const kiloclawRouter = createTRPCRouter({
     return client.runMorningBriefing(ctx.user.id, workerInstanceId(instance));
   }),
 
+  updateBriefingInterests: clawAccessProcedure
+    .input(
+      z.object({
+        // Caps come from the shared `morning-briefing-interests`
+        // module; the worker (`services/kiloclaw/src/routes/platform.ts`)
+        // keeps its own copy across the service boundary.
+        topics: z
+          .array(z.string().trim().min(1).max(MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH))
+          .max(MORNING_BRIEFING_INTERESTS_MAX_TOPICS),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      const client = new KiloClawInternalClient();
+      return client.updateBriefingInterests(ctx.user.id, input.topics, workerInstanceId(instance));
+    }),
+
+  // Post-provisioning location edit from Settings. Onboarding's initial
+  // location set still flows through `updateConfig`/`provision` because
+  // it's bundled with the rest of the initial config; this mutation is
+  // for edits after the instance is already running, mirroring the
+  // shape of `updateBriefingInterests`.
+  updateUserLocation: clawAccessProcedure
+    .input(z.object({ userLocation: userLocationSchema.nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      const client = new KiloClawInternalClient();
+      return client.updateUserLocation(ctx.user.id, input.userLocation, workerInstanceId(instance));
+    }),
+
   readMorningBriefing: clawAccessProcedure
     .input(z.object({ day: z.enum(['today', 'yesterday']) }))
     .query(async ({ ctx, input }) => {
@@ -3165,11 +3422,18 @@ export const kiloclawRouter = createTRPCRouter({
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       try {
-        return await client.patchSecrets(
+        const result = await client.patchSecrets(
           ctx.user.id,
           { secrets: encryptedPatch, meta: input.meta },
           workerInstanceId(instance)
         );
+        const sourceAction = instance ? composioSecretsPatchSource(secrets) : 'none';
+        if (instance && sourceAction === 'upsert_manual') {
+          await markComposioInstanceConfig({ instanceId: instance.id, source: 'manual' });
+        } else if (instance && sourceAction === 'clear') {
+          await clearComposioInstanceConfig(instance.id);
+        }
+        return result;
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           // Extract message from worker response body (JSON or plain text)
@@ -3195,6 +3459,58 @@ export const kiloclawRouter = createTRPCRouter({
     );
     return client.getConfig({ userId: ctx.user.id, instanceId: workerInstanceId(instance) });
   }),
+
+  getComposioOnboardingStatus: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    let sandboxHasComposioSecrets = false;
+    if (instance) {
+      const client = new KiloClawUserClient(
+        generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
+      );
+      const config = await client.getConfig({
+        userId: ctx.user.id,
+        instanceId: workerInstanceId(instance),
+      });
+      sandboxHasComposioSecrets = config.configuredSecrets.composio === true;
+    }
+    return await getManagedComposioGoogleCalendarStatus({
+      scope: {
+        ownerType: 'user',
+        userId: ctx.user.id,
+      },
+      instance,
+      sandboxHasComposioSecrets,
+    });
+  }),
+
+  createComposioGoogleCalendarLink: baseProcedure
+    .input(composioConnectLinkSchema)
+    .mutation(async ({ ctx, input }) => {
+      return await withKiloclawProvisionContextLock(
+        getPersonalProvisionLockKey(ctx.user.id),
+        async () => {
+          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
+          const instance = await getActiveInstance(ctx.user.id);
+          const sandboxConfigSource = instance
+            ? await getComposioInstanceConfigSource(instance.id)
+            : null;
+          if (sandboxConfigSource === 'manual') {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'This sandbox already uses your own Composio credentials.',
+            });
+          }
+
+          return await createManagedComposioGoogleCalendarLink({
+            userId: ctx.user.id,
+            scope: { ownerType: 'user', userId: ctx.user.id },
+            returnTo: input.returnTo,
+            popup: input.popup,
+            attemptId: input.attemptId,
+          });
+        }
+      );
+    }),
 
   getChannelCatalog: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
@@ -4237,7 +4553,7 @@ export const kiloclawRouter = createTRPCRouter({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
       }
 
-      const { anchorInstance } = await resolvePersonalBillingAnchor({
+      const { anchorInstance, currentRow } = await resolvePersonalBillingAnchor({
         userId: ctx.user.id,
         instanceId: input.instanceId,
       });
@@ -4288,12 +4604,21 @@ export const kiloclawRouter = createTRPCRouter({
         staleKiloClawSessions.map(s => stripe.checkout.sessions.expire(s.id).catch(() => {}))
       );
 
+      const intendedPriceVersion =
+        currentRow?.subscription.status === 'trialing'
+          ? currentRow.subscription.kiloclaw_price_version
+          : CURRENT_KILOCLAW_PRICE_VERSION;
+      const intendedPricing = getKiloClawPricingCatalogEntry(intendedPriceVersion);
+
       // Intro pricing eligibility (spec Credit Enrollment rule 3).
       const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
-      const priceId =
-        input.plan === 'standard' && !hadPaidSubscription
-          ? getStripePriceIdForClawPlanIntro('standard')
-          : getStripePriceIdForClawPlan(input.plan);
+      const useStandardIntro =
+        input.plan === 'standard' &&
+        intendedPricing.standardIntroMicrodollars !== undefined &&
+        !hadPaidSubscription;
+      const priceId = useStandardIntro
+        ? getStripePriceIdForClawPlanIntro('standard', { priceVersion: intendedPriceVersion })
+        : getStripePriceIdForClawPlan(input.plan, { priceVersion: intendedPriceVersion });
 
       const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
       const sessionMetadata = {
@@ -4301,6 +4626,7 @@ export const kiloclawRouter = createTRPCRouter({
         billingContext: 'personal',
         plan: input.plan,
         kiloUserId: ctx.user.id,
+        kiloclawPriceVersion: intendedPriceVersion,
         affiliateTrackingId: attribution?.tracking_id ?? '',
         instanceId: anchorInstance.id,
       };
@@ -4430,7 +4756,7 @@ export const kiloclawRouter = createTRPCRouter({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
       }
 
-      const { anchorInstance } = await resolvePersonalBillingAnchor({
+      const { anchorInstance, currentRow } = await resolvePersonalBillingAnchor({
         userId: ctx.user.id,
         instanceId: input.instanceId,
       });
@@ -4461,29 +4787,38 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
 
-      const tierMap = {
-        '19': KiloPassTier.Tier19,
-        '49': KiloPassTier.Tier49,
-        '199': KiloPassTier.Tier199,
-      } as const;
-      const cadenceMap = {
-        monthly: KiloPassCadence.Monthly,
-        yearly: KiloPassCadence.Yearly,
-      } as const;
-
-      const kiloPassTier = tierMap[input.tier];
-      const kiloPassCadence = cadenceMap[input.cadence];
-      if (
-        input.hostingPlan === 'commit' &&
-        !isKiloPassSelectionEligibleForKiloclawCommitUpsell({
-          tier: kiloPassTier,
-          cadence: kiloPassCadence,
-          commitCostMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
-        })
-      ) {
+      const kiloPassTier = KILO_PASS_UPSELL_TIER_MAP[input.tier];
+      const kiloPassCadence = KILO_PASS_UPSELL_CADENCE_MAP[input.cadence];
+      const intendedPriceVersion =
+        currentRow?.subscription.status === 'trialing'
+          ? currentRow.subscription.kiloclaw_price_version
+          : CURRENT_KILOCLAW_PRICE_VERSION;
+      const intendedPricing = getKiloClawPricingCatalogEntry(intendedPriceVersion);
+      const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
+      const useStandardIntro =
+        currentRow?.subscription.status === 'trialing' &&
+        input.hostingPlan === 'standard' &&
+        intendedPricing.standardIntroMicrodollars !== undefined &&
+        !hadPaidSubscription;
+      const hostingCostMicrodollars = getKiloClawPlanCostMicrodollars({
+        priceVersion: intendedPriceVersion,
+        plan: input.hostingPlan,
+        useStandardIntro,
+      });
+      const creditBalanceMicrodollars =
+        ctx.user.total_microdollars_acquired - ctx.user.microdollars_used;
+      const activationPreview = await getKiloPassUpsellActivationPreview({
+        userId: ctx.user.id,
+        tier: kiloPassTier,
+        cadence: kiloPassCadence,
+        balanceMicrodollars: creditBalanceMicrodollars,
+        microdollarsUsed: ctx.user.microdollars_used,
+        costMicrodollars: hostingCostMicrodollars,
+      });
+      if (!activationPreview.eligible) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Selected Kilo Pass option does not include enough credits for commit hosting.',
+          message: getKiloPassUpsellInsufficientMessage(input.hostingPlan),
         });
       }
 
@@ -5026,7 +5361,9 @@ export const kiloclawRouter = createTRPCRouter({
           });
         }
 
-        const targetPriceId = getStripePriceIdForClawPlan(input.toPlan);
+        const targetPriceId = getStripePriceIdForClawPlan(input.toPlan, {
+          priceVersion: sub.kiloclaw_price_version,
+        });
 
         // If an auto schedule exists, update it in place for the user's plan switch.
         if (effectiveScheduledBy === 'auto' && effectiveScheduleId) {

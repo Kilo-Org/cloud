@@ -221,7 +221,13 @@ describe('KiloChatClient', () => {
 
     it('does not emit unhandled rejections after handled send failures', async () => {
       const unhandledRejection = vi.fn<(reason: unknown) => void>();
-      process.on('unhandledRejection', unhandledRejection);
+      const nodeProcess = globalThis as unknown as {
+        process: {
+          on(event: 'unhandledRejection', listener: (reason: unknown) => void): void;
+          off(event: 'unhandledRejection', listener: (reason: unknown) => void): void;
+        };
+      };
+      nodeProcess.process.on('unhandledRejection', unhandledRejection);
 
       const fetch = vi
         .fn<typeof globalThis.fetch>()
@@ -241,7 +247,7 @@ describe('KiloChatClient', () => {
           })
         ).rejects.toThrow(KiloChatApiError);
 
-        await new Promise(resolve => setImmediate(resolve));
+        await new Promise(resolve => setTimeout(resolve, 0));
         await Promise.resolve();
         expect(unhandledRejection).not.toHaveBeenCalled();
 
@@ -258,7 +264,7 @@ describe('KiloChatClient', () => {
           expect.objectContaining({ method: 'POST' })
         );
       } finally {
-        process.off('unhandledRejection', unhandledRejection);
+        nodeProcess.process.off('unhandledRejection', unhandledRejection);
       }
     });
   });

@@ -12,11 +12,13 @@ import type {
   MCPServerConfig,
   RuntimeSkill,
   RuntimeAgent,
+  RuntimeKiloCommand,
 } from './types.js';
 import {
   MetadataSchema,
   PreparationInputSchema,
   type Images,
+  type InitialExecutionPayload,
   type PreparationInput,
   type SessionProfileBundle,
 } from './schemas.js';
@@ -67,10 +69,12 @@ import type {
   PreparingEventData,
   CloudStatusData,
 } from '../shared/protocol.js';
+import { commandsOrDefault, type SlashCommandInfo } from '../shared/slash-commands.js';
 import { STALE_THRESHOLD_MS, SANDBOX_SLEEP_AFTER_SECONDS } from '../core/lease.js';
 import { ExecutionOrchestrator, type OrchestratorDeps } from '../execution/orchestrator.js';
 import type {
   ExecutionMode,
+  ExecutionPayload,
   ExecutionPlan,
   StartExecutionV2Request,
   StartExecutionV2Result,
@@ -87,6 +91,8 @@ import { stopWrapper } from '../kilo/wrapper-manager.js';
 import { SessionService } from '../session-service.js';
 import { executePreparationSteps } from './async-preparation.js';
 import { resolveManagedGitLabToken } from '../services/git-token-service-client.js';
+import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
+import type { WrapperPty } from '../kilo/wrapper-client.js';
 
 // ---------------------------------------------------------------------------
 // Alarm Constants
@@ -109,8 +115,8 @@ const LAST_ACTIVITY_KEY = 'last_activity';
 /** Kilo server idle timeout: 15 minutes */
 const KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT = 15 * 60 * 1000;
 
-/** Default per-execution wall-clock deadline: 30 minutes */
-const DEFAULT_MAX_RUNTIME_MS = 1_800_000;
+/** Default per-execution wall-clock deadline: 60 minutes */
+const DEFAULT_MAX_RUNTIME_MS = 3_600_000;
 
 /** Hung execution timeout: no non-heartbeat events for 5 minutes */
 const HUNG_EXECUTION_TIMEOUT_MS = 5 * 60 * 1000;
@@ -132,6 +138,13 @@ type DisconnectGraceState = {
   wsCloseCode: number;
   wsCloseReason: string;
 };
+
+type TerminalSizeInput = {
+  cols: number;
+  rows: number;
+};
+
+type TerminalCreateInput = Partial<TerminalSizeInput>;
 
 function validateModeAgainstRuntimeAgents(metadata: CloudAgentSessionState): string | null {
   const mode = metadata.mode;
@@ -300,6 +313,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (!this.streamHandler || this.streamHandlerSessionId !== sessionId) {
       this.streamHandler = createStreamHandler(this.ctx, this.eventQueries, sessionId, {
         deriveCloudStatus: () => this.deriveCloudStatus(),
+        getAvailableCommands: () => this.getAvailableCommands(),
       });
       this.streamHandlerSessionId = sessionId;
     }
@@ -316,6 +330,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         clearActiveExecution: () => this.clearActiveExecution(),
         getActiveExecutionId: () => this.executionQueries.getActiveExecutionId(),
         cancelDisconnectGrace: () => this.cancelDisconnectGrace(),
+        setAvailableCommands: (commands: SlashCommandInfo[]) => this.setAvailableCommands(commands),
         getExecution: async (executionId: string) => {
           const execution = await this.executionQueries.get(executionId as ExecutionId);
           if (!execution) return null;
@@ -370,6 +385,16 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.ingestHandler;
   }
 
+  private isAllowedWebSocketOrigin(origin: string | null): boolean {
+    const allowedOrigins = (this.env.WS_ALLOWED_ORIGINS || '')
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean);
+
+    const isRealOrigin = origin !== null && origin !== 'null';
+    return allowedOrigins.length === 0 || !isRealOrigin || allowedOrigins.includes(origin);
+  }
+
   // ---------------------------------------------------------------------------
   // HTTP/WebSocket Routing
   // ---------------------------------------------------------------------------
@@ -387,14 +412,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       const ticket = url.searchParams.get('ticket');
       const origin = request.headers.get('Origin');
 
-      const allowedOrigins = (this.env.WS_ALLOWED_ORIGINS || '')
-        .split(',')
-        .map(value => value.trim())
-        .filter(Boolean);
-
-      if (allowedOrigins.length > 0 && origin && !allowedOrigins.includes(origin)) {
+      if (!this.isAllowedWebSocketOrigin(origin)) {
         logger
-          .withFields({ origin, allowedOrigins, sessionId: sessionIdParam })
+          .withFields({ origin, sessionId: sessionIdParam })
           .warn('DO /stream: Origin not allowed');
         return new Response('Origin not allowed', { status: 403 });
       }
@@ -761,6 +781,22 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   /**
+   * Persist the slash-command catalog reported by the wrapper. Stored as a
+   * dedicated DO storage key (not part of session metadata) because the
+   * catalog is a runtime cache derived from the kilo server, not durable
+   * session config — keeping it separate avoids polluting MetadataSchema.
+   */
+  async setAvailableCommands(commands: SlashCommandInfo[]): Promise<void> {
+    await this.ctx.storage.put('availableCommands', commands);
+  }
+
+  /** Read the cached slash-command catalog. Falls back to defaults if missing or empty. */
+  async getAvailableCommands(): Promise<SlashCommandInfo[]> {
+    const stored = await this.ctx.storage.get<SlashCommandInfo[]>('availableCommands');
+    return commandsOrDefault(stored);
+  }
+
+  /**
    * Update the upstream branch for this session.
    * This allows capturing the branch after kilo execution without a full metadata write.
    */
@@ -849,6 +885,97 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return { success: true };
   }
 
+  private async getTerminalClient(): Promise<OperationResult<{ client: TerminalWrapperClient }>> {
+    const sessionId = await this.requireSessionId();
+    const terminal = await resolveTerminalWrapperClient({
+      env: this.env,
+      metadata: await this.getMetadata(),
+      sessionId,
+    });
+
+    if (!terminal.success || !terminal.data) {
+      return { success: false, error: terminal.error };
+    }
+
+    return { success: true, data: { client: terminal.data.client } };
+  }
+
+  async createTerminal(input: TerminalCreateInput): Promise<OperationResult<{ pty: WrapperPty }>> {
+    const terminal = await this.getTerminalClient();
+    if (!terminal.success || !terminal.data) {
+      return { success: false, error: terminal.error };
+    }
+
+    try {
+      const pty = await terminal.data.client.createTerminal(
+        input.cols !== undefined && input.rows !== undefined
+          ? { cols: input.cols, rows: input.rows }
+          : undefined
+      );
+      await this.updateLastActivity();
+      return { success: true, data: { pty } };
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Failed to create terminal');
+      return { success: false, error: 'Terminal is unavailable' };
+    }
+  }
+
+  async resizeTerminal(input: {
+    ptyId: string;
+    cols: number;
+    rows: number;
+  }): Promise<OperationResult<{ pty: WrapperPty }>> {
+    const terminal = await this.getTerminalClient();
+    if (!terminal.success || !terminal.data) {
+      return { success: false, error: terminal.error };
+    }
+
+    try {
+      const pty = await terminal.data.client.resizeTerminal(input.ptyId, {
+        cols: input.cols,
+        rows: input.rows,
+      });
+      await this.updateLastActivity();
+      return { success: true, data: { pty } };
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          ptyId: input.ptyId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Failed to resize terminal');
+      return { success: false, error: 'Terminal is unavailable' };
+    }
+  }
+
+  async closeTerminal(input: { ptyId: string }): Promise<OperationResult<{ success: boolean }>> {
+    const terminal = await this.getTerminalClient();
+    if (!terminal.success || !terminal.data) {
+      return { success: false, error: terminal.error };
+    }
+
+    try {
+      const result = await terminal.data.client.closeTerminal(input.ptyId);
+      await this.updateLastActivity();
+      return { success: true, data: result };
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          ptyId: input.ptyId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Failed to close terminal');
+      return { success: false, error: 'Terminal is unavailable' };
+    }
+  }
+
   /**
    * Delete session and all associated data.
    */
@@ -890,6 +1017,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     mcpServers?: Record<string, MCPServerConfig>;
     runtimeSkills?: readonly RuntimeSkill[];
     runtimeAgents?: readonly RuntimeAgent[];
+    kiloCommands?: readonly RuntimeKiloCommand[];
     autoCommit?: boolean;
     condenseOnComplete?: boolean;
     appendSystemPrompt?: string;
@@ -899,11 +1027,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     createdOnPlatform?: string;
     gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
     initialMessageId?: string;
+    initialPayload?: InitialExecutionPayload;
     // Workspace metadata (set during prepareSession)
     workspacePath?: string;
     sessionHome?: string;
     branchName?: string;
     sandboxId?: SandboxId;
+    devcontainer?: CloudAgentSessionState['devcontainer'];
   }): Promise<OperationResult> {
     await this.requireSessionId(input.sessionId as SessionId);
     const existing = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
@@ -920,6 +1050,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       mcpServers,
       runtimeSkills,
       runtimeAgents,
+      kiloCommands,
       ...rest
     } = input;
 
@@ -932,6 +1063,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         mcpServers,
         runtimeSkills: runtimeSkills ? [...runtimeSkills] : undefined,
         runtimeAgents: runtimeAgents ? [...runtimeAgents] : undefined,
+        kiloCommands: kiloCommands ? [...kiloCommands] : undefined,
       },
       version: now,
       timestamp: now,
@@ -982,6 +1114,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     gitUrl?: string;
     platform?: 'github' | 'gitlab';
     initialMessageId?: string;
+    initialPayload?: InitialExecutionPayload;
     profile?: SessionProfileBundle;
   }): Promise<OperationResult> {
     await this.requireSessionId(input.sessionId as SessionId);
@@ -1005,6 +1138,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       gitUrl: input.gitUrl,
       platform: input.platform,
       initialMessageId: input.initialMessageId,
+      initialPayload: input.initialPayload,
       profile: input.profile,
       version: now,
       timestamp: now,
@@ -1140,6 +1274,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         mcpServers: inputProfile.mcpServers,
         runtimeSkills: inputProfile.runtimeSkills,
         runtimeAgents: inputProfile.runtimeAgents,
+        kiloCommands: inputProfile.kiloCommands,
         upstreamBranch: input.upstreamBranch,
         autoCommit: input.autoCommit,
         condenseOnComplete: input.condenseOnComplete,
@@ -1151,8 +1286,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         workspacePath: result.workspacePath,
         sessionHome: result.sessionHome,
         branchName: result.branchName,
+        devcontainer: result.devcontainer,
         sandboxId: result.sandboxId,
         initialMessageId: input.initialMessageId,
+        initialPayload: input.initialPayload,
       });
 
       if (!prepareResult.success) {
@@ -1233,6 +1370,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     mcpServers?: Record<string, MCPServerConfig>;
     runtimeSkills?: readonly RuntimeSkill[];
     runtimeAgents?: readonly RuntimeAgent[];
+    kiloCommands?: readonly RuntimeKiloCommand[];
     callbackTarget?: CallbackTarget | null;
     upstreamBranch?: string | null;
   }): Promise<OperationResult> {
@@ -1266,6 +1404,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       'mcpServers',
       'runtimeSkills',
       'runtimeAgents',
+      'kiloCommands',
     ]);
 
     const updated = { ...metadata };
@@ -1638,7 +1777,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
   /**
    * Fail a running execution that has exceeded its wall-clock deadline
-   * (DEFAULT_MAX_RUNTIME_MS = 30 min).
+   * (DEFAULT_MAX_RUNTIME_MS = 60 min).
    */
   private async checkMaxRuntime(now: number): Promise<void> {
     const activeExecutionId = await this.executionQueries.getActiveExecutionId();
@@ -1777,7 +1916,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         .withFields({ sessionId: this.sessionId, sandboxId })
         .debug('Starting stopKiloServer RPC');
 
-      await stopWrapper(sandbox, metadata.sessionId);
+      await stopWrapper(sandbox, metadata.sessionId, {
+        devcontainer: metadata.devcontainer
+          ? {
+              workspacePath: metadata.devcontainer.workspacePath,
+              configPath: metadata.devcontainer.configPath,
+            }
+          : undefined,
+      });
 
       logger
         .withFields({ sessionId: this.sessionId, sandboxId, rpcElapsedMs: Date.now() - rpcStart })
@@ -1807,13 +1953,22 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   /**
-   * Reset the sandbox container's sleep timer so it stays alive during an
-   * active execution.
+   * Reset the sandbox container's inactivity timer so it stays alive during
+   * an active execution.
    *
-   * The wrapper heartbeat travels over an outbound WebSocket that bypasses
-   * `containerFetch()`, so it never calls `renewActivityTimeout()`.  Calling
-   * `setSleepAfter()` with the same value is a lightweight RPC that resets
-   * the timer without changing the configuration.
+   * The @cloudflare/containers runtime expires the container after
+   * `sleepAfter` of inactivity and refreshes that window from
+   * `containerFetch()` only.  The wrapper communicates with the worker over
+   * an outbound WebSocket to `/ingest` that bypasses `containerFetch()`, so
+   * the activity timer is never refreshed by wrapper traffic and the
+   * container is SIGTERM-ed at the 15-minute mark even mid-execution.
+   *
+   * `setSleepAfter()` cannot be used to refresh the timer because the
+   * Sandbox implementation is idempotent — when called with the same value
+   * it returns early without resetting `sleepAfterMs`.  Call
+   * `renewActivityTimeout()` (inherited from the base Container class)
+   * directly instead; it is a synchronous in-memory update of
+   * `sleepAfterMs = Date.now() + sleepAfter*1000`.
    *
    * Called from the DO context's `updateHeartbeat` callback (debounced
    * to every 30 s by the ingest handler) while an execution is running.
@@ -1833,7 +1988,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           metadata.botId
         ));
       const sandbox = getSandbox(getSandboxNamespace(this.env, sandboxId), sandboxId);
-      await sandbox.setSleepAfter(SANDBOX_SLEEP_AFTER_SECONDS);
+      // `renewActivityTimeout` is declared as synchronous `void` on the
+      // base Container class, but `sandbox` is a DO RPC stub so the call
+      // is actually async.  `Promise.resolve` wraps the call without
+      // hiding rejection — failures still propagate to the catch below.
+      await Promise.resolve(sandbox.renewActivityTimeout());
     } catch (error) {
       logger
         .withFields({
@@ -2228,7 +2387,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     userId: UserId;
     orgId?: string;
     mode: ExecutionMode;
-    prompt: string;
+    payload: ExecutionPayload;
     model?: string;
     variant?: string;
     autoCommit?: boolean;
@@ -2250,6 +2409,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           branchName: params.existingMetadata.branchName ?? '',
           sandboxId: params.existingMetadata.sandboxId,
           sessionHome: params.existingMetadata.sessionHome,
+          devcontainer: params.existingMetadata.devcontainer,
           upstreamBranch: params.existingMetadata.upstreamBranch,
           appendSystemPrompt: params.existingMetadata.appendSystemPrompt,
           profile: existingMetadataProfile,
@@ -2287,7 +2447,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       sessionId: params.sessionId,
       userId: params.userId,
       orgId: params.orgId,
-      prompt: params.prompt,
+      payload: params.payload,
       mode: params.mode,
       workspace,
       wrapper: {
@@ -2511,6 +2671,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             mcpServers: request.mcpServers,
             runtimeSkills: request.runtimeSkills ? [...request.runtimeSkills] : undefined,
             runtimeAgents: request.runtimeAgents ? [...request.runtimeAgents] : undefined,
+            kiloCommands: request.kiloCommands ? [...request.kiloCommands] : undefined,
           },
           upstreamBranch: request.upstreamBranch,
           botId: request.botId,
@@ -2525,7 +2686,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           userId: request.userId,
           orgId: request.orgId,
           mode: request.mode,
-          prompt: request.prompt,
+          payload: {
+            type: 'prompt',
+            prompt: request.prompt,
+            mode: request.mode,
+            model: normalizedModel ?? undefined,
+            variant: request.variant,
+          },
           model: normalizedModel,
           variant: request.variant,
           autoCommit: request.autoCommit,
@@ -2616,14 +2783,22 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           createdOnPlatform: metadata.createdOnPlatform,
         };
 
+        const initialPayload = metadata.initialPayload ?? {
+          type: 'prompt' as const,
+          prompt: metadata.prompt ?? '',
+          mode: metadata.mode ?? '',
+          model: metadata.model ?? '',
+          variant: metadata.variant,
+        };
+
         const plan = this.buildExecutionPlan({
           executionId,
           sandboxId,
           sessionId,
           userId: metadata.userId as UserId,
           orgId: metadata.orgId,
-          mode: metadata.mode,
-          prompt: metadata.prompt,
+          mode: metadata.mode ?? '',
+          payload: initialPayload,
           model: metadata.model,
           variant: metadata.variant,
           autoCommit: metadata.autoCommit,
@@ -2655,10 +2830,23 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         await this.updateGitToken(request.tokenOverrides.gitToken);
         metadata.gitToken = request.tokenOverrides.gitToken;
       }
-      const mode = request.mode ?? metadata.mode ?? 'code';
-      const model = normalizeKilocodeModel(request.model ?? metadata.model);
-      const variant = request.variant ?? metadata.variant;
-      if (!model) {
+
+      // Slash commands carry their own agent/model overrides on the kilo side
+      // (Command.Info.agent / .model) — for the cloud-agent-next plan we just
+      // reuse the session's existing mode/model so logger tags + plan shape
+      // stay sensible. Mode/model validation only applies to prompt payloads.
+      const isCommand = request.payload.type === 'command';
+      const mode =
+        (request.payload.type === 'prompt' ? request.payload.mode : undefined) ??
+        metadata.mode ??
+        'code';
+      const model = normalizeKilocodeModel(
+        (request.payload.type === 'prompt' ? request.payload.model : undefined) ?? metadata.model
+      );
+      const variant =
+        (request.payload.type === 'prompt' ? request.payload.variant : undefined) ??
+        metadata.variant;
+      if (!model && !isCommand) {
         return this.buildStartError(
           'BAD_REQUEST',
           'No model specified and session has no default model'
@@ -2710,9 +2898,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           metadata.sessionId,
           metadata.botId
         ));
+      // For command payloads `model` may be undefined (command's own
+      // Command.Info.model takes effect); fall back to the session's stored
+      // model so the resume context still has a string for kilo to log.
       const resumeContext: TokenResumeContext = {
         kilocodeToken: metadata.kilocodeToken ?? '',
-        kilocodeModel: model,
+        kilocodeModel: model ?? metadata.model ?? '',
         githubToken,
         gitToken,
       };
@@ -2724,7 +2915,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         userId: metadata.userId as UserId,
         orgId: metadata.orgId,
         mode,
-        prompt: request.prompt,
+        payload: request.payload,
         model,
         variant,
         autoCommit: request.autoCommit ?? metadata.autoCommit,

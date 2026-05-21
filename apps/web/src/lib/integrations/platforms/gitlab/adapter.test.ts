@@ -1,7 +1,11 @@
 import {
+  buildGitLabOAuthUrl,
+  exchangeGitLabOAuthCode,
+  refreshGitLabOAuthToken,
   validateGitLabInstance,
   searchGitLabProjects,
   normalizeGitLabSearchQuery,
+  fetchGitLabRootTextFileAtRef,
 } from './adapter';
 
 // Mock fetch globally
@@ -72,6 +76,32 @@ describe('normalizeGitLabSearchQuery', () => {
     // This doesn't start with http:// or https://, so it's treated as a search term
     const result = normalizeGitLabSearchQuery('gitlab.com/team/project');
     expect(result).toBe('gitlab.com/team/project');
+  });
+});
+
+describe('GitLab OAuth endpoint safety', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('refuses to build self-hosted authorization URLs without custom credentials', () => {
+    expect(() => buildGitLabOAuthUrl('signed-state', 'https://attacker.example')).toThrow(
+      'Custom GitLab OAuth credentials are required for self-hosted instances'
+    );
+  });
+
+  it('refuses to send default OAuth credentials to self-hosted token endpoints', async () => {
+    await expect(
+      exchangeGitLabOAuthCode('authorization-code', 'https://attacker.example')
+    ).rejects.toThrow('Custom GitLab OAuth credentials are required for self-hosted instances');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('refuses to refresh self-hosted OAuth tokens without custom credentials', async () => {
+    await expect(
+      refreshGitLabOAuthToken('refresh-token', 'https://attacker.example')
+    ).rejects.toThrow('Custom GitLab OAuth credentials are required for self-hosted instances');
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 
@@ -509,5 +539,83 @@ describe('searchGitLabProjects', () => {
       'https://gitlab.com/api/v4/projects?membership=true&search=project123&per_page=20&archived=false',
       expect.anything()
     );
+  });
+});
+
+describe('fetchGitLabRootTextFileAtRef', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('fetches root text file content from the requested ref', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: async () => '# Review policy\n\nFlag only regressions.',
+    });
+
+    const result = await fetchGitLabRootTextFileAtRef(
+      'test-token',
+      'group/subgroup/project',
+      'REVIEW.md',
+      'main',
+      'https://gitlab.example.com/'
+    );
+
+    expect(result).toBe('# Review policy\n\nFlag only regressions.');
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://gitlab.example.com/api/v4/projects/group%2Fsubgroup%2Fproject/repository/files/REVIEW.md/raw?ref=main',
+      expect.objectContaining({
+        headers: {
+          Authorization: 'Bearer test-token',
+        },
+      })
+    );
+  });
+
+  it('returns null for 404 responses', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: async () => 'Not found',
+    });
+
+    const result = await fetchGitLabRootTextFileAtRef(
+      'test-token',
+      'group/project',
+      'REVIEW.md',
+      'main'
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it('returns empty text for empty file responses', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: async () => '',
+    });
+
+    const result = await fetchGitLabRootTextFileAtRef(
+      'test-token',
+      'group/project',
+      'REVIEW.md',
+      'main'
+    );
+
+    expect(result).toBe('');
+  });
+
+  it('throws for non-404 failures', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: async () => 'Server error',
+    });
+
+    await expect(
+      fetchGitLabRootTextFileAtRef('test-token', 'group/project', 'REVIEW.md', 'main')
+    ).rejects.toThrow('GitLab repository file fetch failed: 500');
   });
 });

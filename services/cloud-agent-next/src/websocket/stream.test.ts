@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { createStreamHandler, formatStreamEvent } from './stream.js';
 import type { StoredEvent, StreamFilters } from './types.js';
 import type { SessionId, EventId } from '../types/ids.js';
 import type { EventQueries, EventQueryFilters } from '../session/queries/index.js';
+import { DEFAULT_SLASH_COMMANDS } from '../shared/default-slash-commands.generated';
 
 const SESSION_ID = 'sess_test' as SessionId;
 
@@ -67,6 +68,7 @@ function makeFakeWebSocket(): WebSocket & { sentMessages: string[] } {
       sentMessages.push(data);
     },
     close: vi.fn(),
+    serializeAttachment: vi.fn(),
   } as unknown as WebSocket & { sentMessages: string[] };
 }
 
@@ -194,6 +196,125 @@ describe('stream handler replayEvents', () => {
       expect(prevFromId).toBeDefined();
       expect(prevFromId).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('stream handler handleStreamRequest', () => {
+  const OriginalResponse = Response;
+
+  beforeAll(() => {
+    vi.stubGlobal(
+      'Response',
+      vi.fn(function Response(body?: BodyInit | null, init?: ResponseInit) {
+        if (init && init.status === 101) {
+          const r = new OriginalResponse(body, { ...init, status: 200 });
+          (r as unknown as Record<string, unknown>).webSocket = init.webSocket;
+          return r;
+        }
+        return new OriginalResponse(body, init);
+      })
+    );
+  });
+
+  afterAll(() => {
+    vi.stubGlobal('Response', OriginalResponse);
+  });
+
+  function mockWebSocketPair(serverWs: WebSocket): void {
+    // @ts-expect-error WebSocketPair is a Workers runtime global
+    globalThis.WebSocketPair = vi.fn(function WebSocketPair() {
+      return [{}, serverWs];
+    });
+  }
+
+  it('sends cached commands.available on connect when no eventTypes filter is set', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const eq = makeFakeEventQueries([]);
+    const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
+      getAvailableCommands: async () => [{ name: 'review', description: 'Review code', hints: [] }],
+    });
+
+    const request = new Request('https://example.com/stream', {
+      headers: { Upgrade: 'websocket' },
+    });
+    await handler.handleStreamRequest(request);
+
+    const catalogMessage = serverWs.sentMessages.find(m => {
+      const parsed = JSON.parse(m) as Record<string, unknown>;
+      return parsed.streamEventType === 'commands.available';
+    });
+    expect(catalogMessage).toBeDefined();
+    const parsed = JSON.parse(catalogMessage!) as Record<string, unknown>;
+    expect((parsed.data as Record<string, unknown>).commands).toEqual([
+      { name: 'review', description: 'Review code', hints: [] },
+    ]);
+  });
+
+  it('skips commands.available on connect when eventTypes excludes it', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const eq = makeFakeEventQueries([]);
+    const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
+      getAvailableCommands: async () => [{ name: 'review', description: 'Review code', hints: [] }],
+    });
+
+    const request = new Request('https://example.com/stream?eventTypes=output', {
+      headers: { Upgrade: 'websocket' },
+    });
+    await handler.handleStreamRequest(request);
+
+    const catalogMessage = serverWs.sentMessages.find(m => {
+      const parsed = JSON.parse(m) as Record<string, unknown>;
+      return parsed.streamEventType === 'commands.available';
+    });
+    expect(catalogMessage).toBeUndefined();
+  });
+
+  it('sends commands.available on connect when eventTypes explicitly includes it', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const eq = makeFakeEventQueries([]);
+    const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
+      getAvailableCommands: async () => [{ name: 'review', description: 'Review code', hints: [] }],
+    });
+
+    const request = new Request('https://example.com/stream?eventTypes=output,commands.available', {
+      headers: { Upgrade: 'websocket' },
+    });
+    await handler.handleStreamRequest(request);
+
+    const catalogMessage = serverWs.sentMessages.find(m => {
+      const parsed = JSON.parse(m) as Record<string, unknown>;
+      return parsed.streamEventType === 'commands.available';
+    });
+    expect(catalogMessage).toBeDefined();
+  });
+
+  it('emits default commands when getAvailableCommands returns defaults', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const eq = makeFakeEventQueries([]);
+    const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
+      getAvailableCommands: async () => DEFAULT_SLASH_COMMANDS,
+    });
+
+    const request = new Request('https://example.com/stream', {
+      headers: { Upgrade: 'websocket' },
+    });
+    await handler.handleStreamRequest(request);
+
+    const catalogMessage = serverWs.sentMessages.find(m => {
+      const parsed = JSON.parse(m) as Record<string, unknown>;
+      return parsed.streamEventType === 'commands.available';
+    });
+    expect(catalogMessage).toBeDefined();
+    const parsed = JSON.parse(catalogMessage!) as Record<string, unknown>;
+    expect((parsed.data as Record<string, unknown>).commands).toEqual(DEFAULT_SLASH_COMMANDS);
   });
 });
 

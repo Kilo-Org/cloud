@@ -6,6 +6,7 @@ import {
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
   agent_environment_profile_agents,
+  agent_environment_profile_kilo_commands,
   type AgentEnvironmentProfile,
 } from '@kilocode/db/schema';
 import { eq, and, sql, count, inArray } from 'drizzle-orm';
@@ -14,6 +15,7 @@ import { buildOwnershipCondition, verifyProfileOwnership } from './profile-utils
 import { listMcpServersForProfile } from './profile-mcp-service';
 import { listSkillsForProfile } from './profile-skills-service';
 import { listAgentsForProfile } from './profile-agents-service';
+import { listKiloCommandsForProfile } from './profile-kilo-commands-service';
 
 /**
  * Create a new environment profile.
@@ -109,54 +111,64 @@ export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<P
     return [];
   }
 
-  const [varCounts, commandCounts, mcpServerCounts, skillCounts, agentCounts] = await Promise.all([
-    db
-      .select({
-        profileId: agent_environment_profile_vars.profile_id,
-        count: count(),
-      })
-      .from(agent_environment_profile_vars)
-      .where(inArray(agent_environment_profile_vars.profile_id, profileIds))
-      .groupBy(agent_environment_profile_vars.profile_id),
-    db
-      .select({
-        profileId: agent_environment_profile_commands.profile_id,
-        count: count(),
-      })
-      .from(agent_environment_profile_commands)
-      .where(inArray(agent_environment_profile_commands.profile_id, profileIds))
-      .groupBy(agent_environment_profile_commands.profile_id),
-    db
-      .select({
-        profileId: agent_environment_profile_mcp_servers.profile_id,
-        count: count(),
-      })
-      .from(agent_environment_profile_mcp_servers)
-      .where(inArray(agent_environment_profile_mcp_servers.profile_id, profileIds))
-      .groupBy(agent_environment_profile_mcp_servers.profile_id),
-    db
-      .select({
-        profileId: agent_environment_profile_skills.profile_id,
-        count: count(),
-      })
-      .from(agent_environment_profile_skills)
-      .where(inArray(agent_environment_profile_skills.profile_id, profileIds))
-      .groupBy(agent_environment_profile_skills.profile_id),
-    db
-      .select({
-        profileId: agent_environment_profile_agents.profile_id,
-        count: count(),
-      })
-      .from(agent_environment_profile_agents)
-      .where(inArray(agent_environment_profile_agents.profile_id, profileIds))
-      .groupBy(agent_environment_profile_agents.profile_id),
-  ]);
+  const [varCounts, commandCounts, mcpServerCounts, skillCounts, agentCounts, kiloCommandCounts] =
+    await Promise.all([
+      db
+        .select({
+          profileId: agent_environment_profile_vars.profile_id,
+          count: count(),
+        })
+        .from(agent_environment_profile_vars)
+        .where(inArray(agent_environment_profile_vars.profile_id, profileIds))
+        .groupBy(agent_environment_profile_vars.profile_id),
+      db
+        .select({
+          profileId: agent_environment_profile_commands.profile_id,
+          count: count(),
+        })
+        .from(agent_environment_profile_commands)
+        .where(inArray(agent_environment_profile_commands.profile_id, profileIds))
+        .groupBy(agent_environment_profile_commands.profile_id),
+      db
+        .select({
+          profileId: agent_environment_profile_mcp_servers.profile_id,
+          count: count(),
+        })
+        .from(agent_environment_profile_mcp_servers)
+        .where(inArray(agent_environment_profile_mcp_servers.profile_id, profileIds))
+        .groupBy(agent_environment_profile_mcp_servers.profile_id),
+      db
+        .select({
+          profileId: agent_environment_profile_skills.profile_id,
+          count: count(),
+        })
+        .from(agent_environment_profile_skills)
+        .where(inArray(agent_environment_profile_skills.profile_id, profileIds))
+        .groupBy(agent_environment_profile_skills.profile_id),
+      db
+        .select({
+          profileId: agent_environment_profile_agents.profile_id,
+          count: count(),
+        })
+        .from(agent_environment_profile_agents)
+        .where(inArray(agent_environment_profile_agents.profile_id, profileIds))
+        .groupBy(agent_environment_profile_agents.profile_id),
+      db
+        .select({
+          profileId: agent_environment_profile_kilo_commands.profile_id,
+          count: count(),
+        })
+        .from(agent_environment_profile_kilo_commands)
+        .where(inArray(agent_environment_profile_kilo_commands.profile_id, profileIds))
+        .groupBy(agent_environment_profile_kilo_commands.profile_id),
+    ]);
 
   const varCountMap = new Map(varCounts.map(v => [v.profileId, Number(v.count)]));
   const commandCountMap = new Map(commandCounts.map(c => [c.profileId, Number(c.count)]));
   const mcpServerCountMap = new Map(mcpServerCounts.map(m => [m.profileId, Number(m.count)]));
   const skillCountMap = new Map(skillCounts.map(s => [s.profileId, Number(s.count)]));
   const agentCountMap = new Map(agentCounts.map(a => [a.profileId, Number(a.count)]));
+  const kiloCommandCountMap = new Map(kiloCommandCounts.map(k => [k.profileId, Number(k.count)]));
 
   return profiles.map(p => ({
     id: p.id,
@@ -170,6 +182,7 @@ export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<P
     mcpServerCount: mcpServerCountMap.get(p.id) ?? 0,
     skillCount: skillCountMap.get(p.id) ?? 0,
     agentCount: agentCountMap.get(p.id) ?? 0,
+    kiloCommandCount: kiloCommandCountMap.get(p.id) ?? 0,
   }));
 }
 
@@ -184,7 +197,7 @@ export async function getProfile(
 ): Promise<ProfileResponse> {
   const profile = await verifyProfileOwnership(db, profileId, owner);
 
-  const [vars, commands, mcpServers, skills, agents] = await Promise.all([
+  const [vars, commands, mcpServers, skills, agents, kiloCommands] = await Promise.all([
     db
       .select({
         key: agent_environment_profile_vars.key,
@@ -213,6 +226,7 @@ export async function getProfile(
     listMcpServersForProfile(db, profileId),
     listSkillsForProfile(db, profileId),
     listAgentsForProfile(db, profileId),
+    listKiloCommandsForProfile(db, profileId),
   ]);
 
   return {
@@ -227,6 +241,7 @@ export async function getProfile(
     mcpServers,
     skills,
     agents,
+    kiloCommands,
   };
 }
 

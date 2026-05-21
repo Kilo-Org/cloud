@@ -1,5 +1,5 @@
 import { APP_URL } from '@/lib/constants';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable, requireEnv } from '@/lib/dotenvx';
 import 'server-only';
 
 export const IS_IN_AUTOMATED_TEST = !!getEnvVariable('IS_IN_AUTOMATED_TEST');
@@ -39,6 +39,7 @@ export const OPENAI_API_KEY = getEnvVariable('OPENAI_API_KEY');
 export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
+export const CALLBACK_TOKEN_SECRET = getEnvVariable('CALLBACK_TOKEN_SECRET');
 export const CODE_REVIEW_WORKER_AUTH_TOKEN = getEnvVariable('CODE_REVIEW_WORKER_AUTH_TOKEN');
 export const IMPACT_ACCOUNT_SID = getEnvVariable('IMPACT_ACCOUNT_SID') || '';
 export const IMPACT_AUTH_TOKEN = getEnvVariable('IMPACT_AUTH_TOKEN') || '';
@@ -55,6 +56,7 @@ export const IMPACT_ADVOCATE_DEBUG_LOGGING =
 
 if (!NEXTAUTH_SECRET) throw new Error('NEXTAUTH_SECRET is required JWT signing');
 if (!TURNSTILE_SECRET_KEY) throw new Error('TURNSTILE_SECRET_KEY is required');
+if (!CALLBACK_TOKEN_SECRET) throw new Error('CALLBACK_TOKEN_SECRET is required');
 
 export const STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID = getEnvVariable(
   'STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID'
@@ -101,7 +103,10 @@ export const USER_DEPLOYMENTS_GIT_TOKEN_ENCRYPTION_KEY = getEnvVariable(
  * Must be a base64-encoded 32-byte (256-bit) key.
  * Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
  */
-export const BYOK_ENCRYPTION_KEY = getEnvVariable('BYOK_ENCRYPTION_KEY') || '';
+export const BYOK_ENCRYPTION_KEY = requireEnv(
+  'BYOK_ENCRYPTION_KEY',
+  getEnvVariable('BYOK_ENCRYPTION_KEY')
+);
 
 // Artificial Analysis API
 export const ARTIFICIAL_ANALYSIS_API_KEY = getEnvVariable('ARTIFICIAL_ANALYSIS_API_KEY');
@@ -141,6 +146,10 @@ export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
 export const LINEAR_CLIENT_ID = getEnvVariable('LINEAR_CLIENT_ID');
 export const LINEAR_CLIENT_SECRET = getEnvVariable('LINEAR_CLIENT_SECRET');
 export const LINEAR_WEBHOOK_SECRET = getEnvVariable('LINEAR_WEBHOOK_SECRET');
+
+// DoltHub OAuth integration
+export const DOLTHUB_APP_CLIENT_ID = getEnvVariable('DOLTHUB_APP_CLIENT_ID');
+export const DOLTHUB_APP_CLIENT_SECRET = getEnvVariable('DOLTHUB_APP_CLIENT_SECRET');
 
 // Discord (bot integration — existing)
 export const DISCORD_CLIENT_ID = getEnvVariable('DISCORD_CLIENT_ID');
@@ -225,9 +234,12 @@ export const CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID = getEnvVariable(
 
 // KiloClaw Worker
 export const KILOCLAW_API_URL = getEnvVariable('KILOCLAW_API_URL') || '';
-export const KILOCLAW_INTERNAL_API_SECRET = getEnvVariable('KILOCLAW_INTERNAL_API_SECRET') || '';
 export const KILOCLAW_INBOUND_EMAIL_DOMAIN =
   getEnvVariable('KILOCLAW_INBOUND_EMAIL_DOMAIN') || 'kiloclaw.ai';
+export const COMPOSIO_AGENTS_API_BASE_URL =
+  getEnvVariable('COMPOSIO_AGENTS_API_BASE_URL') || 'https://agents.composio.dev';
+export const COMPOSIO_API_BASE_URL =
+  getEnvVariable('COMPOSIO_API_BASE_URL') || 'https://backend.composio.dev';
 
 /**
  * Per-instance worker URL template.
@@ -326,13 +338,12 @@ export const STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID = getEnvVariable(
 export const STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID = getEnvVariable(
   'STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID'
 );
-export const STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID = getEnvVariable(
-  'STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID'
-);
-
 // Webhook Agent Ingest Worker
 export const WEBHOOK_AGENT_URL =
   getEnvVariable('WEBHOOK_AGENT_URL') || 'https://hooks.kilosessions.ai';
+
+// Model eval ingest Worker
+export const MODEL_EVAL_INGEST_URL = getEnvVariable('MODEL_EVAL_INGEST_URL') || '';
 
 // Session ingest worker (public share proxy)
 export const SESSION_INGEST_WORKER_URL = getEnvVariable('SESSION_INGEST_WORKER_URL') || '';

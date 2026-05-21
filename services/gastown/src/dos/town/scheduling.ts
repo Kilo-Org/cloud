@@ -185,6 +185,7 @@ export async function dispatchAgent(
       // If the agent truly didn't start: reconcileAgents catches it
       // after 90s of missing heartbeats and transitions to 'idle'.
       // If the agent actually started: heartbeats keep it alive. (#1358)
+      const startError = dispatch.getLastStartError();
       ctx.emitEvent({
         event: 'agent.dispatch_failed',
         townId: ctx.townId,
@@ -192,7 +193,7 @@ export async function dispatchAgent(
         agentId: agent.id,
         beadId: bead.bead_id,
         role: agent.role,
-        reason: 'container returned false',
+        reason: startError ?? 'container returned false',
       });
     }
     return started;
@@ -201,21 +202,18 @@ export async function dispatchAgent(
     Sentry.captureException(err, {
       extra: { agentId: agent.id, beadId: bead.bead_id },
     });
-    try {
-      query(
-        ctx.sql,
-        /* sql */ `
-          UPDATE ${agent_metadata}
-          SET ${agent_metadata.columns.status} = 'idle',
-              ${agent_metadata.columns.last_activity_at} = ?
-          WHERE ${agent_metadata.bead_id} = ?
-        `,
-        [now(), agent.id]
-      );
-      // Don't roll back bead to open — same timeout race rationale
-    } catch (rollbackErr) {
-      console.error(`${LOG} dispatchAgent: rollback also failed:`, rollbackErr);
-    }
+    // Do NOT transition the agent to 'idle' here. The container may
+    // already have accepted /agents/start (e.g. /refresh-token failed
+    // late, after the agent process spawned), in which case the SDK
+    // session is alive and heartbeating. Marking it idle would trip
+    // reconcileAgents Rule 3 (idle agent + hooked + live bead →
+    // unhook + reset bead), tearing the hook out from under the
+    // running session and causing tools like gt_request_changes to
+    // fail with "is not hooked to a bead" (#1358 follow-up).
+    //
+    // Instead, leave the agent as 'working'. If the container truly
+    // didn't start, reconcileAgents catches it after 90s of missing
+    // heartbeats and transitions to 'idle' through the normal path.
     ctx.emitEvent({
       event: 'agent.dispatch_failed',
       townId: ctx.townId,
@@ -264,6 +262,12 @@ export function dispatchUnblockedBeads(ctx: SchedulingContext, closedBeadId: str
 /**
  * Returns true if the town has work that requires the fast (5s) alarm
  * interval. Used to decide between active and idle alarm cadence.
+ *
+ * Each signal is wrapped in a thunk so `||` short-circuits at the SQL
+ * layer: as soon as one signal returns true we skip the remaining
+ * queries. On a hot town with working agents this avoids 4 extra reads
+ * per check; on a cold idle town it costs the full 5 reads (same as
+ * before).
  */
 export function hasActiveWork(sql: SqlStorage): boolean {
   // Stalled agents older than 30min no longer count as active work: they
@@ -271,53 +275,81 @@ export function hasActiveWork(sql: SqlStorage): boolean {
   // returning running/unknown). Keeping them in the active set would pin
   // the alarm at its 5s fast cadence indefinitely. The stalled->idle
   // auto-transition in reconcileAgents cleans them up after 2h 30min.
-  const activeAgentRows = [
-    ...query(
-      sql,
-      /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata}
-        WHERE ${agent_metadata.status} = 'working'
-           OR (${agent_metadata.status} = 'stalled'
-               AND ${agent_metadata.last_activity_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes'))`,
-      []
-    ),
-  ];
-  const pendingBeadRows = [
-    ...query(
-      sql,
-      /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata} WHERE ${agent_metadata.status} = 'idle' AND ${agent_metadata.current_hook_bead_id} IS NOT NULL`,
-      []
-    ),
-  ];
-  const pendingReviewRows = [
-    ...query(
-      sql,
-      /* sql */ `SELECT COUNT(*) as cnt FROM ${beads} WHERE ${beads.type} = 'merge_request' AND ${beads.status} IN ('open', 'in_progress')`,
-      []
-    ),
-  ];
-  const pendingTriageRows = [
-    ...query(
-      sql,
-      /* sql */ `SELECT COUNT(*) as cnt FROM ${beads} WHERE ${beads.type} = 'issue' AND ${beads.labels} LIKE ? AND ${beads.status} = 'open'`,
-      [patrol.TRIAGE_LABEL_LIKE]
-    ),
-  ];
+  const hasActiveAgents = (): boolean =>
+    countOf([
+      ...query(
+        sql,
+        /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata}
+          WHERE ${agent_metadata.status} = 'working'
+             OR (${agent_metadata.status} = 'stalled'
+                 AND ${agent_metadata.last_activity_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes'))`,
+        []
+      ),
+    ]) > 0;
+
+  // Idle agents that already hold a hook — the reconciler should dispatch
+  // them on the next tick.
+  const hasHookedIdleAgents = (): boolean =>
+    countOf([
+      ...query(
+        sql,
+        /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata}
+          WHERE ${agent_metadata.status} = 'idle'
+            AND ${agent_metadata.current_hook_bead_id} IS NOT NULL`,
+        []
+      ),
+    ]) > 0;
+
+  const hasOpenMergeRequests = (): boolean =>
+    countOf([
+      ...query(
+        sql,
+        /* sql */ `SELECT COUNT(*) as cnt FROM ${beads}
+          WHERE ${beads.type} = 'merge_request'
+            AND ${beads.status} IN ('open', 'in_progress')`,
+        []
+      ),
+    ]) > 0;
+
+  const hasOpenTriageBeads = (): boolean =>
+    countOf([
+      ...query(
+        sql,
+        /* sql */ `SELECT COUNT(*) as cnt FROM ${beads}
+          WHERE ${beads.type} = 'issue'
+            AND ${beads.labels} LIKE ?
+            AND ${beads.status} = 'open'`,
+        [patrol.TRIAGE_LABEL_LIKE]
+      ),
+    ]) > 0;
+
   // Open issue beads with a rig (eligible for dispatch by reconcileBeads Rule 1)
   // but not yet assigned to any agent. Without this check, the alarm drops to
   // idle cadence after a container restart when agents lose their hooks and
   // beads revert to open+unassigned, delaying dispatch by up to 5 minutes.
-  const unassignedIssueRows = [
-    ...query(
-      sql,
-      /* sql */ `SELECT COUNT(*) as cnt FROM ${beads} WHERE ${beads.type} = 'issue' AND ${beads.status} = 'open' AND ${beads.rig_id} IS NOT NULL AND ${beads.assignee_agent_bead_id} IS NULL`,
-      []
-    ),
-  ];
+  const hasUnassignedIssues = (): boolean =>
+    countOf([
+      ...query(
+        sql,
+        /* sql */ `SELECT COUNT(*) as cnt FROM ${beads}
+          WHERE ${beads.type} = 'issue'
+            AND ${beads.status} = 'open'
+            AND ${beads.rig_id} IS NOT NULL
+            AND ${beads.assignee_agent_bead_id} IS NULL`,
+        []
+      ),
+    ]) > 0;
+
   return (
-    Number(activeAgentRows[0]?.cnt ?? 0) > 0 ||
-    Number(pendingBeadRows[0]?.cnt ?? 0) > 0 ||
-    Number(pendingReviewRows[0]?.cnt ?? 0) > 0 ||
-    Number(pendingTriageRows[0]?.cnt ?? 0) > 0 ||
-    Number(unassignedIssueRows[0]?.cnt ?? 0) > 0
+    hasActiveAgents() ||
+    hasHookedIdleAgents() ||
+    hasOpenMergeRequests() ||
+    hasOpenTriageBeads() ||
+    hasUnassignedIssues()
   );
+}
+
+/** Read the `cnt` column off the first row of a `SELECT COUNT(*) as cnt` query. */
+function countOf(rows: ReadonlyArray<Record<string, unknown>>): number {
+  return Number(rows[0]?.cnt ?? 0);
 }

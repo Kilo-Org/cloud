@@ -20,6 +20,17 @@ export function MessageAttachmentPreviewChip({ row, localUri, onRemove, onRetry 
   const colors = useThemeColors();
   const isImage = isImageMimeType(row.mimeType);
   const failed = row.status === 'failed';
+  const uploading = row.status === 'uploading';
+
+  function renderLeadingIcon() {
+    if (failed) {
+      return <AlertCircle size={14} color={colors.destructive} />;
+    }
+    if (uploading) {
+      return <ActivityIndicator size="small" color={colors.mutedForeground} />;
+    }
+    return <FileIcon size={14} color={colors.mutedForeground} />;
+  }
 
   return (
     <View
@@ -38,23 +49,19 @@ export function MessageAttachmentPreviewChip({ row, localUri, onRemove, onRetry 
         />
       ) : (
         <View className="min-w-0 flex-1 flex-row items-center gap-2">
-          {failed ? (
-            <AlertCircle size={14} color={colors.destructive} />
-          ) : (
-            <FileIcon size={14} color={colors.mutedForeground} />
-          )}
+          {renderLeadingIcon()}
           <View className="min-w-0 flex-1">
             <Text numberOfLines={1} className="text-xs text-foreground">
               {row.filename}
             </Text>
             <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
-              {formatFileSize(row.size)}
+              {uploading ? `${Math.round(row.progress * 100)}%` : formatFileSize(row.size)}
             </Text>
           </View>
         </View>
       )}
 
-      {row.status === 'uploading' ? (
+      {isImage && uploading ? (
         <View className="absolute inset-0 items-center justify-center bg-black/20">
           <ActivityIndicator size="small" color={colors.foreground} />
           <Text className="mt-1 text-[10px] text-foreground">

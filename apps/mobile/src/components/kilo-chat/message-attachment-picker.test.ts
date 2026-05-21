@@ -59,10 +59,10 @@ describe('message attachment picker permissions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // eslint-disable-next-line require-await, typescript-eslint/require-await -- canonical fetch stub: async signature with sync body
-    globalThis.fetch = vi.fn(
-      async () => new Response(new Blob(['x'], { type: 'image/jpeg' }))
-    ) as typeof globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => {
+      await Promise.resolve();
+      return new Response(new Blob(['x'], { type: 'image/jpeg' }));
+    }) as typeof globalThis.fetch;
   });
 
   afterEach(() => {

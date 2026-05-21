@@ -952,7 +952,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       ...overrides,
     }) satisfies MicrodollarUsageContext;
 
-  test('strips NUL bytes from body- and upstream-sourced string fields', () => {
+  test('strips NUL bytes from body- and upstream-sourced string fields', async () => {
     // Fields whose values cross the CTE insert as individual SQL parameters.
     // A NUL byte in any of them crashes the insert with Postgres 22021 --
     // see KILOCODE-WEB-1G3Z.
@@ -973,7 +973,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       },
     });
 
-    const { core, metadata } = toInsertableDbUsageRecord(
+    const { core, metadata } = await toInsertableDbUsageRecord(
       usageStats,
       extractUsageContextInfo(usageContext)
     );
@@ -999,7 +999,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     }
   });
 
-  test('strips NUL bytes from a directly-constructed fraudHeaders object', () => {
+  test('strips NUL bytes from a directly-constructed fraudHeaders object', async () => {
     // Bypass Node's Headers validation to exercise the defensive coverage of
     // HTTP-header-sourced fields. This documents that IF a NUL byte ever
     // reaches these fields (e.g. through a future upstream change), the
@@ -1016,7 +1016,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       },
     });
 
-    const { metadata } = toInsertableDbUsageRecord(
+    const { metadata } = await toInsertableDbUsageRecord(
       baseUsageStats,
       extractUsageContextInfo(usageContext)
     );
@@ -1028,8 +1028,8 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     expect(metadata.http_x_vercel_ja4_digest).toBe('abc');
   });
 
-  test('is a no-op on records without NUL bytes', () => {
-    const { core, metadata } = toInsertableDbUsageRecord(
+  test('is a no-op on records without NUL bytes', async () => {
+    const { core, metadata } = await toInsertableDbUsageRecord(
       baseUsageStats,
       extractUsageContextInfo(makeUsageContext())
     );
@@ -1045,8 +1045,8 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     expect(metadata.message_id).toBe('msg-id');
   });
 
-  test('stores audio transcription api kind metadata', () => {
-    const { metadata } = toInsertableDbUsageRecord(
+  test('stores audio transcription api kind metadata', async () => {
+    const { metadata } = await toInsertableDbUsageRecord(
       baseUsageStats,
       extractUsageContextInfo(makeUsageContext({ api_kind: 'audio_transcriptions' }))
     );

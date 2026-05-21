@@ -82,38 +82,41 @@ function formatName(model: OpenRouterModel, preferredIndex: number) {
   return model.name;
 }
 
-function enhancedModelList(models: OpenRouterModel[]) {
+async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
-  const enhancedModels = models
-    .filter(
-      (model: OpenRouterModel) =>
-        !kiloExclusiveModels.some(m => m.public_id === model.id) && !isForbiddenFreeModel(model.id)
-    )
-    .concat(
-      kiloExclusiveModels
-        .filter(m => m.status === 'public')
-        .map(model => convertFromKiloExclusiveModel(model))
-    )
-    .concat(autoModels)
-    .map((model: OpenRouterModel) => {
-      const preferredIndex = preferredModels.indexOf(model.id);
-      const addPdf =
-        isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
-      return {
-        ...model,
-        name: formatName(model, preferredIndex),
-        preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
-        isFree: isFreeModel(model.id),
-        opencode: model.opencode ?? getOpenCodeSettings(model.id),
-        openclaw: model.openclaw ?? getOpenClawSettings(model.id),
-        architecture: addPdf
-          ? {
-              ...model.architecture,
-              input_modalities: model.architecture.input_modalities.concat(['pdf']),
-            }
-          : model.architecture,
-      };
-    });
+  const enhancedModels = await Promise.all(
+    models
+      .filter(
+        (model: OpenRouterModel) =>
+          !kiloExclusiveModels.some(m => m.public_id === model.id) &&
+          !isForbiddenFreeModel(model.id)
+      )
+      .concat(
+        kiloExclusiveModels
+          .filter(m => m.status === 'public')
+          .map(model => convertFromKiloExclusiveModel(model))
+      )
+      .concat(autoModels)
+      .map(async (model: OpenRouterModel) => {
+        const preferredIndex = preferredModels.indexOf(model.id);
+        const addPdf =
+          isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
+        return {
+          ...model,
+          name: formatName(model, preferredIndex),
+          preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
+          isFree: await isFreeModel(model.id),
+          opencode: model.opencode ?? getOpenCodeSettings(model.id),
+          openclaw: model.openclaw ?? getOpenClawSettings(model.id),
+          architecture: addPdf
+            ? {
+                ...model.architecture,
+                input_modalities: model.architecture.input_modalities.concat(['pdf']),
+              }
+            : model.architecture,
+        };
+      })
+  );
   const sortedModels = enhancedModels.sort((a, b) => {
     // Sort by preferredIndex (undefined values last)
     if (a.preferredIndex !== undefined && b.preferredIndex === undefined) return -1;
@@ -189,7 +192,7 @@ export async function getEnhancedOpenRouterModels(): Promise<OpenRouterModelsRes
     return rawResponse;
   }
 
-  return { data: enhancedModelList(rawResponse.data) };
+  return { data: await enhancedModelList(rawResponse.data) };
 }
 /**
  * Fetch speech-to-text models from the OpenRouter API.

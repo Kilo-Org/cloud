@@ -11,6 +11,7 @@ import { logger } from '../logger.js';
 import { findWrapperForSession, getWrapperSessionMarker } from './wrapper-manager.js';
 import { randomPort } from './ports.js';
 import {
+  buildKiloSessionXdgEnv,
   dockerSocketEnv,
   dockerSocketEnvParts,
   resolveDockerSocketPath,
@@ -445,8 +446,13 @@ export class WrapperClient {
       `KILO_CLOUD_AGENT=1`,
       ...dockerEnvParts,
     ];
+    const devContainerSessionHome =
+      devcontainer && runtimeEnv
+        ? (runtimeEnv.SESSION_HOME ?? runtimeEnv.HOME ?? '/tmp')
+        : undefined;
     const processEnv = mergeEnvRecords(
       runtimeEnv,
+      devContainerSessionHome ? buildKiloSessionXdgEnv(devContainerSessionHome) : undefined,
       wrapperEnv,
       devcontainer ? undefined : dockerSocketEnv(dockerSocketPath)
     );
@@ -463,9 +469,8 @@ export class WrapperClient {
     let envFilePath: string | undefined;
     let envFileWritten = false;
     let innerCommand = `${commandEnvParts.join(' ')} bun run ${shellQuote(effectiveWrapperPath)} ${sessionMarker} ${argParts.join(' ')}`;
-    if (devcontainer && runtimeEnv) {
-      const sessionHome = runtimeEnv.SESSION_HOME ?? runtimeEnv.HOME ?? '/tmp';
-      envFilePath = `${sessionHome}/tmp/kilo-wrapper-env-${agentSessionId}-${Date.now()}.sh`;
+    if (devContainerSessionHome) {
+      envFilePath = `${devContainerSessionHome}/tmp/kilo-wrapper-env-${agentSessionId}-${Date.now()}.sh`;
       await this.session.writeFile(envFilePath, buildExportFileContent(processEnv));
       envFileWritten = true;
       innerCommand = `. ${shellQuote(envFilePath)} && rm -f ${shellQuote(envFilePath)} && ${innerCommand}`;

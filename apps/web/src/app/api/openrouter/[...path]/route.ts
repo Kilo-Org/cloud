@@ -326,7 +326,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     // No valid auth. Experimented public ids are treated as free models here
     // so anonymous traffic can reach the experiment-routing branch in
     // `getProvider`.
-    if (!isFreeModel(originalModelIdLowerCased) && !isExperimentedModel) {
+    if (!(await isFreeModel(originalModelIdLowerCased)) && !isExperimentedModel) {
       // Paid model requires authentication
       return NextResponse.json(
         {
@@ -507,7 +507,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
     if (
       balance <= 0 &&
-      !isFreeModel(originalModelIdLowerCased) &&
+      !(await isFreeModel(originalModelIdLowerCased)) &&
       !isExperimentedModel &&
       !userByok
     ) {

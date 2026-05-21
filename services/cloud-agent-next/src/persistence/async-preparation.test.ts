@@ -59,6 +59,9 @@ vi.mock('../session-service.js', () => ({
     buildRuntimeEnv = vi.fn().mockReturnValue({
       SESSION_HOME: '/home/agent_test',
       KILO_SESSION_INGEST_URL: 'https://ingest.example',
+      XDG_DATA_HOME: '/tmp',
+      XDG_CONFIG_HOME: '/tmp',
+      XDG_CACHE_HOME: '/tmp',
     });
   },
 }));
@@ -306,6 +309,63 @@ describe('executePreparationSteps', () => {
     });
   });
 
+  it('overrides devcontainer import XDG env with session-home paths', async () => {
+    const env = {
+      Sandbox: {} as Env['Sandbox'],
+      SandboxSmall: {} as Env['SandboxSmall'],
+      SandboxDIND: {} as Env['SandboxDIND'],
+      GIT_TOKEN_SERVICE: {
+        getTokenForRepo: vi.fn(),
+      },
+      PER_SESSION_SANDBOX_ORG_IDS: '',
+      GITHUB_APP_SLUG: 'kilo-connect',
+      GITHUB_APP_BOT_USER_ID: '12345',
+    } as unknown as Env;
+    const emitProgress = vi.fn();
+    detectDevContainerMock.mockResolvedValueOnce({
+      configPath: '.devcontainer/devcontainer.json',
+    });
+    bringUpDevContainerMock.mockResolvedValueOnce({
+      containerId: 'container-id',
+      innerWorkspaceFolder: '/workspaces/test',
+      workspacePath: '/workspace/test-org/test-user/sessions/agent_test',
+      agentSessionId: 'agent_test',
+      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
+      teardown: vi.fn(),
+    });
+    const input = {
+      sessionId: 'agent_test',
+      userId: 'test-user',
+      orgId: 'test-org',
+      authToken: 'kilo-token',
+      githubRepo: 'acme/repo',
+      githubToken: 'github-token',
+      kiloSessionId: 'kilo-123',
+      prompt: 'Fix bug',
+      mode: 'code',
+      model: 'kilo/test-model',
+      autoInitiate: true,
+      devcontainer: true,
+    } satisfies PreparationInput;
+
+    await executePreparationSteps(input, env, emitProgress);
+
+    const restoreCommandCall = buildRestoreCommandMock.mock.calls[0] as
+      | [RestoreCommandOptions]
+      | undefined;
+    expect(restoreCommandCall).toBeDefined();
+    if (!restoreCommandCall) return;
+
+    const [restoreOptions] = restoreCommandCall;
+    expect(restoreOptions.runtimeEnv).toMatchObject({
+      SESSION_HOME: '/home/agent_test',
+      KILO_SESSION_INGEST_URL: 'https://ingest.example',
+      XDG_DATA_HOME: '/home/agent_test/.local/share',
+      XDG_CONFIG_HOME: '/home/agent_test/.config',
+      XDG_CACHE_HOME: '/home/agent_test/.cache',
+    });
+  });
+
   it('runs profile setup commands through the devcontainer handle', async () => {
     const env = {
       Sandbox: {} as Env['Sandbox'],
@@ -365,6 +425,9 @@ describe('executePreparationSteps', () => {
         runtimeEnv: {
           SESSION_HOME: '/home/agent_test',
           KILO_SESSION_INGEST_URL: 'https://ingest.example',
+          XDG_DATA_HOME: '/tmp',
+          XDG_CONFIG_HOME: '/tmp',
+          XDG_CACHE_HOME: '/tmp',
         },
       }
     );

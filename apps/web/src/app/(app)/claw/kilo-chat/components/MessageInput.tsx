@@ -2,8 +2,13 @@
 
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { Plus, Send } from 'lucide-react';
-import type { InputContentBlock, Message } from '@kilocode/kilo-chat';
-import { MESSAGE_TEXT_MAX_CHARS, ATTACHMENT_MAX_BYTES } from '@kilocode/kilo-chat';
+import {
+  MESSAGE_TEXT_MAX_CHARS,
+  ATTACHMENT_MAX_BYTES,
+  formatFileSize,
+  type InputContentBlock,
+  type Message,
+} from '@kilocode/kilo-chat';
 import { toast } from 'sonner';
 import { selectIsUploading, selectHasFailed, useAttachmentQueue } from '@kilocode/kilo-chat-hooks';
 
@@ -11,7 +16,6 @@ import { ReplyPreview } from './ReplyPreview';
 import { AttachmentPreviewStrip } from './AttachmentPreviewStrip';
 import { useKiloChatContext } from './kiloChatContext';
 import { webPerformUpload } from '../lib/web-perform-upload';
-import { formatFileSize } from '../lib/format-file-size';
 
 type MessageInputProps = {
   conversationId: string;

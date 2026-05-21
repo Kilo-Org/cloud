@@ -1,5 +1,6 @@
 import {
   MESSAGE_TEXT_MAX_CHARS,
+  buildMessageEditContent,
   type AttachmentBlock,
   type ContentBlock,
 } from '@kilocode/kilo-chat';
@@ -22,13 +23,11 @@ export type BuildEditContentInput = {
 // on save lets us keep the editor surface simple. If user messages ever gain a
 // new block type, this needs to either pass it through or reject the edit.
 export function buildEditContent(input: BuildEditContentInput): ContentBlock[] {
-  const blocks: ContentBlock[] = [];
-  const trimmed = input.text.trim();
-  if (trimmed.length > 0) blocks.push({ type: 'text', text: trimmed });
-  for (const att of input.originalAttachments) {
-    if (!input.removedIds.has(att.attachmentId)) blocks.push(att);
-  }
-  return blocks;
+  return buildMessageEditContent({
+    text: input.text,
+    originalAttachments: input.originalAttachments,
+    removedAttachmentIds: input.removedIds,
+  });
 }
 
 export type SubmitMessageEditInput = {

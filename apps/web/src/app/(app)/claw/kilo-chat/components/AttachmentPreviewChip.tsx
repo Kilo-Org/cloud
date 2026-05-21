@@ -2,9 +2,9 @@
 
 import { File as FileIcon, RotateCw, X, AlertCircle } from 'lucide-react';
 import type { QueuedAttachment } from '@kilocode/kilo-chat-hooks';
+import { formatFileSize } from '@kilocode/kilo-chat';
 
 import { useObjectUrl } from '../lib/object-url';
-import { formatFileSize } from '../lib/format-file-size';
 
 type AttachmentPreviewChipProps = {
   row: QueuedAttachment;

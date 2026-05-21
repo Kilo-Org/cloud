@@ -1,6 +1,6 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
+import { isFeatureFlagEnabled, isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
 import { NewSessionPanel } from '@/components/cloud-agent-next/NewSessionPanel';
 import { CloudSessionsPage } from '@/components/cloud-agent/CloudSessionsPage';
 
@@ -16,13 +16,18 @@ export default async function OrganizationCloudPage({
   );
   const isDevelopment = process.env.NODE_ENV === 'development';
   const useNextAgent = isDevelopment || (await isFeatureFlagEnabled('cloud-agent-next', user.id));
+  const isDevcontainerAvailable =
+    isDevelopment || (await isReleaseToggleEnabled('cloud-agent-devcontainer', user.id));
 
   return (
     <OrganizationByPageLayout
       params={params}
       render={({ organization }) =>
         useNextAgent ? (
-          <NewSessionPanel organizationId={organization.id} />
+          <NewSessionPanel
+            organizationId={organization.id}
+            isDevcontainerAvailable={isDevcontainerAvailable}
+          />
         ) : (
           <CloudSessionsPage organizationId={organization.id} />
         )

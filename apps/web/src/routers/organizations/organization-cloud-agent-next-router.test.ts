@@ -2,8 +2,14 @@ import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals
 import { createCallerFactory } from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 
+const ORGANIZATION_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
+
 const mockPrepareSession = jest.fn<
-  (input: { githubRepo?: string; devcontainer?: boolean }) => Promise<{
+  (input: {
+    githubRepo?: string;
+    devcontainer?: boolean;
+    kilocodeOrganizationId?: string;
+  }) => Promise<{
     cloudAgentSessionId: string;
     kiloSessionId: string;
   }>
@@ -29,8 +35,18 @@ jest.mock('@/lib/posthog-feature-flags', () => ({
   isReleaseToggleEnabled: mockIsReleaseToggleEnabled,
 }));
 
+jest.mock('@/routers/organizations/utils', () => {
+  const trpcInit = jest.requireActual<typeof import('@/lib/trpc/init')>('@/lib/trpc/init');
+
+  return {
+    organizationMemberProcedure: trpcInit.baseProcedure,
+    organizationMemberMutationProcedure: trpcInit.baseProcedure,
+  };
+});
+
 let createCaller: (ctx: { user: User }) => {
   prepareSession: (input: {
+    organizationId: string;
     prompt: string;
     mode: string;
     model: string;
@@ -44,11 +60,11 @@ let createCaller: (ctx: { user: User }) => {
 };
 
 beforeAll(async () => {
-  const mod = await import('./cloud-agent-next-router');
-  createCaller = createCallerFactory(mod.cloudAgentNextRouter);
+  const mod = await import('./organization-cloud-agent-next-router');
+  createCaller = createCallerFactory(mod.organizationCloudAgentNextRouter);
 });
 
-describe('cloudAgentNextRouter.prepareSession', () => {
+describe('organizationCloudAgentNextRouter.prepareSession', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPrepareSession.mockResolvedValue({
@@ -65,6 +81,7 @@ describe('cloudAgentNextRouter.prepareSession', () => {
 
     await expect(
       caller.prepareSession({
+        organizationId: ORGANIZATION_ID,
         prompt: 'Test prompt',
         mode: 'code',
         model: 'kilo/test-model',
@@ -85,6 +102,7 @@ describe('cloudAgentNextRouter.prepareSession', () => {
 
     await expect(
       caller.prepareSession({
+        organizationId: ORGANIZATION_ID,
         prompt: 'Test prompt',
         mode: 'code',
         model: 'kilo/test-model',
@@ -101,6 +119,7 @@ describe('cloudAgentNextRouter.prepareSession', () => {
       expect.objectContaining({
         githubRepo: 'acme/repo',
         devcontainer: true,
+        kilocodeOrganizationId: ORGANIZATION_ID,
       })
     );
   });

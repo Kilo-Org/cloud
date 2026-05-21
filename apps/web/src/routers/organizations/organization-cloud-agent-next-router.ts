@@ -6,6 +6,7 @@ import {
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { generateCloudAgentToken } from '@/lib/tokens';
+import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -192,10 +193,14 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(PrepareSessionInput)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      if (input.devcontainer && !ctx.user.is_admin) {
+      if (
+        input.devcontainer &&
+        process.env.NODE_ENV !== 'development' &&
+        !(await isReleaseToggleEnabled('cloud-agent-devcontainer', ctx.user.id))
+      ) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'Admin access required for devcontainer sessions',
+          message: 'Dev container sessions are not available',
         });
       }
 

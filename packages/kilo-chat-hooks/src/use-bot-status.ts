@@ -7,6 +7,7 @@ import {
   type KiloChatEventOf,
 } from '@kilocode/kilo-chat';
 
+import { useEventServiceClient } from './context';
 import { botStatusKey, botStatusRequestKey } from './query-keys';
 
 const POLL_INTERVAL_MS = 15_000;
@@ -30,6 +31,7 @@ export function useBotStatus(
   sandboxId: string | null
 ): BotStatusRecord | null {
   const queryClient = useQueryClient();
+  const eventService = useEventServiceClient();
 
   useEffect(() => {
     if (!sandboxId) {
@@ -44,6 +46,21 @@ export function useBotStatus(
       );
     });
   }, [client, queryClient, sandboxId]);
+
+  // On every WS open, re-read the cached status from the server. The bot may
+  // have pushed a fresh `bot.status` while the socket was still handshaking;
+  // that push reaches `SANDBOX_STATUS_DO` regardless of WS readiness, but the
+  // WS event itself is dropped if nobody is listening. Refetching the HTTP
+  // endpoint pulls in whatever the DO now holds.
+  useEffect(() => {
+    if (!sandboxId) {
+      return;
+    }
+    return eventService.onConnected(() => {
+      void queryClient.invalidateQueries({ queryKey: botStatusKey(sandboxId) });
+      void queryClient.invalidateQueries({ queryKey: botStatusRequestKey(sandboxId) });
+    });
+  }, [eventService, queryClient, sandboxId]);
 
   useQuery({
     queryKey: botStatusRequestKey(sandboxId),

@@ -443,6 +443,7 @@ describe('codeReviewRouter attempts', () => {
           status: 'failed',
           error_message: 'Container shutdown: SIGTERM',
           terminal_reason: 'sandbox_error',
+          pending_dispatch_retry_count: 1,
         })
       )
       .returning({ id: cloud_agent_code_reviews.id });
@@ -468,6 +469,7 @@ describe('codeReviewRouter attempts', () => {
     });
     expect(storedReview?.status).toBe('pending');
     expect(storedReview?.session_id).toBeNull();
+    expect(storedReview?.pending_dispatch_retry_count).toBe(0);
   });
 
   it('retrigger dispatches using the newly created attempt id', async () => {

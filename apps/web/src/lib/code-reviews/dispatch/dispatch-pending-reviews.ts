@@ -384,11 +384,33 @@ async function handleAmbiguousDispatchFailure(
     const workerStatus = await codeReviewWorkerClient.getReviewStatus(review.id, attemptId);
 
     if (!workerStatus) {
-      const released = await releaseQueuedReviewClaim(review.id, dispatchReservationId);
-      logExceptInTest('[dispatchReview] Worker has no DO state after dispatch failure', {
-        reviewId: review.id,
-        released,
-      });
+      const releaseResult = await releaseQueuedReviewClaim(
+        review.id,
+        dispatchReservationId,
+        attemptId
+      );
+
+      if (releaseResult.outcome === 'released') {
+        logExceptInTest('[dispatchReview] Worker has no DO state after dispatch failure', {
+          reviewId: review.id,
+          releaseOutcome: releaseResult.outcome,
+          pendingDispatchRetryCount: releaseResult.pendingDispatchRetryCount,
+        });
+      } else if (releaseResult.outcome === 'exhausted') {
+        errorExceptInTest(
+          '[dispatchReview] Worker has no DO state after pending-dispatch retries were exhausted',
+          {
+            reviewId: review.id,
+            attemptId,
+            pendingDispatchRetryCount: releaseResult.pendingDispatchRetryCount,
+          }
+        );
+      } else {
+        logExceptInTest('[dispatchReview] Worker has no DO state but claim is no longer current', {
+          reviewId: review.id,
+          attemptId,
+        });
+      }
       return false;
     }
 

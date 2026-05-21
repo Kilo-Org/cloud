@@ -14,6 +14,9 @@ import {
   createInfraRetryAttemptIfMissing,
   getCodeReviewAttemptForReview,
   listCodeReviewAttempts,
+  PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE,
+  releaseQueuedReviewClaim,
+  resetCodeReviewForRetry,
   updateCodeReviewAttemptForCallback,
   findPreviousCompletedReview,
   updateCodeReviewStatus,
@@ -208,6 +211,166 @@ describe('cancelSupersededReviewsForPR', () => {
       .where(eq(cloud_agent_code_reviews.id, otherRepoId))
       .limit(1);
     expect(otherRepoRow?.status).toBe('pending');
+  });
+});
+
+describe('releaseQueuedReviewClaim', () => {
+  let testUser: User;
+  const repo = `${REPO}-release-claim`;
+  let reviewSequence = 0;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, repo));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function createQueuedReview({
+    reservationId = `reservation-${crypto.randomUUID()}`,
+    pendingDispatchRetryCount = 0,
+    sessionId = null,
+  }: {
+    reservationId?: string;
+    pendingDispatchRetryCount?: number;
+    sessionId?: string | null;
+  } = {}) {
+    const sequence = reviewSequence++;
+    const reviewId = await createCodeReview({
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      repoFullName: repo,
+      prNumber: sequence + 1,
+      prUrl: `https://github.com/${repo}/pull/${sequence + 1}`,
+      prTitle: 'test PR',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: `feature/release-${sequence}`,
+      headSha: `sha-release-${sequence}`,
+      platform: 'github',
+    });
+    const attempt = await createCodeReviewAttempt({ codeReviewId: reviewId, status: 'queued' });
+
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        status: 'queued',
+        dispatch_reservation_id: reservationId,
+        pending_dispatch_retry_count: pendingDispatchRetryCount,
+        session_id: sessionId,
+      })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    return { reviewId, attempt, reservationId };
+  }
+
+  it('releases the first no-state claim back to pending and increments the retry counter', async () => {
+    const { reviewId, attempt, reservationId } = await createQueuedReview();
+
+    const result = await releaseQueuedReviewClaim(reviewId, reservationId, attempt.id);
+
+    expect(result).toEqual({ outcome: 'released', pendingDispatchRetryCount: 1 });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    const storedAttempt = await db.query.cloud_agent_code_review_attempts.findFirst({
+      where: eq(cloud_agent_code_review_attempts.id, attempt.id),
+    });
+
+    expect(storedReview?.status).toBe('pending');
+    expect(storedReview?.dispatch_reservation_id).toBeNull();
+    expect(storedReview?.pending_dispatch_retry_count).toBe(1);
+    expect(storedAttempt?.status).toBe('queued');
+  });
+
+  it('fails the review and current attempt when the retry counter is exhausted', async () => {
+    const { reviewId, attempt, reservationId } = await createQueuedReview({
+      pendingDispatchRetryCount: 1,
+    });
+
+    const result = await releaseQueuedReviewClaim(reviewId, reservationId, attempt.id);
+
+    expect(result).toEqual({ outcome: 'exhausted', pendingDispatchRetryCount: 1 });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    const attempts = await listCodeReviewAttempts(reviewId);
+
+    expect(storedReview?.status).toBe('failed');
+    expect(storedReview?.pending_dispatch_retry_count).toBe(1);
+    expect(storedReview?.error_message).toBe(PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE);
+    expect(storedReview?.completed_at).toEqual(expect.any(String));
+    expect(attempts).toEqual([
+      expect.objectContaining({
+        id: attempt.id,
+        status: 'failed',
+        error_message: PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE,
+        completed_at: expect.any(String),
+      }),
+    ]);
+  });
+
+  it('leaves non-current claims unchanged', async () => {
+    const { reviewId, attempt, reservationId } = await createQueuedReview();
+
+    const result = await releaseQueuedReviewClaim(reviewId, 'wrong-reservation', attempt.id);
+
+    expect(result).toEqual({ outcome: 'claim-not-current' });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+
+    expect(storedReview?.status).toBe('queued');
+    expect(storedReview?.dispatch_reservation_id).toBe(reservationId);
+    expect(storedReview?.pending_dispatch_retry_count).toBe(0);
+  });
+
+  it('does not release a claim after a session is established', async () => {
+    const { reviewId, attempt, reservationId } = await createQueuedReview({
+      sessionId: 'agent-established',
+    });
+
+    const result = await releaseQueuedReviewClaim(reviewId, reservationId, attempt.id);
+
+    expect(result).toEqual({ outcome: 'claim-not-current' });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+
+    expect(storedReview?.status).toBe('queued');
+    expect(storedReview?.session_id).toBe('agent-established');
+    expect(storedReview?.pending_dispatch_retry_count).toBe(0);
+  });
+
+  it('resets the pending-dispatch retry counter for explicit retries', async () => {
+    const { reviewId } = await createQueuedReview({ pendingDispatchRetryCount: 1 });
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        status: 'failed',
+        error_message: 'failed before retry',
+        completed_at: new Date().toISOString(),
+      })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    await resetCodeReviewForRetry(reviewId);
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+
+    expect(storedReview?.status).toBe('pending');
+    expect(storedReview?.pending_dispatch_retry_count).toBe(0);
   });
 });
 

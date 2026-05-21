@@ -35,6 +35,7 @@ import { eq } from 'drizzle-orm';
 import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
 import {
   cancelSupersededReviewsForPR,
+  PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE,
   updateRepositoryReviewInstructionsMetadata,
 } from '../db/code-reviews';
 import { cronPendingCodeReviewCreatedAfterSql } from './dispatch-constants';
@@ -963,6 +964,92 @@ describe('tryDispatchPendingReviews', () => {
       .limit(1);
     expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id, attempt?.id);
     expect(storedReview?.status).toBe('pending');
+    expect(storedReview?.pending_dispatch_retry_count).toBe(1);
+  });
+
+  it('fails after exhausting the pending-dispatch no-state retry budget', async () => {
+    const recentTimestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+    mockDispatchReview.mockRejectedValue(new Error('Request timeout after 10000ms'));
+    mockGetReviewStatus.mockResolvedValue(null);
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentTimestamp,
+          updatedAt: recentTimestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected review to be inserted');
+    }
+
+    const firstResult = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const afterFirstDispatch = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+    const attemptsAfterFirstDispatch = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
+    const firstAttempt = attemptsAfterFirstDispatch[0];
+
+    expect(firstResult).toEqual({
+      dispatched: 0,
+      notDispatched: 1,
+      activeCount: 0,
+    });
+    expect(afterFirstDispatch?.status).toBe('pending');
+    expect(afterFirstDispatch?.pending_dispatch_retry_count).toBe(1);
+    expect(attemptsAfterFirstDispatch).toHaveLength(1);
+    expect(firstAttempt?.status).toBe('queued');
+
+    const secondResult = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+    const attempts = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
+
+    expect(secondResult).toEqual({
+      dispatched: 0,
+      notDispatched: 1,
+      activeCount: 0,
+    });
+    expect(storedReview?.status).toBe('failed');
+    expect(storedReview?.pending_dispatch_retry_count).toBe(1);
+    expect(storedReview?.error_message).toBe(PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE);
+    expect(storedReview?.completed_at).toEqual(expect.any(String));
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]).toEqual(
+      expect.objectContaining({
+        id: firstAttempt?.id,
+        status: 'failed',
+        error_message: PENDING_DISPATCH_RETRY_EXHAUSTED_ERROR_MESSAGE,
+        completed_at: expect.any(String),
+      })
+    );
+    expect(mockDispatchReview).toHaveBeenCalledTimes(2);
+    expect(mockGetReviewStatus).toHaveBeenNthCalledWith(1, review.id, firstAttempt?.id);
+    expect(mockGetReviewStatus).toHaveBeenNthCalledWith(2, review.id, firstAttempt?.id);
   });
 
   it('keeps a dispatch timeout claim when the Worker status probe also fails', async () => {

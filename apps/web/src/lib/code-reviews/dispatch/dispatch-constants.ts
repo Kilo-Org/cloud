@@ -9,6 +9,7 @@ export const FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS = 5_000_000;
 export const STALE_QUEUED_CODE_REVIEW_MINUTES = 5;
 export const STALE_RUNNING_CODE_REVIEW_MINUTES = 90;
 export const CRON_PENDING_CODE_REVIEW_MAX_AGE_HOURS = 2;
+export const MAX_PENDING_DISPATCH_RETRIES = 1;
 
 export function staleQueuedCodeReviewCutoffSql() {
   return sql`now() - interval '${sql.raw(String(STALE_QUEUED_CODE_REVIEW_MINUTES))} minutes'`;

@@ -3254,6 +3254,7 @@ export const cloud_agent_code_reviews = pgTable(
     // Review status
     status: text().notNull().default('pending'), // 'pending' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
     dispatch_reservation_id: text(),
+    pending_dispatch_retry_count: smallint().notNull().default(0),
     error_message: text(),
     terminal_reason: text(),
 
@@ -3312,6 +3313,10 @@ export const cloud_agent_code_reviews = pgTable(
         (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
         (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
       )`
+    ),
+    check(
+      'cloud_agent_code_reviews_pending_dispatch_retry_count_check',
+      sql`${table.pending_dispatch_retry_count} >= 0 AND ${table.pending_dispatch_retry_count} <= 4`
     ),
   ]
 );

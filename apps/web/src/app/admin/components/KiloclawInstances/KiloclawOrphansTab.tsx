@@ -484,6 +484,7 @@ function OrphanVolumesSection() {
                     <TableHead>Volume State</TableHead>
                     <TableHead>DO Status</TableHead>
                     <TableHead>Destroyed</TableHead>
+                    <TableHead>Subscription</TableHead>
                     <TableHead>Classification</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -531,6 +532,24 @@ function OrphanVolumesSection() {
                       <TableCell className="text-xs">{volume.do_status ?? 'finalized'}</TableCell>
                       <TableCell title={new Date(volume.destroyed_at).toLocaleString()}>
                         {formatRelativeTime(volume.destroyed_at)}
+                      </TableCell>
+                      <TableCell>
+                        {volume.subscription_status ? (
+                          <Badge
+                            variant="outline"
+                            title="Subscription attached to this destroyed instance. The access check also considers successor subscriptions in the same context."
+                            className={
+                              volume.subscription_status === 'active' ||
+                              volume.subscription_status === 'trialing'
+                                ? 'border-amber-500/30 bg-amber-500/15 text-amber-400'
+                                : undefined
+                            }
+                          >
+                            {volume.subscription_status}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <VolumeClassificationBadge classification={volume.classification} />

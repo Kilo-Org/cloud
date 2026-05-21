@@ -60,6 +60,7 @@
     "expo-location": "55.1.10",
     "expo-notifications": "55.0.23",
     "expo-router": "55.0.14",
+    "expo-screen-corner-radius": "^1.0.1",
     "expo-secure-store": "55.0.14",
     "expo-sharing": "~55.0.19",
     "expo-splash-screen": "55.0.21",

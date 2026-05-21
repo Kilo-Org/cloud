@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Keyboard, View } from 'react-native';
+import { getCornerRadiusSync } from 'expo-screen-corner-radius';
 import { Text } from '@/components/ui/text';
-import { cn } from '@/lib/utils';
 import { formatTypingIndicatorText } from './typing-indicator-text';
+
+const SCREEN_CORNER_RADIUS = getCornerRadiusSync() ?? 0;
 
 type Props = {
   botName?: string | null;
@@ -15,9 +17,10 @@ export function TypingIndicator({ botName, typingMembers }: Props) {
     typingMemberIds: [...typingMembers.keys()],
   });
   const keyboardVisible = useKeyboardVisible();
+  const horizontalPadding = keyboardVisible ? 0 : SCREEN_CORNER_RADIUS;
 
   return (
-    <View className={cn('h-5 justify-center', !keyboardVisible && 'px-7')}>
+    <View className="h-5 justify-center" style={{ paddingHorizontal: horizontalPadding }}>
       {text ? (
         <Text numberOfLines={1} className="text-xs text-muted-foreground">
           {text}

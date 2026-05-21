@@ -1,8 +1,23 @@
 import fs from 'node:fs/promises';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 import { Type } from '@sinclair/typebox';
+import type { OpenClawConfig, OpenClawPluginApi } from 'openclaw/plugin-sdk';
 import { definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
-import { buildBriefingMarkdown, offsetDateKey, resolveBriefingPath } from './briefing-utils';
+
+// Reused inside the narrow function-parameter shapes below so the local
+// type stays a strict subset of the real plugin API. Without this the
+// hand-written `listProviders: (params?: { config?: unknown }) => ...`
+// signature is actually broader than the SDK's typed `ListWebSearchProvidersParams`,
+// and passing the real api into a narrow-typed function fails.
+type SdkWebSearchRuntime = OpenClawPluginApi['runtime']['webSearch'];
+import {
+  buildBriefingMarkdown,
+  type BriefingDocumentSection,
+  offsetDateKey,
+  resolveBriefingPath,
+  wrapBriefingMarkdownForAgent,
+} from './briefing-utils';
 import {
   type BriefingDeliveryResult,
   deliverBriefingToConfiguredChannels,
@@ -23,23 +38,29 @@ import {
   buildGithubEmptySectionLines,
   buildGithubEmptySummary,
   classifyGithubToken,
+  formatGithubTldr,
   type GithubEmptyResultContext,
+  GITHUB_EMPTY_LINE,
+  isCleanGithubEmptyResult,
   missingBriefingScopes,
   parseOAuthScopesHeader,
   readGithubTokenFromEnv,
 } from './github-utils';
 import {
   formatLinearIssueLine,
+  formatLinearTldr,
   hasHighSignalPriority,
+  LINEAR_EMPTY_LINE,
   normalizeLinearIssues,
   summarizeLinearCallFailure,
 } from './linear-utils';
 import {
+  buildLocalNewsEmptyLine,
   buildLocalNewsSectionTitle,
   buildLocalNewsTiers,
-  buildNoLocationSectionLines,
   dedupeByUrl,
   formatLocalNewsLine,
+  formatLocalNewsTldr,
   LOCAL_NEWS_INTEREST_LABEL,
   LOCAL_NEWS_MAX_ITEMS,
   LOCAL_NEWS_MIN_ITEMS,
@@ -49,7 +70,29 @@ import {
   resolveLocationContextWithOverride,
 } from './local-news-utils';
 import { resolveNextReconcileAction } from './reconcile-queue-utils';
-import { normalizeWebResults } from './web-utils';
+import { formatWebTldr, normalizeWebResults, WEB_EMPTY_LINE } from './web-utils';
+import {
+  buildCalendarSectionLines,
+  buildCalendarSectionTitle,
+  buildCalendarTimeWindow,
+  formatCalendarTldr,
+} from './calendar-utils';
+import {
+  fetchCalendarAccessToken,
+  fetchCalendarEvents,
+  resolveCalendarReady,
+} from './calendar-client';
+import { createKiloChatSummaryClient } from './chat-summary-client';
+import {
+  buildChatSummarySectionLines,
+  buildChatSummaryStatus,
+  buildTodaySoFarChatWindow,
+  buildYesterdayChatWindow,
+  CHAT_EMPTY_TODAY,
+  CHAT_EMPTY_YESTERDAY,
+  formatChatTldr,
+  summarizeChatActivity,
+} from './chat-summary-utils';
 
 const PLUGIN_ID = 'kiloclaw-morning-briefing';
 const CRON_JOB_NAME = 'KiloClaw Morning Briefing';
@@ -119,19 +162,28 @@ type StoredStatus = {
 };
 
 type SourceCollectionResult = {
-  source: 'github' | 'linear' | 'local-news' | 'web';
+  source: 'calendar' | 'github' | 'kilo-chat' | 'linear' | 'local-news' | 'web';
   configured: boolean;
   ok: boolean;
   summary: string;
   sectionLines: string[];
+  sections?: BriefingDocumentSection[];
   /**
    * Optional per-source section title override. Most sources use a
    * fixed title (`GitHub`, `Linear`, `Web Search`), but `local-news`
-   * adds the resolved user location in parens when one is set. Bare
-   * `Local News` heading when no location is configured. Set by
-   * `collectLocalNews`; unset for sources with a static title.
+   * adds the resolved user location in parens when one is set, and
+   * `calendar` uses the connected Google account's email (e.g.
+   * `astorms@kilocode.ai daily calendar`). Set by the collector;
+   * unset for sources with a static title.
    */
   sectionTitle?: string;
+  /**
+   * Optional short fragment for the briefing's `**TL;DR:**` header line
+   * (e.g. `3 GitHub issues to review`). Set by `populated` collectors;
+   * unset/empty when the source has nothing worth counting. The
+   * assembler joins all non-empty fragments with ` · `.
+   */
+  tldr?: string;
 };
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -148,10 +200,17 @@ function resolvePluginConfig(raw: unknown): BriefingPluginConfig {
   };
 }
 
-async function readRequestBody(req: import('node:http').IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+async function readRequestBody(
+  req: IncomingMessage & AsyncIterable<Buffer | string>
+): Promise<unknown> {
+  const chunks: Uint8Array[] = [];
+  for await (const rawChunk of req) {
+    const chunk: unknown = rawChunk;
+    if (typeof chunk === 'string') {
+      chunks.push(new TextEncoder().encode(chunk));
+    } else if (chunk instanceof Uint8Array) {
+      chunks.push(chunk);
+    }
   }
   const raw = Buffer.concat(chunks).toString('utf8').trim();
   if (!raw) {
@@ -164,11 +223,7 @@ async function readRequestBody(req: import('node:http').IncomingMessage): Promis
   }
 }
 
-function sendJson(
-  res: import('node:http').ServerResponse,
-  statusCode: number,
-  body: Record<string, unknown>
-): void {
+function sendJson(res: ServerResponse, statusCode: number, body: Record<string, unknown>): void {
   res.statusCode = statusCode;
   res.setHeader('content-type', 'application/json');
   res.end(JSON.stringify(body));
@@ -603,11 +658,9 @@ async function resolveGithubReady(api: {
 
 async function resolveWebSearchReady(api: {
   runtime: {
-    webSearch: {
-      listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-    };
+    webSearch: Pick<SdkWebSearchRuntime, 'listProviders'>;
   };
-  config: unknown;
+  config: OpenClawConfig;
 }): Promise<{ configured: boolean; summary: string }> {
   const providers = api.runtime.webSearch.listProviders({ config: api.config });
   if (!Array.isArray(providers) || providers.length === 0) {
@@ -757,8 +810,14 @@ async function gatherGithubEmptyResultContext(
   // fine-grained context we never confirmed.
   const authFailedClassicOrFineGrained =
     (tokenType === 'classic' || tokenType === 'fine-grained') && login === null;
+  // After the earlier early-returns + the degrade-on-auth-failure above, the
+  // tokenType reaching this return is always one of the third union variant's
+  // literals. TS can't narrow GithubTokenType down to that subset on its own.
+  const narrowedTokenType: 'app' | 'oauth' | 'unknown' = authFailedClassicOrFineGrained
+    ? 'unknown'
+    : (tokenType as 'app' | 'oauth' | 'unknown');
   return {
-    tokenType: authFailedClassicOrFineGrained ? 'unknown' : tokenType,
+    tokenType: narrowedTokenType,
     login,
   };
 }
@@ -805,10 +864,20 @@ async function collectGithub(api: GithubApiRunner): Promise<SourceCollectionResu
         configured: true,
         ok: true,
         summary: buildGithubEmptySummary(ctx),
-        sectionLines: buildGithubEmptySectionLines(ctx),
+        // Clean empty (correctly-scoped token, just no issues) gets the
+        // friendly one-liner; scope / token-misconfiguration cases keep
+        // the verbose PR-7 diagnostic so the user can act on it.
+        sectionLines: isCleanGithubEmptyResult(ctx)
+          ? [GITHUB_EMPTY_LINE]
+          : buildGithubEmptySectionLines(ctx),
       };
     }
-    const lines = items.slice(0, 8).map(item => {
+    // Render at most 8 of the up-to-12 fetched issues. The TL;DR counts
+    // the rendered set, not the fetched set, so the header can't claim
+    // "12 issues" while the section only lists 8. `summary` keeps the
+    // fetched count — it only surfaces in the debug Source Status footer.
+    const renderedItems = items.slice(0, 8);
+    const lines = renderedItems.map(item => {
       const updatedSuffix = item.updatedAt ? ` (updated ${item.updatedAt})` : '';
       return `- [${item.title}](${item.url})${updatedSuffix}`;
     });
@@ -818,6 +887,7 @@ async function collectGithub(api: GithubApiRunner): Promise<SourceCollectionResu
       ok: true,
       summary: `Fetched ${items.length} open GitHub issues`,
       sectionLines: lines,
+      tldr: formatGithubTldr(renderedItems.length),
     };
   } catch (error) {
     return {
@@ -874,7 +944,8 @@ async function collectWebSearch(
 ): Promise<SourceCollectionResult> {
   // Caller already filtered out "Local News" — that has its own source.
   // If nothing remains, the user hasn't opted into general web news.
-  // Surface a nudge instead of forcing a hardcoded fallback query.
+  // No section body — `configured: false` routes it into the single
+  // `## ⚙️ Connect more` nudge the assembler builds.
   const cleanedTopics = interestTopics.map(topic => topic.trim()).filter(topic => topic.length > 0);
   if (cleanedTopics.length === 0) {
     return {
@@ -882,9 +953,7 @@ async function collectWebSearch(
       configured: false,
       ok: true,
       summary: 'No general-interest topics selected',
-      sectionLines: [
-        'Select interests like Tech, AI, Finance, or Markets in Settings → Morning Briefing to add general web news to your briefing.',
-      ],
+      sectionLines: [],
     };
   }
 
@@ -960,7 +1029,7 @@ async function collectWebSearch(
       configured: true,
       ok: true,
       summary: 'Web search returned no results',
-      sectionLines: ['- No web-search results returned.'],
+      sectionLines: [WEB_EMPTY_LINE],
     };
   }
 
@@ -972,20 +1041,15 @@ async function collectWebSearch(
     ok: true,
     summary: `Fetched ${rendered.length} web results across ${cleanedTopics.length} topic(s)${providerSuffix}`,
     sectionLines: rendered.map(item => `- [${item.topic}] [${item.title}](${item.url})`),
+    tldr: formatWebTldr(rendered.length),
   };
 }
 
 type WebSearchRuntime = {
   runtime: {
-    webSearch: {
-      listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-      search: (params: { args: Record<string, unknown>; config?: unknown }) => Promise<{
-        provider: string;
-        result: Record<string, unknown>;
-      }>;
-    };
+    webSearch: SdkWebSearchRuntime;
   };
-  config: unknown;
+  config: OpenClawConfig;
   logger: { info?: (message: string) => void; warn?: (message: string) => void };
 };
 
@@ -1081,12 +1145,14 @@ async function collectLocalNews(
   const locationContext = resolveLocationContextWithOverride(storedUserLocation);
 
   if (locationContext.kind === 'none') {
+    // No section body — `configured: false` routes Local News into the
+    // single `## ⚙️ Connect more` nudge the assembler builds.
     return {
       source: 'local-news',
       configured: false,
       ok: true,
       summary: LOCAL_NEWS_NO_LOCATION_SUMMARY,
-      sectionLines: buildNoLocationSectionLines(locationContext.timezone),
+      sectionLines: [],
       sectionTitle: buildLocalNewsSectionTitle(locationContext),
     };
   }
@@ -1111,7 +1177,7 @@ async function collectLocalNews(
         configured: true,
         ok: true,
         summary: `0 local news results after ${tiersConsumed} tier(s)`,
-        sectionLines: [`No local news found near ${locationContext.raw}.`],
+        sectionLines: [buildLocalNewsEmptyLine(locationContext)],
         sectionTitle: buildLocalNewsSectionTitle(locationContext),
       };
     }
@@ -1123,6 +1189,7 @@ async function collectLocalNews(
       summary: `Fetched ${items.length} local news result(s) in ${tiersConsumed} tier(s)${providerSuffix}`,
       sectionLines: items.map(formatLocalNewsLine),
       sectionTitle: buildLocalNewsSectionTitle(locationContext),
+      tldr: formatLocalNewsTldr(items.length),
     };
   } catch (error) {
     return {
@@ -1207,11 +1274,7 @@ async function collectLinear(api: {
       configured: true,
       ok: true,
       summary: '0 issues assigned to you in Linear',
-      sectionLines: [
-        'No issues assigned to you in Linear.',
-        '',
-        'If you expected results, check `mcporter call linear list_issues assignee:me limit:8 orderBy:updatedAt` from your container shell. The brief is scoped to issues you own; issues assigned to others will not appear.',
-      ],
+      sectionLines: [LINEAR_EMPTY_LINE],
     };
   }
 
@@ -1222,7 +1285,156 @@ async function collectLinear(api: {
     ok: true,
     summary: `Fetched ${issues.length} Linear issues assigned to you`,
     sectionLines: issues.map(issue => formatLinearIssueLine(issue, briefHasHighSignal)),
+    tldr: formatLinearTldr(issues),
   };
+}
+
+/**
+ * Pulls today + tomorrow-morning events from the user's primary Google
+ * calendar via the controller's OAuth broker. Both Settings UI cards
+ * (simple "Calendar Connect" and the full Google Account flow) write
+ * to the same per-instance connection row, so this collector is path-
+ * agnostic: ask the broker for status, then for a token, then hit
+ * Google.
+ *
+ * Returns:
+ *   - `ok:true, configured:false` + nudge body when no Google
+ *     connection or no calendar capability is present
+ *   - `ok:true, configured:true` + rendered section when calendar
+ *     fetch succeeds (including the empty-calendar case)
+ *   - `ok:false, configured:true` when the broker has a connection
+ *     but the token fetch or Google API call fails — the source
+ *     surfaces in the `## Failures` list and the source-status footer
+ */
+async function collectCalendar(now: Date, userTimezone: string): Promise<SourceCollectionResult> {
+  const readiness = await resolveCalendarReady();
+  if (!readiness.statusOk) {
+    return {
+      source: 'calendar',
+      configured: true,
+      ok: false,
+      summary: readiness.reason,
+      sectionLines: [],
+    };
+  }
+
+  // Both "no Google connection" and "connected without calendar scope"
+  // emit no section body — `configured: false` routes Calendar into the
+  // single `## ⚙️ Connect more` nudge the assembler builds.
+  if (!readiness.connected) {
+    return {
+      source: 'calendar',
+      configured: false,
+      ok: true,
+      summary: readiness.reason,
+      sectionLines: [],
+    };
+  }
+
+  if (!readiness.hasCalendarCapability) {
+    return {
+      source: 'calendar',
+      configured: false,
+      ok: true,
+      summary: readiness.reason,
+      sectionLines: [],
+    };
+  }
+
+  let token: Awaited<ReturnType<typeof fetchCalendarAccessToken>>;
+  try {
+    token = await fetchCalendarAccessToken();
+  } catch (error) {
+    return {
+      source: 'calendar',
+      configured: true,
+      ok: false,
+      summary: `Could not retrieve Google access token: ${error instanceof Error ? error.message : String(error)}`,
+      sectionLines: [],
+    };
+  }
+
+  const { timeMin, timeMax } = buildCalendarTimeWindow(now, userTimezone);
+  try {
+    const events = await fetchCalendarEvents(token.accessToken, timeMin, timeMax);
+    return {
+      source: 'calendar',
+      configured: true,
+      ok: true,
+      summary: `Fetched ${events.length} events for ${token.accountEmail}`,
+      sectionLines: buildCalendarSectionLines(events, now, userTimezone),
+      sectionTitle: buildCalendarSectionTitle(token.accountEmail),
+      tldr: formatCalendarTldr(events, now, userTimezone),
+    };
+  } catch (error) {
+    return {
+      source: 'calendar',
+      configured: true,
+      ok: false,
+      summary: `Google Calendar fetch failed: ${error instanceof Error ? error.message : String(error)}`,
+      sectionLines: [],
+    };
+  }
+}
+
+async function collectKiloChatSummary(
+  now: Date,
+  userTimezone: string
+): Promise<SourceCollectionResult> {
+  const client = createKiloChatSummaryClient();
+  if (!client.configured) {
+    return {
+      source: 'kilo-chat',
+      configured: false,
+      ok: true,
+      summary: client.reason,
+      sectionLines: [],
+    };
+  }
+
+  const yesterdayWindow = buildYesterdayChatWindow(now, userTimezone);
+  const todayWindow = buildTodaySoFarChatWindow(now, userTimezone);
+  try {
+    const [yesterday, today] = await Promise.all([
+      client.listConversationsForWindow(yesterdayWindow),
+      client.listConversationsForWindow(todayWindow),
+    ]);
+    const yesterdayStats = summarizeChatActivity(yesterday.conversations, yesterdayWindow);
+    const todayStats = summarizeChatActivity(today.conversations, todayWindow);
+    const truncatedNote =
+      yesterday.truncated || today.truncated
+        ? ' (counts truncated; activity exceeded the scan limit)'
+        : '';
+    return {
+      source: 'kilo-chat',
+      configured: true,
+      ok: true,
+      summary: `Yesterday: ${buildChatSummaryStatus(
+        yesterdayStats,
+        'yesterday'
+      )}; today: ${buildChatSummaryStatus(todayStats, 'so far today')}${truncatedNote}`,
+      sectionLines: [],
+      sections: [
+        {
+          title: `💬 Yesterday in Chat (${yesterdayWindow.dateKey})`,
+          lines: buildChatSummarySectionLines(yesterdayStats, CHAT_EMPTY_YESTERDAY),
+        },
+        {
+          title: '💬 So Far Today in Chat',
+          lines: buildChatSummarySectionLines(todayStats, CHAT_EMPTY_TODAY),
+        },
+      ],
+      tldr: formatChatTldr(yesterdayStats),
+    };
+  } catch (error) {
+    return {
+      source: 'kilo-chat',
+      configured: true,
+      ok: false,
+      summary: `Kilo Chat summary failed: ${error instanceof Error ? error.message : String(error)}`,
+      sectionLines: [],
+    };
+  }
 }
 
 async function generateBriefing(
@@ -1235,15 +1447,11 @@ async function generateBriefing(
           options: { timeoutMs: number; cwd?: string }
         ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
       };
-      webSearch: {
-        listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-        search: (params: { args: Record<string, unknown>; config?: unknown }) => Promise<{
-          provider: string;
-          result: Record<string, unknown>;
-        }>;
-      };
+      webSearch: SdkWebSearchRuntime;
     };
-    config: unknown;
+    config: {
+      agents?: { defaults?: { userTimezone?: string } };
+    };
     logger: { info?: (message: string) => void; warn?: (message: string) => void };
   },
   dateKey: string
@@ -1258,12 +1466,11 @@ async function generateBriefing(
   const paths = getStatePaths(api);
   await ensureStorage(paths);
 
-  // Read interest topics + userLocation directly from config.json — we
-  // only need these two narrow fields here, and the surrounding `api`
-  // shape doesn't have the `pluginConfig` / `agents.defaults.userTimezone`
-  // context that `readStoredConfig` uses to default cron/timezone.
-  // Missing or malformed file => empty topics + null location (env-var
-  // fallback path in resolveLocationContextWithOverride).
+  // Read interest topics + userLocation directly from config.json. The
+  // `api.config.agents.defaults.userTimezone` field above gives us the
+  // brief's effective timezone for the Calendar source's time window.
+  // Missing or malformed config.json => empty topics + null location
+  // (env-var fallback path in resolveLocationContextWithOverride).
   const storedConfig = await readJsonFile<StoredConfig>(paths.configPath);
   const interestTopics = Array.isArray(storedConfig?.interestTopics)
     ? storedConfig.interestTopics.filter((value): value is string => typeof value === 'string')
@@ -1286,12 +1493,28 @@ async function generateBriefing(
   const webSearchTopics = interestTopics.filter(
     topic => topic.trim().toLowerCase() !== localNewsLabelLower
   );
+  // Calendar uses the user's IANA timezone for time window + formatting.
+  // Falls back to UTC when not configured (the brief plugin already
+  // accepts that fallback elsewhere via `resolveEffectiveTimezone`).
+  const storedTimezone =
+    typeof storedConfig?.timezone === 'string' && storedConfig.timezone.trim().length > 0
+      ? storedConfig.timezone.trim()
+      : null;
+  const configuredTimezone = storedTimezone ?? api.config.agents?.defaults?.userTimezone;
+  const briefingTimezone =
+    configuredTimezone && isValidTimezone(configuredTimezone)
+      ? configuredTimezone
+      : DEFAULT_TIMEZONE;
+
+  const generatedAt = new Date();
   const corePromises = [
+    collectCalendar(generatedAt, briefingTimezone),
+    collectKiloChatSummary(generatedAt, briefingTimezone),
     collectGithub(api),
     collectLinear(api),
     collectWebSearch(api, webSearchTopics),
   ];
-  const [github, linear, web] = await Promise.all(corePromises);
+  const [calendar, kiloChat, github, linear, web] = await Promise.all(corePromises);
   // Local News slots between Linear and Web Search — interest-gated so
   // users who haven't opted in pay no search cost and see no
   // local-news entry in the source-status footer.
@@ -1299,46 +1522,78 @@ async function generateBriefing(
     ? await collectLocalNews(api, storedUserLocation)
     : null;
 
+  // Canonical brief order: Calendar → Linear → GitHub → Local News →
+  // Web → Kilo Chat. Fixed so the user gets the same rhythm every
+  // morning. Array order drives both the rendered section order and
+  // the `**TL;DR:**` fragment order.
   const sources: SourceCollectionResult[] = [
-    github,
+    calendar,
     linear,
+    github,
     ...(localNews ? [localNews] : []),
     web,
+    kiloChat,
   ];
   const successes = sources.filter(source => source.ok);
 
   if (successes.length === 0) {
     throw new Error(
-      'No usable briefing sources are available. Configure at least one of GitHub, Linear, Local News, or web search.'
+      'No usable briefing sources are available. Configure at least one of Calendar, Kilo Chat, GitHub, Linear, Local News, or web search.'
     );
   }
 
+  // Only configured-but-errored sources are failures. A source the user
+  // simply hasn't connected (`configured: false`) belongs in the
+  // `## ⚙️ Connect more` nudge the assembler builds, not the failure list.
   const failures = sources
-    .filter(source => !source.ok)
+    .filter(source => source.configured && !source.ok)
     .map(source => `${source.source}: ${source.summary}`);
-  // Default titles per source type. Individual sources can override via
-  // `SourceCollectionResult.sectionTitle` (used by Local News to surface
-  // the resolved location in the parens).
+  // Default titles per source type, each carrying the source's canonical
+  // emoji. Individual sources can override via
+  // `SourceCollectionResult.sectionTitle` (Calendar uses the connected
+  // account email, Local News the resolved location) — those builders
+  // prepend the same emoji themselves.
   const DEFAULT_SECTION_TITLE: Record<SourceCollectionResult['source'], string> = {
-    github: 'GitHub',
-    linear: 'Linear',
-    'local-news': 'Local News',
-    web: 'Web Search',
+    calendar: '🗓 Calendar',
+    github: '🐙 GitHub',
+    // `kilo-chat` always supplies its own `sections`, so this entry only
+    // exists to satisfy the exhaustive Record type and is never rendered.
+    'kilo-chat': '💬 Kilo Chat',
+    linear: '📈 Linear',
+    'local-news': '📰 Local News',
+    web: '🌐 Web',
   };
+  // TL;DR fragments in canonical source order; empty fragments dropped.
+  const tldr = sources
+    .map(source => source.tldr?.trim())
+    .filter((fragment): fragment is string => Boolean(fragment))
+    .join(' · ');
+  // `BRIEFING_DEBUG` (1/true/yes) appends the operator-facing
+  // `## Source Status` footer; off by default for the user-facing brief.
+  const debug = ['1', 'true', 'yes'].includes(
+    (process.env.BRIEFING_DEBUG ?? '').trim().toLowerCase()
+  );
   const markdown = buildBriefingMarkdown({
     dateKey,
-    generatedAt: new Date(),
+    generatedAt,
     statuses: sources.map(source => ({
       source: source.source,
       configured: source.configured,
       ok: source.ok,
       summary: source.summary,
     })),
-    sections: sources.map(source => ({
-      title: source.sectionTitle ?? DEFAULT_SECTION_TITLE[source.source],
-      lines: source.sectionLines,
-    })),
+    sections: sources.flatMap(
+      source =>
+        source.sections ?? [
+          {
+            title: source.sectionTitle ?? DEFAULT_SECTION_TITLE[source.source],
+            lines: source.sectionLines,
+          },
+        ]
+    ),
     failures,
+    tldr,
+    debug,
   });
 
   const filePath = resolveBriefingPath(paths.briefingsDir, dateKey);
@@ -1360,7 +1615,7 @@ async function generateBriefing(
 
   await patchStoredStatus(paths, {
     lastGeneratedDate: dateKey,
-    lastGeneratedAt: new Date().toISOString(),
+    lastGeneratedAt: generatedAt.toISOString(),
     lastPath: filePath,
     sourceSummary: sources.map(source => ({
       source: source.source,
@@ -1438,9 +1693,7 @@ async function getStatusSnapshot(api: {
         options: { timeoutMs: number; cwd?: string }
       ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
     };
-    webSearch: {
-      listProviders: (params?: { config?: unknown }) => Array<{ id?: string }>;
-    };
+    webSearch: Pick<SdkWebSearchRuntime, 'listProviders'>;
   };
   config: {
     agents?: {
@@ -1529,7 +1782,7 @@ export default definePluginEntry({
         // between our read and our final write (the `ensureCronJob` call
         // below is slow). `patchStoredStatus` uses a separate queue, so
         // no deadlock from nesting.
-        return await queueConfigWrite(paths.configPath, async () => {
+        return await queueConfigWrite<'succeeded' | 'failed'>(paths.configPath, async () => {
           const config = await readStoredConfig(api, paths);
 
           if (config.enabled) {
@@ -1764,7 +2017,7 @@ export default definePluginEntry({
       }
     })();
 
-    const runBriefingCommand = async (argsText: string) => {
+    const runBriefingCommand = async (argsText: string, options?: { forAgent?: boolean }) => {
       const args = argsText.trim();
       const [subcommand = 'status'] = args.split(/\s+/).filter(Boolean);
 
@@ -1807,7 +2060,9 @@ export default definePluginEntry({
         if (!briefing.exists || !briefing.markdown) {
           return `No saved briefing for ${briefing.dateKey}.`;
         }
-        return briefing.markdown;
+        return options?.forAgent
+          ? wrapBriefingMarkdownForAgent(briefing.markdown)
+          : briefing.markdown;
       }
 
       const status = await getStatusSnapshot(api);
@@ -1838,6 +2093,7 @@ export default definePluginEntry({
 
     api.registerTool({
       name: 'morning_briefing_handle_command',
+      label: 'Morning briefing /briefing command',
       description:
         'Deterministically handles /briefing commands from raw inbound text when slash routing fails.',
       parameters: Type.Object(
@@ -1851,7 +2107,8 @@ export default definePluginEntry({
         { additionalProperties: false }
       ),
       async execute(_toolCallId, params) {
-        const commandArgs = extractBriefingArgsFromText(params.message);
+        const { message } = params as { message: string };
+        const commandArgs = extractBriefingArgsFromText(message);
         if (commandArgs === null) {
           return {
             content: [
@@ -1860,10 +2117,11 @@ export default definePluginEntry({
                 text: 'No /briefing command found in the provided message.',
               },
             ],
+            details: undefined,
           };
         }
 
-        const resultText = await runBriefingCommand(commandArgs);
+        const resultText = await runBriefingCommand(commandArgs, { forAgent: true });
         return {
           content: [
             {
@@ -1871,12 +2129,14 @@ export default definePluginEntry({
               text: resultText,
             },
           ],
+          details: undefined,
         };
       },
     });
 
     api.registerTool({
       name: 'morning_briefing_generate',
+      label: 'Generate morning briefing',
       description:
         "Generate today's morning briefing from configured sources and persist it as Markdown.",
       parameters: Type.Object(
@@ -1891,7 +2151,8 @@ export default definePluginEntry({
         { additionalProperties: false }
       ),
       async execute(_toolCallId, params) {
-        const dateValue = typeof params.date === 'string' ? params.date : undefined;
+        const typed = params as { date?: string };
+        const dateValue = typeof typed.date === 'string' ? typed.date : undefined;
         const targetDateKey = dateValue ?? (await resolveDateKeyForOffset(api, 0));
         const result = await generateBriefing(api, targetDateKey);
         return {
@@ -1903,15 +2164,30 @@ export default definePluginEntry({
                 `Saved to ${result.filePath}.`,
                 ...result.failures.map(failure => `Note: ${failure}`),
                 ...formatDeliverySummary(result.delivery).map(line => line.replace(/^- /, '')),
+                '',
+                // Hand the agent the full briefing plus a fidelity rule so
+                // an on-demand "run my briefing" chat reply reproduces
+                // every section instead of paraphrasing the file (which
+                // silently dropped sections like "Connect more" and
+                // individual calendar lines). PR-6 replaces this with
+                // structured multi-bubble injection.
+                //
+                // wrapBriefingMarkdownForAgent fences the body in an
+                // untrusted-content tag so a malicious issue or event
+                // title cannot hijack the agent. Shared with
+                // morning_briefing_read so both paths carry the same guard.
+                wrapBriefingMarkdownForAgent(result.markdown),
               ].join('\n'),
             },
           ],
+          details: undefined,
         };
       },
     });
 
     api.registerTool({
       name: 'morning_briefing_read',
+      label: 'Read morning briefing',
       description: 'Read a saved morning briefing Markdown file for a specific date.',
       parameters: Type.Object(
         {
@@ -1926,7 +2202,8 @@ export default definePluginEntry({
         { additionalProperties: false }
       ),
       async execute(_toolCallId, params) {
-        const rawDay = typeof params.day === 'string' ? params.day : 'today';
+        const typed = params as { day?: string };
+        const rawDay = typeof typed.day === 'string' ? typed.day : 'today';
         const dateKey =
           rawDay === 'yesterday'
             ? await resolveDateKeyForOffset(api, -1)
@@ -1942,15 +2219,20 @@ export default definePluginEntry({
                 text: `No briefing exists for ${briefing.dateKey}.`,
               },
             ],
+            details: undefined,
           };
         }
         return {
           content: [
             {
               type: 'text',
-              text: briefing.markdown,
+              // Same untrusted-content fence as morning_briefing_generate:
+              // a saved briefing carries the same external titles, and the
+              // agent reads this in response to "/briefing today".
+              text: wrapBriefingMarkdownForAgent(briefing.markdown),
             },
           ],
+          details: undefined,
         };
       },
     });
@@ -2231,6 +2513,7 @@ export default definePluginEntry({
         'Use /briefing enable|status|run|today|yesterday|disable for command-driven control.',
         'If inbound text contains /briefing but command routing did not execute, call morning_briefing_handle_command exactly once with the full raw inbound message.',
         'Never emulate /briefing by manually calling generic cron/file tools.',
+        'When you present a morning briefing in chat, reproduce every section and every line of the briefing Markdown — including the "Connect more" section and all calendar entries. Light reformatting for readability is fine, but never drop, merge, or summarize away a section or line.',
       ].join('\n'),
     }));
   },

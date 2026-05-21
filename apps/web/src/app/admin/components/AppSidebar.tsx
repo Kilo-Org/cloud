@@ -181,6 +181,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     icon: () => <BarChart />,
   },
   {
+    title: () => 'Model Benchmarks',
+    url: '/admin/model-eval-ingest',
+    icon: () => <FileSearch />,
+  },
+  {
     title: () => 'Session Traces',
     url: '/admin/session-traces',
     icon: () => <FileSearch />,

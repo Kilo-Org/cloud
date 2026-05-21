@@ -225,7 +225,7 @@ are auto-managed and which require manual setup.
 | Variable               | Description                                                                                                                          | How to generate        | Source  | Auto-managed |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------- | ------- | ------------ |
 | `NEXTAUTH_SECRET`      | JWT signing key (HS256). Must match the Next.js app's secret.                                                                        | `openssl rand -hex 32` | Vercel  | Yes          |
-| `INTERNAL_API_SECRET`  | Shared key for platform API routes (`x-internal-api-key` header). Must match Next.js `KILOCLAW_INTERNAL_API_SECRET`.                 | `openssl rand -hex 32` | Vercel  | Yes          |
+| `INTERNAL_API_SECRET`  | Shared key for platform API routes (`x-internal-api-key` header). Must match Next.js internal API secrets.                           | `openssl rand -hex 32` | Vercel  | Yes          |
 | `GATEWAY_TOKEN_SECRET` | HMAC key for per-sandbox gateway tokens. Worker-only (Next.js reads derived tokens from the API). Can be any arbitrary value in dev. | `openssl rand -hex 32` | Example | No           |
 
 For local dev, any placeholder values work (the example file has defaults).
@@ -339,10 +339,10 @@ The Next.js app also needs these two variables to talk to the KiloClaw worker.
 Both are included in `vercel env pull` (run automatically by the dev-start
 script):
 
-| Variable                       | Description                                     |
-| ------------------------------ | ----------------------------------------------- |
-| `KILOCLAW_API_URL`             | Worker URL, e.g. `http://localhost:8795`        |
-| `KILOCLAW_INTERNAL_API_SECRET` | Must match `INTERNAL_API_SECRET` in `.dev.vars` |
+| Variable              | Description                                     |
+| --------------------- | ----------------------------------------------- |
+| `KILOCLAW_API_URL`    | Worker URL, e.g. `http://localhost:8795`        |
+| `INTERNAL_API_SECRET` | Must match `INTERNAL_API_SECRET` in `.dev.vars` |
 
 ## Wrangler Bindings
 
@@ -733,12 +733,12 @@ pnpm deploy
 
 **Secrets that must match the Next.js app:**
 
-| Worker Secret                | Next.js Env Var                | Notes                                                 |
-| ---------------------------- | ------------------------------ | ----------------------------------------------------- |
-| `NEXTAUTH_SECRET`            | `NEXTAUTH_SECRET`              | Same HS256 signing key for JWT verification           |
-| `INTERNAL_API_SECRET`        | `KILOCLAW_INTERNAL_API_SECRET` | Platform API authentication                           |
-| `AGENT_ENV_VARS_PRIVATE_KEY` | `AGENT_ENV_VARS_PUBLIC_KEY`    | RSA key pair (worker has private, Next.js has public) |
-| `WORKER_ENV`                 | `NODE_ENV`                     | Defaults to `production` in `wrangler.jsonc`          |
+| Worker Secret                | Next.js Env Var             | Notes                                                 |
+| ---------------------------- | --------------------------- | ----------------------------------------------------- |
+| `NEXTAUTH_SECRET`            | `NEXTAUTH_SECRET`           | Same HS256 signing key for JWT verification           |
+| `INTERNAL_API_SECRET`        | `INTERNAL_API_SECRET`       | Platform API authentication                           |
+| `AGENT_ENV_VARS_PRIVATE_KEY` | `AGENT_ENV_VARS_PUBLIC_KEY` | RSA key pair (worker has private, Next.js has public) |
+| `WORKER_ENV`                 | `NODE_ENV`                  | Defaults to `production` in `wrangler.jsonc`          |
 
 ## Troubleshooting
 

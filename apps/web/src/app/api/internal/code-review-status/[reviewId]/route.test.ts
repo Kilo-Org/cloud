@@ -7,6 +7,7 @@ import type {
   CloudAgentCodeReviewAttempt,
   PlatformIntegration,
 } from '@kilocode/db/schema';
+import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 
 // --- Mock functions ---
 
@@ -74,7 +75,7 @@ const mockRetryReviewFresh = jest.fn<any>();
 // --- Module mocks ---
 
 jest.mock('@/lib/config.server', () => ({
-  INTERNAL_API_SECRET: 'test-internal-secret',
+  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
 jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
@@ -147,14 +148,31 @@ jest.mock('@/lib/integrations/core/constants', () => ({
 
 // --- Helpers ---
 
-const VALID_SECRET = 'test-internal-secret';
+const CALLBACK_SECRET = 'test-callback-token-secret';
 const REVIEW_ID = '00000000-0000-0000-0000-000000000001';
+let defaultCallbackToken: string;
 
-function makeRequest(body: Record<string, unknown>, secret = VALID_SECRET): NextRequest {
+function makeRequest(
+  body: Record<string, unknown>,
+  options: {
+    callbackToken?: string | null;
+    attemptId?: string;
+  } = {}
+): NextRequest {
+  const url = new URL(`https://test.kilo.ai/api/internal/code-review-status/${REVIEW_ID}`);
+  if (options.attemptId) {
+    url.searchParams.set('attemptId', options.attemptId);
+  }
+
   return {
-    nextUrl: new URL(`https://test.kilo.ai/api/internal/code-review-status/${REVIEW_ID}`),
+    nextUrl: url,
     headers: {
-      get: (name: string) => (name === 'X-Internal-Secret' ? secret : null),
+      get: (name: string) => {
+        if (name === 'X-Callback-Token') {
+          return options.callbackToken === undefined ? defaultCallbackToken : options.callbackToken;
+        }
+        return null;
+      },
     },
     json: () => Promise.resolve(body),
   } as unknown as NextRequest;
@@ -184,6 +202,7 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     session_id: null,
     cli_session_id: null,
     status: 'running',
+    dispatch_reservation_id: null,
     error_message: null,
     terminal_reason: null,
     agent_version: 'v2',
@@ -264,6 +283,11 @@ let POST: typeof POSTType;
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  defaultCallbackToken = await deriveCallbackToken({
+    secret: CALLBACK_SECRET,
+    scope: 'code-review-status-callback',
+    resourceParts: [REVIEW_ID, ''],
+  });
   mockUpdateCodeReviewStatus.mockResolvedValue(undefined);
   mockUpdateCodeReviewAttemptForCallback.mockImplementation(async params =>
     makeAttempt({
@@ -306,6 +330,60 @@ beforeEach(async () => {
 });
 
 describe('POST /api/internal/code-review-status/[reviewId]', () => {
+  describe('authentication', () => {
+    it('returns 401 without callback token', async () => {
+      const response = await POST(
+        makeRequest({ status: 'completed' }, { callbackToken: null }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(401);
+    });
+
+    it('accepts callback token scoped to review and attempt query', async () => {
+      mockGetCodeReviewById.mockResolvedValue(null);
+      const callbackToken = await deriveCallbackToken({
+        secret: CALLBACK_SECRET,
+        scope: 'code-review-status-callback',
+        resourceParts: [REVIEW_ID, 'attempt-1'],
+      });
+      const response = await POST(
+        makeRequest({ status: 'completed' }, { callbackToken, attemptId: 'attempt-1' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(404);
+    });
+
+    it('rejects callback token scoped to a different review', async () => {
+      const callbackToken = await deriveCallbackToken({
+        secret: CALLBACK_SECRET,
+        scope: 'code-review-status-callback',
+        resourceParts: ['different-review', 'attempt-1'],
+      });
+      const response = await POST(
+        makeRequest({ status: 'completed' }, { callbackToken, attemptId: 'attempt-1' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(401);
+    });
+
+    it('rejects callback token scoped to a different attempt', async () => {
+      const callbackToken = await deriveCallbackToken({
+        secret: CALLBACK_SECRET,
+        scope: 'code-review-status-callback',
+        resourceParts: [REVIEW_ID, 'attempt-2'],
+      });
+      const response = await POST(
+        makeRequest({ status: 'completed' }, { callbackToken, attemptId: 'attempt-1' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(401);
+    });
+  });
+
   describe('normalization', () => {
     it('maps interrupted status to cancelled with interrupted terminal reason', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());

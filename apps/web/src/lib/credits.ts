@@ -12,6 +12,7 @@ import { grantCreditForCategory } from '@/lib/promotionalCredits';
 import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import { sendCreditsTopUpEmail } from '@/lib/email';
 import { client as stripeClient } from '@/lib/stripe-client';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 
 export type StripeConfig = { type: 'stripe'; stripe_payment_id: string };
 
@@ -121,6 +122,30 @@ export async function processTopUp(
       });
     }
     return false;
+  }
+
+  const emitCreditPurchasedEvent = () => {
+    void reportEvents({
+      events: [
+        {
+          type: 'billing.credit_purchased',
+          data: {
+            kilo_user_id: user.id,
+            microdollars_acquired: creditAmountInMicrodollars,
+          },
+        },
+      ],
+    });
+  };
+
+  if (dbOrTx) {
+    if (IS_IN_AUTOMATED_TEST) {
+      emitCreditPurchasedEvent();
+    } else {
+      after(emitCreditPurchasedEvent);
+    }
+  } else {
+    emitCreditPurchasedEvent();
   }
 
   if (skipPostTopUpFreeStuff) return true;

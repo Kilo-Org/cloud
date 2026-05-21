@@ -115,7 +115,125 @@ describe('parseUpOutcome', () => {
 });
 
 describe('bringUpDevContainer', () => {
-  it('tears down the container when the tool preflight fails after devcontainer up', async () => {
+  it('bootstraps runtime tools after devcontainer up when the preflight reports them missing', async () => {
+    let preflightCount = 0;
+    const onProgress = vi.fn();
+    const session = mockSessionExec(cmd => {
+      if (cmd.includes('if [ -S /var/run/docker.sock ]')) {
+        return { exitCode: 0, stdout: '/var/run/docker.sock' };
+      }
+      if (cmd === 'docker version --format {{.Server.Version}}') {
+        return { exitCode: 0, stdout: '27.0.0' };
+      }
+      if (cmd.includes('__KILO_READ_DEVCONTAINER_EOF__')) {
+        return { exitCode: 0, stdout: '{"image":"debian:bookworm"}' };
+      }
+      if (cmd.startsWith('devcontainer up ')) {
+        return {
+          exitCode: 0,
+          stdout:
+            '{"outcome":"success","containerId":"deadbeef","remoteWorkspaceFolder":"/workspaces/repo"}',
+        };
+      }
+      if (cmd.includes('command -v bun')) {
+        preflightCount += 1;
+        return preflightCount === 1 ? { exitCode: 0, stdout: 'MISSING' } : { exitCode: 0 };
+      }
+      return { exitCode: 0, stdout: '' };
+    });
+
+    const handle = await bringUpDevContainer(session, {
+      workspacePath: '/workspace/repo',
+      sessionHome: '/home/agent_xyz',
+      agentSessionId: 'agent_xyz',
+      wrapperPort: 5050,
+      kiloCliVersion: '7.2.52',
+      configPath: '.devcontainer/devcontainer.json',
+      onProgress,
+    });
+
+    expect(handle.containerId).toBe('deadbeef');
+    expect(onProgress.mock.calls.map(([message]) => message)).toEqual([
+      'Preparing dev container configuration…',
+      'Building dev container…',
+      'Checking dev container runtime…',
+      'Installing runtime tools in dev container…',
+      'Checking dev container runtime…',
+    ]);
+    const execCalls = (
+      session.exec as unknown as {
+        mock: {
+          calls: Array<[string, { env?: Record<string, string>; timeout?: number } | undefined]>;
+        };
+      }
+    ).mock.calls;
+    const commands = execCalls.map(([cmd]) => cmd);
+    const bootstrapCall = execCalls.find(([cmd]) => cmd.includes('nvm install --lts'));
+    expect(preflightCount).toBe(2);
+    expect(commands.some(cmd => cmd.includes('bun --version'))).toBe(true);
+    expect(commands.some(cmd => cmd.includes('nvm install --lts'))).toBe(true);
+    expect(commands.some(cmd => cmd.includes('nvm use --lts'))).toBe(false);
+    expect(
+      commands.some(cmd =>
+        cmd.includes('curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.14"')
+      )
+    ).toBe(true);
+    expect(commands.some(cmd => cmd.includes('@kilocode/cli@7.2.52'))).toBe(true);
+    expect(commands.some(cmd => cmd.includes('set -euo pipefail'))).toBe(true);
+    expect(commands.some(cmd => cmd.includes('/usr/local/bin/bun'))).toBe(true);
+    expect(commands.some(cmd => cmd.includes('/usr/local/bin/kilo'))).toBe(true);
+    expect(bootstrapCall?.[1]).toEqual({
+      env: { DOCKER_HOST: 'unix:///var/run/docker.sock' },
+      timeout: 10 * 60 * 1000,
+    });
+    expect(commands.some(cmd => cmd.startsWith('devcontainer down '))).toBe(false);
+  });
+
+  it('tears down the container when runtime bootstrap fails', async () => {
+    const session = mockSessionExec(cmd => {
+      if (cmd.includes('if [ -S /var/run/docker.sock ]')) {
+        return { exitCode: 0, stdout: '/var/run/docker.sock' };
+      }
+      if (cmd === 'docker version --format {{.Server.Version}}') {
+        return { exitCode: 0, stdout: '27.0.0' };
+      }
+      if (cmd.includes('__KILO_READ_DEVCONTAINER_EOF__')) {
+        return { exitCode: 0, stdout: '{"image":"debian:bookworm"}' };
+      }
+      if (cmd.startsWith('devcontainer up ')) {
+        return {
+          exitCode: 0,
+          stdout:
+            '{"outcome":"success","containerId":"deadbeef","remoteWorkspaceFolder":"/workspaces/repo"}',
+        };
+      }
+      if (cmd.includes('command -v bun')) {
+        return { exitCode: 0, stdout: 'MISSING' };
+      }
+      if (cmd.includes('nvm install --lts')) {
+        return { exitCode: 1, stdout: '', stderr: 'curl failed' };
+      }
+      return { exitCode: 0, stdout: '' };
+    });
+
+    await expect(
+      bringUpDevContainer(session, {
+        workspacePath: '/workspace/repo',
+        sessionHome: '/home/agent_xyz',
+        agentSessionId: 'agent_xyz',
+        wrapperPort: 5050,
+        kiloCliVersion: '7.2.52',
+        configPath: '.devcontainer/devcontainer.json',
+      })
+    ).rejects.toThrow('Failed to bootstrap dev container runtime tools');
+
+    const commands = (
+      session.exec as unknown as { mock: { calls: Array<[string]> } }
+    ).mock.calls.map(([cmd]) => cmd);
+    expect(commands.some(cmd => cmd.startsWith('devcontainer down '))).toBe(true);
+  });
+
+  it('tears down the container when bootstrap finishes without making runtime tools available', async () => {
     const session = mockSessionExec(cmd => {
       if (cmd.includes('if [ -S /var/run/docker.sock ]')) {
         return { exitCode: 0, stdout: '/var/run/docker.sock' };
@@ -148,7 +266,7 @@ describe('bringUpDevContainer', () => {
         kiloCliVersion: '7.2.52',
         configPath: '.devcontainer/devcontainer.json',
       })
-    ).rejects.toThrow('Dev container is missing required tools');
+    ).rejects.toThrow('Dev container runtime bootstrap completed');
 
     const commands = (
       session.exec as unknown as { mock: { calls: Array<[string]> } }

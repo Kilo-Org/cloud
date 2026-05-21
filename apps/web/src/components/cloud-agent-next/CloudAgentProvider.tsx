@@ -12,6 +12,7 @@ import {
   type FetchedSessionData,
   type KiloSessionId,
   type CloudAgentSessionId,
+  type TransportSendPayload,
 } from '@/lib/cloud-agent-sdk';
 import type { SendMessagePayload } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@/lib/constants';
@@ -23,6 +24,29 @@ type CloudAgentProviderProps = {
   children: ReactNode;
   organizationId?: string;
 };
+
+function normalizeTransportPayload(payload: TransportSendPayload): SendMessagePayload {
+  // The transport-level SendPromptPayload makes mode/model optional (CLI
+  // live transport accepts them as optional). The cloud-agent worker schema
+  // requires them for prompts, so coerce here and fail loudly if missing.
+  if (payload.type === 'prompt') {
+    if (!payload.mode) throw new Error('Cloud Agent mode is required');
+    if (!payload.model) throw new Error('Cloud Agent model is required');
+    return {
+      type: 'prompt',
+      prompt: payload.prompt,
+      mode: payload.mode,
+      model: payload.model,
+      variant: payload.variant,
+    };
+  }
+
+  return {
+    type: 'command',
+    command: payload.command,
+    arguments: payload.arguments,
+  };
+}
 
 export function CloudAgentProvider({ children, organizationId }: CloudAgentProviderProps) {
   const storeRef = useRef(createStore());
@@ -111,28 +135,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
 
       api: {
         send: async input => {
-          // The transport-level SendPromptPayload makes mode/model optional (CLI
-          // live transport accepts them as optional). The cloud-agent worker
-          // schema requires them for prompts, so coerce here and fail loudly
-          // if missing.
-          let normalizedPayload: SendMessagePayload;
-          if (input.payload.type === 'prompt') {
-            if (!input.payload.mode) throw new Error('Cloud Agent mode is required');
-            if (!input.payload.model) throw new Error('Cloud Agent model is required');
-            normalizedPayload = {
-              type: 'prompt',
-              prompt: input.payload.prompt,
-              mode: input.payload.mode,
-              model: input.payload.model,
-              variant: input.payload.variant,
-            };
-          } else {
-            normalizedPayload = {
-              type: 'command',
-              command: input.payload.command,
-              arguments: input.payload.arguments,
-            };
-          }
+          const normalizedPayload = normalizeTransportPayload(input.payload);
 
           if (organizationId) {
             return trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
@@ -236,7 +239,13 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           | 'build'
           | 'architect'
           | 'custom';
-        const castInput = { ...input, mode: input.mode as AgentMode };
+        const castInput = {
+          ...input,
+          initialPayload: input.initialPayload
+            ? normalizeTransportPayload(input.initialPayload)
+            : undefined,
+          mode: input.mode as AgentMode,
+        };
         const result = organizationId
           ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
               ...castInput,

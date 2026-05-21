@@ -4,6 +4,7 @@ import { kilo_pass_subscriptions } from '@kilocode/db/schema';
 
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
@@ -38,6 +39,9 @@ export async function handleKiloPassSubscriptionEvent(params: {
   }
 
   const { kiloUserId, tier, cadence } = metadata;
+
+  let finalStatus: string | undefined;
+  let finalStreakMonths: number | undefined;
 
   await db.transaction(async tx => {
     await appendKiloPassAuditLog(tx, {
@@ -95,7 +99,13 @@ export async function handleKiloPassSubscriptionEvent(params: {
           provider_subscription_id: subscription.id,
         },
       })
-      .returning({ id: kilo_pass_subscriptions.id });
+      .returning({
+        id: kilo_pass_subscriptions.id,
+        current_streak_months: kilo_pass_subscriptions.current_streak_months,
+      });
+
+    finalStatus = stripeStatus;
+    finalStreakMonths = upserted[0]?.current_streak_months ?? 0;
 
     const kiloPassSubscriptionId = upserted[0]?.id;
 
@@ -122,5 +132,19 @@ export async function handleKiloPassSubscriptionEvent(params: {
         });
       }
     }
+  });
+
+  void reportEvents({
+    events: [
+      {
+        type: 'billing.kilo_pass_changed',
+        data: {
+          kilo_user_id: kiloUserId,
+          tier,
+          status: finalStatus ?? null,
+          streak_months: finalStreakMonths,
+        },
+      },
+    ],
   });
 }

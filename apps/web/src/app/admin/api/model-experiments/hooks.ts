@@ -16,6 +16,11 @@ export function useModelExperiment(id: string | null) {
   });
 }
 
+export function useModelExperimentRequests() {
+  const trpc = useTRPC();
+  return useQuery(trpc.admin.modelExperiments.listRequests.queryOptions());
+}
+
 function useInvalidate() {
   const trpc = useTRPC();
   const qc = useQueryClient();

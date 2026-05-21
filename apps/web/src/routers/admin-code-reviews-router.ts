@@ -8,6 +8,11 @@ import {
 } from '@kilocode/db/schema';
 import * as z from 'zod';
 import { sql, and, gte, lt, eq, isNotNull, desc, ilike, or, inArray, type SQL } from 'drizzle-orm';
+import {
+  reconsiderableCodeReviewWorkCondition,
+  staleQueuedCodeReviewCutoffSql,
+  staleRunningCodeReviewCutoffSql,
+} from '@/lib/code-reviews/dispatch/dispatch-constants';
 
 /**
  * SQL condition that identifies billing/credits errors (402 Payment Required).
@@ -77,9 +82,9 @@ const attemptErrorCategoryExpr = sql<string>`CASE
   ELSE 'Other'
 END`;
 
-const FilterSchema = z.object({
-  startDate: z.string().date(), // ISO date string YYYY-MM-DD
-  endDate: z.string().date(), // ISO date string YYYY-MM-DD
+const FilterSchemaShape = {
+  startDate: z.string().datetime(), // ISO datetime string
+  endDate: z.string().datetime(), // ISO datetime string
   userId: z.string().min(1).optional(), // Filter by specific user
   organizationId: z.string().uuid().optional(), // Filter by specific organization
   ownershipType: z.enum(['all', 'personal', 'organization']).optional().default('all'),
@@ -87,7 +92,43 @@ const FilterSchema = z.object({
     .enum(['final_outcome', 'all_attempts'])
     .optional()
     .default('final_outcome'),
-});
+};
+
+type DateIntervalInput = {
+  startDate: string;
+  endDate: string;
+};
+
+const MAX_TELEMETRY_INTERVAL_MS = 90 * 24 * 60 * 60 * 1000;
+
+function hasAscendingDateInterval(input: DateIntervalInput): boolean {
+  return new Date(input.startDate).getTime() < new Date(input.endDate).getTime();
+}
+
+function hasBoundedDateInterval(input: DateIntervalInput): boolean {
+  return (
+    new Date(input.endDate).getTime() - new Date(input.startDate).getTime() <=
+    MAX_TELEMETRY_INTERVAL_MS
+  );
+}
+
+const intervalOrderValidation = {
+  message: 'Start date must be before end date',
+  path: ['endDate'],
+};
+const intervalLengthValidation = {
+  message: 'Date interval cannot exceed 90 days',
+  path: ['endDate'],
+};
+
+const FilterSchema = z
+  .object(FilterSchemaShape)
+  .refine(hasAscendingDateInterval, intervalOrderValidation)
+  .refine(hasBoundedDateInterval, intervalLengthValidation);
+const ErrorSessionsFilterSchema = z
+  .object({ ...FilterSchemaShape, errorMessage: z.string().min(1) })
+  .refine(hasAscendingDateInterval, intervalOrderValidation)
+  .refine(hasBoundedDateInterval, intervalLengthValidation);
 
 type FilterInput = z.infer<typeof FilterSchema>;
 
@@ -156,6 +197,76 @@ function buildBaseConditions(input: FilterInput): SQL[] {
 }
 
 export const adminCodeReviewsRouter = createTRPCRouter({
+  getQueueHealthStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
+    const ownershipFilter = buildOwnershipFilter(
+      input.userId,
+      input.organizationId,
+      input.ownershipType
+    );
+    const staleQueuedCutoff = staleQueuedCodeReviewCutoffSql();
+    const staleRunningCutoff = staleRunningCodeReviewCutoffSql();
+    const waitingOwnerCondition = reconsiderableCodeReviewWorkCondition(staleQueuedCutoff);
+    const liveQueueCondition = sql`(
+      ${waitingOwnerCondition}
+      OR (
+        ${cloud_agent_code_reviews.status} = 'running'
+        AND COALESCE(
+          ${cloud_agent_code_reviews.started_at},
+          ${cloud_agent_code_reviews.updated_at},
+          ${cloud_agent_code_reviews.created_at}
+        ) < ${staleRunningCutoff}
+      )
+    )`;
+
+    const query = db
+      .select({
+        pending_review_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'pending')`,
+        pending_over_five_minutes_count: sql<number>`COUNT(*) FILTER (
+          WHERE ${cloud_agent_code_reviews.status} = 'pending'
+            AND ${cloud_agent_code_reviews.created_at} < ${staleQueuedCutoff}
+        )`,
+        oldest_pending_age_seconds: sql<number>`COALESCE(
+          MAX(EXTRACT(EPOCH FROM (now() - ${cloud_agent_code_reviews.created_at}))) FILTER (
+            WHERE ${cloud_agent_code_reviews.status} = 'pending'
+          ),
+          0
+        )`,
+        stale_queued_claim_count: sql<number>`COUNT(*) FILTER (
+          WHERE ${cloud_agent_code_reviews.status} = 'queued'
+            AND ${cloud_agent_code_reviews.updated_at} < ${staleQueuedCutoff}
+        )`,
+        running_over_ninety_minutes_count: sql<number>`COUNT(*) FILTER (
+          WHERE ${cloud_agent_code_reviews.status} = 'running'
+            AND COALESCE(
+              ${cloud_agent_code_reviews.started_at},
+              ${cloud_agent_code_reviews.updated_at},
+              ${cloud_agent_code_reviews.created_at}
+            ) < ${staleRunningCutoff}
+        )`,
+        owners_with_waiting_reviews_count: sql<number>`COUNT(DISTINCT CASE
+          WHEN ${cloud_agent_code_reviews.owned_by_organization_id} IS NOT NULL
+            THEN CONCAT('org:', ${cloud_agent_code_reviews.owned_by_organization_id}::text)
+          ELSE CONCAT('user:', ${cloud_agent_code_reviews.owned_by_user_id})
+        END) FILTER (WHERE ${waitingOwnerCondition})`,
+      })
+      .from(cloud_agent_code_reviews);
+
+    const queueHealthCondition = ownershipFilter
+      ? and(liveQueueCondition, ownershipFilter)
+      : liveQueueCondition;
+    const result = await query.where(queueHealthCondition);
+    const stats = result[0];
+
+    return {
+      pendingReviewCount: Number(stats?.pending_review_count) || 0,
+      pendingOverFiveMinutesCount: Number(stats?.pending_over_five_minutes_count) || 0,
+      oldestPendingAgeSeconds: Number(stats?.oldest_pending_age_seconds) || 0,
+      staleQueuedClaimCount: Number(stats?.stale_queued_claim_count) || 0,
+      runningOverNinetyMinutesCount: Number(stats?.running_over_ninety_minutes_count) || 0,
+      ownersWithWaitingReviewsCount: Number(stats?.owners_with_waiting_reviews_count) || 0,
+    };
+  }),
+
   // Get overview KPIs
   getOverviewStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
@@ -473,93 +584,91 @@ export const adminCodeReviewsRouter = createTRPCRouter({
   }),
 
   // Get the 20 most recent sessions for a specific error message pattern (drill-down from error table)
-  getErrorSessions: adminProcedure
-    .input(FilterSchema.extend({ errorMessage: z.string().min(1) }))
-    .query(async ({ input }) => {
-      const { errorMessage } = input;
-      const statusTable =
-        input.retryAccountingMode === 'all_attempts'
-          ? cloud_agent_code_review_attempts
-          : cloud_agent_code_reviews;
-      const errorMessageColumn =
-        input.retryAccountingMode === 'all_attempts'
-          ? cloud_agent_code_review_attempts.error_message
-          : cloud_agent_code_reviews.error_message;
-      const excludeBilling =
-        input.retryAccountingMode === 'all_attempts'
-          ? excludeBillingAttemptErrors
-          : excludeBillingErrors;
+  getErrorSessions: adminProcedure.input(ErrorSessionsFilterSchema).query(async ({ input }) => {
+    const { errorMessage } = input;
+    const statusTable =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts
+        : cloud_agent_code_reviews;
+    const errorMessageColumn =
+      input.retryAccountingMode === 'all_attempts'
+        ? cloud_agent_code_review_attempts.error_message
+        : cloud_agent_code_reviews.error_message;
+    const excludeBilling =
+      input.retryAccountingMode === 'all_attempts'
+        ? excludeBillingAttemptErrors
+        : excludeBillingErrors;
 
-      const conditions = [
-        eq(statusTable.status, 'failed'),
-        excludeBilling,
-        eq(
-          sql`COALESCE(SUBSTRING(${errorMessageColumn} FROM 1 FOR 200), 'Unknown Error')`,
-          errorMessage
-        ),
-        ...buildBaseConditions(input),
-      ] as SQL[];
+    const conditions = [
+      eq(statusTable.status, 'failed'),
+      excludeBilling,
+      eq(
+        sql`COALESCE(SUBSTRING(${errorMessageColumn} FROM 1 FOR 200), 'Unknown Error')`,
+        errorMessage
+      ),
+      ...buildBaseConditions(input),
+    ] as SQL[];
 
-      const query = db
-        .select({
-          review_id: cloud_agent_code_reviews.id,
-          session_id:
-            input.retryAccountingMode === 'all_attempts'
-              ? cloud_agent_code_review_attempts.session_id
-              : cloud_agent_code_reviews.session_id,
-          cli_session_id:
-            input.retryAccountingMode === 'all_attempts'
-              ? cloud_agent_code_review_attempts.cli_session_id
-              : cloud_agent_code_reviews.cli_session_id,
-          attempt_id:
-            input.retryAccountingMode === 'all_attempts'
-              ? cloud_agent_code_review_attempts.id
-              : sql<string | null>`NULL`,
-          attempt_number:
-            input.retryAccountingMode === 'all_attempts'
-              ? cloud_agent_code_review_attempts.attempt_number
-              : sql<number | null>`NULL`,
-          user_id: cloud_agent_code_reviews.owned_by_user_id,
-          org_id: cloud_agent_code_reviews.owned_by_organization_id,
-          error_message: errorMessageColumn,
-          created_at:
-            input.retryAccountingMode === 'all_attempts'
-              ? cloud_agent_code_review_attempts.created_at
-              : cloud_agent_code_reviews.created_at,
-          repo_full_name: cloud_agent_code_reviews.repo_full_name,
-          pr_number: cloud_agent_code_reviews.pr_number,
-        })
-        .from(cloud_agent_code_reviews);
+    const query = db
+      .select({
+        review_id: cloud_agent_code_reviews.id,
+        session_id:
+          input.retryAccountingMode === 'all_attempts'
+            ? cloud_agent_code_review_attempts.session_id
+            : cloud_agent_code_reviews.session_id,
+        cli_session_id:
+          input.retryAccountingMode === 'all_attempts'
+            ? cloud_agent_code_review_attempts.cli_session_id
+            : cloud_agent_code_reviews.cli_session_id,
+        attempt_id:
+          input.retryAccountingMode === 'all_attempts'
+            ? cloud_agent_code_review_attempts.id
+            : sql<string | null>`NULL`,
+        attempt_number:
+          input.retryAccountingMode === 'all_attempts'
+            ? cloud_agent_code_review_attempts.attempt_number
+            : sql<number | null>`NULL`,
+        user_id: cloud_agent_code_reviews.owned_by_user_id,
+        org_id: cloud_agent_code_reviews.owned_by_organization_id,
+        error_message: errorMessageColumn,
+        created_at:
+          input.retryAccountingMode === 'all_attempts'
+            ? cloud_agent_code_review_attempts.created_at
+            : cloud_agent_code_reviews.created_at,
+        repo_full_name: cloud_agent_code_reviews.repo_full_name,
+        pr_number: cloud_agent_code_reviews.pr_number,
+      })
+      .from(cloud_agent_code_reviews);
 
-      const rows =
-        input.retryAccountingMode === 'all_attempts'
-          ? await query
-              .innerJoin(
-                cloud_agent_code_review_attempts,
-                eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
-              )
-              .where(and(...conditions))
-              .orderBy(desc(cloud_agent_code_review_attempts.created_at))
-              .limit(20)
-          : await query
-              .where(and(...conditions))
-              .orderBy(desc(cloud_agent_code_reviews.created_at))
-              .limit(20);
+    const rows =
+      input.retryAccountingMode === 'all_attempts'
+        ? await query
+            .innerJoin(
+              cloud_agent_code_review_attempts,
+              eq(cloud_agent_code_review_attempts.code_review_id, cloud_agent_code_reviews.id)
+            )
+            .where(and(...conditions))
+            .orderBy(desc(cloud_agent_code_review_attempts.created_at))
+            .limit(20)
+        : await query
+            .where(and(...conditions))
+            .orderBy(desc(cloud_agent_code_reviews.created_at))
+            .limit(20);
 
-      return rows.map(row => ({
-        reviewId: row.review_id,
-        sessionId: row.session_id,
-        cliSessionId: row.cli_session_id,
-        attemptId: input.retryAccountingMode === 'all_attempts' ? row.attempt_id : null,
-        attemptNumber: input.retryAccountingMode === 'all_attempts' ? row.attempt_number : null,
-        userId: row.user_id,
-        orgId: row.org_id,
-        errorMessage: row.error_message,
-        createdAt: row.created_at,
-        repoFullName: row.repo_full_name,
-        prNumber: row.pr_number,
-      }));
-    }),
+    return rows.map(row => ({
+      reviewId: row.review_id,
+      sessionId: row.session_id,
+      cliSessionId: row.cli_session_id,
+      attemptId: input.retryAccountingMode === 'all_attempts' ? row.attempt_id : null,
+      attemptNumber: input.retryAccountingMode === 'all_attempts' ? row.attempt_number : null,
+      userId: row.user_id,
+      orgId: row.org_id,
+      errorMessage: row.error_message,
+      createdAt: row.created_at,
+      repoFullName: row.repo_full_name,
+      prNumber: row.pr_number,
+    }));
+  }),
 
   // Get user segmentation (note: this doesn't use filters since it shows top users/orgs for selection)
   getUserSegmentation: adminProcedure.input(FilterSchema).query(async ({ input }) => {

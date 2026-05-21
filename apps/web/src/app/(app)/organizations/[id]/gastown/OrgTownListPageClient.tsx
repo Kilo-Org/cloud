@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { Button } from '@/components/Button';
-import { Badge } from '@/components/ui/badge';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,9 +45,7 @@ export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageC
     <PageContainer>
       <GastownBackdrop contentClassName="p-5 md:p-7">
         <div className="flex flex-col gap-3">
-          <SetPageTitle title="Gas Town">
-            <Badge variant="beta">beta</Badge>
-          </SetPageTitle>
+          <SetPageTitle title="Gas Town" />
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="max-w-2xl text-sm leading-relaxed text-white/60">

@@ -5,6 +5,7 @@ import { db } from '@/lib/drizzle';
 import { sql } from 'drizzle-orm';
 import type { GroupByDimension, GroupedData, HeuristicAnalysisResponse } from '../types';
 import { ABUSE_CLASSIFICATION } from '@/types/AbuseClassification';
+import { parseTimeWindow, timeWindowToInterval } from '../timeWindow';
 
 const DIMENSION_MAPPINGS = {
   day: { sql: 'DATE(created_at)', select: (i: number) => `DATE(created_at) as group_${i}` },
@@ -28,6 +29,8 @@ export async function GET(request: NextRequest): Promise<NextResponse<HeuristicA
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const groupByParam = searchParams.get('groupBy');
+    const timeWindow = parseTimeWindow(searchParams.get('since'));
+    const interval = timeWindowToInterval(timeWindow);
 
     if (!userId) {
       return NextResponse.json({ error: 'userId parameter is required' }, { status: 400 });
@@ -84,6 +87,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<HeuristicA
           END as likely_abuse
       ) computed
       WHERE kilo_user_id = ${userId}
+        ${interval ? sql`AND created_at >= NOW() - ${sql.raw(`INTERVAL '${interval}'`)}` : sql``}
       GROUP BY ${sql.raw(groupByClause)}, computed.likely_abuse
       order by ${sql.raw(orderByClause)}
     `;

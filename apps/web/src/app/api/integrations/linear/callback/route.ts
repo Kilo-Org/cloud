@@ -14,7 +14,7 @@ import {
   revokeLinearToken,
   upsertLinearInstallation,
 } from '@/lib/integrations/linear-service';
-import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { type VerifiedOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
 import { linkKiloUser, unlinkTeamKiloUsers } from '@/lib/bot-identity';
@@ -42,7 +42,18 @@ async function deleteChatSdkLinearIdentityCache(organizationId: string): Promise
   await unlinkTeamKiloUsers(bot.getState(), PLATFORM.LINEAR, organizationId);
 }
 
-function buildLinearRedirectPath(ownerStr: string | null, queryParam: string): string {
+const appendQueryParam = (path: string, queryParam: string): string =>
+  `${path}${path.includes('?') ? '&' : '?'}${queryParam}`;
+
+function buildLinearRedirectPath(
+  state: Pick<VerifiedOAuthState, 'owner' | 'returnTo'> | null,
+  queryParam: string
+): string {
+  if (state?.returnTo) {
+    return appendQueryParam(state.returnTo, queryParam);
+  }
+
+  const ownerStr = state?.owner ?? null;
   if (ownerStr?.startsWith('org_')) {
     return `/organizations/${ownerStr.replace('org_', '')}/integrations/linear?${queryParam}`;
   }
@@ -243,7 +254,6 @@ export async function GET(request: NextRequest) {
     // reuse the resulting owner string without re-running HMAC verification
     // on every error branch.
     const verified = state ? verifyOAuthState(state) : null;
-    const verifiedOwner = verified?.owner ?? null;
 
     if (error) {
       captureMessage('Linear OAuth error', {
@@ -252,7 +262,7 @@ export async function GET(request: NextRequest) {
         extra: { error, state },
       });
       return NextResponse.redirect(
-        new URL(buildLinearRedirectPath(verifiedOwner, `error=${error}`), APP_URL)
+        new URL(buildLinearRedirectPath(verified, `error=${encodeURIComponent(error)}`), APP_URL)
       );
     }
 
@@ -263,7 +273,7 @@ export async function GET(request: NextRequest) {
         extra: { state, allParams: Object.fromEntries(searchParams.entries()) },
       });
       return NextResponse.redirect(
-        new URL(buildLinearRedirectPath(verifiedOwner, 'error=missing_code'), APP_URL)
+        new URL(buildLinearRedirectPath(verified, 'error=missing_code'), APP_URL)
       );
     }
 
@@ -342,17 +352,15 @@ export async function GET(request: NextRequest) {
         await linearAdapter.deleteInstallation(organizationId);
         await unlinkTeamKiloUsers(bot.getState(), PLATFORM.LINEAR, organizationId);
         return NextResponse.redirect(
-          new URL(
-            buildLinearRedirectPath(verifiedOwner, 'error=workspace_already_connected'),
-            APP_URL
-          )
+          new URL(buildLinearRedirectPath(verified, 'error=workspace_already_connected'), APP_URL)
         );
       }
       throw error;
     }
 
-    const successPath =
-      owner.type === 'org'
+    const successPath = verified.returnTo
+      ? appendQueryParam(verified.returnTo, 'success=linear_installed')
+      : owner.type === 'org'
         ? `/organizations/${owner.id}/integrations/linear?success=installed`
         : `/integrations/linear?success=installed`;
 
@@ -360,7 +368,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     const searchParams = request.nextUrl.searchParams;
     const state = searchParams.get('state');
-    const verifiedOwner = state ? (verifyOAuthState(state)?.owner ?? null) : null;
+    const verified = state ? verifyOAuthState(state) : null;
 
     captureException(error, {
       tags: {
@@ -374,7 +382,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.redirect(
-      new URL(buildLinearRedirectPath(verifiedOwner, 'error=installation_failed'), APP_URL)
+      new URL(buildLinearRedirectPath(verified, 'error=installation_failed'), APP_URL)
     );
   }
 }

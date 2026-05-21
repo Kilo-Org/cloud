@@ -2,7 +2,7 @@
 /**
  * Probe the kiloclaw rollout bucketing end-to-end.
  *
- * Reads KILOCLAW_API_URL + KILOCLAW_INTERNAL_API_SECRET from .env.local,
+ * Reads KILOCLAW_API_URL + INTERNAL_API_SECRET from .env.local,
  * finds a synthetic instanceId that falls below the candidate's percent,
  * and hits GET /versions/latest twice — once with that in-cohort UUID and
  * once with a random (likely out-of-cohort) UUID. Prints both responses.
@@ -42,9 +42,9 @@ const BASE_URL = 'http://localhost:8795';
 
 const envPath = resolve(process.cwd(), '.env.local');
 const env = { ...loadEnvFromFile(envPath), ...process.env };
-const secret = env.KILOCLAW_INTERNAL_API_SECRET;
+const secret = env.INTERNAL_API_SECRET;
 if (!secret) {
-  console.error('KILOCLAW_INTERNAL_API_SECRET not found in .env.local or env');
+  console.error('INTERNAL_API_SECRET not found in .env.local or env');
   process.exit(1);
 }
 

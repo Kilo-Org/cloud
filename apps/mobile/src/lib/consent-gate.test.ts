@@ -28,7 +28,7 @@ describe('consent gate', () => {
   it('returns accepted when the current consent version is stored', async () => {
     const { CURRENT_CONSENT_VERSION } = await import('./consent');
     const { checkConsentGate } = await import('./consent-gate');
-    store.set('consent-accepted-user-1', String(CURRENT_CONSENT_VERSION));
+    store.set('consent-accepted-user1', String(CURRENT_CONSENT_VERSION));
 
     expect(await checkConsentGate('user-1')).toEqual({ status: 'accepted' });
   });

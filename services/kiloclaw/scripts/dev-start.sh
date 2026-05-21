@@ -294,14 +294,15 @@ else
   SYNC_WARNINGS=$((SYNC_WARNINGS + 1))
 fi
 
-# KILOCLAW_INTERNAL_API_SECRET → KILOCLAW_INTERNAL_API_SECRET
-INTERNAL_SECRET_VAL="$(env_local_val KILOCLAW_INTERNAL_API_SECRET)"
+# INTERNAL_API_SECRET → INTERNAL_API_SECRET
+INTERNAL_SECRET_VAL="$(env_local_val INTERNAL_API_SECRET)"
 if [ -n "$INTERNAL_SECRET_VAL" ]; then
-  sed "s|^KILOCLAW_INTERNAL_API_SECRET=.*|KILOCLAW_INTERNAL_API_SECRET=$INTERNAL_SECRET_VAL|" \
+  set_or_append_dev_var INTERNAL_API_SECRET "$INTERNAL_SECRET_VAL" false
+  sed '/^KILOCLAW_INTERNAL_API_SECRET=/d' \
     "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
   mv "$KILOCLAW_DIR/.dev.vars.tmp" "$KILOCLAW_DIR/.dev.vars"
 else
-  echo "    WARNING: KILOCLAW_INTERNAL_API_SECRET not found in .env.local — platform API auth will fail"
+  echo "    WARNING: INTERNAL_API_SECRET not found in .env.local — platform API auth will fail"
   SYNC_WARNINGS=$((SYNC_WARNINGS + 1))
 fi
 

@@ -390,7 +390,7 @@ export async function handlePullRequestCodeReview(
       logExceptInTest(`Dispatch attempt for ${repository.full_name}#${pull_request.number}`, {
         reviewId,
         dispatched: dispatchResult.dispatched,
-        pending: dispatchResult.pending,
+        notDispatched: dispatchResult.notDispatched,
         activeCount: dispatchResult.activeCount,
       });
     } catch (dispatchError) {

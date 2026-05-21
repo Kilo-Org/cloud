@@ -32,9 +32,13 @@ function generateWebhookSecret(): string {
 }
 
 function buildGitLabRedirectPath(
-  state: Pick<VerifiedGitLabOAuthState, 'owner'> | null | undefined,
+  state: Pick<VerifiedGitLabOAuthState, 'owner' | 'returnTo'> | null | undefined,
   queryParams: string
 ): string {
+  if (state?.returnTo) {
+    return `${state.returnTo}${state.returnTo.includes('?') ? '&' : '?'}${queryParams}`;
+  }
+
   if (state?.owner.type === 'org') {
     return `/organizations/${state.owner.id}/integrations/gitlab?${queryParams}`;
   }
@@ -240,8 +244,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const successPath =
-      owner.type === 'org'
+    const successPath = verifiedState.returnTo
+      ? `${verifiedState.returnTo}${verifiedState.returnTo.includes('?') ? '&' : '?'}success=gitlab_connected`
+      : owner.type === 'org'
         ? `/organizations/${owner.id}/integrations/gitlab?success=connected`
         : `/integrations/gitlab?success=connected`;
 

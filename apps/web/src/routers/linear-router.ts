@@ -14,6 +14,11 @@ import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-midd
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { validateReturnPath } from '@/lib/integrations/validate-return-path';
+
+const oauthUrlInput = z
+  .object({ organizationId: z.string().uuid().optional(), returnTo: z.string().optional() })
+  .optional();
 
 // Dynamic import to avoid a circular dependency with @/lib/bot (which imports
 // the bot-platform registry, which imports this router's service layer).
@@ -69,7 +74,7 @@ export const linearRouter = createTRPCRouter({
     };
   }),
 
-  getOAuthUrl: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
+  getOAuthUrl: baseProcedure.input(oauthUrlInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
       await requireActiveSubscriptionOrTrial(input.organizationId);
@@ -77,7 +82,8 @@ export const linearRouter = createTRPCRouter({
     const statePrefix = input?.organizationId
       ? `org_${input.organizationId}`
       : `user_${ctx.user.id}`;
-    const state = createOAuthState(statePrefix, ctx.user.id);
+    const returnTo = input?.returnTo ? validateReturnPath(input.returnTo) : undefined;
+    const state = createOAuthState(statePrefix, ctx.user.id, returnTo ?? undefined);
     return { url: linearService.getLinearOAuthUrl(state) };
   }),
 

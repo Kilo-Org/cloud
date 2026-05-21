@@ -8,6 +8,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import type { Env, FixTicket, FixRequest, ClassificationResult } from './types';
+import { buildAutoFixPrCallbackTarget, type AutoFixPrCallbackTarget } from './callback-target';
 import { buildPRPrompt, buildReviewCommentPrompt } from './services/prompt-builder';
 import { CloudAgentNextClient } from './services/cloud-agent-next-client';
 
@@ -147,8 +148,12 @@ export class AutoFixOrchestrator extends DurableObject<Env> {
     const githubToken = configData.githubToken;
     const config = configData.config;
 
-    // Build callback URL for Cloud Agent
-    const callbackUrl = `${this.env.API_URL}/api/internal/auto-fix/pr-callback`;
+    // Build callback target for Cloud Agent
+    const callbackTarget = await buildAutoFixPrCallbackTarget({
+      apiUrl: this.env.API_URL,
+      ticketId: this.state.ticketId,
+      callbackTokenSecret: this.env.CALLBACK_TOKEN_SECRET,
+    });
 
     // Determine if this is a review comment trigger
     const isReviewCommentFix = this.state.triggerSource === 'review_comment';
@@ -208,7 +213,7 @@ export class AutoFixOrchestrator extends DurableObject<Env> {
       prompt,
       model: config.model_slug,
       githubToken,
-      callbackUrl,
+      callbackTarget,
       upstreamBranch: reviewCommentUpstreamBranch,
     });
   }
@@ -217,7 +222,7 @@ export class AutoFixOrchestrator extends DurableObject<Env> {
     prompt: string;
     model: string;
     githubToken?: string;
-    callbackUrl: string;
+    callbackTarget: AutoFixPrCallbackTarget;
     upstreamBranch?: string;
   }): Promise<void> {
     const cloudAgentBaseUrl = this.getCloudAgentBaseUrl();
@@ -239,19 +244,14 @@ export class AutoFixOrchestrator extends DurableObject<Env> {
       autoCommit: true,
       createdOnPlatform: 'autofix',
       ...(params.upstreamBranch ? { upstreamBranch: params.upstreamBranch } : {}),
-      callbackTarget: {
-        url: params.callbackUrl,
-        headers: {
-          'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
-        },
-      },
+      callbackTarget: params.callbackTarget,
     };
 
     console.log('[AutoFixOrchestrator] Preparing auto-fix session in cloud-agent-next', {
       ticketId: this.state.ticketId,
       triggerSource: this.state.triggerSource,
       cloudAgentBaseUrl,
-      callbackUrl: params.callbackUrl,
+      callbackUrl: params.callbackTarget.url,
       upstreamBranch: params.upstreamBranch,
       internalKeyLength: internalApiKey.length,
     });

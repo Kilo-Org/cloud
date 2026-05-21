@@ -4,13 +4,23 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 
 export type FilterParams = {
+  /** Inclusive ISO datetime lower bound for telemetry queries. */
   startDate: string;
+  /** Exclusive ISO datetime upper bound for telemetry queries. */
   endDate: string;
   userId?: string;
   organizationId?: string;
   ownershipType?: 'all' | 'personal' | 'organization';
   retryAccountingMode?: 'final_outcome' | 'all_attempts';
 };
+
+export function useCodeReviewQueueHealthStats(params: FilterParams) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.admin.codeReviews.getQueueHealthStats.queryOptions(params),
+    enabled: Boolean(params.startDate && params.endDate),
+  });
+}
 
 export function useCodeReviewOverviewStats(params: FilterParams) {
   const trpc = useTRPC();

@@ -57,6 +57,7 @@ import {
 import { enqueueImpactSaleReversalForCharge } from '@/lib/affiliate-events';
 import { markPersonalKiloClawReferralPaymentAdverse } from '@/lib/kiloclaw-referrals';
 import { invoiceLooksLikeKiloClawByPriceId } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import {
   STRIPE_TEAMS_MONTHLY_PRICE_ID,
   STRIPE_TEAMS_ANNUAL_PRICE_ID,
@@ -595,6 +596,26 @@ async function handlePaymentMethodEvent(
       .where(
         and(eq(payment_methods.stripe_id, paymentMethod.id), eq(payment_methods.user_id, user.id))
       );
+    void reportEvents({
+      events: [
+        {
+          type: 'stripe.payment_method.detached',
+          occurred_at: event.created * 1000,
+          data: { id: event.id, type: event.type, customer: paymentMethod.customer },
+        },
+      ],
+    });
+  } else if (event.type === 'payment_method.attached') {
+    await ensurePaymentMethodStored(user.id, paymentMethod);
+    void reportEvents({
+      events: [
+        {
+          type: 'stripe.payment_method.attached',
+          occurred_at: event.created * 1000,
+          data: { id: event.id, type: event.type, customer: paymentMethod.customer },
+        },
+      ],
+    });
   } else {
     await ensurePaymentMethodStored(user.id, paymentMethod);
   }
@@ -791,6 +812,17 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
     case 'charge.dispute.created': {
       const dispute = event.data.object;
+
+      void reportEvents({
+        events: [
+          {
+            type: 'stripe.charge.dispute.created',
+            occurred_at: event.created * 1000,
+            data: { id: event.id, type: event.type },
+          },
+        ],
+      });
+
       const chargeId =
         typeof dispute.charge === 'string' ? dispute.charge : (dispute.charge?.id ?? null);
       if (!chargeId) {
@@ -1049,6 +1081,58 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         });
       });
 
+      break;
+    }
+
+    case 'charge.dispute.funds_withdrawn': {
+      void reportEvents({
+        events: [
+          {
+            type: 'stripe.charge.dispute.funds_withdrawn',
+            occurred_at: event.created * 1000,
+            data: { id: event.id, type: event.type },
+          },
+        ],
+      });
+      break;
+    }
+
+    case 'radar.early_fraud_warning.created': {
+      void reportEvents({
+        events: [
+          {
+            type: 'stripe.radar.early_fraud_warning.created',
+            occurred_at: event.created * 1000,
+            data: { id: event.id, type: event.type },
+          },
+        ],
+      });
+      break;
+    }
+
+    case 'charge.failed': {
+      void reportEvents({
+        events: [
+          {
+            type: 'stripe.charge.failed',
+            occurred_at: event.created * 1000,
+            data: { id: event.id, type: event.type, customer: event.data.object.customer },
+          },
+        ],
+      });
+      break;
+    }
+
+    case 'payment_intent.succeeded': {
+      void reportEvents({
+        events: [
+          {
+            type: 'stripe.payment_intent.succeeded',
+            occurred_at: event.created * 1000,
+            data: { id: event.id, type: event.type, customer: event.data.object.customer },
+          },
+        ],
+      });
       break;
     }
 

@@ -29,6 +29,7 @@ export function SecretEntrySection({
   isDirty,
   actionRowExtra,
   actionRowInlineExtra,
+  statusInlineExtra,
   defaultOpen,
   onRedeploy,
   redeployLabel = 'Redeploy',
@@ -41,6 +42,7 @@ export function SecretEntrySection({
   isDirty: boolean;
   actionRowExtra?: React.ReactNode;
   actionRowInlineExtra?: React.ReactNode;
+  statusInlineExtra?: React.ReactNode;
   defaultOpen?: boolean;
   onRedeploy?: () => void;
   /** Label for the toast action button. Defaults to "Redeploy". */
@@ -190,6 +192,7 @@ export function SecretEntrySection({
                   >
                     {configured ? 'Configured' : 'Not configured'}
                   </Badge>
+                  {statusInlineExtra}
                   {(formatError || isDirty) && (
                     <Tooltip>
                       <TooltipTrigger asChild>

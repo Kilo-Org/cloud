@@ -38,6 +38,23 @@ describe('gitlab oauth state', () => {
     });
   });
 
+  test('round-trips a safe return path', () => {
+    const state = createGitLabOAuthState(
+      {
+        owner: { type: 'user', id: 'user_123' },
+        returnTo: '/collab/authorize?services=gitlab&step=0',
+      },
+      'user_123'
+    );
+
+    expect(verifyGitLabOAuthState(state)).toEqual({
+      owner: { type: 'user', id: 'user_123' },
+      instanceUrl: DEFAULT_GITLAB_OAUTH_INSTANCE_URL,
+      returnTo: '/collab/authorize?services=gitlab&step=0',
+      userId: 'user_123',
+    });
+  });
+
   test('rejects tampered state', () => {
     const state = createGitLabOAuthState(
       {

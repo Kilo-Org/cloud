@@ -1600,8 +1600,8 @@ export const microdollar_usage_metadata = pgTable(
   },
   table => [
     index('idx_microdollar_usage_metadata_created_at').on(table.created_at),
-    index('idx_microdollar_usage_metadata_session_id_created_at')
-      .on(table.session_id, table.created_at)
+    index('idx_microdollar_usage_metadata_session_id')
+      .using('btree', table.session_id)
       .where(isNotNull(table.session_id)),
   ]
 );
@@ -2918,6 +2918,28 @@ export const ModelStatsBenchmarksSchema = z
         lastUpdated: z.string().optional(),
       })
       .optional(),
+    kiloBench: z
+      .object({
+        overallScore: z.number(),
+        evals: z.record(
+          z.string(),
+          z.object({
+            taskSource: z.string(),
+            displayName: z.string().optional(),
+            overallScore: z.number(),
+            totalScore: z.number(),
+            avgCostUsd: z.number().nullable(),
+            avgInputTokens: z.number().nullable(),
+            avgOutputTokens: z.number().nullable(),
+            avgCacheReadTokens: z.number().nullable(),
+            avgExecutionMs: z.number().nullable(),
+            nTotalTrials: z.number(),
+            nErrored: z.number(),
+            lastPromotedAt: z.string(),
+          })
+        ),
+      })
+      .optional(),
   })
   .optional();
 
@@ -3018,6 +3040,51 @@ export const modelStats = pgTable(
 
 export type ModelStats = typeof modelStats.$inferSelect;
 export type NewModelStats = typeof modelStats.$inferInsert;
+
+export const model_eval_ingestions = pgTable(
+  'model_eval_ingestions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bench_eval_name: text('bench_eval_name').notNull().unique(),
+    bench_eval_url: text('bench_eval_url').notNull(),
+    provider: text('provider').notNull(),
+    model: text('model').notNull(),
+    model_stats_id: uuid('model_stats_id').references(() => modelStats.id),
+    variant: text('variant'),
+    task_source: text('task_source').notNull(),
+    n_total_trials: integer('n_total_trials').notNull(),
+    total_score: decimal('total_score', { precision: 14, scale: 6, mode: 'number' }).notNull(),
+    overall_score: decimal('overall_score', { precision: 12, scale: 8, mode: 'number' }).notNull(),
+    n_errored: integer('n_errored').notNull(),
+    avg_cost_microdollars: bigint('avg_cost_microdollars', { mode: 'number' }),
+    avg_input_tokens: integer('avg_input_tokens'),
+    avg_output_tokens: integer('avg_output_tokens'),
+    avg_cache_read_tokens: integer('avg_cache_read_tokens'),
+    avg_execution_ms: integer('avg_execution_ms'),
+    promoted_at: timestamp('promoted_at', { withTimezone: true, mode: 'string' }).notNull(),
+    promoted_by_email: text('promoted_by_email').notNull(),
+    promotion_note: text('promotion_note'),
+    created_at: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+  },
+  table => [
+    index('IDX_model_eval_ingestions_lookup').on(
+      table.provider,
+      table.model,
+      table.variant,
+      table.task_source,
+      table.promoted_at
+    ),
+    index('IDX_model_eval_ingestions_model_stats').on(table.model_stats_id),
+    index('IDX_model_eval_ingestions_promoted_by_email_lower').on(
+      sql`LOWER(${table.promoted_by_email})`
+    ),
+  ]
+);
+
+export type ModelEvalIngestion = typeof model_eval_ingestions.$inferSelect;
+export type NewModelEvalIngestion = typeof model_eval_ingestions.$inferInsert;
 
 export const MODELS_BY_PROVIDER_ADMIN_URL = '/admin/sync-providers';
 
@@ -3186,6 +3253,7 @@ export const cloud_agent_code_reviews = pgTable(
 
     // Review status
     status: text().notNull().default('pending'), // 'pending' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
+    dispatch_reservation_id: text(),
     error_message: text(),
     terminal_reason: text(),
 
@@ -4749,6 +4817,8 @@ export type NewCloudAgentFeedback = typeof cloud_agent_feedback.$inferInsert;
 
 // ─── KiloClaw (multi-tenant sandbox instances) ──────────────────────
 
+export type KiloClawComposioInstanceConfigSource = 'managed' | 'manual';
+
 export const kiloclaw_instances = pgTable(
   'kiloclaw_instances',
   {
@@ -4783,6 +4853,7 @@ export const kiloclaw_instances = pgTable(
     // set/clear, plus auto-cleared as part of a tier resize.
     // Shape: { size: { cpus, memory_mb, cpu_kind? }, reason, actorId, actorEmail, setAt }.
     admin_size_override: jsonb(),
+    composio_config_source: text().$type<KiloClawComposioInstanceConfigSource>(),
   },
   table => [
     // One active instance per user+sandbox combination.
@@ -4821,6 +4892,10 @@ export const kiloclaw_instances = pgTable(
     index('IDX_kiloclaw_instances_admin_size_override')
       .on(table.id)
       .where(sql`${table.admin_size_override} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
+    check(
+      'kiloclaw_instances_composio_config_source_check',
+      sql`${table.composio_config_source} IS NULL OR ${table.composio_config_source} IN ('managed', 'manual')`
+    ),
   ]
 );
 
@@ -4893,6 +4968,69 @@ export const kiloclaw_google_oauth_connections = pgTable(
 export type KiloClawGoogleOAuthConnection = typeof kiloclaw_google_oauth_connections.$inferSelect;
 export type NewKiloClawGoogleOAuthConnection =
   typeof kiloclaw_google_oauth_connections.$inferInsert;
+
+export type KiloClawComposioIdentityOwnerType = 'user' | 'organization_user';
+export type KiloClawComposioIdentityStatus = 'pending' | 'active' | 'revoked';
+
+export const kiloclaw_composio_identities = pgTable(
+  'kiloclaw_composio_identities',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owner_type: text().$type<KiloClawComposioIdentityOwnerType>().notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id),
+    organization_id: uuid().references(() => organizations.id),
+    status: text().$type<KiloClawComposioIdentityStatus>().default('pending').notNull(),
+    composio_agent_key_encrypted: text(),
+    composio_user_api_key_encrypted: text(),
+    composio_api_key_encrypted: text(),
+    composio_org_id: text(),
+    composio_org_name: text(),
+    composio_project_id: text(),
+    composio_consumer_user_id: text(),
+    google_calendar_connected_account_id: text(),
+    composio_agent_email: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    uniqueIndex('UQ_kiloclaw_composio_identities_current_user')
+      .on(table.user_id)
+      .where(sql`${table.owner_type} = 'user' AND ${table.revoked_at} IS NULL`),
+    uniqueIndex('UQ_kiloclaw_composio_identities_current_org_user')
+      .on(table.organization_id, table.user_id)
+      .where(sql`${table.owner_type} = 'organization_user' AND ${table.revoked_at} IS NULL`),
+    index('IDX_kiloclaw_composio_identities_user').on(table.user_id),
+    index('IDX_kiloclaw_composio_identities_organization').on(table.organization_id),
+    check(
+      'kiloclaw_composio_identities_owner_type_check',
+      sql`${table.owner_type} IN ('user', 'organization_user')`
+    ),
+    check(
+      'kiloclaw_composio_identities_status_check',
+      sql`${table.status} IN ('pending', 'active', 'revoked')`
+    ),
+    check(
+      'kiloclaw_composio_identities_owner_scope_check',
+      sql`(${table.owner_type} = 'user' AND ${table.organization_id} IS NULL) OR (${table.owner_type} = 'organization_user' AND ${table.organization_id} IS NOT NULL)`
+    ),
+    check(
+      'kiloclaw_composio_identities_active_complete_check',
+      sql`${table.status} <> 'active' OR (${table.composio_agent_key_encrypted} IS NOT NULL AND ${table.composio_user_api_key_encrypted} IS NOT NULL AND ${table.composio_org_id} IS NOT NULL AND ${table.composio_project_id} IS NOT NULL AND ${table.composio_consumer_user_id} IS NOT NULL AND ${table.revoked_at} IS NULL)`
+    ),
+  ]
+);
+
+export type KiloClawComposioIdentity = typeof kiloclaw_composio_identities.$inferSelect;
+export type NewKiloClawComposioIdentity = typeof kiloclaw_composio_identities.$inferInsert;
 
 export const kiloclaw_inbound_email_reserved_aliases = pgTable(
   'kiloclaw_inbound_email_reserved_aliases',
@@ -6186,11 +6324,12 @@ export type ModelExperimentVariantVersion = typeof model_experiment_variant_vers
 export type NewModelExperimentVariantVersion = typeof model_experiment_variant_version.$inferInsert;
 
 // One row per experimented request, keyed on usage_id (1:1 with microdollar_usage).
-// Stores attribution + R2 prompt hashes. The two sha256 columns hold either
-// a 64-char lowercase hex digest pointing at an R2 object, or one of the
-// reserved sentinels: `__absent__` (system only, no leading system message),
-// `__failed__` (R2 storage failed), `__deleted__` (prompt content wiped
-// while retaining attribution).
+// Stores attribution + a single R2 prompt hash for the post-`transformRequest`
+// upstream body. `request_body_sha256` holds either a 64-char lowercase hex
+// digest pointing at an R2 object, or one of the reserved sentinels:
+// `__failed__` (R2 storage failed) or `__deleted__` (prompt content wiped
+// while retaining attribution). `request_kind` records which upstream API
+// shape the body was serialized for.
 export const model_experiment_request = pgTable(
   'model_experiment_request',
   {
@@ -6204,8 +6343,8 @@ export const model_experiment_request = pgTable(
     // 'user' | 'machine' | 'ip'
     allocation_subject: text().notNull(),
     client_request_id: text(),
-    // 64-char lowercase hex sha256, or '__absent__' | '__failed__' | '__deleted__'.
-    system_prompt_sha256: text().notNull(),
+    // 'chat_completions' | 'messages' | 'responses'
+    request_kind: text().notNull(),
     // 64-char lowercase hex sha256, or '__failed__' | '__deleted__'.
     request_body_sha256: text().notNull(),
     was_truncated: boolean().notNull().default(false),
@@ -6224,8 +6363,8 @@ export const model_experiment_request = pgTable(
       sql`${table.allocation_subject} IN ('user', 'machine', 'ip')`
     ),
     check(
-      'model_experiment_request_system_prompt_sha256_format',
-      sql`${table.system_prompt_sha256} ~ '^[0-9a-f]{64}$' OR ${table.system_prompt_sha256} IN ('__absent__', '__failed__', '__deleted__')`
+      'model_experiment_request_request_kind_valid',
+      sql`${table.request_kind} IN ('chat_completions', 'messages', 'responses')`
     ),
     check(
       'model_experiment_request_request_body_sha256_format',

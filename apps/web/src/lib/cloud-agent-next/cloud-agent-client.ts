@@ -92,6 +92,7 @@ export type AgentMode = string;
 /** Input for prepareSession procedure */
 export type PrepareSessionInput = {
   prompt: string;
+  initialPayload?: SendMessagePayload;
   mode: AgentMode;
   model: string;
   variant?: string;
@@ -271,8 +272,10 @@ export type GetSessionOutput = {
   preparedAt?: number;
   initiatedAt?: number;
 
-  // Callback configuration (debug-friendly, URL + headers)
-  callbackTarget?: CallbackTarget;
+  // Callback configuration is intentionally NOT exposed: the stored target
+  // may carry service-to-service auth headers (e.g. X-Internal-Secret used
+  // by Worker callback ingresses), and getSession is reachable by the
+  // session's owning user.
 
   // Initial message ID for correlation
   initialMessageId?: string;

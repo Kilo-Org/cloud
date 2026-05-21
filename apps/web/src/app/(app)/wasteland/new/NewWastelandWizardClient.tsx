@@ -13,7 +13,6 @@ import {
   ChevronDown,
   GitFork,
   Globe,
-  Info,
   Loader2,
   Sparkles,
 } from 'lucide-react';
@@ -46,6 +45,33 @@ import {
   useUpstreamVerification,
   type UpstreamIntent,
 } from '@/components/wasteland/UpstreamIntent';
+import { parseDolthubUpstream } from '@/lib/wasteland/upstream';
+
+/**
+ * Build the canonical post-create URL for a wasteland.
+ *
+ * Personal-scope wastelands route to `/wasteland/{owner}/{repo}` (the
+ * M2.2 path the rest of the product uses). The bare `/wasteland/{id}`
+ * URL would otherwise hit the `[owner]/[repo]` route with the id as the
+ * owner segment and 404. When the upstream string can't be parsed we
+ * fall back to `/wasteland/by-id/{wastelandId}`, the redirect page that
+ * resolves the upstream server-side.
+ *
+ * Org-scope wastelands keep their existing `/organizations/{orgId}/...`
+ * URL — the org wasteland routes have their own id-based pages.
+ */
+function postCreateWastelandPath(args: {
+  wastelandId: string;
+  upstream: string;
+  lockedOrgId: string | null | undefined;
+}): string {
+  if (args.lockedOrgId) {
+    return `/organizations/${args.lockedOrgId}/wasteland/${args.wastelandId}`;
+  }
+  const parsed = parseDolthubUpstream(args.upstream);
+  if (parsed) return `/wasteland/${parsed.owner}/${parsed.repo}`;
+  return `/wasteland/by-id/${args.wastelandId}`;
+}
 
 const NAME_MAX_LENGTH = 128;
 
@@ -144,7 +170,7 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
   const [step, setStep] = useState<Step>('intent');
   const [error, setError] = useState<string | null>(null);
   const [successState, setSuccessState] = useState<SuccessState | null>(null);
-  // Track the wasteland created in `runProvisionAndJoin` so a retry
+  // Track the wasteland created in `runProvision` so a retry
   // after a credential-store / join failure reuses the existing record
   // instead of creating a duplicate. Cleared if the user navigates
   // back to a step that could change the create payload.
@@ -260,32 +286,26 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
   const rigHandleError = getRigHandleError(rigHandle);
   const rigStepValid = rigHandleError === null;
 
-  // Whether this intent runs the join ceremony (commons + connect).
-  // `create` skips join entirely (the createUpstream path already
-  // bootstraps + registers); `reuse` is N/A here (the standalone
-  // wizard never shows the reuse card).
-  const needsJoinCeremony = intent.kind === 'commons' || intent.kind === 'connect';
+  // Whether this intent runs the upstream-bootstrap path (`createUpstream`)
+  // versus the explicit fork-and-register ceremony (`joinWasteland`). Both
+  // paths now go through the same stepper — credentials and rig handle are
+  // required for either flow because both call into a DoltHub-authenticated
+  // mutation. `reuse` is N/A here (the standalone wizard never shows the
+  // reuse card).
+  const isCreateIntent = intent.kind === 'create';
 
-  // The set of steps shown in the stepper, gated by intent.
+  // The set of steps shown in the stepper, gated by intent. The work
+  // step's label changes based on the action; everything else is shared.
   const visibleSteps = useMemo<{ key: Step; label: string }[]>(() => {
-    if (needsJoinCeremony) {
-      return [
-        { key: 'intent', label: 'Wasteland' },
-        { key: 'credentials', label: 'DoltHub' },
-        { key: 'rig', label: 'Rig handle' },
-        { key: 'preview', label: 'Confirm' },
-        { key: 'work', label: 'Joining' },
-        { key: 'success', label: 'Done' },
-      ];
-    }
-    // create path: name → credentials are deferred to settings page,
-    // so we go intent → work → success.
     return [
       { key: 'intent', label: 'Wasteland' },
-      { key: 'work', label: 'Creating' },
+      { key: 'credentials', label: 'DoltHub' },
+      { key: 'rig', label: 'Rig handle' },
+      { key: 'preview', label: 'Confirm' },
+      { key: 'work', label: isCreateIntent ? 'Creating' : 'Joining' },
       { key: 'success', label: 'Done' },
     ];
-  }, [needsJoinCeremony]);
+  }, [isCreateIntent]);
 
   const stepIndex = visibleSteps.findIndex(s => s.key === step);
 
@@ -307,12 +327,14 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
   };
 
   /**
-   * Run the full provision-and-join flow. Called from the preview step
-   * (commons/connect) or directly from the intent step (create).
-   * Wraps in a separate function so the "Retry" button on a failure
-   * can re-invoke without reopening earlier steps.
+   * Run the full provision flow. Both branches start with `createWasteland`
+   * + `storeCredential`; the join branch (commons/connect) finishes with
+   * `joinWasteland`, while the create branch finishes with `createUpstream`
+   * (which bootstraps a brand-new DoltHub repo and registers the caller as
+   * the first rig). Wraps in a separate function so the "Retry" button on
+   * a failure can re-invoke without reopening earlier steps.
    */
-  const runProvisionAndJoin = async () => {
+  const runProvision = async () => {
     setStep('work');
     setError(null);
 
@@ -333,31 +355,30 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
         wastelandId = created.wasteland_id;
         setPendingWastelandId(wastelandId);
       }
-      const wastelandPath = lockedOrgId
-        ? `/organizations/${lockedOrgId}/wasteland/${wastelandId}`
-        : `/wasteland/${wastelandId}`;
+      const wastelandPath = postCreateWastelandPath({
+        wastelandId,
+        upstream,
+        lockedOrgId,
+      });
 
-      if (!needsJoinCeremony) {
-        // create intent — the user still has to wire DoltHub on the
-        // settings page, but the wasteland record is in place.
-        toast.message(
-          'Wasteland created. Connect DoltHub on the settings page to bootstrap the upstream.',
-          { duration: 8000 }
-        );
-        setSuccessState({ wastelandId, wastelandPath, upstream, join: null });
-        setStep('success');
-        return;
-      }
-
-      // 2. Persist DoltHub credentials so the join (and every
-      //    subsequent op) can resolve them deterministically.
+      // 2. Persist DoltHub credentials so the downstream mutation
+      //    (joinWasteland or createUpstream) can resolve them
+      //    deterministically. For the create branch the caller is
+      //    the upstream admin by definition; for commons/connect we
+      //    honour the toggle on the corresponding picker card.
       const tokenToStore = resolveDolthubToken();
       if (!tokenToStore) {
         throw new Error('Connect your DoltHub account or paste an API token to continue.');
       }
-      // intent is commons or connect here (needsJoinCeremony narrowed it).
-      // Both carry an `isUpstreamAdmin` flag from the picker.
-      const isUpstreamAdmin = intent.isUpstreamAdmin;
+      // The standalone wizard's picker never surfaces the `reuse` card,
+      // so `intent.kind` is always `commons | connect | create` here. Pull
+      // the admin flag explicitly per branch so TS narrows correctly.
+      const isUpstreamAdmin =
+        intent.kind === 'create'
+          ? true
+          : intent.kind === 'commons' || intent.kind === 'connect'
+            ? intent.isUpstreamAdmin
+            : false;
       await wastelandClient.wasteland.storeCredential.mutate({
         wastelandId,
         dolthubToken: tokenToStore,
@@ -366,11 +387,21 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
         isUpstreamAdmin,
       });
 
-      // 3. Run the explicit fork-and-register ceremony.
-      const join = await wastelandClient.wasteland.joinWasteland.mutate({
-        wastelandId,
-        rigHandle: rigHandle.trim(),
-      });
+      // 3. Bootstrap the DoltHub repo (create) OR run the explicit
+      //    fork-and-register ceremony (commons/connect).
+      let join: JoinResult | null = null;
+      if (isCreateIntent) {
+        await wastelandClient.wasteland.createUpstream.mutate({
+          wastelandId,
+          upstream,
+          rigHandle: rigHandle.trim(),
+        });
+      } else {
+        join = await wastelandClient.wasteland.joinWasteland.mutate({
+          wastelandId,
+          rigHandle: rigHandle.trim(),
+        });
+      }
 
       void queryClient.invalidateQueries({
         queryKey: trpc.wasteland.listWastelands.queryKey({}),
@@ -391,25 +422,19 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
 
   /**
    * Retry handler from the failure-state preview step.
-   * `runProvisionAndJoin` reuses `pendingWastelandId` when set, so a
-   * retry after a credential-store / join failure does not create a
-   * duplicate wasteland record. `storeCredential` and `joinWasteland`
-   * are themselves idempotent.
+   * `runProvision` reuses `pendingWastelandId` when set, so a retry
+   * after a credential-store / join / create-upstream failure does not
+   * create a duplicate wasteland record. `storeCredential`, `joinWasteland`,
+   * and `createUpstream` are themselves idempotent.
    */
   const handleRetry = () => {
-    void runProvisionAndJoin();
+    void runProvision();
   };
 
   // ── Step transitions ──────────────────────────────────────────────
 
   const goToCredentials = () => {
     if (!intentStepValid) return;
-    if (!needsJoinCeremony) {
-      // Skip straight to provisioning — the create path doesn't
-      // collect credentials in this wizard.
-      void runProvisionAndJoin();
-      return;
-    }
     setStep('credentials');
   };
 
@@ -456,7 +481,7 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
           setIntent={setIntent}
           dolthubUsername={cachedDolthubUsername}
           canContinue={intentStepValid}
-          continueLabel={needsJoinCeremony ? 'Next' : 'Create wasteland'}
+          continueLabel="Next"
           onContinue={goToCredentials}
           isPending={createMutation.isPending}
           commonsDisabled={hasCommonsConnection}
@@ -510,7 +535,7 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
             setError(null);
             setStep('rig');
           }}
-          onJoin={() => void runProvisionAndJoin()}
+          onJoin={() => void runProvision()}
           onRetry={handleRetry}
         />
       )}
@@ -716,15 +741,6 @@ function IntentStep({
           disabled={isPending}
           commonsDisabled={commonsDisabled}
         />
-        {intent.kind === 'create' && (
-          <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            <Info className="mt-0.5 size-3 shrink-0" />
-            <span>
-              We&apos;ll save this intent on your wasteland. Connect DoltHub on the settings page to
-              bootstrap the upstream.
-            </span>
-          </div>
-        )}
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
@@ -992,41 +1008,72 @@ function PreviewStep({
   onJoin: () => void;
   onRetry: () => void;
 }) {
-  if (intent.kind === 'reuse' || intent.kind === 'create') {
-    // Defensive: this step should never render for these intents.
+  if (intent.kind === 'reuse') {
+    // Defensive: the standalone wizard never offers the reuse card.
     return null;
   }
   const upstream = resolveUpstreamFromIntent(intent);
   const slash = upstream.indexOf('/');
   const repo = slash > 0 ? upstream.slice(slash + 1) : upstream;
   const fork = `${dolthubOrg}/${repo}`;
+  const isCreate = intent.kind === 'create';
+
+  const heading = isCreate ? 'Confirm new upstream' : 'Confirm fork target';
+  const introText = isCreate ? (
+    <>
+      Bootstrapping <span className="font-mono text-foreground">{upstream}</span> on DoltHub will:
+    </>
+  ) : (
+    <>
+      Connecting to <span className="font-mono text-foreground">{upstream}</span> will:
+    </>
+  );
+  const primaryActionLabel = isCreate ? 'Create wasteland' : 'Join wasteland';
 
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h2 className="text-lg font-medium text-foreground">Confirm fork target</h2>
+        <h2 className="text-lg font-medium text-foreground">{heading}</h2>
         <p className="text-sm text-muted-foreground">
           Here&apos;s what we&apos;re about to do. Nothing has been written yet.
         </p>
       </div>
 
       <div className="space-y-4 rounded-lg border border-border bg-card px-5 py-4 text-sm">
-        <p className="text-foreground">
-          Connecting to <span className="font-mono text-foreground">{upstream}</span> will:
-        </p>
+        <p className="text-foreground">{introText}</p>
         <ol className="space-y-3 text-muted-foreground">
-          <li className="flex items-start gap-3">
-            <GitFork className="mt-0.5 size-4 shrink-0 text-primary/80" />
-            <span>
-              Fork the upstream to <span className="font-mono text-foreground">{fork}</span> on your
-              DoltHub account.
-            </span>
-          </li>
+          {isCreate ? (
+            <li className="flex items-start gap-3">
+              <GitFork className="mt-0.5 size-4 shrink-0 text-primary/80" />
+              <span>
+                Create the DoltHub repo{' '}
+                <span className="font-mono text-foreground">{upstream}</span> with the wasteland
+                schema applied.
+              </span>
+            </li>
+          ) : (
+            <li className="flex items-start gap-3">
+              <GitFork className="mt-0.5 size-4 shrink-0 text-primary/80" />
+              <span>
+                Fork the upstream to <span className="font-mono text-foreground">{fork}</span> on
+                your DoltHub account.
+              </span>
+            </li>
+          )}
           <li className="flex items-start gap-3">
             <Sparkles className="mt-0.5 size-4 shrink-0 text-primary/80" />
             <span>
-              Register your rig <span className="font-mono text-foreground">{rigHandle}</span> in
-              the upstream via a pull request.
+              {isCreate ? (
+                <>
+                  Register your rig <span className="font-mono text-foreground">{rigHandle}</span>{' '}
+                  as the first upstream contributor.
+                </>
+              ) : (
+                <>
+                  Register your rig <span className="font-mono text-foreground">{rigHandle}</span>{' '}
+                  in the upstream via a pull request.
+                </>
+              )}
             </span>
           </li>
           <li className="flex items-start gap-3">
@@ -1038,8 +1085,9 @@ function PreviewStep({
           </li>
         </ol>
         <p className="border-t border-border pt-3 text-xs text-muted-foreground">
-          Your fork is yours — work you do here stays on your fork until you explicitly publish a
-          PR.
+          {isCreate
+            ? 'You\u2019re the upstream admin from day one. You can invite contributors from wasteland settings.'
+            : 'Your fork is yours \u2014 work you do here stays on your fork until you explicitly publish a PR.'}
         </p>
       </div>
 
@@ -1050,14 +1098,14 @@ function PreviewStep({
           <p className="text-xs text-muted-foreground">
             {/(^|\s)(401|403)(\s|:|$)/.test(error) || /unauthor|forbidden/i.test(error) ? (
               <>
-                If DoltHub rejected the fork, try{' '}
+                If DoltHub rejected the request, try{' '}
                 <a
                   href={`https://dolthub.com/repositories/${upstream}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary underline-offset-4 hover:underline"
                 >
-                  forking it manually
+                  {isCreate ? 'creating it manually' : 'forking it manually'}
                 </a>{' '}
                 first, then click Retry.
               </>
@@ -1080,7 +1128,7 @@ function PreviewStep({
           </Button>
         ) : (
           <Button onClick={onJoin} variant="primary">
-            Join wasteland
+            {primaryActionLabel}
             <ArrowRight className="size-4" />
           </Button>
         )}
@@ -1106,11 +1154,15 @@ function WorkStep({
     <div className="flex flex-col items-center gap-3 py-12 text-center">
       <Loader2 className="size-8 animate-spin text-muted-foreground" />
       <p className="text-sm text-foreground">
-        {isCreate ? 'Creating wasteland…' : 'Joining the wasteland…'}
+        {isCreate ? 'Creating the upstream…' : 'Joining the wasteland…'}
       </p>
       <p className="max-w-md text-xs text-muted-foreground">
         {isCreate ? (
-          <>Setting up the wasteland record. You&apos;ll connect DoltHub on the settings page.</>
+          <>
+            Bootstrapping <span className="font-mono text-foreground">{upstream}</span> on DoltHub
+            and registering rig <span className="font-mono text-foreground">{rigHandle}</span>. This
+            usually takes under a minute.
+          </>
         ) : (
           <>
             Forking <span className="font-mono text-foreground">{upstream}</span> to{' '}
@@ -1136,7 +1188,11 @@ function SuccessStep({
   onDone: () => void;
 }) {
   const { join } = state;
+  const isCreate = intent.kind === 'create';
   const upstreamPath = state.upstream ? `/wasteland/${state.upstream}` : state.wastelandPath;
+  const dolthubRepoUrl = state.upstream
+    ? `https://www.dolthub.com/repositories/${state.upstream}`
+    : null;
 
   return (
     <div className="space-y-6">
@@ -1148,12 +1204,16 @@ function SuccessStep({
               ? join.alreadyJoined
                 ? 'Already joined'
                 : 'Joined the wasteland'
-              : 'Wasteland created'}
+              : isCreate
+                ? 'Wasteland created'
+                : 'Wasteland created'}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {join
               ? 'Your fork is live and your rig is registered upstream.'
-              : 'Connect DoltHub on the settings page to bootstrap the upstream.'}
+              : isCreate
+                ? 'Your DoltHub repo is live and your rig is registered as the first contributor.'
+                : 'Wasteland record is in place.'}
           </p>
         </div>
       </div>
@@ -1201,8 +1261,27 @@ function SuccessStep({
         </dl>
       )}
 
+      {!join && isCreate && dolthubRepoUrl && (
+        <dl className="space-y-3 rounded-lg border border-border bg-card px-5 py-4 text-sm">
+          <div className="flex items-start justify-between gap-3">
+            <dt className="text-muted-foreground">DoltHub repo</dt>
+            <dd className="text-right">
+              <a
+                href={dolthubRepoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-mono text-foreground underline-offset-4 hover:underline"
+              >
+                {state.upstream}
+                <ArrowUpRight className="size-3" />
+              </a>
+            </dd>
+          </div>
+        </dl>
+      )}
+
       <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
-        {intent.kind !== 'create' && state.upstream && (
+        {state.upstream && (
           <Link
             href={upstreamPath}
             className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm text-foreground hover:bg-muted/40"

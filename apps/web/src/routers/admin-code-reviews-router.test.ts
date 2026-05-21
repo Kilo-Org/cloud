@@ -11,13 +11,15 @@ import {
 import { eq } from 'drizzle-orm';
 
 const REPO = `test-org/admin-code-review-wait-${Date.now()}`;
-const START_DATE = '2035-01-01';
-const END_DATE = '2035-01-20';
+const START_DATE = '2035-01-01T00:00:00.000Z';
+const END_DATE = '2035-01-20T00:00:00.000Z';
 
 type ReviewOwner = { type: 'user'; id: string } | { type: 'org'; id: string };
 type FilterInput = {
   startDate: string;
   endDate: string;
+  userId?: string;
+  organizationId?: string;
   ownershipType?: 'all' | 'personal' | 'organization';
   retryAccountingMode?: 'final_outcome' | 'all_attempts';
 };
@@ -35,6 +37,10 @@ function filterInput(overrides: Partial<FilterInput> = {}): FilterInput {
 
 function timestamp(minutesFromDayStart: number): string {
   return new Date(Date.UTC(2035, 0, 10, 0, minutesFromDayStart)).toISOString();
+}
+
+function minutesAgo(minutes: number): string {
+  return new Date(Date.now() - minutes * 60 * 1000).toISOString();
 }
 
 describe('adminCodeReviewsRouter', () => {
@@ -162,6 +168,53 @@ describe('adminCodeReviewsRouter', () => {
     expect(result.p99WaitSeconds).toBeCloseTo(592.8);
     expect(result.maxWaitSeconds).toBeCloseTo(600);
     expect(result.waitWithinFiveMinuteRate).toBeCloseTo(66.67, 1);
+  });
+
+  it('filters sub-day intervals with an inclusive start and exclusive end', async () => {
+    const personalOwner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
+
+    await db
+      .insert(cloud_agent_code_reviews)
+      .values([
+        reviewValues({ owner: personalOwner, status: 'pending', createdAt: timestamp(720) }),
+        reviewValues({ owner: personalOwner, status: 'pending', createdAt: timestamp(750) }),
+        reviewValues({ owner: personalOwner, status: 'pending', createdAt: timestamp(780) }),
+      ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.codeReviews.getOverviewStats(
+      filterInput({ startDate: timestamp(720), endDate: timestamp(780) })
+    );
+
+    expect(result.totalReviews).toBe(2);
+  });
+
+  it('rejects empty telemetry date intervals', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(
+      caller.admin.codeReviews.getOverviewStats(
+        filterInput({ startDate: timestamp(780), endDate: timestamp(780) })
+      )
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('rejects telemetry date intervals longer than 90 days', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const longInterval = filterInput({
+      startDate: '2035-01-01T00:00:00.000Z',
+      endDate: '2035-04-02T00:00:00.000Z',
+    });
+
+    await expect(caller.admin.codeReviews.getOverviewStats(longInterval)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    await expect(
+      caller.admin.codeReviews.getErrorSessions({
+        ...longInterval,
+        errorMessage: 'Container shutdown: SIGTERM',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
   it('counts recovered retries as final outcomes by default and separate attempts in all-attempts mode', async () => {
@@ -319,6 +372,121 @@ describe('adminCodeReviewsRouter', () => {
     expect(organizationTrend.avgSeconds).toBeCloseTo(600);
     expect(organizationTrend.p50Seconds).toBeCloseTo(600);
     expect(organizationTrend.p95Seconds).toBeCloseTo(600);
+  });
+
+  it('reports live queue health independent of date and retry filters while honoring owner filters', async () => {
+    const personalOwner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
+    const organizationOwner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;
+
+    await db.insert(cloud_agent_code_reviews).values([
+      reviewValues({
+        owner: personalOwner,
+        status: 'pending',
+        createdAt: minutesAgo(12),
+      }),
+      reviewValues({
+        owner: personalOwner,
+        status: 'pending',
+        createdAt: minutesAgo(2),
+      }),
+      reviewValues({
+        owner: organizationOwner,
+        status: 'queued',
+        createdAt: minutesAgo(15),
+        updatedAt: minutesAgo(6),
+      }),
+      reviewValues({
+        owner: organizationOwner,
+        status: 'queued',
+        createdAt: minutesAgo(3),
+        updatedAt: minutesAgo(2),
+      }),
+      reviewValues({
+        owner: personalOwner,
+        status: 'running',
+        createdAt: minutesAgo(100),
+        updatedAt: minutesAgo(91),
+        startedAt: minutesAgo(91),
+      }),
+      reviewValues({
+        owner: organizationOwner,
+        status: 'running',
+        createdAt: minutesAgo(10),
+        updatedAt: minutesAgo(2),
+        startedAt: minutesAgo(2),
+      }),
+      reviewValues({
+        owner: organizationOwner,
+        status: 'completed',
+        createdAt: minutesAgo(20),
+        completedAt: minutesAgo(19),
+      }),
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const globalQueue = await caller.admin.codeReviews.getQueueHealthStats(
+      filterInput({ retryAccountingMode: 'all_attempts' })
+    );
+    const personalQueue = await caller.admin.codeReviews.getQueueHealthStats(
+      filterInput({ ownershipType: 'personal' })
+    );
+    const userQueue = await caller.admin.codeReviews.getQueueHealthStats(
+      filterInput({ userId: adminUser.id })
+    );
+    const organizationQueue = await caller.admin.codeReviews.getQueueHealthStats(
+      filterInput({ organizationId: testOrganizationId })
+    );
+
+    expect(globalQueue).toMatchObject({
+      pendingReviewCount: 2,
+      pendingOverFiveMinutesCount: 1,
+      staleQueuedClaimCount: 1,
+      runningOverNinetyMinutesCount: 1,
+      ownersWithWaitingReviewsCount: 2,
+    });
+    expect(globalQueue.oldestPendingAgeSeconds).toBeGreaterThanOrEqual(11 * 60);
+    expect(personalQueue).toMatchObject({
+      pendingReviewCount: 2,
+      pendingOverFiveMinutesCount: 1,
+      staleQueuedClaimCount: 0,
+      runningOverNinetyMinutesCount: 1,
+      ownersWithWaitingReviewsCount: 1,
+    });
+    expect(userQueue).toMatchObject({
+      pendingReviewCount: 2,
+      pendingOverFiveMinutesCount: 1,
+      staleQueuedClaimCount: 0,
+      runningOverNinetyMinutesCount: 1,
+      ownersWithWaitingReviewsCount: 1,
+    });
+    expect(organizationQueue).toMatchObject({
+      pendingReviewCount: 0,
+      pendingOverFiveMinutesCount: 0,
+      staleQueuedClaimCount: 1,
+      runningOverNinetyMinutesCount: 0,
+      ownersWithWaitingReviewsCount: 1,
+    });
+  });
+
+  it('returns zero-valued live queue health when no waiting work exists', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(caller.admin.codeReviews.getQueueHealthStats(filterInput())).resolves.toEqual({
+      pendingReviewCount: 0,
+      pendingOverFiveMinutesCount: 0,
+      oldestPendingAgeSeconds: 0,
+      staleQueuedClaimCount: 0,
+      runningOverNinetyMinutesCount: 0,
+      ownersWithWaitingReviewsCount: 0,
+    });
+  });
+
+  it('requires admin access for live queue health stats', async () => {
+    const caller = await createCallerForUser(regularUser.id);
+
+    await expect(caller.admin.codeReviews.getQueueHealthStats(filterInput())).rejects.toThrow(
+      'Admin access required'
+    );
   });
 
   it('requires admin access for wait time stats', async () => {

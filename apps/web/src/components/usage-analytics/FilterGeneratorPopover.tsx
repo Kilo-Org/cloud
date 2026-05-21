@@ -22,7 +22,7 @@ import {
 import { Check, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DIMENSION_LABELS, type Dimension, type FilterDirection } from './types';
-import type { DateRange, PersonalScope, UsageFilters } from './hooks';
+import { useResolveOrgUsers, type DateRange, type PersonalScope, type UsageFilters } from './hooks';
 import type { Granularity } from './types';
 
 type FilterGeneratorPopoverProps = {
@@ -90,15 +90,37 @@ export function FilterGeneratorPopover({
     enabled: open,
   });
 
-  const suggestions = useMemo(() => {
-    const items = breakdown?.breakdown ?? [];
-    return items
-      .filter(i => i.key)
-      .map(i => ({
-        key: i.key,
-        label: labelForDimensionValue ? labelForDimensionValue(dimension, i.key) : i.key,
-      }));
-  }, [breakdown, dimension, labelForDimensionValue]);
+  const suggestionKeys = useMemo(
+    () => (breakdown?.breakdown ?? []).filter(i => i.key).map(i => i.key),
+    [breakdown]
+  );
+  const userSuggestionIds = useMemo(
+    () => (dimension === 'user' ? suggestionKeys : []),
+    [dimension, suggestionKeys]
+  );
+  const { data: userSuggestionResolution, isLoading: userSuggestionResolutionLoading } =
+    useResolveOrgUsers(organizationId, userSuggestionIds);
+  const isResolvingUserSuggestions =
+    dimension === 'user' && userSuggestionIds.length > 0 && userSuggestionResolutionLoading;
+  const resolvedUsersById = useMemo(
+    () => new Map(userSuggestionResolution?.users.map(user => [user.id, user]) ?? []),
+    [userSuggestionResolution]
+  );
+
+  const suggestions = useMemo(
+    () =>
+      suggestionKeys.map(key => {
+        const resolvedUser = resolvedUsersById.get(key);
+        return {
+          key,
+          label:
+            resolvedUser?.email ||
+            resolvedUser?.name ||
+            (labelForDimensionValue ? labelForDimensionValue(dimension, key) : key),
+        };
+      }),
+    [dimension, labelForDimensionValue, resolvedUsersById, suggestionKeys]
+  );
 
   const activeSet = useMemo(() => {
     const keyFor = (d: Dimension, dir: FilterDirection): keyof UsageFilters => {
@@ -171,7 +193,7 @@ export function FilterGeneratorPopover({
         <Command>
           <CommandInput placeholder={`Search ${DIMENSION_LABELS[dimension].toLowerCase()}…`} />
           <CommandList>
-            {isLoading ? (
+            {isLoading || isResolvingUserSuggestions ? (
               <div className="text-muted-foreground px-2 py-6 text-center text-sm">Loading…</div>
             ) : (
               <>

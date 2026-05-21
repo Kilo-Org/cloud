@@ -17,12 +17,12 @@ setup('authenticate', async ({ page }) => {
   // Navigate to sign in page with fakeUser query param to trigger auto-submit
   await page.goto(`/users/sign_in?fakeUser=${encodeURIComponent(testEmail)}`);
 
-  // Wait for navigation to complete - user will end up on survey, get-started, or profile
+  // Wait for navigation to complete - user will end up on survey, profile, or their org
   await page.waitForURL(
     url =>
       url.pathname === '/customer-source-survey' ||
-      url.pathname === '/get-started' ||
-      url.pathname === '/profile',
+      url.pathname === '/profile' ||
+      url.pathname.startsWith('/organizations/'),
     {
       timeout: 20000,
       waitUntil: 'networkidle',
@@ -32,10 +32,13 @@ setup('authenticate', async ({ page }) => {
   // If we land on the survey page, skip it to complete setup
   if (new URL(page.url()).pathname === '/customer-source-survey') {
     await page.click('button:has-text("Skip")');
-    await page.waitForURL(url => url.pathname === '/get-started' || url.pathname === '/profile', {
-      timeout: 10000,
-      waitUntil: 'networkidle',
-    });
+    await page.waitForURL(
+      url => url.pathname === '/profile' || url.pathname.startsWith('/organizations/'),
+      {
+        timeout: 10000,
+        waitUntil: 'networkidle',
+      }
+    );
   }
 
   // Save the authenticated state (cookies, localStorage, etc.)

@@ -26,9 +26,10 @@ import { useUser } from '@/hooks/useUser';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus, MorningBriefingStatusLite } from '@/lib/kiloclaw/types';
 import { morningBriefingStatusOk } from '@/lib/kiloclaw/types';
-import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
+import { calverAtLeast, cleanVersion, controllerCalverSupports } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import {
+  useClawComposioOnboardingStatus,
   useClawConfig,
   useClawMyPin,
   useClawGoogleSetupCommand,
@@ -1891,6 +1892,7 @@ export function SettingsTab({
   const posthog = usePostHog();
   const { data: user } = useUser();
   const { data: config } = useClawConfig();
+  const { data: composioOnboardingStatus } = useClawComposioOnboardingStatus();
   const { organizationId } = useClawContext();
   const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
   const isRunning = status.status === 'running';
@@ -2004,21 +2006,29 @@ export function SettingsTab({
     cleanVersion(controllerVersion?.version),
     OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION
   );
-  // Optimistic during the version query so we don't briefly flash
-  // "Upgrade required" while loading. Matches the onboarding-flow guard
-  // in `ClawOnboardingFlow.tsx` (`controllerVersionQuery.isPending ||
-  // calverAtLeast(...)`). Important for hook stability too — the editor
-  // returns early when this is false, so a false→true transition mid-
-  // session would otherwise trip the rules-of-hooks check on the next
-  // render.
-  const supportsBriefingInterests =
-    isLoadingControllerVersion ||
-    calverAtLeast(
-      cleanVersion(controllerVersion?.version),
-      MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION
-    );
+  // Fail OPEN: hide the interests editor only when the controller
+  // version is positively parsed as too old, OR the worker reports an
+  // explicit `version: null` (its positive old-controller signal for a
+  // missing `/_kilo/version` route). A still-loading / errored /
+  // unparseable version keeps the editor visible — the worker's
+  // `controller_route_unavailable` 404 on save is the backstop for those,
+  // and a false "Upgrade required" on a current instance is a worse UX.
+  // Hook count stays stable (the editor early-returns on false) since
+  // genuinely-unknown states no longer flip the gate.
+  const supportsBriefingInterests = controllerCalverSupports(
+    controllerVersion?.version,
+    MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION
+  );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
+  const composioManagedConfigured = composioOnboardingStatus?.sandboxConfigSource === 'managed';
+  const composioManagedConnected =
+    composioManagedConfigured && composioOnboardingStatus?.status === 'connected';
+  const composioManualConfigured = composioOnboardingStatus?.sandboxConfigSource === 'manual';
+  const composioConfigured =
+    (configuredSecrets['composio'] ?? false) ||
+    composioManagedConfigured ||
+    composioManualConfigured;
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
   const braveSearchConfigured = configuredSecrets['brave-search'] ?? false;
   // Reflects which provider is actually active. Mirrors controller arbitration
@@ -2052,7 +2062,6 @@ export function SettingsTab({
       : '/api/integrations/google/disconnect';
   }, [organizationId]);
   const canSeeGoogleCalendar = !!user?.is_admin;
-  const canSeeMorningBriefing = !!user?.is_admin;
 
   function handleCycleInboundEmailAddress() {
     mutations.cycleInboundEmailAddress.mutate(undefined, {
@@ -2455,11 +2464,39 @@ export function SettingsTab({
                 <SecretEntrySection
                   key={entry.id}
                   entry={entry}
-                  configured={configuredSecrets[entry.id] ?? false}
+                  configured={composioConfigured}
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
                   onRedeploy={onRedeploy}
+                  statusInlineExtra={
+                    composioManagedConfigured ? (
+                      <Badge
+                        variant="secondary"
+                        className="gap-1 px-1.5 py-0 text-[10px] leading-4"
+                      >
+                        <ShieldCheck className="h-3 w-3" />
+                        Kilo-managed
+                      </Badge>
+                    ) : undefined
+                  }
+                  actionRowExtra={
+                    composioManagedConnected ? (
+                      <p className="text-muted-foreground flex items-start gap-2 text-xs">
+                        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        Google Calendar is connected through Kilo-managed Composio for this OpenClaw
+                        instance. Saving your own Composio credentials here will switch this
+                        instance to manual setup.
+                      </p>
+                    ) : composioManagedConfigured ? (
+                      <p className="text-muted-foreground flex items-start gap-2 text-xs">
+                        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        Kilo-managed Composio is configured for this OpenClaw instance. Reconnect
+                        Google Calendar from onboarding, or save your own Composio credentials here
+                        to switch this instance to manual setup.
+                      </p>
+                    ) : undefined
+                  }
                 />
               ))}
           </div>
@@ -2522,23 +2559,21 @@ export function SettingsTab({
             mutations={mutations}
             onRedeploy={onRedeploy}
           />
-          {canSeeMorningBriefing && (
-            <MorningBriefingCard
-              mutations={mutations}
-              briefingStatus={morningBriefingStatus}
-              isRunning={isRunning}
-              actionsReady={morningBriefingActionsReady}
-              onRequestUpgrade={onRequestUpgrade}
-              supportsInterests={supportsBriefingInterests}
-              userLocation={status.userLocation ?? null}
-              userTimezone={status.userTimezone ?? null}
-              fallbackReadiness={{
-                githubConfigured: configuredSecrets.github ?? false,
-                linearConfigured: configuredSecrets.linear ?? false,
-                webConfigured: braveSearchConfigured || exaSearchConfigured,
-              }}
-            />
-          )}
+          <MorningBriefingCard
+            mutations={mutations}
+            briefingStatus={morningBriefingStatus}
+            isRunning={isRunning}
+            actionsReady={morningBriefingActionsReady}
+            onRequestUpgrade={onRequestUpgrade}
+            supportsInterests={supportsBriefingInterests}
+            userLocation={status.userLocation ?? null}
+            userTimezone={status.userTimezone ?? null}
+            fallbackReadiness={{
+              githubConfigured: configuredSecrets.github ?? false,
+              linearConfigured: configuredSecrets.linear ?? false,
+              webConfigured: braveSearchConfigured || exaSearchConfigured,
+            }}
+          />
         </div>
       </div>
 

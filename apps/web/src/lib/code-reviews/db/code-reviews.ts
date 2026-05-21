@@ -9,6 +9,7 @@ import { db } from '@/lib/drizzle';
 import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
+  kilocode_users,
   microdollar_usage,
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
@@ -17,6 +18,16 @@ import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
+import {
+  activeCodeReviewWorkCondition,
+  reconsiderableCodeReviewWorkCondition,
+  FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS,
+  MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER,
+  MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER,
+  MAX_CONCURRENT_CODE_REVIEWS_PER_ORG,
+  staleQueuedCodeReviewCutoffSql,
+  staleRunningCodeReviewCutoffSql,
+} from '../dispatch/dispatch-constants';
 
 type CodeReviewAttemptStatus = CodeReviewStatus;
 
@@ -50,6 +61,15 @@ type AttemptCallbackFields = {
   terminalReason?: CodeReviewTerminalReason;
   startedAt?: Date;
   completedAt?: Date;
+};
+
+export type DispatchableCodeReviewOwnerCandidate =
+  | { type: 'user'; id: string }
+  | { type: 'org'; id: string };
+
+export type DispatchableCodeReviewOwnerCandidatesResult = {
+  owners: DispatchableCodeReviewOwnerCandidate[];
+  hasMore: boolean;
 };
 
 function isTerminalCodeReviewStatus(status: string): boolean {
@@ -156,6 +176,98 @@ export async function getCodeReviewById(reviewId: string): Promise<CloudAgentCod
     captureException(error, {
       tags: { operation: 'getCodeReviewById' },
       extra: { reviewId },
+    });
+    throw error;
+  }
+}
+
+export async function listDispatchableCodeReviewOwnerCandidates(
+  params: {
+    limit?: number;
+  } = {}
+): Promise<DispatchableCodeReviewOwnerCandidatesResult> {
+  const limit = Math.max(1, Math.min(params.limit ?? 100, 1_000));
+  const staleQueuedCutoff = staleQueuedCodeReviewCutoffSql();
+  const staleRunningCutoff = staleRunningCodeReviewCutoffSql();
+
+  try {
+    const result = await db.execute<{ owner_type: 'user' | 'org'; owner_id: string }>(sql`
+      WITH reconsiderable_work AS (
+        SELECT
+          CASE
+            WHEN ${cloud_agent_code_reviews.owned_by_organization_id} IS NOT NULL THEN 'org'
+            ELSE 'user'
+          END AS owner_type,
+          COALESCE(
+            ${cloud_agent_code_reviews.owned_by_organization_id}::text,
+            ${cloud_agent_code_reviews.owned_by_user_id}
+          ) AS owner_id,
+          MIN(${cloud_agent_code_reviews.created_at}) AS oldest_reconsiderable_at
+        FROM ${cloud_agent_code_reviews}
+        WHERE ${reconsiderableCodeReviewWorkCondition(staleQueuedCutoff)}
+        GROUP BY owner_type, owner_id
+      ), active_work AS (
+        SELECT
+          reconsiderable_work.owner_type,
+          reconsiderable_work.owner_id,
+          COUNT(*) AS active_count
+        FROM ${cloud_agent_code_reviews}
+        INNER JOIN reconsiderable_work
+          ON reconsiderable_work.owner_type = CASE
+            WHEN ${cloud_agent_code_reviews.owned_by_organization_id} IS NOT NULL THEN 'org'
+            ELSE 'user'
+          END
+          AND reconsiderable_work.owner_id = COALESCE(
+            ${cloud_agent_code_reviews.owned_by_organization_id}::text,
+            ${cloud_agent_code_reviews.owned_by_user_id}
+          )
+        WHERE ${activeCodeReviewWorkCondition(staleQueuedCutoff, staleRunningCutoff)}
+        GROUP BY reconsiderable_work.owner_type, reconsiderable_work.owner_id
+      ), capacity_candidates AS (
+        SELECT
+          reconsiderable_work.owner_type,
+          reconsiderable_work.owner_id,
+          reconsiderable_work.oldest_reconsiderable_at,
+          COALESCE(active_work.active_count, 0) AS active_count,
+          CASE
+            WHEN reconsiderable_work.owner_type = 'org'
+              THEN ${MAX_CONCURRENT_CODE_REVIEWS_PER_ORG}::bigint
+            WHEN COALESCE(
+              ${kilocode_users.total_microdollars_acquired},
+              0
+            ) - COALESCE(${kilocode_users.microdollars_used}, 0) > ${FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS}
+              THEN ${MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER}::bigint
+            ELSE ${MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER}::bigint
+          END AS capacity_limit
+        FROM reconsiderable_work
+        LEFT JOIN active_work
+          ON active_work.owner_type = reconsiderable_work.owner_type
+          AND active_work.owner_id = reconsiderable_work.owner_id
+        LEFT JOIN ${kilocode_users}
+          ON reconsiderable_work.owner_type = 'user'
+          AND ${kilocode_users.id} = reconsiderable_work.owner_id
+      )
+      SELECT owner_type, owner_id
+      FROM capacity_candidates
+      WHERE active_count < capacity_limit
+      ORDER BY oldest_reconsiderable_at ASC, owner_type ASC, owner_id ASC
+      LIMIT ${limit + 1}
+    `);
+
+    const hasMore = result.rows.length > limit;
+    const owners = result.rows
+      .slice(0, limit)
+      .map(row =>
+        row.owner_type === 'org'
+          ? ({ type: 'org', id: row.owner_id } satisfies DispatchableCodeReviewOwnerCandidate)
+          : ({ type: 'user', id: row.owner_id } satisfies DispatchableCodeReviewOwnerCandidate)
+      );
+
+    return { owners, hasMore };
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'listDispatchableCodeReviewOwnerCandidates' },
+      extra: { limit },
     });
     throw error;
   }
@@ -747,7 +859,8 @@ export async function updateCodeReviewStatusIfNonTerminal(
     totalTokensIn?: number;
     totalTokensOut?: number;
     totalCostMusd?: number;
-  } = {}
+  } = {},
+  dispatchReservationId?: string
 ): Promise<boolean> {
   try {
     const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
@@ -785,7 +898,10 @@ export async function updateCodeReviewStatusIfNonTerminal(
       .where(
         and(
           eq(cloud_agent_code_reviews.id, reviewId),
-          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
+          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running']),
+          dispatchReservationId
+            ? eq(cloud_agent_code_reviews.dispatch_reservation_id, dispatchReservationId)
+            : undefined
         )
       )
       .returning({ id: cloud_agent_code_reviews.id });
@@ -800,18 +916,23 @@ export async function updateCodeReviewStatusIfNonTerminal(
   }
 }
 
-export async function releaseQueuedReviewClaim(reviewId: string): Promise<boolean> {
+export async function releaseQueuedReviewClaim(
+  reviewId: string,
+  dispatchReservationId: string
+): Promise<boolean> {
   try {
     const released = await db
       .update(cloud_agent_code_reviews)
       .set({
         status: 'pending',
+        dispatch_reservation_id: null,
         updated_at: new Date().toISOString(),
       })
       .where(
         and(
           eq(cloud_agent_code_reviews.id, reviewId),
           eq(cloud_agent_code_reviews.status, 'queued'),
+          eq(cloud_agent_code_reviews.dispatch_reservation_id, dispatchReservationId),
           isNull(cloud_agent_code_reviews.session_id)
         )
       )
@@ -821,7 +942,67 @@ export async function releaseQueuedReviewClaim(reviewId: string): Promise<boolea
   } catch (error) {
     captureException(error, {
       tags: { operation: 'releaseQueuedReviewClaim' },
-      extra: { reviewId },
+      extra: { reviewId, dispatchReservationId },
+    });
+    throw error;
+  }
+}
+
+export async function failReservedQueuedReview(
+  reviewId: string,
+  dispatchReservationId: string,
+  errorMessage: string
+): Promise<boolean> {
+  try {
+    const failed = await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        status: 'failed',
+        error_message: errorMessage,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.id, reviewId),
+          eq(cloud_agent_code_reviews.status, 'queued'),
+          eq(cloud_agent_code_reviews.dispatch_reservation_id, dispatchReservationId)
+        )
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    return failed.length > 0;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'failReservedQueuedReview' },
+      extra: { reviewId, dispatchReservationId },
+    });
+    throw error;
+  }
+}
+
+export async function reviewIsStillReserved(
+  reviewId: string,
+  dispatchReservationId: string
+): Promise<boolean> {
+  try {
+    const [review] = await db
+      .select({ id: cloud_agent_code_reviews.id })
+      .from(cloud_agent_code_reviews)
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.id, reviewId),
+          eq(cloud_agent_code_reviews.status, 'queued'),
+          eq(cloud_agent_code_reviews.dispatch_reservation_id, dispatchReservationId)
+        )
+      )
+      .limit(1);
+
+    return !!review;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'reviewIsStillReserved' },
+      extra: { reviewId, dispatchReservationId },
     });
     throw error;
   }
@@ -1111,6 +1292,7 @@ export async function resetCodeReviewForRetry(reviewId: string): Promise<void> {
       .update(cloud_agent_code_reviews)
       .set({
         status: 'pending',
+        dispatch_reservation_id: null,
         session_id: null,
         cli_session_id: null,
         error_message: null,

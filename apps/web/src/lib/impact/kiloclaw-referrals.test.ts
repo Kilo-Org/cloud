@@ -72,6 +72,7 @@ import {
   sendImpactAdvocateRewardRedemptionPayload,
 } from '@/lib/impact/advocate';
 import { client as stripeClient } from '@/lib/stripe-client';
+import { ImpactReferralPaymentProvider } from '@kilocode/db/schema-types';
 
 const mockIsImpactConfigured = jest.mocked(isImpactConfigured);
 const mockIsImpactAdvocateConfigured = jest.mocked(isImpactAdvocateConfigured);
@@ -604,6 +605,98 @@ describe('kiloclaw referrals', () => {
       expect(reports).toHaveLength(1);
       expect(reports[0].state).toBe('delivered');
       expect(mockSendImpactConversionPayload).toHaveBeenCalledTimes(1);
+    });
+
+    it('scopes conversion identity and report dedupe by payment provider', async () => {
+      const referrer = await insertTestUser({
+        google_user_email: 'provider-scope-referrer@example.com',
+        normalized_email: 'provider-scope-referrer@example.com',
+      });
+      const referee = await insertTestUser({
+        google_user_email: 'provider-scope-referee@example.com',
+        normalized_email: 'provider-scope-referee@example.com',
+      });
+      const opaqueReferralIdentifier = await insertImpactAdvocateParticipant(referrer.id);
+      const sourcePaymentId = 'shared-source-payment-id';
+
+      await insertActivePersonalSubscription(referrer.id);
+      await insertActivePersonalSubscription(referee.id);
+      await db.insert(impact_attribution_touches).values({
+        id: '33333333-3333-4333-8333-333333333333',
+        dedupe_key: 'provider-scope-referral-touch',
+        user_id: referee.id,
+        touch_type: 'referral',
+        provider: 'impact_advocate',
+        opaque_tracking_value: 'sq-cookie',
+        tracking_value_length: 9,
+        is_tracking_value_accepted: true,
+        rs_code: opaqueReferralIdentifier,
+        touched_at: '2026-03-31T00:00:00.000Z',
+        expires_at: '2026-04-30T00:00:00.000Z',
+      });
+
+      const creditsDisposition = await processPersonalKiloClawPaidConversion({
+        userId: referee.id,
+        sourcePaymentId,
+        orderId: sourcePaymentId,
+        paymentProvider: ImpactReferralPaymentProvider.Credits,
+        amount: 9,
+        currencyCode: 'usd',
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+        itemSku: 'price_standard',
+        convertedAt: new Date('2026-04-09T00:00:00.000Z'),
+      });
+      const stripeDisposition = await processPersonalKiloClawPaidConversion({
+        userId: referee.id,
+        sourcePaymentId,
+        orderId: sourcePaymentId,
+        paymentProvider: ImpactReferralPaymentProvider.Stripe,
+        amount: 9,
+        currencyCode: 'usd',
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+        itemSku: 'price_standard',
+        convertedAt: new Date('2026-04-09T00:00:00.000Z'),
+      });
+      const repeatCreditsDisposition = await processPersonalKiloClawPaidConversion({
+        userId: referee.id,
+        sourcePaymentId,
+        orderId: sourcePaymentId,
+        paymentProvider: ImpactReferralPaymentProvider.Credits,
+        amount: 9,
+        currencyCode: 'usd',
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+        itemSku: 'price_standard',
+        convertedAt: new Date('2026-04-09T00:00:00.000Z'),
+      });
+
+      expect(creditsDisposition.conversionId).toEqual(expect.any(String));
+      expect(stripeDisposition.conversionId).toEqual(expect.any(String));
+      expect(stripeDisposition.conversionId).not.toBe(creditsDisposition.conversionId);
+      expect(repeatCreditsDisposition.conversionId).toBe(creditsDisposition.conversionId);
+
+      const conversions = await db
+        .select({
+          id: impact_referral_conversions.id,
+          paymentProvider: impact_referral_conversions.payment_provider,
+        })
+        .from(impact_referral_conversions)
+        .where(eq(impact_referral_conversions.source_payment_id, sourcePaymentId));
+      expect(conversions).toHaveLength(2);
+      expect(conversions.map(conversion => conversion.paymentProvider).sort()).toEqual([
+        ImpactReferralPaymentProvider.Credits,
+        ImpactReferralPaymentProvider.Stripe,
+      ]);
+
+      const reports = await db
+        .select({ dedupeKey: impact_conversion_reports.dedupe_key })
+        .from(impact_conversion_reports);
+      expect(reports.map(report => report.dedupeKey).sort()).toEqual([
+        `impact-referral-sale:kiloclaw:${ImpactReferralPaymentProvider.Credits}:${sourcePaymentId}`,
+        `impact-referral-sale:kiloclaw:${ImpactReferralPaymentProvider.Stripe}:${sourcePaymentId}`,
+      ]);
     });
 
     it('resolves referrers through referral_codes when no participant mapping exists', async () => {

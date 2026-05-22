@@ -3233,6 +3233,42 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
     expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
   });
 
+  it('clears the grace gate for a long-destroyed instance stored as Postgres timestamp text', async () => {
+    // Regression: the grace check is evaluated in SQL, never by parsing the
+    // stored timestamp with the JS `Date` constructor. A row destroyed 60
+    // days ago — written in Postgres native timestamp text, not ISO 8601 —
+    // must clear the 7-day grace gate and reach the destroy handoff.
+    const destroyedAt = new Date(Date.now() - 60 * 86_400_000)
+      .toISOString()
+      .replace('T', ' ')
+      .replace('Z', '+00');
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        destroyed_at: destroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    mockDestroyOrphanVolume.mockResolvedValue({
+      ok: true,
+      flyApp: 'inst-grace',
+      volumeId: VOLUME_ID,
+      volumeName: 'kiloclaw_grace',
+      alreadyGone: false,
+    });
+    const caller = await createCallerForUser(adminUser.id);
+
+    const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
+      instanceId: instance.id,
+      volumeId: VOLUME_ID,
+    });
+
+    expect(result).toMatchObject({ success: true });
+    expect(mockDestroyOrphanVolume).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects when the user has an access-granting subscription', async () => {
     const instanceId = await insertDestroyedInstance({
       destroyedAt: daysAgo(30),

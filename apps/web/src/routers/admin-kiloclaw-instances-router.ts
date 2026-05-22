@@ -4121,17 +4121,22 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           sandbox_id: kiloclaw_instances.sandbox_id,
           organization_id: kiloclaw_instances.organization_id,
           destroyed_at: kiloclaw_instances.destroyed_at,
-          // The latest `destroyed_at` across every destroyed row of this
-          // (user, sandbox). A reprovisioned sandbox has several destroyed
-          // rows sharing one Fly volume; the grace period runs from the most
-          // recent destruction, not whichever row the admin selected.
-          latest_sandbox_destroyed_at: sql<string | null>`(
-            select max(latest.destroyed_at)
-            from ${kiloclaw_instances} as latest
-            where latest.user_id = ${kiloclaw_instances.user_id}
-              and latest.sandbox_id = ${kiloclaw_instances.sandbox_id}
-              and latest.destroyed_at is not null
-          )`,
+          // Whether the orphan-volume grace period has elapsed, evaluated
+          // entirely in Postgres. Grace runs from the LATEST destruction of
+          // this (user, sandbox): a reprovisioned sandbox has several
+          // destroyed rows sharing one Fly volume, so the clock follows the
+          // most recent destruction, not whichever row the admin selected.
+          // Computing this in SQL avoids parsing a database timestamp with
+          // the JS `Date` constructor, whose handling of Postgres timestamp
+          // text differs across the Vercel and Cloudflare runtimes.
+          grace_period_elapsed: sql<boolean>`
+            extract(epoch from (now() - (
+              select max(latest.destroyed_at)
+              from ${kiloclaw_instances} as latest
+              where latest.user_id = ${kiloclaw_instances.user_id}
+                and latest.sandbox_id = ${kiloclaw_instances.sandbox_id}
+                and latest.destroyed_at is not null
+            ))) * 1000 > ${ORPHAN_VOLUME_GRACE_PERIOD_MS}`,
         })
         .from(kiloclaw_instances)
         .where(eq(kiloclaw_instances.id, input.instanceId))
@@ -4152,10 +4157,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
       // 3. Grace period, measured from the latest destruction of this
       //    sandbox — give Fly + the DO sweep time to self-heal first.
-      const now = new Date();
-      const latestDestroyedAt = row.latest_sandbox_destroyed_at ?? row.destroyed_at;
-      const destroyedMsAgo = now.getTime() - new Date(latestDestroyedAt).getTime();
-      if (destroyedMsAgo <= ORPHAN_VOLUME_GRACE_PERIOD_MS) {
+      //    `grace_period_elapsed` is computed by Postgres in the query above;
+      //    `false` or `null` (no destroyed row, already ruled out by gate 2)
+      //    both fail closed.
+      if (row.grace_period_elapsed !== true) {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
           message: 'Instance was destroyed too recently — wait out the 7-day grace period',
@@ -4173,7 +4178,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         organization_id: row.organization_id,
       };
       const { accessGrantingContextKeys, pendingDestructionContextKeys } =
-        await getOrphanVolumeContextProtections(db, [context], now);
+        await getOrphanVolumeContextProtections(db, [context], new Date());
       const contextKey = orphanVolumeSubscriptionContextKey(context);
       if (accessGrantingContextKeys.has(contextKey)) {
         throw new TRPCError({
